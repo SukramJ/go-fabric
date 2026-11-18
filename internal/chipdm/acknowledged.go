@@ -236,20 +236,22 @@ var Acknowledged = []Acknowledgement{
 	// --- (ii) CHIP is right, the snapshot is wrong --------------------------
 	{
 		ClassCHIP, "GroupKeyManagement.GroupKeySetStruct.GroupKeyMulticastPolicy", "conformance", "d", "o",
-		"Matter 1.6.1 deprecates the field (matter.js's own 1.6.1 scrape states D); a matter.js override written when " +
-			"the specification said \"P, M\" forces O for every revision",
+		"matter.js's 1.6.1 scrape and CHIP's data model state D; a matter.js override, by its own comment written when " +
+			"the specification said \"P, M\", forces O for every revision",
 		localOverride + "GroupKeyManagementOverrides.ts; support/models/src/v1.6.1/spec.ts GroupKeySetStruct",
-		"No certification case reads the field. go-fabric's KeySetReadResponse reports field 8 as matter.js's " +
+		"No certification case names the field (grep). go-fabric's KeySetReadResponse reports field 8 as matter.js's " +
 			"GroupKeyManagementServer does while its model defines the field, which a D field still is, so the behaviour " +
-			"stays; CHIP's server omits it. Finding recorded; upstream candidate (gate the override until 1.6.1).",
+			"stays; CHIP's group-key-mgmt-server does not name the field (grep). Finding recorded; upstream candidate " +
+			"(gate the override until 1.6.1).",
 	},
 	{
 		ClassCHIP, "semtag.Label", "conformance", "mfgcode!=null,o", "o",
-		"The specification makes Label mandatory when MfgCode is not null; matter.js relaxes it to O " +
+		"CHIP's data model makes Label mandatory when MfgCode is not null; matter.js relaxes it to O " +
 			"(\"TODO we do not support MfgCode != null\")",
 		localOverride + "semtag.ts",
-		"go-fabric serves no Descriptor TagList (cluster/core/descriptor.go) and ModeSelect's SemanticTagStruct is a " +
-			"different struct, so nothing depends on it. Finding recorded; known upstream TODO.",
+		"Behaviour depends on it where a host enables the Descriptor TagList (cluster/core/descriptor.go " +
+			"EnableTagList, AddTags; off by default): neither refuses a tag with a manufacturer code and no label, which " +
+			"CHIP's data model makes non-conformant. Finding recorded; known upstream TODO.",
 	},
 
 	// --- (iv) the harness excuses it -----------------------------------------

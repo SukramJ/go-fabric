@@ -302,13 +302,13 @@ CHIP marks these cluster ids provisional. A certification run rejects a provisio
 ### (ii) CHIP is right, the snapshot is wrong
 
 - **GroupKeyManagement.GroupKeySetStruct.GroupKeyMulticastPolicy** (conformance): CHIP `d`, snapshot `o` — 1 difference(s).
-  - Why: Matter 1.6.1 deprecates the field (matter.js's own 1.6.1 scrape states D); a matter.js override written when the specification said "P, M" forces O for every revision.
+  - Why: matter.js's 1.6.1 scrape and CHIP's data model state D; a matter.js override, by its own comment written when the specification said "P, M", forces O for every revision.
   - Source: matter.js support/models/src/local/GroupKeyManagementOverrides.ts; support/models/src/v1.6.1/spec.ts GroupKeySetStruct.
-  - Impact: No certification case reads the field. go-fabric's KeySetReadResponse reports field 8 as matter.js's GroupKeyManagementServer does while its model defines the field, which a D field still is, so the behaviour stays; CHIP's server omits it. Finding recorded; upstream candidate (gate the override until 1.6.1).
+  - Impact: No certification case names the field (grep). go-fabric's KeySetReadResponse reports field 8 as matter.js's GroupKeyManagementServer does while its model defines the field, which a D field still is, so the behaviour stays; CHIP's group-key-mgmt-server does not name the field (grep). Finding recorded; upstream candidate (gate the override until 1.6.1).
 - **semtag.Label** (conformance): CHIP `mfgcode!=null,o`, snapshot `o` — 1 difference(s).
-  - Why: The specification makes Label mandatory when MfgCode is not null; matter.js relaxes it to O ("TODO we do not support MfgCode != null").
+  - Why: CHIP's data model makes Label mandatory when MfgCode is not null; matter.js relaxes it to O ("TODO we do not support MfgCode != null").
   - Source: matter.js support/models/src/local/semtag.ts.
-  - Impact: go-fabric serves no Descriptor TagList (cluster/core/descriptor.go) and ModeSelect's SemanticTagStruct is a different struct, so nothing depends on it. Finding recorded; known upstream TODO.
+  - Impact: Behaviour depends on it where a host enables the Descriptor TagList (cluster/core/descriptor.go EnableTagList, AddTags; off by default): neither refuses a tag with a manufacturer code and no label, which CHIP's data model makes non-conformant. Finding recorded; known upstream TODO.
 
 ### (iv) the harness excuses it
 
