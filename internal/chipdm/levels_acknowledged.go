@@ -32,6 +32,20 @@ var LevelAcknowledged = []Acknowledgement{
 		Source: "docs/adr/0030-the-served-surface-is-a-value-under-policies.md decision 5; parity/levels/1.4.json, " +
 			"1.4.1.json, 1.4.2.json",
 	},
+	{
+		// Seen once the cross-check compared the directions apart
+		// (R2-P6-test-2853); classified by fable-6b-w3-items.md D4.
+		Class: ClassCHIP, Path: "*.cluster.0x0201.response.0x01", Property: "presence", Chip: absent, Ours: present,
+		Reason: "GetRelayStatusLogResponse (0x01): matter.js's model at v0.13.0, v0.14.0 and v0.16.0 keeps the " +
+			"response while its request GetRelayStatusLog (0x04) is not in the model — the response's conformance " +
+			"names a command the model does not hold; CHIP's data_model/1.4, 1.4.1 and 1.4.2 hold neither. " +
+			"matter.js's model drops it from v0.17.0",
+		Source: "matter.js packages/model/src/standard/elements/Thermostat.ts:1229-1235 at v0.13.0, " +
+			"thermostat-cluster.element.ts:338 at v0.14.0 and :335 at v0.16.0; parity/levels/1.4.json, " +
+			"1.4.1.json, 1.4.2.json",
+		Impact: "Nothing served depends on it: the cluster definition at the pin has no response 0x01 " +
+			"(parity/levels/1.6.1.json responseCommands [2, 253]). No upstream candidate: matter.js removed it at v0.17.0.",
+	},
 }
 
 // LevelsWithoutDataModel are the levels the cross-check does not compare,
