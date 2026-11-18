@@ -8,7 +8,7 @@ import "testing"
 // TestDecodeUTF8_ReplacesIllFormedLikeTextDecoder pins the matter.js read
 // of an ill-formed UTF-8 string element: DataReader.readUtf8String uses a
 // non-fatal TextDecoder (packages/general/src/util/DataReader.ts:66-68 at
-// 0ceb202d), which replaces each maximal subpart with one U+FFFD.
+// db021da0), which replaces each maximal subpart with one U+FFFD.
 func TestDecodeUTF8_ReplacesIllFormedLikeTextDecoder(t *testing.T) {
 	cases := []struct {
 		name string
@@ -57,7 +57,7 @@ func TestDecoder_IllFormedUTF8StringElement(t *testing.T) {
 // TestBoundedWriters_SmallestFit pins the nullable-bounded writers to
 // matter.js's encoding: the nullable schema wraps a TlvNumber schema
 // whose length follows the value (packages/types/src/tlv/TlvNumber.ts:247-297
-// at 0ceb202d), so 1 goes out as a one-byte integer whatever the type.
+// at db021da0), so 1 goes out as a one-byte integer whatever the type.
 func TestBoundedWriters_SmallestFit(t *testing.T) {
 	writes := map[string]func(*Encoder) error{
 		"Uint8":  func(e *Encoder) error { return e.PutUint8Bounded(AnonymousTag(), 1) },
