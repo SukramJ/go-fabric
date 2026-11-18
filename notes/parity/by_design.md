@@ -5565,7 +5565,7 @@ host's radio.
 
 matter.js's `ThermostatServer` lists MatterScheduleConfiguration as not
 implemented (`packages/node/src/behaviors/thermostat/ThermostatServer.ts:82`
-at `862ad75f`; `:126-128` warns when the feature is enabled), so the
+at `db021da0`; `:126-128` warns when the feature is enabled), so the
 feature's behaviour in `cluster/thermo` (`schedules.go`, `schedules_write.go`,
 the Schedules branch of `atomic.go`) follows connectedhomeip's
 `ThermostatSchedules` at `645b267a` — the harness commit `6170af84` has no
@@ -5592,7 +5592,7 @@ Presets commit refuses to drop a preset a schedule or a transition names,
 INVALID_IN_STATE (`ThermostatClusterPresets.cpp:708-724` at `645b267a`,
 `IsPresetHandleInUseBySchedules`; the file at `6170af84` holds no such check
 in `PrecommitPresets`, `:624` ff.);
-matter.js has no schedules to check. (5) The staged Presets a Schedules write is checked against may be another peer's: the atomic writes follow matter.js (one per peer and attribute), the check follows chip's `IsPresetHandlePresentInPresetsOrPending` (`ThermostatClusterPresets.cpp:480-491` at `645b267a`), and chip has one atomic state per endpoint (a second client's begin is RESOURCE_EXHAUSTED, `ThermostatClusterAtomic.cpp:360-363`; `InAtomicWrite` asks no originator, `:172-191`), so the cross-peer case does not arise there. No reference defines it; a removal the other peer later commits is INVALID_IN_STATE while a schedule names the handle (review II, phase 6a, R2-P6-par-1565). Hosts serve MSCH behind a flag, off by default,
+matter.js has no schedules to check. (5) The staged Presets a Schedules write is checked against may be another peer's: the atomic writes follow matter.js (one per peer and attribute), the check follows chip's `IsPresetHandlePresentInPresetsOrPending` (`ThermostatClusterPresets.cpp:480-491` at `645b267a`), and chip has one atomic state per endpoint (a second client's begin is RESOURCE_EXHAUSTED, `ThermostatClusterAtomic.cpp:360-363` at `645b267a`; `InAtomicWrite` asks no originator, `:172-191`), so the cross-peer case does not arise there. No reference defines it; a removal the other peer later commits is INVALID_IN_STATE while a schedule names the handle (review II, phase 6a, R2-P6-par-1565). Hosts serve MSCH behind a flag, off by default,
 until a live pairing with Apple Home is verified (owner decision
 2026-10-26; the reference bridge's `--thermostat-schedules`). Retire the
 register row when matter.js implements the feature; then reconcile onto
@@ -5622,8 +5622,8 @@ review read and was not re-read; what this entry says of it is unverified.
 
 Review II, phase 6b (2026-11-18, N6a-reg-4, measured): the connectedhomeip
 citations of this entry and of `cluster/thermo` that name `645b267a` hold at
-that commit, the newer one — its diff to the harness commit `6170af84`
-removes the schedules files. At `6170af84`,
+that commit, the newer one (`6170af84` is its ancestor); the schedules
+files were added after the harness commit. At `6170af84`,
 `src/app/clusters/thermostat-server/` has no `ThermostatClusterSchedules.h`,
 `ThermostatClusterSchedules.cpp`, `ScheduleStructWithOwnedMembers.h` or
 `tests/TestThermostatClusterSchedules.cpp` (`git ls-tree`), so a citation of
@@ -5639,7 +5639,8 @@ the virtual `IsPresetHandlePresent` (`ThermostatClusterBase.h:99-103` at
 `645b267a`, the protected constructor at `6170af84`). The atomic-write lines
 hold at `6170af84` at other lines: precommit then commit,
 `ThermostatClusterAtomic.cpp:362-367` (`:442-447` at `645b267a`, choice
-(3)); a failing `SetAtomicWrite` answers RESOURCE_EXHAUSTED, `:318-326`, and
+(3)); a failing `SetAtomicWrite` answers each attribute status
+RESOURCE_EXHAUSTED and the command FAILURE, `:318-326` (`:324`, `:326`), and
 `InAtomicWrite` is `:121-140` — the `645b267a` branch for a write that
 belongs to another client (`:360-363`) is not there in that form.
 

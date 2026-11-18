@@ -92,8 +92,8 @@ func idError(why string) error {
 // command or event id is illegal, every one named — matter.js
 // ValidatedElements #validateSchema, which records a fatal error per
 // illegal id and reports them together
-// (packages/node/src/behavior/cluster/ValidatedElements.ts:190-222 at
-// db021da0).
+// (packages/node/src/behavior/cluster/ValidatedElements.ts:185-225, report
+// :154-177 at db021da0).
 func checkElementIDs(def *Cluster) error {
 	var errs []error
 	named := func(element string, err error) {

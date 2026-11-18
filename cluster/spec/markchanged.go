@@ -45,11 +45,11 @@ type ChangeMarker interface {
 // ([Server.MarkQuietChanged]) rather than directly ([ErrNotReportable]).
 //
 // Mirrors matter.js
-// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:174-209 at
+// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:174-206 at
 // db021da0 (markChanged: the empty list :175-177, an attribute not among
 // the supported ones :184-186, the changesOmitted and quieter refusals
-// :189-200, then datasource.advanceVersion :204 and broadcastChanges
-// :206; Datasource.ts:151 advanceVersion). matter.js also refuses a call
+// :189-200, then datasource.advanceVersion :203 and broadcastChanges
+// :205; Datasource.ts:151 advanceVersion). matter.js also refuses a call
 // before the behavior is initialized (:179-181); a Server exists only
 // constructed, so there is no such state.
 func (s *Server) MarkChanged(attrIDs ...uint32) error {

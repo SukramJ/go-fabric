@@ -2,11 +2,13 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsFeaturesTest.ts
-// at 862ad75f: a GeneralDiagnostics server with a feature selection of its
+// at db021da0: a GeneralDiagnostics server with a feature selection of its
 // own, and the DataModelTest feature held against the node's
 // maxPathsPerInvoke (GeneralDiagnosticsServer.ts:52-53 the default
-// selection, #assertDataModelTest :186-204, run from #online :415,
-// at db021da0).
+// selection, #assertDataModelTest :186-204, run from #online :415). The
+// file's first case ("lets a subclass of a derived type override the
+// extension methods and call super", :34-66) is a TypeScript type-level
+// check and has no Go form.
 //
 // matter.js builds a MockServerNode whose root carries
 // GeneralDiagnosticsServer.with() and a basicInformation.maxPathsPerInvoke,
