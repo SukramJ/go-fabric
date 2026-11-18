@@ -13,7 +13,7 @@ import (
 // TestSessionSubscriptionsChangedHook: the hook fires with the session id
 // when a subscription is added on it and again when it is closed on it,
 // whichever close path; nil detaches it (matter.js SessionManager
-// subscriptionsChanged, SessionsBehavior.ts:53, :75-93 at 862ad75f).
+// subscriptionsChanged, SessionsBehavior.ts:54, :75-93 at db021da0).
 func TestSessionSubscriptionsChangedHook(t *testing.T) {
 	t.Parallel()
 	m := newTestManager(Config{})

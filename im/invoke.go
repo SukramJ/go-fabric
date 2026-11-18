@@ -75,7 +75,7 @@ type InvokeRequest struct {
 	// (BD-Matter-DelayReportData).
 	DelayReportData *DelayReportData
 	// InteractionModelRevision is the request's InteractionModelRevision
-	// (tag 0xFF, TlvInvokeRequest.ts:30 at 862ad75f):
+	// (tag 0xFF, TlvInvokeRequest.ts:30 at db021da0):
 	// [MarshalInvokeRequestTLV] writes it, 0 writing
 	// [MatterInteractionModelRevision]; [UnmarshalInvokeRequestTLV] fills
 	// it, 0 when the field is absent. The server acts on neither.
@@ -392,7 +392,7 @@ func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFie
 	// is the command's INVALID_COMMAND, the rest of the batch
 	// unaffected. Mirrors matter.js
 	// packages/protocol/src/action/server/CommandInvokeResponse.ts:551-562
-	// at 862ad75f (#decodeWithSchema: InvalidCommandError); the
+	// at db021da0 (#decodeWithSchema: InvalidCommandError); the
 	// reader read past it and the request failed as a whole.
 	if notStruct, err := skipNonStructFields(dec, el); notStruct || err != nil {
 		if err != nil {
@@ -968,7 +968,7 @@ func (g *invokeGate) wildcardTarget(endpoint uint16, clusterID, commandID uint32
 // result: its response, or its status. A cluster-specific status goes out
 // under an outer FAILURE whatever the handler named — Matter §7.10.7,
 // matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:448-451
-// at 862ad75f (#addStatus); it went out under the handler's status.
+// at db021da0 (#addStatus); it went out under the handler's status.
 func resultEntry(inv CommandInvocation, res InvokeResult) InvokeResponseEntry {
 	ent := InvokeResponseEntry{
 		Path:          res.Path,

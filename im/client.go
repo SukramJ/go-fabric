@@ -104,7 +104,7 @@ func marshalDataVersionFilter(enc *tlv.Encoder, f DataVersionFilter) {
 // DataVersionFilterSize is the encoded size of f as one member of the
 // DataVersionFilters array — what matter.js's #shortenDataVersionFilters
 // measures with TlvDataVersionFilter.encode
-// (interaction/InteractionMessenger.ts:1181 at 862ad75f).
+// (interaction/InteractionMessenger.ts:1181 at db021da0).
 func DataVersionFilterSize(f DataVersionFilter) int {
 	enc := tlv.NewEncoder()
 	marshalDataVersionFilter(enc, f)
@@ -114,13 +114,13 @@ func DataVersionFilterSize(f DataVersionFilter) int {
 
 // MarshalTLV encodes w as a client sends it. Mirrors matter.js
 // packages/types/src/protocol/messages/TlvWriteRequest.ts:16-27 at
-// 0ceb202d with the request action/request/Write.ts:56-184 builds:
+// db021da0 with the request action/request/Write.ts:62-190 builds:
 // SuppressResponse (0) only when set, TimedRequest (1), WriteRequests (2)
 // of AttributeDataIB — DataVersion (0) when set, Path (1), Data (2)
 // through valueWriter (the attribute's own TLV schema, Write.ts:165-186
-// at 862ad75f) — MoreChunkedMessages (3),
-// which a client sends false (Write.ts:77), and InteractionModelRevision
-// (0xFF).
+// at db021da0) — MoreChunkedMessages (3),
+// which the request builder defaults to false (Write.ts:83), and
+// InteractionModelRevision (0xFF).
 func (w WriteRequest) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWriter) {
 	enc.StartStruct(tlv.AnonymousTag())
 	if w.SuppressResponse {
@@ -147,7 +147,7 @@ func (w WriteRequest) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWri
 // packages/types/src/protocol/messages/TlvTimedRequest.ts:13-17 (Timeout
 // (0) in milliseconds, InteractionModelRevision (0xFF)), as
 // InteractionClientMessenger.sendTimedRequest fills it
-// (interaction/InteractionMessenger.ts:1440-1452 at 862ad75f).
+// (interaction/InteractionMessenger.ts:1440-1452 at db021da0).
 func (r TimedRequest) MarshalTLV(enc *tlv.Encoder) {
 	enc.StartStruct(tlv.AnonymousTag())
 	enc.PutUint(tlv.ContextTag(tagTimedReqTimeout), uint64(r.TimeoutMs))
@@ -361,7 +361,7 @@ type EventDataReader func(path ConcreteEventPath, el tlv.Element, dec *tlv.Decod
 
 // UnmarshalReportDataTLV decodes a ReportDataMessage as a client receives
 // it — matter.js packages/types/src/protocol/messages/TlvDataReport.ts:17-31
-// at 0ceb202d: SubscriptionId (0), AttributeReports (1), EventReports (2),
+// at db021da0: SubscriptionId (0), AttributeReports (1), EventReports (2),
 // MoreChunkedMessages (3), SuppressResponse (4). An AttributeReportIB is
 // a status (AttributeStatusIB) or data (AttributeDataIB: DataVersion (0,
 // optional), Path (1), Data (2), the value read through valueReader); an

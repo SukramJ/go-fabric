@@ -1227,7 +1227,7 @@ func TestTick_UrgentEventAndDirty_OneReport(t *testing.T) {
 // the ceiling below the subscriber's floor: a min=10, max=30 request against
 // a cfg.MaxIntervalCeiling=5 manager is accepted with max=10, as matter.js
 // raises MaxInterval back to the floor after its publisher cap
-// (packages/node/src/node/server/ServerSubscription.ts:324-343 at 862ad75f).
+// (packages/node/src/node/server/ServerSubscription.ts:324-343 at db021da0).
 // The manager's own floor above the capped ceiling still inverts the
 // cadence and is refused with ErrCadenceInvertedAfterClamp.
 func TestSubscribe_PostClampInversion_ErrCadenceInvertedAfterClamp(t *testing.T) {

@@ -292,7 +292,7 @@ func (l *EventLog) raiseCeiling() bool {
 // says (BasicInformation's Leave carries the index of the fabric it left).
 // Mirrors matter.js
 // packages/node/src/behavior/cluster/FabricScopedDataHandler.ts:114-170 at
-// 862ad75f (limitNodeDataToAllowedFabrics: the occurrences of events whose
+// db021da0 (limitNodeDataToAllowedFabrics: the occurrences of events whose
 // access is fabric-scoped or fabric-sensitive, bound to a fabric that is
 // not allowed, are removed), run when a fabric is deleted
 // (ServerEnvironment.ts:186-195). They stayed in the log.

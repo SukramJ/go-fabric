@@ -1006,7 +1006,7 @@ func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath 
 // subject that passes the View pass, which comes first; the event's own
 // read privilege is checked for an event that exists. Mirrors matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts:158-224 at
-// 862ad75f (#addConcrete, core spec §8.4.3.2); such a path used to be
+// db021da0 (#addConcrete, core spec §8.4.3.2); such a path used to be
 // answered with nothing.
 //
 // With this node's id stamped ([WithLocalNodeID]), a concrete path naming

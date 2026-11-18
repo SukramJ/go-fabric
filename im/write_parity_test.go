@@ -292,7 +292,7 @@ func TestWriteParity_InvalidMessage_MalformedTLV(t *testing.T) {
 
 // TestWriteParity_DataVersion_WildcardEndpoint_Ignored mirrors matter.js
 // packages/protocol/src/action/server/AttributeWriteResponse.ts:67-71 at
-// 862ad75f: a write whose wildcard-endpoint path carries a DataVersion is
+// db021da0: a write whose wildcard-endpoint path carries a DataVersion is
 // written, the version ignored — the server stays lenient although Matter
 // §8.9.2.8.1 forbids the client to send it (AttributeWriteResponseTest.ts
 // "writes version mismatch wildcard attribute where mismatch got ignored").

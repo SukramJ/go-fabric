@@ -546,7 +546,7 @@ func HandleWrite(ctx context.Context, d Dispatcher, req WriteRequest) WriteOutco
 		// to, client/interaction/write.go formulateWrite), and the
 		// server stays lenient — matter.js writes a wildcard path without
 		// looking at the version (packages/protocol/src/action/server/AttributeWriteResponse.ts:67-71
-		// at 862ad75f, "dataVersion silently ignored for Wildcard";
+		// at db021da0, "dataVersion silently ignored for Wildcard";
 		// AttributeWriteResponseTest.ts "writes version mismatch wildcard
 		// attribute where mismatch got ignored"). It used to be refused with
 		// InvalidAction, after the client-side guard.

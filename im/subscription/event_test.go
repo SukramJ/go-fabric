@@ -354,7 +354,7 @@ func TestOnEventFired_NonConcretePath_IsNoOp(t *testing.T) {
 // Info event behind its min interval included — and leaves the invoking
 // session's and the other fabrics' subscriptions alone: matter.js
 // Fabric.leave's closeSubscriptions(true) on every session of the fabric
-// (packages/protocol/src/fabric/Fabric.ts:447-457 at 862ad75f).
+// (packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0).
 func TestFlushFabricReportsNowExceptTheInvokingSession(t *testing.T) {
 	t.Parallel()
 	ch := make(chan eventReporterCall, 8)

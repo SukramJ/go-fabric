@@ -124,7 +124,7 @@ const (
 	// DefaultMaxIntervalCeilingSeconds is the publisher's ceiling: one
 	// hour. matter.js: MAX_INTERVAL_PUBLISHER_LIMIT = Hours.one
 	// (packages/node/src/node/server/ServerSubscription.ts:71 at
-	// 862ad75f); chip: kSubscriptionMaxIntervalPublisherLimit.
+	// db021da0); chip: kSubscriptionMaxIntervalPublisherLimit.
 	DefaultMaxIntervalCeilingSeconds = 3600
 	// DefaultTickInterval is the report sweeper's period.
 	DefaultTickInterval = 250 * time.Millisecond
@@ -294,7 +294,7 @@ func (m *Manager) SetOnSubscriptionClosed(fn func(subID uint32)) {
 // "reconnect" broadcast with it, as matter.js's subscriptionsChanged
 // observer does when the subscription isTerminated
 // (packages/protocol/src/protocol/DeviceAdvertiser.ts:174-179 at
-// 862ad75f). Pass nil to detach.
+// db021da0). Pass nil to detach.
 func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32, fabricIndex uint8)) {
 	m.mu.Lock()
 	m.onTerminated = fn
@@ -306,7 +306,7 @@ func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32, fabricIndex 
 // one closed on it by any close path — with the session's id, outside the
 // manager's lock. matter.js's SessionManager raises subscriptionsChanged
 // for both (packages/node/src/behavior/system/sessions/
-// SessionsBehavior.ts:53, :75-93 at 862ad75f). Pass nil to detach.
+// SessionsBehavior.ts:54, :75-93 at db021da0). Pass nil to detach.
 func (m *Manager) SetOnSessionSubscriptionsChanged(fn func(sessionID uint16)) {
 	m.mu.Lock()
 	m.onSessionChanged = fn
@@ -482,7 +482,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// MaxInterval stays >= MinIntervalFloor even when the floor exceeds
 	// the publisher limit (Matter §8.5.3.2). Mirrors matter.js
 	// packages/node/src/node/server/ServerSubscription.ts:324-343 at
-	// 862ad75f (Duration.max(minIntervalFloor, …) around the
+	// db021da0 (Duration.max(minIntervalFloor, …) around the
 	// MAX_INTERVAL_PUBLISHER_LIMIT cap) and chip ReadHandler.cpp, which
 	// accepts the requested MaxInterval; such a request was refused as
 	// inverted after the clamp.
