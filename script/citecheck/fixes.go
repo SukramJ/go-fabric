@@ -67,8 +67,12 @@ func derive(pin tree, results []result) (fixes []fix, owner []ownerCitation, err
 		if c.Bare {
 			continue // a bare part bound to its file is counted, not corrected
 		}
-		base := path.Base(c.Path)
-		tail := base + c.Text[len(c.Path):]
+		written := c.Path // the path as the Go text spells it: an alias stays one
+		if c.Alias != "" {
+			written = c.Alias
+		}
+		base := path.Base(written)
+		tail := base + c.Text[len(written):]
 		switch {
 		case r.hard == "" && r.drift == nil:
 			continue
@@ -82,7 +86,7 @@ func derive(pin tree, results []result) (fixes []fix, owner []ownerCitation, err
 			if pick != "" {
 				suffix := uniqueSuffix(pin.files(), pick)
 				newPath := suffix
-				fixes = append(fixes, fix{File: c.File, Line: c.Line, Old: c.Text, New: newPath + c.Text[len(c.Path):], Reason: "ambiguous: lengthened to " + pick})
+				fixes = append(fixes, fix{File: c.File, Line: c.Line, Old: c.Text, New: newPath + c.Text[len(written):], Reason: "ambiguous: lengthened to " + pick})
 				continue
 			}
 			owner = append(owner, ownerCitation{File: c.File, Line: c.Line, Citation: c.Text, Problem: errAmbiguous, Candidates: r.candidates})

@@ -14,11 +14,14 @@
 //
 // # What it checks
 //
-//  1. Collect. A citation is `<path>.ts:<line>[-<line>]`. A full-line
-//     comment paragraph is read as one text (a path broken after a '/' is
-//     rejoined), every other line on its own; the citation's sentence ends
-//     at a '.', '!' or '?' before white space. A commit the sentence names
-//     checks the citation at that commit instead of the pin — the one
+//  1. Collect. A citation is `<path>.ts:<line>[-<line>]`, or
+//     `<alias>:<line>[-<line>]` for a file the Go code names by an
+//     abbreviation its package defines (citeAliases: DAV is
+//     DeviceAttestationValidator.ts), checked as the file it stands for. A
+//     full-line comment paragraph is read as one text (a path broken after a
+//     '/' is rejoined), every other line on its own; the citation's sentence
+//     ends at a '.', '!' or '?' before white space. A commit the sentence
+//     names checks the citation at that commit instead of the pin — the one
 //     nearest the citation that is a matter.js commit, since a sentence may
 //     name the chip harness commit as well; a sentence naming none is
 //     checked at the pin. A sentence names a commit as `at <sha>` (or `at`
@@ -28,10 +31,10 @@
 //     the wave-4 read) — every form but `at <sha>` only with a letter in the
 //     sha, since they frame plain numbers too: a sha abbreviated to digits
 //     only is skipped there, and the citation is checked at the pin unless
-//     the sentence names another commit. A bare line part
-//     (":12-14") whose nearest reference before it is a .ts file named
-//     without a line, or a part already bound, is bound to that file and
-//     checked as its citation; it is counted on its own (below).
+//     the sentence names another commit. A bare line part (":12-14") whose
+//     nearest reference before it is a .ts file named without a line, or a
+//     part already bound, is bound to that file and checked as its citation;
+//     it is counted on its own (below).
 //  2. Resolve. A packages/… path exactly; a partial path as a unique suffix
 //     of the tree; a bare file name as a unique basename of the tree
 //     (`git ls-tree -r --name-only <sha> -- examples packages support`:

@@ -5,6 +5,7 @@ package main
 
 import (
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -26,8 +27,12 @@ type citation struct {
 	Line int
 	// Text is the citation as written ("DescriptorServer.ts:227-254").
 	Text string
-	// Path is the cited path as written, without the line part.
+	// Path is the cited path as written, without the line part — for a
+	// citation by an alias ([citeAliases]) the path the alias stands for.
 	Path string
+	// Alias is the abbreviation the citation names its file by ("DAV"),
+	// empty for a citation that names the path.
+	Alias string
 	// Lo and Hi are the cited lines (Hi == Lo for a single line).
 	Lo, Hi int
 	// Sha is the commit the citation is checked at, set by run; empty for
@@ -59,6 +64,32 @@ type citation struct {
 
 // citeRE matches a cited TypeScript path and its line or line range.
 var citeRE = regexp.MustCompile(`((?:[A-Za-z0-9_.@-]+/)*[A-Za-z0-9_.@-]*[A-Za-z0-9_@-]\.ts):(\d+)(?:[-–](\d+))?`)
+
+// citeAliases are the abbreviations the Go code cites a matter.js file by,
+// with the path each stands for: `<alias>:<line>[-<line>]` is a citation
+// of that file, checked like one written with the path — at the pin, or at
+// the commit its sentence names. An alias is defined where it is used: the
+// package doc of controller/attestation binds DAV to
+// DeviceAttestationValidator.ts (review II, phase 6b, the wave-4 boundary
+// read).
+var citeAliases = map[string]string{
+	"DAV": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
+}
+
+// aliasRE matches an alias citation; its groups are those of citeRE (the
+// alias, the line, the end of the range), so the two are read alike.
+var aliasRE = regexp.MustCompile(`\b(` + strings.Join(slices.Sorted(maps.Keys(citeAliases)), "|") + `):(\d+)(?:[-–](\d+))?`)
+
+// citeMatches returns the citations of text, those by path and those by an
+// alias, in text order.
+func citeMatches(text string) [][]int {
+	out := citeRE.FindAllStringSubmatchIndex(text, -1)
+	if aliases := aliasRE.FindAllStringSubmatchIndex(text, -1); len(aliases) > 0 {
+		out = append(out, aliases...)
+		sort.Slice(out, func(a, b int) bool { return out[a][0] < out[b][0] })
+	}
+	return out
+}
 
 // The other references a sentence may carry: a bare line part (":108-112",
 // whose file the reader takes from the context, so it is not checked) and
@@ -333,7 +364,7 @@ func collectFile(file, src string) ([]citation, []mention) {
 	var out []citation
 	var ments []mention
 	for _, seg := range segments(src) {
-		matches := citeRE.FindAllStringSubmatchIndex(seg.text, -1)
+		matches := citeMatches(seg.text)
 		paths := filesWithoutLine(seg.text)
 		// The sentences hold a citation or a .ts file named without a line.
 		anchors := make([][2]int, 0, len(matches)+len(paths))
@@ -534,10 +565,13 @@ func collectSentence(file string, seg segment, s, e int, matches [][]int, paths 
 		if m[6] >= 0 {
 			hi, _ = strconv.Atoi(seg.text[m[6]:m[7]])
 		}
-		p := seg.text[m[2]:m[3]]
+		p, alias := seg.text[m[2]:m[3]], ""
+		if full, ok := citeAliases[p]; ok {
+			p, alias = full, p
+		}
 		stems[strings.TrimSuffix(path.Base(p), ".ts")] = true
 		spans = append(spans, span{start: m[0] - s, end: m[1] - s, c: citation{
-			File: file, Line: seg.lines[m[1]-1], Text: seg.text[m[0]:m[1]], Path: p, Lo: lo, Hi: hi,
+			File: file, Line: seg.lines[m[1]-1], Text: seg.text[m[0]:m[1]], Path: p, Alias: alias, Lo: lo, Hi: hi,
 		}})
 	}
 	for _, p := range paths {

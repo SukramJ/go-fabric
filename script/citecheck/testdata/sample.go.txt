@@ -33,3 +33,6 @@ func Forms() {}
 
 // Four: Widget.ts:2 (packages/core/src/, 89abcdef). Five: at its pin 7654fedc (Widget.ts:3). Six (Widget.ts:1, HEAD 2345abcd). Seven: pin 12345678 Widget.ts:2.
 func MoreForms() {}
+
+// Alias: the validator's `idHex` (DAV:2-3). Older: DAV:4 at 0123abcd; NODAV:5 and DAVID:5 are none.
+func Alias() {}

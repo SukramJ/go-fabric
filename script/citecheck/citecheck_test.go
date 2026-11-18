@@ -280,6 +280,7 @@ func sampleTree() fakeTree {
 		"packages/other/lib/Gadget.ts": file(5, nil),
 		"packages/a/index.ts":          file(3, nil),
 		"packages/b/index.ts":          file(3, nil),
+		"packages/protocol/src/certificate/DeviceAttestationValidator.ts": file(40, map[int]string{30: "function idHex() {}"}),
 	}
 }
 
@@ -377,10 +378,15 @@ func TestCheckAndDerive(t *testing.T) {
 	if r := by("unnamed"); r.checked || r.hard != "" {
 		t.Errorf("a citation without names is checked hard only: %+v", r)
 	}
+	// An alias resolves to the file it stands for, and its fix keeps the
+	// alias (expect.json, "fixes").
+	if r := by("alias"); r.rule != ruleExact || r.drift == nil || r.drift.Nearest != 30 || !r.attached {
+		t.Errorf("alias: %+v, want an exact path with attached drift to 30", r)
+	}
 
 	sum := summarise("pin", results)
-	if sum.citations != 19 || sum.files != 1 || len(sum.hard) != 4 || len(sum.drift) != 2 {
-		t.Errorf("summary: %d citations, %d files, %d hard, %d drift; want 19, 1, 4, 2", sum.citations, sum.files, len(sum.hard), len(sum.drift))
+	if sum.citations != 21 || sum.files != 1 || len(sum.hard) != 4 || len(sum.drift) != 3 {
+		t.Errorf("summary: %d citations, %d files, %d hard, %d drift; want 21, 1, 4, 3", sum.citations, sum.files, len(sum.hard), len(sum.drift))
 	}
 	// The two bare parts are checked and counted on their own: never a
 	// citation, a hard error or a drift of the run.
@@ -392,7 +398,7 @@ func TestCheckAndDerive(t *testing.T) {
 		t.Fatal(err)
 	}
 	md, _ := os.ReadFile(filepath.Join(dir, "summary.md"))
-	if !strings.Contains(string(md), "| **Drift** | 2 |") || !strings.Contains(string(md), "## Hard errors") {
+	if !strings.Contains(string(md), "| **Drift** | 3 |") || !strings.Contains(string(md), "## Hard errors") {
 		t.Errorf("summary.md:\n%s", md)
 	}
 

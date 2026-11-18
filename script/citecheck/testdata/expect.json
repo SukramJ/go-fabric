@@ -21,7 +21,9 @@
     {"line": 34, "text": "Widget.ts:2", "shas": ["89abcdef"], "why": "a sha closing a parenthesis after a comma"},
     {"line": 34, "text": "Widget.ts:3", "shas": ["7654fedc"], "why": "pin <sha>"},
     {"line": 34, "text": "Widget.ts:1", "shas": ["2345abcd"], "why": "HEAD <sha>"},
-    {"line": 34, "text": "Widget.ts:2", "why": "a sha of digits only after pin is a number"}
+    {"line": 34, "text": "Widget.ts:2", "why": "a sha of digits only after pin is a number"},
+    {"line": 37, "text": "DAV:2-3", "path": "packages/protocol/src/certificate/DeviceAttestationValidator.ts", "idents": ["idHex"], "attached": ["idHex"], "why": "an alias stands for its file"},
+    {"line": 37, "text": "DAV:4", "path": "packages/protocol/src/certificate/DeviceAttestationValidator.ts", "shas": ["0123abcd"], "why": "an alias citation is checked at the commit its sentence names; NODAV and DAVID are no alias"}
   ],
   "results": {
     "basename": "3 Widget.ts:40-42",
@@ -29,12 +31,14 @@
     "suffix": "9 src/Gadget.ts:2",
     "ambiguous": "10 Gadget.ts:3",
     "beyond": "17 Widget.ts:99",
-    "unnamed": "23 Widget.ts:1"
+    "unnamed": "23 Widget.ts:1",
+    "alias": "37 DAV:2-3"
   },
   "fixes": {
     "3 Widget.ts:40-42": "Widget.ts:60-62",
     "10 Gadget.ts:3": "src/Gadget.ts:3",
-    "26 Gadget.ts:2": "src/Gadget.ts:2"
+    "26 Gadget.ts:2": "src/Gadget.ts:2",
+    "37 DAV:2-3": "DAV:30-31"
   },
   "owner": [
     "17 Widget.ts:99 line beyond end of file",
