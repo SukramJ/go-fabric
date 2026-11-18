@@ -48,7 +48,7 @@ func (r *recordingIdentify) seen() []uint16 {
 // identifyTime$Changed from the attribute and the command alike and its
 // tick drives the same reactor to stopIdentifying
 // (packages/node/src/behaviors/identify/IdentifyServer.ts:57-58,
-// :100-127 at 862ad75f; W3-clucore-02).
+// :100-127 at db021da0; W3-clucore-02).
 func TestParityMatterJS_IdentifyTimeReachesTheHost(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

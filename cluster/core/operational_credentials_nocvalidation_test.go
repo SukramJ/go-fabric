@@ -312,7 +312,7 @@ func TestUpdateNOC_NewNodeIDUpdatesStoreAndFiresWithdraw(t *testing.T) {
 // TestRemoveFabric_WithdrawsTheRemovedFabricOnly verifies that
 // RemoveFabric fires onFabricWithdraw once, with the removed fabric's
 // (CompressedID, NodeID), and republishes nothing else. Mirrors matter.js
-// DeviceAdvertiser.ts:109-111 at 862ad75f (fabrics.events.deleting →
+// DeviceAdvertiser.ts:109-111 at db021da0 (fabrics.events.deleting →
 // Advertisement.cancelAll of that fabric's operational advertisements;
 // no reannounce of the remaining set — review 2026-11 W6-reg-08 retired
 // the OnMDNSReannounce hook that did one).

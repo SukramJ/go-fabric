@@ -165,7 +165,7 @@ type identifyHandlerRef struct{ h contract.IdentifyHandler }
 // refuses the command. nil removes it. Mirrors matter.js's application
 // override of IdentifyServer.identify and triggerEffect
 // (packages/node/src/behaviors/identify/IdentifyServer.ts:129-135 at
-// 862ad75f).
+// db021da0).
 func (i *Identify) SetHandler(h contract.IdentifyHandler) {
 	if h == nil {
 		i.handler.Store(nil)
@@ -294,7 +294,7 @@ func (i *Identify) MatterRead(attrID uint32) (any, bool) {
 // units of seconds, and SHALL be writable." — clients drive Identify
 // either via the command or by setting the attribute directly, and the
 // host's handler sees both: matter.js reacts to identifyTime$Changed
-// whichever wrote it (IdentifyServer.ts:57-58 at 862ad75f), so the write
+// whichever wrote it (IdentifyServer.ts:57-58 at db021da0), so the write
 // runs the handler as the Identify command does and a refusal refuses the
 // write with its status.
 func (i *Identify) MatterWrite(ctx context.Context, attrID uint32, value any) error {
@@ -319,7 +319,7 @@ func (i *Identify) MatterWriteChanged(ctx context.Context, attrID uint32, value 
 		return false, fmt.Errorf("core: Identify.IdentifyTime: %w", err)
 	}
 	// Mirrors matter.js packages/node/src/behaviors/identify/
-	// IdentifyServer.ts:57-58, :108-114 at 862ad75f: the attribute and the
+	// IdentifyServer.ts:57-58, :108-114 at db021da0: the attribute and the
 	// command reach one reactor (#identifyTimeChangedHandler).
 	changed, err := i.setIdentifyTime(ctx, t)
 	if err != nil {
@@ -509,7 +509,7 @@ func (i *Identify) tick(done <-chan struct{}) (over, zero bool) {
 	// The countdown reached zero: the edge advances the DataVersion and
 	// is reported by the caller (W3-clucore-05), and the host is told to
 	// stop, as matter.js's tick drives the reactor to #stopIdentifying
-	// (IdentifyServer.ts:100-114, :121-127 at 862ad75f); 0 is the
+	// (IdentifyServer.ts:100-114, :121-127 at db021da0); 0 is the
 	// contract's "stops".
 	i.dataVersion.Bump()
 	h := i.hostHandler()
@@ -595,13 +595,13 @@ func coerceUint16(v any) (uint16, error) {
 	}
 	// A value of another type is a datatype mismatch: InvalidAction, as
 	// matter.js's ValidationDatatypeMismatchError answers it
-	// (packages/types/src/common/ValidationError.ts:35-38 at 862ad75f).
+	// (packages/types/src/common/ValidationError.ts:35-38 at db021da0).
 	return 0, spec.Errorf(im.StatusInvalidAction, "core: unsupported IdentifyTime type %T", v)
 }
 
 // boundUint16 refuses a value above the uint16 range with ConstraintError
 // instead of masking it into a different, valid IdentifyTime. Mirrors
-// matter.js packages/types/src/tlv/TlvNumber.ts:151-155 at 862ad75f
+// matter.js packages/types/src/tlv/TlvNumber.ts:151-155 at db021da0
 // (ValidationOutOfBoundsError, a ValidationError = ConstraintError;
 // W3-clucore-04).
 func boundUint16(x uint64) (uint16, error) {

@@ -427,7 +427,7 @@ func TestICDManagementRefusals(t *testing.T) {
 // "16" constraint on RegisterClient and UnregisterClient so that "a
 // malformed key fails #assertMayModify's byte comparison rather than being
 // rejected with ConstraintError before the handler runs"
-// (IcdManagementServer.ts:59-74 at 862ad75f): an Administrator's key is
+// (IcdManagementServer.ts:59-74 at db021da0): an Administrator's key is
 // ignored, a Manage caller's mismatch is FAILURE (:756-763). The generated
 // decoder used to answer CONSTRAINT_ERROR for both (W3-clusec-06); the
 // stored Key keeps its bound.

@@ -329,7 +329,7 @@ func TestOpcreds_AddNOC_BadIPK(t *testing.T) {
 
 	// An IPK of the wrong length is CONSTRAINT_ERROR at the IM level, as
 	// matter.js's schema ("octstr, M, 16", operational-credentials.element.ts:98
-	// at 862ad75f) refuses it before addNoc runs; chip answers
+	// at db021da0) refuses it before addNoc runs; chip answers
 	// INVALID_COMMAND (OperationalCredentialsCluster.cpp:469 at 6170af84).
 	// The server used to answer in-band InvalidNOC (W3-clusec-07).
 	_, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{

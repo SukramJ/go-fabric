@@ -916,7 +916,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	}
 	// ExpiryLengthSeconds is not bounded by FailSafeMaxSeconds: matter.js
 	// arms or extends with the value as sent
-	// (GeneralCommissioningServer.ts:89-106 at 862ad75f) and chip arms it
+	// (GeneralCommissioningServer.ts:89-106 at db021da0) and chip arms it
 	// as given (GeneralCommissioningCluster.cpp:439-441 at 6170af84,
 	// FailSafeContext.cpp:112-119); both end the window at the cumulative
 	// limit's own timer, as the clamp below does. The ValueOutsideRange
@@ -984,7 +984,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	unlocked = true
 	if armedHook != nil && !extending {
 		// Mirrors matter.js GeneralCommissioningServer.ts:90-100 at
-		// 862ad75f: an ArmFailSafe while armed extends the fail-safe
+		// db021da0: an ArmFailSafe while armed extends the fail-safe
 		// context, one while disarmed creates a new
 		// ServerNodeFailsafeContext (the hook runs only then), surfacing a
 		// fresh `rootCertSet` / `fabricIndex` set so multi-admin pairing

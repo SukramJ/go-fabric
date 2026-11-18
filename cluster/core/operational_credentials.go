@@ -192,7 +192,7 @@ type OperationalCredentials struct {
 	// the records it still holds, so the stale <compressedID>-<nodeID>
 	// instance would keep answering until its TTL. Mirrors matter.js
 	// packages/protocol/src/protocol/DeviceAdvertiser.ts:109-111 at
-	// 862ad75f (fabrics.events.deleting → Advertisement.cancelAll of the
+	// db021da0 (fabrics.events.deleting → Advertisement.cancelAll of the
 	// fabric's operational advertisements); matter.js republishes nothing
 	// else on a removal. May be nil.
 	onFabricWithdraw func(ctx context.Context, compressedID [8]byte, nodeID uint64)
@@ -563,7 +563,7 @@ type OpcredsConfig struct {
 	// the event reaches the subscribers the fabric still admits. matter.js
 	// Fabric.leave: the leaving event, the flush of every session's
 	// subscriptions, then the delete (packages/protocol/src/fabric/Fabric.ts:447-457
-	// at 862ad75f; BasicInformationServer.ts:175, :186-188 emits Leave on
+	// at db021da0; BasicInformationServer.ts:175, :186-188 emits Leave on
 	// it). A fail-safe's revert of an AddNOC deletes without leaving
 	// (FailsafeContext.ts:271-274, :310) and does not fire it. May be nil.
 	OnFabricLeaving func(ctx context.Context, fabricIndex uint8)
@@ -2091,7 +2091,7 @@ func (o *OperationalCredentials) failSafeKeyPair() (priv *ecdsa.PrivateKey, draw
 // buildPKCS10CSR creates the DER-encoded PKCS#10 certification request
 // with `priv` as the subject key — [mattercert.CreateCSR], the request
 // matter.js's Certificate.createCertificateSigningRequest builds
-// (Certificate.ts:264-277 at 862ad75f): the placeholder subject `O=CSR`,
+// (Certificate.ts:259-272 at db021da0): the placeholder subject `O=CSR`,
 // which the CA replaces with the operational subject DN when issuing the
 // NOC, signed ECDSA-SHA256 per Matter §6.4.1.2.
 func buildPKCS10CSR(priv *ecdsa.PrivateKey) ([]byte, error) {
@@ -2555,7 +2555,7 @@ func fabricInstalled(fabrics []store.FabricRecord, fabricID uint64, rootPub []by
 // nocVerifier is the verifier of a NOC chain under the trust root: built
 // from the root certificate when it is held, so a root-signed NOC's
 // authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:170-184 at 862ad75f); from the
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db021da0); from the
 // root's public key alone for a legacy fabric row without the certificate.
 func nocVerifier(rcac, rootPublicKey []byte) (*mattercert.Verifier, error) {
 	if len(rcac) > 0 {
@@ -2908,7 +2908,7 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 	if gerr == nil {
 		// The fabric leaves before its rows go: the Leave event and the
 		// flush of its subscriptions run while the store still holds the
-		// fabric and its ACL (Fabric.leave, Fabric.ts:447-457 at 862ad75f:
+		// fabric and its ACL (Fabric.leave, Fabric.ts:447-457 at db021da0:
 		// the leaving event, the sessions' closeSubscriptions(true), then
 		// delete). An index the store does not hold leaves nothing.
 		o.mu.Lock()
@@ -2965,7 +2965,7 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 		// instance; the stale <compressedID>-<nodeID> record would
 		// otherwise keep answering until its TTL and commissioners
 		// resolve an identity that no longer exists. Mirrors matter.js
-		// DeviceAdvertiser.ts:109-111 at 862ad75f (fabrics.events.deleting
+		// DeviceAdvertiser.ts:109-111 at db021da0 (fabrics.events.deleting
 		// → Advertisement.cancelAll); matter.js republishes no other
 		// fabric on a removal, and neither does this server (the
 		// remaining fabrics' records are untouched).

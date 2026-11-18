@@ -889,10 +889,10 @@ func (b *BasicInformation) commitLabel(ctx context.Context, attrID uint32, s str
 // checkLabelWrite holds a NodeLabel or Location write to the attribute's
 // constraint — NodeLabel "max 32", Location "2"
 // (packages/model/src/standard/elements/basic-information.element.ts:36,
-// :40 at 862ad75f) — and refuses a violation with CONSTRAINT_ERROR, as
+// :40 at db021da0) — and refuses a violation with CONSTRAINT_ERROR, as
 // matter.js's string-length validator does. Mirrors matter.js
 // packages/node/src/behavior/state/validation/constraint.ts:199-211 at
-// 862ad75f (ConstraintError, "String length of … is not within bounds");
+// db021da0 (ConstraintError, "String length of … is not within bounds");
 // the refusal used to surface as FAILURE. A value that is no string — the
 // bridge's stand-in for a string its schema refused, one too long before
 // its IS1 among them — is CONSTRAINT_ERROR as well, the definition's

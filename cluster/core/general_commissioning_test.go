@@ -288,7 +288,7 @@ func TestGencomm_ArmFailSafe_Arms(t *testing.T) {
 // TestGencomm_ArmFailSafe_AboveMax_ArmsToTheCumulativeLimit: an
 // ExpiryLengthSeconds above FailSafeMaxSeconds arms, as matter.js arms or
 // extends with the value as sent (GeneralCommissioningServer.ts:89-106 at
-// 862ad75f) and chip arms it as given (GeneralCommissioningCluster.cpp:439-441
+// db021da0) and chip arms it as given (GeneralCommissioningCluster.cpp:439-441
 // at 6170af84); the cumulative limit's own timer ends the window
 // (FailsafeTimer.ts:33-35, FailSafeContext.cpp:112-119). The server used to
 // answer ValueOutsideRange (W3-clusec-05).

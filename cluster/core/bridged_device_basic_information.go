@@ -151,7 +151,7 @@ var errBridgedBasicInfoUnknown = spec.Errorf(im.StatusUnsupportedWrite, "core: B
 // BridgedConfig carries the bridged device's static metadata. Reachable +
 // UniqueID are mandatory; the rest, NodeLabel included, are optional —
 // matter.js: "All attributes are optional except for the "reachable"
-// attribute" (BridgedDeviceBasicInformationServer.ts:20 at 862ad75f),
+// attribute" (BridgedDeviceBasicInformationServer.ts:20 at db021da0),
 // NodeLabel conformance "O" (bridged-device-basic-information.element.ts:30).
 // An empty NodeLabel is served as the empty string; a controller may write
 // its own.
@@ -512,12 +512,12 @@ func (b *BridgedDeviceBasicInformation) MatterWriteChanged(ctx context.Context, 
 		return false, fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 	}
 	// NodeLabel is BasicInformation's by reference
-	// (bridged-device-basic-information.element.ts:30 at 862ad75f), "max
+	// (bridged-device-basic-information.element.ts:30 at db021da0), "max
 	// 32" (basic-information.element.ts:36); a longer label is refused
 	// with CONSTRAINT_ERROR as the root cluster's checkLabelWrite refuses
 	// it. Mirrors matter.js
 	// packages/node/src/behavior/state/validation/constraint.ts:199-211 at
-	// 862ad75f (ConstraintError, "String length of … is not within
+	// db021da0 (ConstraintError, "String length of … is not within
 	// bounds"); the refusal used to surface as FAILURE.
 	if _, err := b.inst().CheckValue(attrID, s, nil); err != nil {
 		return false, refusedWrite{sentinel: fmt.Errorf("core: BridgedDeviceBasicInformation NodeLabel write of %d bytes", len(s)), status: err}

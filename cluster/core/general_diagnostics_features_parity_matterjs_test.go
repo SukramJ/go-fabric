@@ -4,8 +4,9 @@
 // A port of matter.js packages/node/test/behaviors/general-diagnostics/GeneralDiagnosticsFeaturesTest.ts
 // at 862ad75f: a GeneralDiagnostics server with a feature selection of its
 // own, and the DataModelTest feature held against the node's
-// maxPathsPerInvoke (GeneralDiagnosticsServer.ts:51-52 the default
-// selection, #assertDataModelTest :125-143, run from #online :352).
+// maxPathsPerInvoke (GeneralDiagnosticsServer.ts:52-53 the default
+// selection, #assertDataModelTest :186-204, run from #online :415,
+// at db021da0).
 //
 // matter.js builds a MockServerNode whose root carries
 // GeneralDiagnosticsServer.with() and a basicInformation.maxPathsPerInvoke,

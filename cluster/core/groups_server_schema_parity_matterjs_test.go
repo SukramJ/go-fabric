@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/groups/GroupsServerSchemaTest.ts
-// at 862ad75f: GroupsServer relaxes the AddGroup GroupId "min 1" and
+// at db021da0: GroupsServer relaxes the AddGroup GroupId "min 1" and
 // GroupName "max 16" constraints (GroupsServer.ts:20-48), so an
 // out-of-range value reaches the handler, which answers ConstraintError in
 // its AddGroupResponse (:94-103) instead of the interaction layer refusing

@@ -13,7 +13,7 @@ import (
 )
 
 // TestParityMatterJS_OTAProviderTransferKeepsEntryAlive ports OtaTest.ts:
-// 2100-2183 (packages/node/test/behaviors/ota/OtaTest.ts at 862ad75f) on
+// 2100-2183 (packages/node/test/behaviors/ota/OtaTest.ts at db021da0) on
 // the provider: the blocks of a running BDX transfer refresh the update's
 // in-progress entry (internal.inProgressDetails, the Go inProgress map;
 // progressInfo, OtaSoftwareUpdateProviderServer.ts:329-331), and a fresh

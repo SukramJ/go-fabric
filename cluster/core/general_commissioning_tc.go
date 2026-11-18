@@ -19,7 +19,7 @@ import (
 // matter.js (register row BD-chip-GeneralCommissioning-TermsAndConditions,
 // notes/parity/by_design.md): matter.js's GeneralCommissioningServer has
 // no terms-and-conditions logic (`class GeneralCommissioningServer`,
-// GeneralCommissioningServer.ts:31 at 862ad75f, 285 lines). The behaviour
+// GeneralCommissioningServer.ts:31 at db021da0, 285 lines). The behaviour
 // is connectedhomeip's, `src/app/clusters/general-commissioning-server/
 // GeneralCommissioningCluster.cpp` at 6170af84 with its
 // TermsAndConditionsProvider (`src/app/server/TermsAndConditionsProvider.h`,

@@ -48,7 +48,7 @@ func TestBridgedBasicInfo_ValidationEmptyUniqueID(t *testing.T) {
 // TestBridgedBasicInfo_EmptyNodeLabelAccepted: NodeLabel is optional on the
 // bridged cluster. matter.js: "All attributes are optional except for the
 // "reachable" attribute" (BridgedDeviceBasicInformationServer.ts:20 at
-// 862ad75f); the attribute's conformance is "O"
+// db021da0); the attribute's conformance is "O"
 // (bridged-device-basic-information.element.ts:30).
 // A device whose host stated an empty name serves the empty string (until
 // 2026-10-30 the constructor refused it, and the bridged endpoint lost its
@@ -163,7 +163,7 @@ func TestBridgedBasicInfo_WriteNodeLabelTooLong(t *testing.T) {
 	b := newValidBridged(t)
 	err := b.MatterWrite(context.Background(), 0x0005, strings.Repeat("z", 33))
 	// CONSTRAINT_ERROR, as matter.js's string-length validator answers it
-	// (constraint.ts:199-211 at 862ad75f) and the root cluster does
+	// (constraint.ts:199-211 at db021da0) and the root cluster does
 	// (W3-clucore-01); it used to be FAILURE.
 	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusConstraintError {
 		t.Fatalf("NodeLabel > 32 bytes: %v, want CONSTRAINT_ERROR", err)
