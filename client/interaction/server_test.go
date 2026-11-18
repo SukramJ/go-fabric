@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	acdef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
 	"github.com/SukramJ/go-fabric/cluster/spec/groups"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -373,6 +374,32 @@ func TestServeWrite(t *testing.T) {
 		defer d.mu.Unlock()
 		if len(d.writes) != 2 || d.writes[0] || d.writes[1] {
 			t.Fatalf("writes reached the dispatcher as %v, want two untimed", d.writes)
+		}
+	})
+}
+
+// TestServeChunkedWriteRefusedWhole: a chunked write — an ACL replace
+// sent in two chunks — is refused whole with FAILURE at its first chunk:
+// nothing of it reaches the dispatcher, so the list stays as it was rather
+// than at its first chunk. The server answers one WriteRequest per
+// exchange until ADR 0032's single session layer (review II,
+// F-db021da0-51).
+func TestServeChunkedWriteRefusedWhole(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s, _, d := serverRig(t, 0)
+		acl := im.ConcreteAttributePath{Endpoint: 0, Cluster: acdef.ClusterID, Attribute: acdef.AttrAcl, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+		first := im.WriteRequest{MoreChunkedMessages: true, Writes: []im.AttributeWrite{
+			{Path: acl, Value: im.AttributeValue{Value: spec.List[acdef.AccessControlEntryStruct]{}}},
+		}}
+		s.push(t, 0x7238, im.OpcodeWriteRequest, encode(t, func(e *tlv.Encoder) { first.MarshalTLV(e, wire.AttributeValueWriter) }))
+		s.ackPushed(t, expectStatus(t, s, im.StatusFailure))
+		synctest.Wait()
+
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		if len(d.writes) != 0 {
+			t.Fatalf("%d writes of a refused chunked write reached the dispatcher, want none", len(d.writes))
 		}
 	})
 }

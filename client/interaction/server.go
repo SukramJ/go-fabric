@@ -293,9 +293,19 @@ func (s *server) awaitChunkStatus(ctx context.Context, x *exchange.Exchange) boo
 // db021da0) and the messenger answers it
 // (packages/protocol/src/interaction/InteractionMessenger.ts:457-459),
 // sending no status for a request that suppressed its response (:317-322).
+//
+// A chunked write (MoreChunkedMessages) is refused whole with FAILURE
+// before any of it is applied: this server answers one WriteRequest per
+// exchange and would apply the first chunk alone — an ACL replace would
+// leave the list at its first chunk. It fails closed until ADR 0032's
+// single session layer serves these sessions with the bridge's server
+// (review II, F-db021da0-51).
 func (s *server) write(ctx context.Context, x *exchange.Exchange, req im.WriteRequest, timed bool) im.StatusCode {
 	if req.TimedRequest != timed {
 		return im.StatusTimedRequestMismatch
+	}
+	if req.MoreChunkedMessages {
+		return im.StatusFailure
 	}
 	d := s.dispatcher()
 	if d == nil {
