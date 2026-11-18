@@ -77,9 +77,9 @@ var (
 	// NOC's matter-node-id lies outside the operational node ID range
 	// 0x0000_0000_0000_0001 .. 0xFFFF_FFEF_FFFF_FFFF. AddNOC and UpdateNOC
 	// answer it with NOCResponse InvalidNodeOpId instead of InvalidNOC.
-	// Mirrors matter.js 0ceb202d
+	// Mirrors matter.js
 	// packages/protocol/src/certificate/kinds/Noc.ts:20 (OperationalNodeIdError
-	// extends CertificateError) thrown at :83-85.
+	// extends CertificateError) thrown at :86-88, at db021da0.
 	ErrNonOperationalNodeID = errors.New("mattercert: NOC node id is not an operational node id")
 	// ErrUnsupportedAlgorithm is returned for non-ECDSA signatures or
 	// non-P-256 keys.

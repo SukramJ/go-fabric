@@ -488,10 +488,11 @@ func (e *Entry) PeerTransportParameters() (transports uint16, maxTCPMessageSize 
 // (re)transmission to this peer: the peer's active interval when it
 // sent a message within its active threshold, its idle interval
 // otherwise. Fields the peer never advertised fall back to the spec
-// defaults. Mirrors matter.js MRP.ts:162-190 retransmissionIntervalOf at
-// db021da0 (:181 "baseInterval = (isPeerActive ? activeInterval :
-// idleInterval) + additionalDelay", re-evaluated per transmission) and chip
-// GetMRPBaseTimeout.
+// defaults. Mirrors the selection of matter.js MRP.ts:162-190
+// retransmissionIntervalOf at db021da0 (:181 "baseInterval = (isPeerActive
+// ? activeInterval : idleInterval) + additionalDelay", re-evaluated per
+// transmission; the additionalDelay term is the caller's, see the tracker's
+// margin in bridge/outbound_reliable.go) and chip GetMRPBaseTimeout.
 func (e *Entry) RetransmitBaseInterval(_ time.Time) time.Duration {
 	idle, active, _, peerActive := e.PeerMRPSchedule()
 	if peerActive {
@@ -1571,11 +1572,11 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 // sessions a peer held when an exchange on one of them ran out of MRP
 // retransmissions. No CloseSession goes on the wire: the peer is
 // lost, so matter.js marks the session peer-lost and force-closes it
-// (NodeSession.ts:325-328 handlePeerLoss → initiateForceClose), and
+// (NodeSession.ts:341-344 handlePeerLoss → initiateForceClose), and
 // the session manager applies that to every session of the peer
-// created before the reporting exchange (SessionManager.ts:677-695
-// #handlePeerLoss, the `asOf` check at :688). A zero asOf closes them
-// all. Returns the number of sessions closed.
+// created before the reporting exchange (SessionManager.ts:727-746
+// #handlePeerLoss, the `asOf` check at :740, at db021da0). A zero asOf
+// closes them all. Returns the number of sessions closed.
 //
 // asOf is compared with the session's wall-clock creation time: on
 // [clock.System] both carry Go's monotonic reading and a wall-clock step

@@ -136,8 +136,13 @@ func (p derParts) extensionsByOID(t *testing.T) map[string][]byte {
 
 // Every malformed part of a DER certificate is refused as ErrMalformed
 // (or ErrUnsupportedAlgorithm for an algorithm this module does not
-// speak) — parseAsn1Certificate (Certificate.ts:612-770 at 862ad75f)
-// throws on each.
+// speak) — parseAsn1Certificate (Certificate.ts:667-837 at db021da0)
+// throws on the malformed structures (the root :681-685, the
+// TBSCertificate :692-694, the version :700-704, the signature algorithm
+// :713-720, the validity :733-735, the public key :745-753 and :769-775,
+// the extensions :787-789 and parseExtensions :446-447, :488-489,
+// :591-592); a signature algorithm or a curve it does not know it reads as
+// 0 (:725, :777-778), which this module refuses.
 func TestDecodeDERRefusesEachMalformedPart(t *testing.T) {
 	t.Parallel()
 	rcac := certificatesExternalDER(t, "RCAC")

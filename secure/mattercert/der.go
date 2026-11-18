@@ -24,20 +24,20 @@ const MaxOperationalCertDERBytes = 600
 
 // DecodeDER parses an X.509 DER operational certificate (RCAC, ICAC or
 // NOC, as a PKI outside Matter issues them) into the [Certificate] its
-// Matter TLV form carries — Rcac/Icac/Noc.fromAsn1 at 862ad75f
-// (Certificate.ts:612-770 parseAsn1Certificate): the DER is refused over
-// 600 bytes before parsing, the signature algorithm must be the same
-// inside and outside the TBSCertificate (RFC 5280 §4.1.1.2), the DN
-// attributes come back in their arrival order with the Matter ids parsed
-// from their hex strings (by the stricter rule of the db021da0 pin, see
-// derMatterAttribute; the rest of this path is cited at 862ad75f and not
-// yet re-read at db021da0), a recognised extension (basicConstraints,
-// keyUsage, extendedKeyUsage, subjectKeyIdentifier,
-// authorityKeyIdentifier) without its value OCTET STRING is refused and an
-// extension of any other OID is not read — whatever its value holds.
-// The TBSCertificate bytes are kept on Certificate.TBSDER, which
-// [TBSToDER] then returns unchanged (asUnsignedDer, Certificate.ts:196-199),
-// and Certificate.Raw is the TLV form ([Encode]).
+// Matter TLV form carries — Rcac/Icac/Noc.fromAsn1 (Certificate.ts:667-837
+// parseAsn1Certificate at db021da0): the DER is refused over 600 bytes
+// before parsing (:672-677), the signature algorithm must be the same
+// inside and outside the TBSCertificate (RFC 5280 §4.1.1.2, :717-720), the
+// DN attributes come back in their arrival order with the Matter ids
+// parsed from their hex strings (parseSubjectOrIssuer :302-382,
+// parseMatterRdnHex :242-249; see derMatterAttribute), a recognised
+// extension (basicConstraints, keyUsage, extendedKeyUsage,
+// subjectKeyIdentifier, authorityKeyIdentifier) without its value OCTET
+// STRING is refused (:488-490) and an extension of any other OID is not
+// read (:484-485) — whatever its value holds. The TBSCertificate bytes are
+// kept on Certificate.TBSDER, which [TBSToDER] then returns unchanged
+// (asUnsignedDer, Certificate.ts:187-194), and Certificate.Raw is the TLV
+// form ([Encode]).
 func DecodeDER(der []byte) (*Certificate, error) {
 	if len(der) > MaxOperationalCertDERBytes {
 		return nil, fmt.Errorf("%w: DER certificate of %d bytes exceeds the %d byte limit", ErrMalformed, len(der), MaxOperationalCertDERBytes)
