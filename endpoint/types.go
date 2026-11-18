@@ -728,7 +728,7 @@ func (e *Endpoint) storeLabelHeld(ctx context.Context, label string) error {
 // [mattercore.BridgedConfig.HoldNodeLabel]: the state's labelMu, which
 // every server instance built for this endpoint and the host's rename
 // share, and the NodeLabel the endpoint serves under it (F-db021da0-43).
-func (e *Endpoint) holdNodeLabel() (string, func()) {
+func (e *Endpoint) holdNodeLabel() (label string, unlock func()) {
 	s := e.endpointState()
 	s.labelMu.Lock()
 	return e.NodeLabel(), s.labelMu.Unlock
