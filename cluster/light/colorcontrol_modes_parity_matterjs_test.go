@@ -473,9 +473,10 @@ func TestColorLoopSet(t *testing.T) {
 // with ColorLoopTime 0 moves the hue, one turn a second, as
 // connectedhomeip guards the zero ("loopTimeSec = (timeSec == 0) ? 1u :
 // timeSec", ColorControlCluster.cpp:913 at 6170af84); the attribute keeps
-// reading 0. matter.js divides by it (ColorControlServer.ts:1201-1210 at
-// db021da0), and the loop then sets ColorLoopActive over a hue that does
-// not move — the divergence this test pins.
+// reading 0. matter.js divides by `colorLoopTime`
+// (ColorControlServer.ts:1208 at db021da0), with ColorLoopActive set
+// Active before it (:1156), over a hue that does not move — the
+// divergence this test pins.
 func TestColorLoopTimeZeroTurnsOnceASecond(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv := colorLight(t, allColorFeatures, true)

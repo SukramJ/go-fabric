@@ -82,7 +82,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 494,
+    "line": 514,
     "citation": "BindingManager.ts:147-157",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "sourceEndpoint",
@@ -91,7 +91,7 @@
   },
   {
     "file": "binding/manager.go",
-    "line": 573,
+    "line": 593,
     "citation": "BindingManager.ts:513-520",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "#scheduleGroupRecheck",
@@ -154,7 +154,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 900,
+    "line": 903,
     "citation": "ExchangeManager.ts:480-486",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "at": "db021da0",
@@ -164,7 +164,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1885,
+    "line": 1888,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -173,7 +173,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1887,
+    "line": 1890,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -182,7 +182,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1924,
+    "line": 1927,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -191,7 +191,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1947,
+    "line": 1950,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -294,7 +294,7 @@
   },
   {
     "file": "bridge/handlers.go",
-    "line": 1248,
+    "line": 1255,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
@@ -451,7 +451,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 1659,
+    "line": 1682,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:347",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "sendDataReport",
@@ -460,7 +460,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2278,
+    "line": 2301,
     "citation": "ThermostatServer.ts:451",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "reactTo",
@@ -469,7 +469,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2354,
+    "line": 2377,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -1085,7 +1085,7 @@
   },
   {
     "file": "client/interaction/server_test.go",
-    "line": 387,
+    "line": 414,
     "citation": "InteractionMessenger.ts:458-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -1276,7 +1276,7 @@
   },
   {
     "file": "cluster/core/group_key_management.go",
-    "line": 913,
+    "line": 915,
     "citation": "GroupKeyManagementServer.ts:96",
     "resolved": "packages/node/src/behaviors/group-key-management/GroupKeyManagementServer.ts",
     "at": "db021da0",
@@ -1461,7 +1461,7 @@
   },
   {
     "file": "cluster/cover/windowcovering_server.go",
-    "line": 923,
+    "line": 934,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
     "identifier": "OperationalStatus",
@@ -2107,7 +2107,7 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 321,
+    "line": 325,
     "citation": "DeviceAttestationValidator.ts:235",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "considerTestCertificates",
@@ -2116,7 +2116,7 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 847,
+    "line": 851,
     "citation": "DclCertificateService.ts:1144-1147",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "at": "db021da0",
@@ -2235,7 +2235,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 1132,
+    "line": 1141,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -2245,7 +2245,7 @@
   },
   {
     "file": "examples/reference-bridge/ota.go",
-    "line": 57,
+    "line": 61,
     "citation": "OtaRequestorTestInstance.ts:166-168",
     "resolved": "support/chip-testing/src/OtaRequestorTestInstance.ts",
     "identifier": "CanConsent",
@@ -2625,7 +2625,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1742,
+    "line": 1768,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
@@ -2663,7 +2663,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 976,
+    "line": 1139,
     "citation": "packages/protocol/src/session/case/CaseServer.ts:219",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "at": "db021da0",
@@ -2838,7 +2838,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 665,
+    "line": 676,
     "citation": "packages/protocol/src/session/SessionManager.ts:213",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "#nextSessionId",
@@ -2847,7 +2847,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1065,
+    "line": 1076,
     "citation": "NodeSession.ts:403",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2856,7 +2856,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1067,
+    "line": 1078,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -2865,7 +2865,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1256,
+    "line": 1267,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2874,7 +2874,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1282,
+    "line": 1293,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2883,7 +2883,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1347,
+    "line": 1358,
     "citation": "NodeSession.ts:305-309",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -2892,7 +2892,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1836,
+    "line": 1847,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -3027,7 +3027,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 290,
+    "line": 324,
     "citation": "NodeSession.ts:437",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "logNew",
@@ -3036,7 +3036,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 325,
+    "line": 359,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",

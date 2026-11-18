@@ -140,7 +140,8 @@ func TestDoorLockRefusalKindsParityMatterJS(t *testing.T) {
 		{"SetWeekDaySchedule StartHour 24", lockdef.CmdSetWeekDaySchedule, weekDayRequest(func(r *lockdef.SetWeekDayScheduleRequest) {
 			r.StartHour = 24
 		})},
-		// A mandatory field missing (conformance; ValueValidator.ts:146,
+		// A mandatory field missing (conformance;
+		// packages/node/src/behavior/state/validation/ValueValidator.ts:146,
 		// read by 6a's reference read, not re-read).
 		{"SetWeekDaySchedule without EndMinute", lockdef.CmdSetWeekDaySchedule, rawRequest(func(enc *tlv.Encoder, tag tlv.Tag) {
 			enc.StartStruct(tag)
@@ -157,13 +158,15 @@ func TestDoorLockRefusalKindsParityMatterJS(t *testing.T) {
 
 // TestDoorLockRequestGateRefusalKindsParityMatterJS (F-db021da0-20): the
 // three kinds matter.js's model validator refuses before the handler — an
-// enum value that is no member (ValueValidator.ts:176-180), a member
-// outside the field's member list (OperationType "add, modify",
+// enum value that is no member
+// (packages/node/src/behavior/state/validation/ValueValidator.ts:176-180),
+// a member outside the field's member list (OperationType "add, modify",
 // door-lock-cluster.element.ts:428; the names become member ids,
 // EncodedConstraint.ts:205-212, :236-241, and a list constraint fails when
 // every part fails, Constraint.ts:172-191, :207-209), and a bit no member
-// defines (ValueValidator.ts:209-225, :307-311; DaysMaskBitmap,
-// door-lock-cluster.element.ts:581-588) — answer INVALID_COMMAND for the
+// defines
+// (packages/node/src/behavior/state/validation/ValueValidator.ts:209-225, :307-311;
+// DaysMaskBitmap, door-lock-cluster.element.ts:581-588) — answer INVALID_COMMAND for the
 // ten refusal commands (DoorLockServer.ts:1494-1511 at db021da0). The
 // decoder passes them (decision 64's split: types and constraints at the
 // decoder, conformance and enums at the gate); the server's request gate

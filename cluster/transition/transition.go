@@ -712,15 +712,16 @@ func (e *Engine) step(now time.Time) {
 	}
 	if len(changes) > 0 {
 		if err := e.cfg.Apply(changes); err != nil {
-			// A refused step ends every transition, as matter.js stops on
-			// a step error (Transitions.ts:594-600 at db021da0), and ends
-			// them as a cancel does — Settled per name, RemainingTime 0
-			// reported where something was — so no subscriber keeps a
-			// RemainingTime above 0 for a transition that no longer runs
-			// (R2-P6-err-1415, ahead of matter.js, whose stop reports
-			// nothing, :263-284; the rule is the one connectedhomeip quotes
-			// and implements, "When it changes to 0."
-			// (LevelControlCluster.cpp:688-691, :706 at 6170af84)).
+			// A refused step ends every transition, as matter.js's step
+			// `.catch` calls `stop` on a step error (Transitions.ts:594-600
+			// at db021da0). It ends them as a cancel does — Settled per
+			// name, RemainingTime 0 reported where something was — so no
+			// subscriber keeps a RemainingTime above 0 for a transition
+			// that no longer runs (R2-P6-err-1415, ahead of matter.js, whose
+			// `stop` reports nothing, Transitions.ts:263-284 at db021da0;
+			// the rule is the one connectedhomeip quotes and implements,
+			// "When it changes to 0." (LevelControlCluster.cpp:688-691,
+			// :706 at 6170af84)).
 			// No retry: the transitions stay ended.
 			e.cancelLocked(nil)
 			return

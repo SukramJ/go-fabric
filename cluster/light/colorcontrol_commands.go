@@ -732,10 +732,10 @@ func (s *ColorControlServer) stopColorLoop(ctx context.Context) error {
 // seconds, in the loop's direction. A ColorLoopTime of 0 turns once a
 // second, as connectedhomeip guards it ("loopTimeSec = (timeSec == 0) ?
 // 1u : timeSec", ColorControlCluster.cpp:913 at 6170af84); the attribute
-// keeps reading 0. matter.js divides by it (ColorControlServer.ts:1201-1210
-// at db021da0), an infinite rate the engine takes as immediate and,
-// without a target, drops — ColorLoopActive set over nothing
-// (R2-P6-fsm-1412).
+// keeps reading 0. matter.js divides by `colorLoopTime`
+// (ColorControlServer.ts:1208 at db021da0), an infinite rate the engine
+// takes as immediate and, without a target, drops — ColorLoopActive set
+// Active beforehand (:1156) over nothing (R2-P6-fsm-1412).
 func (s *ColorControlServer) startColorLoopLogic(ctx context.Context, startHue uint16) error {
 	if err := s.update(ctx, func(st *colorState) { st.enhancedHue = startHue }); err != nil {
 		return err
