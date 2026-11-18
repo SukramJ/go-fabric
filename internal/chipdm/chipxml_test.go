@@ -568,7 +568,8 @@ func TestLoadComposition(t *testing.T) {
 	if len(reqs) != 2 || reqs[1].Side != "deviceType" || reqs[1].ID != 0x510 || reqs[1].Conformance != nil {
 		t.Fatalf("requirements = %+v", reqs)
 	}
-	if cl := reqs[1].Clusters; len(cl) != 1 || cl[0].ID != 0x90 || cl[0].Side != "server" || cl[0].Conformance.Key() != "m" {
+	// The row states no side, and none is supplied.
+	if cl := reqs[1].Clusters; len(cl) != 1 || cl[0].ID != 0x90 || cl[0].Side != "" || cl[0].Conformance.Key() != "m" {
 		t.Errorf("contained clusters = %+v", cl)
 	}
 

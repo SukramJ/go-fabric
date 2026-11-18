@@ -654,6 +654,13 @@ func loadContainedDeviceType(n *xmlNode) (*Requirement, error) {
 			if err != nil {
 				return nil, fmt.Errorf("contained device type %s: %w", name, err)
 			}
+			// A cluster requirement of a contained device type states no
+			// side (all 14 at 6170af84, data_model/1.6.1). Its side is
+			// left empty, not supplied: the comparison keys these rows on
+			// the cluster id and does not compare a side.
+			if _, stated := cl.attr("side"); !stated {
+				r.Side = ""
+			}
 			req.Clusters = append(req.Clusters, r)
 		}
 	}
@@ -736,9 +743,10 @@ func loadClusterRequirement(n *xmlNode) (*Requirement, error) {
 	if id == nil {
 		return nil, fmt.Errorf("cluster requirement %s has no id", name)
 	}
-	// A cluster requirement of a contained device type states no side;
-	// any value but server or client is an error, not a server
-	// (R2-P6-test-2852).
+	// A cluster requirement of <clusters> states its side; any value but
+	// server or client is an error, not a server (R2-P6-test-2852). One
+	// that states none is read as server here; loadContainedDeviceType
+	// takes that back for a contained type's rows, which state none.
 	side := n.str("side")
 	switch side {
 	case "", "server":

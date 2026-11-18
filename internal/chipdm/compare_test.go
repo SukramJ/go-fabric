@@ -497,15 +497,15 @@ func TestCompareComposition(t *testing.T) {
 	chip := &Model{DeviceTypes: []*DeviceType{{ID: u32(0x18), Name: "Battery Storage", Requirements: []*Requirement{
 		{ID: 0x3, Name: "Identify", Side: "server", Conformance: m("O")},
 		{ID: 0x510, Name: "Electrical Sensor", Side: "deviceType", Clusters: []*Requirement{
-			{ID: 0x90, Name: "Electrical Power Measurement", Side: "server", Conformance: m("M")},
-			{ID: 0x91, Name: "Electrical Energy Measurement", Side: "server", Conformance: m("M")},
+			{ID: 0x90, Name: "Electrical Power Measurement", Conformance: m("M")}, // CHIP states no side
+			{ID: 0x91, Name: "Electrical Energy Measurement", Conformance: m("M")},
 		}},
 	}}}}
 	res := Compare(ours, chip)
 	got := diffStrings(res)
 	want := []string{
-		`BatteryStorage.ElectricalSensor (deviceType).Electrical Energy Measurement (server) composed requirement: chip "present", ours "absent"`,
-		`BatteryStorage.ElectricalSensor (deviceType).Electrical Energy Measurement (server) composed requirement: chip "present", ours "absent"`,
+		`BatteryStorage.ElectricalSensor (deviceType).Electrical Energy Measurement composed requirement: chip "present", ours "absent"`,
+		`BatteryStorage.ElectricalSensor (deviceType).Electrical Energy Measurement composed requirement: chip "present", ours "absent"`,
 		`BatteryStorage.ElectricalSensor (deviceType).ElectricalPowerMeasurement (server) conformance: chip "m", ours "o"`,
 		`BatteryStorage.Identify (server) requirement: chip "once", ours "twice"`,
 	}
@@ -514,15 +514,21 @@ func TestCompareComposition(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("differences:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
-	// PowerSource (not listed by CHIP); the first instance's Descriptor and
-	// its feature ALTC, the second's DIRC.
-	if n := res.NotCompared["device type composition CHIP does not state"]; n != 1 {
-		t.Errorf("composition not stated = %d, want 1", n)
+	// PowerSource (not listed by CHIP) and the two listed Electrical Sensor
+	// instances, whose conformance CHIP does not state; the first instance's
+	// Descriptor and its feature ALTC, the second's DIRC.
+	if n := res.NotCompared["device type composition CHIP does not state"]; n != 3 {
+		t.Errorf("composition not stated = %d, want 3", n)
+	}
+	if n := res.NotCompared["side of a composed requirement"]; n != 1 {
+		t.Errorf("sides not compared = %d, want 1 (the matched row, counted once)", n)
 	}
 	if n := res.NotCompared["composition requirements CHIP does not state"]; n != 3 {
 		t.Errorf("composition requirements not stated = %d, want 3", n)
 	}
-	if res.Compared["composed requirement"] != 2 {
+	// CHIP's matched row counted once for two instances; a listed
+	// contained type is no "requirement" compared, only its id.
+	if res.Compared["composed requirement"] != 1 || res.Compared["contained device type id"] != 2 || res.Compared["requirement"] != 1 {
 		t.Errorf("compared = %v", res.Compared)
 	}
 }

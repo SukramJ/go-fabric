@@ -445,10 +445,11 @@ func atomFromJSON(raw json.RawMessage) (string, error) {
 //
 // "or" is "|" once: matter.js rewrites the first " or " only
 // (Conformance.ts:554 at db021da0, a string pattern), and the parser does the
-// same. A further "or" would lex as a name and, white space separating the
-// terms, parse as an otherwise list nobody wrote; it is an error instead
+// same. A further "or" is left as a word, which this parser lexes as a name;
+// white space separating the terms (Conformance.ts:598-615), the text would
+// parse as an otherwise list nobody wrote. It is an error instead
 // (R2-P6-test-2851, a module rule — the guard fails closed where matter.js
-// would misread).
+// rewrites nothing and parses on).
 func ParseConformance(text string) (*Conf, error) {
 	p := &confParser{}
 	if err := p.lex(strings.Replace(text, " or ", " | ", 1)); err != nil {

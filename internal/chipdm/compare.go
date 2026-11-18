@@ -84,7 +84,8 @@ var notCarried = map[string]string{
 	"definitions outside the snapshot":             "CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit.",
 	"members CHIP does not state":                  "A command, event or data type whose fields CHIP leaves unstated because the specification gives them by reference (Level Control's *WithOnOff commands); the snapshot's fields have nothing to be compared with.",
 	"data model files not read":                    "An XML file outside clusters/, device_types/, globals/ and namespaces/, or below a subdirectory of one: the loader does not read it.",
-	"device type composition CHIP does not state":  "A device type the snapshot requires a composed device type to contain that CHIP's `composedDeviceTypes` does not list. CHIP lists a contained device type with the cluster requirements stated for it and states no conformance or constraint of the contained type itself.",
+	"device type composition CHIP does not state":  "A device type the snapshot requires a composed device type to contain that CHIP's `composedDeviceTypes` does not list, and each instance of one it lists. CHIP lists a contained device type with the cluster requirements stated for it and states no conformance or constraint of the contained type itself: for a contained type CHIP lists, only its id is compared.",
+	"side of a composed requirement":               "CHIP states no side for the cluster requirements of a contained device type; the comparison matches them on the cluster id and does not compare the side.",
 	"composition requirements CHIP does not state": "A cluster requirement, or a feature, attribute, command or event requirement below one, that the snapshot states for a contained device type CHIP lists and CHIP's `clusterRequirements` do not.",
 }
 
@@ -1020,9 +1021,12 @@ func (c *comparer) chipSuperset(dt *DeviceType) *DeviceType {
 func (c *comparer) requirements(path []string, chip, ours, superset *DeviceType) {
 	key := func(r *Requirement) string { return r.Side + ":" + canonicalName(r.Name) }
 	// A composed device type may contain one device type more than once
-	// (Battery Storage, two Electrical Sensors): CHIP's requirement of the
-	// contained type holds for each instance. Any other key is one
-	// requirement.
+	// (Battery Storage: matter.js states two Electrical Sensor instances,
+	// battery-storage.element.ts:21-24, :41-44 at db021da0). CHIP states one
+	// <deviceType> without a count — at 6170af84 with each of its cluster
+	// rows twice —, so which row belongs to which instance is not stated:
+	// every CHIP row is compared with every instance (a module rule). Any
+	// other key is one requirement.
 	index := map[string][]*Requirement{}
 	for _, r := range ours.Requirements {
 		k := key(r)
@@ -1040,10 +1044,18 @@ func (c *comparer) requirements(path []string, chip, ours, superset *DeviceType)
 			c.report(append(slices.Clone(path), r.Name+" ("+r.Side+")"), "requirement", "present", "absent")
 			continue
 		}
-		for _, o := range index[k] {
-			c.res.Compared["requirement"]++
+		for i, o := range index[k] {
 			p := append(slices.Clone(path), o.Name+" ("+o.Side+")")
 			c.value(p, "id", hexID(&r.ID), hexID(&o.ID))
+			if r.Side == "deviceType" {
+				// A contained type CHIP lists: its id is compared, its
+				// conformance and constraint CHIP does not state.
+				c.res.Compared["contained device type id"]++
+				c.notCompared("device type composition CHIP does not state", 1)
+				c.composition(p, r, o, i == 0)
+				continue
+			}
+			c.res.Compared["requirement"]++
 			if r.Conformance != nil {
 				c.value(p, "conformance", r.Conformance.Key(), o.Conformance.Key())
 			}
@@ -1051,9 +1063,6 @@ func (c *comparer) requirements(path []string, chip, ours, superset *DeviceType)
 				c.value(p, "quality", or(strings.Join(r.Quality, " "), "none"), or(strings.Join(o.Quality, " "), "none"))
 			}
 			c.elementRequirements(p, r, o, false)
-			if r.Side == "deviceType" {
-				c.composition(p, r, o)
-			}
 		}
 	}
 	for _, o := range ours.Requirements {
@@ -1078,31 +1087,39 @@ func (c *comparer) requirements(path []string, chip, ours, superset *DeviceType)
 
 // composition compares the cluster requirements CHIP states for a device
 // type a composed device type contains with the snapshot's (R2-P6-test-2850):
-// CHIP's are compared — present, id, conformance, quality and the element
-// requirements it states below them —, the snapshot's further ones are
-// counted as not compared.
-func (c *comparer) composition(path []string, chip, ours *Requirement) {
-	key := func(r *Requirement) string { return r.Side + ":" + canonicalName(r.Name) }
-	index := map[string]*Requirement{}
+// CHIP's rows are compared — present, conformance, quality and the element
+// requirements they state —, the snapshot's further ones are counted as not
+// compared. CHIP's rows state no side, so they are matched on the cluster id
+// and the side is counted as not compared. first is the first instance of
+// the contained type: a CHIP row is counted once, however many instances it
+// is compared with.
+func (c *comparer) composition(path []string, chip, ours *Requirement, first bool) {
+	index := map[uint32]*Requirement{}
 	for _, r := range ours.Clusters {
-		if index[key(r)] != nil {
+		if index[r.ID] != nil {
 			c.duplicate(path, r.Name+" ("+r.Side+")", "composed requirement")
 			continue
 		}
-		index[key(r)] = r
+		index[r.ID] = r
 	}
-	seen := map[string]bool{}
+	seen := map[uint32]bool{}
 	for _, r := range chip.Clusters {
-		k := key(r)
-		seen[k] = true
-		o := index[k]
+		seen[r.ID] = true
+		o := index[r.ID]
 		if o == nil {
-			c.report(append(slices.Clone(path), r.Name+" ("+r.Side+")"), "composed requirement", "present", "absent")
+			c.report(append(slices.Clone(path), r.Name), "composed requirement", "present", "absent")
 			continue
 		}
-		c.res.Compared["composed requirement"]++
+		if first {
+			c.res.Compared["composed requirement"]++
+			if r.Side == "" {
+				c.notCompared("side of a composed requirement", 1)
+			}
+		}
 		p := append(slices.Clone(path), o.Name+" ("+o.Side+")")
-		c.value(p, "id", hexID(&r.ID), hexID(&o.ID))
+		if r.Side != "" {
+			c.value(p, "side", r.Side, o.Side)
+		}
 		if r.Conformance != nil {
 			c.value(p, "conformance", r.Conformance.Key(), o.Conformance.Key())
 		}
@@ -1112,7 +1129,7 @@ func (c *comparer) composition(path []string, chip, ours *Requirement) {
 		c.elementRequirements(p, r, o, true)
 	}
 	for _, o := range ours.Clusters {
-		if !seen[key(o)] {
+		if !seen[o.ID] {
 			c.notCompared("composition requirements CHIP does not state", 1+len(o.Elements))
 		}
 	}
