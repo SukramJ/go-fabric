@@ -40,9 +40,9 @@ var LevelAcknowledged = []Acknowledgement{
 			"response while its request GetRelayStatusLog (0x04) is not in the model — the response's conformance " +
 			"names a command the model does not hold; CHIP's data_model/1.4, 1.4.1 and 1.4.2 hold neither. " +
 			"matter.js's model drops it from v0.17.0",
-		Source: "matter.js packages/model/src/standard/elements/Thermostat.ts:1229-1235 at v0.13.0, " +
-			"thermostat-cluster.element.ts:338 at v0.14.0 and :335 at v0.16.0; parity/levels/1.4.json, " +
-			"1.4.1.json, 1.4.2.json",
+		Source: "matter.js packages/model/src/standard/elements/Thermostat.ts:1229-1235 at e812bd07 (v0.13.0). " +
+			"thermostat-cluster.element.ts:338 at d87d1de4 (v0.14.0). thermostat-cluster.element.ts:335 at " +
+			"84dbb68c (v0.16.0). parity/levels/1.4.json, 1.4.1.json, 1.4.2.json",
 		Impact: "Nothing served depends on it: the cluster definition at the pin has no response 0x01 " +
 			"(parity/levels/1.6.1.json responseCommands [2, 253]). No upstream candidate: matter.js removed it at v0.17.0.",
 	},
