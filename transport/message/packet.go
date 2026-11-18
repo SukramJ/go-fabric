@@ -28,17 +28,17 @@ var (
 // matter.js refuses to encode. Mirrors matter.js
 // packages/protocol/src/codec/MessageCodec.ts at db021da0:
 //
-// - :450-452 encodePacket — a header with Message Extensions is not
-// encoded ([ErrEncodeExtensions]);
-// - :490-496 encodePacketHeader — a group-session header must carry the
-// destination group id and the source node id and no destination node
-// id ([ErrGroupHeader]);
-// - a unicast header naming a destination group id is refused
-// ([ErrUnicastGroupDestination]): matter.js cannot build one, and its
-// decoder (MessageCodec.ts:231-233 at db021da0) and chip's
-// (MessageHeader.cpp:209-212 at 6170af84) discard it;
-// - :498-513 — the bytes are [Header.Marshal]'s: Message Flags, Session
-// ID, Security Flags, Message Counter, Source Node ID, the destination.
+//   - :450-452 encodePacket — a header with Message Extensions is not
+//     encoded ([ErrEncodeExtensions]);
+//   - :490-496 encodePacketHeader — a group-session header must carry the
+//     destination group id and the source node id and no destination node
+//     id ([ErrGroupHeader]);
+//   - a unicast header naming a destination group id is refused
+//     ([ErrUnicastGroupDestination]): matter.js cannot build one, and its
+//     decoder (MessageCodec.ts:231-233 at db021da0) and chip's
+//     (MessageHeader.cpp:209-212 at 6170af84) discard it;
+//   - :498-513 — the bytes are [Header.Marshal]'s: Message Flags, Session
+//     ID, Security Flags, Message Counter, Source Node ID, the destination.
 //
 // [Header.Marshal] stays the unchecked encoder the AAD and the tests use.
 func (h Header) MarshalPacket() ([]byte, error) {

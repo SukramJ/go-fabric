@@ -305,8 +305,10 @@ func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32, fabricIndex 
 // session's set of subscriptions changed — a subscription added on it, or
 // one closed on it by any close path — with the session's id, outside the
 // manager's lock. matter.js's SessionManager raises subscriptionsChanged
-// for both (packages/node/src/behavior/system/sessions/
-// SessionsBehavior.ts:54, :75-93 at db021da0). Pass nil to detach.
+// for both (packages/protocol/src/session/SessionManager.ts:321-331 at
+// db021da0), which SessionsBehavior observes
+// (packages/node/src/behavior/system/sessions/SessionsBehavior.ts:54,
+// :75-93). Pass nil to detach.
 func (m *Manager) SetOnSessionSubscriptionsChanged(fn func(sessionID uint16)) {
 	m.mu.Lock()
 	m.onSessionChanged = fn
@@ -1222,7 +1224,8 @@ type Info struct {
 // keeps the list in SubscriptionsServer's internal.subscriptions
 // (SubscriptionsServer.ts:161 at db021da0; State.subscriptions,
 // :380-391, is deprecated and no longer written) and exposes no live
-// one.
+// list of these records — its live subscriptions are per session
+// (NodeSession.ts:191-193).
 func (m *Manager) Snapshot() []Info {
 	subs := m.snapshot()
 	out := make([]Info, 0, len(subs))

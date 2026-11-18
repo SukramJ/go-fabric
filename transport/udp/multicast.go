@@ -115,9 +115,11 @@ func (l *Listener) membership(group net.IP, join bool) error {
 // once on every up, multicast-capable interface — the set [Listener.JoinGroup]
 // joins on — choosing each egress interface with the IPV6_PKTINFO control
 // message. It fails only when no interface took the datagram
-// ([ErrNoMulticastInterface]), which is the "no UDP interface for the
-// multicast address" of matter.js GroupSession.create
-// (packages/protocol/src/session/GroupSession.ts:185-195 at db021da0).
+// ([ErrNoMulticastInterface]) — matter.js GroupSession.create fails the
+// same way when its transports hold no UDP interface for the multicast
+// address (packages/protocol/src/session/GroupSession.ts:186-190 at
+// db021da0; it throws PairRetransmissionLimitReachedError, "IPv6 interface
+// not initialized").
 // matter.js sends on one interface — the configured, the observed or the
 // default one (packages/nodejs/src/net/NodeJsUdpSocket.ts:298-325); a
 // receiver reachable over two interfaces takes the second copy as a

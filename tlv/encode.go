@@ -528,10 +528,14 @@ func (e *Encoder) writeStringLike(tag Tag, b []byte, t1, t2, t4, t8 ElementType)
 // writeControlAndTag emits the control byte (tag-kind << 5 | type)
 // followed by the tag bytes for that kind.
 //
-// Mirrors chip TLVWriter.cpp:WriteElementHead (CHIP_ERROR_INVALID_TLV_TAG) —
-// context-specific tags are rejected inside an Array container. All other
-// container/tag combinations are allowed (Structure accepts context tags;
-// List accepts any tag).
+// Mirrors one refusal of chip TLVWriter.cpp:WriteElementHead
+// (CHIP_ERROR_INVALID_TLV_TAG): a context-specific tag inside an Array
+// container. chip's writer refuses more — a context tag in every container
+// other than a Structure or a List, so also outside any container
+// (src/lib/core/TLVWriter.cpp:685-688 at 6170af84), an anonymous tag inside
+// a Structure (:695-697) and a profile tag inside an Array (:706-707). This
+// encoder checks the Array case only and writes the others (see the note
+// below).
 func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 	// Container-type check: reject context tags inside an Array.
 	// Mirrors chip src/lib/core/TLVWriter.cpp:685-688
@@ -553,9 +557,9 @@ func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 	}
 	// Note: chip TLVReader.cpp:865-871 (at 6170af84) enforces two strictness rules
 	// (no context tag at top level; no anonymous tag inside a
-	// Structure except EndOfContainer). Both are READ-side checks in
-	// chip's verifier — Apple's MTRDevice drops the whole IM message
-	// when either rule fires. go-fabric's writer stays permissive
+	// Structure except EndOfContainer). chip's reader enforces both
+	// (and its writer too, TLVWriter.cpp:685-688, :695-697) — Apple's
+	// MTRDevice drops the whole IM message when either rule fires. go-fabric's writer stays permissive
 	// so codec-level tests can construct malformed fixtures to
 	// validate the decoder rejection path; the strict rules are
 	// checked by [Validate] (decode.go).

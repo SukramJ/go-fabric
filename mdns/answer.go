@@ -496,8 +496,8 @@ func (r *Responder) answerNextLocked(query *dns.Msg, ifIndex int, src *net.UDPAd
 	}
 }
 
-// queryRecords is matter.js #queryRecords (MdnsServer.ts:377-387 at
-// 862ad75f): the records whose name matches the question's
+// queryRecords is matter.js queryRecords (InterfaceResponder.ts:924-932 at
+// db021da0): the records whose name matches the question's
 // case-insensitively (RFC 6762 §16) and whose type is the question's, or
 // any type for ANY.
 func queryRecords(q dns.Question, all []dns.RR) []dns.RR {

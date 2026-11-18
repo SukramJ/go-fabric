@@ -697,7 +697,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		// the cluster, accepts the command and on which the session may
 		// invoke it; an endpoint it may not is skipped, not reported.
 		// Mirrors matter.js
-		// packages/protocol/src/action/server/CommandInvokeResponse.ts:131-170
+		// packages/protocol/src/action/server/CommandInvokeResponse.ts:131-173
 		// (#processWildcard), :330-361 (#processEndpointForWildcard) and
 		// :367-398 (#wildcardTargetOf: the command's privilege :380, its
 		// Large Message quality :384-386, its fabric scope :388-390, its
@@ -771,9 +771,9 @@ func undecodedWildcardEntries(ctx context.Context, wild AuthorizingInvoker, g *i
 // fabric scope, timed quality), and every endpoint a wildcard path expands to. A path that
 // fails a check contributes nothing, and nothing runs. It is matter.js's
 // dispatch-endpoint set, collected in CommandInvokeResponse's validation
-// pass and handed to its dispatch hook before any command runs
-// (packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165
-// and :297 at 862ad75f), the endpoints a DelayReportData defers.
+// pass (packages/protocol/src/action/server/CommandInvokeResponse.ts:159-165
+// and :298 at db021da0) and handed to its dispatch hook before any command
+// runs (:101-103), the endpoints a DelayReportData defers.
 func DispatchEndpoints(ctx context.Context, d Dispatcher, req InvokeRequest) map[uint16]bool {
 	g := newInvokeGate(ctx, d)
 	out := map[uint16]bool{}

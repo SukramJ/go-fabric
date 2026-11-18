@@ -87,12 +87,14 @@ type ReadRequest struct {
 // MarshalTLV encodes r at the top level (always anonymous tag) as a
 // client sends it. Mirrors matter.js
 // packages/types/src/protocol/messages/TlvReadRequest.ts:19-35 at
-// 0ceb202d with the request action/request/Read.ts:40-89 builds: the
+// db021da0 with the request action/request/Read.ts:40-89 builds: the
 // optional lists — AttributeRequests (0), EventRequests (1), EventFilters
-// (2) — only when they have members, IsFabricFiltered (3) always,
-// DataVersionFilters (4) only with members, and InteractionModelRevision
+// (2) — when the request has them, IsFabricFiltered (3) always,
+// DataVersionFilters (4) when it has them, and InteractionModelRevision
 // (0xFF) [MatterInteractionModelRevision]
-// (packages/model/src/common/Specification.ts:124), in field order.
+// (packages/model/src/common/Specification.ts:124), in field order. A list
+// without members is left out here; Read.ts:75-89 would send one its
+// caller passed as an empty array.
 func (r ReadRequest) MarshalTLV(enc *tlv.Encoder) {
 	enc.StartStruct(tlv.AnonymousTag())
 	marshalAttributePaths(enc, tagReadReqAttributeRequests, r.AttributeRequests)
