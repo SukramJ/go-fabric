@@ -727,8 +727,10 @@ func (s *Server) SetSupportedAreas(areas []Area) error {
 
 // SetSupportedMaps records the device's map list (MAPS); it is refused
 // when it breaks #assertSupportedMaps. Every area on a map the new list no
-// longer holds is removed with it — and every area when the new list is
-// empty — with what follows an area's removal (SelectedAreas, CurrentArea,
+// longer holds is removed with it — and every area when the new list
+// empties a list that was not empty (an empty list set on an empty one
+// keeps the areas, as chip clears them only when the maps were not
+// already empty) — with what follows an area's removal (SelectedAreas, CurrentArea,
 // Progress), in one report, as connectedhomeip's ClearSupportedMaps and
 // RemoveSupportedMap take the areas along
 // (ServiceAreaCluster.cpp:944-947, :964-998 at 6170af84; chip has no
@@ -746,7 +748,7 @@ func (s *Server) SetSupportedMaps(maps []Map) error {
 	}
 	var gone []uint32
 	for _, a := range s.areas {
-		if len(maps) == 0 || !a.MapId.Null && !slices.ContainsFunc(maps, func(m Map) bool { return m.MapId == a.MapId.Value }) {
+		if len(maps) == 0 && len(s.maps) > 0 || !a.MapId.Null && !slices.ContainsFunc(maps, func(m Map) bool { return m.MapId == a.MapId.Value }) {
 			gone = append(gone, a.AreaId)
 		}
 	}

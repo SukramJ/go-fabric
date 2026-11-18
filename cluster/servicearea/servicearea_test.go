@@ -592,4 +592,22 @@ func TestAreasNameASupportedMap(t *testing.T) {
 	if got := read[spec.List[servicearea.Area]](t, srv, sa.AttrSupportedAreas); len(got) != 0 {
 		t.Errorf("SupportedAreas %+v after the maps were cleared, want none", got)
 	}
+
+	// An empty maps list set on an empty one keeps the areas — valid with
+	// no maps — and the selection: chip clears the areas only when the
+	// maps were not already empty (Fable round 2, D2).
+	cfg = vacuum(&device{})
+	cfg.SupportedMaps = nil
+	cfg.SupportedAreas = []servicearea.Area{area(7, nil, "Kitchen"), area(9, nil, "Hall")}
+	cfg.SelectedAreas = []uint32{9}
+	srv = newServer(t, cfg)
+	if err := srv.SetSupportedMaps(nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := read[spec.List[servicearea.Area]](t, srv, sa.AttrSupportedAreas); len(got) != 2 {
+		t.Errorf("SupportedAreas %+v after an empty maps list was set on an empty one, want both", got)
+	}
+	if got := read[[]uint32](t, srv, sa.AttrSelectedAreas); !slices.Equal(got, []uint32{9}) {
+		t.Errorf("SelectedAreas %v, want [9]", got)
+	}
 }
