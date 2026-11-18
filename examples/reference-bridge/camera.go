@@ -147,6 +147,11 @@ type demoCamera struct {
 	st settings
 	// restored is the state read from st, applied by devices.
 	restored cameraState
+	// keptUnread is why the kept state could not be read (attach) or
+	// decoded (build); while set, persist writes nothing, so the defaults
+	// the camera started from do not overwrite the state the operator still
+	// has in --db (R2-P6-store-2652).
+	keptUnread error
 	// videos and audios are the camera-app's available streams
 	// (camera-device.cpp InitializeVideoStreams, InitializeAudioStreams);
 	// snapshots every snapshot stream id it made (AddSnapshotStream).
@@ -275,25 +280,50 @@ func camVideo(id, minFPS, maxFPS, minW, minH, maxW, maxH uint16) csdef.VideoStre
 	}
 }
 
-// attach reads the kept state from st; call it before devices.
+// attach reads the kept state from st; call it before devices. A state it
+// cannot read or decode is logged, and the camera keeps it: it starts
+// from its defaults and persists nothing over it (keptUnread).
 func (c *demoCamera) attach(ctx context.Context, st settings) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.st = st
 	v, ok, err := st.GetSetting(ctx, cameraStateSetting)
-	if err != nil || !ok {
+	if err != nil {
+		c.keepUnreadLocked(fmt.Errorf("read %s: %w", cameraStateSetting, err))
+		return
+	}
+	if !ok {
 		return
 	}
 	if err := json.Unmarshal([]byte(v), &c.restored); err != nil {
-		c.logger.Warn("camerasim.load", slog.Any("err", err))
+		c.keepUnreadLocked(fmt.Errorf("decode %s: %w", cameraStateSetting, err))
 	}
 }
 
-// restore decodes a kept cluster state into its Patch.
-func restore[P any](raw json.RawMessage) P {
+// keepUnreadLocked records why the kept state was not taken and logs it
+// once. Caller holds c.mu.
+func (c *demoCamera) keepUnreadLocked(err error) {
+	if c.keptUnread != nil {
+		return
+	}
+	c.keptUnread = err
+	c.logger.Warn("camerasim.load", slog.Any("err", err),
+		slog.String("hint", "the camera starts from its defaults and keeps nothing until the setting is repaired or removed and the daemon restarted"))
+}
+
+// restore decodes a kept cluster state into its Patch; a field it cannot
+// decode keeps the whole kept state from being overwritten
+// (keepUnreadLocked).
+func restore[P any](c *demoCamera, raw json.RawMessage) P {
 	var p P
-	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &p)
+	if len(raw) == 0 {
+		return p
+	}
+	if err := json.Unmarshal(raw, &p); err != nil {
+		c.mu.Lock()
+		c.keepUnreadLocked(fmt.Errorf("decode %s: %w", cameraStateSetting, err))
+		c.mu.Unlock()
+		return *new(P)
 	}
 	return p
 }
@@ -318,12 +348,13 @@ func keep(state any, fields []string) json.RawMessage {
 	return data
 }
 
-// persist writes the camera's state.
+// persist writes the camera's state — nothing while a kept state it could
+// not read stands (keptUnread).
 func (c *demoCamera) persist() {
 	c.mu.Lock()
-	st := c.st
+	st, unread := c.st, c.keptUnread
 	c.mu.Unlock()
-	if st == nil || c.camera == nil {
+	if st == nil || c.camera == nil || unread != nil {
 		return
 	}
 	state := cameraState{
@@ -358,7 +389,7 @@ func (c *demoCamera) build() error {
 	c.mu.Unlock()
 
 	// The stream management (camera-app.cpp:185-283).
-	avs := restore[csdef.Patch](restored.AvStream)
+	avs := restore[csdef.Patch](c, restored.AvStream)
 	maxHDR := cam30fps
 	sensor := csdef.VideoSensorParamsStruct{SensorWidth: camMaxWidth, SensorHeight: camMaxHeight, MaxFps: camMaxVideoFrameRate, MaxHdrfps: &maxHDR}
 	minViewport := csdef.VideoResolutionStruct{Width: camMinWidth, Height: camMinHeight}
@@ -457,7 +488,7 @@ func (c *demoCamera) build() error {
 		csdef.FeatureHighDynamicRange | csdef.FeatureNightVision
 
 	// The camera's pan, tilt and zoom (camera-app.cpp:43-64).
-	avset := restore[avdef.Patch](restored.AvSettings)
+	avset := restore[avdef.Patch](c, restored.AvSettings)
 	panMin, panMax, tiltMin, tiltMax, zoomMax, maxPresets := camPanMin, camPanMax, camTiltMin, camTiltMax, camZoomMax, camMaxPresets
 	avset.PanMin, avset.PanMax, avset.TiltMin, avset.TiltMax, avset.ZoomMax, avset.MaxPresets = &panMin, &panMax, &tiltMin, &tiltMax, &zoomMax, &maxPresets
 	avsetFeatures := avdef.FeatureDigitalPtz | avdef.FeatureMechanicalPan | avdef.FeatureMechanicalTilt | avdef.FeatureMechanicalZoom | avdef.FeatureMechanicalPresets
@@ -475,7 +506,7 @@ func (c *demoCamera) build() error {
 
 	// The push transports, kept as the camera-app keeps them
 	// (push-av-stream-manager.cpp LoadCurrentConnections, :630-671).
-	push := restore[padef.Patch](restored.Push)
+	push := restore[padef.Patch](c, restored.Push)
 	push.SupportedFormats = nil
 	if push.CurrentConnections != nil {
 		for _, conn := range *push.CurrentConnections {
@@ -505,7 +536,7 @@ func (c *demoCamera) build() error {
 	c.camera = cam
 
 	// The chime (chime-manager.h:41-45; the chime server's defaults).
-	ch := restore[chimedef.Patch](restored.Chime)
+	ch := restore[chimedef.Patch](c, restored.Chime)
 	ch.InstalledChimeSounds = nil // the ChimePort's
 	chime, err := device.NewChime(c.options("chime", "Chime"), chimedef.Declare{Initial: ch, ChimePort: camChimePort{c}})
 	if err != nil {

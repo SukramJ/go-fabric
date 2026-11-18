@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -11,9 +12,11 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"log/slog"
 	"math/big"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -131,5 +134,63 @@ func TestTLSKeysMatchTheirCertificate(t *testing.T) {
 	restarted.RemoveClientKey(ctx, 1, 7)
 	if restarted.ClientKeyMatches(ctx, 1, 7, cert) {
 		t.Fatal("a removed key still matches")
+	}
+}
+
+// flakySettings is a settings store whose reads fail or return what the
+// test planted, and which counts its writes.
+type flakySettings struct {
+	readErr error
+	value   string
+	writes  int
+}
+
+func (s *flakySettings) GetSetting(context.Context, string) (string, bool, error) {
+	if s.readErr != nil {
+		return "", false, s.readErr
+	}
+	return s.value, s.value != "", nil
+}
+
+func (s *flakySettings) SetSetting(context.Context, string, string) error {
+	s.writes++
+	return nil
+}
+
+// TestCameraKeepsAStateItCannotRead holds R2-P6-store-2652: a kept state
+// the camera cannot read, or one with a field it cannot decode, is logged
+// and left alone — the camera starts from its defaults and persists
+// nothing over it.
+func TestCameraKeepsAStateItCannotRead(t *testing.T) {
+	t.Parallel()
+	for name, st := range map[string]*flakySettings{
+		"a read error":    {readErr: errors.New("disk I/O error")},
+		"a corrupt field": {value: `{"chime":{"SelectedChime":"not a number"}}`},
+		"corrupt JSON":    {value: `{"chime":`},
+	} {
+		var logs bytes.Buffer
+		c := newDemoCamera(surface.Policies{}, cameraOptions{}, slog.New(slog.NewTextHandler(&logs, nil)))
+		c.attach(context.Background(), st)
+		if _, err := c.devices(); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		c.persist()
+		if st.writes != 0 {
+			t.Errorf("%s: %d writes over the kept state", name, st.writes)
+		}
+		if !strings.Contains(logs.String(), "camerasim.load") {
+			t.Errorf("%s: not logged:\n%s", name, logs.String())
+		}
+	}
+	// The state it did read is persisted as before.
+	ok := &flakySettings{}
+	c := newDemoCamera(surface.Policies{}, cameraOptions{}, slog.New(slog.DiscardHandler))
+	c.attach(context.Background(), ok)
+	if _, err := c.devices(); err != nil {
+		t.Fatal(err)
+	}
+	c.persist()
+	if ok.writes != 1 {
+		t.Errorf("a readable state: %d writes, want 1", ok.writes)
 	}
 }
