@@ -11,7 +11,7 @@ import (
 )
 
 // TestEcdsaSignatureP1363ParityMatterJS mirrors
-// packages/general/test/crypto/EcdsaSignatureTest.ts:10-25 at 862ad75f
+// packages/general/test/crypto/EcdsaSignatureTest.ts:10-25 at db021da0
 // ("accepts a 64-byte IEEE P1363 signature", "rejects an IEEE P1363
 // signature of the wrong length"): the Sigma signature is r ‖ s, 32 bytes
 // each (unpackECDSASig / packECDSASig), and any other length is refused.
@@ -35,7 +35,7 @@ func TestEcdsaSignatureP1363ParityMatterJS(t *testing.T) {
 
 // TestDhSharedSecretParityMatterJS mirrors
 // packages/general/test/crypto/StandardCryptoTest.ts:107-116 and
-// packages/nodejs/test/crypto/NodeJsCryptoTest.ts:186-195 at 862ad75f
+// packages/nodejs/test/crypto/NodeJsCryptoTest.ts:186-195 at db021da0
 // ("computes correct DH shared secret"): two fresh P-256 key pairs derive
 // the same 32-byte secret (ecdhSharedSecret).
 func TestDhSharedSecretParityMatterJS(t *testing.T) {

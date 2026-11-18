@@ -151,7 +151,7 @@ func (p Parameters) EffectiveMaxTCPMessageSize() uint32 {
 // R2-P6-par-2905). A reader here cannot tell an absent bitmap from 0
 // ([DecodeFields]). matter.js itself encodes the minimal width and
 // its decoder checks only the element type (TlvNumber.ts:118-143 at
-// 0ceb202d), so either width is accepted on the wire; the fixed width
+// db021da0), so either width is accepted on the wire; the fixed width
 // keeps the fixtures stable.
 func (p Parameters) Encode(enc *tlv.Encoder, outer tlv.Tag) {
 	enc.StartStruct(outer)

@@ -16,8 +16,8 @@ import (
 // The send half of a group session: the AEAD seal of a group message and
 // the privacy obfuscation of its header — the counterparts of the
 // candidate decrypt and deobfuscation groups.Manager.Decode runs. Mirrors
-// matter.js packages/protocol/src/session/GroupSession.ts:251-287 (encode)
-// and packages/protocol/src/codec/MessagePrivacy.ts:38-56 at 0ceb202d.
+// matter.js packages/protocol/src/session/GroupSession.ts:297-325 (encode)
+// and packages/protocol/src/codec/MessagePrivacy.ts:38-56 at db021da0.
 
 // ErrNotGroupHeader is returned by [EncryptGroup] for a header that is not
 // a group-session header carrying a destination group id. Mirrors the
@@ -58,7 +58,7 @@ const privacyHeaderOffset = 4
 // and rebuild the nonce from. sourceNodeID names the sender's node id and
 // must agree with the header ([ErrSourceNodeMismatch]); a nonce from any
 // other id would seal a message no receiver can open. Mirrors matter.js
-// packages/protocol/src/session/GroupSession.ts:260-269 at 862ad75f
+// packages/protocol/src/session/GroupSession.ts:300-309 at db021da0
 // ("Receivers derive the nonce from the header, so the header's source
 // node ID is the only one used").
 func EncryptGroup(operationalKey []byte, sourceNodeID uint64, header message.Header, payload []byte) (headerBytes, ciphertext []byte, err error) {

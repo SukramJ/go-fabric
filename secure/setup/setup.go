@@ -106,7 +106,7 @@ const base38Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-."
 // §5.7. Errors out when p fails Validate, and refuses what matter.js's
 // encoder refuses: a version other than 0 and an invalid passcode
 // (QrPairingCodeSchema.validate, PairingCodeSchema.ts:279-286 at
-// 0ceb202d, INVALID_PASSCODES :160-162). The vendor/product identity rules
+// db021da0, INVALID_PASSCODES :160-162). The vendor/product identity rules
 // bind a code being read only (validateDecoded, :288-293): [DecodeQRCode]
 // applies them, the encoder does not.
 func QRCode(p Payload) (string, error) {
@@ -225,7 +225,7 @@ func base38Encode(b []byte) string {
 // versionFlag is 0 here (vendor + product not embedded); [ManualCodeLong]
 // writes the 21-digit form that carries them. A trivial passcode is
 // refused, as matter.js's encoder refuses it (ManualPairingCodeSchema.validate,
-// PairingCodeSchema.ts:429-430 at 0ceb202d).
+// PairingCodeSchema.ts:429-430 at db021da0).
 func ManualCode(discriminator uint16, passcode uint32) (string, error) {
 	return manualCode(discriminator, passcode, nil, true)
 }
@@ -234,7 +234,7 @@ func ManualCode(discriminator uint16, passcode uint32) (string, error) {
 // the vendor and product id after the 10 digits of the short form and
 // sets the VID_PID_PRESENT bit of the first digit. Mirrors matter.js
 // ManualPairingCodeSchema.encodeInternal (PairingCodeSchema.ts:440-454 at
-// 0ceb202d): the first digit is (discriminator >> 10) | 1 << 2, the vendor
+// db021da0): the first digit is (discriminator >> 10) | 1 << 2, the vendor
 // and product id are five digits each, and the Verhoeff check digit
 // closes the code.
 func ManualCodeLong(discriminator uint16, passcode uint32, vendorID, productID uint16) (string, error) {

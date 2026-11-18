@@ -8,9 +8,9 @@
 // output to the matter.js HEAD reference values.
 //
 // Test-vector provenance:
-//   - ietf_draft01_*   — Spake2pTest.ts:14-62 at 862ad75f (IETF draft-bar-cfrg-spake2plus-01)
-//   - pase_*           — PasePairingTest.ts:56-159
-//   - TestPasePairingSpake2Process — PasePairingTest.ts:263-315 at 862ad75f
+//   - ietf_draft01_*   — Spake2pTest.ts:14-62 at db021da0 (IETF draft-bar-cfrg-spake2plus-01)
+//   - pase_*           — PasePairingTest.ts:56-159 at 862ad75f
+//   - TestPasePairingSpake2Process — PasePairingTest.ts:263-315 at db021da0
 //     ("do special successful pase process"), inline
 //
 // If any assertion fails that is a REAL drift against matter.js — stop,
