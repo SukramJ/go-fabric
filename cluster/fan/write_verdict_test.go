@@ -102,16 +102,35 @@ func TestFanWriteCommitNamesTheSiblings(t *testing.T) {
 		written any
 		want    []uint32
 	}{
-		{"FanMode Off moves both settings", fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
-			fan.AttrFanMode, uint64(fan.FanModeOff), []uint32{fan.AttrFanMode, fan.AttrPercentSetting, fan.AttrSpeedSetting}},
-		{"PercentSetting moves SpeedSetting", fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
-			fan.AttrPercentSetting, uint64(60), []uint32{fan.AttrPercentSetting, fan.AttrSpeedSetting}},
-		{"a sibling already there is not named", fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(6)},
-			fan.AttrPercentSetting, uint64(60), []uint32{fan.AttrPercentSetting}},
-		{"SpeedSetting 0 moves FanMode and PercentSetting", fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
-			fan.AttrSpeedSetting, uint64(0), []uint32{fan.AttrSpeedSetting, fan.AttrFanMode, fan.AttrPercentSetting}},
-		{"the held value", fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
-			fan.AttrPercentSetting, uint64(40), nil},
+		{
+			"FanMode Off moves both settings",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
+			fan.AttrFanMode, uint64(fan.FanModeOff),
+			[]uint32{fan.AttrFanMode, fan.AttrPercentSetting, fan.AttrSpeedSetting},
+		},
+		{
+			"PercentSetting moves SpeedSetting",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
+			fan.AttrPercentSetting, uint64(60),
+			[]uint32{fan.AttrPercentSetting, fan.AttrSpeedSetting},
+		},
+		{
+			"a sibling already there is not named",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(6)},
+			fan.AttrPercentSetting, uint64(60),
+			[]uint32{fan.AttrPercentSetting},
+		},
+		{
+			"SpeedSetting 0 moves FanMode and PercentSetting",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
+			fan.AttrSpeedSetting, uint64(0),
+			[]uint32{fan.AttrSpeedSetting, fan.AttrFanMode, fan.AttrPercentSetting},
+		},
+		{
+			"the held value",
+			fandef.State{FanMode: fan.FanModeLow, PercentSetting: u8(40), SpeedSetting: u8(4)},
+			fan.AttrPercentSetting, uint64(40), nil,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
