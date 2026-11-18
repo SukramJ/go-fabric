@@ -1370,12 +1370,12 @@ func (n *Node) startLocked(ctx context.Context) error {
 	n.root.BasicInformation.EmitStartUp()
 	n.root.GeneralDiagnostics.EmitBootReason()
 	n.keeperWG.Add(1)
-	// The keeper's inputs are read here, under the start's lock, not when
-	// its goroutine first runs: a field set after Start is not its input.
-	life, clk, st, diag := n.life, n.cfg.Clock, n.st, n.root.GeneralDiagnostics
+	// The keeper's store is read here, under the start's lock, not when its
+	// goroutine first runs: a port set after Start is not its store.
+	st := n.st
 	go func() {
 		defer n.keeperWG.Done()
-		keepOperationalTime(life, clk, st, diag, operationalTimeInterval, n.logger)
+		keepOperationalTime(n.life, n.cfg.Clock, st, n.root.GeneralDiagnostics, operationalTimeInterval, n.logger)
 	}()
 
 	n.ensureOTAProviderACL(ctx)
