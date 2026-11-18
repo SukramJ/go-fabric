@@ -53,9 +53,43 @@ var (
 	// or passcode is invalid.
 	ErrOnboardingCode = errors.New("client: onboarding code")
 	// ErrOnboardingMismatch is a readable code that names another device:
-	// its vendor, product or discriminator differs from the node's.
+	// its vendor, product or discriminator differs from the node's. The
+	// error [Node.SetOnboardingCode] returns is an
+	// [*OnboardingMismatchError], which names the field and both values.
 	ErrOnboardingMismatch = errors.New("client: onboarding code names another device")
 )
+
+// OnboardingMismatchError is the mismatch [Node.SetOnboardingCode]
+// reports: the code names another device. errors.Is(err,
+// [ErrOnboardingMismatch]) holds for it. None of its values is a secret:
+// vendor and product ids are public, the discriminator is advertised.
+type OnboardingMismatchError struct {
+	// Field is the identity field that differs: one of
+	// [OnboardingCheckedVendor], [OnboardingCheckedProduct] and
+	// [OnboardingCheckedDiscriminator].
+	Field OnboardingChecks
+	// Code is the code's value of the field.
+	Code uint16
+	// Node is the node's value: its vendor or product id, or the
+	// discriminator it advertised — shifted to the code's 4 bits when the
+	// code is a manual one, as compared.
+	Node uint16
+}
+
+// Error is the mismatch in words.
+func (e *OnboardingMismatchError) Error() string {
+	switch e.Field {
+	case OnboardingCheckedVendor:
+		return fmt.Sprintf("%v: its vendor id is 0x%04X, the node's is 0x%04X", ErrOnboardingMismatch, e.Code, e.Node)
+	case OnboardingCheckedProduct:
+		return fmt.Sprintf("%v: its product id is 0x%04X, the node's is 0x%04X", ErrOnboardingMismatch, e.Code, e.Node)
+	default:
+		return fmt.Sprintf("%v: its discriminator is %d, the node advertised %d", ErrOnboardingMismatch, e.Code, e.Node)
+	}
+}
+
+// Is reports target as [ErrOnboardingMismatch].
+func (e *OnboardingMismatchError) Is(target error) bool { return target == ErrOnboardingMismatch }
 
 // OnboardingSource tells how a node's onboarding code came to be stored.
 type OnboardingSource uint8
@@ -316,12 +350,12 @@ func (n *Node) checkOnboarding(id onboardingIdentity) (OnboardingChecks, error) 
 	vendor, product := n.identityIDs(rec)
 	if id.vendor != 0 && vendor != nil {
 		if id.vendor != *vendor {
-			return 0, fmt.Errorf("%w: its vendor id is 0x%04X, the node's is 0x%04X", ErrOnboardingMismatch, id.vendor, *vendor)
+			return 0, &OnboardingMismatchError{Field: OnboardingCheckedVendor, Code: id.vendor, Node: *vendor}
 		}
 		checks |= OnboardingCheckedVendor
 		if id.product != 0 && product != nil {
 			if id.product != *product {
-				return 0, fmt.Errorf("%w: its product id is 0x%04X, the node's is 0x%04X", ErrOnboardingMismatch, id.product, *product)
+				return 0, &OnboardingMismatchError{Field: OnboardingCheckedProduct, Code: id.product, Node: *product}
 			}
 			checks |= OnboardingCheckedProduct
 		}
@@ -332,7 +366,7 @@ func (n *Node) checkOnboarding(id onboardingIdentity) (OnboardingChecks, error) 
 			want >>= 8
 		}
 		if id.discriminator != want {
-			return 0, fmt.Errorf("%w: its discriminator is %d, the node advertised %d", ErrOnboardingMismatch, id.discriminator, want)
+			return 0, &OnboardingMismatchError{Field: OnboardingCheckedDiscriminator, Code: id.discriminator, Node: want}
 		}
 		checks |= OnboardingCheckedDiscriminator
 	}

@@ -5,10 +5,12 @@ package client_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/interaction"
@@ -182,4 +184,38 @@ func TestClientChunkedWriteParity(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestClientWriteRefusedBeforeSending: a write the controller refuses
+// before it sends is matched through the facade's own errors — a timed
+// list write larger than one message is ErrRequestTooLarge, a negative
+// TimedTimeout on a timed write ErrMalformedRequest — and the device's
+// list is unchanged (issue 544).
+func TestClientWriteRefusedBeforeSending(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		value []userlabeldef.LabelStruct
+		opts  client.WriteOptions
+		want  error
+	}{
+		"timed, larger than one message": {labels(50), client.WriteOptions{Timed: true}, client.ErrRequestTooLarge},
+		"timed, negative timed timeout":  {labels(1), client.WriteOptions{Timed: true, TimedTimeout: -time.Second}, client.ErrMalformedRequest},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			cp, _ := chunkedPair(t)
+			w := client.WriteRequest{Path: cp.lightPath(userlabeldef.ClusterID, userlabeldef.AttrLabelList), Value: spec.List[userlabeldef.LabelStruct](tc.value)}
+			var err error
+			cp.run(t, func(ctx context.Context) error {
+				_, err = cp.node.Write(ctx, []client.WriteRequest{w}, tc.opts)
+				return nil
+			})
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("err = %v, want %v", err, tc.want)
+			}
+			if got := cp.light.UserLabel().Get().LabelList; len(got) != 0 {
+				t.Fatalf("LabelList has %d entries after a refused write", len(got))
+			}
+		})
+	}
 }

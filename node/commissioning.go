@@ -435,6 +435,8 @@ func (h *commissioningHost) snapshot(window *bridge.CommissioningWindow) WindowS
 	if snap.Open {
 		snap.OpenedAt, snap.Deadline, snap.Timeout = window.Timing()
 		switch {
+		case !snap.Own && snap.Administrator.Status == wire.WindowStatusBasic:
+			snap.Kind = WindowAdministratorBasic
 		case !snap.Own:
 			snap.Kind = WindowEnhanced
 		case h.currentBasic() != nil:

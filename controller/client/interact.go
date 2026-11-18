@@ -13,6 +13,21 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 )
 
+// The errors of a request the controller refuses before it sends
+// anything: the request is the caller's to fix, not a failure of the node
+// (issue 544).
+var (
+	// ErrRequestTooLarge is a request that does not fit one message where
+	// it must: a timed or response-suppressed write, or one value that
+	// fits no message — the client machinery's
+	// [interaction.ErrRequestTooLarge].
+	ErrRequestTooLarge = interaction.ErrRequestTooLarge
+	// ErrMalformedRequest is a request the controller does not formulate,
+	// such as a timed one with a negative TimedTimeout — the client
+	// machinery's [interaction.ErrMalformedRequest].
+	ErrMalformedRequest = interaction.ErrMalformedRequest
+)
+
 // ReadRequest is a read through the node — matter.js ClientRead
 // (packages/protocol/src/action/client/ClientRead.ts:15 at db021da0): the
 // paths and filters it sends ([ReadPaths], embedded as ReadRequest, its
