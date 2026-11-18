@@ -534,7 +534,8 @@ func (e *Encoder) writeStringLike(tag Tag, b []byte, t1, t2, t4, t8 ElementType)
 // List accepts any tag).
 func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 	// Container-type check: reject context tags inside an Array.
-	// Mirrors chip src/lib/core/TLVWriter.cpp:WriteElementHead:705-710.
+	// Mirrors chip src/lib/core/TLVWriter.cpp:685-688
+	// (WriteElementHead) at 6170af84.
 	if len(e.containerStack) > 0 &&
 		e.containerStack[len(e.containerStack)-1] == TypeArray &&
 		tag.Kind == TagKindContext {
