@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9962,
+  "entry_points": 9966,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27685,
+    "total_exported": 27689,
     "reachable": 20824,
-    "whitelisted": 6837,
+    "whitelisted": 6841,
     "unreachable": 24
   },
   "by_package": [
@@ -8422,6 +8422,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestWrittenAttributeOfAServerWithoutReportViewWaitsForTheAdvance",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 590
+    },
+    {
+      "package": "bridge",
       "identifier": "TestWrittenAttributeReachesASubscriber",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
@@ -12150,6 +12157,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_uptime_test.go",
       "line": 16
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestGroupKeyMapEveryWriterHoldsWriteMu",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/group_key_management_write_lock_internal_test.go",
+      "line": 56
     },
     {
       "package": "cluster/core",
@@ -37912,6 +37926,13 @@
       "line": 469
     },
     {
+      "package": "groups",
+      "identifier": "TestUnparsablePayloadFailsItsCandidate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/decode_payload_header_test.go",
+      "line": 19
+    },
+    {
       "package": "icd",
       "identifier": "TestRegistrationsAllDoesNotAliasKeys",
       "reason": "auto-whitelist:pattern=test-file",
@@ -37945,6 +37966,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/after_response_test.go",
       "line": 13
+    },
+    {
+      "package": "im",
+      "identifier": "TestArrayElementWithATagIsMalformed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/array_element_tag_test.go",
+      "line": 35
     },
     {
       "package": "im",
