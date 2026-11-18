@@ -37489,14 +37489,14 @@
       "identifier": "TestR2P6Sec3320Concurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/resume_replay_internal_test.go",
-      "line": 46
+      "line": 47
     },
     {
       "package": "fabrictest",
       "identifier": "TestR2P6Sec3320Replay",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/resume_replay_internal_test.go",
-      "line": 33
+      "line": 34
     },
     {
       "package": "fabrictest",
