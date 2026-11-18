@@ -174,8 +174,11 @@ func (n *Node) newClientStack(cfg ClientConfig) (*clientStack, error) {
 // does not share, so a flow that means one (a DiagnosticLogs transfer)
 // finds none. What the bridge's server adds beyond the gates is not on this
 // path: events are not reported in a read, a SubscribeRequest answers
-// InvalidAction, and a write or invoke reaches the bridge's subscriptions
-// through the servers' own change notifications only.
+// InvalidAction, a chunked write (MoreChunkedMessages) is refused whole
+// with FAILURE before any of it is applied until ADR 0032's single session
+// layer (client/interaction, F-db021da0-51, decision 242), and a write or
+// invoke reaches the bridge's subscriptions through the servers' own change
+// notifications only.
 func (n *Node) clientServerConfig() interaction.ServerConfig {
 	maxPaths := int(n.cfg.MaxPathsPerInvoke)
 	if maxPaths == 0 {
