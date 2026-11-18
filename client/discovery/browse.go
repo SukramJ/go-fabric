@@ -44,7 +44,7 @@ var errServiceType = errors.New("discovery: browse: empty service type")
 // closes.
 //
 // matter.js browses no foreign service type: its DnssdNames
-// (packages/general/src/net/dns-sd/DnssdNames.ts at 862ad75f) is generic,
+// (packages/general/src/net/dns-sd/DnssdNames.ts at db021da0) is generic,
 // and MdnsService narrows it to Matter's types
 // (packages/protocol/src/mdns/MdnsService.ts:27, :90-94). Browse widens
 // the same cache for one type by an ingress filter, as the commissionable

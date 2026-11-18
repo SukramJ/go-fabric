@@ -11,7 +11,7 @@ import (
 // Identity is what an onboarding payload or a commissionable advertisement
 // says about a device's identity — matter.js CommissioningDiscovery.Identity
 // (packages/node/src/behavior/system/controller/discovery/CommissioningDiscovery.ts:96-100
-// at 862ad75f). 0 is unspecified (§ 2.5.2, § 2.5.3): the payload codecs
+// at db021da0). 0 is unspecified (§ 2.5.2, § 2.5.3): the payload codecs
 // and the advertisement parser report it as absent.
 type Identity struct {
 	VendorID, ProductID uint16

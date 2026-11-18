@@ -19,7 +19,7 @@ type (
 )
 
 // TestParityTimingDefaults: every default of matter.js
-// packages/protocol/src/peer/PeerTimingParameters.ts:184-209 at 0ceb202d.
+// packages/protocol/src/peer/PeerTimingParameters.ts:186-211 at db021da0.
 func TestParityTimingDefaults(t *testing.T) {
 	t.Parallel()
 	d := DefaultTiming()
@@ -88,7 +88,7 @@ func TestParityTimingMerge(t *testing.T) {
 }
 
 // TestParityErrorDelays: the error-to-delay table of matter.js
-// PeerConnection.ts:674-696 at 0ceb202d, with busyDelay as
+// PeerConnection.ts:696-718 at db021da0, with busyDelay as
 // SecureChannelMessenger.ts:44-50 reads it (general Busy, protocol Busy,
 // two bytes little-endian).
 func TestParityErrorDelays(t *testing.T) {

@@ -14,8 +14,8 @@ import (
 )
 
 // The TCP initiator: matter.js Peer's resolveTransports
-// (packages/protocol/src/peer/Peer.ts:352-410 at 862ad75f) and its
-// transport preference (:76-83), the tcpUnsupported flag (:292-293, :352-353), PeerSet's
+// (packages/protocol/src/peer/Peer.ts:353-411 at db021da0) and its
+// transport preference (:76-83), the tcpUnsupported flag (:293-294, :353-354), PeerSet's
 // socket opening by address type (PeerSet.ts:274-304) and the
 // TcpUnsupportedError of a TCP session that denies TCP
 // (PeerCommunicationError.ts:22-26).

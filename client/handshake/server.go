@@ -25,9 +25,9 @@ type FabricResolver interface {
 	// FabricForDestination returns the first fabric one of whose
 	// candidate destination ids equals destinationID for initiatorRandom,
 	// false for none — matter.js FabricManager.findFabricFromDestinationId
-	// (packages/protocol/src/fabric/FabricManager.ts:306-334 at 0ceb202d).
+	// (packages/protocol/src/fabric/FabricManager.ts:325-353 at db021da0).
 	// A fabric being deleted is not returned: matter.js throws
-	// FabricNotFoundError for it (:312-314) as for no match (:333).
+	// FabricNotFoundError for it (:331-333) as for no match (:352).
 	FabricForDestination(destinationID [32]byte, initiatorRandom [sigma.RandomSize]byte) (Fabric, bool)
 	// FabricByIndex returns the fabric of a resumption record — matter.js
 	// keeps the fabric in the record (SessionManager.ts:837-839,
@@ -87,7 +87,7 @@ type CASEServerConfig struct {
 // CASEServer is the controller's CASE responder: a peer that opens CASE to
 // us — a node re-establishing its subscriptions after a restart — is
 // answered as a device answers a controller. It is the port of matter.js
-// packages/protocol/src/session/case/CaseServer.ts:49-347 at 0ceb202d
+// packages/protocol/src/session/case/CaseServer.ts:49-347 at db021da0
 // over secure/sigma's Responder, which holds the cryptography; this type
 // holds the exchange loop, the status reports, the session and the
 // record.

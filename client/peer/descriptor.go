@@ -14,7 +14,7 @@ import (
 
 // Descriptor is what is known about a peer — a node on one of our
 // fabrics — and what a [Store] keeps of it. It is matter.js PeerDescriptor
-// (packages/protocol/src/peer/PeerDescriptor.ts:34-81 at 0ceb202d).
+// (packages/protocol/src/peer/PeerDescriptor.ts:34-75 at db021da0).
 type Descriptor struct {
 	// Address is the peer's logical address: our fabric index and its node
 	// id (:40-43).
@@ -52,7 +52,7 @@ type Descriptor struct {
 	// TCPUnsupported records a peer that negotiated a TCP session but
 	// reported no TCP server: TCP is not attempted again until a later
 	// session reports TCP server support (PeerDescriptor.ts:62-66,
-	// Peer.ts:346-353 at 862ad75f).
+	// Peer.ts:347-354 at db021da0).
 	TCPUnsupported bool
 }
 

@@ -24,7 +24,7 @@ type statusState struct {
 // outstanding, it resolves the service actively ([Service.Resolve]) until
 // the service is reachable again with no attempt outstanding. It is
 // matter.js IpServiceStatus
-// (packages/general/src/net/dns-sd/IpServiceStatus.ts:23-205 at 0ceb202d);
+// (packages/general/src/net/dns-sd/IpServiceStatus.ts:23-205 at db021da0);
 // [Service.Reachable] is its isReachable flag.
 type Status struct {
 	s *Service

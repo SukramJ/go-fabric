@@ -878,7 +878,7 @@ func TestContinuousDiscoveryParity(t *testing.T) {
 	})
 }
 
-// TestPASERaceParity: PaseDiscovery (PaseDiscovery.ts:28-71 at 862ad75f)
+// TestPASERaceParity: PaseDiscovery (PaseDiscovery.ts:28-71 at db021da0)
 // — the race's winner is the attempt's result, and a race without a
 // device reports one of the discovery outcomes, ErrDiscovery's kinds
 // (DiscoveryError.ts:12-29).

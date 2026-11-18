@@ -51,7 +51,7 @@ type PASEOptions struct {
 // on a fresh exchange over a new unsecured session of mgr, and returns
 // the secure session, registered with mgr. Mirrors matter.js
 // packages/protocol/src/session/pase/PaseClient.ts:73-216 (pair, #doPair)
-// at 0ceb202d:
+// at db021da0:
 //
 //  1. a 32-byte random and a free session id (:136-137);
 //     PBKDFParamRequest with passcode id 0, hasPbkdfParameters false and

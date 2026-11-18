@@ -129,7 +129,7 @@ func queryQNames(id Identifier) []string {
 
 // CommissionedIdentity identifies a commissioned device independently of
 // the transport that discovered it — matter.js CommissionableDeviceIdentity
-// (packages/protocol/src/common/Scanner.ts:222-239 at 862ad75f): the long
+// (packages/protocol/src/common/Scanner.ts:222-239 at db021da0): the long
 // discriminator and "<vendor>+<product>" or only "<vendor>".
 type CommissionedIdentity struct {
 	D  uint16

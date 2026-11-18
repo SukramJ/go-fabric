@@ -20,7 +20,7 @@ import (
 
 // TestDiscoveryCancelWithRealDeviceParity is a port of
 // packages/node/test/behavior/system/controller/discovery/DiscoveryCancelTest.ts:568-674
-// at 862ad75f ("with a real device", interruptMidPase): a commissioning
+// at db021da0 ("with a real device", interruptMidPase): a commissioning
 // race over the controller's DNS-SD transport against a fabrictest device
 // whose PASE answers are held once the controller opens PASE
 // (fabrictest.Network.Filter drops the device's datagrams to the

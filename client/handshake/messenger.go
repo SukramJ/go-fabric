@@ -32,7 +32,7 @@ var (
 // packages/protocol/src/securechannel/SecureChannelMessenger.ts:55
 // (EXPECTED_CRYPTO_PROCESSING_TIME = 35 s, the messenger's default) and
 // :58 (DEFAULT_NORMAL_PROCESSING_TIME = 2 s, used for the PBKDF
-// parameter exchange, PaseMessenger.ts:84-96) at 0ceb202d.
+// parameter exchange, PaseMessenger.ts:84-96) at db021da0.
 const (
 	ExpectedCryptoProcessingTime = 35 * time.Second
 	DefaultNormalProcessingTime  = 2 * time.Second

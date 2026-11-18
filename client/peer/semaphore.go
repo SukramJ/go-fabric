@@ -15,13 +15,13 @@ import (
 // ErrSemaphoreClosed is a slot request of a closed or cleared
 // [Semaphore] — matter.js's ClosedError("Queue is closed") and ("Queue
 // cleared") (packages/general/src/util/Semaphore.ts:73, :227, :252 at
-// 862ad75f).
+// db021da0).
 var ErrSemaphoreClosed = errors.New("peer: semaphore closed")
 
 // Semaphore limits concurrent work by slots: a caller obtains a [Slot],
 // works, and closes it. A delay is a cooldown between consecutive grants;
 // a timeout releases a slot its holder forgot. It is matter.js's
-// Semaphore (packages/general/src/util/Semaphore.ts:38-256 at 862ad75f),
+// Semaphore (packages/general/src/util/Semaphore.ts:38-256 at db021da0),
 // the throttle of a network profile. It is safe for concurrent use.
 type Semaphore struct {
 	clock       clock.Clock

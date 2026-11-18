@@ -41,7 +41,7 @@ func (r ReachabilityReason) String() string {
 
 // monitor follows a peer's discovered addresses and probes the session
 // when its address leaves them — matter.js PeerAddressMonitor
-// (packages/protocol/src/peer/PeerAddressMonitor.ts:43-293 at 0ceb202d),
+// (packages/protocol/src/peer/PeerAddressMonitor.ts:43-293 at db021da0),
 // the ICD branch (:143-172) included. Unlike matter.js, a session-suspect
 // run walks the discovered alternates too (ReasonSessionSuspect), and both
 // runs walk them with the proven host's addresses first (orderForPeer).
@@ -203,7 +203,7 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 	}
 	if s.Transport() == exchange.TransportTCP {
 		// A TCP session is evicted when its connection drops: probing is
-		// moot (PeerAddressMonitor.ts:137-141 at 862ad75f).
+		// moot (PeerAddressMonitor.ts:137-141 at db021da0).
 		return true
 	}
 	current := addressOf(s.Addr()).AddrPort()

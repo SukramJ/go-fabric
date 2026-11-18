@@ -93,7 +93,7 @@ type ConnectOptions struct {
 	// Network names the network profile whose throttle the connection
 	// process takes a slot of — its connect sub-profile when it has one —
 	// for a process this call starts; "" is the peer's medium profile
-	// (matter.js PeerConnection.ts:110-118 at 862ad75f, options.network).
+	// (matter.js PeerConnection.ts:112-120 at db021da0, options.network).
 	// "icdLit" is the unthrottled profile a sustained subscription to a
 	// LIT ICD peer connects on, so its subscribe lands inside the peer's
 	// brief active window (SustainedSubscription.ts:133-149). A name no
@@ -105,7 +105,7 @@ type ConnectOptions struct {
 	AdditionalMrpDelay *time.Duration
 	// RequiredTransport is a hard transport constraint for a process this
 	// call starts: TCP or UDP only — "Large Message Quality requires TCP"
-	// (Peer.ts:734 at 862ad75f); nil for none.
+	// (Peer.ts:735 at db021da0); nil for none.
 	RequiredTransport *exchange.Transport
 	// PreferredTransport overrides the peer's transport preference for a
 	// process this call starts; nil keeps it (Peer.ts:736-741).
@@ -148,9 +148,9 @@ type attempt struct {
 }
 
 // connection is one run of the connection process of a peer — matter.js
-// PeerConnection (packages/protocol/src/peer/PeerConnection.ts:93-753 at
-// 0ceb202d): an attempt per address and transport variant, over UDP or
-// TCP. Its state (:129-177) is guarded by mu.
+// PeerConnection (packages/protocol/src/peer/PeerConnection.ts:95-775 at
+// db021da0): an attempt per address and transport variant, over UDP or
+// TCP. Its state (:131-179) is guarded by mu.
 type connection struct {
 	p           *Peer
 	timing      Timing

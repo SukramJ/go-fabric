@@ -21,8 +21,8 @@ import (
 
 // Peer is a node on one of our fabrics: its descriptor, its sessions, its
 // operational DNS-SD service and the work that keeps a session to it. It
-// is matter.js Peer (packages/protocol/src/peer/Peer.ts:64-674 at
-// 0ceb202d) without the transport preference, the BasicInformation input
+// is matter.js Peer (packages/protocol/src/peer/Peer.ts:64-675 at
+// db021da0) without the transport preference, the BasicInformation input
 // and the client interaction (stages 3 and 4); of its physical
 // properties it takes the medium ([Peer.SetMedium]) its network profile
 // is selected by. It is safe for concurrent use.
@@ -131,7 +131,7 @@ func (p *Peer) busyRemaining() time.Duration {
 // properties its network profile is selected by — matter.js
 // Peer.physicalProperties, which the client node sets
 // (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
-// 862ad75f). nil removes it: the peer's medium is unknown.
+// db021da0). nil removes it: the peer's medium is unknown.
 func (p *Peer) SetMedium(fn func() Medium) {
 	if fn == nil {
 		p.mediumOf.Store(nil)
@@ -591,7 +591,7 @@ func (p *Peer) HasSession() bool { return p.NewestSession() != nil }
 func (p *Peer) NewestSession() *exchange.Session { return p.newestOn(nil) }
 
 // NewestSessionOn is [Peer.NewestSession] among the sessions over t —
-// Peer.newestSession(type) (Peer.ts:581-601 at 862ad75f).
+// Peer.newestSession(type) (Peer.ts:582-602 at db021da0).
 func (p *Peer) NewestSessionOn(t exchange.Transport) *exchange.Session { return p.newestOn(&t) }
 
 // SessionFor is the newest session over the first transport
@@ -633,7 +633,7 @@ func (p *Peer) newestOn(t *exchange.Transport) *exchange.Session {
 	// The order is the monotonic reading of the last message heard
 	// (exchange.Session.ActiveMonotonic), so a wall-clock step between
 	// two sessions' traffic does not reverse it — matter.js keeps
-	// activeTimestamp on Time.nowUs (Session.ts:141-151 at 862ad75f).
+	// activeTimestamp on Time.nowUs (Session.ts:142-152 at db021da0).
 	var found *exchange.Session
 	var at time.Duration
 	for _, s := range p.Sessions() {
