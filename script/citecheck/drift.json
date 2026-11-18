@@ -28,15 +28,6 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 159,
-    "citation": "MessageExchange.ts:1219-1222",
-    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
-    "identifier": "#sendAdditionalDelay",
-    "nearest": 1184,
-    "occurrences": 6
-  },
-  {
-    "file": "bdx/responder.go",
     "line": 427,
     "citation": "BdxProtocol.ts:159-164",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
@@ -155,37 +146,30 @@
   {
     "file": "bridge/bridge.go",
     "line": 1888,
-    "citation": "NodeSession.ts:384-393",
+    "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
     "nearest": 421,
     "occurrences": 1
-  },
-  {
-    "file": "bridge/bridge.go",
-    "line": 1890,
-    "citation": "ExchangeManager.ts:693",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "CloseSession",
-    "nearest": 758,
-    "occurrences": 0
   },
   {
     "file": "bridge/bridge.go",
     "line": 1927,
-    "citation": "NodeSession.ts:384-393",
+    "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
+    "at": "db021da0",
     "identifier": "gracefulClose",
     "nearest": 421,
     "occurrences": 1
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1950,
-    "citation": "Fabric.ts:408-415",
-    "resolved": "packages/protocol/src/fabric/Fabric.ts",
-    "identifier": "initiateForceClose",
-    "nearest": 437,
+    "line": 2816,
+    "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
+    "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
+    "at": "db021da0",
+    "identifier": "addTransports",
+    "nearest": 156,
     "occurrences": 2
   },
   {
@@ -236,7 +220,7 @@
   },
   {
     "file": "bridge/exchange_routing.go",
-    "line": 344,
+    "line": 348,
     "citation": "InteractionServer.ts:460-469",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "at": "db021da0",
@@ -257,7 +241,7 @@
   {
     "file": "bridge/fabric_session_close_test.go",
     "line": 171,
-    "citation": "Fabric.ts:408-415",
+    "citation": "Fabric.ts:432-439",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
     "nearest": 574,
@@ -283,15 +267,6 @@
     "occurrences": 1
   },
   {
-    "file": "bridge/handlers.go",
-    "line": 1255,
-    "citation": "MRP.ts:129",
-    "resolved": "packages/protocol/src/protocol/MRP.ts",
-    "identifier": "retransmissionIntervalOf",
-    "nearest": 147,
-    "occurrences": 2
-  },
-  {
     "file": "bridge/interaction_protocol_parity_matterjs_test.go",
     "line": 184,
     "citation": "InteractionProtocolTest.ts:2126-2138",
@@ -312,10 +287,11 @@
   {
     "file": "bridge/outbound_reliable_test.go",
     "line": 182,
-    "citation": "MRP.ts:129",
+    "citation": "MRP.ts:181",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
+    "at": "db021da0",
     "identifier": "retransmissionIntervalOf",
-    "nearest": 147,
+    "nearest": 162,
     "occurrences": 2
   },
   {
@@ -376,39 +352,12 @@
   },
   {
     "file": "bridge/securechannel.go",
-    "line": 2442,
-    "citation": "ExchangeManager.ts:693",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "gracefulClose",
-    "nearest": 758,
-    "occurrences": 1
-  },
-  {
-    "file": "bridge/securechannel.go",
-    "line": 2586,
+    "line": 2593,
     "citation": "ExchangeManager.ts:696-713",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "#deleteSession",
     "nearest": 761,
     "occurrences": 2
-  },
-  {
-    "file": "bridge/securechannel_close_parity_test.go",
-    "line": 18,
-    "citation": "packages/protocol/src/protocol/ExchangeManager.ts:693",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "gracefulClose",
-    "nearest": 758,
-    "occurrences": 1
-  },
-  {
-    "file": "bridge/securechannel_close_parity_test.go",
-    "line": 102,
-    "citation": "ExchangeManager.ts:693",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "identifier": "gracefulClose",
-    "nearest": 758,
-    "occurrences": 1
   },
   {
     "file": "bridge/securechannel_close_parity_test.go",
@@ -622,7 +571,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 662,
+    "line": 663,
     "citation": "MessageExchange.ts:987-997",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#endAckWait",
@@ -631,7 +580,7 @@
   },
   {
     "file": "client/exchange/exchange.go",
-    "line": 703,
+    "line": 704,
     "citation": "MessageExchange.ts:1215-1222",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "#sendAdditionalDelay",
@@ -782,15 +731,6 @@
     "identifier": "handlePeerLoss",
     "nearest": 686,
     "occurrences": 2
-  },
-  {
-    "file": "client/exchange/margins.go",
-    "line": 69,
-    "citation": "MessageExchange.ts:1242-1250",
-    "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
-    "identifier": "initialRetransmissionTime",
-    "nearest": 1278,
-    "occurrences": 6
   },
   {
     "file": "client/exchange/mrp.go",
@@ -1151,7 +1091,7 @@
     "line": 26,
     "citation": "Peer.ts:190-195",
     "resolved": "packages/protocol/src/peer/Peer.ts",
-    "at": "0ceb202d",
+    "at": "db021da0",
     "identifier": "#save",
     "nearest": 105,
     "occurrences": 2
@@ -1357,15 +1297,6 @@
     "identifier": "#verifyOperationalCert",
     "nearest": 598,
     "occurrences": 3
-  },
-  {
-    "file": "cluster/core/operational_credentials_nocvalidation_test.go",
-    "line": 240,
-    "citation": "Fabric.ts:548",
-    "resolved": "packages/protocol/src/fabric/Fabric.ts",
-    "identifier": "nodeId",
-    "nearest": 512,
-    "occurrences": 24
   },
   {
     "file": "cluster/core/operational_credentials_parity_test.go",
@@ -1729,7 +1660,7 @@
   },
   {
     "file": "controller/attestation/pqc.go",
-    "line": 84,
+    "line": 85,
     "citation": "AttestationCertificates.ts:33",
     "resolved": "packages/protocol/src/certificate/kinds/AttestationCertificates.ts",
     "identifier": "parseAttestationCertificate",
@@ -1744,16 +1675,6 @@
     "identifier": "serialNumber",
     "nearest": 709,
     "occurrences": 4
-  },
-  {
-    "file": "controller/ca/ca.go",
-    "line": 684,
-    "citation": "kinds/definitions/operational.ts:109-110",
-    "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
-    "at": "0ceb202d",
-    "identifier": "keyUsage",
-    "nearest": 44,
-    "occurrences": 1
   },
   {
     "file": "controller/client/addresses.go",
@@ -2021,7 +1942,7 @@
     "line": 56,
     "citation": "PairingCodeSchema.ts:330-345",
     "resolved": "packages/types/src/schema/PairingCodeSchema.ts",
-    "at": "862ad75f",
+    "at": "db021da0",
     "identifier": "ManualPairingCodeCodec",
     "nearest": 496,
     "occurrences": 1
@@ -2064,7 +1985,7 @@
   },
   {
     "file": "controller/dcl/cert.go",
-    "line": 31,
+    "line": 32,
     "citation": "DclCertificateService.ts:2089",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "identifier": "CertificateKind",
@@ -2073,7 +1994,7 @@
   },
   {
     "file": "controller/dcl/cert.go",
-    "line": 134,
+    "line": 135,
     "citation": "Certificate.ts:650",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "serialNumber",
@@ -2318,9 +2239,9 @@
   {
     "file": "groups/request_chunk_test.go",
     "line": 30,
-    "citation": "Write.ts:149-171",
+    "citation": "Write.ts:155-177",
     "resolved": "packages/protocol/src/action/request/Write.ts",
-    "at": "0ceb202d",
+    "at": "db021da0",
     "identifier": "AccessControl",
     "nearest": 16,
     "occurrences": 4
@@ -3036,15 +2957,6 @@
     "identifier": "retransmissionIntervalOf",
     "nearest": 147,
     "occurrences": 2
-  },
-  {
-    "file": "store/fabric.go",
-    "line": 336,
-    "citation": "Fabric.ts:548",
-    "resolved": "packages/protocol/src/fabric/Fabric.ts",
-    "identifier": "nodeId",
-    "nearest": 512,
-    "occurrences": 24
   },
   {
     "file": "transport/message/fuzz_message_test.go",

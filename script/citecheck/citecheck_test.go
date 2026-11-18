@@ -125,7 +125,7 @@ import (
 // with its lines broken off) and cluster/levelcontrol/native.go
 // (targetValue, beside Transitions.ts); none is new. Rows whose sentence
 // now names its commit carry it in "at".
-const citecheckDriftRatchet = 340
+const citecheckDriftRatchet = 330
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -143,7 +143,7 @@ const citecheckDriftRatchet = 340
 // "matter.js 0ceb202d …"; 115 citations that read as the pin's before),
 // less the unit's own rows re-read and re-labelled at db021da0. The cite
 // unit counted 1211 at dd17ab06 in the old forms.
-const citecheckOffPinRatchet = 1216
+const citecheckOffPinRatchet = 151
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
