@@ -124,7 +124,8 @@ func TestControllerRecoversFromASilentRestart(t *testing.T) {
 		// session it opens.
 		t.Run("controller recovers", func(t *testing.T) {
 			t.Parallel()
-			site, p, pl, ep, old, reports := subscribedPair(t)
+			sp := subscribedPair(t)
+			site, p, pl, ep, old, reports := sp.site, sp.p, sp.pl, sp.ep, sp.old, sp.reports
 			ctx := testContext(t)
 			waitPersistedSubscription(ctx, t, site, p)
 			if err := p.Device.Act(func(n *node.Node) error {
@@ -153,7 +154,8 @@ func TestControllerRecoversFromASilentRestart(t *testing.T) {
 		// (R2-P6-par-3102).
 		t.Run("device resumes", func(t *testing.T) {
 			t.Parallel()
-			site, p, pl, ep, old, reports := subscribedPair(t)
+			sp := subscribedPair(t)
+			site, p, pl, ep, old, reports := sp.site, sp.p, sp.pl, sp.ep, sp.old, sp.reports
 			ctx := testContext(t)
 			waitPersistedSubscription(ctx, t, site, p)
 			restartSilently(ctx, t, site, p)
@@ -170,10 +172,19 @@ func TestControllerRecoversFromASilentRestart(t *testing.T) {
 	})
 }
 
-// subscribedPair is a commissioned pair whose controller holds a
-// sustained subscription to the plug's OnOff, with the session it was
-// made on and the channel its reports arrive on.
-func subscribedPair(t *testing.T) (*fabrictest.Site, *fabrictest.Pair, *plug, uint16, *exchange.Session, chan *interaction.Report) {
+// subscribed is a commissioned pair whose controller holds a sustained
+// subscription to the plug's OnOff, with the session it was made on and
+// the channel its reports arrive on.
+type subscribed struct {
+	site    *fabrictest.Site
+	p       *fabrictest.Pair
+	pl      *plug
+	ep      uint16
+	old     *exchange.Session
+	reports chan *interaction.Report
+}
+
+func subscribedPair(t *testing.T) subscribed {
 	t.Helper()
 	site, p, pl, ep := pairWithPlug(t, fabrictest.Options{})
 	ctx := testContext(t)
@@ -191,7 +202,7 @@ func subscribedPair(t *testing.T) (*fabrictest.Site, *fabrictest.Pair, *plug, ui
 		t.Fatalf("Subscribe: %v", err)
 	}
 	t.Cleanup(sub.Close)
-	return site, p, pl, ep, old, reports
+	return subscribed{site: site, p: p, pl: pl, ep: ep, old: old, reports: reports}
 }
 
 // waitPersistedSubscription waits until the device has stored the

@@ -98,6 +98,7 @@ func TestNestedModuleSleepRatchets(t *testing.T) {
 			t.Errorf("nested module %s: read no test file; the walk is not seeing it", rel)
 		}
 		t.Run(rel, func(t *testing.T) {
+			t.Parallel()
 			checkRatchet(t, "time.Sleep", "nestedRatchets["+rel+"].sleep", sleeps, want.sleep)
 			checkRatchet(t, "time.After", "nestedRatchets["+rel+"].after", afters, want.after)
 		})

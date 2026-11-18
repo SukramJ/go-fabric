@@ -39,7 +39,7 @@ func releasedPort(t *testing.T, addr, after string) {
 // a foreign socket, not the node's, and is retried once with a log line
 // — a collision visible as such, not a flake (R2-P6-test-3104,
 // N5-tflake-2, N6a-flake-4).
-func startOn(t *testing.T, ctx context.Context, addr string, newN func() *node.Node) *node.Node {
+func startOn(ctx context.Context, t *testing.T, addr string, newN func() *node.Node) *node.Node {
 	t.Helper()
 	n := newN()
 	err := n.Start(ctx)
@@ -87,7 +87,7 @@ func TestStopWithDoneContextReleasesThePort(t *testing.T) {
 	const runs = 20
 	for i := range runs {
 		if i > 0 {
-			n = startOn(t, t.Context(), addr, nodeOn(addr))
+			n = startOn(t.Context(), t, addr, nodeOn(addr))
 		}
 		if err := n.Stop(done); err != nil {
 			t.Fatalf("node %d: Stop with a done context: %v", i, err)
