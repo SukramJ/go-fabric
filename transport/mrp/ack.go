@@ -163,8 +163,8 @@ func NewAckTracker(delay time.Duration) *AckTracker {
 // `ackedMessageId !== sentMessageIdToAck`) — so it is made due at once for the
 // next [AckTracker.Due] to emit as a standalone ack, and the new counter
 // becomes the pending one. Mirrors chip ReliableMessageContext.cpp:158-171
-// ("forcing tx of solitary ack") and matter.js MessageExchange.ts:539-543
-// at 862ad75f, which send the pending ack standalone before taking the
+// ("forcing tx of solitary ack") and matter.js MessageExchange.ts:555-559
+// at db021da0, which send the pending ack standalone before taking the
 // new one.
 func (t *AckTracker) Owe(ackCounter uint32, sessionID, exchangeID uint16, initiator bool, now time.Time) {
 	key := ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}

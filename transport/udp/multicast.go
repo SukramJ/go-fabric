@@ -42,8 +42,8 @@ var multicastInterfaces = func() []net.Interface {
 // MockUdpSocket hands the membership to the host's MockNetwork. A datagram
 // to a group goes to the network's router for every host that takes its
 // destination: MockUdpSocket.send
-// (packages/general/src/net/mock/MockUdpSocket.ts:87-97 at 862ad75f) with
-// MockNetwork.shouldReceive (MockNetwork.ts:79-81).
+// (packages/general/src/net/mock/MockUdpSocket.ts:87-97 at db021da0) with
+// MockNetwork.shouldReceive (MockNetwork.ts:67-69).
 type multicastMember interface {
 	JoinGroup(group net.IP) error
 	LeaveGroup(group net.IP) error
@@ -117,7 +117,7 @@ func (l *Listener) membership(group net.IP, join bool) error {
 // message. It fails only when no interface took the datagram
 // ([ErrNoMulticastInterface]), which is the "no UDP interface for the
 // multicast address" of matter.js GroupSession.create
-// (packages/protocol/src/session/GroupSession.ts:143-153 at 0ceb202d).
+// (packages/protocol/src/session/GroupSession.ts:185-195 at db021da0).
 // matter.js sends on one interface — the configured, the observed or the
 // default one (packages/nodejs/src/net/NodeJsUdpSocket.ts:298-325); a
 // receiver reachable over two interfaces takes the second copy as a

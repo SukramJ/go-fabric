@@ -26,26 +26,26 @@ var (
 
 // MarshalPacket encodes the header of an outbound packet, refusing what
 // matter.js refuses to encode. Mirrors matter.js
-// packages/protocol/src/codec/MessageCodec.ts at 0ceb202d:
+// packages/protocol/src/codec/MessageCodec.ts at db021da0:
 //
-//   - :441-443 encodePacket — a header with Message Extensions is not
-//     encoded ([ErrEncodeExtensions]);
-//   - :481-488 encodePacketHeader — a group-session header must carry the
-//     destination group id and the source node id and no destination node
-//     id ([ErrGroupHeader]);
-//   - a unicast header naming a destination group id is refused
-//     ([ErrUnicastGroupDestination]): matter.js cannot build one, and its
-//     decoder (MessageCodec.ts:223-225 at 862ad75f) and chip's
-//     (MessageHeader.cpp:209-212 at 6170af84) discard it;
-//   - :489-504 — the bytes are [Header.Marshal]'s: Message Flags, Session
-//     ID, Security Flags, Message Counter, Source Node ID, the destination.
+// - :450-452 encodePacket — a header with Message Extensions is not
+// encoded ([ErrEncodeExtensions]);
+// - :490-496 encodePacketHeader — a group-session header must carry the
+// destination group id and the source node id and no destination node
+// id ([ErrGroupHeader]);
+// - a unicast header naming a destination group id is refused
+// ([ErrUnicastGroupDestination]): matter.js cannot build one, and its
+// decoder (MessageCodec.ts:231-233 at db021da0) and chip's
+// (MessageHeader.cpp:209-212 at 6170af84) discard it;
+// - :498-513 — the bytes are [Header.Marshal]'s: Message Flags, Session
+// ID, Security Flags, Message Counter, Source Node ID, the destination.
 //
 // [Header.Marshal] stays the unchecked encoder the AAD and the tests use.
 func (h Header) MarshalPacket() ([]byte, error) {
 	// The reserved DSIZ 0b11 has no destination field and every receiver
-	// discards it ([UnmarshalHeader]; matter.js MessageCodec.ts:210-213,
-	// chip MessageHeader.cpp:192-195); matter.js cannot build one, its
-	// flags follow from the fields present.
+	// discards it ([UnmarshalHeader]; matter.js MessageCodec.ts:218-221
+	// at db021da0, chip MessageHeader.cpp:192-195); matter.js cannot
+	// build one, its flags follow from the fields present.
 	if h.DestSize > DestGroup {
 		return nil, fmt.Errorf("%w: 0b%02b", ErrReservedDestSize, h.DestSize)
 	}
@@ -74,8 +74,8 @@ var ErrEncodeSecuredExtensions = errors.New("message: security extensions not su
 // MarshalPayload encodes the protocol header of an outbound message,
 // refusing what matter.js refuses to encode — the payload-side twin of
 // [Header.MarshalPacket]. Mirrors matter.js
-// packages/protocol/src/codec/MessageCodec.ts:429-437 (encodePayload): a
-// header with Secured Extensions is not encoded
+// packages/protocol/src/codec/MessageCodec.ts:438-447 (encodePayload) at
+// db021da0: a header with Secured Extensions is not encoded
 // ([ErrEncodeSecuredExtensions]); otherwise the bytes are
 // [ProtocolHeader.Marshal]'s. [ProtocolHeader.Marshal] stays the unchecked
 // encoder the decode round-trip tests use.

@@ -125,7 +125,7 @@ var (
 
 	// ErrUnicastGroupDestination is returned for a unicast session type
 	// whose DSIZ names a destination group id. Mirrors matter.js
-	// packages/protocol/src/codec/MessageCodec.ts:223-225
+	// packages/protocol/src/codec/MessageCodec.ts:231-233 at db021da0
 	// ("Unicast session cannot have destination group
 	// id.") and chip src/transport/raw/MessageHeader.cpp:209-212
 	// (kDestinationGroupIdPresent outside a group session).

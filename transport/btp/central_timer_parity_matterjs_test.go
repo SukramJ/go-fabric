@@ -21,7 +21,7 @@ func (immediateClock) AfterFunc(_ time.Duration, fn func()) clock.Timer {
 
 // The central owes the acknowledgement of the handshake response
 // (sequence 0) and starts its send-ack timer in the constructor
-// (BtpSessionHandler.ts:221-226 at 862ad75f). The timer's callback reads
+// (BtpSessionHandler.ts:221-226 at db021da0). The timer's callback reads
 // the sequence state the constructor sets, so even a timer that fires at
 // once acknowledges sequence 0 with the central's first sequence number 0
 // — and the race detector sees no unsynchronised write.

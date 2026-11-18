@@ -123,7 +123,7 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 // Send frames msg with its 4-byte little-endian length and writes it.
 // Returns [ErrMessageTooLarge] above [Conn.MaxMessageSize] and
 // [ErrConnClosed] after the connection closed. Mirrors matter.js
-// TcpChannel.ts:119-133 send.
+// TcpChannel.ts:110-126 send at db021da0.
 //
 // The write is bounded by an absolute deadline: a frame not handed to the
 // socket within 30 s of the Send (a peer that stopped reading, its receive
@@ -386,9 +386,10 @@ func (c *Conn) serve(handler Handler) {
 // has reached the handler, so the close is observed after them. A
 // local Close cuts the wait. Mirrors matter.js
 // packages/protocol/src/transport/tcp/TcpChannel.ts:85-98 (the close
-// follows the last chunk's #handleData) and :281-296 (a completed
+// follows the last chunk's #handleData) and :263-282 (a completed
 // message is delivered within #extractMessages, before the bad
-// header's close); the iterator drains its queue first (:183-185).
+// header's close); the iterator drains its queue first (:176-178 at
+// db021da0).
 func (c *Conn) awaitDelivery(last <-chan struct{}) {
 	select {
 	case <-last:

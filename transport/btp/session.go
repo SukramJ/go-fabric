@@ -91,7 +91,7 @@ type outgoing struct {
 }
 
 // Session is one BTP session — matter.js BtpSessionHandler
-// (packages/protocol/src/ble/BtpSessionHandler.ts:31-715) at 0ceb202d. It
+// (packages/protocol/src/ble/BtpSessionHandler.ts:31-715) at db021da0. It
 // is safe for concurrent use.
 type Session struct {
 	role         Role
@@ -335,7 +335,7 @@ func (s *Session) OnStall(f func(replay [][]byte)) {
 
 // Stalled reports whether the session was suspended by its stall report.
 // matter.js suspends and emits in one synchronous step
-// (BtpSessionHandler.ts:657-658 at 862ad75f); here the observer runs
+// (BtpSessionHandler.ts:657-658 at db021da0); here the observer runs
 // after the lock is released, so a transport whose Send met the inactive
 // session in between asks this and waits for the renegotiation the
 // report starts.
