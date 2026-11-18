@@ -20,7 +20,7 @@
 // family table by TestCertifiabilityDocument — is the status.
 //
 // The `chiptool` build tag keeps the harness-driven tests out of
-// `make test`, `make race` and the default `go test ./...`. Five entry
+// `make test`, `make race` and the default `go test ./...`. Six entry
 // points:
 //
 //   - TestChipToolCommissionsReferenceBridge — commission, read, invoke,
