@@ -488,9 +488,10 @@ func (e *Entry) PeerTransportParameters() (transports uint16, maxTCPMessageSize 
 // (re)transmission to this peer: the peer's active interval when it
 // sent a message within its active threshold, its idle interval
 // otherwise. Fields the peer never advertised fall back to the spec
-// defaults. Mirrors matter.js MRP.ts:129-135 retransmissionIntervalOf
-// ("baseInterval = isPeerActive ? activeInterval : idleInterval",
-// re-evaluated per transmission) and chip GetMRPBaseTimeout.
+// defaults. Mirrors matter.js MRP.ts:162-190 retransmissionIntervalOf at
+// db021da0 (:181 "baseInterval = (isPeerActive ? activeInterval :
+// idleInterval) + additionalDelay", re-evaluated per transmission) and chip
+// GetMRPBaseTimeout.
 func (e *Entry) RetransmitBaseInterval(_ time.Time) time.Duration {
 	idle, active, _, peerActive := e.PeerMRPSchedule()
 	if peerActive {
