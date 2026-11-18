@@ -297,10 +297,11 @@ func (b *Bridge) releaseReplyRouteLocked(tracker *mrp.AckTracker, key mrp.Exchan
 // Needed on every mid-stream chunk in a multi-chunk ReportData burst
 // (Subscribe-Initial AND chunked Read-Response): after the peer
 // IM:StatusResponse-acks chunk N, chunk N+1 must piggyback that
-// StatusResponse counter, otherwise python-matter-server's
-// ReliableMessaging.cpp drops the chunk with "Dropping message
-// without piggyback ack when we are waiting for an ack" and the
-// commissioning interview times out after 5 retries.
+// StatusResponse counter, otherwise python-matter-server drops the
+// chunk with "Dropping message without piggyback ack when we are
+// waiting for an ack" (connectedhomeip src/messaging/ExchangeContext.cpp:593
+// at 6170af84) and the commissioning interview times out after 5
+// retries.
 //
 // Mirrors the SubscribeResponse fix in subscribe.go's send-response
 // branch but generalises it for every chunk in the burst. No-op when

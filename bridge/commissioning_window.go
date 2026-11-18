@@ -1131,12 +1131,13 @@ func RandomSalt() ([]byte, error) {
 // Commissioning window timeout constants.
 //
 //   - commissioningWindowMaxSec — standard upper bound for a commissioned
-//     bridge per Matter §11.19.8.1 (chip CommissioningWindowManager.cpp
-//     kMaxCommissioningTimeout = 900 s).
+//     bridge per Matter §11.19.8.1 (chip CommissioningWindowManager.cpp:318-330
+//     MaxCommissioningTimeout() at 6170af84: 15 × 60 s = 900 s).
 //   - commissioningWindowMaxSecUncommissioned — extended upper bound for an
 //     uncommissioned node (FabricCount == 0) per Matter §11.19.8.1 and chip
 //     CommissioningWindowManager.cpp::MaxCommissioningTimeout() which returns
-//     172 800 s (48 h) when the fabric table is empty.
+//     172 800 s (48 h) when the fabric table is empty and
+//     CHIP_DEVICE_CONFIG_EXT_ADVERTISING is set.
 const (
 	commissioningWindowMaxSec               = uint16(900)
 	commissioningWindowMaxSecUncommissioned = uint32(172800) // 48 h per Matter §11.19.8.1
