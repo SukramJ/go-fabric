@@ -391,7 +391,7 @@ func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFie
 	// another type cannot decode against any command's schema and
 	// is the command's INVALID_COMMAND, the rest of the batch
 	// unaffected. Mirrors matter.js
-	// packages/protocol/src/action/server/CommandInvokeResponse.ts:551-562
+	// packages/protocol/src/action/server/CommandInvokeResponse.ts:555-563
 	// at db021da0 (#decodeWithSchema: InvalidCommandError); the
 	// reader read past it and the request failed as a whole.
 	if notStruct, err := skipNonStructFields(dec, el); notStruct || err != nil {

@@ -23,7 +23,7 @@ import (
 func ListChunked(cluster, attribute uint32) bool { return im.ListChunkedByDefault(cluster, attribute) }
 
 // WriteRequest is one attribute to write — a Write.Attribute of matter.js
-// (Write.ts:204-218) with numeric ids.
+// (Write.ts:207-217) with numeric ids.
 type WriteRequest struct {
 	// Path names the attribute: the endpoint may be a wildcard, the cluster
 	// and attribute must be set.
@@ -32,7 +32,7 @@ type WriteRequest struct {
 	// through [Raw].
 	Value spec.Encodable
 	// DataVersion, when set, makes the write conditional; it needs a
-	// concrete endpoint (Write.ts:64-69, :128-131).
+	// concrete endpoint (Write.ts:70-75, :134-137).
 	DataVersion *uint32
 }
 
@@ -44,22 +44,22 @@ type rawNode spec.Node
 func (n rawNode) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { spec.Node(n).EncodeTLV(enc, tag) }
 
 // WriteOptions configures [Interaction.Write] — matter.js Write.Options
-// (Write.ts:188-199).
+// (Write.ts:194-205).
 type WriteOptions struct {
 	// Timed sends a TimedRequest first (ClientInteraction.ts:369-371). An
 	// attribute [schema.IsTimedWrite] names is written timed without it
-	// (Write.ts:188).
+	// (Write.ts:198).
 	Timed bool
 	// TimedTimeout is the TimedRequest's timeout; 0 is
 	// [DefaultTimedRequestTimeout]. A timeout marks the write timed
-	// (Write.ts:74); a negative one makes a timed write fail with
+	// (Write.ts:200-201, :80); a negative one makes a timed write fail with
 	// [ErrMalformedRequest].
 	TimedTimeout time.Duration
 	// SuppressResponse asks the peer for no WriteResponse.
 	SuppressResponse bool
 	// DisableListChunking writes a list value as one AttributeDataIB; by
 	// default a list is written as REPLACE-ALL with the empty list and one
-	// append per element (chunkLists = true, Write.ts:59, :149-171).
+	// append per element (chunkLists = true, Write.ts:65, :155-177).
 	DisableListChunking bool
 	// ClientRequest names the write exchange's network profile and margin.
 	ClientRequest

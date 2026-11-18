@@ -144,21 +144,21 @@ func Interval(d time.Duration) *time.Duration { return &d }
 //   - the intervals default to 1 s and 60 min, the ceiling may not be below
 //     the floor (:1043-1054), and each is at most 65535 s (Subscribe.ts:46-60
 //     at 0ceb202d);
-//   - the attempt (:1056-1120): the request with the intervals in seconds
-//     (:1073-1080), encoded to fit one message (InteractionMessenger.ts:1052-1055
+//   - the attempt (:1056-1125): the request with the intervals in seconds
+//     (:1074-1081), encoded to fit one message (InteractionMessenger.ts:1052-1055
 //     at 0ceb202d); the priming report's chunks read and acknowledged
 //     (:1083, InteractionMessenger.ts:938-972 at 0ceb202d) and handed to
 //     Updated; the SubscribeResponse (:1086); an attempt that fails abandons
 //     the subscription, waiting for the peer's report unless the peer or
 //     the session ended the interaction (:1087-1098); the subscription
 //     registered by (peer, id), with the maximum peer response time for the
-//     subscription processing time (:1101-1111) — its liveness timeout the
+//     subscription processing time (:1101-1110) — its liveness timeout the
 //     maximum interval plus twice that time, as at 0ceb202d (:1054-1063
 //     there).
 //
 // ctx bounds the establishment of a plain subscription. A sustained one
 // (Sustain) is returned at once and establishes itself on its own until
-// closed (:1137-1162).
+// closed (:1139-1162).
 func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscription, error) {
 	paths := len(req.Attributes) + len(req.Events)
 	if paths == 0 {

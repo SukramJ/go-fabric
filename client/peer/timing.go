@@ -18,36 +18,36 @@ type Timing struct {
 	// no timeout (:22-28).
 	DefaultConnectionTimeout time.Duration
 	// MaxDelayBetweenInitialContactRetries caps the backoff between the
-	// retransmissions of the first CASE message (:30-35).
+	// retransmissions of the first CASE message (:30-37).
 	MaxDelayBetweenInitialContactRetries time.Duration
 	// DelayBeforeNextAddress staggers the first attempts of two addresses
-	// (:37-42).
+	// (:39-44).
 	DelayBeforeNextAddress time.Duration
-	// DelayAfterNetworkError is the pause after a transient error (:44-52).
+	// DelayAfterNetworkError is the pause after a transient error (:46-54).
 	DelayAfterNetworkError time.Duration
 	// DelayAfterPeerError is the pause after the peer refused the session
-	// (:54-59).
+	// (:56-61).
 	DelayAfterPeerError time.Duration
-	// DelayAfterUnhandledError is the pause after any other error (:61-66).
+	// DelayAfterUnhandledError is the pause after any other error (:63-68).
 	DelayAfterUnhandledError time.Duration
 	// KickThrottleInterval is the shortest interval between two kicks that
-	// reach the attempts (:68-74).
+	// reach the attempts (:70-76).
 	KickThrottleInterval time.Duration
 	// KickMinRetransmissions is the retransmissions an exchange must have
-	// made before a kick may restart it (:76-82).
+	// made before a kick may restart it (:78-84).
 	KickMinRetransmissions int
 	// KickMinRestartSaving is the least a restart must shorten the wait for
-	// the next retransmission to be worth it (:84-92).
+	// the next retransmission to be worth it (:86-94).
 	KickMinRestartSaving time.Duration
 	// KickRestartCooldown is the shortest interval between two
-	// kick-triggered restarts, per trigger (:94-106).
+	// kick-triggered restarts, per trigger (:96-108).
 	KickRestartCooldown KickRestartCooldown
 	// AddressChangeStabilizationDelay is the quiet time after an address
 	// change before the session's address is checked, and before a stale
-	// fallback address is retired (:108-114).
+	// fallback address is retired (:110-116).
 	AddressChangeStabilizationDelay time.Duration
 	// AddressChangeProbeCooldown bounds the growing interval between
-	// address-change probes (:116-132).
+	// address-change probes (:118-134).
 	AddressChangeProbeCooldown ProbeCooldown
 	// ProvenAddressRetention is how long a connection process goes on
 	// attempting an address discovery stopped advertising: the last
@@ -86,11 +86,11 @@ type ProbeCooldown struct {
 	Max time.Duration
 }
 
-// maxInitialContactRetryInterval is PeerTimingParameters.ts:184.
+// maxInitialContactRetryInterval is PeerTimingParameters.ts:186.
 const maxInitialContactRetryInterval = 2 * time.Minute
 
 // DefaultTiming is matter.js PeerTimingParameters.defaults
-// (PeerTimingParameters.ts:184-209), with this module's
+// (PeerTimingParameters.ts:189-211), with this module's
 // ProvenAddressRetention of 10 minutes.
 func DefaultTiming() Timing {
 	return Timing{
@@ -112,7 +112,8 @@ func DefaultTiming() Timing {
 
 // Merge layers the set fields of over onto base, the groups field-wise so
 // one member of a group leaves its sibling alone — matter.js
-// PeerTimingParameters.merge and applyOverrides (PeerTimingParameters.ts:149-182).
+// PeerTimingParameters.merge and applyOverrides
+// (PeerTimingParameters.ts:179-184, :155-170).
 // A negative field of over is unset as a zero one is ([Timing]), except
 // ProvenAddressRetention.
 func Merge(base, over Timing) Timing {

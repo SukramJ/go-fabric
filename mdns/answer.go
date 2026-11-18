@@ -578,8 +578,9 @@ func newResponse(id uint16) *dns.Msg {
 }
 
 // splitResponse packs answers and additionals into responses of at most
-// [maxMessageSize] bytes, as matter.js MdnsSocket.send does
-// (packages/general/src/net/dns-sd/MdnsSocket.ts:155-227 at db021da0):
+// [maxMessageSize] bytes, as the answer splitting of matter.js
+// MdnsSocket.send does
+// (packages/general/src/net/dns-sd/MdnsSocket.ts:155-228 at db021da0):
 // answers fill a packet and spill into the next with no additionals; the
 // additionals follow the last answers and spill into packets of their own.
 // The size is counted uncompressed, as matter.js encodes records one by one.

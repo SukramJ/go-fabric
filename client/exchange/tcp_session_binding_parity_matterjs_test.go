@@ -4,7 +4,7 @@
 package exchange
 
 // A port of matter.js packages/protocol/test/protocol/TcpSessionBindingTest.ts
-// at db021da0: sessions bound to TCP connections (ExchangeManager.ts:665-775)
+// at db021da0: sessions bound to TCP connections (ExchangeManager.ts:665-778)
 // — a dropped connection evicts its sessions, a connection outlives a
 // session while another uses it and closes with its last, the transport of
 // a session. A fake Channel stands in for TcpChannel. The TCP session

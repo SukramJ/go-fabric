@@ -23,7 +23,7 @@ const (
 )
 
 // Our own revisions, the ones matter.js SessionParameters.defaults
-// (SessionParameters.ts:158-164) takes from packages/model/src/common/Specification.ts.
+// (SessionParameters.ts:193-199) takes from packages/model/src/common/Specification.ts.
 const (
 	// localDataModelRevision is Specification.ts:115 DATA_MODEL_REVISION.
 	localDataModelRevision uint16 = 21
@@ -33,7 +33,7 @@ const (
 
 // DefaultLocalParameters is the session parameters a controller sends
 // when its host chose none: matter.js SessionParameters.defaults
-// (SessionParameters.ts:158-164), the fallbacks with this module's
+// (SessionParameters.ts:193-199), the fallbacks with this module's
 // data-model revision, interaction-model revision and specification
 // version.
 func DefaultLocalParameters() sessionparams.Parameters {
@@ -52,7 +52,7 @@ func DefaultLocalParameters() sessionparams.Parameters {
 // fallbacks overlaid by what the peer reported (nil reported nothing), with
 // TCP cleared for a peer below Matter 1.5, MaxTCPMessageSize only when TCP
 // remains, and a MaxPathsPerInvoke of 0 taking the fallback. Mirrors
-// matter.js SessionParameters.ts:42-81 (the SessionParameters factory).
+// matter.js SessionParameters.ts:48-91 (the SessionParameters factory).
 func PeerParameters(reported *sessionparams.Parameters) sessionparams.Parameters {
 	var r sessionparams.Parameters
 	if reported != nil {

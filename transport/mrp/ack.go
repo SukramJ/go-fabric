@@ -159,13 +159,13 @@ func NewAckTracker(delay time.Duration) *AckTracker {
 // kept with its DueAt, so a duplicate does not slide the deadline. One
 // pending for a different counter is not covered by the new ack — an MRP
 // ack names a single counter (chip ReliableMessageMgr.cpp:339-342
-// CheckAndRemRetransTable, matter.js MessageExchange.ts:505-510 compares
-// `ackedMessageId !== sentMessageIdToAck`) — so it is made due at once for the
-// next [AckTracker.Due] to emit as a standalone ack, and the new counter
-// becomes the pending one. Mirrors chip ReliableMessageContext.cpp:158-171
-// ("forcing tx of solitary ack") and matter.js MessageExchange.ts:555-559
-// at db021da0, which send the pending ack standalone before taking the
-// new one.
+// CheckAndRemRetransTable, matter.js MessageExchange.ts:521-526 at db021da0
+// compares `ackedMessageId !== sentMessageIdToAck`) — so it is made due at
+// once for the next [AckTracker.Due] to emit as a standalone ack, and the
+// new counter becomes the pending one. Mirrors chip
+// ReliableMessageContext.cpp:158-171 ("forcing tx of solitary ack") and
+// matter.js MessageExchange.ts:555-559 at db021da0, which send the
+// pending ack standalone before taking the new one.
 func (t *AckTracker) Owe(ackCounter uint32, sessionID, exchangeID uint16, initiator bool, now time.Time) {
 	key := ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	t.mu.Lock()

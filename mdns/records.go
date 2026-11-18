@@ -83,7 +83,7 @@ func namesOf(svc Service, host string) serviceNames {
 // AAAA record per address of the interface, IPv6 before IPv4 and then in
 // selection-preference order (:166-177). The unique types — SRV, TXT, A,
 // AAAA — carry the cache-flush bit, the shared PTRs do not (:181-183,
-// DnsCodec.ts:198-208 isUnique). Every record carries [recordTTL].
+// DnsCodec.ts:198-207 isUnique). Every record carries [recordTTL].
 //
 // The PTR records follow OperationalMdnsAdvertisement.ts:33-41,
 // CommissionableMdnsAdvertisement.ts:43-71 and

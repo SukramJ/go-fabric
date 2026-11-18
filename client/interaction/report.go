@@ -577,7 +577,7 @@ var ErrReportTooLarge = errors.New("interaction: report too large")
 // chunks — it hands each report on as it arrives
 // (packages/protocol/src/interaction/InteractionMessenger.ts:1012-1053 at
 // db021da0) — and accumulates only the chunks of an invoke response,
-// without a bound (:1224-1246). connectedhomeip's ReadClient does not
+// without a bound (:1224-1247). connectedhomeip's ReadClient does not
 // collect a read's chunks either: each ReportData is processed as it
 // arrives and each AttributeReportIB handed to the callback
 // (src/app/ReadClient.cpp:632, :840, :896 at 6170af84), the end reported

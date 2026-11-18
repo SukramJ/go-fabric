@@ -14,7 +14,7 @@ import (
 
 // Descriptor is what is known about a peer — a node on one of our
 // fabrics — and what a [Store] keeps of it. It is matter.js PeerDescriptor
-// (packages/protocol/src/peer/PeerDescriptor.ts:34-75 at db021da0).
+// (packages/protocol/src/peer/PeerDescriptor.ts:39-75 at db021da0).
 type Descriptor struct {
 	// Address is the peer's logical address: our fabric index and its node
 	// id (:40-43).
@@ -28,7 +28,7 @@ type Descriptor struct {
 	// minor release (review II, R2-P6-par-3351).
 	DataModelRevision uint16
 	// OperationalAddress is where the peer was last reached, nil when
-	// unknown (:50-53). It is kept as a UDP address: matter.js
+	// unknown (:45-48). It is kept as a UDP address: matter.js
 	// OperationalAddress.from (:22-31) tags an untyped address as UDP; a
 	// TCP session's address is recorded with the discovered port, the
 	// transport not kept.
@@ -43,16 +43,16 @@ type Descriptor struct {
 	// node's instance with an SRV to its own host).
 	OperationalHost string
 	// DiscoveryData is what the peer's operational TXT record announced,
-	// nil when nothing is known (:55-58).
+	// nil when nothing is known (:50-53).
 	DiscoveryData *discovery.TXTData
 	// ReportedSessionParameters is what the peer reported in its most
 	// recent session that reported any; a report replaces the previous one
-	// as a whole (:60-65).
+	// as a whole (:55-60).
 	ReportedSessionParameters *sessionparams.Parameters
 	// TCPUnsupported records a peer that negotiated a TCP session but
 	// reported no TCP server: TCP is not attempted again until a later
 	// session reports TCP server support (PeerDescriptor.ts:62-66,
-	// Peer.ts:347-354 at db021da0).
+	// Peer.ts:353-355 at db021da0).
 	TCPUnsupported bool
 }
 

@@ -1223,7 +1223,7 @@ type Info struct {
 // closed, by ID: a read-only view for a host's diagnostics. matter.js
 // keeps the list in SubscriptionsServer's internal.subscriptions
 // (SubscriptionsServer.ts:161 at db021da0; State.subscriptions,
-// :380-391, is deprecated and no longer written) and exposes no live
+// :384-390, is deprecated and no longer written) and exposes no live
 // list of these records — its live subscriptions are per session
 // (NodeSession.ts:191-193).
 func (m *Manager) Snapshot() []Info {

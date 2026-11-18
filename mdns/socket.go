@@ -24,8 +24,9 @@ import (
 // joined to 224.0.0.251 and ff02::fb on every multicast interface, with the
 // interface of each received packet reported so the answer goes out where
 // the query came in (matter.js answers per interface, MdnsServer.ts:115 and
-// InterfaceResponder.ts:743-751 at db021da0). The wildcard multicast bind
-// coexists with the OS responder (avahi, mDNSResponder) and with the
+// InterfaceResponder.ts:743-789 (#transmit, the send on its own interface
+// :751) at db021da0). The wildcard multicast bind coexists with the OS
+// responder (avahi, mDNSResponder) and with the
 // module's own querier (query_conn.go).
 
 var (

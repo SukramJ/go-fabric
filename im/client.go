@@ -114,7 +114,7 @@ func DataVersionFilterSize(f DataVersionFilter) int {
 
 // MarshalTLV encodes w as a client sends it. Mirrors matter.js
 // packages/types/src/protocol/messages/TlvWriteRequest.ts:16-27 at
-// db021da0 with the request action/request/Write.ts:62-190 builds:
+// db021da0 with the request action/request/Write.ts:49-191 builds:
 // SuppressResponse (0) only when set, TimedRequest (1), WriteRequests (2)
 // of AttributeDataIB — DataVersion (0) when set, Path (1), Data (2)
 // through valueWriter (the attribute's own TLV schema, Write.ts:165-186

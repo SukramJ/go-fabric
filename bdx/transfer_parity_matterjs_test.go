@@ -617,7 +617,7 @@ func TestBdxPerBlockDebugLogging(t *testing.T) {
 		var announced bdx.Init
 		runBdxTransfer(t, bdxCase{
 			sender: true, data: bdxRandom(2*blockSize + tailSize), maxBlockSize: blockSize,
-			// Announced before it negotiates (BdxTest.ts:1374-1379).
+			// Announced before it negotiates (BdxTest.ts:1396-1400).
 			observe: func(s *bdx.ServerSession) {
 				responder = s
 				announced = s.Init()
@@ -636,7 +636,7 @@ func TestBdxPerBlockDebugLogging(t *testing.T) {
 			t.Fatalf("the session's Init changed with the observer's copy: %+v", in)
 		}
 
-		// Result carries no file designator (BdxTest.ts:1388).
+		// Result carries no file designator (BdxTest.ts:1414).
 		negotiated, ok := responder.Negotiated()
 		if !ok || negotiated.Mode != bdx.SenderDrive || negotiated.BlockSize != blockSize || negotiated.StartOffset != 0 {
 			t.Fatalf("negotiated %+v (%v)", negotiated, ok)

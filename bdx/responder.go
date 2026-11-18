@@ -90,7 +90,7 @@ type ScopeConfig struct {
 // MrpDelayExchange is an [Exchange] whose MRP retransmissions take an
 // additional delay: the margin joins the peer's base interval before the
 // backoff amplifies it. Mirrors matter.js MessageExchange's
-// peerAdditionalMrpDelay setter (MessageExchange.ts:368-379 at db021da0).
+// peerAdditionalMrpDelay setter (MessageExchange.ts:377-379 at db021da0).
 // A [Responder] sets it on the exchange of every session it accepts when
 // the session has a delay; an exchange without the method keeps its own.
 type MrpDelayExchange interface {
