@@ -36,7 +36,7 @@ type Snapshot struct {
 	// (packages/node/src/storage/server/ServerEndpointStores.ts:33-45
 	// load, :109-130 assignNumber;
 	// packages/node/src/node/server/ServerEndpointInitializer.ts:59-65
-	// eraseDescendant, :67-69 deactivateDescendant at 862ad75f). The
+	// eraseDescendant, :67-69 deactivateDescendant at db021da0). The
 	// owner erases a number with [Store.RemoveEndpoint].
 	Endpoints []Spec
 }

@@ -41,7 +41,7 @@ func (h *holdSink) SetTemperatureSetpointHold(_ context.Context, hold uint8) err
 // sets TemperatureSetpointHold and ThermostatRunningState serves them on
 // the kit's Thermostat server, with the hold also its duration, null —
 // matter.js sets temperatureSetpointHoldDuration to null
-// (ThermostatServer.ts:365-369 at 862ad75f) — and a controller's hold
+// (ThermostatServer.ts:365-369 at db021da0) — and a controller's hold
 // write reaches the declared Sink,
 // whose refusal refuses the write with its status. A declaration that
 // sets neither serves neither.

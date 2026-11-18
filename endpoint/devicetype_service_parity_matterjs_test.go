@@ -280,7 +280,7 @@ func TestDeviceTypeConformanceServiceParityMatterJS(t *testing.T) {
 	})
 
 	// :356-363: matter.js judges a runtime change with { refuse: false }
-	// (DeviceTypeConformanceService.ts:295, :335-338 at 862ad75f); the Go
+	// (DeviceTypeConformanceService.ts:295, :335-338 at db021da0); the Go
 	// validator has no per-call option and judges a change of an installed
 	// endpoint the same way — a strict validator reports what it violates
 	// rather than refusing it.

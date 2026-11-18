@@ -21,7 +21,7 @@ import (
 //
 // matter.js's application overrides IdentifyServer's identify and
 // triggerEffect (packages/node/src/behaviors/identify/IdentifyServer.ts:129-135
-// at 862ad75f).
+// at db021da0).
 
 var _ contract.IdentifyHandler = (*Device)(nil)
 

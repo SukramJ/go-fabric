@@ -19,7 +19,7 @@ const bindingClusterID uint32 = 0x001E
 // Binding server on an endpoint whose DeviceTypeList lists deviceTypes and
 // that declares clients — the facts of the endpoint as its Descriptor
 // states them, as matter.js's #addBaseServers judges them
-// (DeviceTypeConformanceService.ts:361-369 at 862ad75f, a pass over
+// (DeviceTypeConformanceService.ts:361-369 at db021da0, a pass over
 // ServerEndpointFacts, whose device types are the DeviceTypeList's). Base
 // states Binding as "Simple & Client", and the Client condition holds for
 // a declared client application cluster a binding may direct — matter.js

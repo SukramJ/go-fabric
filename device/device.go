@@ -504,7 +504,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings, sibling func(uin
 	}
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
-	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d). Its state
+	// (ValidatedElements.ts:341-343, :361-368 at db021da0). Its state
 	// starts where matter.js's does: the default server's initialize
 	// values, then SelectDefaultValue for what is still unset
 	// (defaults_fallback.go).
@@ -605,7 +605,7 @@ func powerSource(cfg *spec.ServerConfig, features uint32, self func() (uint16, b
 
 // powerSourceDefaults fills what matter.js's PowerSourceServer.initialize
 // sets when the state leaves it unset (packages/node/src/behaviors/power-source/PowerSourceServer.ts:37-62
-// at 862ad75f): Status Unspecified; Description "Mains power" with WIRED,
+// at db021da0): Status Unspecified; Description "Mains power" with WIRED,
 // else "Battery power" with BAT; with BAT, BatChargeLevel Ok and
 // BatReplaceability Unspecified; with WIRED, WiredCurrentType AC.
 func powerSourceDefaults(features uint32, initial map[uint32]any) {
@@ -637,8 +637,8 @@ func powerSourceDefaults(features uint32, initial map[uint32]any) {
 // endpoints a bridged device's power source feeds are its own, unless the
 // declaration's Initial names them. matter.js's PowerSourceServer sets no
 // EndpointList (packages/node/src/behaviors/power-source/PowerSourceServer.ts:21-63
-// at 862ad75f), and the model makes EndpointList mandatory
-// (power-source-cluster.element.ts:130 at 862ad75f), so the application
+// at db021da0), and the model makes EndpointList mandatory
+// (power-source-cluster.element.ts:130 at db021da0), so the application
 // fills it; the kit fills it as the measurement-projected server does
 // (cluster/measurement SetEndpoint).
 type ownEndpointList struct{ self func() (uint16, bool) }

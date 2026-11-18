@@ -31,12 +31,12 @@ import (
 // generated server the kit falls back to.
 var initializeDefaults = map[uint32]func(features uint32, initial map[uint32]any){
 	// FanControlServer.initialize (packages/node/src/behaviors/fan-control/FanControlServer.ts:14-18
-	// at 862ad75f): FanMode Off.
+	// at db021da0): FanMode Off.
 	fandef.ClusterID: func(_ uint32, initial map[uint32]any) {
 		setUnset(initial, fandef.AttrFanMode, fandef.FanModeOff)
 	},
 	// SmokeCoAlarmBaseServer.initialize (packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts:19-41
-	// at 862ad75f): ExpressedState Normal, SmokeState and COState Normal
+	// at db021da0): ExpressedState Normal, SmokeState and COState Normal
 	// with their features, BatteryAlert Normal, TestInProgress and
 	// HardwareFaultAlert false, EndOfServiceAlert Normal.
 	smokedef.ClusterID: func(features uint32, initial map[uint32]any) {
@@ -53,7 +53,7 @@ var initializeDefaults = map[uint32]func(features uint32, initial map[uint32]any
 		setUnset(initial, smokedef.AttrEndOfServiceAlert, smokedef.EndOfServiceNormal)
 	},
 	// OccupancySensingServer.initialize (packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:22-66
-	// at 862ad75f): with a detector feature and the sensor type or its
+	// at db021da0): with a detector feature and the sensor type or its
 	// bitmap unset, the bitmap from the features (PIR, Ultrasonic,
 	// PhysicalContact) and the type from the bitmap — PirAndUltrasonic,
 	// Pir, else PhysicalContact; Ultrasonic alone leaves the type unset,

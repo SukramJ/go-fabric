@@ -20,7 +20,7 @@ import (
 // keeps the generated server. No device type at the pin lists the cluster
 // as a server: matter.js has it only as the thermostat's client
 // (AmbientContextSensingClient, packages/node/src/devices/thermostat.ts:133-138
-// at 862ad75f). A host mounts it on another type as the declaration's
+// at db021da0). A host mounts it on another type as the declaration's
 // HostServer (acsdef.Declare{HostServer: srv} with
 // [sensing.NewAmbientContext]), the route for a cluster a type does not
 // list ([HostServer]).
@@ -54,7 +54,7 @@ func newAmbientContextServer(b defaultBuild) (contract.ClusterServer, error) {
 // sensor type from the detector features, OccupancyChanged on every
 // Occupancy change with OccupancyEvent
 // (packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:22-90
-// at 862ad75f) — and, when the declaration serves HoldTime, chip's hold
+// at db021da0) — and, when the declaration serves HoldTime, chip's hold
 // timer on the device's clock. HoldTime and HoldTimeLimits start from
 // Initial; it needs no port, so it is the default wherever a device type
 // lists the cluster (OccupancySensor).

@@ -20,7 +20,7 @@ import (
 // PowerSource states BridgedPowerSourceInfo, under which BridgedNode makes
 // PowerSourceConfiguration mandatory ("BridgedPowerSourceInfo, D": a
 // trailing D announces a deprecation, the terms before it decide —
-// matter.js Conformance.ts:936-940 at 862ad75f); the kit mounts it, so the
+// matter.js Conformance.ts:936-940 at db021da0); the kit mounts it, so the
 // node reports no device-type violation, and a controller reads its
 // Sources.
 func TestBridgedPowerSourceConfiguration(t *testing.T) {

@@ -345,8 +345,8 @@ type HostStatement struct {
 // (R2-P6-api-2503).
 //
 // matter.js has no such split: every change of a persistent attribute is
-// stored, whoever made it (packages/node/src/behavior/state/managed/Datasource.ts:1427-1438
-// at 862ad75f; NodeLabel is nonvolatile, basic-information.element.ts:36-37),
+// stored, whoever made it (packages/node/src/behavior/state/managed/Datasource.ts:1442-1453
+// at db021da0; NodeLabel is nonvolatile, basic-information.element.ts:36-37),
 // and the stored value replaces the endpoint's configured state when the
 // node restarts (Datasource.ts:580-583). The host's statement is the
 // configured state here — changed without becoming the stored one.

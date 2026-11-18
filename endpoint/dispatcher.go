@@ -771,7 +771,7 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 // endpoint does not serve, UNSUPPORTED_EVENT for an event its server does
 // not list, Success otherwise — the existence checks of matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts:158-221 at
-// 862ad75f (#addConcrete), in their order. A path that names no event is
+// db021da0 (#addConcrete), in their order. A path that names no event is
 // UNSUPPORTED_EVENT when the server lists none: matter.js registers a
 // wildcard event path per event of the cluster (EventReadResponse.ts:277-284
 // at db021da0), so such a cluster selects nothing (review II,
@@ -1382,7 +1382,7 @@ func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteA
 // its message (ADR 0026 principle 8). A status error naming Success
 // answers FAILURE. Mirrors matter.js's answer to a StatusResponseError a
 // behaviour throws, its code and clusterCode
-// (packages/types/src/common/StatusResponseError.ts:18-25 at 862ad75f).
+// (packages/types/src/common/StatusResponseError.ts:18-25 at db021da0).
 // Returns (status, clusterStatus, hasClusterStatus).
 func classifyError(err error) (im.StatusCode, uint8, bool) {
 	if err == nil {
@@ -1474,7 +1474,7 @@ func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID
 // authorizes a concrete write at View first, answers the existence
 // statuses next, and checks the write privilege only for an attribute that
 // exists (packages/protocol/src/action/server/AttributeWriteResponse.ts:200-241
-// at 862ad75f, core spec §8.7.3.2), so a View subject learns that an
+// at db021da0, core spec §8.7.3.2), so a View subject learns that an
 // attribute is absent, as it does on a read. The dispatcher's Write then
 // answers UNSUPPORTED_ENDPOINT, _CLUSTER or _ATTRIBUTE.
 //
@@ -1525,7 +1525,7 @@ func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrI
 // authorizes a concrete invoke at Operate first, answers the existence
 // statuses next, and checks the command's privilege only for a command
 // that exists (packages/protocol/src/action/server/CommandInvokeResponse.ts:241-278
-// at 862ad75f, core spec §8.8.3.2), so an Operate subject learns that a
+// at db021da0, core spec §8.8.3.2), so an Operate subject learns that a
 // Manage command's cluster is absent. The existence check then answers
 // UNSUPPORTED_ENDPOINT, _CLUSTER or _COMMAND.
 func (d *TopologyDispatcher) MinInvokePrivilege(endpoint uint16, clusterID, cmdID uint32) uint8 {
