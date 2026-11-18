@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9974,
+  "entry_points": 9995,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27705,
-    "reachable": 20833,
-    "whitelisted": 6849,
+    "total_exported": 27713,
+    "reachable": 20834,
+    "whitelisted": 6856,
     "unreachable": 23
   },
   "by_package": [
@@ -12972,6 +12972,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestWiFiConnectNetworkSwitchesADisabledInterfaceOn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_connect_enable_test.go",
+      "line": 25
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestWiFiDriverCallsAreBoundedByTheAdvertisedTimes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_p6_test.go",
@@ -13599,13 +13606,6 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/jointfabric/datastore.go",
       "line": 39
-    },
-    {
-      "package": "cluster/jointfabric",
-      "identifier": "Administrator.SetTrustAnchorsForTest",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "cluster/jointfabric/export_test.go",
-      "line": 12
     },
     {
       "package": "cluster/jointfabric",
@@ -35218,6 +35218,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestNodeLabelServedIsStoredLast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/set_node_label_test.go",
+      "line": 79
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestParityMatterJSBaseRequirements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_parity_matterjs_test.go",
@@ -35586,6 +35593,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/materialize_edges_test.go",
       "line": 83
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestSetNodeLabelReturnsTheStoresRefusal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/set_node_label_test.go",
+      "line": 54
     },
     {
       "package": "endpoint",
@@ -41574,6 +41588,13 @@
     },
     {
       "package": "node",
+      "identifier": "FabricUpdated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 85
+    },
+    {
+      "package": "node",
       "identifier": "FailSafeHookCommit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/export_test.go",
@@ -41903,6 +41924,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestAResumptionRecordWithinOneIdentityStays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_resumption_after_update_internal_test.go",
+      "line": 108
+    },
+    {
+      "package": "node",
       "identifier": "TestAdmitSessionClosesASessionWhoseFabricWentWhileItOpened",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_removed_internal_test.go",
@@ -42162,6 +42190,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestFabricUpdateWaitsForTheHandshakeWhateverItsContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/client_fabric_teardown_internal_test.go",
+      "line": 36
+    },
+    {
+      "package": "node",
       "identifier": "TestHeapReadOncePerSample",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/heap_sample_internal_test.go",
@@ -42190,6 +42225,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestLocalOperateEntrySkipsAFabricAnAddNOCHasNotCommitted",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/local_acl_pending_internal_test.go",
+      "line": 20
+    },
+    {
+      "package": "node",
       "identifier": "TestMDNSInterfacesFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/mdns_interfaces_test.go",
@@ -42201,6 +42243,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/mdns_interfaces_test.go",
       "line": 41
+    },
+    {
+      "package": "node",
+      "identifier": "TestNoResumptionRecordOutlivesAnUpdateAfterTheAdmit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_resumption_after_update_internal_test.go",
+      "line": 45
     },
     {
       "package": "node",
@@ -42382,7 +42431,7 @@
       "identifier": "TestUpdateNOCDropsResumptionRecordsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/resumption_update_internal_parity_matterjs_test.go",
-      "line": 24
+      "line": 28
     },
     {
       "package": "node",
