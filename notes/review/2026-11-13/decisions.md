@@ -463,6 +463,7 @@ findings row.
 | 262 | Issues #537 (a typed onboarding mismatch) and #544 (the facade's errors of a write refused before sending) | **Both in `v0.23.0`**: additive; #537 asks for the tag that first carries #520 |
 | 263 | Issue #539 (an administrator's basic window reported as `WindowEnhanced`) | **In `v0.23.0`** — the owner's choice; the recommendation was `v0.23.1`, as no regression and a facade enum best read against the reference first. The fix reads the window status the bridge already holds (`bridge/commissioning_window.go:147-151`) and adds `WindowAdministratorBasic` |
 | 264 | Issue #543 (a cancelled commissioning leaves the fail-safe armed) | **Closed after the tag** with a comment: fixed on main by `flow.disarmAfterAbort` (`e1f18a2e`, review II phase 0, decision 5; `controller/commissioner/flow_test.go:318`); an abort at step 20.1 over CASE has no test of its own, and the lost CommissioningComplete answer the issue infers is not measured |
+| 265 | The race job's flakes on the release PR (`controller/camera` `TestServiceOnTheFabric`, the camera exchange "expected message missing after 35s"; `controller/client` `TestDefaultSubscription` "no transition to Connected"), red on main since #538 (`942b416c`) | **Fixed in the release pull request** — the owner's choice; the recommendation was a rerun to green with the causes first in phase 7, as the flakes are not in the release's delta |
 
 The removal review of N6a-api-1 (decision 125 c), at openccu-loom `6dbf73cf`,
 go-ha2fabric `ec7deea`, go-fabric-ui `1056db2` and go-fabric-server
