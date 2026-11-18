@@ -726,9 +726,15 @@ func (s *Server) SetSupportedAreas(areas []Area) error {
 }
 
 // SetSupportedMaps records the device's map list (MAPS); it is refused
-// when it breaks #assertSupportedMaps, and when a held area names a map
-// the new list does not hold (R2-P6-fsm-1593: every area's MapID names a
-// SupportedMaps entry) — change the areas first.
+// when it breaks #assertSupportedMaps. Every area on a map the new list no
+// longer holds is removed with it — and every area when the new list is
+// empty — with what follows an area's removal (SelectedAreas, CurrentArea,
+// Progress), in one report, as connectedhomeip's ClearSupportedMaps and
+// RemoveSupportedMap take the areas along
+// (ServiceAreaCluster.cpp:944-947, :964-998 at 6170af84; chip has no
+// whole-list setter): every area keeps naming a SupportedMaps entry
+// (R2-P6-fsm-1593). The removed areas are lost without an error; a host
+// that moves to other maps sets the maps, then the areas.
 func (s *Server) SetSupportedMaps(maps []Map) error {
 	if !s.Serves(sa.AttrSupportedMaps) {
 		return fmt.Errorf("%w: SupportedMaps needs MAPS", ErrConfig)
@@ -738,15 +744,19 @@ func (s *Server) SetSupportedMaps(maps []Map) error {
 		s.mu.Unlock()
 		return err
 	}
+	var gone []uint32
 	for _, a := range s.areas {
-		if !a.MapId.Null && !slices.ContainsFunc(maps, func(m Map) bool { return m.MapId == a.MapId.Value }) {
-			s.mu.Unlock()
-			return invalid("Area %d's MapID %d is not in the new supported maps list", a.AreaId, a.MapId.Value)
+		if len(maps) == 0 || !a.MapId.Null && !slices.ContainsFunc(maps, func(m Map) bool { return m.MapId == a.MapId.Value }) {
+			gone = append(gone, a.AreaId)
 		}
+	}
+	changed := []uint32{sa.AttrSupportedMaps}
+	for _, id := range gone {
+		changed = append(changed, s.removeAreaLocked(id)...)
 	}
 	s.maps = slices.Clone(maps)
 	s.mu.Unlock()
-	s.changed(sa.AttrSupportedMaps)
+	s.report(changed)
 	return nil
 }
 
@@ -869,7 +879,7 @@ func (s *Server) report(changed []uint32) {
 
 // RemoveSupportedMapsEntry removes a map and every area that lies on it,
 // as connectedhomeip's RemoveSupportedMap collects every area on the
-// removed map (ServiceAreaCluster.cpp:970-992 at 6170af84), so no area
+// removed map (ServiceAreaCluster.cpp:970-995 at 6170af84), so no area
 // names a map that is gone (R2-P6-fsm-1593). matter.js removes the first
 // one only (removeSupportedMapsEntry, ServiceAreaServer.ts:276-289 at
 // db021da0).

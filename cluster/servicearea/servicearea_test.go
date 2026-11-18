@@ -542,9 +542,9 @@ func TestRemoveEntries(t *testing.T) {
 // TestAreasNameASupportedMap (R2-P6-fsm-1593): with SupportedMaps non-empty
 // every area's MapID names one of them, as connectedhomeip requires
 // (ServiceAreaCluster.cpp:506-512 at 6170af84): SetSupportedAreas refuses
-// an area on another map, SetSupportedMaps refuses a list that drops a map
-// an area lies on, and RemoveSupportedMapsEntry takes every area on the
-// map along, as chip's RemoveSupportedMap (:970-992). matter.js judges
+// an area on another map, and SetSupportedMaps and RemoveSupportedMapsEntry
+// take every area on a map that goes along, as chip's ClearSupportedMaps
+// and RemoveSupportedMap (:944-947, :964-998). matter.js judges
 // null or not null only and removes the first area (ServiceAreaServer.ts:137-143,
 // :276-289 at db021da0).
 func TestAreasNameASupportedMap(t *testing.T) {
@@ -559,18 +559,37 @@ func TestAreasNameASupportedMap(t *testing.T) {
 	if err := srv.SetSupportedAreas(stray); !errors.Is(err, servicearea.ErrInvalidState) {
 		t.Errorf("SetSupportedAreas with an area on map 4: %v, want ErrInvalidState", err)
 	}
-	if err := srv.SetSupportedMaps([]servicearea.Map{{MapId: 0, Name: "Ground"}}); !errors.Is(err, servicearea.ErrInvalidState) {
-		t.Errorf("SetSupportedMaps dropping map 1, which area 10 lies on: %v, want ErrInvalidState", err)
+
+	// A new maps list without map 1 takes area 10 along, as chip's
+	// RemoveSupportedMap (Fable D2).
+	if err := srv.SetSupportedMaps([]servicearea.Map{{MapId: 0, Name: "Ground"}}); err != nil {
+		t.Fatalf("SetSupportedMaps dropping map 1: %v", err)
 	}
-	if got := read[spec.List[servicearea.Map]](t, srv, sa.AttrSupportedMaps); len(got) != 2 {
-		t.Errorf("a refused SetSupportedMaps changed the list: %+v", got)
+	if got := read[spec.List[servicearea.Area]](t, srv, sa.AttrSupportedAreas); len(got) != 2 || slices.ContainsFunc(got, func(a servicearea.Area) bool { return a.AreaId == 10 }) {
+		t.Errorf("SupportedAreas %+v after map 1 left the list, want areas 7 and 9", got)
+	}
+	if got := read[[]uint32](t, srv, sa.AttrSelectedAreas); !slices.Equal(got, []uint32{7, 9}) {
+		t.Errorf("SelectedAreas %v, want [7 9]", got)
 	}
 
 	srv.RemoveSupportedMapsEntry(0)
-	if got := read[spec.List[servicearea.Area]](t, srv, sa.AttrSupportedAreas); len(got) != 1 || got[0].AreaId != 10 {
-		t.Errorf("SupportedAreas %+v after map 0 went, want area 10 alone", got)
+	if got := read[spec.List[servicearea.Area]](t, srv, sa.AttrSupportedAreas); len(got) != 0 {
+		t.Errorf("SupportedAreas %+v after map 0 went, want none", got)
 	}
-	if got := read[[]uint32](t, srv, sa.AttrSelectedAreas); !slices.Equal(got, []uint32{10}) {
-		t.Errorf("SelectedAreas %v, want [10]", got)
+	if got := read[[]uint32](t, srv, sa.AttrSelectedAreas); len(got) != 0 {
+		t.Errorf("SelectedAreas %v, want none", got)
+	}
+
+	// An empty maps list takes every area along, null-MapID ones
+	// included (chip ClearSupportedMaps, :944-947).
+	cfg = vacuum(&device{})
+	cfg.SupportedMaps = []servicearea.Map{{MapId: 0, Name: "Ground"}}
+	cfg.SupportedAreas = []servicearea.Area{area(7, ptr[uint32](0), "Kitchen")}
+	srv = newServer(t, cfg)
+	if err := srv.SetSupportedMaps(nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := read[spec.List[servicearea.Area]](t, srv, sa.AttrSupportedAreas); len(got) != 0 {
+		t.Errorf("SupportedAreas %+v after the maps were cleared, want none", got)
 	}
 }
