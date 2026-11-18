@@ -69,7 +69,7 @@ func (s *Sender) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields
 
 // logInvoke logs a group invoke as it leaves, naming the group and the
 // multicast address it goes to. Mirrors matter.js packages/protocol/src/
-// action/client/ClientInteraction.ts:495-508 at 862ad75f, which logs every
+// action/client/ClientInteraction.ts:495-508 at db021da0, which logs every
 // invoke at info, and peerAddressDiagnostic (:86-95), which adds the group
 // and the destination for a group session; the path has no endpoint
 // (matter.js prints "*.onOff.on") and suppressResponse is set.
@@ -92,8 +92,8 @@ func (s *Sender) logInvoke(path im.ConcreteCommandPath) {
 // one append per element — unless the attribute is AccessControl's ACL or
 // Extension or opts.DisableListChunking is set: ClientGroupInteraction.write
 // hands the request to ClientInteraction.write
-// (ClientGroupInteraction.ts:44-68 at 0ceb202d), whose Write() builder
-// chunks a list as a unicast write does (Write.ts:149-171). The encoding is
+// (ClientGroupInteraction.ts:44-68 at db021da0), whose Write() builder
+// chunks a list as a unicast write does (Write.ts:155-177). The encoding is
 // im.WriteRequest.MarshalTLV's.
 func (s *Sender) Write(ctx context.Context, path im.ConcreteAttributePath, value spec.Encodable, opts RequestOptions) error {
 	if opts.Timed {

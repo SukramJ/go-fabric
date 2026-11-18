@@ -21,11 +21,11 @@ import (
 
 // The send half of group communication: outbound group sessions, framed,
 // sealed and privacy-obfuscated group messages to the group's multicast
-// address. Mirrors matter.js at 0ceb202d:
-// packages/protocol/src/session/SessionManager.ts:712-744
+// address. Mirrors matter.js at db021da0:
+// packages/protocol/src/session/SessionManager.ts:762-794
 // (groupSessionForAddress), packages/protocol/src/session/GroupSession.ts
 // (create, encode), packages/protocol/src/protocol/MessageExchange.ts:
-// 640-776 (#send on a group session) and packages/protocol/src/groups/
+// 670-812 (#send on a group session) and packages/protocol/src/groups/
 // (Groups.currentKeyForId, KeySets.currentKeyForId, errors.ts).
 
 // Errors of [Manager.Sender] and [Sender.Send].

@@ -41,7 +41,7 @@ const (
 // The two deadlines come from a [PeerSchedule] fed the clock's monotonic
 // reading ([clock.MonotonicOf]), so a step of the wall clock moves neither:
 // matter.js feeds its schedule Time.nowUs (IcdPeerWakefulness.ts:148, :154,
-// :160) and compares on it (:100, :116, :226 at 862ad75f). The timers run
+// :160) and compares on it (:100, :116, :226 at db021da0). The timers run
 // on the injected clock. Every callback runs outside the wakefulness's lock,
 // on the goroutine of the change (a timer's for an expiry) — or, while the
 // callbacks of an earlier change still run, on that change's goroutine
@@ -207,7 +207,7 @@ func (w *PeerWakefulness) observe(o wakeObserver) func() {
 // reading and converted at the current wall-clock offset, as matter.js's
 // IcdClient.nextExpectedCheckin exposes it: "The wakefulness runs on the
 // monotonic clock; expose the deadline on the wall clock"
-// (packages/node/src/behavior/system/icd/IcdClient.ts:83-87 at 862ad75f).
+// (packages/node/src/behavior/system/icd/IcdClient.ts:83-87 at db021da0).
 func (w *PeerWakefulness) NextCheckInDue() (time.Time, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()

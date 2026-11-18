@@ -3,11 +3,11 @@
 
 package bdx_test
 
-// A port of matter.js packages/protocol/test/bdx/BdxTest.ts at 862ad75f:
+// A port of matter.js packages/protocol/test/bdx/BdxTest.ts at db021da0:
 // whole transfers between an initiator (Send / Receive, matter.js
 // BdxClient.asSender / asReceiver) and a [bdx.Responder] serving the "ota"
 // scope (BdxProtocol.onNewExchange), every message both sides sent
-// recorded before an optional manipulation, as bdx-helpers.ts:85-204
+// recorded before an optional manipulation, as bdx-helpers.ts:85-207
 // (bdxTransfer) does. The matter.js PersistedFileDesignator of the client
 // is the Data / Sink of the Go initiator; its transferFileDesignator is
 // TransferFileDesignator.

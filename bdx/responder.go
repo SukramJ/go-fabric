@@ -90,7 +90,7 @@ type ScopeConfig struct {
 // MrpDelayExchange is an [Exchange] whose MRP retransmissions take an
 // additional delay: the margin joins the peer's base interval before the
 // backoff amplifies it. Mirrors matter.js MessageExchange's
-// peerAdditionalMrpDelay setter (MessageExchange.ts:352-363 at 862ad75f).
+// peerAdditionalMrpDelay setter (MessageExchange.ts:368-379 at db021da0).
 // A [Responder] sets it on the exchange of every session it accepts when
 // the session has a delay; an exchange without the method keeps its own.
 type MrpDelayExchange interface {
@@ -154,9 +154,9 @@ func (r *Responder) SetClock(c clock.Clock) {
 // ([ScopeConfig.AdditionalMrpDelay]); a negative d clears it. Mirrors
 // matter.js's BDX margin of the node's network profile,
 // LimitsConfig.bdxAdditionalMrpDelay (NetworkServer.ts:152-153 at
-// 862ad75f; NetworkProfile.ts:156-159, `bdx: limits.bdxAdditionalMrpDelay
+// db021da0; NetworkProfile.ts:156-159, `bdx: limits.bdxAdditionalMrpDelay
 // ?? additionalMrpDelay`), which MessageExchange #sendAdditionalDelay reads
-// for a BDX exchange (MessageExchange.ts:1219-1222).
+// for a BDX exchange (MessageExchange.ts:1259-1262).
 func (r *Responder) SetAdditionalMrpDelay(d time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -491,7 +491,7 @@ type ServerSession struct {
 // received it on the exchange: the line matter.js's exchange writes for
 // every message (`Message « for: BDX/…`, `Message » for: …`), which the
 // cert suite reads a transfer's counters and lengths from
-// (support/chip-testing/test/cert/tc-bdx-support.ts:273-296 at 862ad75f).
+// (support/chip-testing/test/cert/tc-bdx-support.ts:271-294 at db021da0).
 // Payload is the message's; [Decode] reads a BDX one.
 type MessageEvent struct {
 	// Sent is true for a message this side sent, false for one the peer

@@ -11,9 +11,9 @@ import "time"
 // activity threshold, a peer-loss cutoff, the age of a cache entry — reads
 // it through [MonotonicOf] and converts to the wall clock only for
 // exposure, the way matter.js keeps its timestamps on Time.nowUs (the
-// monotonic reading, packages/general/src/time/Time.ts:53-64 at 862ad75f)
+// monotonic reading, packages/general/src/time/Time.ts:53-64 at db021da0)
 // and reports them through the current wall-clock offset
-// (packages/protocol/src/session/Session.ts:154-162).
+// (packages/protocol/src/session/Session.ts:155-163).
 //
 // [System] implements it with the monotonic reading time.Now carries;
 // [github.com/SukramJ/go-fabric/clock/clocktest.Fake] implements it with

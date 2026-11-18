@@ -4,11 +4,11 @@
 package groups
 
 // A port of matter.js packages/protocol/test/session/SessionManagerTest.ts
-// at 862ad75f, the reception-state cases of a key set's removal: matter.js
+// at db021da0, the reception-state cases of a key set's removal: matter.js
 // keys the replay window on the operational key
 // (packages/protocol/src/groups/MessagingState.ts:80-98) and forgets it when
 // the last key set deriving that key goes
-// (packages/protocol/src/groups/FabricGroups.ts:185-219,
+// (packages/protocol/src/groups/FabricGroups.ts:190-224,
 // #forgetUnreferencedReceptionState). Review 2026-11 W2-sec-05.
 
 import (
