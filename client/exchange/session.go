@@ -16,8 +16,8 @@ import (
 )
 
 // UnsecuredSessionID is the session id of the unsecured session. Mirrors
-// matter.js packages/protocol/src/session/UnsecuredSession.ts:18
-// (UNICAST_UNSECURE_SESSION_ID) at 0ceb202d.
+// matter.js packages/protocol/src/codec/MessageCodec.ts:32
+// (UNICAST_UNSECURE_SESSION_ID) at db021da0.
 const UnsecuredSessionID uint16 = 0
 
 // Session is one session of the controller with a peer: the unsecured
@@ -75,7 +75,7 @@ type Session struct {
 	// activeMono is activeTimestamp on the clock's monotonic reading
 	// (clock.MonotonicOf): what the active threshold and the newest-session
 	// order are judged on, so a wall-clock step cannot flip them — matter.js
-	// keeps the stamps on Time.nowUs (Session.ts:141-151 at 862ad75f).
+	// keeps the stamps on Time.nowUs (Session.ts:142-152 at db021da0).
 	activeMono time.Duration
 	exchanges  map[*Exchange]struct{}
 	// handshakes counts the exchanges in exchanges a Sigma1 opened on an
@@ -108,7 +108,7 @@ func (s *Session) Addr() *net.UDPAddr {
 //
 // A session bound to a TCP connection stays on it: its address names the
 // connection (matter.js probes and migrates UDP sessions only,
-// PeerAddressMonitor.ts:138-139 at 862ad75f).
+// PeerAddressMonitor.ts:138-139 at db021da0).
 //
 // A move to a different address notifies the observer OnAddressChanged
 // installed — matter.js MessageChannel's networkAddressChanged, which the
@@ -266,7 +266,7 @@ func (s *Session) Resumed() bool { return s.resumed }
 
 // CreatedAt is when the session was established — matter.js
 // Session.createdAt, the cutoff SessionManager.#handlePeerLoss compares
-// (SessionManager.ts:690-692 at 0ceb202d).
+// (SessionManager.ts:740-742 at db021da0).
 func (s *Session) CreatedAt() time.Time { return s.createdAt }
 
 // IsPeerActive reports whether the peer sent a message within its active
@@ -335,7 +335,7 @@ func (s *Session) ActiveMonotonic() (time.Duration, bool) {
 // A resolver that returns nil, or none, pads nothing. Mirrors matter.js
 // Session.peerMrpMarginsResolver, which the peer sets on each of its
 // sessions to its network profile's margins once its medium is known
-// (packages/protocol/src/peer/Peer.ts:184-186 at 862ad75f).
+// (packages/protocol/src/peer/Peer.ts:184-186 at db021da0).
 func (s *Session) SetPeerMargins(fn func() *Margins) {
 	if fn == nil {
 		s.peerMargins.Store(nil)

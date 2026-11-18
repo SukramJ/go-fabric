@@ -12,14 +12,14 @@ import (
 
 // Fallbacks for session parameters a peer did not report. Mirrors matter.js
 // packages/protocol/src/session/SessionIntervals.ts:45-49 (the intervals)
-// and SessionParameters.ts:118-153 (the rest) at 0ceb202d.
+// and SessionParameters.ts:147-188 (the rest) at db021da0.
 const (
 	FallbackIdleInterval             uint32 = 500  // ms, SessionIntervals.ts:46
 	FallbackActiveInterval           uint32 = 300  // ms, SessionIntervals.ts:47
 	FallbackActiveThreshold          uint16 = 4000 // ms, SessionIntervals.ts:48
-	FallbackDataModelRevision        uint16 = 17   // SessionParameters.ts:125
-	FallbackInteractionModelRevision uint16 = 11   // SessionParameters.ts:131
-	FallbackMaxPathsPerInvoke        uint16 = 1    // SessionParameters.ts:145
+	FallbackDataModelRevision        uint16 = 17   // SessionParameters.ts:154
+	FallbackInteractionModelRevision uint16 = 11   // SessionParameters.ts:160
+	FallbackMaxPathsPerInvoke        uint16 = 1    // SessionParameters.ts:174
 )
 
 // Our own revisions, the ones matter.js SessionParameters.defaults

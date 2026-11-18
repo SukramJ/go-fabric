@@ -14,7 +14,7 @@ const (
 	// MaxTransmissions is the number of transmissions of one reliable
 	// message, the first included. Mirrors matter.js
 	// packages/protocol/src/protocol/MRP.ts:33 (MAX_TRANSMISSIONS = 5) at
-	// 0ceb202d.
+	// db021da0.
 	MaxTransmissions = 5
 
 	// StandaloneAckTimeout is how long a received reliable message waits
@@ -61,7 +61,7 @@ type Intervals struct {
 // value in [0, 1); 1 gives the maximum), floored to whole milliseconds.
 //
 // Mirrors matter.js packages/protocol/src/protocol/MRP.ts:162-190
-// (retransmissionIntervalOf) at 0ceb202d with additionalDelay and
+// (retransmissionIntervalOf) at db021da0 with additionalDelay and
 // fixedBackoff zero, through transport/mrp.BackoffDuration, the same
 // formula; [RetransmissionIntervalPadded] takes the pad an exchange's
 // network profile gives it.

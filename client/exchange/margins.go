@@ -14,7 +14,7 @@ import (
 // traffic class: bulk transfer sustains many round trips over one path,
 // so it may need a margin different from normal messaging. Mirrors
 // matter.js MRP.Margins (packages/protocol/src/protocol/MRP.ts:12-19 at
-// 862ad75f); a network profile precomputes them (client/peer
+// db021da0); a network profile precomputes them (client/peer
 // NetworkProfile.Margins).
 type Margins struct {
 	Messaging time.Duration
@@ -36,7 +36,7 @@ func MarginFor(m *Margins, protocol uint16) (time.Duration, bool) {
 
 // Pad is the sender-side addition to the MRP backoff — matter.js
 // MRP.RetryDelayInputs' additionalDelay and fixedBackoff
-// (packages/protocol/src/protocol/MRP.ts:122-140 at 862ad75f).
+// (packages/protocol/src/protocol/MRP.ts:122-140 at db021da0).
 type Pad struct {
 	// Additional joins the base interval, so the exponential backoff
 	// amplifies it: a network profile's margin.

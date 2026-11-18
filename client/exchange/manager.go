@@ -99,7 +99,7 @@ type Config struct {
 	// sender-side axis every exchange's backoff takes the larger of it and
 	// the peer's margin for — matter.js SessionManager.localAdditionalMrpDelay,
 	// set from the node's own network profile ("fast" by default, so 0;
-	// ServerNetworkRuntime.ts:405-406, NetworkServer.ts:242 at 862ad75f).
+	// ServerNetworkRuntime.ts:409-410, NetworkServer.ts:248 at db021da0).
 	LocalAdditionalMrpDelay time.Duration
 	// LocalFixedMrpBackoff is the flat pad added after every exchange's
 	// backoff, not amplified by it — matter.js
@@ -256,7 +256,7 @@ func (m *Manager) Reliable() bool { return m.reliable }
 // x acknowledges any message, and not returned by [Exchange.Next], which
 // waits for the message after it. It is matter.js
 // ProtocolHandler.onNewExchange (packages/protocol/src/protocol/ProtocolHandler.ts:22-23
-// at 0ceb202d). It runs on a goroutine of its own, one per exchange, so
+// at db021da0). It runs on a goroutine of its own, one per exchange, so
 // the receive path never waits for it; the exchange is closed when it
 // returns, if the handler did not close it.
 type ProtocolHandler func(x *Exchange, first *Message)
@@ -1490,13 +1490,13 @@ func (m *Manager) acceptAs(s *Session, msg *Message, countHandshake bool) *Excha
 // handleSecureChannel is the Secure Channel handler of a controller for an
 // exchange the peer opened on a secure session. Mirrors matter.js
 // packages/protocol/src/securechannel/SecureChannelProtocol.ts:30-88
-// (StatusReportOnlySecureChannelProtocol) at 0ceb202d: an initial
+// (StatusReportOnlySecureChannelProtocol) at db021da0: an initial
 // StatusReport Success / CloseSession means the peer closed the session —
-// NodeSession.handlePeerClose (NodeSession.ts:305-309), the session lost
+// NodeSession.handlePeerClose (NodeSession.ts:335-339), the session lost
 // with a [PeerInitiatedCloseError] — and the exchange that carried it
 // closes, acknowledging it; any other initial StatusReport is ignored
 // (:69-77); a standalone ack ends there, unacknowledged as every
-// standalone ack (:43-45, MessageExchange.ts:519-522);
+// standalone ack (:43-45, MessageExchange.ts:549-552);
 // any other message is refused as unexpected (:46-49). Every branch closes
 // the exchange, so an ack the message asked for goes out.
 func (m *Manager) handleSecureChannel(x *Exchange, msg *Message) {
