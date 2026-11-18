@@ -13,8 +13,8 @@
   (`internal/chiptool/matterjs_test.go`, `TestMatterJSController`).
   matter.js too drops a removed fabric's subscription rows at removal,
   not one restart later: the fabric's sessions close (`Fabric.ts:484-487`
-  at `db021da0`), their subscriptions end (`NodeSession.ts:427`,
-  `ServerSubscription.ts:768-770`, `:834`) and `SubscriptionsServer.ts:168-187`
+  at `db021da0`), their subscriptions end (`Session.ts:331-335`,
+  `NodeSession.ts:312-322`, `ServerSubscription.ts:768-770`, `:834`) and `SubscriptionsServer.ts:168-187`
   drops the rows.
 - **Date**: 2026-10-04
 - **Related**:
