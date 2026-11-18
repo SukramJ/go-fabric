@@ -150,8 +150,9 @@ func TestControllerRecoversFromASilentRestart(t *testing.T) {
 		// The subscription persisted before the restart: the restarted
 		// device re-establishes it (node.go ReestablishFormerSubscriptions)
 		// on a session the device opens, and the report arrives there. The
-		// session from before the restart is not asserted on
-		// (R2-P6-par-3102).
+		// session from before the restart stays: a session the peer
+		// establishes does not end the controller's older ones
+		// (R2-P6-par-3102, owner decision 239).
 		t.Run("device resumes", func(t *testing.T) {
 			t.Parallel()
 			sp := subscribedPair(t)
@@ -167,6 +168,9 @@ func TestControllerRecoversFromASilentRestart(t *testing.T) {
 			}
 			if fabrictestseam.Peers(p.Controller).Initiated(s) {
 				t.Fatal("the new session is the controller's, want the one the restarted device opened to re-establish its subscription")
+			}
+			if old.IsPeerLost() || old.IsClosed() {
+				t.Fatalf("the session from before the restart: lost %v, closed %v; want it kept", old.IsPeerLost(), old.IsClosed())
 			}
 		})
 	})
