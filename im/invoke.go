@@ -698,9 +698,11 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		// invoke it; an endpoint it may not is skipped, not reported.
 		// Mirrors matter.js
 		// packages/protocol/src/action/server/CommandInvokeResponse.ts:131-170
-		// (#processWildcard) and :337-412 (#processEndpointForWildcard,
-		// #wildcardTargetOf: the command's privilege, its fabric scope,
-		// its timed quality) at 862ad75f. It answered UNSUPPORTED_ENDPOINT.
+		// (#processWildcard), :330-361 (#processEndpointForWildcard) and
+		// :367-398 (#wildcardTargetOf: the command's privilege :380, its
+		// Large Message quality :384-386, its fabric scope :388-390, its
+		// timed quality :392-394) at db021da0. It answered
+		// UNSUPPORTED_ENDPOINT.
 		if wild, ok := d.(AuthorizingInvoker); ok && !inv.Path.HasEndpoint {
 			if !inv.DecodeStatus.IsSuccess() {
 				ir.Responses = append(ir.Responses, undecodedWildcardEntries(ctx, wild, g, inv)...)
