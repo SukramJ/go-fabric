@@ -56,8 +56,16 @@ func main() {
 	}
 	var files []string
 	for _, root := range flag.Args() {
-		_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+		err := filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			// A dot-directory (.git, .claude's worktrees) holds copies
+			// of the module, never its sources (R2-P6-err-2823).
+			if info.IsDir() && p != root && strings.HasPrefix(info.Name(), ".") {
+				return filepath.SkipDir
+			}
+			if info.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
 				return nil
 			}
 			for _, s := range skips {
@@ -68,6 +76,10 @@ func main() {
 			files = append(files, p)
 			return nil
 		})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "bx3-mutex:", err)
+			os.Exit(1)
+		}
 	}
 	sort.Strings(files)
 	changed := 0
@@ -206,11 +218,17 @@ func doFile(path string, apply bool) int {
 		for _, e := range edits {
 			lines = append(lines[:e.line-1], append([]string{e.text}, lines[e.line-1:]...)...)
 		}
-		_ = os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644)
+		if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, "bx3-mutex:", err) // an edit not written is not applied
+			os.Exit(1)
+		}
 		// a comment above a field breaks gofmt's alignment block
 		g := filepath.Join(os.Getenv("HOME"), "go", "bin", "gofumpt")
 		if _, err := os.Stat(g); err == nil {
-			_ = exec.Command(g, "-w", path).Run()
+			if err := exec.Command(g, "-w", path).Run(); err != nil {
+				fmt.Fprintln(os.Stderr, "bx3-mutex: gofumpt:", path, err)
+				os.Exit(1)
+			}
 		}
 	}
 	return len(edits)
