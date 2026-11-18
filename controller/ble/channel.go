@@ -563,11 +563,12 @@ func (c *Channel) endLost() {
 // Serve) — so a message over BLE is held to the size of one over UDP
 // (TM R5 5a.5). connectedhomeip reassembles a BTP message in one
 // packet buffer and refuses a larger one, CHIP_ERROR_INBOUND_MESSAGE_TOO_BIG
-// (src/ble/BtpEngine.cpp:305, :312-314, :328-330 at 6170af84); matter.js
+// (src/ble/BtpEngine.cpp:305, :312-314, :329-331 at 6170af84); matter.js
 // bounds it by the declared 16-bit length only
-// (packages/protocol/src/ble/BtpSessionHandler.ts:314, :322-330 at
-// db021da0) and sends at most 1232 bytes over BLE (packages/protocol/src/
-// ble/Ble.ts:37 at db021da0), connectedhomeip one packet buffer.
+// (packages/protocol/src/ble/BtpSessionHandler.ts:314, :323-331 at
+// db021da0) and states a BLE channel's payload bound as 1232 bytes
+// (packages/protocol/src/ble/Ble.ts:37, BleConsts.ts:79,
+// packages/general/src/net/udp/UdpSocket.ts:12 at db021da0).
 const maxInboundMessage = udp.MaxDatagramSize
 
 // deliver hands a reassembled Matter message to the exchange manager. A

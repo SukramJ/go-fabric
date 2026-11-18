@@ -10,17 +10,21 @@ import (
 )
 
 // reportedValue decodes an attribute value the device reported by its
-// shape alone: spec.DecodeValue checks no length or range constraint and
+// shape alone: spec.DecodeValue checks no length or range constraint
+// beyond the type's width (matter.js checks not even that,
+// packages/types/src/tlv/TlvNumber.ts:142 at db021da0 — a difference),
+// takes an integer of the other signedness and bounds-checks it, and
 // leaves out a struct field the value does not carry. A value whose shape
 // does not decode is logged and reported absent (false), and the read goes
 // on. Mirrors matter.js packages/protocol/src/action/client/InputChunk.ts:
 // 299-303 at db021da0 (decodeAttributeValueWithSchema with
 // DATA_REPORT_DECODE_OPTIONS, ending in the schema's decodeTlv, which does
-// not validate: AttributeDataDecoder.ts:311-335, TlvSchema.ts:64-66) and
-// :312-320 (an UnexpectedDataError is a warning and the entry is skipped).
-// A value the flow cannot do without is then its "no …" refusal, where
-// both references fail too (matter.js ControllerCommissioningFlow.ts:
-// 861-872 at db021da0; connectedhomeip
+// not validate: AttributeDataDecoder.ts:311-335, TlvSchema.ts:64-66;
+// the other signedness under relaxNumberTypeChecks, TlvNumber.ts:124-141)
+// and :312-320 (an UnexpectedDataError is a warning and the entry is
+// skipped). An absent value the flow cannot do without is then its "no …"
+// refusal, where both references fail too (matter.js
+// ControllerCommissioningFlow.ts:861-872 at db021da0; connectedhomeip
 // src/controller/CHIPDeviceController.cpp:2781-2790 at 6170af84). Review
 // II, F-db021da0-15.
 func reportedValue(log *slog.Logger, what string, t spec.Type, n spec.Node) (any, bool) {
@@ -32,16 +36,19 @@ func reportedValue(log *slog.Logger, what string, t spec.Type, n spec.Node) (any
 	return v, true
 }
 
-// reportedScalar is [reportedValue] for a scalar, through a decoder that
-// reads it by shape alone (an integer's width, null): the typed result
-// without a conversion.
-func reportedScalar[T any](log *slog.Logger, what string, d spec.Decoder[T], n spec.Node) (T, bool) {
-	v, err := d(n)
-	if err != nil {
-		log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", what), slog.Any("err", err))
-		return v, false
+// reportedUint is [reportedValue] for an unsigned integer of bits width
+// (an integer of the other signedness taken and bounds-checked); null is
+// isNull.
+func reportedUint[T uint8 | uint16 | uint32 | uint64](log *slog.Logger, what string, bits int, n spec.Node) (v T, isNull, ok bool) {
+	val, ok := reportedValue(log, what, spec.Type{Kind: spec.KindUint, Bits: bits}, n)
+	if !ok {
+		return 0, false, false
 	}
-	return v, true
+	if val == nil {
+		return 0, true, true
+	}
+	u, _ := val.(uint64)
+	return T(u), false, true // DecodeValue held it to bits
 }
 
 // reportedStruct is [reportedValue] for a struct of def; a null value is

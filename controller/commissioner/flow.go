@@ -783,6 +783,8 @@ func (f *flow) armFailsafe(ctx context.Context, d time.Duration) (stepResult, er
 		}
 		var info gencomm.BasicCommissioningInfo
 		var has bool
+		// A value without FailSafeExpiryLengthSeconds is refused: this
+		// module's rule — the flow cannot arm without it (F-db021da0-15).
 		if info.FailSafeExpiryLengthSeconds, has = fieldUint[uint16](def, fields, "FailSafeExpiryLengthSeconds"); !has {
 			return 0, fmt.Errorf("%w: no BasicCommissioningInfo FailSafeExpiryLengthSeconds", errUnexpectedResponse)
 		}
@@ -1022,7 +1024,9 @@ func (f *flow) configureRegulatoryInformation(ctx context.Context) (stepResult, 
 	var capability uint8
 	if ok[0] {
 		// By shape, a malformed value absent (F-db021da0-15, reportedValue).
-		capability, ok[0] = reportedScalar(f.log, "LocationCapability", spec.DecodeUint[uint8](8), v[0])
+		var isNull bool
+		capability, isNull, ok[0] = reportedUint[uint8](f.log, "LocationCapability", 8, v[0])
+		ok[0] = ok[0] && !isNull
 	}
 	if !ok[0] {
 		return 0, fmt.Errorf("%w: no LocationCapability", errUnexpectedResponse)

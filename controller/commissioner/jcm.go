@@ -177,14 +177,14 @@ func (t *jcmTrust) parseAdminFabricIndexAndEndpointID(r *interaction.Report) err
 		if a.Path.Cluster != jfadef.ClusterID || a.Path.Attribute != jfadef.AttrAdministratorFabricIndex {
 			continue
 		}
-		idx, ok := reportedScalar(t.logger(), "AdministratorFabricIndex", spec.DecodeNullable(spec.DecodeUint[uint8](8)), a.Value)
+		idx, isNull, ok := reportedUint[uint8](t.logger(), "AdministratorFabricIndex", 8, a.Value)
 		if !ok {
 			continue
 		}
-		if idx.Null || idx.Value == 0 { // :99-109
+		if isNull || idx == 0 { // :99-109
 			return fmt.Errorf("%w: AdministratorFabricIndex is null", errJCMParse)
 		}
-		t.info.AdminFabricIndex, t.info.AdminEndpointID = idx.Value, a.Path.Endpoint
+		t.info.AdminFabricIndex, t.info.AdminEndpointID = idx, a.Path.Endpoint
 	}
 	if t.info.AdminFabricIndex == 0 || t.info.AdminEndpointID == jcm.InvalidEndpointID { // :121-131
 		return fmt.Errorf("%w: no JointFabricAdministrator with an AdministratorFabricIndex", errJCMParse)

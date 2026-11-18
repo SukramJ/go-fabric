@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
+	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
 	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -86,6 +87,37 @@ func TestReportedValueDecodedByShapeParityMatterjs(t *testing.T) {
 		n := nodeOf(t, func(e *tlv.Encoder) { e.PutUint(anon, 7) })
 		if _, ok := reportedStruct(log, "BasicCommissioningInfo", gencomm.BasicCommissioningInfoDef, n); ok {
 			t.Fatal("an integer decoded as a struct")
+		}
+	})
+
+	t.Run("an integer of the other signedness is taken and bounds-checked", func(t *testing.T) {
+		t.Parallel()
+		// matter.js under relaxNumberTypeChecks (TlvNumber.ts:124-141 at
+		// db021da0): a signed element for an unsigned field.
+		if v, isNull, ok := reportedUint[uint8](log, "LocationCapability", 8, nodeOf(t, func(e *tlv.Encoder) { e.PutInt(anon, 2) })); !ok || isNull || v != 2 {
+			t.Fatalf("signed 2 for a uint8: %d, null %v, ok %v", v, isNull, ok)
+		}
+		if _, _, ok := reportedUint[uint8](log, "LocationCapability", 8, nodeOf(t, func(e *tlv.Encoder) { e.PutInt(anon, -1) })); ok {
+			t.Fatal("signed -1 for a uint8 taken")
+		}
+		if _, isNull, ok := reportedUint[uint8](log, "AdministratorFabricIndex", 8, nodeOf(t, func(e *tlv.Encoder) { e.PutNull(anon) })); !ok || !isNull {
+			t.Fatalf("null: null %v, ok %v", isNull, ok)
+		}
+		// A difference, recorded: a same-signedness value above the width
+		// is absent here; matter.js reads it unchecked (TlvNumber.ts:142).
+		if _, _, ok := reportedUint[uint8](log, "LocationCapability", 8, nodeOf(t, func(e *tlv.Encoder) { e.PutUint(anon, 300) })); ok {
+			t.Fatal("300 for a uint8 taken")
+		}
+		// The site: a signed AdministratorFabricIndex is the administrator's.
+		tr, f := newTrust(t, &delegate{})
+		r := f.report(t)
+		for i := range r.Attributes {
+			if a := &r.Attributes[i]; a.Path.Attribute == jfadef.AttrAdministratorFabricIndex && a.Path.Cluster == jfadef.ClusterID {
+				a.Value = nodeOf(t, func(e *tlv.Encoder) { e.PutInt(anon, int64(f.index)) })
+			}
+		}
+		if err := tr.parseAdminFabricIndexAndEndpointID(r); err != nil || tr.info.AdminFabricIndex != f.index {
+			t.Fatalf("parse: %v, index %d", err, tr.info.AdminFabricIndex)
 		}
 	})
 
