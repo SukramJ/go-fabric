@@ -126,9 +126,10 @@ updates:
       - dependency-name: "ubuntu"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
-  # The documentation site's build (docs/requirements.txt, pages.yml). Its
-  # header asks for versions released at least two weeks before they are
-  # pinned: the cooldown.
+  # The documentation site's build (docs/requirements.in and its hashed
+  # pip-compile lock docs/requirements.txt, pages.yml). Its header asks for
+  # versions released at least two weeks before they are pinned: the
+  # cooldown.
   - package-ecosystem: pip
     directory: "/docs"
     schedule:
@@ -138,6 +139,24 @@ updates:
     commit-message:
       prefix: "docs(deps)"
 
-  # script/ble-virtual (package.json, package-lock.json) has no entry on
-  # purpose: its four direct requires are one matter.js prerelease build,
-  # pinned deliberately for the ble-virtual leg, and moved by hand.
+  # script/ble-virtual (package.json, package-lock.json), the ble-virtual
+  # leg's matter.js peripheral and controller. Its four direct requires are
+  # one matter.js prerelease build, pinned deliberately and moved by hand:
+  # ignored here. What Dependabot proposes is the lockfile's transitive
+  # set, in one grouped pull request (R2-P5-sup-07).
+  - package-ecosystem: npm
+    directory: "/script/ble-virtual"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "ci"
+    allow:
+      - dependency-type: "all"
+    ignore:
+      - dependency-name: "@matter/*"
+      - dependency-name: "@project-chip/*"
+    groups:
+      ble-virtual:
+        patterns: ["*"]

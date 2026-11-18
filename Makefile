@@ -352,7 +352,10 @@ cite-check: no-untracked-go ## regenerate the citation artefacts, then fail on a
 # CHIP_CERT_BINS_IMAGE is only the host fallback: `make chiptool-extract`
 # copies chip-tool out of it for a run without Docker (arm64 hosts; the image
 # publishes arm64 manifests only). Bump it deliberately, like the image pin.
-CHIP_CERT_BINS_IMAGE ?= connectedhomeip/chip-cert-bins:6feac778f196483b6355d35fc529f183b293b71f
+# Pinned by digest as well (R2-P5-sup-07): the tag names a commit but can be
+# pushed again; the digest is the index `docker buildx imagetools inspect`
+# printed for the tag on 2026-11-18.
+CHIP_CERT_BINS_IMAGE ?= connectedhomeip/chip-cert-bins:6feac778f196483b6355d35fc529f183b293b71f@sha256:aa51b88d33e8a29304941eecd46eae5f6e4aa597627581c9d6b425895e8fb0ba
 CHIPTOOL_BIN_DIR     ?= bin
 
 # The CHIP test harness image the chip-tool suite runs by default: the
@@ -488,6 +491,11 @@ CHIPTOOL_CONTAINER_SUBNET  ?= fd00:6f66:6162:c7::/64
 CHIPTOOL_CONTAINER_RUN     ?= .
 CHIPTOOL_CONTAINER_SKIP    ?= ^(TestChipCertificationFamilies|TestChipToolBLEWiFi|TestChipToolBLECases)$$|^TestChipToolSuite$$/^groups$$|^TestGoCertificationCases$$/^CAMERA-GO$$
 GO_MOD_VERSION := $(shell sed -n 's/^go //p' go.mod)
+# The Go image of chiptool-container, by tag and digest (R2-P5-sup-07; the
+# index digest of golang:1.27.4 on 2026-11-18). The target refuses a GO_IMAGE
+# whose version is not go.mod's: a digest that outlived a go.mod bump would
+# build with the old Go under the new tag's name.
+GO_IMAGE ?= golang:1.27.4@sha256:205c7636d74e0ffbe3d007162df7d74f859f5a8c8322dfb9f907977686c126cf
 
 .PHONY: chiptool-container
 chiptool-container: ## the chip-tool suite's host fallback in one linux/arm64 container on a bridge network — the local loop where the harness image cannot use the host network (arm64 + Docker)
@@ -503,9 +511,12 @@ chiptool-container: ## the chip-tool suite's host fallback in one linux/arm64 co
 	@[ "$$(docker network inspect -f '{{.EnableIPv6}}' $(CHIPTOOL_CONTAINER_NETWORK))" = "true" ] || { \
 		echo "chiptool-container: the network $(CHIPTOOL_CONTAINER_NETWORK) exists without IPv6, which Matter needs; name another with CHIPTOOL_CONTAINER_NETWORK."; \
 		exit 1; }
+	@case "$(GO_IMAGE)" in golang:$(GO_MOD_VERSION)@sha256:*) ;; *) \
+		echo "chiptool-container: GO_IMAGE $(GO_IMAGE) is not golang:$(GO_MOD_VERSION)@sha256:… — move the pin with go.mod"; \
+		exit 1;; esac
 	docker build --platform linux/arm64 \
 		--build-arg CHIP_CERT_BINS_IMAGE=$(CHIP_CERT_BINS_IMAGE) \
-		--build-arg GO_IMAGE=golang:$(GO_MOD_VERSION) \
+		--build-arg GO_IMAGE=$(GO_IMAGE) \
 		-t $(CHIPTOOL_CONTAINER_IMAGE) internal/chiptool/container
 	docker run --rm --platform linux/arm64 --network $(CHIPTOOL_CONTAINER_NETWORK) \
 		-v "$(CURDIR)":/src \
