@@ -65,7 +65,9 @@
 //     a [Network.Filter] sees each as one datagram to the group and every
 //     member receives it.
 //   - [Options].Loopback puts every host on a real UDP socket on [::1]
-//     instead, for a test that needs sockets.
+//     instead, for a test that needs sockets. On a fake clock such a site
+//     runs alone among the process's loopback sites: a parallel test's
+//     [NewSite] waits until the open one's test ends.
 //
 // Time. A fake clock moves only when the test moves it — [Site.Step] —
 // or inside [Site.Run] and [Site.Eventually], which every helper here

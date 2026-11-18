@@ -74,7 +74,11 @@ type Options struct {
 	// Loopback runs the site's hosts on real UDP sockets on the loopback
 	// address ([::1], an ephemeral port each) instead of the in-memory
 	// network, for a test that needs sockets. The site still answers its
-	// controllers' DNS-SD queries from what the devices publish.
+	// controllers' DNS-SD queries from what the devices publish. On a fake
+	// clock a loopback site runs alone among the process's loopback sites:
+	// [NewSite] waits while a test outside its own tree (the test, its
+	// parents and subtests) holds an open one, as the site's quiet check
+	// cannot tell another loopback site's work from its own.
 	Loopback bool
 	// Settle is the quiet period of [Site.Settle]; 0 is [DefaultSettle].
 	Settle time.Duration
@@ -176,6 +180,8 @@ func NewSite(tb testing.TB, opts Options) *Site {
 	}
 	if !opts.Loopback {
 		s.net = newNetwork(s.clk, opts.Net)
+	} else if s.fake != nil {
+		holdLoopbackSlot(tb)
 	}
 	s.dir = tb.TempDir()
 	s.inSyscall.Store(goroutinesInSyscall())

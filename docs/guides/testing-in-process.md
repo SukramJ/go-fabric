@@ -458,6 +458,13 @@ wall clock; `Topology.Configure` may set the device's listen address
   parallel test in the same binary delays a clock step — by at most 50 ms
   on an in-memory site with a fake clock, and on loopback by at most a
   second while nothing on the site moves.
+- Loopback sites on a fake clock run one test at a time in a process:
+  `NewSite` waits while a test outside its own tree holds an open one.
+  Two in parallel read each other's work as their own, so every clock
+  step waited its full second (a subscription's keep-alive was not
+  reached in a two-minute wait), and a step that moved on could overtake
+  a handshake the other site starved. A test and its subtests share the
+  slot.
 - Devices carry the CSA test attestation chain, the controllers trust the
   CSA test PAAs, and every credential is fixed and public: the package is
   for tests.

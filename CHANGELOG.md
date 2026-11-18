@@ -643,6 +643,7 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 
 ### Fixed
 
+- `fabrictest`: loopback sites on a fake clock run one test at a time in a process — `NewSite` waits while a test outside its own tree holds an open one. In parallel each read the other's goroutines as its own work and held every clock step for a second: the clock crawled past two-minute waits, and a step that moved on overtook a starved handshake ("expected message missing after 35s") — the `controller` and `controller/camera` camera tests under `-race -cpu 2`.
 - `node`: a secure session's retransmissions follow the peer's advertised MRP intervals — the active one while the peer is active, the idle one otherwise — as matter.js does; every retransmission of a node-built device ran on the 500 ms idle default whatever the peer advertised (review II, Fable round 2 of phase 6b wave 3).
 - `store.Apply` upgrades a database at schema v7, v8 or v9 that holds an ICD key in clear; it failed with "no such column: sealed" (review II).
 - `handshake.StoreResumption.DeleteResumptionRecord` removes a stored record that does not open (`store.ErrUnseal`) instead of reporting the read error and keeping it (review II).
