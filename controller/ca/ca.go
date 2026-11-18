@@ -678,10 +678,13 @@ func (c *CA) Verifier() *mattercert.Verifier { return c.verifier }
 // GenerateNOC issues a NOC for the subject key pub (65-byte uncompressed
 // P-256), on fabricID for nodeID with the CASE Authenticated Tags cats.
 // Mirrors matter.js CertificateAuthority.ts:287-320 (generateNoc) at
-// 0ceb202d: the next certificate id; issuer and signer the ICAC when there
+// db021da0: the next certificate id; issuer and signer the ICAC when there
 // is one, else the root (#getSigningParameters :411-429); subject
 // {fabricId, nodeId, caseAuthenticatedTags} in that order (the DN list
-// keeps the caller's order, kinds/definitions/operational.ts:109-110);
+// keeps the caller's order: kinds/definitions/operational.ts:111 makes it
+// a TlvDistinguishedName, whose DistinguishedNameSchema.encodeTlvInternal
+// and rdnsOfProperties keep it, kinds/DistinguishedName.ts:613-630,
+// :460-482);
 // validity −1 / +10 years; not a CA; keyUsage digitalSignature;
 // extendedKeyUsage [clientAuth, serverAuth]; SHA-1 of pub as the subject
 // key identifier and the signer's as the authority key identifier.

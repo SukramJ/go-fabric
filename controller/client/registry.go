@@ -141,7 +141,7 @@ type Registry struct {
 	closed bool
 	// removeFabric, when set, stands between a decommission and its
 	// RemoveFabric invoke: the test seam of matter.js's patchRemoveFabric
-	// (DecommissionTest.ts:36-47 at 862ad75f), set only by
+	// (DecommissionTest.ts:48-58 at db021da0), set only by
 	// export_test.go's PatchRemoveFabric. Nil invokes directly.
 	removeFabric func(fabricIndex uint8, invoke func(fabricIndex uint8) (Result, error)) (Result, error)
 

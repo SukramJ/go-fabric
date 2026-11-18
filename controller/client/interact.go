@@ -89,8 +89,8 @@ func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Rep
 // The routing is applied to the caller's copy, so a reused request never
 // caches it across a SIT⇄LIT flip. Mirrors matter.js
 // ClientNodeInteraction.#awaitModeIcdRouting
-// (packages/node/src/node/client/ClientNodeInteraction.ts:300-318 at
-// 862ad75f), applied at :78-81 (read) and :188-191 (write). An invoke
+// (packages/node/src/node/client/ClientNodeInteraction.ts:321-324 at
+// db021da0), applied at :78-81 (read) and :188-191 (write). An invoke
 // takes routeInvoke instead.
 func (n *Node) routeICD(r *interaction.ClientRequest) {
 	if n.icd == nil || r.Network != "" {
@@ -120,17 +120,17 @@ func (n *Node) noteICDActive() {
 }
 
 // Subscribe subscribes through the node — ClientNodeInteraction.subscribe
-// (ClientNodeInteraction.ts:125-169 at 0ceb202d): the cached versions go
-// along as filters (:128, no changes-omitted refresh), as for a read none
-// for a cluster the caller filters and none with the other fabric filter
-// than the cache's ([structure.withKnownVersions]); the interval bounds
-// are the node's for the request's (:129-133); each report is applied to
-// the image before req.Updated sees it (:139-146), its store writes and
-// hooks on the node's job queue, off the report's exchange
-// (ClientStructure.ts:417-439); a sustained
-// subscription's re-subscriptions send the versions then current and the
+// (ClientNodeInteraction.ts:119-182 at db021da0): the cached versions go
+// along as filters (:123-124, :136, no changes-omitted refresh), as for a
+// read none for a cluster the caller filters and none with the other
+// fabric filter than the cache's ([structure.withKnownVersions]); the
+// interval bounds are the node's for the request's (:137-141); each
+// report is applied to the image before req.Updated sees it (:147-159),
+// its store writes and hooks on the node's job queue, off the report's
+// exchange (ClientStructure.ts:417-439); a sustained subscription's
+// re-subscriptions send the versions then current (:161-168) and the
 // event minimum past the highest event it delivered itself, the
-// request's own event filters until then (:148-155, :162-168).
+// request's own event filters until then (SustainedSubscription.ts:379-384).
 //
 // A sustained subscription's re-subscription starts from the caller's own
 // filters, runs the caller's RefreshRequest on them, then injects the

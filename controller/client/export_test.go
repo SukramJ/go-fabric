@@ -163,7 +163,7 @@ func SetNewlyCommissioned(n *Node) {
 
 // PatchRemoveFabric makes r's decommissions call fn in place of their
 // RemoveFabric invoke — matter.js patchRemoveFabric
-// (DecommissionTest.ts:36-47 at 862ad75f), which replaces the peer's
+// (DecommissionTest.ts:48-58 at db021da0), which replaces the peer's
 // OperationalCredentialsClient.removeFabric. fn gets the fabric index the
 // decommission removes and the invoke it replaces, which it may call with
 // any index. The returned restore removes the patch.
