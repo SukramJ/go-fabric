@@ -166,8 +166,9 @@ type Options struct {
 	// the commissioning after step 0.1 with a [*TermsRequiredError]
 	// (BD-Matter-Commissioner-TermsRequirementRead).
 	TermsAndConditions *TermsAndConditionsAcknowledgement
-	// OnAttestationFailure is the attestation policy (DAV:156). The zero
-	// value accepts every finding: a device whose attestation failed is
+	// OnAttestationFailure is the attestation policy
+	// (DeviceAttestationValidator.ts:244 at db021da0). The zero value
+	// accepts every finding: a device whose attestation failed is
 	// commissioned and the findings are logged, as matter.js's flow does
 	// without a callback (ControllerCommissioningFlow.ts:1370-1385 at
 	// db021da0); the controller facade sets attestation.Reject() by
