@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10016,
+  "entry_points": 10025,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27726,
+    "total_exported": 27733,
     "reachable": 20837,
-    "whitelisted": 6866,
+    "whitelisted": 6873,
     "unreachable": 23
   },
   "by_package": [
@@ -43285,7 +43285,7 @@
       "identifier": "TestCertificatesRootFabricIDParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/certificates_parity_matterjs_test.go",
-      "line": 411
+      "line": 412
     },
     {
       "package": "secure/mattercert",
@@ -44332,6 +44332,13 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestFullSigma_CommitsTheResolutionOnlyOnAcceptance",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_claim_test.go",
+      "line": 281
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestInitiatorOverwritesSharedSecretAfterFailedSigma2",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/zeroise_test.go",
@@ -44717,10 +44724,52 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestResumeClaim_HeldIDFallsThroughUntilReleased",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_claim_test.go",
+      "line": 94
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestResumeClaim_NoClaimWithoutAClaimingStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_claim_test.go",
+      "line": 148
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestResumeClaim_RecordGoneUnderTheClaimIsAMiss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_claim_test.go",
+      "line": 179
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestResumeClaim_RefusedForNoSessionIDReleasesAndCommitsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_claim_test.go",
+      "line": 208
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestResumeClaim_ReleaseGivesTheClaimBackOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_claim_test.go",
+      "line": 68
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestResumeRecordOfTheWrongShapeIsAMiss",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/resume_record_shape_test.go",
       "line": 54
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestResume_RenewerWithoutAnIDKeepsTheOneHeld",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/resume_claim_test.go",
+      "line": 251
     },
     {
       "package": "secure/sigma",
