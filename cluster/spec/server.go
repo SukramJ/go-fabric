@@ -85,7 +85,7 @@ type ServerConfig struct {
 	// Deprecated: a host-owned tracker adds nothing — the wire carries the
 	// endpoint's DataVersion for the cluster, and the server's own version
 	// where it serves one (decision 165, F-db021da0-46); leave it nil.
-	// Removable in the next minor release.
+	// Removable in v0.25.0.
 	DataVersion *cluster.DataVersionTracker
 	// Source optionally answers reads ahead of the stored values.
 	Source Source
@@ -115,8 +115,8 @@ type ServerConfig struct {
 	//
 	// Deprecated: a server's own rule is [ServerConfig.WriteRule], which
 	// no host veto replaces; the host's veto is [Server.SetBeforeWrite] (the
-	// typed server's OnWrite), set after construction. Removable in the next
-	// minor release.
+	// typed server's OnWrite), set after construction. Removable in
+	// v0.25.0.
 	BeforeWrite func(ctx context.Context, attrID uint32, value any) error
 	// Initial holds the values the server starts with, checked as
 	// [Server.Set] checks a value.
@@ -1031,8 +1031,8 @@ func (s *Server) EmitEvent(eventID uint32, data any) error {
 // an emitter the event is dropped.
 //
 // Deprecated: use [Server.EmitEvent], which emits on the endpoint the
-// server is mounted on instead of one its caller names. Removable in the
-// next minor release.
+// server is mounted on instead of one its caller names. Removable in
+// v0.25.0.
 func (s *Server) Emit(endpoint uint16, eventID uint32, data any) error {
 	if !s.Emits(eventID) {
 		return fmt.Errorf("%w: %s event 0x%02X", ErrNotEmitted, s.def.Name, eventID)

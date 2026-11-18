@@ -1191,14 +1191,14 @@ func (a *CaseAdapter) ProcessSigma2Resume(_ []byte) (opcode uint8, respPayload [
 // Deprecated: an AckTracker holds the acknowledgements this node owes,
 // which a peer's acknowledgement does not fulfil, so it is not an
 // [AckHandler]; [Bridge.AttachAckTracker] no longer wires one. There is
-// no replacement. Removable in v0.23.0.
+// no replacement. Removable in v0.25.0.
 type MRPAckAdapter struct {
 	tracker *mrp.AckTracker
 }
 
 // NewMRPAckAdapter wraps t.
 //
-// Deprecated: see [MRPAckAdapter]. Removable in v0.23.0.
+// Deprecated: see [MRPAckAdapter]. Removable in v0.25.0.
 func NewMRPAckAdapter(t *mrp.AckTracker) *MRPAckAdapter {
 	return &MRPAckAdapter{tracker: t}
 }

@@ -393,7 +393,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3277,
+      "line": 3274,
       "kind": "method"
     },
     {

@@ -106,8 +106,8 @@ func MustGenerateRotatingID(uniqueID []byte, lifetimeCounter uint16) string {
 //
 // Deprecated: use 16 random bytes drawn once and persisted as the unique
 // id passed to [GenerateRotatingID] (node.Commissioning.RotatingDeviceID
-// does both and advances a persisted lifetime counter). Removable in the
-// next minor release.
+// does both and advances a persisted lifetime counter). Removable in
+// v0.25.0.
 func DeriveUniqueIDFromIdentity(vendorID, productID uint16, serialNumber, nodeLabel string) []byte {
 	h := sha256.New()
 	var idBytes [4]byte

@@ -260,8 +260,7 @@ func (s *Server) RecordOccupancyChanged(data OccupancyChangedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordOccupancyChanged, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitOccupancyChanged(endpoint uint16, data OccupancyChangedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventOccupancyChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -230,8 +230,7 @@ func (s *Server) RecordAlarmsStateChanged(data AlarmsStateChangedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordAlarmsStateChanged, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitAlarmsStateChanged(endpoint uint16, data AlarmsStateChangedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAlarmsStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -254,8 +253,7 @@ func (s *Server) RecordSensorFault(data SensorFaultEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSensorFault, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSensorFault(endpoint uint16, data SensorFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

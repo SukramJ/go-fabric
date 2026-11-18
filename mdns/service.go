@@ -590,8 +590,8 @@ type CommissionableServiceConfig struct {
 	// PairingHint is the pairing hint's low 16 bits.
 	//
 	// Deprecated: use Hints, which carries every bit of the bitmap
-	// (bits 16 to 22 do not fit here); removable in the next minor
-	// release. It keeps its meaning while Hints is zero.
+	// (bits 16 to 22 do not fit here); removable in
+	// v0.25.0. It keeps its meaning while Hints is zero.
 	PairingHint        uint16
 	PairingInstruction string
 	// RotatingID is the optional Rotating Device Identifier (Matter

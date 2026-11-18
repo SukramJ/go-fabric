@@ -269,8 +269,7 @@ func (s *Server) RecordSmokeAlarm(data SmokeAlarmEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSmokeAlarm, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSmokeAlarm(endpoint uint16, data SmokeAlarmEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSmokeAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -293,8 +292,7 @@ func (s *Server) RecordCoAlarm(data CoAlarmEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordCoAlarm, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitCoAlarm(endpoint uint16, data CoAlarmEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventCoAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -317,8 +315,7 @@ func (s *Server) RecordLowBattery(data LowBatteryEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLowBattery, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLowBattery(endpoint uint16, data LowBatteryEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLowBattery, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -341,8 +338,7 @@ func (s *Server) RecordHardwareFault(data HardwareFaultEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordHardwareFault, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitHardwareFault(endpoint uint16, data HardwareFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventHardwareFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -365,8 +361,7 @@ func (s *Server) RecordEndOfService(data EndOfServiceEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordEndOfService, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitEndOfService(endpoint uint16, data EndOfServiceEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventEndOfService, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -389,8 +384,7 @@ func (s *Server) RecordSelfTestComplete(data SelfTestCompleteEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSelfTestComplete, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSelfTestComplete(endpoint uint16, data SelfTestCompleteEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSelfTestComplete, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -413,8 +407,7 @@ func (s *Server) RecordAlarmMuted(data AlarmMutedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordAlarmMuted, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitAlarmMuted(endpoint uint16, data AlarmMutedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAlarmMuted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -437,8 +430,7 @@ func (s *Server) RecordMuteEnded(data MuteEndedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMuteEnded, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMuteEnded(endpoint uint16, data MuteEndedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMuteEnded, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -461,8 +453,7 @@ func (s *Server) RecordInterconnectSmokeAlarm(data InterconnectSmokeAlarmEvent) 
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordInterconnectSmokeAlarm, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitInterconnectSmokeAlarm(endpoint uint16, data InterconnectSmokeAlarmEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventInterconnectSmokeAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -485,8 +476,7 @@ func (s *Server) RecordInterconnectCoAlarm(data InterconnectCoAlarmEvent) error 
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordInterconnectCoAlarm, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitInterconnectCoAlarm(endpoint uint16, data InterconnectCoAlarmEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventInterconnectCoAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -509,8 +499,7 @@ func (s *Server) RecordAllClear(data AllClearEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordAllClear, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitAllClear(endpoint uint16, data AllClearEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAllClear, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

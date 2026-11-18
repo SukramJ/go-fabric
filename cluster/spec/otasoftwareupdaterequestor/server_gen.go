@@ -196,8 +196,7 @@ func (s *Server) RecordStateTransition(data StateTransitionEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordStateTransition, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitStateTransition(endpoint uint16, data StateTransitionEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventStateTransition, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -220,8 +219,7 @@ func (s *Server) RecordVersionApplied(data VersionAppliedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordVersionApplied, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitVersionApplied(endpoint uint16, data VersionAppliedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventVersionApplied, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -244,8 +242,7 @@ func (s *Server) RecordDownloadError(data DownloadErrorEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordDownloadError, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitDownloadError(endpoint uint16, data DownloadErrorEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventDownloadError, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -23,7 +23,7 @@ import (
 //
 // Deprecated: implement [GATTPeripheral], which registers the service in a
 // call of its own, so a refused registration is answered before the node
-// advertises; removable in the next minor release. The node adapts a
+// advertises; removable in v0.25.0. The node adapts a
 // BLEPeripheral to it (registration reported by Serve, as before).
 type BLEPeripheral interface {
 	// Advertise starts advertising adv, or replaces the advertisement that

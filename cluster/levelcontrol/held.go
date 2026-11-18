@@ -53,8 +53,8 @@ type HeldConfig struct {
 	//
 	// Deprecated: no controller reads this tracker — the wire carries the
 	// endpoint's DataVersion for the cluster, which the bridge keeps
-	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
-	// minor release.
+	// (decision 165, F-db021da0-46); leave it nil. Removable in
+	// v0.25.0.
 	DataVersion *cluster.DataVersionTracker
 	// ManageTransitions runs the commands as gradual transitions, stepping
 	// the level every StepInterval and reporting RemainingTime (matter.js

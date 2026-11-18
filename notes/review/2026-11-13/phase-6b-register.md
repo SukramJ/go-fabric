@@ -1248,9 +1248,9 @@ rows.
 | N4-f2-3 | — | open, as F-db021da0-42, -43, -44 (6a) | fixed with F-db021da0-42 and -43 `438f9d3c`; -44 not reproduced (the register editor's judgement) |
 | N5b-notes-1 | — | open (6a): the `by_design` entry not written | phase 7 (the register editor's judgement): no fix note names it |
 | N-flake-1 | — | open (6a): its findings row not written | fixed `0c509819`, `a25cb9f7` |
-| R2-P5-redact-01 | — | — | held back until its fix merges (owner decisions 25, 126) — the release after 6b (decision 126) |
-| N4-frsec-1 | — | — | held back until its fix merges (owner decisions 25, 126) — the release after 6b (decision 126) |
-| DR5b-F-01 | — | — | held back until its fix merges (owner decisions 25, 126) — the release after 6b (decision 126) |
+| R2-P5-redact-01 | — | — | closed before this phase: fixed by #534 (`phase-5b-register.md`), public since 2026-11-18 with the release that carries the fix (owner decision 126) |
+| N4-frsec-1 | — | — | closed before this phase: fixed by #534 (`phase-5b-register.md`), public since 2026-11-18 with the release that carries the fix (owner decision 126) |
+| DR5b-F-01 | — | — | closed before this phase: fixed by #534 (`phase-5b-register.md`), public since 2026-11-18 with the release that carries the fix (owner decision 126) |
 
 ## The questions
 
@@ -1579,10 +1579,10 @@ The reference reads: 518 rows — 357 taken in a fix round, 25 recorded by a fix
 note, 116 a fact note, used, 20 not taken up.
 
 What earlier phases handed to 6b: 218 rows — 5 fixed in part, 92 fixed, 1 a
-recorded divergence, 5 decided, 5 closed before this phase, 3 struck, 3 not a
+recorded divergence, 5 decided, 8 closed before this phase, 3 struck, 3 not a
 finding, 6 not reproduced, 7 open, 45 re-cited in the citation pass, 17 phase
 7, 1 the pin lift after phase 7, 1 taken with other rows, 3 not performable,
-24 held back.
+21 held back.
 
 The questions: 126 rows, 70 answered by the owner and 56 by the coordinator.
 The owner's decisions of this phase: 73 rows (185 to 257).
@@ -1591,13 +1591,14 @@ The 36 noticed items: 2 fixed, 4 not a finding, 1 re-cited in the citation
 pass, 27 phase 7, 1 the release after 6b, 1 the pin lift after phase 7.
 Unread: 18 rows.
 
-**Held back: 24 rows, all carried rows of earlier phases that stay open after
-this branch, or of the three decision 126 names** — R2-P3-rr-ctl-02,
+**Held back: 21 rows, all carried rows of earlier phases that stay open after
+this branch** — R2-P3-rr-ctl-02,
 N3-rwrace-1, N3-ctl-3, U3-ctl-dev-1 second half, U3-ctl-lan-1 (3)–(5), U-ctr-1
 rest, N-net-1 (b), N-rw3req-3, N-bridge2-3, TM R3b.2, TM R3b.4, U-alloc-1
 (device parts), U3-lan-dev-1, N4-f3-2, U3-admin-1, TM R3.2, TM R3.6, TM R3.3,
-TM R3.5 first half, U3-net-1, TM R3.8 rest, R2-P5-redact-01, N4-frsec-1,
-DR5b-F-01. No finding of this phase's review is held back: R2-P6-sec-3320, the
+TM R3.5 first half, U3-net-1, TM R3.8 rest. The three rows decision 126
+names (R2-P5-redact-01, N4-frsec-1, DR5b-F-01) are public since 2026-11-18,
+with the release that carries their fix. No finding of this phase's review is held back: R2-P6-sec-3320, the
 one the verify raised beside a held row, is fixed on this branch, and so are
 the earlier phases' rows N3-coord-1, N3-rwrace-2, TM R3.7, TM R5 5a.5,
 U4-fr-sec-2 (R2-P6-sec-2401), U3-ctl-lan-1 parts (1) and (2) and the 5b DCL

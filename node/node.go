@@ -1809,7 +1809,7 @@ func (n *Node) EndpointState() EndpointState { return n.endpoints }
 // hands that assembler (issue #117).
 //
 // Deprecated: use [Node.EndpointState], whose saves and loads report the
-// store's error. Removable in the next minor release.
+// store's error. Removable in v0.25.0.
 func (n *Node) Persistence() EndpointPersistence {
 	if h, ok := n.endpoints.(hostEndpoints); ok {
 		return h.p

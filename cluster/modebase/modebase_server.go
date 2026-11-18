@@ -267,8 +267,8 @@ type Config struct {
 	//
 	// Deprecated: no controller reads this tracker — the wire carries the
 	// endpoint's DataVersion for the cluster, which the bridge keeps
-	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
-	// minor release.
+	// (decision 165, F-db021da0-46); leave it nil. Removable in
+	// v0.25.0.
 	DataVersion *cluster.DataVersionTracker
 }
 
@@ -459,7 +459,7 @@ type Server struct {
 	// Deprecated: the command path is [spec.SelfHeld] with
 	// [spec.InvokeHeld] (decision 154): register a host handler with
 	// [Server.Handle] and invoke with [Server.MatterInvoke]. Removable in
-	// the next minor release.
+	// v0.25.0.
 	spec.Hooks //nolint:staticcheck // the deprecated field kept for its window
 
 	k        kind
@@ -529,7 +529,7 @@ func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, valu
 // binds it at construction.
 //
 // Deprecated: the server's command path needs no binding (decision 154).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func (s *Server) Init(inst *spec.Instance) {
 	s.Hooks.Init(inst) //nolint:staticcheck // the deprecated field
 }
@@ -540,7 +540,7 @@ func (s *Server) Init(inst *spec.Instance) {
 //
 // Deprecated: use [Server.MatterInvoke], which admits the request and
 // checks the response with the server's values as peers (decision 154).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func (s *Server) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
 	return s.Hooks.Invoke(ctx, cmdID, fields) //nolint:staticcheck // the deprecated field
 }
@@ -550,7 +550,7 @@ func (s *Server) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any
 //
 // Deprecated: the served attributes are read-only, so no controller write
 // reaches a veto; the server has no write path that calls it. Removable in
-// the next minor release.
+// v0.25.0.
 func (s *Server) CheckWrite(ctx context.Context, attrID uint32, value any) error {
 	return s.Hooks.CheckWrite(ctx, attrID, value) //nolint:staticcheck // the deprecated field
 }
@@ -759,7 +759,7 @@ func (s *Server) MatterClusterID() uint32 { return s.inst.MatterClusterID() }
 //
 // Deprecated: no controller reads this version — the wire carries the
 // endpoint's DataVersion for the cluster, which the bridge keeps
-// (decision 165, F-db021da0-46). Removable in the next minor release.
+// (decision 165, F-db021da0-46). Removable in v0.25.0.
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister].

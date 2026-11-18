@@ -23,46 +23,46 @@ const (
 	//
 	// Deprecated: use EventSwitchLatched of cluster/spec/switchcluster, the
 	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
+	// decision 140). Removable in v0.25.0.
 	MatterEventSwitchLatched = swdef.EventSwitchLatched
 	// MatterEventInitialPress fires on the first press (MS / AS).
 	//
 	// Deprecated: use EventInitialPress of cluster/spec/switchcluster, the
 	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
+	// decision 140). Removable in v0.25.0.
 	MatterEventInitialPress = swdef.EventInitialPress
 	// MatterEventLongPress fires once the long-press threshold is
 	// crossed (MSL feature).
 	//
 	// Deprecated: use EventLongPress of cluster/spec/switchcluster, the
 	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
+	// decision 140). Removable in v0.25.0.
 	MatterEventLongPress = swdef.EventLongPress
 	// MatterEventShortRelease fires when a short press ends (MSR).
 	//
 	// Deprecated: use EventShortRelease of cluster/spec/switchcluster, the
 	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
+	// decision 140). Removable in v0.25.0.
 	MatterEventShortRelease = swdef.EventShortRelease
 	// MatterEventLongRelease fires when a long press ends (MSL).
 	//
 	// Deprecated: use EventLongRelease of cluster/spec/switchcluster, the
 	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
+	// decision 140). Removable in v0.25.0.
 	MatterEventLongRelease = swdef.EventLongRelease
 	// MatterEventMultiPressOngoing fires during multi-press capture
 	// (MSM feature).
 	//
 	// Deprecated: use EventMultiPressOngoing of cluster/spec/switchcluster, the
 	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
+	// decision 140). Removable in v0.25.0.
 	MatterEventMultiPressOngoing = swdef.EventMultiPressOngoing
 	// MatterEventMultiPressComplete fires once the multi-press window
 	// closes (MSM feature).
 	//
 	// Deprecated: use EventMultiPressComplete of cluster/spec/switchcluster, the
 	// generated id: one source of ids (review II, R2-P6-par-1262,
-	// decision 140). Removable in the next minor release.
+	// decision 140). Removable in v0.25.0.
 	MatterEventMultiPressComplete = swdef.EventMultiPressComplete
 
 	// switchClusterRevision is the definition's (Switch bumped 1→2 in

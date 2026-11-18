@@ -404,7 +404,7 @@ func (g *GeneralCommissioning) SetOnFailSafeStarting(fn func(ctx context.Context
 //
 // Deprecated: use [GeneralCommissioning.SetOnFailSafeExpiry], whose hook
 // tells the fabric that armed the fail-safe from the one an AddNOC added
-// (this hook's one fabric is either); removable in the next minor release.
+// (this hook's one fabric is either); removable in v0.25.0.
 func (g *GeneralCommissioning) SetOnFailSafeExpired(fn func(ctx context.Context, fabricIndex uint8)) {
 	g.mu.Lock()
 	g.onFailSafeExpired = fn
@@ -427,7 +427,7 @@ func (g *GeneralCommissioning) SetOnFailSafeExpired(fn func(ctx context.Context,
 // Deprecated: use [GeneralCommissioning.SetFailSafeSessionCloser], whose
 // closer names the sessions it closed, so a PASE session opened after the
 // close still arms ([GeneralCommissioning.ArmOnPaseSession]); removable in
-// the next minor release.
+// v0.25.0.
 func (g *GeneralCommissioning) SetOnFailSafeRolledBack(fn func(ctx context.Context)) {
 	g.mu.Lock()
 	g.onFailSafeRolledBack = fn
@@ -1684,8 +1684,8 @@ func (g *GeneralCommissioning) AutoArmOnPaseEstablished(ctx context.Context) {
 // Deprecated: use [GeneralCommissioning.ArmOnPaseSession], which takes the
 // session's id and is refused only when a rollback closed that session —
 // this arm is refused whenever a rollback it settled closed PASE sessions,
-// its own opened after the close included; removable in the next minor
-// release.
+// its own opened after the close included; removable in
+// v0.25.0.
 func (g *GeneralCommissioning) ArmOnPaseEstablished(ctx context.Context) error {
 	return g.armFailSafeFor(ctx, uint32(PaseSessionAutoArmSeconds), 0, true, 0)
 }

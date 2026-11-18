@@ -505,8 +505,7 @@ func (s *Server) RecordEvConnected(data EvConnectedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordEvConnected, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitEvConnected(endpoint uint16, data EvConnectedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventEvConnected, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -529,8 +528,7 @@ func (s *Server) RecordEvNotDetected(data EvNotDetectedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordEvNotDetected, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitEvNotDetected(endpoint uint16, data EvNotDetectedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventEvNotDetected, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -553,8 +551,7 @@ func (s *Server) RecordEnergyTransferStarted(data EnergyTransferStartedEvent) er
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordEnergyTransferStarted, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitEnergyTransferStarted(endpoint uint16, data EnergyTransferStartedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventEnergyTransferStarted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -577,8 +574,7 @@ func (s *Server) RecordEnergyTransferStopped(data EnergyTransferStoppedEvent) er
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordEnergyTransferStopped, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitEnergyTransferStopped(endpoint uint16, data EnergyTransferStoppedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventEnergyTransferStopped, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -601,8 +597,7 @@ func (s *Server) RecordFault(data FaultEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordFault, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitFault(endpoint uint16, data FaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -625,8 +620,7 @@ func (s *Server) RecordRfid(data RfidEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordRfid, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitRfid(endpoint uint16, data RfidEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventRfid, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

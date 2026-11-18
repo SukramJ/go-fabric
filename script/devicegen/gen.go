@@ -548,7 +548,7 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 		// definitions (review II, R2-P5-apidev-16).
 		w.WriteString("//\n// Deprecated: the root endpoint is the node's (node.Node.Root), not a\n")
 		w.WriteString("// device: NewRootNode always refuses, its root clusters have no\n")
-		w.WriteString("// committed definitions. RootNodeType stays for [Lookup]. Removable in\n// the next minor release.\n")
+		w.WriteString("// committed definitions. RootNodeType stays for [Lookup]. Removable in\n// v0.25.0.\n")
 	}
 	fmt.Fprintf(&w, "func New%s(opts Options, decls ...Declaration) (*%s, error) {\n", n, n)
 	fmt.Fprintf(&w, "\td, err := FromSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif d == nil {\n\t\treturn nil, err\n\t}\n\t// A device the specification level withheld comes with its error ([New]).\n\treturn &%s{d}, err\n}\n", n, n)

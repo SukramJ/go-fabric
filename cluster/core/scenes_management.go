@@ -109,7 +109,7 @@ type SceneInfoStruct struct {
 	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
 	// the model from the schema, whatever the server returns; no server of
 	// this module sets it any more. Return the entry whole. Removable in
-	// the next minor release.
+	// v0.25.0.
 	Redacted bool
 }
 

@@ -15,7 +15,7 @@
 // Deprecated: the node's commissioning window and
 // cluster/core.OperationalCredentials serve commissioning, and
 // controller/attestation checks a device's attestation; each exported
-// identifier names its replacement. Removable in the next minor release.
+// identifier names its replacement. Removable in v0.25.0.
 //
 // The phases of commissioning (Matter Core Spec §5); the package covers
 // the first three:

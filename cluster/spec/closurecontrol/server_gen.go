@@ -257,8 +257,7 @@ func (s *Server) RecordOperationalError(data OperationalErrorEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordOperationalError, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitOperationalError(endpoint uint16, data OperationalErrorEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventOperationalError, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -281,8 +280,7 @@ func (s *Server) RecordMovementCompleted(data MovementCompletedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMovementCompleted, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMovementCompleted(endpoint uint16, data MovementCompletedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMovementCompleted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -305,8 +303,7 @@ func (s *Server) RecordEngageStateChanged(data EngageStateChangedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordEngageStateChanged, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitEngageStateChanged(endpoint uint16, data EngageStateChangedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventEngageStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -329,8 +326,7 @@ func (s *Server) RecordSecureStateChanged(data SecureStateChangedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSecureStateChanged, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSecureStateChanged(endpoint uint16, data SecureStateChangedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSecureStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

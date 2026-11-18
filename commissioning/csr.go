@@ -32,7 +32,7 @@ var (
 	// Deprecated: use cluster/core.OperationalCredentials
 	// (core.NewOperationalCredentials), which answers CSRRequest on the node;
 	// secure/mattercert.CreateCSR for the PKCS#10 request alone; removable in
-	// the next minor release.
+	// v0.25.0.
 	ErrCSRNonce = errors.New("commissioning: CSR nonce must be 32 bytes")
 )
 
@@ -41,7 +41,7 @@ var (
 // Deprecated: use cluster/core.OperationalCredentials
 // (core.NewOperationalCredentials), which answers CSRRequest on the node;
 // secure/mattercert.CreateCSR for the PKCS#10 request alone; removable in
-// the next minor release.
+// v0.25.0.
 type CSRInput struct {
 	// CSRNonce is the 32-byte nonce from the commissioner's
 	// CSRRequest.
@@ -59,7 +59,7 @@ type CSRInput struct {
 // Deprecated: use cluster/core.OperationalCredentials
 // (core.NewOperationalCredentials), which answers CSRRequest on the node;
 // secure/mattercert.CreateCSR for the PKCS#10 request alone; removable in
-// the next minor release.
+// v0.25.0.
 type CSRResult struct {
 	// PrivateKey is the freshly generated P-256 private key. The
 	// caller persists it via the OperationalCredentials cluster's
@@ -84,7 +84,7 @@ type CSRResult struct {
 // Deprecated: use cluster/core.OperationalCredentials
 // (core.NewOperationalCredentials), which answers CSRRequest on the node;
 // secure/mattercert.CreateCSR for the PKCS#10 request alone; removable in
-// the next minor release.
+// v0.25.0.
 func BuildCSR(in CSRInput) (*CSRResult, error) {
 	if len(in.CSRNonce) != 32 {
 		return nil, fmt.Errorf("%w: got %d", ErrCSRNonce, len(in.CSRNonce))

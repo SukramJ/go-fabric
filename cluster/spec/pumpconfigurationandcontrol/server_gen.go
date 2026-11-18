@@ -471,8 +471,7 @@ func (s *Server) RecordSupplyVoltageLow(data SupplyVoltageLowEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSupplyVoltageLow, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSupplyVoltageLow(endpoint uint16, data SupplyVoltageLowEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSupplyVoltageLow, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -495,8 +494,7 @@ func (s *Server) RecordSupplyVoltageHigh(data SupplyVoltageHighEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSupplyVoltageHigh, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSupplyVoltageHigh(endpoint uint16, data SupplyVoltageHighEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSupplyVoltageHigh, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -519,8 +517,7 @@ func (s *Server) RecordPowerMissingPhase(data PowerMissingPhaseEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPowerMissingPhase, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPowerMissingPhase(endpoint uint16, data PowerMissingPhaseEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPowerMissingPhase, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -543,8 +540,7 @@ func (s *Server) RecordSystemPressureLow(data SystemPressureLowEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSystemPressureLow, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSystemPressureLow(endpoint uint16, data SystemPressureLowEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSystemPressureLow, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -567,8 +563,7 @@ func (s *Server) RecordSystemPressureHigh(data SystemPressureHighEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSystemPressureHigh, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSystemPressureHigh(endpoint uint16, data SystemPressureHighEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSystemPressureHigh, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -591,8 +586,7 @@ func (s *Server) RecordDryRunning(data DryRunningEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordDryRunning, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitDryRunning(endpoint uint16, data DryRunningEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventDryRunning, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -615,8 +609,7 @@ func (s *Server) RecordMotorTemperatureHigh(data MotorTemperatureHighEvent) erro
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMotorTemperatureHigh, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMotorTemperatureHigh(endpoint uint16, data MotorTemperatureHighEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMotorTemperatureHigh, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -639,8 +632,7 @@ func (s *Server) RecordPumpMotorFatalFailure(data PumpMotorFatalFailureEvent) er
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPumpMotorFatalFailure, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPumpMotorFatalFailure(endpoint uint16, data PumpMotorFatalFailureEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPumpMotorFatalFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -663,8 +655,7 @@ func (s *Server) RecordElectronicTemperatureHigh(data ElectronicTemperatureHighE
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordElectronicTemperatureHigh, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitElectronicTemperatureHigh(endpoint uint16, data ElectronicTemperatureHighEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicTemperatureHigh, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -687,8 +678,7 @@ func (s *Server) RecordPumpBlocked(data PumpBlockedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPumpBlocked, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPumpBlocked(endpoint uint16, data PumpBlockedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPumpBlocked, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -711,8 +701,7 @@ func (s *Server) RecordSensorFailure(data SensorFailureEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSensorFailure, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSensorFailure(endpoint uint16, data SensorFailureEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSensorFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -735,8 +724,7 @@ func (s *Server) RecordElectronicNonFatalFailure(data ElectronicNonFatalFailureE
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordElectronicNonFatalFailure, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitElectronicNonFatalFailure(endpoint uint16, data ElectronicNonFatalFailureEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicNonFatalFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -759,8 +747,7 @@ func (s *Server) RecordElectronicFatalFailure(data ElectronicFatalFailureEvent) 
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordElectronicFatalFailure, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitElectronicFatalFailure(endpoint uint16, data ElectronicFatalFailureEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventElectronicFatalFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -783,8 +770,7 @@ func (s *Server) RecordGeneralFault(data GeneralFaultEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordGeneralFault, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitGeneralFault(endpoint uint16, data GeneralFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventGeneralFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -807,8 +793,7 @@ func (s *Server) RecordLeakage(data LeakageEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLeakage, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLeakage(endpoint uint16, data LeakageEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLeakage, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -831,8 +816,7 @@ func (s *Server) RecordAirDetection(data AirDetectionEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordAirDetection, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitAirDetection(endpoint uint16, data AirDetectionEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAirDetection, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -855,8 +839,7 @@ func (s *Server) RecordTurbineOperation(data TurbineOperationEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordTurbineOperation, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitTurbineOperation(endpoint uint16, data TurbineOperationEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventTurbineOperation, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

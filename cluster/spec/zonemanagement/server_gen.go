@@ -269,8 +269,7 @@ func (s *Server) RecordZoneTriggered(data ZoneTriggeredEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordZoneTriggered, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitZoneTriggered(endpoint uint16, data ZoneTriggeredEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventZoneTriggered, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -293,8 +292,7 @@ func (s *Server) RecordZoneStopped(data ZoneStoppedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordZoneStopped, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitZoneStopped(endpoint uint16, data ZoneStoppedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventZoneStopped, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -19,7 +19,7 @@ import (
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 const SchedulesClusterID uint32 = 0x0024
 
 // Schedules cluster attribute IDs per Matter §11.20.5.
@@ -28,7 +28,7 @@ const SchedulesClusterID uint32 = 0x0024
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 const (
 	SchedulesAttrScheduleProgrammingHandle         uint32 = 0x0000
 	SchedulesAttrNumberOfSchedules                 uint32 = 0x0001
@@ -47,7 +47,7 @@ const (
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 const SchedulesClusterRevision uint16 = 1
 
 // ErrSchedulesReadOnly is returned when a write or invoke is attempted on
@@ -58,7 +58,7 @@ const SchedulesClusterRevision uint16 = 1
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 var ErrSchedulesReadOnly = errors.New("wire: Schedules cluster is read-only")
 
 // ScheduleEntry is the bridge-side representation of one programmed
@@ -70,7 +70,7 @@ var ErrSchedulesReadOnly = errors.New("wire: Schedules cluster is read-only")
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 type ScheduleEntry struct {
 	// DayOfWeek is the day index using the Matter convention: 0=Sunday,
 	// 1=Monday, …, 6=Saturday.
@@ -88,7 +88,7 @@ type ScheduleEntry struct {
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 type ScheduleStruct struct {
 	// DayOfWeek is the Matter-convention day index (0=Sun..6=Sat).
 	DayOfWeek uint8
@@ -109,7 +109,7 @@ type ScheduleStruct struct {
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 type SchedulesSource interface {
 	MatterScheduleEntries() []ScheduleEntry
 }
@@ -131,7 +131,7 @@ type SchedulesSource interface {
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 type SchedulesServer struct {
 	src SchedulesSource
 }
@@ -143,7 +143,7 @@ type SchedulesServer struct {
 // this module serves (parity/schema.json has no such cluster) and nothing
 // mounts this surface; a thermostat's week programs are the Thermostat
 // server's schedules (cluster/thermo, docs/guides/thermostat.md).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func NewSchedulesServer(src SchedulesSource) *SchedulesServer {
 	return &SchedulesServer{src: src}
 }

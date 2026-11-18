@@ -182,7 +182,7 @@ each keeps its row and names the other.
 | R2-P5-peer-06 | low | fixed `911d585f` | `bridge/case_initiator.go` — the initiator's callers stated as they are |
 | R2-P5-peer-07 | low | open: findings row `F-db021da0-50` (the coordinator's answer to peer Q3) | `bridge/subscription_reestablish.go` — Subscription re-establishment connects over UDP only |
 | R2-P5-peer-08 | note | struck: resolved by the order of the waves, B after H; nothing to build (fix-peer) | the phase plan — waves B and H both listed bridge/ota_provider_link.go |
-| R2-P5-redact-01 | — | held back until its fix merges (owner decision 25) — phase 5b | — |
+| R2-P5-redact-01 | high | fixed by construction `2b253a95`, `3cb9a8c6`, `40c1767e`, `9ccd46e2` (owner decision 110; fix-aredact), with N4-frsec-1 | `cluster/spec/server.go` — Disclosure class, held back until the release that carries its fix (owner decisions 25, 126). Same hole as N4-frsec-1, reached through a type of the module itself, so N4-frsec-1's 'no server of the module is affected' does not hold for it. Confirming read: High holds as a disclosure class: the module refuses an F attribute on its generated server and silently accepts an S one, which matter.js filters on every remote read. Limits, stated plainly: it needs a host that mounts the generated server of one of the six class-B clusters and stores several fabrics' entries in it; the module's own cluster/tls and cluster/camera servers filter (their lines not re-read by me). The path through the dispatcher to the wire was read, not run end to end. |
 | R2-P5-redact-02 | low (medium) | fixed `2b253a95`, `e62fe4c6`, `a86a8379` (owner decision 110); the row `F-db021da0-30` is closed (`26a09ab6`) | `cluster/core/ecosystem_information.go` — the fabric scope of every attribute and event is generated from the snapshot; the hand-written redactions are gone, their Redacted fields deprecated (carried: F-db021da0-30) |
 | R2-P5-redact-03 | low | fixed `2b253a95`, `40c1767e` | `im/read.go` — the event gate and the event read privilege come from the generated table (the coordinator's answer to redact-4) |
 | R2-P5-redact-04 | low | fixed `d1026de0` | `contract/matter.go` — the dispatcher scopes every fabric-scoped attribute of the model |
@@ -222,7 +222,7 @@ it (`rwa`, `rwb`); the notes it left were placed by the coordinator.
 | DR5b-c3-06 | note | struck: no action; recorded so that the order is not changed into a deadlock later (the reviewer's) | `store/seal.go` — NewSealed's key check runs before the sealing transaction |
 | DR5b-c3-07 | note | phase 6: not taken into the rework (the coordinator's list) | `controller/softwareupdate/images.go` — two concurrent streamed downloads of one name, one of them refused, can remove the other's verified file; the fix shape is a lock per name |
 | DR5b-c3-08 | note | closed: the coordinator ran controller and mdns under emulated linux/386 — a commissioner test made deterministic (`de4365e2`), one mdns case fails under the emulation only (its mechanism not read) | `Makefile` — the 32-bit test run takes controller and mdns (owner decision 104, `f9974fa8`) |
-| DR5b-F-01 | — | held back until its fix merges (owner decision 25) — phase 5b | — |
+| DR5b-F-01 | medium | fixed `6ede7e00` (fix-rwa item 1); 5b rework read: holds on every append path | the diff review's Fable read: a list-append write hands the server every fabric's entries (redaction × write), held-back class. endpoint/dispatcher.go:1840-1848 (appendListValue) read the current list from the server and appended the request's element; the read was narrowed to the writer's fabric only by a FabricScopedReader that honours filtered, any other server was read with MatterRead. Measured with an overlay test (vendor cluster 0xFFF1FC02, a FabricScopeDeclarer without FabricScopedReader, list [{1, fabric 1}, {2, fabric 2}], request stamped fabric 2, append {9, fabric 2}): MatterWrite was handed all three entries, status Success. Inferred: a server that applies a write as the accessing fabric's whole list stores or rewrites fabric 1's entry. The module's own writable scoped lists were not reached. matter.js: InteractionServer.ts:484-489 (always fabric filtered), ListManager.ts:609-620, AttributeWriteResponse.ts:437-449 |
 | DR5b-F-02 | medium | fixed `261abd16` (the docs); owner decision 118: `1c4c465b`, `9adfdfbb`, `904ca733` | `controller/controller.go`, `docs/security.md` — the controller keeps its CASE resumption records in its database; Config.Sealer seals them with the CA, the fabric and the node registry's secrets |
 | DR5b-F-03 | low | fixed `3880494a` | `client/handshake/store_resumption.go` — DeleteResumptionRecord removes a stored record that does not open |
 | DR5b-F-04 | info | phase 6: not taken into the rework (the register editor's placement) | `cluster/core/network_commissioning_wifi.go` — the Wi-Fi list fails closed where the durable commit is wired; without that hook a refused save is logged only; one sentence at loadCommitted's doc would say so |
@@ -448,7 +448,7 @@ to two units has one row (F-db021da0-19 and -34: `port` and `peer`).
 | R2-P4-imwrite-01 | peer | open | fixed `4fd600da`, `7548edee` (owner decision 115); the row `F-db021da0-29` is closed (`26a09ab6`) |
 | F-db021da0-1 | peer | open | fixed `1e75c43f` (wave H, owner decision 94) with R2-P5-peer-05; the row is closed (`26a09ab6`) |
 | F-db021da0-30 | redact | open | fixed `2b253a95`, `40c1767e`, `e62fe4c6` with R2-P5-redact-02 (owner decision 110); the row is closed (`26a09ab6`) |
-| N4-frsec-1 | — | — | held back until its fix merges (owner decision 25) — phase 5b |
+| N4-frsec-1 | redact | open | fixed by construction `2b253a95`, `3cb9a8c6`, `40c1767e`, `9ccd46e2` (owner decision 110) with R2-P5-redact-01 |
 
 Phase 5a's register placed these rows in 5b; the ones no 5b unit was given are
 placed here.
@@ -599,7 +599,7 @@ The 240 findings, by their first disposition:
 | disposition | units | diff review | rework | reference reads | all |
 | --- | --- | --- | --- | --- | --- |
 | fixed in part | 3 | 0 | 0 | 1 | 4 |
-| fixed | 83 | 19 | 4 | 78 | 184 |
+| fixed | 84 | 20 | 4 | 78 | 186 |
 | a recorded divergence | 0 | 0 | 0 | 12 | 12 |
 | decided | 0 | 0 | 0 | 3 | 3 |
 | closed by a later run | 0 | 1 | 0 | 0 | 1 |
@@ -607,20 +607,20 @@ The 240 findings, by their first disposition:
 | not a finding | 0 | 0 | 1 | 0 | 1 |
 | open: a findings row | 1 | 0 | 0 | 9 | 10 |
 | open: phase 6 | 1 | 6 | 2 | 4 | 13 |
-| held back | 1 | 1 | 2 | 3 | 7 |
+| held back | 0 | 0 | 2 | 3 | 5 |
 | all | 90 | 29 | 9 | 112 | 240 |
 
-By the severity their rows carry — units: 12 medium, 71 low, 6 note, 1 held
-back; diff review: 2 medium, 13 low, 11 note, 2 info, 1 held back; rework: 1
+By the severity their rows carry — units: 1 high, 12 medium, 71 low, 6 note;
+diff review: 3 medium, 13 low, 11 note, 2 info; rework: 1
 medium, 3 low, 1 note, 2 info, 2 held back; reference reads: 1 high, 14
 medium, 55 low, 9 info, 30 without one, 3 held back.
 
-Of the 188 fixed or fixed in part: 16 were corrected by an item of a later
+Of the 190 fixed or fixed in part: 16 were corrected by an item of a later
 read, 8 name a `by_design` entry and 23 a findings row.
 
 What earlier phases handed to phase 5b: 64 rows for the units' carried items —
-3 fixed in part, 55 fixed, 1 decided, 1 closed before this phase, 1 struck, 2
-open: phase 6, 1 held back; and 16 rows phase 5a's register placed in 5b — 13
+3 fixed in part, 56 fixed, 1 decided, 1 closed before this phase, 1 struck, 2
+open: phase 6; and 16 rows phase 5a's register placed in 5b — 13
 fixed, 3 open: phase 6.
 
 The units' questions: 30 rows, 10 answered by the owner and 20 by the
@@ -630,10 +630,11 @@ coordinator. The owner's decisions of this phase: 16 rows (105 to 119 and
 The 16 noticed items: 1 fixed in part, 5 fixed, 1 struck, 1 open: a findings
 row, 1 open: other, 7 open: phase 6. Unread: 13 rows, all phase 6.
 
-**Held back: 8 rows** — 3 fixed by phase 5b's pull request (#534) that are
-published with the release that carries their fix (owner decision 126):
-R2-P5-redact-01, DR5b-F-01 and the carried item N4-frsec-1; and 5 findings
-still open, for phase 6: RW-i2, RW-i3, 5b-dcl F6, 5b-dcl R7+R8, 5b-dcl R9.
+**Held back: 5 rows** — findings still open, for phase 6: RW-i2, RW-i3, 5b-dcl
+F6, 5b-dcl R7+R8, 5b-dcl R9. The 3 rows of the disclosure class fixed by phase
+5b's pull request (#534) — R2-P5-redact-01, DR5b-F-01 and the carried item
+N4-frsec-1 — are in the tables since 2026-11-18, with the release that
+carries their fix (owner decision 126); the counts above include them.
 Nine rows held back until #534 merged are in the tables since 2026-11-16
 (owner decision 126): 5b-H H2, 5b-wire F-H2-a, 5b-wire H2-n, TM R6.2,
 N3-net-4, 5a-2 F2, 5a-3 F2, 5a-4 F2, N5-rw2-1; the counts above include them.

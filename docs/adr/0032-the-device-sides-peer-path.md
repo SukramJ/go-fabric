@@ -104,7 +104,7 @@ that serves as `core.OtaProviderConnector` and `camera.PeerConnector`:
    binding manager behaves as before.
 
 `bridge.Bridge.ConnectPeer` and `ConnectOtaProvider` are deprecated and
-keep their behaviour until the next minor release. The ADR 0008 initiator
+keep their behaviour until their removal, permissible in `v0.25.0`. The ADR 0008 initiator
 stays in `bridge` for the re-establishment of former subscriptions, its one
 caller again; that re-establishment stays on UDP — matter.js prefers TCP
 there when the peer's last known address was TCP

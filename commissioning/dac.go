@@ -17,21 +17,21 @@ var (
 	//
 	// Deprecated: use controller/attestation.Validate with a
 	// controller/attestation.PAAStore, the commissioner's device attestation
-	// check; removable in the next minor release.
+	// check; removable in v0.25.0.
 	ErrDACMalformed = errors.New("commissioning: DAC certificate malformed")
 	// ErrDACChainBroken is returned when the chain's signatures do
 	// not link up.
 	//
 	// Deprecated: use controller/attestation.Validate with a
 	// controller/attestation.PAAStore, the commissioner's device attestation
-	// check; removable in the next minor release.
+	// check; removable in v0.25.0.
 	ErrDACChainBroken = errors.New("commissioning: DAC chain broken")
 	// ErrDACExpired is returned when any cert in the chain is outside
 	// its NotBefore..NotAfter window.
 	//
 	// Deprecated: use controller/attestation.Validate with a
 	// controller/attestation.PAAStore, the commissioner's device attestation
-	// check; removable in the next minor release.
+	// check; removable in v0.25.0.
 	ErrDACExpired = errors.New("commissioning: DAC certificate expired or not yet valid")
 )
 
@@ -41,7 +41,7 @@ var (
 //
 // Deprecated: use controller/attestation.Validate with a
 // controller/attestation.PAAStore, the commissioner's device attestation
-// check; removable in the next minor release.
+// check; removable in v0.25.0.
 type DACChain struct {
 	// DAC is the Device Attestation Certificate (Matter §6.2). DER.
 	DAC []byte
@@ -60,7 +60,7 @@ type DACChain struct {
 //
 // Deprecated: use controller/attestation.Validate with a
 // controller/attestation.PAAStore, the commissioner's device attestation
-// check; removable in the next minor release.
+// check; removable in v0.25.0.
 func VerifyChain(chain DACChain, paaPool *x509.CertPool, now time.Time) (dac, pai, paa *x509.Certificate, err error) {
 	if paaPool == nil {
 		return nil, nil, nil, fmt.Errorf("%w: PAA pool is nil", ErrDACChainBroken)
@@ -113,7 +113,7 @@ func VerifyChain(chain DACChain, paaPool *x509.CertPool, now time.Time) (dac, pa
 //
 // Deprecated: use controller/attestation.Validate with a
 // controller/attestation.PAAStore, the commissioner's device attestation
-// check; removable in the next minor release.
+// check; removable in v0.25.0.
 func LoadPAAPoolFromPEM(pemBytes []byte) (*x509.CertPool, error) {
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM(pemBytes) {

@@ -35,7 +35,7 @@ Entry points: 10026 across 290 test packages, and 368 package initializers.
 |---|---|---|---|
 | bdx | ServerSession.InitType | bdx/responder.go | 568 |
 | bdx | ServerSession.Scope | bdx/responder.go | 562 |
-| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3277 |
+| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3274 |
 | bridge | Bridge.SubscriptionFlushReporter | bridge/subscribe.go | 404 |
 | client/exchange | Manager.LocalFixedMrpBackoff | client/exchange/manager.go | 240 |
 | cluster/core | OperationalCredentials.RolledBackUpdates | cluster/core/operational_credentials.go | 736 |

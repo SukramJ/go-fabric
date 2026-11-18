@@ -365,7 +365,7 @@ type Config struct {
 	// installed. nil is no BLE: the bridge never touches a radio.
 	//
 	// Deprecated: set GATT, whose service registration [Bridge.StartBLE]
-	// answers before it advertises; removable in the next minor release.
+	// answers before it advertises; removable in v0.25.0.
 	// BLE keeps its meaning while GATT is nil; both set fail [New].
 	BLE contract.BLEPeripheral //nolint:staticcheck // the deprecated port, kept for its window
 
@@ -3087,7 +3087,7 @@ type CommissioningAdvertisement struct {
 	// PairingHint is the pairing hint's low 16 bits.
 	//
 	// Deprecated: use Hints, which carries every bit of the bitmap;
-	// removable in the next minor release. It keeps its meaning while
+	// removable in v0.25.0. It keeps its meaning while
 	// Hints is zero; both set fail AnnounceCommissioning with
 	// [mdns.ErrInvalidService].
 	PairingHint        uint16
@@ -3271,9 +3271,6 @@ func (b *Bridge) diagRing() *diagevent.Ring {
 // [mrpRTTWindow] for why this stays off the cluster surface.
 //
 // Safe on a nil bridge (Matter disabled), which reports an empty summary.
-//
-// Deprecated: nothing reads it, and it has no replacement; removable in
-// the next minor release.
 func (b *Bridge) ControllerRTT() MRPRTTStats {
 	if b == nil {
 		return MRPRTTStats{}

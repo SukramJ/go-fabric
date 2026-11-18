@@ -1165,8 +1165,8 @@ func (g *GroupKeyManagement) MatterGeneratedCommands() []uint32 {
 // scoped by the request's own fabric. Nothing in this module calls it.
 //
 // Deprecated: a fabric-scoped write takes its fabric from the request
-// ([im.WithFabricFilter]); there is no replacement. Removable in the next
-// minor release.
+// ([im.WithFabricFilter]); there is no replacement. Removable in
+// v0.25.0.
 func (g *GroupKeyManagement) SetCurrentFabric(idx uint8) {
 	g.mu.Lock()
 	g.currentFabric = idx

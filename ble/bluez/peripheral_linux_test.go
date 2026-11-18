@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -46,21 +47,33 @@ func waitUntil(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-// served is a Serve that runs until the test ends or cancel is called;
-// done closes when it returned, with its error in err.
+// served is a registered service whose Serve runs until the test ends or
+// cancel is called; done closes when it returned, with its error in err.
 type served struct {
+	svc    contract.GATTService
 	cancel func()
 	done   chan struct{}
 	err    error
 }
 
+// serve registers the service and serves it.
 func serve(t *testing.T, p *peripheral, c3 []byte, accept func(contract.BLEConnection)) *served {
 	t.Helper()
+	svc, err := p.RegisterService(t.Context(), c3)
+	if err != nil {
+		t.Fatalf("RegisterService: %v", err)
+	}
+	return serveRegistered(t, svc, accept)
+}
+
+// serveRegistered serves a registered service.
+func serveRegistered(t *testing.T, svc contract.GATTService, accept func(contract.BLEConnection)) *served {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &served{cancel: cancel, done: make(chan struct{})}
+	s := &served{svc: svc, cancel: cancel, done: make(chan struct{})}
 	go func() {
 		defer close(s.done)
-		s.err = p.Serve(ctx, c3, accept)
+		s.err = svc.Serve(ctx, accept)
 	}()
 	t.Cleanup(func() { cancel(); <-s.done })
 	return s
@@ -78,7 +91,9 @@ func TestNewPeripheralNeedsTheAdapter(t *testing.T) {
 // 6170af84) — service 0xFFF6, primary; C1 "write" through AcquireWrite, C2
 // "indicate" through AcquireNotify, C3 "read" with the additional data —
 // registered with GattManager1.RegisterApplication under its
-// ObjectManager root, unregistered and withdrawn when Serve returns.
+// ObjectManager root by RegisterService, unregistered and withdrawn when
+// Serve returns. A second registration while it is registered, and a
+// second Serve, are refused with ErrServing.
 func TestPeripheralRegistersApplication(t *testing.T) {
 	p, b := newTestPeripheral(t)
 	s := serve(t, p, []byte{0x15, 0x30}, func(contract.BLEConnection) {})
@@ -121,7 +136,11 @@ func TestPeripheralRegistersApplication(t *testing.T) {
 	if _, derr := read(bluezSender, map[string]dbus.Variant{"offset": dbus.MakeVariant(uint16(3))}); derr == nil {
 		t.Fatal("C3 read beyond its value succeeded")
 	}
-	if err := p.Serve(context.Background(), nil, func(contract.BLEConnection) {}); !errors.Is(err, ErrServing) {
+	if _, err := p.RegisterService(t.Context(), nil); !errors.Is(err, ErrServing) {
+		t.Fatalf("second RegisterService: %v", err)
+	}
+	<-s.svc.(*gattService).served // the first Serve runs
+	if err := s.svc.Serve(t.Context(), func(contract.BLEConnection) {}); !errors.Is(err, ErrServing) {
 		t.Fatalf("second Serve: %v", err)
 	}
 	s.cancel()
@@ -134,6 +153,13 @@ func TestPeripheralRegistersApplication(t *testing.T) {
 	}
 	if b.exported(p.root) || b.exported(p.charPath(1)) {
 		t.Fatal("the application is still exported")
+	}
+	// The registration ended with Serve: the next one is taken.
+	again := serve(t, p, nil, func(contract.BLEConnection) {})
+	again.cancel()
+	<-again.done
+	if again.err != nil {
+		t.Fatalf("Serve of the next registration: %v", again.err)
 	}
 }
 
@@ -562,6 +588,133 @@ func TestPeripheralRefusesCentralWhileDropping(t *testing.T) {
 	}
 }
 
+// TestPeripheralCentralBeforeServe: a central that acquires C1 after
+// RegisterService returned but before Serve installed accept is held, not
+// refused, and accepted once Serve runs (connFor).
+func TestPeripheralCentralBeforeServe(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	svc, err := p.RegisterService(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fc := b.connectCentral("AA:BB:CC:DD:EE:0A")
+	errc := make(chan error, 1)
+	go func() { errc <- fc.acquireWrite(p.charPath(1), 50) }()
+	// Not answered yet (a refusal would also show below, as an error).
+	select {
+	case err := <-errc:
+		t.Fatalf("AcquireWrite before Serve returned: %v", err)
+	default:
+	}
+	a := &acceptedConn{}
+	serveRegistered(t, svc, a.accept)
+	if err := <-errc; err != nil {
+		t.Fatalf("AcquireWrite held until Serve: %v", err)
+	}
+	if got := a.conn(t).Remote(); got != "AA:BB:CC:DD:EE:0A" {
+		t.Fatalf("accepted %q", got)
+	}
+}
+
+// TestPeripheralCloseEndsUnservedRegistration: a registration whose Serve
+// never comes is unregistered by Close — RegisterService's ctx bounds the
+// registration only — a central held for it is refused, and a Serve after
+// it returns at once.
+func TestPeripheralCloseEndsUnservedRegistration(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	svc, err := p.RegisterService(ctx, []byte{1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	if app, _ := b.registered(); app == nil {
+		t.Fatal("the registration ended with RegisterService's ctx")
+	}
+	fc := b.connectCentral("AA:BB:CC:DD:EE:0B")
+	acquire, ok := b.method(p.charPath(1), ifaceGattChar, "AcquireWrite").(acquireFunc)
+	if !ok {
+		t.Fatal("AcquireWrite not exported")
+	}
+	errc := make(chan *dbus.Error, 1)
+	go func() { _, _, derr := acquire(bluezSender, fc.options(50)); errc <- derr }()
+	if err := p.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if derr := <-errc; derr == nil {
+		t.Fatal("a central held for an unserved registration was accepted after Close")
+	}
+	if !slices.Contains(b.called(), string(testAdapter)+" "+ifaceGattManager+".UnregisterApplication") {
+		t.Fatalf("Close did not unregister the unserved application: %q", b.called())
+	}
+	if app, _ := b.registered(); app != nil || b.exported(p.root) {
+		t.Fatal("the unserved application outlived Close")
+	}
+	// A Serve that blocked here would hang the test until its deadline.
+	if err := svc.Serve(context.Background(), func(contract.BLEConnection) { t.Error("accepted after Close") }); err == nil {
+		t.Fatal("Serve after Close returned nil")
+	}
+}
+
+// TestPeripheralServeOnEndedContext: a Serve on a context that has ended —
+// the bridge's path for a service registered after its BLE side was taken
+// down — returns nil at once and unregisters the service.
+func TestPeripheralServeOnEndedContext(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	svc, err := p.RegisterService(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := svc.Serve(ctx, func(contract.BLEConnection) { t.Error("accepted on an ended context") }); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+	if app, _ := b.registered(); app != nil || b.exported(p.root) {
+		t.Fatal("the application outlived Serve")
+	}
+	if _, err := p.RegisterService(t.Context(), nil); err != nil {
+		t.Fatalf("RegisterService after Serve returned: %v", err)
+	}
+}
+
+// TestPeripheralAcceptDoesNotOverlap: two centrals' first acquires at once
+// — godbus runs each exported call on a goroutine of its own — reach
+// accept one after the other.
+func TestPeripheralAcceptDoesNotOverlap(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	var mu sync.Mutex
+	inFlight, most, accepted := 0, 0, 0
+	serve(t, p, nil, func(contract.BLEConnection) {
+		mu.Lock()
+		inFlight++
+		most = max(most, inFlight)
+		mu.Unlock()
+		for range 1000 { // give an overlapping accept the chance to enter
+			runtime.Gosched()
+		}
+		mu.Lock()
+		inFlight--
+		accepted++
+		mu.Unlock()
+	})
+	var wg sync.WaitGroup
+	for i := range 3 {
+		fc := b.connectCentral(fmt.Sprintf("AA:BB:CC:DD:EE:%02X", 0x10+i))
+		wg.Go(func() {
+			if err := fc.acquireWrite(p.charPath(1), 50); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	mu.Lock()
+	defer mu.Unlock()
+	if accepted != 3 || most != 1 {
+		t.Fatalf("accepted %d, at most %d at once; want 3, one at a time", accepted, most)
+	}
+}
+
 // acquiredFlag reads C1's WriteAcquired or C2's NotifyAcquired as BlueZ
 // reads it, through the characteristic's Properties.Get.
 func acquiredFlag(t *testing.T, b *fakeBus, p *peripheral, n int, name string) bool {
@@ -798,8 +951,8 @@ func TestPeripheralRegistrationWithoutAReply(t *testing.T) {
 	b.failWith(ifaceGattManager+".RegisterApplication", errLateReply)
 	sctx, scancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer scancel()
-	if err := p.Serve(sctx, nil, func(contract.BLEConnection) {}); err == nil {
-		t.Fatal("Serve without a registration reply succeeded")
+	if _, err := p.RegisterService(sctx, nil); err == nil {
+		t.Fatal("RegisterService without a registration reply succeeded")
 	}
 	if app, _ := b.registered(); app != nil || b.exported(p.root) {
 		t.Fatalf("after an application registration without a reply: registered %v, exported %v", app != nil, b.exported(p.root))
@@ -892,7 +1045,7 @@ func TestPeripheralCentralGoneBeforeItsAcquire(t *testing.T) {
 // TestPeripheralFailedUnregisterKeepsTheRegistration: an
 // UnregisterAdvertisement or UnregisterApplication that fails keeps the
 // registration, its objects and the owed unregister; the next Advertise,
-// StopAdvertising or Serve retries it before anything else (review II,
+// StopAdvertising or RegisterService retries it before anything else (review II,
 // R2-P6-err-2012).
 func TestPeripheralFailedUnregisterKeepsTheRegistration(t *testing.T) {
 	p, b := newTestPeripheral(t)
@@ -945,7 +1098,8 @@ func TestPeripheralFailedUnregisterKeepsTheRegistration(t *testing.T) {
 		t.Fatal("the advertisement is still registered or exported")
 	}
 
-	// The application: Serve's unregister fails, the objects stay.
+	// The application: Serve's unregister fails, the objects stay, and
+	// the next RegisterService retries it first.
 	unregApp := ifaceGattManager + ".UnregisterApplication"
 	b.failWith(unregApp, dbus.Error{Name: "org.bluez.Error.Failed", Body: []any{"busy"}})
 	s := serve(t, p, nil, func(contract.BLEConnection) {})

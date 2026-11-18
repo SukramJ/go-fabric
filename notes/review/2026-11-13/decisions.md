@@ -451,3 +451,26 @@ response-command differences are classified by the guards unit. Two items need
 nothing beyond register lines. The class (ii) reason texts are reworded;
 "go-fabric serves no Descriptor TagList" is false at `b5ffb4c9`, so a new
 findings row.
+
+## 2026-11-18, the release after 6b
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 258 | Does the weekly marker check (red by design until the pin lift, decision 187) block the release? | **No**: the release describes the pin `db021da0`; `release.yml` gates on `ci.yml`'s required checks only (`script/release-provenance.sh`), and the pin lift stays its own pull request after phase 7 |
+| 259 | The 51 deprecations `[Unreleased]` marks, all stated "removable in `v0.23.0`" or "in the next minor release" | **Kept in `v0.23.0`, removable in `v0.25.0`**: the window of README §API stability is in force again — its suspension held while the reference consumer was the only one, and the module has four (openccu-loom, go-ha2fabric, go-fabric-ui, go-fabric-server) |
+| 260 | `bridge.Bridge.ControllerRTT`, deprecated without replacement as "nothing reads it" | **Not deprecated**: openccu-loom reads it for three health gauges (`cmd/openccu-loom/daemon_matter.go:549-553` at `6dbf73cf`), so the premise was false |
+| 261 | The nested modules' release (decisions 100, 114, 125) | **Two steps**: the root release pull request moves `ble/bluez` and `examples/ble-wifi-light` onto `GATTPeripheral` with their go.mod unchanged; after the tag `v0.23.0` a `release/nested-v0.23.0` pull request raises the three requires to `v0.23.0` and the nested tags follow — a require cannot name a version before its tag, and a pull request that changes a nested go.mod is held to the release shape (decision 103) |
+
+The removal review of N6a-api-1 (decision 125 c), at openccu-loom `6dbf73cf`,
+go-ha2fabric `ec7deea`, go-fabric-ui `1056db2` and go-fabric-server
+`d61a545` (each `origin/main`, 2026-11-18): none of the four uses one of the
+seven deprecations without a replacement (`SetCurrentFabric` three times,
+`ErrAckWaitTimeout`, modebase `CheckWrite` / `Init`, wire `GoToLift` /
+`TiltValue`). Of the whole deprecated surface openccu-loom uses
+`node.Config.SupportedFabrics` (`daemon_matter.go:447`, replaced by
+`Config.Limits.SupportedFabrics`) and `ControllerRTT` (decision 260), and
+go-fabric-ui's test `fabricui/error_branches_test.go:22` names
+`node.ErrCommissioningWindowNotConfigured` (no replacement; the `bridge`
+value is what the opener returns); go-ha2fabric and go-fabric-server use
+none. Read with `git grep -w` of every deprecated identifier's last name
+over `*.go`, tests included, each hit read by hand.

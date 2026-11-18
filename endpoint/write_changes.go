@@ -25,7 +25,7 @@ import (
 // Deprecated: the verdict travels in the write's result,
 // [im.WriteResult.Commit], which [im.HandleWrite] returns; WriteChanges keeps
 // recording, by the written path and one verdict per cluster, as before.
-// Removable in the next minor release.
+// Removable in v0.25.0.
 type WriteChanges struct {
 	mu sync.Mutex
 	// changed is, per written attribute, whether any successful write of
@@ -69,7 +69,7 @@ func (w *WriteChanges) record(p im.ConcreteAttributePath, changed bool) {
 // Deprecated: the verdict travels in the write's result,
 // [im.WriteResult.Commit], which [im.HandleWrite] returns; a
 // Commit whose Changed does not name the attribute is its replacement.
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func (w *WriteChanges) Unchanged(p im.ConcreteAttributePath) bool {
 	if w == nil {
 		return false
@@ -87,7 +87,7 @@ func (w *WriteChanges) Unchanged(p im.ConcreteAttributePath) bool {
 // Deprecated: the verdict travels in the write's result,
 // [im.WriteResult.Commit], which [im.HandleWrite] returns; a
 // Commit that names the attribute is its replacement.
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func (w *WriteChanges) Changed(p im.ConcreteAttributePath) bool {
 	if w == nil {
 		return false
@@ -104,7 +104,7 @@ func (w *WriteChanges) Changed(p im.ConcreteAttributePath) bool {
 // Deprecated: the verdict travels in the write's result,
 // [im.WriteResult.Commit], which [im.HandleWrite] returns; the
 // attributes every result's Commit names are its replacement.
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func (w *WriteChanges) ChangedAttributes() []im.ConcreteAttributePath {
 	if w == nil {
 		return nil
@@ -131,7 +131,7 @@ type writeChangesKey struct{}
 // Deprecated: the verdict travels in the write's result,
 // [im.WriteResult.Commit], which [im.HandleWrite] returns; nothing
 // needs to be attached to the context.
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func WithWriteChanges(ctx context.Context, w *WriteChanges) context.Context {
 	return context.WithValue(ctx, writeChangesKey{}, w)
 }

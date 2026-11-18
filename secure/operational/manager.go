@@ -774,7 +774,7 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 // [Manager.OpenFromSigmaWithID] installs over it (review II, R2-P3-dr-dev-07,
 // N3-findev-1, decision 160). Use [Manager.AllocateStake], whose [Stake]
 // [Manager.ReleaseStake] and the …WithStake installs take; AllocateID is
-// removable in the next minor release.
+// removable in v0.25.0.
 func (m *Manager) AllocateID() (uint16, error) {
 	s, err := m.AllocateStake()
 	return s.ID, err
@@ -938,7 +938,7 @@ const placeholderQueueSlack = 64
 // stake an allocation at a full table made for another handshake after it
 // took the caller's (review II, R2-P3-dr-dev-07). Use [Manager.AllocateStake]
 // and [Manager.ReleaseStake], which free the caller's own stake only;
-// ReleaseID is removable in v0.23.0.
+// ReleaseID is removable in v0.25.0.
 func (m *Manager) ReleaseID(id uint16) {
 	m.mu.Lock()
 	if e, ok := m.sessions[id]; ok && e.Session == nil {
@@ -1004,7 +1004,7 @@ func (m *Manager) OpenFromSigmaAsInitiatorWithStake(s Stake, fabricIndex uint8, 
 // stake, or closes the session it already established under the id
 // (review II, N3-findev-1). Use [Manager.AllocateStake] and
 // [Manager.OpenFromSigmaWithStake], which install under the caller's own
-// stake only; OpenFromSigmaWithID is removable in the next minor release.
+// stake only; OpenFromSigmaWithID is removable in v0.25.0.
 func (m *Manager) OpenFromSigmaWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
 	return m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false)
 }
@@ -1015,7 +1015,7 @@ func (m *Manager) OpenFromSigmaWithID(id uint16, fabricIndex uint8, localNodeID,
 // Deprecated: as [Manager.OpenFromSigmaWithID], the install does not
 // check the stake. Use [Manager.AllocateStake] and
 // [Manager.OpenFromSigmaAsInitiatorWithStake];
-// OpenFromSigmaAsInitiatorWithID is removable in the next minor release.
+// OpenFromSigmaAsInitiatorWithID is removable in v0.25.0.
 func (m *Manager) OpenFromSigmaAsInitiatorWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
 	return m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true)
 }
@@ -1212,7 +1212,7 @@ func (m *Manager) OpenFromPaseWithStake(s Stake, localNodeID, peerNodeID uint64,
 // closes the session it established under the id (review II, decision
 // 159). Use [Manager.AllocateStake] and [Manager.OpenFromPaseWithStake],
 // which install under the caller's own stake only; OpenFromPaseWithID is
-// removable in the next minor release.
+// removable in v0.25.0.
 func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, peerSessionID uint16, sharedSecret []byte) (*Entry, error) {
 	return m.openFromPase(id, nil, localNodeID, peerNodeID, peerSessionID, sharedSecret)
 }
@@ -1538,7 +1538,7 @@ func (m *Manager) PASESessionIDs() []uint16 {
 // sessions (subscription.Manager.ClosePeer). There is no replacement
 // that sends the farewell; [Manager.Close] on each id
 // [Manager.SessionIDsForPeer] returns closes the sessions without one.
-// Removable in v0.23.0 (review II, R2-P2 design note 4).
+// Removable in v0.25.0 (review II, R2-P2 design note 4).
 func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0)

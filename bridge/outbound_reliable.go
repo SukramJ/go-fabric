@@ -22,7 +22,7 @@ import (
 //
 // Deprecated: no function of the module returns it any more — the
 // tracker's wait for an acknowledgement, which had no caller outside its
-// tests, was removed in review II. Removable in the next minor release
+// tests, was removed in review II. Removable in v0.25.0
 // (owner decision 174).
 var ErrAckWaitTimeout = errors.New("bridge: outbound ack wait: timeout")
 

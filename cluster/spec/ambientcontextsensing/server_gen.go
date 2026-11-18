@@ -276,8 +276,7 @@ func (s *Server) RecordAmbientContextDetectStarted(data AmbientContextDetectStar
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordAmbientContextDetectStarted, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitAmbientContextDetectStarted(endpoint uint16, data AmbientContextDetectStartedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAmbientContextDetectStarted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -300,8 +299,7 @@ func (s *Server) RecordAmbientContextDetectEnded(data AmbientContextDetectEndedE
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordAmbientContextDetectEnded, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitAmbientContextDetectEnded(endpoint uint16, data AmbientContextDetectEndedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAmbientContextDetectEnded, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

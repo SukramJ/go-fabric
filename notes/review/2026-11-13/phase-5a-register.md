@@ -329,7 +329,7 @@ belong to 5b; they appear by id only.
 | N4-d4gate-2 | tflake | not looked at | phase 6 (the register editor's): TestBleScannerDeduplicationAndAging fails under load |
 | TM R6.2 | — | — | phase 5b; fixed by #534 (`phase-5b-register.md`) |
 | N3-net-4 | — | — | phase 5b; fixed by #534 (`phase-5b-register.md`) |
-| N4-frsec-1 | — | — | held back until its fix merges (owner decision 25) — 5b |
+| N4-frsec-1 | — | — | phase 5b; fixed by #534 (`phase-5b-register.md`), public since 2026-11-18 with the release that carries the fix (owner decision 126) |
 
 ## The owner's decisions of this phase
 
@@ -442,8 +442,7 @@ read, and 6 leave a part open in their disposition (R2-P5-tassert-05,
 R2-P5-tmut-13, R2-P5-tmut-18, R2-P5-sup-04, R2-P5-sup-07, 5a-4 F6).
 
 What earlier phases handed to phase 5a: 33 rows — 13 fixed, 2 fixed in part, 1
-struck, 5 closed before this phase, 6 open: phase 5b, 5 open: phase 6, 1 held
-back.
+struck, 5 closed before this phase, 7 open: phase 5b, 5 open: phase 6.
 
 The 39 noticed items: 13 fixed, 2 struck, 6 decided by the owner at the end of
 5a (decisions 98 to 104, two of them done in `04756ba3`), 5 open: phase 5b, 13
@@ -452,9 +451,9 @@ open: phase 6.
 Unread: 10 rows, all phase 6. The owner's decisions: 7 rows (91 to 97), and
 the seven of the wizard at the end of 5a (98 to 104) in `decisions.md`.
 
-**Held back: 1 row** — N4-frsec-1, handed from an earlier phase by id only,
-fixed by phase 5b's pull request (#534) and published with the release that
-carries its fix (owner decision 126). The four rows of this phase held back
+**Held back: none.** N4-frsec-1, handed from an earlier phase by id only and
+fixed by phase 5b's pull request (#534), is in the table since 2026-11-18,
+with the release that carries its fix (owner decision 126). The four rows of this phase held back
 until #534 merged (5a-2 F2, 5a-3 F2, 5a-4 F2, N5-rw2-1) and the handed rows
 TM R6.2 and N3-net-4 are in the tables since 2026-11-16 (owner decision
 126), at their state of phase 5a; the counts above include them. The rows

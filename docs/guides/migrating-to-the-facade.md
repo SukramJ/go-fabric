@@ -42,7 +42,7 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
-## Removed in the next release: `Bridge.ConnectPeer` and `Bridge.ConnectOtaProvider`
+## Deprecated in v0.23.0, removable in v0.25.0: `Bridge.ConnectPeer` and `Bridge.ConnectOtaProvider`
 
 A node reaches the peers its device-side servers talk to — the OTA
 requestor's provider, the camera's WebRTC requestor — over its own peer
@@ -72,7 +72,7 @@ Ethernet one.
 A Linux host uses `github.com/SukramJ/go-fabric/wifi/wpasupplicant` as the
 driver ([Operations](operations.md#wi-fi-provisioning)).
 
-## Removed in the next release: `SetAttestationChallenge`
+## Removed in v0.23.0: `SetAttestationChallenge`
 
 AttestationRequest, CSRRequest and SignVIDVerificationRequest sign over
 the attestation challenge of the session the invoke arrived on and no
@@ -293,10 +293,10 @@ One value changed: `Cluster.Decoded` of a nullable struct attribute
 returns the generated struct now, as it does for a non-nullable one,
 where it returned a `map[uint32]any` by field id.
 
-## Changed after v0.22.2: the facade review (wave A2)
+## Changed in v0.23.0: the facade review (wave A2)
 
 New fields and ports replace older ones; every older one keeps its
-behaviour until it is removed in the next minor release. The behaviour
+behaviour until its removal, permissible in `v0.25.0`. The behaviour
 changes are the rows marked *changed*.
 
 | Before | Now |
@@ -315,7 +315,6 @@ changes are the rows marked *changed*.
 | `bridge.Bridge.AttachRootPartsListProvider`, `AttachAggregatorPartsListProvider` | not needed: `Bridge.Start` installs the live PartsList of both itself; the two stay as overrides |
 | `bridge.Bridge.AttachPaseHandler`, `AttachCaseHandler` | `AttachPaseHandlerProvider`, `AttachCaseHandlerProvider` with a provider that returns the one handler for every handshake |
 | `bridge.Bridge.SubscriptionPersistenceEnabled`, `FormerSubscriptionCount` | `bridgetest.SubscriptionPersistence(b)` in a test |
-| `bridge.Bridge.ControllerRTT` | none |
 | `contract.BLEPeripheral`, `node.Network.BLE`, `bridge.Config.BLE` | `contract.GATTPeripheral` (`RegisterService` returns a `contract.GATTService`, whose `Serve` takes the centrals), `node.Network.GATT`, `bridge.Config.GATT`: a refused registration is `StartBLE`'s error and nothing is advertised; both set is refused |
 | `cluster/core.GeneralCommissioning.SetOnFailSafeExpired(func(ctx, fabricIndex))` | `SetOnFailSafeExpiry(func(ctx, core.FailSafeExpiry))`: `ArmedFabric`, `AddedFabric`, `OverPASE` |
 | `GeneralCommissioning.SetOnFailSafeRolledBack(func(ctx))` | `SetFailSafeSessionCloser(func(ctx) (closed []uint16))`, which names the PASE sessions it closed |
@@ -329,7 +328,7 @@ changes are the rows marked *changed*.
 | a host switch source's `WireMatterSwitchHandler` / `WireMatterSwitchPositions` matched by name | `contract.SwitchGestureSource`, `contract.SwitchPositionSource` |
 | a host Wi-Fi driver | may implement `contract.WiFiLinkWatcher` (link changes) and `contract.WiFiDisconnector` (leave the network at the fail-safe's expiry) |
 
-## Changed after v0.22.2: the store port and the endpoint state
+## Changed in v0.23.0: the store port and the endpoint state
 
 The persistence port grows by six methods (review II, decision 107), which
 a host's own backend adds; `store.Store` and `store/memstore` implement
@@ -356,7 +355,7 @@ migrations applies step `v9`.
 | a lab whose ledger names hosts on the local network | sets `dcl.Client.AllowPrivateDestinations` on that ledger's client (the TestClient for the test net), or passes its own `HTTPClient` |
 | prod and test OTA images stored before the upgrade | not served until a ledger update that carries the checksum re-binds them (no new download), or until `softwareupdate.ImagesConfig.AllowUnverifiedLedgerImages` is set; storing them again with `Images.Store` makes them host-supplied. A test ledger whose records carry no checksum needs the option too |
 
-## Changed after v0.22.2: the generated server's write hooks and events
+## Changed in v0.23.0: the generated server's write hooks and events
 
 | Before | Now |
 | --- | --- |
@@ -372,7 +371,7 @@ migrations applies step `v9`.
 | `<cluster>def.Declare{Features: 0}` to select no feature (it kept the device type's default) | `Declare{NoFeatures: true}`; beside a non-zero `Features` it is `device.ErrConfiguration` |
 | a host handler (`Handle`, typed `Handle<Command>`) on LevelControl after which the server ended the current scene | the handler is the whole command: the server ends no scene for it, runs no gate and no transition; a scene recall reaches the server's logic, never the handler |
 
-## Changed after v0.22.2: the write verdict
+## Changed in v0.23.0: the write verdict
 
 A write's verdict — which attributes it changed — travels in its result,
 not in the context.
@@ -382,7 +381,7 @@ not in the context.
 | `endpoint.WithWriteChanges(ctx, changes)` around `im.HandleWriteRequest`, then `changes.Unchanged(path)`, `Changed`, `ChangedAttributes()` | `out := im.HandleWrite(ctx, d, req)`; `out.Response` is the WriteResponse, each of `out.Results` carries `Commit` (`im.WriteCommit`): the ids of the attributes the write changed, empty for none, nil when the dispatcher gave no verdict |
 | a server whose write moves another attribute answering `MatterWriteChanged` true for the cluster (the written attribute is reported too) | implement `contract.ChangeNamingWriter` (`MatterWriteCommit`) and name the attributes that changed; only those are reported. `spec.Server` names its own |
 
-## Changed after v0.22.2: fabric-scoped reads
+## Changed in v0.23.0: fabric-scoped reads
 
 The dispatcher scopes every fabric-scoped attribute of the model on a
 request, whatever the server returns ([ports](ports.md)).
@@ -395,10 +394,10 @@ request, whatever the server returns ([ports](ports.md)).
 | an entry of a fabric-scoped list without a `FabricIndex`, or with one outside 1 to 254 | the request is answered `FAILURE` for the attribute's path: give every entry its owning fabric |
 | fabric-sensitive events gated per cluster | gated per event from the generated table (`schema.EventReadScope`), with the event's own read privilege |
 
-## Changed after v0.22.2: store sealing, the RI and the core security servers
+## Changed in v0.23.0: store sealing, the RI and the core security servers
 
 Review II, phase 6a. Every deprecated identifier keeps its behaviour until
-it is removed in the next minor release; the behaviour changes are the
+its removal, permissible in `v0.25.0`; the behaviour changes are the
 rows marked *changed* or *breaking*.
 
 | Before | Now |
@@ -416,10 +415,10 @@ rows marked *changed* or *breaking*.
 | *changed:* `spec.Register` of a different definition under a cluster id already registered (it replaced the first) | panics: register a vendor cluster under its own id; registering the held definition again is a no-op |
 | *changed:* `cluster.AsUint8`, `cluster.AsInt16` wrapping a value outside their width | refuse it (`false`), and a non-whole float too |
 
-## Changed after v0.22.2: the session stake, self-held servers and the wire ids
+## Changed in v0.23.0: the session stake, self-held servers and the wire ids
 
 Review II, phase 6a, second wave. Every deprecated identifier keeps its
-behaviour until it is removed in the next minor release.
+behaviour until its removal, permissible in `v0.25.0`.
 
 | Before | Now |
 | --- | --- |
@@ -435,10 +434,10 @@ with `bridge/` and `endpoint/` but without the node sets `endpoint.Config.Fabric
 to its fabric store. A Binding without that source refuses every write, where it
 used to store an entry for any fabric index (decision 158). The node sets it.
 
-## Changed after v0.22.2: subscription reports, access and the wire
+## Changed in v0.23.0: subscription reports, access and the wire
 
 Review II, phase 6a, third wave. Every deprecated identifier keeps its
-behaviour until it is removed in the next minor release; the behaviour
+behaviour until its removal, permissible in `v0.25.0`; the behaviour
 changes are the rows marked *changed*.
 
 | Before | Now |
@@ -452,10 +451,10 @@ changes are the rows marked *changed*.
 | `bridgetest.EstablishSubscriptionTarget(b, subID, target)` in a test | subscribe through a commissioned `bridgetest.Session` (`Session.Subscribe`): the real SubscribeRequest sets the route and anchors the peer's counter window |
 | `bridge.ErrAckWaitTimeout` compared from a host | nothing: no function returns it |
 
-## Changed after v0.22.2: the controller, the client stack and the radio kits
+## Changed in v0.23.0: the controller, the client stack and the radio kits
 
 Review II, phase 6b, first wave. Every deprecated identifier keeps its
-behaviour until it is removed in the next minor release; the behaviour
+behaviour until its removal, permissible in `v0.25.0`; the behaviour
 changes are the rows marked *changed* or *breaking*.
 
 | Before | Now |
@@ -464,10 +463,10 @@ changes are the rows marked *changed* or *breaking*.
 | *changed:* `sqlstore.New` on a registry a `sqlstore.NewSealed` has marked | refuses to write a secret value (`store.ErrNoSealer`): open it with `NewSealed` and its sealer; `sqlstore.Reseal` / `controller.Reseal` rotate the key |
 | `peer.Descriptor.DataModelRevision` | `Descriptor.ReportedSessionParameters.DataModelRevision`, the revision the peer's session parameters report |
 
-## Changed after v0.22.2: the node, the device and the controller
+## Changed in v0.23.0: the node, the device and the controller
 
 Review II, phase 6b, second wave. Every deprecated identifier keeps its
-behaviour until it is removed in the next minor release; the behaviour
+behaviour until its removal, permissible in `v0.25.0`; the behaviour
 changes are the rows marked *changed* or *breaking*.
 
 | Before | Now |

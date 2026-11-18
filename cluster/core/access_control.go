@@ -144,7 +144,7 @@ type AccessControlAuxiliaryEntryStruct struct {
 	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
 	// the model from the schema, whatever the server returns; no server of
 	// this module sets it any more. Return the entry whole. Removable in
-	// the next minor release.
+	// v0.25.0.
 	Redacted bool
 }
 
@@ -169,7 +169,7 @@ type AccessControlExtensionEntry struct {
 	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
 	// the model from the schema, whatever the server returns; no server of
 	// this module sets it any more. Return the entry whole. Removable in
-	// the next minor release.
+	// v0.25.0.
 	Redacted bool
 }
 
@@ -298,7 +298,7 @@ type AccessControlEntryStruct struct {
 	// Deprecated: the dispatcher scopes every fabric-scoped attribute of
 	// the model from the schema, whatever the server returns; no server of
 	// this module sets it any more. Return the entry whole. Removable in
-	// the next minor release.
+	// v0.25.0.
 	Redacted bool
 }
 
@@ -449,8 +449,8 @@ func (*AccessControl) MinWritePrivilege(attrID uint32) uint8 {
 //
 // Deprecated: a fabric-scoped write takes its fabric from the request
 // ([im.WithFabricFilter]); a local write without one lands on the fabric
-// its entries carry. There is no replacement. Removable in the next minor
-// release.
+// its entries carry. There is no replacement. Removable in
+// v0.25.0.
 func (a *AccessControl) SetCurrentFabric(idx uint8) {
 	a.mu.Lock()
 	a.currentFabric = idx

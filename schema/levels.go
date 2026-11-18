@@ -114,7 +114,7 @@ func ClusterResponseCommandLevels(cluster, cmd uint32) LevelSet {
 // Deprecated: use [ClusterRequestCommandLevels] or
 // [ClusterResponseCommandLevels]: an id can name a request at one level and
 // a response at another, which the union cannot tell apart. Removable in
-// the next minor release.
+// v0.25.0.
 func ClusterCommandLevels(cluster, cmd uint32) LevelSet {
 	return ClusterRequestCommandLevels(cluster, cmd) | ClusterResponseCommandLevels(cluster, cmd)
 }

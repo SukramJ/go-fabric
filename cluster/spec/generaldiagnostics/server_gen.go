@@ -292,8 +292,7 @@ func (s *Server) RecordHardwareFaultChange(data HardwareFaultChangeEvent) error 
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordHardwareFaultChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitHardwareFaultChange(endpoint uint16, data HardwareFaultChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventHardwareFaultChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -316,8 +315,7 @@ func (s *Server) RecordRadioFaultChange(data RadioFaultChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordRadioFaultChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitRadioFaultChange(endpoint uint16, data RadioFaultChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventRadioFaultChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -340,8 +338,7 @@ func (s *Server) RecordNetworkFaultChange(data NetworkFaultChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordNetworkFaultChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitNetworkFaultChange(endpoint uint16, data NetworkFaultChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventNetworkFaultChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -364,8 +361,7 @@ func (s *Server) RecordBootReason(data BootReasonEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordBootReason, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitBootReason(endpoint uint16, data BootReasonEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventBootReason, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

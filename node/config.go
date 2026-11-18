@@ -166,7 +166,7 @@ type Config struct {
 	// cannot refuse a save. [Node.Persistence] returns it.
 	//
 	// Deprecated: use EndpointState, whose saves refuse a controller's
-	// change the store refuses. Removable in the next minor release.
+	// change the store refuses. Removable in v0.25.0.
 	EndpointPersistence EndpointPersistence
 	// AggregatorServers are mounted on the Aggregator endpoint after
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
@@ -197,7 +197,7 @@ type Config struct {
 	// SupportedFabrics is [Limits].SupportedFabrics.
 	//
 	// Deprecated: set Limits.SupportedFabrics, where the node's other
-	// capacity limits are; removable in the next minor release. It keeps
+	// capacity limits are; removable in v0.25.0. It keeps
 	// its meaning while Limits.SupportedFabrics is zero.
 	SupportedFabrics uint8
 	// TimeSynchronization is the root TimeSynchronization cluster
@@ -223,7 +223,7 @@ type Config struct {
 	// MaxPathsPerInvoke is [Limits].MaxPathsPerInvoke.
 	//
 	// Deprecated: set Limits.MaxPathsPerInvoke, where the node's other
-	// capacity limits are; removable in the next minor release. It keeps
+	// capacity limits are; removable in v0.25.0. It keeps
 	// its meaning while Limits.MaxPathsPerInvoke is zero.
 	MaxPathsPerInvoke uint16
 	// Sessions are the MRP intervals the node reports in its session
@@ -310,7 +310,7 @@ type Network struct {
 	// BLE.
 	//
 	// Deprecated: set GATT, whose service registration is answered before
-	// the node advertises; removable in the next minor release. BLE keeps
+	// the node advertises; removable in v0.25.0. BLE keeps
 	// its meaning while GATT is nil; both set fail [Config.Validate].
 	BLE contract.BLEPeripheral //nolint:staticcheck // the deprecated port, kept for its window
 	// GATT is the node's Bluetooth LE peripheral ([contract.GATTPeripheral]),

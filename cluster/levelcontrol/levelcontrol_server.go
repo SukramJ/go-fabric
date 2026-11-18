@@ -337,8 +337,8 @@ type Config struct {
 	//
 	// Deprecated: no controller reads this tracker — the wire carries the
 	// endpoint's DataVersion for the cluster, which the bridge keeps
-	// (decision 165, F-db021da0-46); leave it nil. Removable in the next
-	// minor release.
+	// (decision 165, F-db021da0-46); leave it nil. Removable in
+	// v0.25.0.
 	DataVersion *cluster.DataVersionTracker
 	// Lighting advertises the LT feature: MinLevel 1, RemainingTime,
 	// StartUpCurrentLevel and the CoupleColorTempToLevel option
@@ -663,7 +663,7 @@ func (*Server) MatterClusterID() uint32 { return ClusterID }
 //
 // Deprecated: no controller reads this version — the wire carries the
 // endpoint's DataVersion for the cluster, which the bridge keeps
-// (decision 165, F-db021da0-46). Removable in the next minor release.
+// (decision 165, F-db021da0-46). Removable in v0.25.0.
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterRead resolves the three conformance-M attributes plus the two

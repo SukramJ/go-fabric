@@ -48,7 +48,7 @@ var (
 	//
 	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
 	// deprecated; subscribe through a [Session] of the test [Commissioner]
-	// instead ([Session.Subscribe]). Removable in the next minor release
+	// instead ([Session.Subscribe]). Removable in v0.25.0
 	// (review II, N-ctr-5, owner decision 172).
 	ErrNoPeer = errors.New("bridgetest: subscription target has no peer address")
 
@@ -57,7 +57,7 @@ var (
 	//
 	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
 	// deprecated; subscribe through a [Session] of the test [Commissioner]
-	// instead ([Session.Subscribe]). Removable in the next minor release
+	// instead ([Session.Subscribe]). Removable in v0.25.0
 	// (review II, N-ctr-5, owner decision 172).
 	ErrNoSubscriptionID = errors.New("bridgetest: subscription id 0")
 
@@ -68,7 +68,7 @@ var (
 	//
 	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
 	// deprecated; subscribe through a [Session] of the test [Commissioner]
-	// instead ([Session.Subscribe]). Removable in the next minor release
+	// instead ([Session.Subscribe]). Removable in v0.25.0
 	// (review II, N-ctr-5, decision 140).
 	ErrNoPeerCounter = errors.New("bridgetest: subscription target on a secure session has no peer counter")
 
@@ -81,7 +81,7 @@ var (
 	//
 	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
 	// deprecated; subscribe through a [Session] of the test [Commissioner]
-	// instead ([Session.Subscribe]). Removable in the next minor release
+	// instead ([Session.Subscribe]). Removable in v0.25.0
 	// (review II, N-ctr-5, owner decision 172).
 	ErrPeerCounterNotAnchored = errors.New("bridgetest: peer receive window not anchored")
 
@@ -90,7 +90,7 @@ var (
 	//
 	// Deprecated: returned only by [EstablishSubscriptionTarget], which is
 	// deprecated; subscribe through a [Session] of the test [Commissioner]
-	// instead ([Session.Subscribe]). Removable in the next minor release
+	// instead ([Session.Subscribe]). Removable in v0.25.0
 	// (review II, N-ctr-5, owner decision 172).
 	ErrNotEstablished = errors.New("bridgetest: subscription target not established")
 )
@@ -101,7 +101,7 @@ var (
 //
 // Deprecated: taken only by the deprecated [EstablishSubscriptionTarget];
 // subscribe through a [Session] of the test [Commissioner] instead
-// ([Session.Subscribe]). Removable in the next minor release (review II,
+// ([Session.Subscribe]). Removable in v0.25.0 (review II,
 // N-ctr-5, owner decision 172).
 type SubscriptionTarget struct {
 	// Peer is the address reports are sent to. Required.
@@ -150,7 +150,7 @@ type SubscriptionTarget struct {
 	// Deprecated: read only by [EstablishSubscriptionTarget], which is
 	// deprecated; subscribe through a [Session] of the test [Commissioner]
 	// instead ([Session.Subscribe]), whose real SubscribeRequest anchors
-	// the window itself. Removable in the next minor release (review II,
+	// the window itself. Removable in v0.25.0 (review II,
 	// N-ctr-5, decision 140).
 	PeerCounter uint32
 
@@ -197,8 +197,8 @@ type SubscriptionTarget struct {
 // Deprecated: no test outside this package calls it. Subscribe through a
 // [Session] of the test [Commissioner] instead ([Session.Subscribe]): a
 // real SubscribeRequest establishes both halves of the subscription and
-// anchors the peer's window with its own counter. Removable in the next
-// minor release (review II, N-ctr-5, decision 140).
+// anchors the peer's window with its own counter. Removable in
+// v0.25.0 (review II, N-ctr-5, decision 140).
 func EstablishSubscriptionTarget(b *bridge.Bridge, subID uint32, target SubscriptionTarget) error {
 	switch {
 	case b == nil:

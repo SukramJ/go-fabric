@@ -874,8 +874,7 @@ func (s *Server) RecordSystemModeChange(data SystemModeChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSystemModeChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSystemModeChange(endpoint uint16, data SystemModeChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSystemModeChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -898,8 +897,7 @@ func (s *Server) RecordLocalTemperatureChange(data LocalTemperatureChangeEvent) 
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLocalTemperatureChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLocalTemperatureChange(endpoint uint16, data LocalTemperatureChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLocalTemperatureChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -922,8 +920,7 @@ func (s *Server) RecordOccupancyChange(data OccupancyChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordOccupancyChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitOccupancyChange(endpoint uint16, data OccupancyChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventOccupancyChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -946,8 +943,7 @@ func (s *Server) RecordSetpointChange(data SetpointChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSetpointChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSetpointChange(endpoint uint16, data SetpointChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSetpointChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -970,8 +966,7 @@ func (s *Server) RecordRunningStateChange(data RunningStateChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordRunningStateChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitRunningStateChange(endpoint uint16, data RunningStateChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventRunningStateChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -994,8 +989,7 @@ func (s *Server) RecordRunningModeChange(data RunningModeChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordRunningModeChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitRunningModeChange(endpoint uint16, data RunningModeChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventRunningModeChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -1018,8 +1012,7 @@ func (s *Server) RecordActiveScheduleChange(data ActiveScheduleChangeEvent) erro
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordActiveScheduleChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitActiveScheduleChange(endpoint uint16, data ActiveScheduleChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventActiveScheduleChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -1042,8 +1035,7 @@ func (s *Server) RecordActivePresetChange(data ActivePresetChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordActivePresetChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitActivePresetChange(endpoint uint16, data ActivePresetChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventActivePresetChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

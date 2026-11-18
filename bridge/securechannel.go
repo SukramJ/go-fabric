@@ -149,7 +149,7 @@ func (noopAckHandler) Discharge(uint16, uint16, bool) bool { return false }
 //
 // Deprecated: wire PASE through [Bridge.AttachPaseHandlerProvider]; a
 // provider that returns one handler for every handshake is this
-// method's shape. Removable in the next minor release.
+// method's shape. Removable in v0.25.0.
 func (b *Bridge) AttachPaseHandler(h PaseHandler) {
 	// A fresh acceptor marks a commissioning-window boundary; give the new
 	// window its own PASE brute-force budget and a free
@@ -447,7 +447,7 @@ func (b *Bridge) dropHandshakeNotBegun(src net.Addr, proto message.ProtocolHeade
 //
 // Deprecated: wire CASE through [Bridge.AttachCaseHandlerProvider]; a
 // provider that returns one handler for every handshake is this
-// method's shape. Removable in the next minor release.
+// method's shape. Removable in v0.25.0.
 func (b *Bridge) AttachCaseHandler(h CaseHandler) {
 	var unfinished []HandshakeKey
 	b.mu.Lock()
