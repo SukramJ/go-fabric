@@ -5589,8 +5589,9 @@ in one unit (`AtomicWriteHandler.ts:271-339`), and the observable result
 is the same — the five "CommitWrite of more than one attribute" cases of
 `AtomicWriteHandlerTest.ts:392-516` are ported and pass. (4) With MSCH a
 Presets commit refuses to drop a preset a schedule or a transition names,
-INVALID_IN_STATE (`ThermostatClusterPresets.cpp:708-724`; unverified: the
-file at `6170af84` holds no schedule check, and `645b267a` was not read);
+INVALID_IN_STATE (`ThermostatClusterPresets.cpp:708-724` at `645b267a`,
+`IsPresetHandleInUseBySchedules`; the file at `6170af84` holds no such check
+in `PrecommitPresets`, `:624` ff.);
 matter.js has no schedules to check. (5) The staged Presets a Schedules write is checked against may be another peer's: the atomic writes follow matter.js (one per peer and attribute), the check follows chip's `IsPresetHandlePresentInPresetsOrPending` (`ThermostatClusterPresets.cpp:480-491` at `645b267a`), and chip has one atomic state per endpoint (a second client's begin is RESOURCE_EXHAUSTED, `ThermostatClusterAtomic.cpp:360-363`; `InAtomicWrite` asks no originator, `:172-191`), so the cross-peer case does not arise there. No reference defines it; a removal the other peer later commits is INVALID_IN_STATE while a schedule names the handle (review II, phase 6a, R2-P6-par-1565). Hosts serve MSCH behind a flag, off by default,
 until a live pairing with Apple Home is verified (owner decision
 2026-10-26; the reference bridge's `--thermostat-schedules`). Retire the
