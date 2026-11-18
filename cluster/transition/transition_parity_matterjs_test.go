@@ -750,8 +750,9 @@ func TestStartAllAppliesOneCommandTogether(t *testing.T) {
 // — an immediate move, or one already at its target — ends it as a cancel
 // does: Settled for the name and RemainingTime 0 reported, as
 // connectedhomeip stops the running transition before any new one and
-// reports RemainingTime 0 (LevelControlCluster.cpp:351, :731-735 at
-// 6170af84). matter.js's replace stops it silently (Transitions.ts:124,
+// sets RemainingTime to 0, reportable when the stopped transition was 1 s
+// or longer (LevelControlCluster.cpp:351, :731-735, :701-706 at 6170af84;
+// the transition here runs 15 s). matter.js's replace stops it silently (Transitions.ts:124,
 // :263-284 at db021da0) — the divergence this test pins.
 func TestReplaceWithoutAGradualTransitionEndsAsACancel(t *testing.T) {
 	for name, next := range map[string]transition.Transition{

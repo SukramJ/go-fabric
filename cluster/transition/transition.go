@@ -263,8 +263,10 @@ func (e *Engine) StartAll(ts ...Transition) error {
 // unknown value, no distance, at the bound — ends as a cancel does:
 // Settled for the name and RemainingTime by cancel's rule. Follows
 // connectedhomeip, which stops the running transition before any new one
-// and reports RemainingTime 0 (LevelControlCluster.cpp:351, :731-735,
-// :706 at 6170af84); matter.js's replace stops it silently
+// and sets RemainingTime to 0, reportable when the stopped transition was
+// 1 s or longer (LevelControlCluster.cpp:351, :731-735, :701-706 at
+// 6170af84) — cancel's rule reports 0 where something was reported, the
+// same effect; matter.js's replace stops it silently
 // (Transitions.ts:124, :263-284 at db021da0; R2-P6-fsm-1402). A replace by
 // a gradual transition reports its own RemainingTime. The caller holds op.
 func (e *Engine) startLocked(t Transition) (Change, bool) {
@@ -716,8 +718,9 @@ func (e *Engine) step(now time.Time) {
 			// reported where something was — so no subscriber keeps a
 			// RemainingTime above 0 for a transition that no longer runs
 			// (R2-P6-err-1415, ahead of matter.js, whose stop reports
-			// nothing, :263-284; the rule is connectedhomeip's "report when
-			// it changes to 0", LevelControlCluster.cpp:706 at 6170af84).
+			// nothing, :263-284; the rule is the one connectedhomeip quotes
+			// and implements, "When it changes to 0."
+			// (LevelControlCluster.cpp:688-691, :706 at 6170af84)).
 			// No retry: the transitions stay ended.
 			e.cancelLocked(nil)
 			return

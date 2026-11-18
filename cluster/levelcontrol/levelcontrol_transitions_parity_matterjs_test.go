@@ -364,8 +364,9 @@ func TestRemainingTimeReportAdvancesTheDataVersion(t *testing.T) {
 // TestImmediateMoveEndsTheRunningTransition (R2-P6-fsm-1402): a
 // MoveToLevel with no transition time that replaces a running transition
 // ends it as a cancel does — RemainingTime reported 0 — as connectedhomeip
-// stops the running transition before any new one and reports
-// RemainingTime 0 (LevelControlCluster.cpp:351, :731-735 at 6170af84);
+// stops the running transition before any new one and sets RemainingTime
+// to 0, reportable when the stopped transition was 1 s or longer
+// (LevelControlCluster.cpp:351, :731-735, :701-706 at 6170af84; 60 s here);
 // matter.js's replace reports nothing (Transitions.ts:124, :263-284 at
 // db021da0).
 func TestImmediateMoveEndsTheRunningTransition(t *testing.T) {

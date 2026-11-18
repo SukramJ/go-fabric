@@ -203,8 +203,8 @@ func (i *Identify) hostHandler() contract.IdentifyHandler {
 // packages/node/src/behaviors/identify/IdentifyServer.ts:116-119 at
 // db021da0 ([Symbol.asyncDispose] → #stopIdentifying, :100-106), which
 // stops the identify timer when the behavior — and with it the endpoint —
-// is destroyed, and, only while the timer runs, emits stopIdentifying
-// without touching identifyTime (F-db021da0-9).
+// is destroyed, and, only while the timer runs, clears isIdentifying and
+// emits stopIdentifying without touching identifyTime (F-db021da0-9).
 func (i *Identify) Close() {
 	i.timerMu.Lock()
 	running := false

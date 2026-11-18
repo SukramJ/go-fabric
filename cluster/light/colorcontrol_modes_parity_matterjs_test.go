@@ -210,8 +210,10 @@ func TestRemainingTimeOnStops(t *testing.T) {
 			invoke(t, srv, ccdef.CmdStopMoveStep, ccdef.StopMoveStepRequest{})
 		}, []uint64{100, 0}},
 		// R2-P6-fsm-1402: an immediate move ends the running transition as
-		// a cancel does, as connectedhomeip (LevelControlCluster.cpp:351,
-		// :731-735 at 6170af84); matter.js's replace reports nothing.
+		// a cancel does, as connectedhomeip's level cluster
+		// (LevelControlCluster.cpp:351, :731-735, :701-706 at 6170af84: 0,
+		// reportable for a transition of 1 s or longer — 10 s here);
+		// matter.js's replace reports nothing.
 		{"an immediate move replaces a running one", allColorFeatures, func(t *testing.T, srv *light.ColorControlServer) {
 			t.Helper()
 			invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100})
