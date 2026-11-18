@@ -964,11 +964,11 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 		// memory is not the committed one any more (the replaced NOC, or
 		// after a rolled-back update the new one), so it answers no
 		// Sigma1 and is no longer advertised until a later load succeeds
-		// — the next update, a rollback or the next start. Follows
-		// connectedhomeip, which never goes on serving an identity it
-		// cannot match with the stored fabric (FabricTable.cpp:2064-2070
-		// at 6170af84 removes the fabric then); the stored fabric is kept
-		// here, a failed read being one a later read may serve
+		// — the next update, a rollback or the next start.
+		// connectedhomeip deletes the fabric when the commit of its
+		// pending data fails in storage, on an update as well
+		// (FabricTable.cpp:2064-2070 at 6170af84); the stored fabric is
+		// kept here, a failed read being one a later read may serve
 		// (judgement; fix-fxo-node Q3, Fable D3).
 		if c, nd, ok := n.caseIDs.forget(fabricIndex); ok {
 			n.br.WithdrawFabric(ctx, fabricIndex, c, nd)

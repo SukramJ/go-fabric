@@ -376,10 +376,11 @@ func (s *Session) HandleIncoming(data []byte) error {
 // maxInboundMessage is the largest message a session reassembles: the
 // module's datagram bound, [udp.MaxDatagramSize], so a message over BLE is
 // held to the size of one over UDP (TM R5 5a.5). The declared length is
-// judged at the beginning segment, where connectedhomeip refuses a message
-// larger than its one reassembly buffer, CHIP_ERROR_INBOUND_MESSAGE_TOO_BIG
-// (src/ble/BtpEngine.cpp:305, :312-314 at 6170af84); matter.js bounds it
-// by the declared 16-bit length only
+// judged at the beginning segment; connectedhomeip bounds the reassembled
+// data instead, by its one reassembly buffer, and refuses at the segment
+// that overflows it, CHIP_ERROR_INBOUND_MESSAGE_TOO_BIG
+// (src/ble/BtpEngine.cpp:305, :312-314, :326-331 at 6170af84); matter.js
+// bounds it by the declared 16-bit length only
 // (packages/protocol/src/ble/BtpSessionHandler.ts:314, :322-330 at
 // db021da0). The controller's channel holds the same bound
 // (controller/ble Channel.deliver).

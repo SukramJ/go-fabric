@@ -884,8 +884,15 @@ func (w *windowSalt) current() ([]byte, *spake2.VerifierContext, error) {
 		}
 	}
 	if w.vc == nil {
-		// Derived on the first exchange of the window, in the exchange's
-		// handling, not in the window's transition.
+		// Derived on the first exchange of the window, not in the window's
+		// transition, which keeps the transition hook short. The window
+		// reads as open before the hook has run (the hooks fire after the
+		// window's lock is released), and the hook renews the salt before
+		// it attaches the PASE acceptor (renewSalt before attachPase): a
+		// PBKDFParamRequest that arrives in between finds no acceptor and
+		// is consumed by the fail-closed noop. A derivation in the hook
+		// widened that gap; it is older than decision 251 and open in the
+		// findings register.
 		vc, err := spake2.NewVerifierContext(w.passcode, w.salt, w.iterations)
 		if err != nil {
 			return nil, nil, fmt.Errorf("spake2 verifier context: %w", err)

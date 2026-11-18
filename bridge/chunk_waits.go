@@ -48,7 +48,7 @@ import (
 // claim, as the per-session bound answers. Below the threshold, and on a
 // node of one fabric, nothing changes; a node whose host wired no counter
 // keeps the per-session bound alone (review II, TM R3.7, decision 245). The rule is
-// this module's: matter.js bounds exchanges per session only
+// this module's: matter.js bounds a session's outgoing exchanges only
 // (packages/protocol/src/protocol/ExchangeManager.ts:63 at db021da0);
 // connectedhomeip reserves read and subscription resources per fabric
 // (src/app/InteractionModelEngine.h:113-116, :674-686 at 6170af84).
