@@ -50,6 +50,20 @@ func waitingConsent(answer <-chan bool) func(context.Context, TrustInfo) (bool, 
 	}
 }
 
+// answerConsent gives the waiting Consent ok and returns the stage's
+// result. A stage that ended before Consent took the answer fails the test
+// with its result and cause instead of blocking the send forever.
+func answerConsent(t *testing.T, tr *jcmTrust, answer chan<- bool, ok bool, result <-chan jcm.Result) jcm.Result {
+	t.Helper()
+	select {
+	case answer <- ok:
+		return <-result
+	case r := <-result:
+		t.Fatalf("the consent stage ended before the host answered: %s (cause %v)", r, tr.cause)
+		return r
+	}
+}
+
 // TestConsentOutlivesTheFailSafe: a consent that takes longer than the
 // fail-safe still completes — the flow re-arms the fail-safe while the
 // host decides, and stops re-arming once it has (review II,
@@ -77,8 +91,7 @@ func TestConsentOutlivesTheFailSafe(t *testing.T) {
 	if left := f.failSafeTimeLeft(); left <= 0 {
 		t.Fatalf("the fail-safe ran out while the host decided (%v left)", left)
 	}
-	answer <- true
-	if r := <-result; r != jcm.Success {
+	if r := answerConsent(t, tr, answer, true, result); r != jcm.Success {
 		t.Fatalf("consent: %s", r)
 	}
 	if f.armIntervalRunning() {
@@ -140,8 +153,7 @@ func TestConsentKeepsAShortFailSafe(t *testing.T) {
 			t.Fatalf("the fail-safe lapsed (%v left)", left)
 		}
 	}
-	answer <- true
-	if r := <-result; r != jcm.Success {
+	if r := answerConsent(t, tr, answer, true, result); r != jcm.Success {
 		t.Fatalf("consent: %s", r)
 	}
 }
@@ -232,10 +244,23 @@ func TestConsentAwaitsAReArmInFlight(t *testing.T) {
 func TestConsentOnBLE(t *testing.T) {
 	t.Parallel()
 	answer := make(chan bool)
-	f, clock, dev, tr := consentFlowWith(t, gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}, true, waitingConsent(answer))
+	asked := make(chan struct{})
+	wait := waitingConsent(answer)
+	f, clock, dev, tr := consentFlowWith(t, gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}, true,
+		func(ctx context.Context, info TrustInfo) (bool, error) {
+			close(asked)
+			return wait(ctx, info)
+		})
 	f.startArmInterval(context.Background())
 	result := make(chan jcm.Result, 1)
 	go func() { result <- tr.askUserForConsent(t.Context()) }()
+	// The stage holds the fail-safe and asks the host before the clock
+	// moves: advancing it while the stage still arms races the stage.
+	select {
+	case <-asked:
+	case r := <-result:
+		t.Fatalf("the consent stage ended before it asked the host: %s (cause %v)", r, tr.cause)
+	}
 	for range 6 {
 		armed := len(dev.armed())
 		clock.Advance(BTPIdleAliveInterval)
@@ -244,8 +269,7 @@ func TestConsentOnBLE(t *testing.T) {
 	if left := f.failSafeTimeLeft(); left <= 0 {
 		t.Fatalf("the fail-safe ran out while the host decided (%v left)", left)
 	}
-	answer <- true
-	if r := <-result; r != jcm.Success {
+	if r := answerConsent(t, tr, answer, true, result); r != jcm.Success {
 		t.Fatalf("consent: %s", r)
 	}
 	if !f.armIntervalRunning() {
