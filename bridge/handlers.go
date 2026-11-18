@@ -950,6 +950,12 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		a.establishedSessionID = sessionID
 		a.sigma3Accepted = false
 		a.mu.Unlock()
+		if (!install || a.onEstablished == nil) && result.ReleaseClaim != nil {
+			// No session is installed for this resume, so nobody replaces
+			// the record it presented: the claim goes back (review II,
+			// R2-P6-sec-3320, decision 243).
+			result.ReleaseClaim()
+		}
 		if install && a.onEstablished != nil {
 			// The callback's second argument is the PEER's session id
 			// (Sigma1.initiatorSessionID) — the id the initiator expects
