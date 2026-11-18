@@ -13,7 +13,7 @@ import (
 // TestMatterQuiesceStopsTheTimers: MatterQuiesce, which the bridge calls
 // when the server leaves the topology or stops, leaves none of the three
 // timers armed and none of them runs afterwards — matter.js
-// SwitchServer.ts:379-384 at 862ad75f ([Symbol.asyncDispose]; W3-club2-02).
+// SwitchServer.ts:379-384 at db021da0 ([Symbol.asyncDispose]; W3-club2-02).
 func TestMatterQuiesceStopsTheTimers(t *testing.T) {
 	t.Parallel()
 	clk := clocktest.New(time.Unix(0, 0))

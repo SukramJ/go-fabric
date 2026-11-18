@@ -15,7 +15,7 @@ import (
 // mode when the attribute is served, by a controller's write and by the
 // host's SetSystemMode alike, and emits RunningModeChange; Auto leaves it
 // — matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:1185,
-// :1194-1206 at 862ad75f (#handleSystemModeChange; W3-clua1-01).
+// :1194-1206 at db021da0 (#handleSystemModeChange; W3-clua1-01).
 func TestParityMatterJS_SystemModeDrivesRunningMode(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

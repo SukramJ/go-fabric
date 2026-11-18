@@ -474,7 +474,7 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 // previous value is stored and handed to the port again — and its status
 // stands for every attribute. Mirrors matter.js
 // packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:314-326 at
-// 862ad75f: any failure rolls the one transaction back, and a failure
+// db021da0: any failure rolls the one transaction back, and a failure
 // while committing "cannot be traced to one attribute, so it stands for
 // each of them" (AtomicWriteHandlerTest.ts:491-517 "discards a valid
 // Presets write when the Schedules write fails"; W3-clua1-02). The

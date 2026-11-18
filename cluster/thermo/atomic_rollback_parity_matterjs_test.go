@@ -57,7 +57,7 @@ func (p *refusingPorts) CommitSchedules(_ context.Context, schedules []Schedule)
 // value stored and handed to its port again — and the refusal's status
 // stands for every attribute. Mirrors matter.js
 // packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:314-326 at
-// 862ad75f and AtomicWriteHandlerTest.ts:491-517 ("discards a valid
+// db021da0 and AtomicWriteHandlerTest.ts:491-517 ("discards a valid
 // Presets write when the Schedules write fails"), the failure here
 // raised by this module's host ports (W3-clua1-02).
 func TestParityMatterJS_AtomicCommitIsOneUnit(t *testing.T) {

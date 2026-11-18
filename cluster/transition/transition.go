@@ -236,7 +236,7 @@ func (e *Engine) Start(t Transition) error { return e.StartAll(t) }
 // does, the targets of the immediate ones applied in a single Apply.
 // matter.js starts a command's transitions inside the command's
 // transaction (moveToColorLogic starts currentX then currentY,
-// ColorControlServer.ts:797-813 at 0ceb202d), so an immediate transition's
+// ColorControlServer.ts:797-813 at db021da0), so an immediate transition's
 // values reach the state in one commit and a hook on the committed state
 // sees both at once; a step of a gradual transition applies every
 // property's value together anyway (Transitions.ts:537-574). Apply's error

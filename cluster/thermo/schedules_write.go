@@ -410,7 +410,7 @@ func precommitSchedules(stored, pending []Schedule, active []byte) error {
 // (ThermostatClusterSchedules.h:134-145 at 645b267a: "it is the
 // responsibility of this API to allocate unique schedule handles"); here
 // the server issues 16 random bytes, as matter.js does for a preset
-// (ThermostatServer.ts:1526 at 862ad75f).
+// (ThermostatServer.ts:1526 at db021da0).
 func issueScheduleHandles(list []Schedule) error {
 	for i := range list {
 		if !list[i].ScheduleHandle.Null {

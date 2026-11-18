@@ -19,7 +19,7 @@ import (
 // The Events feature (TEVT) and its events, served after connectedhomeip:
 // matter.js's ThermostatServer emits none of the cluster's eight events
 // (its only emit is the calibratedTemperature$Changed observable,
-// ThermostatServer.ts:525 at 862ad75f), so chip's
+// ThermostatServer.ts:525 at db021da0), so chip's
 // src/app/clusters/thermostat-server at 6170af84 is the authority. Every
 // Generate…Event there returns unless the selection has TEVT
 // (ThermostatClusterEvents.cpp:33-36, :59-61, :83-86, :109-112, :137-140,
@@ -51,7 +51,7 @@ const ThermostatFeatureTEVT = uint32(tdef.FeatureEvents)
 
 // servedEvents are the TEVT events the selection emits. Each is
 // provisional ("P, TEVT…", thermostat-cluster.element.ts:287-333 at
-// 862ad75f), which the definition reads as optional, so the server names
+// db021da0), which the definition reads as optional, so the server names
 // them: every event whose feature condition the selection meets.
 func servedEvents(features uint32) []uint32 {
 	if features&ThermostatFeatureTEVT == 0 {
@@ -258,7 +258,7 @@ func (s *ThermostatServer) SetThermostatRunningMode(mode uint8) error {
 // RunningModeChange through emitChanges. Auto and the other modes leave
 // it to the host ([ThermostatServer.SetThermostatRunningMode]). Mirrors
 // matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:1185,
-// :1194-1206 at 862ad75f (#handleSystemModeChange on systemMode$Changed;
+// :1194-1206 at db021da0 (#handleSystemModeChange on systemMode$Changed;
 // W3-clua1-01).
 func (s *ThermostatServer) followSystemModeLocked(mode uint8) bool {
 	if !s.inst.Serves(tdef.AttrThermostatRunningMode) {

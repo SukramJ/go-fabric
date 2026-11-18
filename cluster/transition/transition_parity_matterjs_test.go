@@ -672,7 +672,7 @@ var xy = map[string]transition.Property{"currentX": {Min: 0, Max: 0xFEFF}, "curr
 
 // TestStartAllAppliesOneCommandTogether: the transitions of one command
 // started as one — matter.js starts them inside the command's transaction
-// (moveToColorLogic, ColorControlServer.ts:797-813 at 0ceb202d), so the
+// (moveToColorLogic, ColorControlServer.ts:797-813 at db021da0), so the
 // immediate ones reach the state in one commit; a step applies every
 // property together (Transitions.ts:537-574). Issue #84.
 func TestStartAllAppliesOneCommandTogether(t *testing.T) {

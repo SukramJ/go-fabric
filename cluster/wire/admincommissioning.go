@@ -76,7 +76,7 @@ const (
 // accepted and OpenBasicCommissioningWindow is not. admCommInstBasic is the
 // same definition with BC (FeatureMap bit 0), which admits
 // OpenBasicCommissioningWindow and the BasicWindowOpen status
-// (administrator-commissioning.element.ts:23, :43, :55 at 862ad75f).
+// (administrator-commissioning.element.ts:23, :43, :55 at db021da0).
 var (
 	admCommInst      = mustAdmCommInstance(0)
 	admCommInstBasic = mustAdmCommInstance(uint32(admdef.FeatureBasic))
@@ -215,8 +215,8 @@ type AdministratorCommissioningConfig struct {
 	// an administrator's OpenBasicCommissioningWindow opens a window
 	// against the node's configured passcode, status BasicWindowOpen.
 	// matter.js serves it only through AdministratorCommissioningServer
-	// .with("Basic") (AdministratorCommissioningServer.ts:55-57, :105-117
-	// at 862ad75f); off by default here too.
+	// .with("Basic") (AdministratorCommissioningServer.ts:59-61, :115-127
+	// at db021da0); off by default here too.
 	BasicCommissioning bool
 }
 

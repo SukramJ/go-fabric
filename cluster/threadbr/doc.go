@@ -11,7 +11,7 @@
 // (packages/node/src/behaviors/thread-border-router-management/
 // ThreadBorderRouterManagementServer.ts:14 and packages/node/src/behaviors/
 // thread-network-diagnostics/ThreadNetworkDiagnosticsServer.ts:14 at
-// 862ad75f, `export class …Server extends …Behavior {}`), so the rules here
+// db021da0, `export class …Server extends …Behavior {}`), so the rules here
 // follow connectedhomeip at the harness image's CHIP commit 6170af84:
 // src/app/clusters/thread-border-router-management-server/
 // ThreadBorderRouterManagementCluster.cpp over
