@@ -24,7 +24,9 @@
   `store.Store` is its SQLite implementation — and its second
   implementation is `store/memstore` (phase 21a, `e1b2bff8`); the two
   residues it names are still file-based (`cluster/core/ota_requestor_query.go`,
-  `controller/dcl/snapshot/fetch.go`). Principle 9: the metrics hook
+  `controller/dcl/snapshot/fetch.go`); both are open findings, to be
+  fixed in phase 7 (owner decision 249; see the findings register,
+  `notes/parity/matter_behaviour_findings.md`). Principle 9: the metrics hook
   (`contract.Metrics`, `contract/metrics.go`) and the diagnostic event
   ring (`diagevent/`) exist.
 - **Date**: 2026-10-20

@@ -131,8 +131,10 @@ Verification (`VENDOR_ID_VERIFICATION_FAILED`, cause
 the administrator answers an `AnnounceJointFabricAdministrator` with
 `FAILURE`. `jcm.SelfAnchored` is the explicit opt-in to chip's
 placeholder, the other side's own RCAC, for tests and examples. The
-device kit's administrator (`device.NewJointFabricAdministrator`) is
-built without a lookup, so it fails the verification.
+device kit's administrator (`device.NewJointFabricAdministrator`) takes
+the lookup through its declaration's `TrustAnchors` port
+(`jointfabricadministrator.Declare.TrustAnchors`); without one it fails the
+verification.
 
 ## The commissioner side
 
