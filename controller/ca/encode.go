@@ -127,7 +127,7 @@ func serialBytes(id uint64) []byte {
 }
 
 // encodeCert writes the certificate TLV with sig as its signature. The
-// top-level structure is in schema order (operational.ts:123-153); the
+// top-level structure is in schema order (operational.ts:124-154); the
 // DN lists and the extension list keep the order the caller gives, which
 // is the order of matter.js's object literals in CertificateAuthority.ts:
 // the DN lists are a TlvDistinguishedName (operational.ts:111) and the

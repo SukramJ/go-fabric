@@ -90,7 +90,7 @@ func (n *Node) read(ctx context.Context, req ReadRequest, emitEvents bool) (*Rep
 // caches it across a SIT⇄LIT flip. Mirrors matter.js
 // ClientNodeInteraction.#awaitModeIcdRouting
 // (packages/node/src/node/client/ClientNodeInteraction.ts:321-324 at
-// db021da0), applied at :78-81 (read) and :188-191 (write). An invoke
+// db021da0), applied at :81-84 (read) and :189-192 (write). An invoke
 // takes routeInvoke instead.
 func (n *Node) routeICD(r *interaction.ClientRequest) {
 	if n.icd == nil || r.Network != "" {

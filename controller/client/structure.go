@@ -1007,13 +1007,13 @@ func (s *structure) isOnTheNode(ep *Endpoint) bool {
 
 // ownerFor is the claimant that owns a part, with the claimants that
 // conflict with that choice, nil while that cannot be told. Mirrors
-// matter.js packages/node/src/node/client/ClientStructure.ts:1509-1551
+// matter.js packages/node/src/node/client/ClientStructure.ts:1509-1550
 // (#ownerFor at db021da0): a claimant the root does not name owns nothing
 // (:1513-1518), one whose composition is unknown makes the part wait
 // (:1520-1525); an ordinary claimant is closer to the part than any
-// full-family one (:1530-1533); among the candidates the closest wins
+// full-family one (:1530-1532); among the candidates the closest wins
 // ([structure.closestClaimant]); a full-family owner waits until every
-// endpoint it names has reported its own parts (:1539-1541). The
+// endpoint it names has reported its own parts (:1538-1540). The
 // contenders are the other ordinary claimants, or the full-family ones
 // that do not name the owner (:1543-1548).
 func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders []*Endpoint) {

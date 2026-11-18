@@ -21,7 +21,8 @@ import (
 
 // defaultRequest is the default subscription — every attribute, every
 // event urgent, fabric-filtered, replacing our other subscriptions —
-// narrowed by the stored options (NetworkClient.ts:121-128 at 0ceb202d).
+// narrowed by the stored options (the options branch of
+// NetworkClient.#defaultSubscribe, NetworkClient.ts:265-271 at db021da0).
 // The caller holds the lock.
 func (n *Node) defaultRequest() SubscribePaths {
 	r := SubscribePaths{
@@ -71,12 +72,12 @@ func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 }
 
 // syncAutoSubscribeLocked is NetworkClient.#syncAutoSubscribe
-// (NetworkClient.ts:131-237 at db021da0): a newly commissioned node reads
-// the default subscription's paths once (:143-152, unless NoInitialRead);
+// (NetworkClient.ts:131-238 at db021da0): a newly commissioned node reads
+// the default subscription's paths once (:143-153, unless NoInitialRead);
 // then, when a subscription is desired and none is held, the default
 // subscription is established, sustained, with the event minimum past the
 // highest event seen and a bootstrap read unless the initial read ran
-// (:164-201); when none is desired the held one ends (:154-161). desire
+// (:164-206); when none is desired the held one ends (:159-162). desire
 // overrides the node's autoSubscribe (desiredState, :131). The caller
 // holds subSync.
 func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error {
@@ -133,7 +134,7 @@ func (n *Node) syncAutoSubscribeLocked(ctx context.Context, desire *bool) error 
 // NetworkClient.#handleDefaultSubscriptionChange
 // (packages/node/src/behavior/system/network/NetworkClient.ts:118-129 at
 // db021da0), a reaction to the defaultSubscription state that runs one at
-// a time with Start and [Node.SetAutoSubscribe] (:114-116, :89-98). An
+// a time with Start and [Node.SetAutoSubscribe] (:114-116, :93-98). An
 // unchanged request is nothing.
 //
 // The adoption waits, within ctx, for the node's queued report jobs —
@@ -359,7 +360,7 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 	var sub *Subscription
 	// The callbacks act only while this is the node's default
 	// subscription, so a replaced or ended one never acts for its
-	// successor (NetworkClient.ts:163-167, :177-201, :217-233 at db021da0).
+	// successor (NetworkClient.ts:164-167, :179-205, :212-236 at db021da0).
 	alive := func() {
 		n.mu.RLock()
 		current := n.subOwner == owner
@@ -768,14 +769,14 @@ func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 }
 
 // evaluateSeeded marks the node seeded once its structure is known.
-// Mirrors matter.js packages/node/src/node/client/Peers.ts:760-797
+// Mirrors matter.js packages/node/src/node/client/Peers.ts:760-798
 // (#evaluateSeeded at db021da0): BasicInformation is present and every
 // endpoint the root's reported PartsList names (the valid endpoint
 // numbers) is installed — an empty PartsList is a node of its root only;
 // a node whose PartsList was not reported needs an endpoint beyond the
 // root. A root-only node whose reported DeviceTypeList names nothing but
 // Root Node is logged as offering no function beyond node management
-// (:786-796).
+// (:787-797).
 func (n *Node) evaluateSeeded() {
 	n.mu.Lock()
 	if n.seeded || n.s.root == nil || readyCluster(n.s.root, basicinformation.ClusterID) == nil {

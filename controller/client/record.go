@@ -140,8 +140,8 @@ type Record struct {
 	// when it announced none (:1067-1071).
 	AdvertisedIntervals *AdvertisedIntervals
 	// TCPUnsupported is set when a TCP session reported no TCP server
-	// support (:1073-1078): the peer's descriptor flag, saved with it
-	// (CommissioningClient.ts:737, :761 at 862ad75f).
+	// support (CommissioningClient.ts:1108-1113): the peer's descriptor flag,
+	// saved with it (:737, :761 at db021da0).
 	TCPUnsupported bool
 	// TCPSupport is the announced transports bitmap (T), nil when unknown
 	// (:1080-1084).

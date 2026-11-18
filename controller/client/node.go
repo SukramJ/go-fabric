@@ -667,7 +667,7 @@ func (n *Node) icdModeLocked() int64 {
 // establishes the sustained default subscription at once (reading first
 // when newly commissioned) or closes it; a stopped one follows the choice
 // at its next start — matter.js NetworkClient's autoSubscribe state, whose
-// change runs #syncAutoSubscribe (NetworkClient.ts:46, :114-116, :131-197
+// change runs #syncAutoSubscribe (NetworkClient.ts:46, :114-116, :131-238
 // at db021da0). An unchanged choice is nothing.
 func (n *Node) SetAutoSubscribe(ctx context.Context, on bool) error {
 	n.mu.Lock()

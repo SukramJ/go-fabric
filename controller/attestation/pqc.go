@@ -16,8 +16,8 @@ import (
 // PQC Phase 1 of the attestation certificates: a PAA and a PAI may carry
 // an ML-DSA-44 or ML-DSA-65 key and any attestation certificate an ML-DSA
 // signature, the DAC key stays EC P-256 — matter.js's "pqc-phase-1"
-// forward feature (packages/model/src/common/Specification.ts:93 at
-// 862ad75f) over packages/general/src/crypto/MlDsa.ts and
+// forward feature (packages/model/src/common/Specification.ts:92 at
+// db021da0) over packages/general/src/crypto/MlDsa.ts and
 // packages/protocol/src/certificate/kinds/ (AttestationCertificates.ts:14-63
 // at db021da0, CertificateSignature.ts). The keys, signatures and their
 // RFC 9881 encodings are the standard library's (crypto/mldsa, crypto/x509
