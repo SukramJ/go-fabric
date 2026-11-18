@@ -125,7 +125,12 @@ import (
 // with its lines broken off) and cluster/levelcontrol/native.go
 // (targetValue, beside Transitions.ts); none is new. Rows whose sentence
 // now names its commit carry it in "at".
-const citecheckDriftRatchet = 330
+//
+// 305 after the Fable wave-4 read applied (review II, phase 6b): the rows
+// it corrected go, two heuristic rows come (client/interaction/server.go,
+// cluster/spec/decode_value.go: a name the sentence gives for another
+// part); none is a moved citation.
+const citecheckDriftRatchet = 305
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -143,8 +148,11 @@ const citecheckDriftRatchet = 330
 // with the forms the collector learnt in the same change ("(0ceb202d, …",
 // "matter.js 0ceb202d …"; 115 citations that read as the pin's before),
 // less the unit's own rows re-read and re-labelled at db021da0. The cite
-// unit counted 1211 at dd17ab06 in the old forms.
-const citecheckOffPinRatchet = 151
+// unit counted 1211 at dd17ab06 in the old forms. 151 after the five
+// wave-4 units; 122 after the Fable wave-4 read applied, with the forms
+// of F3 (a sha closing a parenthesis after a comma, "pin <sha>",
+// "HEAD <sha>") counted.
+const citecheckOffPinRatchet = 122
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
