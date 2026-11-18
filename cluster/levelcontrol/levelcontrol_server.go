@@ -432,6 +432,11 @@ type Server struct {
 	// ([Server.nextCoupling]).
 	coupling    coupling
 	couplingGen uint64
+	// onSeenGen is the generation of the with-On/Off transition a step
+	// has read the device on during; offEndedGen the one a step then read
+	// it off during, which the next step's apply ends
+	// ([Server.stepCouple], R2-P6-fsm-1401).
+	onSeenGen, offEndedGen uint64
 	// observe serialises an observation of CurrentLevel: the read from
 	// the source and the compare-and-store ([Server.noteLevel]).
 	observe sync.Mutex

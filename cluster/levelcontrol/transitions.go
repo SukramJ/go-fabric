@@ -5,6 +5,7 @@ package levelcontrol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -149,6 +150,15 @@ func (s *Server) readLevel(string) (float64, bool) {
 // MoveToLevel that executes whatever the On/Off state — the engine gated
 // the command already — then reports the change and couples.
 func (s *Server) applyLevel(changes []transition.Change) error {
+	s.mu.Lock()
+	ended := s.offEndedGen != 0 && s.offEndedGen == s.couplingGen
+	if ended {
+		s.offEndedGen = 0
+	}
+	s.mu.Unlock()
+	if ended {
+		return errOffEndedTransition
+	}
 	ctx := context.Background()
 	// A change the host's notifier reports while the level is handed over
 	// is the command's.
@@ -443,7 +453,8 @@ func (s *Server) transitionAndInvalidate(ctx context.Context, target, rate float
 // a "with On/Off" command towards a level above the minimum switches the
 // device on, which may move the level to OnLevel — then derive the rate
 // from the level that leaves, start the engine, and couple what the level
-// arrived at. Every step of the transition couples again. rate is a
+// arrived at. Every step of the transition records its coupling again
+// but switches nothing ([Server.stepCouple]). rate is a
 // constant rate (Move, Step; 0 applies at once); rateFrom, when set,
 // derives it from the current level (MoveToLevel).
 func (s *Server) transition(ctx context.Context, target, rate float64, rateFrom func(current float64) float64, withOnOff bool, options uint8) error {
@@ -469,12 +480,9 @@ func (s *Server) transition(ctx context.Context, target, rate float64, rateFrom 
 			return err
 		}
 	}
-	// The steps run after the command is answered, so they keep its
-	// context's values but not its cancellation.
-	stepCtx := context.WithoutCancel(ctx)
 	if err := s.engine.Start(transition.Transition{
 		Name: propCurrentLevel, Rate: rate, RateFrom: rateFrom, Target: target,
-		OnStep: func(float64) { _, _ = s.couple(stepCtx, gen, withOnOff, options, target) },
+		OnStep: func(float64) { s.stepCouple(gen, withOnOff, options, target) },
 	}); err != nil {
 		return err
 	}
@@ -488,6 +496,50 @@ func (s *Server) nextCoupling() uint64 {
 	defer s.mu.Unlock()
 	s.couplingGen++
 	return s.couplingGen
+}
+
+// errOffEndedTransition is the step apply's refusal of a with-On/Off
+// transition the device was switched off during: the engine ends every
+// transition as a cancel does (Settled, RemainingTime 0).
+var errOffEndedTransition = errors.New("levelcontrol: the device was switched off during a with-On/Off transition")
+
+// stepCouple is a step's coupling: it records what the transition couples
+// to, as [Server.couple] does, and does not switch the device on again —
+// the command's couple did, once. A step that reads the device off after
+// a step of the same transition read it on marks the transition ended by
+// the Off: the next step's apply refuses it ([errOffEndedTransition]) and
+// the engine ends it as a cancel does. Follows connectedhomeip, which
+// switches on once, when the with-On/Off command is taken, never at a
+// step, and stops the running transition on an Off
+// (src/app/clusters/level-control/LevelControlCluster.cpp:342-345,
+// :742-826, :829-889, :351 at 6170af84; R2-P6-fsm-1401). matter.js
+// couples on every step (LevelControlServer.ts:545-547) and lets the fade
+// run on after an Off (:664 at db021da0). Until a step has read the
+// device on, a step reads nothing into an Off: an On/Off port whose
+// OnOff() lags its SetOnOff(true) keeps its fade. chip's Off effect itself
+// — the fade to MinLevel over OffTransitionTime — is not adopted.
+func (s *Server) stepCouple(gen uint64, withOnOff bool, options uint8, target float64) {
+	coupleOnOff := withOnOff && s.onOff != nil
+	c := coupling{
+		turnsOff:         coupleOnOff && min(max(target, float64(s.minLevel())), float64(lvldef.LevelMax)) <= float64(s.minLevel()),
+		colorTemperature: s.lighting && options&OptionCoupleColorTempToLevel != 0 && s.ct != nil,
+	}
+	on := coupleOnOff && s.onOff.OnOff()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if gen != s.couplingGen {
+		return
+	}
+	s.coupling = c
+	if !coupleOnOff {
+		return
+	}
+	switch {
+	case on:
+		s.onSeenGen = gen
+	case s.onSeenGen == gen:
+		s.offEndedGen = gen
+	}
 }
 
 // couple is matter.js LevelControlServer.couple: it records what the
