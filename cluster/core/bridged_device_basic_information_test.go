@@ -163,7 +163,7 @@ func TestBridgedBasicInfo_WriteNodeLabelTooLong(t *testing.T) {
 	b := newValidBridged(t)
 	err := b.MatterWrite(context.Background(), 0x0005, strings.Repeat("z", 33))
 	// CONSTRAINT_ERROR, as matter.js's string-length validator answers it
-	// (constraint.ts:199-211 at db021da0) and the root cluster does
+	// (constraint.ts:200-211 at db021da0) and the root cluster does
 	// (W3-clucore-01); it used to be FAILURE.
 	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusConstraintError {
 		t.Fatalf("NodeLabel > 32 bytes: %v, want CONSTRAINT_ERROR", err)
