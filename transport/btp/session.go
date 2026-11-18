@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // maximumSequenceNumber is the last sequence number before the wrap to 0
@@ -372,6 +373,18 @@ func (s *Session) HandleIncoming(data []byte) error {
 	return err
 }
 
+// maxInboundMessage is the largest message a session reassembles: the
+// module's datagram bound, [udp.MaxDatagramSize], so a message over BLE is
+// held to the size of one over UDP (TM R5 5a.5). The declared length is
+// judged at the beginning segment, where connectedhomeip refuses a message
+// larger than its one reassembly buffer, CHIP_ERROR_INBOUND_MESSAGE_TOO_BIG
+// (src/ble/BtpEngine.cpp:305, :312-314 at 6170af84); matter.js bounds it
+// by the declared 16-bit length only
+// (packages/protocol/src/ble/BtpSessionHandler.ts:314, :322-330 at
+// db021da0). The controller's channel holds the same bound
+// (controller/ble Channel.deliver).
+const maxInboundMessage = udp.MaxDatagramSize
+
 func (s *Session) handleIncomingLocked(data []byte) error {
 	if len(data) > s.fragmentSize {
 		// Apple seems to read the ATT_MTU as the size of one ATT packet
@@ -425,6 +438,9 @@ func (s *Session) handleIncomingLocked(data []byte) error {
 	case h.IsBeginningSegment:
 		if s.reassembling {
 			return protocolError("BTP message flow error! New beginning packet was received without previous message being completed.")
+		}
+		if n := int(*p.MessageLength); n > maxInboundMessage {
+			return protocolError(fmt.Sprintf("BTP message length %d exceeds the %d-byte inbound bound", n, maxInboundMessage))
 		}
 		s.reassembling, s.incomingLen, s.incoming = true, int(*p.MessageLength), p.SegmentPayload
 	case h.IsContinuingSegment || h.IsEndingSegment:
