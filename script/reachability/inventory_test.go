@@ -81,7 +81,9 @@ import (
 // node.ICD.OnModeChangeAsync, node.Node.OTAProviderEndpoint and
 // .OnOTAProviderStatusAsync, secure/operational.Entry.PeerMRPIntervals,
 // secure/sigma.Initiator.PeerNodeID, transport/tcp.Dialer.OnPanicRecovered.
-const reachabilityUnreachedRatchet = 24
+// Lowered 24 -> 23 (F-db021da0-13): bridge/chunk_timeout_test.go wires
+// bridge.OperationalSessionLookup.WithRetransmitIntervalResolver.
+const reachabilityUnreachedRatchet = 23
 
 // reachabilityWhitelistRatchet holds, per class, the exemptions that take an
 // exported identifier out of the measure by a decision rather than by what its

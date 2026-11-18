@@ -1,26 +1,26 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)
-Entry points: 9966 across 290 test packages, and 368 package initializers.
+Entry points: 9974 across 290 test packages, and 368 package initializers.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 27689 |
-| Reached by a test | 20824 |
-| Whitelisted | 6841 |
-| **Unreached** | **24** |
+| Total exported | 27705 |
+| Reached by a test | 20833 |
+| Whitelisted | 6849 |
+| **Unreached** | **23** |
 
 ## Top-20 packages by unreached exported identifiers
 
 | Package | Funcs | Types | Other |
 |---|---|---|---|
 | cluster/jointfabric | 4 | 0 | 0 |
-| bridge | 3 | 0 | 0 |
 | icd | 3 | 0 | 0 |
 | node | 3 | 0 | 0 |
 | bdx | 2 | 0 | 0 |
+| bridge | 2 | 0 | 0 |
 | cluster/core | 2 | 0 | 0 |
 | controller/client | 2 | 0 | 0 |
 | client/exchange | 1 | 0 | 0 |
@@ -35,9 +35,8 @@ Entry points: 9966 across 290 test packages, and 368 package initializers.
 |---|---|---|---|
 | bdx | ServerSession.InitType | bdx/responder.go | 568 |
 | bdx | ServerSession.Scope | bdx/responder.go | 562 |
-| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3269 |
-| bridge | Bridge.SubscriptionFlushReporter | bridge/subscribe.go | 381 |
-| bridge | OperationalSessionLookup.WithRetransmitIntervalResolver | bridge/handlers.go | 1373 |
+| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3272 |
+| bridge | Bridge.SubscriptionFlushReporter | bridge/subscribe.go | 404 |
 | client/exchange | Manager.LocalFixedMrpBackoff | client/exchange/manager.go | 240 |
 | cluster/core | OperationalCredentials.RolledBackUpdates | cluster/core/operational_credentials.go | 736 |
 | cluster/core | ScenesState.ForgetFabric | cluster/core/scenes_management.go | 538 |
@@ -63,10 +62,10 @@ Entry points: 9966 across 290 test packages, and 368 package initializers.
 | Package | Funcs | Types | Other |
 |---|---|---|---|
 | cluster/jointfabric | 4 | 0 | 0 |
-| bridge | 3 | 0 | 0 |
 | icd | 3 | 0 | 0 |
 | node | 3 | 0 | 0 |
 | bdx | 2 | 0 | 0 |
+| bridge | 2 | 0 | 0 |
 | cluster/core | 2 | 0 | 0 |
 | controller/client | 2 | 0 | 0 |
 | client/exchange | 1 | 0 | 0 |

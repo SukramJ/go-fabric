@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 9966,
+  "entry_points": 9974,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,21 +295,15 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27689,
-    "reachable": 20824,
-    "whitelisted": 6841,
-    "unreachable": 24
+    "total_exported": 27705,
+    "reachable": 20833,
+    "whitelisted": 6849,
+    "unreachable": 23
   },
   "by_package": [
     {
       "package": "cluster/jointfabric",
       "unreachable_funcs": 4,
-      "unreachable_types": 0,
-      "unreachable_other": 0
-    },
-    {
-      "package": "bridge",
-      "unreachable_funcs": 3,
       "unreachable_types": 0,
       "unreachable_other": 0
     },
@@ -327,6 +321,12 @@
     },
     {
       "package": "bdx",
+      "unreachable_funcs": 2,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "bridge",
       "unreachable_funcs": 2,
       "unreachable_types": 0,
       "unreachable_other": 0
@@ -393,21 +393,14 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3269,
+      "line": 3272,
       "kind": "method"
     },
     {
       "package": "bridge",
       "identifier": "Bridge.SubscriptionFlushReporter",
       "file": "bridge/subscribe.go",
-      "line": 381,
-      "kind": "method"
-    },
-    {
-      "package": "bridge",
-      "identifier": "OperationalSessionLookup.WithRetransmitIntervalResolver",
-      "file": "bridge/handlers.go",
-      "line": 1373,
+      "line": 404,
       "kind": "method"
     },
     {
@@ -2027,21 +2020,28 @@
       "identifier": "TestChunkStatusResponseTimeoutDefaultsZeroIntervals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_timeout_test.go",
-      "line": 76
+      "line": 77
     },
     {
       "package": "bridge",
       "identifier": "TestChunkStatusResponseTimeoutOverAConnection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_timeout_test.go",
-      "line": 58
+      "line": 59
     },
     {
       "package": "bridge",
       "identifier": "TestChunkStatusResponseTimeoutSumsBothDirections",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_timeout_test.go",
-      "line": 25
+      "line": 26
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkStatusResponseTimeoutSumsThePeersSchedule",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/chunk_timeout_test.go",
+      "line": 126
     },
     {
       "package": "bridge",
@@ -4967,7 +4967,7 @@
       "identifier": "TestMaxScheduleTimeLeavesActiveOnlyPastTheThreshold",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_timeout_test.go",
-      "line": 106
+      "line": 107
     },
     {
       "package": "bridge",
@@ -6144,6 +6144,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_resume_unacknowledged_test.go",
       "line": 95
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestR2P6Sec3320Release",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_resume_claim_test.go",
+      "line": 53
     },
     {
       "package": "bridge",
@@ -8013,6 +8020,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_limits_test.go",
       "line": 97
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTMR37",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/tmr37_internal_test.go",
+      "line": 58
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTMR37Claims",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/tmr37_internal_test.go",
+      "line": 33
     },
     {
       "package": "bridge",
@@ -35578,7 +35599,7 @@
       "identifier": "TestSpecInstanceDeclaresItsDefinitionsScope",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/fabric_scope_test.go",
-      "line": 101
+      "line": 103
     },
     {
       "package": "endpoint",
@@ -37972,7 +37993,7 @@
       "identifier": "TestArrayElementWithATagIsMalformed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/array_element_tag_test.go",
-      "line": 35
+      "line": 34
     },
     {
       "package": "im",
@@ -38245,7 +38266,7 @@
       "identifier": "TestConcreteEventPath_WildcardHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 190
+      "line": 191
     },
     {
       "package": "im",
@@ -38578,6 +38599,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestFilterArraysRefuseAWrongTypeElement",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/event_filter_read_test.go",
+      "line": 342
+    },
+    {
+      "package": "im",
       "identifier": "TestGatesPassAnAccessingFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/accessing_fabric_test.go",
@@ -38707,7 +38735,7 @@
       "identifier": "TestHandleReadEventRequest_AppliesEventMinFromWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 163
+      "line": 164
     },
     {
       "package": "im",
@@ -39295,35 +39323,35 @@
       "identifier": "TestReadEventFilterArray_DecodesPeerWireLayout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 141
+      "line": 142
     },
     {
       "package": "im",
       "identifier": "TestReadEventFilterArray_MultipleFilters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 100
-    },
-    {
-      "package": "im",
-      "identifier": "TestReadEventFilterArray_NestedContainerElementIsDrainedNotDesynced",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "im/event_filter_read_test.go",
-      "line": 261
+      "line": 101
     },
     {
       "package": "im",
       "identifier": "TestReadEventFilterArray_NoNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 76
+      "line": 77
     },
     {
       "package": "im",
       "identifier": "TestReadEventFilterArray_SingleFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 51
+      "line": 52
+    },
+    {
+      "package": "im",
+      "identifier": "TestReadEventFilterArray_WrongTypeElementRefusesTheRequest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/event_filter_read_test.go",
+      "line": 258
     },
     {
       "package": "im",
@@ -39589,7 +39617,7 @@
       "identifier": "TestUnmarshalReadRequest_ScalarEventFiltersFieldIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 226
+      "line": 227
     },
     {
       "package": "im",
@@ -39638,7 +39666,7 @@
       "identifier": "TestUnmarshalSubscribeRequest_ScalarEventFiltersFieldIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_filter_read_test.go",
-      "line": 309
+      "line": 310
     },
     {
       "package": "im",
@@ -41945,6 +41973,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestBasicWindowsUseFreshSalts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/window_salt_internal_test.go",
+      "line": 21
+    },
+    {
+      "package": "node",
       "identifier": "TestBuildOtaRequestorTransferProtocols",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/ota_owner_internal_test.go",
@@ -41955,7 +41990,7 @@
       "identifier": "TestCASEHandshakeWithinOneIdentityIsAdmitted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
-      "line": 109
+      "line": 111
     },
     {
       "package": "node",
@@ -41969,7 +42004,7 @@
       "identifier": "TestCASEInitiatorRefusesASessionAcrossAnUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
-      "line": 79
+      "line": 81
     },
     {
       "package": "node",
@@ -41987,10 +42022,17 @@
     },
     {
       "package": "node",
+      "identifier": "TestCASEResponderKeepsTheResolutionOfItsAcceptedSigma1",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_fabric_updated_internal_test.go",
+      "line": 180
+    },
+    {
+      "package": "node",
       "identifier": "TestCASEResponderRefusesASessionAcrossAnUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "node",
@@ -42004,7 +42046,7 @@
       "identifier": "TestCASEResponderRefusesASessionWhoseUpdateFollowsItsStake",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
-      "line": 132
+      "line": 134
     },
     {
       "package": "node",
@@ -47290,6 +47332,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/btp/session_parity_matterjs_test.go",
       "line": 161
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionRefusesAMessageAboveTheDatagramBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 1043
     },
     {
       "package": "transport/btp",
