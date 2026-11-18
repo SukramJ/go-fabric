@@ -393,7 +393,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3276,
+      "line": 3277,
       "kind": "method"
     },
     {
@@ -1334,7 +1334,7 @@
       "identifier": "TestBindSessionRouteNeverSwitchesTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 414
+      "line": 415
     },
     {
       "package": "bridge",
@@ -3511,7 +3511,7 @@
       "identifier": "TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_conformance_test.go",
-      "line": 93
+      "line": 94
     },
     {
       "package": "bridge",
@@ -4589,7 +4589,7 @@
       "identifier": "TestHandshakeHoldNeedsAConnection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 570
+      "line": 571
     },
     {
       "package": "bridge",
@@ -6325,7 +6325,7 @@
       "identifier": "TestReboundSessionMovesItsConnectionCount",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 531
+      "line": 532
     },
     {
       "package": "bridge",
@@ -6913,7 +6913,7 @@
       "identifier": "TestRouteHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 486
+      "line": 487
     },
     {
       "package": "bridge",
@@ -8327,7 +8327,7 @@
       "identifier": "TestUnsolicitedReportOverTCPHasNoMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 461
+      "line": 462
     },
     {
       "package": "bridge",
@@ -9440,7 +9440,7 @@
       "identifier": "TestMessageExchangeClosingNotification",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
-      "line": 276
+      "line": 277
     },
     {
       "package": "client/exchange",
@@ -9475,7 +9475,7 @@
       "identifier": "TestMessageExchangePaddedBDXCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
-      "line": 257
+      "line": 258
     },
     {
       "package": "client/exchange",
@@ -38210,21 +38210,21 @@
       "identifier": "TestBuildEventReports_EmptyPaths",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_report_test.go",
-      "line": 659
+      "line": 660
     },
     {
       "package": "im",
       "identifier": "TestBuildEventReports_MultiPathOutputIsGloballyAscending",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_report_test.go",
-      "line": 727
+      "line": 728
     },
     {
       "package": "im",
       "identifier": "TestBuildEventReports_OneEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_report_test.go",
-      "line": 680
+      "line": 681
     },
     {
       "package": "im",
@@ -38623,7 +38623,7 @@
       "identifier": "TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_report_test.go",
-      "line": 501
+      "line": 502
     },
     {
       "package": "im",
@@ -39568,14 +39568,14 @@
       "identifier": "TestReportData_MarshalTLV_NoEventReports_ArrayAbsent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_report_test.go",
-      "line": 604
+      "line": 605
     },
     {
       "package": "im",
       "identifier": "TestReportData_MarshalTLV_WithEventReports_ArrayPresent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_report_test.go",
-      "line": 624
+      "line": 625
     },
     {
       "package": "im",
@@ -40163,14 +40163,14 @@
       "identifier": "TestSessionSubscriptionsChangedHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/session_changed_test.go",
-      "line": 17
+      "line": 18
     },
     {
       "package": "im/subscription",
       "identifier": "TestSessionSubscriptionsChangedHookOnRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/session_changed_test.go",
-      "line": 49
+      "line": 50
     },
     {
       "package": "im/subscription",
@@ -43334,49 +43334,49 @@
       "identifier": "TestCreateCSRRefusesANilKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 682
+      "line": 687
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDERDistinguishedNameEdges",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 389
+      "line": 394
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecodeDERReadsPathLenAsItsBytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 286
+      "line": 291
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecodeDERReadsSignatureIntegersAsTheirBytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 252
+      "line": 257
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecodeDERRefusesEachMalformedPart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 141
+      "line": 146
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecodeDERRefusesEveryTruncation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 341
+      "line": 346
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecodeDERSkipsForeignExtensionsAndReadsEveryKeyPurpose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 357
+      "line": 362
     },
     {
       "package": "secure/mattercert",
@@ -43558,21 +43558,21 @@
       "identifier": "TestEncodeCanonicalOrderWithoutAnOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 548
+      "line": 553
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestEncodeDERRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 489
+      "line": 494
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestEncodeRefusesOrdersWithoutValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 516
+      "line": 521
     },
     {
       "package": "secure/mattercert",
@@ -43593,7 +43593,7 @@
       "identifier": "TestValidateRCACRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 650
+      "line": 655
     },
     {
       "package": "secure/mattercert",
@@ -43607,7 +43607,7 @@
       "identifier": "TestVerifierConstructionAndExtractionRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/der_edges_test.go",
-      "line": 585
+      "line": 590
     },
     {
       "package": "secure/mattercert",
@@ -45441,14 +45441,14 @@
       "identifier": "TestParityMatterJS_Spake2_Vectors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/parity_matterjs_test.go",
-      "line": 115
+      "line": 117
     },
     {
       "package": "secure/spake2",
       "identifier": "TestPasePairingSpake2Process",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/parity_matterjs_test.go",
-      "line": 389
+      "line": 391
     },
     {
       "package": "secure/spake2",
@@ -46442,7 +46442,7 @@
       "identifier": "TestDecodeAppleSigma1Bytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 814
+      "line": 815
     },
     {
       "package": "tlv",
@@ -46876,56 +46876,56 @@
       "identifier": "TestPutUint16Bounded_SentinelRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 700
+      "line": 701
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint16Bounded_ValidValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 711
+      "line": 712
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint32Bounded_SentinelRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 736
+      "line": 737
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint32Bounded_ValidValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 747
+      "line": 748
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint64Bounded_SentinelRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 772
+      "line": 773
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint64Bounded_ValidValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 783
+      "line": 784
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint8Bounded_SentinelRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 665
+      "line": 666
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint8Bounded_ValidValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 676
+      "line": 677
     },
     {
       "package": "tlv",
