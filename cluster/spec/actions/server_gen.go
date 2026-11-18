@@ -298,8 +298,7 @@ func (s *Server) RecordStateChanged(data StateChangedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordStateChanged, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitStateChanged(endpoint uint16, data StateChangedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -322,8 +321,7 @@ func (s *Server) RecordActionFailed(data ActionFailedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordActionFailed, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitActionFailed(endpoint uint16, data ActionFailedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventActionFailed, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

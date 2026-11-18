@@ -174,8 +174,7 @@ func (s *Server) RecordLoggedOut(data LoggedOutEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLoggedOut, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLoggedOut(endpoint uint16, data LoggedOutEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLoggedOut, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

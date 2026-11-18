@@ -254,7 +254,7 @@ func HandleOn[Req, Resp any](srv contract.ClusterServer, cmdID uint32, fn func(c
 //
 // Deprecated: use the server's EmitEvent ([Server.EmitEvent]) — the
 // generated typed server's Record<Event> — which emits on the endpoint the
-// server is mounted on. Removable in the next minor release.
+// server is mounted on. Removable in v0.25.0.
 func EmitOn(srv contract.ClusterServer, endpoint uint16, eventID uint32, data any) error {
 	em, ok := srv.(EventEmitting)
 	if !ok {

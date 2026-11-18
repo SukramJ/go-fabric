@@ -199,8 +199,7 @@ func (s *Server) RecordCurrentConditionsChanged(data CurrentConditionsChangedEve
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordCurrentConditionsChanged, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitCurrentConditionsChanged(endpoint uint16, data CurrentConditionsChangedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventCurrentConditionsChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -173,8 +173,7 @@ func (s *Server) RecordSwitchLatched(data SwitchLatchedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSwitchLatched, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSwitchLatched(endpoint uint16, data SwitchLatchedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSwitchLatched, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -197,8 +196,7 @@ func (s *Server) RecordInitialPress(data InitialPressEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordInitialPress, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitInitialPress(endpoint uint16, data InitialPressEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventInitialPress, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -221,8 +219,7 @@ func (s *Server) RecordLongPress(data LongPressEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLongPress, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLongPress(endpoint uint16, data LongPressEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLongPress, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -245,8 +242,7 @@ func (s *Server) RecordShortRelease(data ShortReleaseEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordShortRelease, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitShortRelease(endpoint uint16, data ShortReleaseEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventShortRelease, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -269,8 +265,7 @@ func (s *Server) RecordLongRelease(data LongReleaseEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLongRelease, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLongRelease(endpoint uint16, data LongReleaseEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLongRelease, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -293,8 +288,7 @@ func (s *Server) RecordMultiPressOngoing(data MultiPressOngoingEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMultiPressOngoing, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMultiPressOngoing(endpoint uint16, data MultiPressOngoingEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressOngoing, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -317,8 +311,7 @@ func (s *Server) RecordMultiPressComplete(data MultiPressCompleteEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMultiPressComplete, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMultiPressComplete(endpoint uint16, data MultiPressCompleteEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMultiPressComplete, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

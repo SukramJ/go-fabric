@@ -60,6 +60,17 @@ func TestCommissioningWindowLifetime_AdministratorBasicWindow(t *testing.T) {
 	if cluster.Status != wire.WindowStatusBasic || cluster.AdminFabricIsNull {
 		t.Errorf("cluster window %+v, want BasicWindowOpen by the administrator's fabric", cluster)
 	}
+	// The facade names it so, not WindowEnhanced (issue 539).
+	var kind node.WindowKind
+	if err := p.Device.Act(func(n *node.Node) error {
+		kind = n.Window().Kind
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if kind != node.WindowAdministratorBasic {
+		t.Errorf("Window().Kind %v, want %v", kind, node.WindowAdministratorBasic)
+	}
 
 	site.Fake().Advance(181 * time.Second)
 	if got := windowStatusOf(p.Device); got != wire.WindowStatusClosed {

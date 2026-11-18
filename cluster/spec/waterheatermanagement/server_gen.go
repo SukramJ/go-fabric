@@ -214,8 +214,7 @@ func (s *Server) RecordBoostStarted(data BoostStartedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordBoostStarted, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitBoostStarted(endpoint uint16, data BoostStartedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventBoostStarted, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -238,8 +237,7 @@ func (s *Server) RecordBoostEnded(data BoostEndedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordBoostEnded, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitBoostEnded(endpoint uint16, data BoostEndedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventBoostEnded, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

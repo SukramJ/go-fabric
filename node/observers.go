@@ -243,6 +243,12 @@ const (
 	// its PAKE verifier — matter.js's EnhancedWindowOpen with
 	// byAdministrator true.
 	WindowEnhanced
+	// WindowAdministratorBasic is an administrator's
+	// OpenBasicCommissioningWindow (the Basic feature): the window the
+	// AdministratorCommissioning cluster reports as BasicWindowOpen, opened
+	// over the node's own setup passcode, which is the one a commissioner
+	// enters (issue 539).
+	WindowAdministratorBasic
 )
 
 // String names the kind.
@@ -256,6 +262,8 @@ func (k WindowKind) String() string {
 		return "basic"
 	case WindowEnhanced:
 		return "enhanced"
+	case WindowAdministratorBasic:
+		return "administrator-basic"
 	default:
 		return fmt.Sprintf("WindowKind(%d)", uint8(k))
 	}

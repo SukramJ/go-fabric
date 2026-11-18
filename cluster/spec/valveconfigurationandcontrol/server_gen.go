@@ -315,8 +315,7 @@ func (s *Server) RecordValveStateChanged(data ValveStateChangedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordValveStateChanged, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitValveStateChanged(endpoint uint16, data ValveStateChangedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventValveStateChanged, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -339,8 +338,7 @@ func (s *Server) RecordValveFault(data ValveFaultEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordValveFault, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitValveFault(endpoint uint16, data ValveFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventValveFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -155,7 +155,7 @@ type RootNode struct{ *Device }
 // Deprecated: the root endpoint is the node's (node.Node.Root), not a
 // device: NewRootNode always refuses, its root clusters have no
 // committed definitions. RootNodeType stays for [Lookup]. Removable in
-// the next minor release.
+// v0.25.0.
 func NewRootNode(opts Options, decls ...Declaration) (*RootNode, error) {
 	d, err := FromSpec(Spec{Type: RootNodeID, Options: opts, Declarations: decls})
 	if d == nil {

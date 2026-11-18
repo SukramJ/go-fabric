@@ -199,8 +199,7 @@ func (s *Server) RecordSoftwareFault(data SoftwareFaultEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordSoftwareFault, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitSoftwareFault(endpoint uint16, data SoftwareFaultEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventSoftwareFault, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

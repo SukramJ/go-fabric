@@ -20,7 +20,7 @@ import "github.com/SukramJ/go-fabric/contract"
 //
 // Deprecated: use [Server.Set] for a value the server holds and
 // [Server.MarkChanged] (or [Server.MarkQuietChanged]) for one the host
-// computes on read. Removable in the next minor release.
+// computes on read. Removable in v0.25.0.
 func (s *Server) Notify(attrIDs ...uint32) { s.AttributeChanges.Notify(attrIDs...) }
 
 // NotifyFrom tells every listener — change and report listeners alike —
@@ -28,7 +28,7 @@ func (s *Server) Notify(attrIDs ...uint32) { s.AttributeChanges.Notify(attrIDs..
 // version advance [Server.Notify] names.
 //
 // Deprecated: use [Server.Set] or [Server.MarkChanged] (see
-// [Server.Notify]). Removable in the next minor release.
+// [Server.Notify]). Removable in v0.25.0.
 func (s *Server) NotifyFrom(origin contract.Origin, attrIDs ...uint32) {
 	s.AttributeChanges.NotifyFrom(origin, attrIDs...)
 }
@@ -38,8 +38,8 @@ func (s *Server) NotifyFrom(origin contract.Origin, attrIDs ...uint32) {
 // version advance [Server.Notify] names.
 //
 // Deprecated: use [Server.Set] or [Server.MarkQuietChanged], which tell the
-// change listeners and report through the attribute's throttle. Removable
-// in the next minor release.
+// change listeners and report through the attribute's throttle. Removable in
+// v0.25.0.
 func (s *Server) ChangedFrom(origin contract.Origin, attrIDs ...uint32) {
 	s.AttributeChanges.ChangedFrom(origin, attrIDs...)
 }
@@ -49,7 +49,7 @@ func (s *Server) ChangedFrom(origin contract.Origin, attrIDs ...uint32) {
 // advance [Server.Notify] names, and a quieter attribute's throttle.
 //
 // Deprecated: use [Server.Set], [Server.MarkChanged] or
-// [Server.MarkQuietChanged]. Removable in the next minor release.
+// [Server.MarkQuietChanged]. Removable in v0.25.0.
 func (s *Server) ReportFrom(origin contract.Origin, attrIDs ...uint32) {
 	s.AttributeChanges.ReportFrom(origin, attrIDs...)
 }

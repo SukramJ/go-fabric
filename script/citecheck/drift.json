@@ -630,7 +630,7 @@
   },
   {
     "file": "client/handshake/server_test.go",
-    "line": 323,
+    "line": 383,
     "citation": "SessionManager.ts:205",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "at": "db021da0",
@@ -2325,7 +2325,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1769,
+    "line": 1772,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",

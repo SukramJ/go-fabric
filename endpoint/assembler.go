@@ -67,14 +67,14 @@ type Config struct {
 	//
 	// Deprecated: use Persistence, whose SaveNodeLabel stores the label
 	// before it is served and refuses the write when the store refuses.
-	// Removable in the next minor release.
+	// Removable in v0.25.0.
 	OnNodeLabelWritten func(key SourceKey, label string)
 	// Scenes persists the scene tables of the endpoints that serve
 	// ScenesManagement (see [ScenesStore]). nil keeps the tables for the
 	// life of the process. Ignored when Persistence is set.
 	//
 	// Deprecated: use Persistence, whose LoadScenes and SaveScenes report
-	// the store's error. Removable in the next minor release.
+	// the store's error. Removable in v0.25.0.
 	Scenes ScenesStore
 	// RootDeviceConditions are the device-type conditions the host states
 	// for the root endpoint ([Endpoint.DeviceConditions]) — the node's own
@@ -118,7 +118,7 @@ type Persistence interface {
 // keeps sceneTable as nonvolatile state. key is the endpoint's stable key.
 //
 // Deprecated: use [Persistence], whose LoadScenes and SaveScenes report the
-// store's error. Removable in the next minor release.
+// store's error. Removable in v0.25.0.
 type ScenesStore interface {
 	LoadScenes(key SourceKey) []byte
 	SaveScenes(key SourceKey, table []byte)

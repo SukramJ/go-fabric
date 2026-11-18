@@ -457,3 +457,55 @@ func TestOnboardingChecksNameWhatRan(t *testing.T) {
 		t.Fatalf("a node without a product id: checks %b, err %v", c.Checks, err)
 	}
 }
+
+// TestOnboardingMismatchErrorNamesTheField: each mismatch is an
+// *OnboardingMismatchError with the field and both values, errors.Is
+// ErrOnboardingMismatch, and its text as before (issue 537).
+func TestOnboardingMismatchErrorNamesTheField(t *testing.T) {
+	t.Parallel()
+	base := setup.Payload{VendorID: onbVendor, ProductID: onbProduct, Discriminator: onbDiscriminator, Passcode: onbPasscode}
+	otherVendor, otherProduct, otherDisc := base, base, base
+	otherVendor.VendorID++
+	otherProduct.ProductID++
+	otherDisc.Discriminator = 0x123
+	for name, tc := range map[string]struct {
+		code string
+		want OnboardingMismatchError
+		text string
+	}{
+		"vendor": {
+			qrOf(t, otherVendor),
+			OnboardingMismatchError{OnboardingCheckedVendor, onbVendor + 1, onbVendor},
+			fmt.Sprintf("its vendor id is 0x%04X, the node's is 0x%04X", onbVendor+1, onbVendor),
+		},
+		"product": {
+			qrOf(t, otherProduct),
+			OnboardingMismatchError{OnboardingCheckedProduct, onbProduct + 1, onbProduct},
+			fmt.Sprintf("its product id is 0x%04X, the node's is 0x%04X", onbProduct+1, onbProduct),
+		},
+		"discriminator": {
+			qrOf(t, otherDisc),
+			OnboardingMismatchError{OnboardingCheckedDiscriminator, 0x123, onbDiscriminator},
+			fmt.Sprintf("its discriminator is %d, the node advertised %d", 0x123, onbDiscriminator),
+		},
+		"short discriminator": {
+			manualOf(t, 0x100),
+			OnboardingMismatchError{OnboardingCheckedDiscriminator, 0x1, onbDiscriminator >> 8},
+			fmt.Sprintf("its discriminator is %d, the node advertised %d", 0x1, onbDiscriminator>>8),
+		},
+	} {
+		n, _ := onboardingNode(t, &MemoryStore{}, 1)
+		_, err := n.SetOnboardingCode(tc.code)
+		var m *OnboardingMismatchError
+		if !errors.As(err, &m) || *m != tc.want {
+			t.Errorf("%s: err = %#v, want %+v", name, err, tc.want)
+			continue
+		}
+		if !errors.Is(err, ErrOnboardingMismatch) {
+			t.Errorf("%s: errors.Is ErrOnboardingMismatch false", name)
+		}
+		if want := ErrOnboardingMismatch.Error() + ": " + tc.text; err.Error() != want {
+			t.Errorf("%s: text %q, want %q", name, err.Error(), want)
+		}
+	}
+}

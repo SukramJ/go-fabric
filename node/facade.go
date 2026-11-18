@@ -81,7 +81,7 @@ var (
 	// Deprecated: no node method returns it; its only source is
 	// bridge.CommissioningWindowOpener, which the node does not use —
 	// compare with bridge.ErrCommissioningWindowAlreadyOpen there.
-	// Removable in the next minor release.
+	// Removable in v0.25.0.
 	ErrCommissioningWindowAlreadyOpen = bridge.ErrCommissioningWindowAlreadyOpen
 	// ErrCommissioningWindowNotConfigured is the window's answer when no
 	// passcode is configured.
@@ -89,7 +89,7 @@ var (
 	// Deprecated: no node method returns it; its only source is
 	// bridge.CommissioningWindowOpener, which the node does not use —
 	// compare with bridge.ErrCommissioningWindowNotConfigured there.
-	// Removable in the next minor release.
+	// Removable in v0.25.0.
 	ErrCommissioningWindowNotConfigured = bridge.ErrCommissioningWindowNotConfigured
 )
 

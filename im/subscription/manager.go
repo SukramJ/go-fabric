@@ -63,8 +63,8 @@ var (
 // Deprecated: Use [ReportSender] ([Manager.SetReportSender]), the one hook
 // for every report, and pass nil as [NewManager]'s reporter. While a
 // Reporter, [EventReporter] or [FlushReporter] is set the manager reports
-// through them as before and no ReportSender is used. Removable in the next
-// minor release.
+// through them as before and no ReportSender is used. Removable in
+// v0.25.0.
 type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAttributePath)
 
 // EventReporter is the hook for a report that carries events. The engine
@@ -87,7 +87,7 @@ type Reporter func(ctx context.Context, sub *Subscription, paths []im.ConcreteAt
 // Deprecated: Use [ReportSender] ([Manager.SetReportSender]): its [Report]
 // carries the events and the attribute changes due with them, and its
 // [NothingForSubscriber] replaces [Subscription.NothingSent]. Removable in
-// the next minor release.
+// v0.25.0.
 type EventReporter func(ctx context.Context, sub *Subscription, events []im.EventReport)
 
 // FlushReporter receives everything a subscription owes when its fabric
@@ -101,7 +101,7 @@ type EventReporter func(ctx context.Context, sub *Subscription, events []im.Even
 // ([Subscription.TakeDuePaths]).
 //
 // Deprecated: Use [ReportSender] ([Manager.SetReportSender]): a flush is a
-// [Report] with Flush set. Removable in the next minor release.
+// [Report] with Flush set. Removable in v0.25.0.
 type FlushReporter func(ctx context.Context, sub *Subscription, events []im.EventReport, paths []im.ConcreteAttributePath)
 
 // EventSource is where the engine reads a subscription's events when its
@@ -222,8 +222,8 @@ func (m *Manager) SetICDIdleModeDuration(seconds uint16) { m.icdIdleMax.Store(ui
 // detach. Safe to call before Start; calling after Start swaps in the
 // new hook for subsequent ticks.
 //
-// Deprecated: Use [Manager.SetReportSender]. Removable in the next minor
-// release.
+// Deprecated: Use [Manager.SetReportSender]. Removable in
+// v0.25.0.
 func (m *Manager) SetEventReporter(r EventReporter) {
 	m.mu.Lock()
 	m.eventReporter = r
@@ -234,8 +234,8 @@ func (m *Manager) SetEventReporter(r EventReporter) {
 // Pass nil to detach; without one a flush sends nothing and leaves what
 // the subscriptions owe in place. Safe to call before Start.
 //
-// Deprecated: Use [Manager.SetReportSender]. Removable in the next minor
-// release.
+// Deprecated: Use [Manager.SetReportSender]. Removable in
+// v0.25.0.
 func (m *Manager) SetFlushReporter(r FlushReporter) {
 	m.mu.Lock()
 	m.flushReporter = r
@@ -909,7 +909,7 @@ func (m *Manager) CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16) {
 // endpoint from its protocol collections only
 // (packages/node/src/node/integration/ProtocolService.ts:216-220 at
 // db021da0). Close a subscription with [Manager.Close]; CloseEndpoint is
-// removable in v0.23.0.
+// removable in v0.25.0.
 func (m *Manager) CloseEndpoint(endpointID uint16) int {
 	m.mu.Lock()
 	victims := make([]*Subscription, 0)

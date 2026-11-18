@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10026,
+  "entry_points": 10029,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27734,
-    "reachable": 20837,
-    "whitelisted": 6874,
+    "total_exported": 27741,
+    "reachable": 20843,
+    "whitelisted": 6875,
     "unreachable": 23
   },
   "by_package": [
@@ -393,7 +393,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3277,
+      "line": 3274,
       "kind": "method"
     },
     {
@@ -30493,6 +30493,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestOnboardingMismatchErrorNamesTheField",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/onboarding_internal_test.go",
+      "line": 464
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestPakePasscodeVerifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/window_internal_test.go",
@@ -37482,14 +37489,14 @@
       "identifier": "TestR2P6Sec3320Concurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/resume_replay_internal_test.go",
-      "line": 46
+      "line": 47
     },
     {
       "package": "fabrictest",
       "identifier": "TestR2P6Sec3320Replay",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/resume_replay_internal_test.go",
-      "line": 33
+      "line": 34
     },
     {
       "package": "fabrictest",

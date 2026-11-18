@@ -303,8 +303,7 @@ func (s *Server) RecordPowerAdjustStart(data PowerAdjustStartEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPowerAdjustStart, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPowerAdjustStart(endpoint uint16, data PowerAdjustStartEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPowerAdjustStart, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -327,8 +326,7 @@ func (s *Server) RecordPowerAdjustEnd(data PowerAdjustEndEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPowerAdjustEnd, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPowerAdjustEnd(endpoint uint16, data PowerAdjustEndEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPowerAdjustEnd, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -351,8 +349,7 @@ func (s *Server) RecordPaused(data PausedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPaused, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPaused(endpoint uint16, data PausedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPaused, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -375,8 +372,7 @@ func (s *Server) RecordResumed(data ResumedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordResumed, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitResumed(endpoint uint16, data ResumedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventResumed, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -255,8 +255,7 @@ func (s *Server) RecordNotify(data NotifyEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordNotify, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitNotify(endpoint uint16, data NotifyEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventNotify, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

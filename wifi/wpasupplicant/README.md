@@ -5,7 +5,7 @@
 (`fi.w1.wpa_supplicant1` on the system bus), in pure Go (no cgo). Set it as
 `node.Config.Network.WiFi.Driver`: the node then serves NetworkCommissioning
 with the Wi-Fi feature and joins the network a commissioner provisions —
-typically over BLE (`node.Config.Network.BLE`, `ble/bluez`).
+typically over BLE (`node.Config.Network.GATT`, `ble/bluez`).
 
 It is a Go module of its own, so the main module keeps its dependencies and a
 wired host never pulls `github.com/godbus/dbus/v5`. The main module never

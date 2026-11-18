@@ -3095,7 +3095,7 @@ func (o *OperationalCredentials) notifyFabricRemoved(fabricIndex uint8) {
 //
 // Deprecated: a fabric-scoped command or read takes its fabric from the
 // request ([im.WithFabricFilter]); there is no replacement. Removable in
-// the next minor release.
+// v0.25.0.
 func (o *OperationalCredentials) SetCurrentFabric(idx uint8) {
 	o.mu.Lock()
 	o.currentFabric = idx

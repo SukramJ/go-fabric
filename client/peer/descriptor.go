@@ -24,8 +24,8 @@ type Descriptor struct {
 	//
 	// Deprecated: PeerDescriptor has no such member at db021da0; the peer's
 	// data model revision is the one its session parameters report — use
-	// ReportedSessionParameters.DataModelRevision. Removable in the next
-	// minor release (review II, R2-P6-par-3351).
+	// ReportedSessionParameters.DataModelRevision. Removable in
+	// v0.25.0 (review II, R2-P6-par-3351).
 	DataModelRevision uint16
 	// OperationalAddress is where the peer was last reached, nil when
 	// unknown (:45-48). It is kept as a UDP address: matter.js

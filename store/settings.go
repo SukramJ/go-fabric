@@ -129,7 +129,7 @@ func (s *Store) SetSettings(ctx context.Context, values map[string]string) error
 // DeleteSetting removes key; a key that is not there is no error.
 //
 // Deprecated: use [Store.DeleteSettings], which every [Settings] backend
-// implements. Removable in the next minor release.
+// implements. Removable in v0.25.0.
 func (s *Store) DeleteSetting(ctx context.Context, key string) error {
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM matter_settings WHERE key = ? AND key <> ?`, key, settingSealCanary); err != nil {
 		return fmt.Errorf("store: delete setting %q: %w", key, err)

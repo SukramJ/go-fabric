@@ -181,8 +181,7 @@ func (s *Server) RecordTargetUpdated(data TargetUpdatedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordTargetUpdated, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitTargetUpdated(endpoint uint16, data TargetUpdatedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventTargetUpdated, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

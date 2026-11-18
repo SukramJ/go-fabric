@@ -497,8 +497,7 @@ func (s *Server) RecordWiredFaultChange(data WiredFaultChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordWiredFaultChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitWiredFaultChange(endpoint uint16, data WiredFaultChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventWiredFaultChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -521,8 +520,7 @@ func (s *Server) RecordBatFaultChange(data BatFaultChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordBatFaultChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitBatFaultChange(endpoint uint16, data BatFaultChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventBatFaultChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -545,8 +543,7 @@ func (s *Server) RecordBatChargeFaultChange(data BatChargeFaultChangeEvent) erro
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordBatChargeFaultChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitBatChargeFaultChange(endpoint uint16, data BatChargeFaultChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventBatChargeFaultChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

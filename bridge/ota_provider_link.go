@@ -101,8 +101,8 @@ var ErrPayloadTooLarge = camera.ErrPayloadTooLarge
 // reuses a session of the server stack ([Bridge.LivePeerSession]) or
 // establishes one on the client stack (docs/adr/0032); a host that runs
 // the bridge without a node attaches its own [core.OtaProviderConnector].
-// ConnectOtaProvider keeps its behaviour and is removable in the next minor
-// release.
+// ConnectOtaProvider keeps its behaviour and is removable in
+// v0.25.0.
 func (b *Bridge) ConnectOtaProvider(ctx context.Context, fabricIndex uint8, providerNodeID uint64) (core.OtaProviderSession, error) {
 	s, err := b.ConnectPeer(ctx, fabricIndex, providerNodeID)
 	if err != nil {
@@ -127,7 +127,7 @@ func (b *Bridge) ConnectOtaProvider(ctx context.Context, fabricIndex uint8, prov
 // stack, which carries TCP for a Large Message command (docs/adr/0032).
 // ConnectPeer keeps its behaviour — the newest live session of any
 // transport, else CASE over UDP through the ADR 0008 initiator — and is
-// removable in the next minor release.
+// removable in v0.25.0.
 func (b *Bridge) ConnectPeer(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*PeerSession, error) {
 	ctx, cancel := clock.WithTimeout(ctx, b.clk(), peerConnectTimeout)
 	defer cancel()

@@ -158,7 +158,7 @@ type Subscription struct {
 // [ReportSender] returns [NothingForSubscriber] instead.
 //
 // Deprecated: Use [ReportSender] and return [NothingForSubscriber].
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func (s *Subscription) NothingSent() {
 	s.mu.Lock()
 	s.sentNothing = true
@@ -200,7 +200,7 @@ func (s *Subscription) revokeReport(work dueWork) {
 // gets the paths in its [Report]; for it this returns nil.
 //
 // Deprecated: Use [ReportSender]: [Report.Paths] carries the paths due with
-// the events. Removable in the next minor release.
+// the events. Removable in v0.25.0.
 func (s *Subscription) TakeDuePaths() []im.ConcreteAttributePath {
 	s.mu.Lock()
 	defer s.mu.Unlock()

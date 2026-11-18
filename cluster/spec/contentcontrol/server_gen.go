@@ -428,8 +428,7 @@ func (s *Server) RecordRemainingScreenTimeExpired(data RemainingScreenTimeExpire
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordRemainingScreenTimeExpired, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitRemainingScreenTimeExpired(endpoint uint16, data RemainingScreenTimeExpiredEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventRemainingScreenTimeExpired, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -452,8 +451,7 @@ func (s *Server) RecordEnteringBlockContentTimeWindow(data EnteringBlockContentT
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordEnteringBlockContentTimeWindow, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitEnteringBlockContentTimeWindow(endpoint uint16, data EnteringBlockContentTimeWindowEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventEnteringBlockContentTimeWindow, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -181,17 +182,15 @@ func (r *resumeReplayRig) copyOn(exchange uint16, counter uint32, sessionID uint
 			binary.LittleEndian.PutUint64(c[8:16], r.hdr.SourceNodeID+sourceDelta)
 		}
 		if sessionID != 0 {
-			patched := false
-			for j := n + 6; j+4 <= len(c); j++ {
-				if c[j] == 0x25 && c[j+1] == 0x02 { // context tag 2, uint16: initiatorSessionId
-					binary.LittleEndian.PutUint16(c[j+2:j+4], sessionID)
-					patched = true
-					break
-				}
+			// Decoded and encoded again, not patched in place: TLV encodes
+			// the genuine id at its minimal width, one byte below 256, and
+			// a byte scan for its tag also matches inside the randoms.
+			sigma1, err := sigma.UnmarshalSigma1(c[n+6:])
+			if err != nil {
+				t.Fatalf("the genuine Sigma1: %v", err)
 			}
-			if !patched {
-				t.Fatal("no initiatorSessionId in the Sigma1")
-			}
+			sigma1.InitiatorSessionID = sessionID
+			c = append(c[:n+6:n+6], sigma1.Marshal()...)
 		}
 		return c
 	}

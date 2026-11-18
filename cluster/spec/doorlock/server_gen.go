@@ -813,8 +813,7 @@ func (s *Server) RecordDoorLockAlarm(data DoorLockAlarmEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordDoorLockAlarm, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitDoorLockAlarm(endpoint uint16, data DoorLockAlarmEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventDoorLockAlarm, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -837,8 +836,7 @@ func (s *Server) RecordDoorStateChange(data DoorStateChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordDoorStateChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitDoorStateChange(endpoint uint16, data DoorStateChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventDoorStateChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -861,8 +859,7 @@ func (s *Server) RecordLockOperation(data LockOperationEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLockOperation, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLockOperation(endpoint uint16, data LockOperationEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLockOperation, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -885,8 +882,7 @@ func (s *Server) RecordLockOperationError(data LockOperationErrorEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLockOperationError, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLockOperationError(endpoint uint16, data LockOperationErrorEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLockOperationError, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -909,8 +905,7 @@ func (s *Server) RecordLockUserChange(data LockUserChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordLockUserChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitLockUserChange(endpoint uint16, data LockUserChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventLockUserChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

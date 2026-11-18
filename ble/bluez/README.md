@@ -9,8 +9,8 @@ in pure Go (no cgo), for both roles of go-fabric:
   `commissioner.Options.Channel` commission a Wi-Fi or Thread device over BLE
   ([ADR 0024](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0024-ble-commissioning-in-the-controller.md)).
 - **The node's peripheral**: `NewPeripheral` implements
-  `contract.BLEPeripheral`, the radio a device-side host hands its node
-  (`node.Config.Network.BLE`), so an uncommissioned node is commissionable
+  `contract.GATTPeripheral`, the radio a device-side host hands its node
+  (`node.Config.Network.GATT`), so an uncommissioned node is commissionable
   over BLE. The node decides when it is on the radio and what it advertises;
   BTP runs in the main module (`transport/btp.Accept`).
 
@@ -24,7 +24,7 @@ if err != nil {
 	return err
 }
 defer radio.(io.Closer).Close()
-cfg.Network.BLE = radio // node.Config
+cfg.Network.GATT = radio // node.Config
 ```
 
 ```go

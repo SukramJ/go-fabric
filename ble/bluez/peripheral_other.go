@@ -9,4 +9,4 @@ import "github.com/SukramJ/go-fabric/contract"
 
 // NewPeripheral returns [ErrUnsupported]: BlueZ is Linux's (ADR 0024
 // decision 6 keeps macOS and Windows out while they need cgo).
-func NewPeripheral(string) (contract.BLEPeripheral, error) { return nil, ErrUnsupported } //nolint:staticcheck // SA1019: this module moves to contract.GATTPeripheral with the next release (decision 114; nested modules follow a release)
+func NewPeripheral(string) (contract.GATTPeripheral, error) { return nil, ErrUnsupported }

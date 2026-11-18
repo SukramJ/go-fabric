@@ -4,7 +4,7 @@
 // Package bluez is the BlueZ platform of both BLE roles over the D-Bus
 // system bus, without cgo (ADR 0024 decision 3): the commissioner's
 // [ble.Central] and its [ble.Connection]s ([NewCentral]), and the node's
-// contract.BLEPeripheral ([NewPeripheral]). It is a module of its own, so
+// contract.GATTPeripheral ([NewPeripheral]). It is a module of its own, so
 // the main module keeps its dependencies and a host without BLE never
 // pulls godbus.
 //

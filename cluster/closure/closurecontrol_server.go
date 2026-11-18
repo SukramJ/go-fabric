@@ -165,7 +165,7 @@ type ControlServer struct {
 	// Deprecated: the server routes its commands through [spec.InvokeHeld]
 	// and declares Handle, Emit, EmitEvent and SetBeforeWrite itself
 	// (review II, decision 154): register a host handler with
-	// [ControlServer.Handle]. Removable in the next minor release.
+	// [ControlServer.Handle]. Removable in v0.25.0.
 	spec.Hooks //nolint:staticcheck // the deprecated field keeps its exact shape for the deprecation window
 
 	// held routes MatterInvoke through [spec.InvokeHeld] — the request

@@ -270,6 +270,66 @@ func TestCASEServerResumeMICFallsBack(t *testing.T) {
 	}
 }
 
+// TestCASEServerRegistersTheResumedSessionBeforeSigma2Resume: the
+// responder of a resumption holds the session in its manager before its
+// Sigma2_Resume leaves, so the initiator's first message on the session,
+// which may follow Sigma2_Resume at once, finds it. Registered after the
+// send, that message met no session when the responder's goroutine was
+// slow to return from the send, and was dropped: over TCP for good, the
+// camera's first signal over its own CASE session after a restart waited
+// out its 35 s response timeout (TestServiceOnTheFabric under load). The
+// check reads the manager as the datagram goes to the socket, so it does
+// not depend on scheduling.
+func TestCASEServerRegistersTheResumedSessionBeforeSigma2Resume(t *testing.T) {
+	t.Parallel()
+	r := newResponderRig(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if _, _, err := r.open(ctx, r.nodeFabric); err != nil {
+		t.Fatalf("CASE: %v", err)
+	}
+	r.accepted(t)
+
+	type look struct {
+		id         uint16
+		registered bool
+	}
+	looks := make(chan look, 4)
+	r.serverRec.setHook(func(d []byte) {
+		opcode, payload, ok := unsecuredMessage(d)
+		if !ok || opcode != mrp.SCOpcodeSigma2Resume {
+			return
+		}
+		s2r, err := sigma.UnmarshalSigma2Resume(payload)
+		if err != nil {
+			t.Errorf("Sigma2_Resume: %v", err)
+			return
+		}
+		looks <- look{id: s2r.ResponderSessionID, registered: r.serverMgr.Session(s2r.ResponderSessionID) != nil}
+	})
+	client, resumed, err := r.open(ctx, r.nodeFabric)
+	if err != nil {
+		t.Fatalf("resumed CASE: %v", err)
+	}
+	server := r.accepted(t)
+	if !resumed || !server.Resumed() {
+		t.Fatalf("resumed %v/%v, want a resumption", resumed, server.Resumed())
+	}
+	select {
+	case l := <-looks:
+		if l.id != server.ID() {
+			t.Fatalf("Sigma2_Resume names session %d, the responder's is %d", l.id, server.ID())
+		}
+		if !l.registered {
+			t.Fatalf("session %d was not in the responder's manager when its Sigma2_Resume was sent", l.id)
+		}
+	default:
+		t.Fatal("no Sigma2_Resume sent")
+	}
+	ping(t, r.nodeMgr, client)
+	ping(t, r.serverMgr, server)
+}
+
 // TestCASEServerResumptionPairRequired: a Sigma1 with a resumption id but
 // no resume MIC is refused with InvalidParam (CaseServer.ts:108-111).
 func TestCASEServerResumptionPairRequired(t *testing.T) {

@@ -237,8 +237,7 @@ func (s *Server) RecordCumulativeEnergyMeasured(data CumulativeEnergyMeasuredEve
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordCumulativeEnergyMeasured, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitCumulativeEnergyMeasured(endpoint uint16, data CumulativeEnergyMeasuredEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventCumulativeEnergyMeasured, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -261,8 +260,7 @@ func (s *Server) RecordPeriodicEnergyMeasured(data PeriodicEnergyMeasuredEvent) 
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPeriodicEnergyMeasured, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPeriodicEnergyMeasured(endpoint uint16, data PeriodicEnergyMeasuredEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPeriodicEnergyMeasured, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

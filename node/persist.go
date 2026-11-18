@@ -118,7 +118,7 @@ func NewEndpointState(st store.Settings, logger *slog.Logger) EndpointState {
 // NodeLabel from [EndpointPersistence.NodeLabel] before assembling.
 //
 // Deprecated: use [EndpointState], whose saves and loads report the
-// store's error. Removable in the next minor release.
+// store's error. Removable in v0.25.0.
 type EndpointPersistence interface {
 	endpoint.ScenesStore //nolint:staticcheck // the deprecated port keeps its deprecated shape
 	// OnNodeLabelWritten persists a commissioner-written NodeLabel of the
@@ -132,7 +132,7 @@ type EndpointPersistence interface {
 // st's settings table — the keys the node uses. st must hold the store
 // schema (store.Apply); a nil logger is slog.Default().
 //
-// Deprecated: use [NewEndpointState]. Removable in the next minor release.
+// Deprecated: use [NewEndpointState]. Removable in v0.25.0.
 func NewEndpointPersistence(st store.Settings, logger *slog.Logger) EndpointPersistence {
 	return legacyEndpoints{NewEndpointState(st, logger)}
 }

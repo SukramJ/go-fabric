@@ -6,7 +6,7 @@
 // (fi.w1.wpa_supplicant1 on the system bus), without cgo. Set it as
 // node.Network.WiFi's Driver: the node then serves NetworkCommissioning
 // with the Wi-Fi feature, and the network a commissioner hands it —
-// typically over BLE (node.Network.BLE, ble/bluez) — is joined through
+// typically over BLE (node.Network.GATT, ble/bluez) — is joined through
 // it. It is a module of its own, so the main module keeps its
 // dependencies and a wired host never pulls godbus.
 //

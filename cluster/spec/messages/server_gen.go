@@ -194,8 +194,7 @@ func (s *Server) RecordMessageQueued(data MessageQueuedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMessageQueued, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMessageQueued(endpoint uint16, data MessageQueuedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMessageQueued, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -218,8 +217,7 @@ func (s *Server) RecordMessagePresented(data MessagePresentedEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMessagePresented, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMessagePresented(endpoint uint16, data MessagePresentedEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMessagePresented, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -242,8 +240,7 @@ func (s *Server) RecordMessageComplete(data MessageCompleteEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMessageComplete, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMessageComplete(endpoint uint16, data MessageCompleteEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMessageComplete, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -853,8 +853,7 @@ func (s *Server) RecordConnectionStatus(data ConnectionStatusEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordConnectionStatus, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitConnectionStatus(endpoint uint16, data ConnectionStatusEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventConnectionStatus, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -877,8 +876,7 @@ func (s *Server) RecordNetworkFaultChange(data NetworkFaultChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordNetworkFaultChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitNetworkFaultChange(endpoint uint16, data NetworkFaultChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventNetworkFaultChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

@@ -18,7 +18,7 @@ import (
 // Deprecated: use the node's commissioning window
 // (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
 // a host that runs the handshake itself uses secure/spake2
-// (NewVerifierFromValue, NewVerifier); removable in the next minor release.
+// (NewVerifierFromValue, NewVerifier); removable in v0.25.0.
 type PASEConfig struct {
 	// Passcode is the 27-bit setup code (Matter §5.1.6.4) the
 	// operator entered into the commissioner. Always between
@@ -52,8 +52,8 @@ var (
 	// Deprecated: use the node's commissioning window
 	// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
 	// a host that runs the handshake itself uses secure/spake2
-	// (NewVerifierFromValue, NewVerifier); removable in the next minor
-	// release.
+	// (NewVerifierFromValue, NewVerifier); removable in
+	// v0.25.0.
 	ErrPASEStateMismatch = errors.New("commissioning: PASE state mismatch")
 	// ErrPASEInvalidPasscode is returned when [PASEConfig.Passcode]
 	// is outside the allowed setup-code range.
@@ -61,8 +61,8 @@ var (
 	// Deprecated: use the node's commissioning window
 	// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
 	// a host that runs the handshake itself uses secure/spake2
-	// (NewVerifierFromValue, NewVerifier); removable in the next minor
-	// release.
+	// (NewVerifierFromValue, NewVerifier); removable in
+	// v0.25.0.
 	ErrPASEInvalidPasscode = errors.New("commissioning: invalid passcode")
 	// ErrPASEInvalidIterations is returned when [PASEConfig.Iterations]
 	// is outside Matter's 1000..100000 range.
@@ -70,8 +70,8 @@ var (
 	// Deprecated: use the node's commissioning window
 	// (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
 	// a host that runs the handshake itself uses secure/spake2
-	// (NewVerifierFromValue, NewVerifier); removable in the next minor
-	// release.
+	// (NewVerifierFromValue, NewVerifier); removable in
+	// v0.25.0.
 	ErrPASEInvalidIterations = errors.New("commissioning: invalid PBKDF2 iterations")
 )
 
@@ -93,7 +93,7 @@ var (
 // Deprecated: use the node's commissioning window
 // (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
 // a host that runs the handshake itself uses secure/spake2
-// (NewVerifierFromValue, NewVerifier); removable in the next minor release.
+// (NewVerifierFromValue, NewVerifier); removable in v0.25.0.
 type PASEResponder struct {
 	cfg       PASEConfig
 	verifier  *spake2.Verifier
@@ -114,7 +114,7 @@ type PASEResponder struct {
 // Deprecated: use the node's commissioning window
 // (node.Node.OpenBasicWindow, node.Node.OpenOwnWindow), which serves PASE;
 // a host that runs the handshake itself uses secure/spake2
-// (NewVerifierFromValue, NewVerifier); removable in the next minor release.
+// (NewVerifierFromValue, NewVerifier); removable in v0.25.0.
 func NewPASEResponder(cfg PASEConfig) (*PASEResponder, error) {
 	if cfg.Passcode < 1 || cfg.Passcode > 99999998 {
 		// The value is not rendered: the text reaches a log, and a

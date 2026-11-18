@@ -364,8 +364,7 @@ func (s *Server) RecordDisconnection(data DisconnectionEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordDisconnection, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitDisconnection(endpoint uint16, data DisconnectionEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventDisconnection, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -388,8 +387,7 @@ func (s *Server) RecordAssociationFailure(data AssociationFailureEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordAssociationFailure, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitAssociationFailure(endpoint uint16, data AssociationFailureEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventAssociationFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -412,8 +410,7 @@ func (s *Server) RecordConnectionStatus(data ConnectionStatusEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordConnectionStatus, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitConnectionStatus(endpoint uint16, data ConnectionStatusEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventConnectionStatus, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

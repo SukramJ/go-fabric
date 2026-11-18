@@ -468,7 +468,7 @@ ids are this register's (`N4-<group>-<n>`, the group being the fix note's).
 | N4-f2-3 | `phase-4-fix-f2.md`; the coordinator's list | concurrency left by the same survey: the Groupcast commands change a GroupKeyMap outside the write mutex; two NodeLabel writes to one bridged device are each judged against their own copy; a hand-off LevelControl that is also its endpoint's source notifier hears a host change on two subscriptions (read, not measured) | phase 6: `F-db021da0-42`, `-43`, `-44` | `cluster/core`, `endpoint/materialize.go`, `cluster/levelcontrol` |
 | N4-f3-1 | `phase-4-fix-f3.md`; the coordinator's list | a finished responder accepted any Sigma3 bytes although its doc said the same bytes only; a gate's comment cited a function and a field matter.js does not have | fixed `ec13b650`, `060b21bb` | `secure/sigma/protocol.go`, `bridge/bridge.go` |
 | N4-f3-2 | — | — | held back until its fix merges (owner decision 25) — phase 6 | — |
-| N4-frsec-1 | — | — | held back until its fix merges (owner decision 25) — phase 5 | — |
+| N4-frsec-1 | the final review (`fr-sec`); the coordinator's list | a server of the host's own that serves a fabric-scoped attribute and does not implement `contract.FabricScopedReader` is still answered through its plain `MatterRead` when a request reads it (`endpoint/dispatcher.go:910`), so what another fabric's reader gets is whatever that server returns; `contract/matter.go:95-97` calls the missing interface the safe default. No server of the module is affected | phase 5: with owner decision 85 — a check when the endpoint is assembled; fixed by #534 (`phase-5b-register.md`), public since 2026-11-18 with the release that carries the fix (owner decision 126) | `endpoint/dispatcher.go`, `contract/matter.go` |
 | N4-notesE-1 | — | — | held back until its fix merges (owner decision 25) — phase 6 | — |
 | N4-notesE-2 | the coordinator's list | through a provider an abandoned CASE handshake ends at the adapter's one-minute lifetime, where matter.js ends it at the wait for Sigma3 | phase 6: parity; `BD-Matter-CaseHold-BoundedByEvictionOnly` is the entry it belongs to | `bridge/handlers.go` |
 | N4-rrim-1 | — | — | held back until its fix merges (owner decision 25) — phase 6 | — |
@@ -646,8 +646,9 @@ before this phase, 17 open: a findings row, 1 open: this phase's notes, not
 done, 3 open: phase 5, 22 open: phase 6.
 
 The 61 noticed items: 13 fixed, 4 a recorded divergence, no code change, 3
-struck, 4 open: a findings row, 1 open: phase 4, the certification ports, 13
-open: phase 5, 18 open: phase 6, 5 held back.
+struck, 4 open: a findings row, 1 open: phase 4, the certification ports, 14
+open: phase 5, 18 open: phase 6, 4 held back (N4-frsec-1, held back until the
+release that carries its fix, is counted with phase 5).
 
 Unread: 10 rows for the 16 review units, phase 6, and 2 held-back rows.
 
@@ -701,9 +702,10 @@ phase 6 for `-35`, `-36`, `-42` to `-44`, `-48` — and 10 name none (`-20`,
 `-22`, `-23`, `-27`, `-28`, `-38`, `-39`, `-45`, `-46`, `-47`); read off each
 row by a search for the phase, asserted by the generator.
 
-**Held back: 7 rows** — no finding, 5 noticed items (N4-f3-2, N4-frsec-1,
-N4-notesE-1, N4-rrim-1, N4-rwsub-3) and 2 unread parts (U4-fr-sec-1,
-U4-fr-sec-2); 1 in phase 5, 6 in phase 6. Of the 32 rows phase 3 held back, 3
+**Held back: 6 rows** — no finding, 4 noticed items (N4-f3-2, N4-notesE-1,
+N4-rrim-1, N4-rwsub-3) and 2 unread parts (U4-fr-sec-1, U4-fr-sec-2), all in
+phase 6. N4-frsec-1, held back until the release that carries its fix, is in
+the table since 2026-11-18 (owner decision 126), at its state of phase 4. Of the 32 rows phase 3 held back, 3
 are public with this file, each struck (N3-gc-1, N3-net-2, N3-rwhs-2), and 29
 stay in phase 3's file as they were, with the 6 parts of public rows it leaves
 out.

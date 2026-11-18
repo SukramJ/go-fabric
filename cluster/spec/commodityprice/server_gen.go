@@ -227,8 +227,7 @@ func (s *Server) RecordPriceChange(data PriceChangeEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPriceChange, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPriceChange(endpoint uint16, data PriceChangeEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPriceChange, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

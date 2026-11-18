@@ -368,7 +368,7 @@ type subTarget struct {
 //
 // Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
 // [subscription.ReportSender] itself; pass nil as
-// [subscription.NewManager]'s reporter. Removable in the next minor release.
+// [subscription.NewManager]'s reporter. Removable in v0.25.0.
 func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 	return b.reportSubscription
 }
@@ -385,8 +385,8 @@ func (b *Bridge) SubscriptionReporter() subscription.Reporter {
 // ReportData carries both ([Bridge.reportSubscriptionEvents]).
 //
 // Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
-// [subscription.ReportSender] itself, which reports events too. Removable
-// in the next minor release.
+// [subscription.ReportSender] itself, which reports events too. Removable in
+// v0.25.0.
 func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 	return b.reportSubscriptionEvents
 }
@@ -400,7 +400,7 @@ func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 //
 // Deprecated: [Bridge.AttachSubscriptionManager] installs the bridge's
 // [subscription.ReportSender] itself, which reports the flush too.
-// Removable in the next minor release.
+// Removable in v0.25.0.
 func (b *Bridge) SubscriptionFlushReporter() subscription.FlushReporter {
 	return b.reportSubscriptionFlush
 }

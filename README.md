@@ -26,7 +26,7 @@ element model ships embedded so parity is a test, not a claim.
 
 ## Status
 
-As of `v0.22.2` (2026-11-12); the starting point of the milestones is [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060) of 2026-10-17.
+As of `v0.23.0` (2026-11-18); the starting point of the milestones is [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060) of 2026-10-17.
 
 | Area | State |
 | --- | --- |
@@ -180,72 +180,71 @@ An identifier on its way out is marked, kept working, and only then removed.
    release in which their code still compiles and the warning is already
    visible.
 
-**Suspended until a second consumer or `v1.0.0`** (owner decision,
-2026-10-21). While the reference consumer is the module's only one and
-migrates in one step, a replaced identifier is removed in the next minor
-release, without the window, once
+**In force again since 2026-11-18** (owner decision 259 of review II). From
+2026-10-21 the window was suspended while the reference consumer was the
+module's only one and migrated in one step: a replaced identifier was
+removed in the next minor release, once
 [`docs/guides/migrating-to-the-facade.md`](./docs/guides/migrating-to-the-facade.md)
-names its replacement — a removal without its line there is a defect. The
-removal is announced under `### Removed` as below. The window returns, as
-written above, with the second consumer or with `v1.0.0`, whichever comes
-first.
+named its replacement. The module has four consumers now, so the window
+applies as written above: an identifier `v0.23.0` marks is removable in
+`v0.25.0`. A removal still has its line in the migration guide, and is
+announced under `### Removed` as below.
 
 Currently deprecated, each with its replacement and the release its removal
 becomes permissible in:
 
 | Deprecated | Replacement | Removable in |
 | --- | --- | --- |
-| `im.EventLog.SetCounterPersistence` | `EventLog.SetCeilingPersistence`, whose persist function returns the store's error | `v0.23.0` |
-| `secure/operational.Manager.ReleaseID` | `Manager.AllocateStake` and `Manager.ReleaseStake`, which free the caller's own stake only | `v0.23.0` |
-| `secure/operational.Manager.ClosePeer` | none with the CloseSession farewell; `Manager.Close` on each id `Manager.SessionIDsForPeer` returns closes without it | `v0.23.0` |
-| `transport/mrp.NewWindowNoRollover` | `transport/mrp.NewWindowNoRolloverAt(0)` | `v0.23.0` |
-| `bridge.FailSafeArmer` | none; the fail-safe comes with the commissioner's ArmFailSafe or the arm of its PASE session | `v0.23.0` |
-| `bridge.CommissioningWindow.SetFailSafeArmer` | `CommissioningWindow.SetFailSafeExpirer` | `v0.23.0` |
-| `cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession`, which returns the refusal of the arm and takes the session's id | `v0.23.0` |
-| `im/subscription.Manager.CloseEndpoint` | `Manager.Close` on each subscription to end; a Reassemble that removes an endpoint ends none | `v0.23.0` |
-| `bridge.MRPAckAdapter`, `bridge.NewMRPAckAdapter` | none; `Bridge.AttachAckTracker` wires the tracker, which a peer's acknowledgement does not discharge | `v0.23.0` |
-| `groups.NoKeyError` | `groups.DecodeError`, the outcome of a group message no candidate key passed; `Manager.Decode` no longer returns `NoKeyError` | `v0.23.0` |
-| `store.Store.DeleteSetting` | `Store.DeleteSettings`, which every `store.Settings` backend implements | `v0.23.0` |
-| `endpoint.Config.OnNodeLabelWritten`, `endpoint.Config.Scenes`, `endpoint.ScenesStore` | `endpoint.Config.Persistence` (`endpoint.Persistence`), whose saves and loads report the store's error | `v0.23.0` |
-| `node.EndpointPersistence`, `node.Config.EndpointPersistence`, `node.NewEndpointPersistence` | `node.EndpointState`, `node.Config.EndpointState`, `node.NewEndpointState` | `v0.23.0` |
-| `cluster/core.AccessControlEntryStruct.Redacted`, `AccessControlAuxiliaryEntryStruct.Redacted`, `AccessControlExtensionEntry.Redacted`, `SceneInfoStruct.Redacted` | none: return the entry whole; the dispatcher scopes every fabric-scoped attribute of the model | `v0.23.0` |
-| `node.Node.Persistence` | `Node.EndpointState`, which returns the new port | `v0.23.0` |
-| `cluster/spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule` for a server's own rule (no host veto replaces it); `Server.SetBeforeWrite` / the typed `OnWrite` for the host's veto | `v0.23.0` |
-| `cluster/spec.Server.Notify`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` | `Server.Set` for a held value, `Server.MarkChanged` (or `MarkQuietChanged` for a quieter attribute) for one the host computes on read | `v0.23.0` |
-| `cluster/spec.Server.Emit`, `cluster/spec.EmitOn`, `<cluster>def.Server.Emit<Event>` | `Server.EmitEvent`, `<cluster>def.Server.Record<Event>`: the event goes out on the endpoint the server is mounted on (`spec.ErrNotMounted` before) | `v0.23.0` |
-| `cluster/wire.ScenesManagement` | `cluster/core.ScenesManagement` (`core.NewScenesManagement`) | `v0.23.0` |
-| `cluster/wire.SchedulesServer`, `NewSchedulesServer`, `SchedulesSource`, `ScheduleEntry`, `ScheduleStruct`, `ErrSchedulesReadOnly`, the `Schedules*` constants | the Thermostat server's schedules (`cluster/thermo`, `docs/guides/thermostat.md`) | `v0.23.0` |
-| `bridge.Bridge.ConnectPeer`, `bridge.Bridge.ConnectOtaProvider` | none to call: a node reaches its OTA provider and its camera's requestor over its own peer path (ADR 0032); `Bridge.LivePeerSession` reuses a live session without a handshake | `v0.23.0` |
-| `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` | none; `bridge.CommissioningWindowOpener` returns the `bridge` values | `v0.23.0` |
-| `node.Config.SupportedFabrics`, `node.Config.MaxPathsPerInvoke` | `Config.Limits.SupportedFabrics`, `Config.Limits.MaxPathsPerInvoke` | `v0.23.0` |
-| `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint` | `Hints` (`mdns.PairingHints`) | `v0.23.0` |
-| `bridge.Bridge.AttachPaseHandler`, `bridge.Bridge.AttachCaseHandler` | `AttachPaseHandlerProvider`, `AttachCaseHandlerProvider` | `v0.23.0` |
-| `bridge.Bridge.SubscriptionPersistenceEnabled`, `bridge.Bridge.FormerSubscriptionCount` | `bridgetest.SubscriptionPersistence` | `v0.23.0` |
-| `bridge.Bridge.ControllerRTT` | none | `v0.23.0` |
-| `contract.BLEPeripheral`, `node.Network.BLE`, `bridge.Config.BLE` | `contract.GATTPeripheral`, `node.Network.GATT`, `bridge.Config.GATT` | `v0.23.0` |
-| `cluster/core.GeneralCommissioning.SetOnFailSafeExpired` | `GeneralCommissioning.SetOnFailSafeExpiry` | `v0.23.0` |
-| `cluster/core.GeneralCommissioning.SetOnFailSafeRolledBack` | `GeneralCommissioning.SetFailSafeSessionCloser` | `v0.23.0` |
-| `cluster/core.GeneralCommissioning.ArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession` | `v0.23.0` |
-| `device.NewRootNode` | none; the root endpoint is the node's (`node.Node.Root`) | `v0.23.0` |
-| `endpoint.WriteChanges`, `endpoint.WithWriteChanges` (`Unchanged`, `Changed`, `ChangedAttributes`) | `im.HandleWrite`, whose results carry each write's verdict in `im.WriteResult.Commit` | `v0.23.0` |
-| `commissioning` (the package: `PASEConfig`, `PASEResponder`, `NewPASEResponder`, `BuildAttestation`, `AttestationInput`, `AttestationResult`, `BuildCSR`, `CSRInput`, `CSRResult`, `DACChain`, `VerifyChain`, `LoadPAAPoolFromPEM`, `ErrPASE*`, `ErrAttestation*`, `ErrCSRNonce`, `ErrDAC*`) | the node's commissioning window (`node.Node.OpenBasicWindow`, `OpenOwnWindow`) and `cluster/core.OperationalCredentials`; `secure/spake2` and `secure/mattercert.CreateCSR` for the pieces; `controller/attestation.Validate` for the DAC chain | `v0.23.0` |
-| `mdns.DeriveUniqueIDFromIdentity` | `node.Commissioning.RotatingDeviceID`, or 16 random bytes drawn once and persisted, passed to `mdns.GenerateRotatingID` | `v0.23.0` |
-| `cluster/core.OperationalCredentials.SetCurrentFabric`, `cluster/core.GroupKeyManagement.SetCurrentFabric`, `cluster/core.AccessControl.SetCurrentFabric` | none: a fabric-scoped command or write takes its fabric from the request (`im.WithFabricFilter`) | `v0.23.0` |
-| `secure/operational.Manager.OpenFromSigmaWithID`, `Manager.OpenFromSigmaAsInitiatorWithID`, `Manager.OpenFromPaseWithID` | `Manager.AllocateStake` with `OpenFromSigmaWithStake`, `OpenFromSigmaAsInitiatorWithStake`, `OpenFromPaseWithStake`, which install only while the handshake still holds its id (`ErrStakeLost` otherwise) | `v0.23.0` |
-| `secure/operational.Manager.AllocateID` | `Manager.AllocateStake` (`Stake.ID` where the id is announced) | `v0.23.0` |
-| `cluster/spec.Hooks` | a `spec.Server` over the server's own state, MatterInvoke routed through `spec.InvokeHeld` over `spec.NewSelfHeld`; events `spec.Events`, veto `spec.WriteVeto` | `v0.23.0` |
-| `cluster/closure.ControlServer.Hooks` (the embedded field) | `ControlServer.Handle`, `Emit`, `EmitEvent`, `SetBeforeWrite` | `v0.23.0` |
-| `cluster/modebase.Server.Hooks`, `Server.Init`, `Server.Invoke`, `Server.CheckWrite` | `Server.Handle` for a host handler, `Server.MatterInvoke` for the checked command path; `Init` needs none, `CheckWrite` none (no controller write reaches a veto) | `v0.23.0` |
-| `cluster/wire` ids that duplicate a generated constant (`ColorCtrl…`, `ColorHueDir…`, `ColorMoveMode…`, `ColorStepMode…`, `FanControl…`, `MatterEvent…`, `OperationalState…`, `RvcOperationalState…`, `Thermostat…`, `WindowCovering…`; CHANGELOG names each) | the `ClusterID` / `Attr…` / `Cmd…` / `Event…` / enum constant of `cluster/spec/<cluster>` | `v0.23.0` |
-| `cluster/wire.ThermostatCmdSetWeeklySchedule`, `ThermostatCmdGetWeeklySchedule`, `ThermostatCmdClearWeeklySchedule`, `WindowCoveringCmdGoToLiftValue`, `WindowCoveringCmdGoToTiltValue`, `GoToLiftValueRequest`, `GoToTiltValueRequest`, `DecodeGoToLiftValue`, `DecodeGoToTiltValue`, `ErrWindowCoveringMalformed` | none: the commands are not in the model the module serves | `v0.23.0` |
-| `cluster/spec.ServerConfig.DataVersion`, every server `Config.DataVersion` (and `levelcontrol.HeldConfig.DataVersion`), `MatterDataVersion` of `levelcontrol.Server`, `modeselect.Server`, `modebase.Server` | none: leave the field nil; the wire carries the endpoint's DataVersion for the cluster, or the server's own where it serves one | `v0.23.0` |
-| `im/subscription.Reporter`, `EventReporter`, `FlushReporter`, `Manager.SetEventReporter`, `Manager.SetFlushReporter` | `ReportSender` set with `Manager.SetReportSender`; a flush is a `Report` with `Flush` set | `v0.23.0` |
-| `im/subscription.Subscription.TakeDuePaths`, `Subscription.NothingSent` | `Report.Paths`; a `ReportSender` with nothing for the subscriber returns `NothingForSubscriber` | `v0.23.0` |
-| `bridge.Bridge.SubscriptionReporter`, `SubscriptionEventReporter`, `SubscriptionFlushReporter` | none needed: `Bridge.AttachSubscriptionManager` installs the bridge's sender; pass nil as `subscription.NewManager`'s reporter | `v0.23.0` |
-| `bridge/bridgetest.EstablishSubscriptionTarget`, `SubscriptionTarget`, `SubscriptionTarget.PeerCounter`, `ErrNoPeerCounter`, `ErrNoSubscriptionID`, `ErrNoPeer`, `ErrPeerCounterNotAnchored`, `ErrNotEstablished` | `bridgetest.Session.Subscribe` of the test `Commissioner` | `v0.23.0` |
-| `bridge.ErrAckWaitTimeout` | none: no function returns it | `v0.23.0` |
-| `client/peer.Descriptor.DataModelRevision` | `Descriptor.ReportedSessionParameters.DataModelRevision`, the revision the peer's session parameters report | `v0.23.0` |
-| `schema.ClusterCommandLevels` | `schema.ClusterRequestCommandLevels` for an accepted command, `schema.ClusterResponseCommandLevels` for a generated one | `v0.23.0` |
+| `im.EventLog.SetCounterPersistence` | `EventLog.SetCeilingPersistence`, whose persist function returns the store's error | `v0.25.0` |
+| `secure/operational.Manager.ReleaseID` | `Manager.AllocateStake` and `Manager.ReleaseStake`, which free the caller's own stake only | `v0.25.0` |
+| `secure/operational.Manager.ClosePeer` | none with the CloseSession farewell; `Manager.Close` on each id `Manager.SessionIDsForPeer` returns closes without it | `v0.25.0` |
+| `transport/mrp.NewWindowNoRollover` | `transport/mrp.NewWindowNoRolloverAt(0)` | `v0.25.0` |
+| `bridge.FailSafeArmer` | none; the fail-safe comes with the commissioner's ArmFailSafe or the arm of its PASE session | `v0.25.0` |
+| `bridge.CommissioningWindow.SetFailSafeArmer` | `CommissioningWindow.SetFailSafeExpirer` | `v0.25.0` |
+| `cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession`, which returns the refusal of the arm and takes the session's id | `v0.25.0` |
+| `im/subscription.Manager.CloseEndpoint` | `Manager.Close` on each subscription to end; a Reassemble that removes an endpoint ends none | `v0.25.0` |
+| `bridge.MRPAckAdapter`, `bridge.NewMRPAckAdapter` | none; `Bridge.AttachAckTracker` wires the tracker, which a peer's acknowledgement does not discharge | `v0.25.0` |
+| `groups.NoKeyError` | `groups.DecodeError`, the outcome of a group message no candidate key passed; `Manager.Decode` no longer returns `NoKeyError` | `v0.25.0` |
+| `store.Store.DeleteSetting` | `Store.DeleteSettings`, which every `store.Settings` backend implements | `v0.25.0` |
+| `endpoint.Config.OnNodeLabelWritten`, `endpoint.Config.Scenes`, `endpoint.ScenesStore` | `endpoint.Config.Persistence` (`endpoint.Persistence`), whose saves and loads report the store's error | `v0.25.0` |
+| `node.EndpointPersistence`, `node.Config.EndpointPersistence`, `node.NewEndpointPersistence` | `node.EndpointState`, `node.Config.EndpointState`, `node.NewEndpointState` | `v0.25.0` |
+| `cluster/core.AccessControlEntryStruct.Redacted`, `AccessControlAuxiliaryEntryStruct.Redacted`, `AccessControlExtensionEntry.Redacted`, `SceneInfoStruct.Redacted` | none: return the entry whole; the dispatcher scopes every fabric-scoped attribute of the model | `v0.25.0` |
+| `node.Node.Persistence` | `Node.EndpointState`, which returns the new port | `v0.25.0` |
+| `cluster/spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule` for a server's own rule (no host veto replaces it); `Server.SetBeforeWrite` / the typed `OnWrite` for the host's veto | `v0.25.0` |
+| `cluster/spec.Server.Notify`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` | `Server.Set` for a held value, `Server.MarkChanged` (or `MarkQuietChanged` for a quieter attribute) for one the host computes on read | `v0.25.0` |
+| `cluster/spec.Server.Emit`, `cluster/spec.EmitOn`, `<cluster>def.Server.Emit<Event>` | `Server.EmitEvent`, `<cluster>def.Server.Record<Event>`: the event goes out on the endpoint the server is mounted on (`spec.ErrNotMounted` before) | `v0.25.0` |
+| `cluster/wire.ScenesManagement` | `cluster/core.ScenesManagement` (`core.NewScenesManagement`) | `v0.25.0` |
+| `cluster/wire.SchedulesServer`, `NewSchedulesServer`, `SchedulesSource`, `ScheduleEntry`, `ScheduleStruct`, `ErrSchedulesReadOnly`, the `Schedules*` constants | the Thermostat server's schedules (`cluster/thermo`, `docs/guides/thermostat.md`) | `v0.25.0` |
+| `bridge.Bridge.ConnectPeer`, `bridge.Bridge.ConnectOtaProvider` | none to call: a node reaches its OTA provider and its camera's requestor over its own peer path (ADR 0032); `Bridge.LivePeerSession` reuses a live session without a handshake | `v0.25.0` |
+| `node.ErrCommissioningWindowAlreadyOpen`, `node.ErrCommissioningWindowNotConfigured` | none; `bridge.CommissioningWindowOpener` returns the `bridge` values | `v0.25.0` |
+| `node.Config.SupportedFabrics`, `node.Config.MaxPathsPerInvoke` | `Config.Limits.SupportedFabrics`, `Config.Limits.MaxPathsPerInvoke` | `v0.25.0` |
+| `mdns.CommissionableServiceConfig.PairingHint`, `bridge.CommissioningAdvertisement.PairingHint` | `Hints` (`mdns.PairingHints`) | `v0.25.0` |
+| `bridge.Bridge.AttachPaseHandler`, `bridge.Bridge.AttachCaseHandler` | `AttachPaseHandlerProvider`, `AttachCaseHandlerProvider` | `v0.25.0` |
+| `bridge.Bridge.SubscriptionPersistenceEnabled`, `bridge.Bridge.FormerSubscriptionCount` | `bridgetest.SubscriptionPersistence` | `v0.25.0` |
+| `contract.BLEPeripheral`, `node.Network.BLE`, `bridge.Config.BLE` | `contract.GATTPeripheral`, `node.Network.GATT`, `bridge.Config.GATT` | `v0.25.0` |
+| `cluster/core.GeneralCommissioning.SetOnFailSafeExpired` | `GeneralCommissioning.SetOnFailSafeExpiry` | `v0.25.0` |
+| `cluster/core.GeneralCommissioning.SetOnFailSafeRolledBack` | `GeneralCommissioning.SetFailSafeSessionCloser` | `v0.25.0` |
+| `cluster/core.GeneralCommissioning.ArmOnPaseEstablished` | `GeneralCommissioning.ArmOnPaseSession` | `v0.25.0` |
+| `device.NewRootNode` | none; the root endpoint is the node's (`node.Node.Root`) | `v0.25.0` |
+| `endpoint.WriteChanges`, `endpoint.WithWriteChanges` (`Unchanged`, `Changed`, `ChangedAttributes`) | `im.HandleWrite`, whose results carry each write's verdict in `im.WriteResult.Commit` | `v0.25.0` |
+| `commissioning` (the package: `PASEConfig`, `PASEResponder`, `NewPASEResponder`, `BuildAttestation`, `AttestationInput`, `AttestationResult`, `BuildCSR`, `CSRInput`, `CSRResult`, `DACChain`, `VerifyChain`, `LoadPAAPoolFromPEM`, `ErrPASE*`, `ErrAttestation*`, `ErrCSRNonce`, `ErrDAC*`) | the node's commissioning window (`node.Node.OpenBasicWindow`, `OpenOwnWindow`) and `cluster/core.OperationalCredentials`; `secure/spake2` and `secure/mattercert.CreateCSR` for the pieces; `controller/attestation.Validate` for the DAC chain | `v0.25.0` |
+| `mdns.DeriveUniqueIDFromIdentity` | `node.Commissioning.RotatingDeviceID`, or 16 random bytes drawn once and persisted, passed to `mdns.GenerateRotatingID` | `v0.25.0` |
+| `cluster/core.OperationalCredentials.SetCurrentFabric`, `cluster/core.GroupKeyManagement.SetCurrentFabric`, `cluster/core.AccessControl.SetCurrentFabric` | none: a fabric-scoped command or write takes its fabric from the request (`im.WithFabricFilter`) | `v0.25.0` |
+| `secure/operational.Manager.OpenFromSigmaWithID`, `Manager.OpenFromSigmaAsInitiatorWithID`, `Manager.OpenFromPaseWithID` | `Manager.AllocateStake` with `OpenFromSigmaWithStake`, `OpenFromSigmaAsInitiatorWithStake`, `OpenFromPaseWithStake`, which install only while the handshake still holds its id (`ErrStakeLost` otherwise) | `v0.25.0` |
+| `secure/operational.Manager.AllocateID` | `Manager.AllocateStake` (`Stake.ID` where the id is announced) | `v0.25.0` |
+| `cluster/spec.Hooks` | a `spec.Server` over the server's own state, MatterInvoke routed through `spec.InvokeHeld` over `spec.NewSelfHeld`; events `spec.Events`, veto `spec.WriteVeto` | `v0.25.0` |
+| `cluster/closure.ControlServer.Hooks` (the embedded field) | `ControlServer.Handle`, `Emit`, `EmitEvent`, `SetBeforeWrite` | `v0.25.0` |
+| `cluster/modebase.Server.Hooks`, `Server.Init`, `Server.Invoke`, `Server.CheckWrite` | `Server.Handle` for a host handler, `Server.MatterInvoke` for the checked command path; `Init` needs none, `CheckWrite` none (no controller write reaches a veto) | `v0.25.0` |
+| `cluster/wire` ids that duplicate a generated constant (`ColorCtrl…`, `ColorHueDir…`, `ColorMoveMode…`, `ColorStepMode…`, `FanControl…`, `MatterEvent…`, `OperationalState…`, `RvcOperationalState…`, `Thermostat…`, `WindowCovering…`; CHANGELOG names each) | the `ClusterID` / `Attr…` / `Cmd…` / `Event…` / enum constant of `cluster/spec/<cluster>` | `v0.25.0` |
+| `cluster/wire.ThermostatCmdSetWeeklySchedule`, `ThermostatCmdGetWeeklySchedule`, `ThermostatCmdClearWeeklySchedule`, `WindowCoveringCmdGoToLiftValue`, `WindowCoveringCmdGoToTiltValue`, `GoToLiftValueRequest`, `GoToTiltValueRequest`, `DecodeGoToLiftValue`, `DecodeGoToTiltValue`, `ErrWindowCoveringMalformed` | none: the commands are not in the model the module serves | `v0.25.0` |
+| `cluster/spec.ServerConfig.DataVersion`, every server `Config.DataVersion` (and `levelcontrol.HeldConfig.DataVersion`), `MatterDataVersion` of `levelcontrol.Server`, `modeselect.Server`, `modebase.Server` | none: leave the field nil; the wire carries the endpoint's DataVersion for the cluster, or the server's own where it serves one | `v0.25.0` |
+| `im/subscription.Reporter`, `EventReporter`, `FlushReporter`, `Manager.SetEventReporter`, `Manager.SetFlushReporter` | `ReportSender` set with `Manager.SetReportSender`; a flush is a `Report` with `Flush` set | `v0.25.0` |
+| `im/subscription.Subscription.TakeDuePaths`, `Subscription.NothingSent` | `Report.Paths`; a `ReportSender` with nothing for the subscriber returns `NothingForSubscriber` | `v0.25.0` |
+| `bridge.Bridge.SubscriptionReporter`, `SubscriptionEventReporter`, `SubscriptionFlushReporter` | none needed: `Bridge.AttachSubscriptionManager` installs the bridge's sender; pass nil as `subscription.NewManager`'s reporter | `v0.25.0` |
+| `bridge/bridgetest.EstablishSubscriptionTarget`, `SubscriptionTarget`, `SubscriptionTarget.PeerCounter`, `ErrNoPeerCounter`, `ErrNoSubscriptionID`, `ErrNoPeer`, `ErrPeerCounterNotAnchored`, `ErrNotEstablished` | `bridgetest.Session.Subscribe` of the test `Commissioner` | `v0.25.0` |
+| `bridge.ErrAckWaitTimeout` | none: no function returns it | `v0.25.0` |
+| `client/peer.Descriptor.DataModelRevision` | `Descriptor.ReportedSessionParameters.DataModelRevision`, the revision the peer's session parameters report | `v0.25.0` |
+| `schema.ClusterCommandLevels` | `schema.ClusterRequestCommandLevels` for an accepted command, `schema.ClusterResponseCommandLevels` for a generated one | `v0.25.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;
@@ -259,8 +258,7 @@ tracked a pseudo-version. `main` is still consumable the same way — see
 `CONTRIBUTING.md` — but a tagged version is what a consumer should pin.
 
 SemVer permits a `v0` module to break on any minor bump. This module does not use that permission as a default. The window
-above applies at `v0` exactly as it would at `v1` — outside its suspension
-until a second consumer or `v1.0.0` (above): a breaking change is a
+above applies at `v0` exactly as it would at `v1`: a breaking change is a
 minor bump, never a patch, and wherever the old identifier can be kept
 working it is kept working for the full window.
 

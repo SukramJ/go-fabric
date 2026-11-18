@@ -106,7 +106,7 @@ func TestPairBluetoothProxyFlag(t *testing.T) {
 	}
 }
 
-// TestPairOverBLE pairs the harness over its BLE radio (node.Network.BLE,
+// TestPairOverBLE pairs the harness over its BLE radio (node.Network.GATT,
 // an in-memory bletest radio): found by its advertisement, PASE over BTP,
 // the Wi-Fi network steps, then CASE over IP found by DNS-SD, and a read
 // over it.

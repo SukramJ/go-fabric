@@ -525,15 +525,25 @@ func (s *scripted) quiet(t *testing.T, d time.Duration) {
 	}
 }
 
-// nextAdvancing is next with the clock walked a minute at a time while
-// the manager stays silent, for a message that waits on timers.
+// nextAdvancing is next for a message that waits on timers: while the
+// manager stays silent, the clock moves to the earliest armed deadline and
+// no further, and within lets the work that deadline started run until the
+// bubble blocks. A fixed step is not safe: Advance also fires the timers
+// that work arms while Advance still runs, so a minute's step over the
+// sustained subscription's 15 s retry wait fired the replacement's MRP
+// retransmissions and its exchange timeout (15.039 s) inside the same
+// call whenever the sustain goroutine armed them before Advance returned —
+// the replacement failed before the test's reply reached it
+// (TestDefaultSubscription's "no transition to Connected").
 func (s *scripted) nextAdvancing(t *testing.T) msg {
 	t.Helper()
 	for range 600 {
 		if m, ok := s.within(t, 20*time.Millisecond); ok {
 			return m
 		}
-		s.clock.Advance(time.Minute)
+		if armed := s.clock.Armed(); len(armed) > 0 {
+			s.clock.Advance(max(armed[0], 0))
+		}
 	}
 	t.Fatal("the manager sent nothing")
 	return msg{}

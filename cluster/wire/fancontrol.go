@@ -8,7 +8,7 @@ package wire
 //
 // Deprecated: use ClusterID of cluster/spec/fancontrol, the
 // generated id: one source of ids (review II, R2-P6-par-1262,
-// decision 140). Removable in the next minor release.
+// decision 140). Removable in v0.25.0.
 const FanControlClusterID uint32 = 0x0202
 
 // FanControlCmdStep is the FanControl Step command: conformance STEP,
@@ -16,7 +16,7 @@ const FanControlClusterID uint32 = 0x0202
 //
 // Deprecated: use CmdStep of cluster/spec/fancontrol, the
 // generated id: one source of ids (review II, R2-P6-par-1262,
-// decision 140). Removable in the next minor release.
+// decision 140). Removable in v0.25.0.
 const FanControlCmdStep uint32 = 0x00
 
 // Step command field tags (fan-control.element.ts:71-73).

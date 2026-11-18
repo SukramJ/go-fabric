@@ -80,7 +80,7 @@ func NewWindow() *Window { return &Window{rollover: true, initialBitmap: 0} }
 // [NewWindowNoRolloverAt].
 //
 // Deprecated: use [NewWindowNoRolloverAt] with counter 0, the window a
-// secure unicast session starts with. Removable in v0.23.0.
+// secure unicast session starts with. Removable in v0.25.0.
 func NewWindowNoRollover() *Window { return &Window{rollover: false, initialBitmap: ^uint32(0)} }
 
 // NewWindowNoRolloverAt returns a no-rollover window already anchored at

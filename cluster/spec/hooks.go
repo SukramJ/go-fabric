@@ -26,7 +26,7 @@ import (
 // Source answering its reads, Handlers its own commands — and routes
 // MatterInvoke through [InvokeHeld] over [NewSelfHeld]; its events and its
 // veto are an [Events] and a [WriteVeto] (review II, decision 154).
-// Removable in the next minor release.
+// Removable in v0.25.0.
 type Hooks struct {
 	inst     *Instance
 	handlers HostHandlers

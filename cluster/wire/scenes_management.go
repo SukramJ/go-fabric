@@ -27,7 +27,7 @@ import (
 //
 // Deprecated: the ScenesManagement server is cluster/core's
 // (core.ScenesManagement, built with core.NewScenesManagement), the one the
-// device kit mounts. Removable in the next minor release.
+// device kit mounts. Removable in v0.25.0.
 type ScenesManagement struct{}
 
 // Cluster ID, revision and attribute ids, the generated definition's

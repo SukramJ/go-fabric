@@ -1370,9 +1370,12 @@ func (n *Node) startLocked(ctx context.Context) error {
 	n.root.BasicInformation.EmitStartUp()
 	n.root.GeneralDiagnostics.EmitBootReason()
 	n.keeperWG.Add(1)
+	// The keeper's store is read here, under the start's lock, not when its
+	// goroutine first runs: a port set after Start is not its store.
+	st := n.st
 	go func() {
 		defer n.keeperWG.Done()
-		keepOperationalTime(n.life, n.cfg.Clock, n.st, n.root.GeneralDiagnostics, operationalTimeInterval, n.logger)
+		keepOperationalTime(n.life, n.cfg.Clock, st, n.root.GeneralDiagnostics, operationalTimeInterval, n.logger)
 	}()
 
 	n.ensureOTAProviderACL(ctx)
@@ -1809,7 +1812,7 @@ func (n *Node) EndpointState() EndpointState { return n.endpoints }
 // hands that assembler (issue #117).
 //
 // Deprecated: use [Node.EndpointState], whose saves and loads report the
-// store's error. Removable in the next minor release.
+// store's error. Removable in v0.25.0.
 func (n *Node) Persistence() EndpointPersistence {
 	if h, ok := n.endpoints.(hostEndpoints); ok {
 		return h.p

@@ -39,8 +39,12 @@ import (
 // calls (central_linux.go).
 const peripheralTimeout = 5 * time.Second
 
-// ErrServing is a second [contract.BLEPeripheral.Serve] while one runs.
-var ErrServing = errors.New("bluez: the Matter GATT service is served already")
+// ErrServing is a [contract.GATTPeripheral.RegisterService] while the
+// Matter GATT service is registered — from its registration until its
+// [contract.GATTService.Serve] returned, or Close ended a registration that
+// was never served — and a second Serve of one registration. The node
+// registers one service at a time.
+var ErrServing = errors.New("bluez: the Matter GATT service is registered already")
 
 // Method and signal names of the exported side.
 const (
@@ -55,17 +59,18 @@ const (
 	appearanceUnknown = 0xffff
 )
 
-// NewPeripheral is a [contract.BLEPeripheral] on the BlueZ adapter (hci0
+// NewPeripheral is a [contract.GATTPeripheral] on the BlueZ adapter (hci0
 // when empty) over the system bus — the radio a device-side host hands its
-// node (node.Network.BLE). The returned value also has Close, which ends
-// Serve, withdraws the advertisement and releases the bus. It needs the
+// node (node.Network.GATT). The returned value also has Close, which ends
+// the service's Serve, unregisters a service that is registered but not
+// served, withdraws the advertisement and releases the bus. It needs the
 // system-bus rights the central needs, and bluetoothd's LE advertising
 // manager and GATT server. An indication's confirmation is read from the
 // notify socket (BlueZ 5.80 and later) or taken from C2's Confirm method
 // (BlueZ up to 5.73) — connectedhomeip's note on the versions between
 // (src/platform/Linux/bluez/BluezConnection.cpp:220-223 at 6170af84)
 // applies here too.
-func NewPeripheral(adapter string) (contract.BLEPeripheral, error) { //nolint:staticcheck // SA1019: this module moves to contract.GATTPeripheral with the next release (decision 114; nested modules follow a release)
+func NewPeripheral(adapter string) (contract.GATTPeripheral, error) {
 	if adapter == "" {
 		adapter = DefaultAdapter
 	}
@@ -106,13 +111,15 @@ type peripheral struct {
 	registered bool
 	advOwed    bool
 	// appOwed is an UnregisterApplication that failed at the end of a
-	// Serve: the application stays exported, and the next Serve retries
-	// the unregister before it registers (R2-P6-err-2012).
+	// service's Serve: the application stays exported, and the next
+	// RegisterService retries the unregister before it registers
+	// (R2-P6-err-2012).
 	appOwed bool
-	// serving is set while Serve runs; accept and c3 are its arguments.
-	serving bool
-	accept  func(contract.BLEConnection)
-	c3      []byte
+	// svc is the Matter GATT service from its RegisterService until its
+	// registration ended (Serve returned, or Close ended it unserved); nil
+	// without one. c3 is its C3 value, RegisterService's copy.
+	svc *gattService
+	c3  []byte
 	// conns are the centrals that use the Matter service, by device
 	// path.
 	conns map[dbus.ObjectPath]*pconn
@@ -133,7 +140,10 @@ type peripheral struct {
 	bluezOwner string
 }
 
-var _ contract.BLEPeripheral = (*peripheral)(nil) //nolint:staticcheck // SA1019: this module moves to contract.GATTPeripheral with the next release (decision 114; nested modules follow a release)
+var (
+	_ contract.GATTPeripheral = (*peripheral)(nil)
+	_ contract.GATTService    = (*gattService)(nil)
+)
 
 // newPeripheral is the peripheral over b: the adapter must exist.
 func newPeripheral(b bus, adapter dbus.ObjectPath) (*peripheral, error) {
@@ -162,7 +172,11 @@ func (p *peripheral) charPath(n int) dbus.ObjectPath {
 }
 func (p *peripheral) advPath() dbus.ObjectPath { return p.root + "/advertising" }
 
-// Close ends Serve, withdraws the advertisement and releases the bus.
+// Close ends the service's Serve, unregisters a service that is
+// registered but not served (nothing else would: RegisterService's ctx
+// bounds the registration only), withdraws the advertisement and releases
+// the bus. A registration still in flight sees the close when BlueZ
+// answered it and unregisters itself (RegisterService).
 func (p *peripheral) Close() error {
 	p.mu.Lock()
 	if p.closed {
@@ -171,10 +185,21 @@ func (p *peripheral) Close() error {
 		return nil
 	}
 	p.closed = true
+	unserved := p.svc
+	if unserved != nil && unserved.state == svcRegistered {
+		unserved.state = svcEnded
+	} else {
+		unserved = nil
+	}
 	p.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
 	defer cancel()
 	_ = p.StopAdvertising(ctx)
+	if unserved != nil {
+		close(unserved.ended)
+		_ = p.unregisterApplication(ctx)
+		p.endRegistration(unserved)
+	}
 	close(p.done)
 	err := p.bus.Close()
 	<-p.dispatched
@@ -268,7 +293,7 @@ func (p *peripheral) dropAll(disconnect bool) {
 
 // --- the advertisement --------------------------------------------------
 
-// Advertise implements contract.BLEPeripheral: an LEAdvertisement1 of
+// Advertise implements contract.GATTPeripheral: an LEAdvertisement1 of
 // type peripheral with the Matter service UUID, the service data of the
 // payload, Discoverable (so BlueZ sets "BR/EDR not supported"), the name
 // MATTER-<discriminator>, no appearance and the interval as both minimum
@@ -340,7 +365,7 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 	return nil
 }
 
-// StopAdvertising implements contract.BLEPeripheral:
+// StopAdvertising implements contract.GATTPeripheral:
 // LEAdvertisingManager1.UnregisterAdvertisement (chip
 // BluezAdvertisement.cpp:294-318).
 func (p *peripheral) StopAdvertising(ctx context.Context) error {
@@ -483,49 +508,53 @@ func matterServiceData(data []byte) ([]byte, bool) {
 
 // --- the GATT application ----------------------------------------------
 
-// Serve implements contract.BLEPeripheral: the GATT application — the
-// service 0xFFF6, C1 with the flag "write" taken through AcquireWrite, C2
-// with "indicate" through AcquireNotify and Confirm, C3 with "read" (chip
-// BluezEndpoint.cpp:448-520; C3 always, as matter.js serves it,
-// BlenoBleServer.ts:92-120) — is exported under its ObjectManager root
-// (:522-534) and registered with GattManager1.RegisterApplication
-// (:267-294). accept runs for a central at its first AcquireWrite or
-// AcquireNotify, before any event of it is delivered. When ctx ends every
-// central is disconnected and the application unregistered.
-func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.BLEConnection)) error {
+// RegisterService implements contract.GATTPeripheral: the GATT application
+// — the service 0xFFF6, C1 with the flag "write" taken through
+// AcquireWrite, C2 with "indicate" through AcquireNotify and Confirm, C3
+// with "read" (chip BluezEndpoint.cpp:448-520; C3 always, as matter.js
+// serves it, BlenoBleServer.ts:92-120) — is exported under its
+// ObjectManager root (:522-534) and registered with
+// GattManager1.RegisterApplication (:267-294). An unregister owed by the
+// previous registration is retried first. c3 is copied. ctx bounds the
+// registration only: the service stays registered until its Serve
+// returned, or — never served — until Close. A registration while one is
+// registered is refused with [ErrServing].
+func (p *peripheral) RegisterService(ctx context.Context, c3 []byte) (contract.GATTService, error) {
 	p.mu.Lock()
 	if p.closed {
 		p.mu.Unlock()
-		return errPeripheralClosed
+		return nil, errPeripheralClosed
 	}
-	if p.serving {
+	if p.svc != nil {
 		p.mu.Unlock()
-		return ErrServing
+		return nil, ErrServing
 	}
-	p.serving, p.accept, p.c3 = true, accept, bytes.Clone(c3)
+	s := &gattService{p: p, state: svcRegistering, served: make(chan struct{}), ended: make(chan struct{})}
+	p.svc, p.c3 = s, bytes.Clone(c3)
+	owed := p.appOwed
 	p.mu.Unlock()
 	p.acquiredMu.Lock()
 	p.mu.Lock()
 	p.writeAcquired, p.notifyAcquired = false, false
 	p.mu.Unlock()
 	p.acquiredMu.Unlock()
-	defer func() {
+	fail := func(err error) (contract.GATTService, error) {
 		p.mu.Lock()
-		p.serving, p.accept, p.c3 = false, nil, nil
+		s.state = svcEnded
 		p.mu.Unlock()
-	}()
-	p.mu.Lock()
-	owed := p.appOwed
-	p.mu.Unlock()
+		close(s.ended)
+		p.endRegistration(s)
+		return nil, err
+	}
 	if owed {
 		if err := p.unregisterApplication(ctx); err != nil {
-			return err
+			return fail(err)
 		}
 	}
-	//nolint:contextcheck // the exported handlers run on the bus's goroutines, outside Serve's context; fromBluez bounds its own call
+	//nolint:contextcheck // the exported handlers run on the bus's goroutines, outside RegisterService's context; fromBluez bounds its own call
 	if err := p.exportApplication(); err != nil {
 		p.unexportApplication()
-		return err
+		return fail(err)
 	}
 	regCtx, cancel := context.WithTimeout(ctx, peripheralTimeout)
 	_, err := call(regCtx, p.bus, p.adapter, ifaceGattManager+".RegisterApplication", p.root, map[string]dbus.Variant{})
@@ -533,27 +562,117 @@ func (p *peripheral) Serve(ctx context.Context, c3 []byte, accept func(contract.
 	if err != nil {
 		p.releaseUnanswered(ctx, err, ifaceGattManager+".UnregisterApplication", p.root)
 		p.unexportApplication()
-		return err
+		return fail(err)
 	}
+	p.mu.Lock()
+	closed := p.closed
+	if !closed {
+		s.state = svcRegistered
+	}
+	p.mu.Unlock()
+	if closed {
+		// Close ran while BlueZ registered the application and left the
+		// registration in flight to this call.
+		_ = p.unregisterApplication(context.WithoutCancel(ctx))
+		return fail(errPeripheralClosed)
+	}
+	return s, nil
+}
+
+// serviceState is where a [gattService] is in its life, guarded by the
+// peripheral's mu.
+type serviceState int
+
+const (
+	// svcRegistering: RegisterService runs.
+	svcRegistering serviceState = iota
+	// svcRegistered: registered, Serve not called yet.
+	svcRegistered
+	// svcServing: Serve runs and accepts centrals.
+	svcServing
+	// svcEnded: no central is accepted any more; the registration is
+	// ending or ended.
+	svcEnded
+)
+
+// gattService is one registration of the Matter GATT service.
+type gattService struct {
+	p *peripheral
+	// served is closed when Serve installed accept; ended when the
+	// service stopped accepting centrals (Serve's end, Close of an
+	// unserved registration, a failed registration).
+	served, ended chan struct{}
+	// state, accept and serveCalled are guarded by p.mu.
+	state       serviceState
+	accept      func(contract.BLEConnection)
+	serveCalled bool
+	// acceptMu keeps the calls of accept from overlapping: godbus runs
+	// each exported method call on a goroutine of its own, so two
+	// centrals' first acquires may arrive at once.
+	acceptMu sync.Mutex
+	// accepting counts the accept calls under way; Serve waits for them
+	// before it drops the centrals and returns, so accept is not called
+	// after Serve returned.
+	accepting sync.WaitGroup
+}
+
+// Serve implements contract.GATTService: accept runs for a central at its
+// first AcquireWrite or AcquireNotify, before any event of it is
+// delivered, one call at a time. When ctx ends — or Close ends the
+// peripheral — every central is disconnected and the application
+// unregistered; a failed unregister is Serve's error and stays owed to the
+// next RegisterService. A second Serve is refused with [ErrServing]; a
+// Serve after Close ended the unserved registration returns at once with
+// the peripheral's closed error.
+func (s *gattService) Serve(ctx context.Context, accept func(contract.BLEConnection)) error {
+	p := s.p
+	p.mu.Lock()
+	if s.serveCalled {
+		p.mu.Unlock()
+		return ErrServing
+	}
+	s.serveCalled = true
+	if s.state != svcRegistered {
+		p.mu.Unlock()
+		return errPeripheralClosed
+	}
+	s.state, s.accept = svcServing, accept
+	p.mu.Unlock()
+	close(s.served)
 	select {
 	case <-ctx.Done():
 	case <-p.done:
 	}
 	// No central is accepted from here on, so none outlives the drop.
 	p.mu.Lock()
-	p.serving = false
+	s.state = svcEnded
 	p.mu.Unlock()
+	close(s.ended)
+	s.accepting.Wait()
 	p.dropAll(true) //nolint:contextcheck // Serve's context has ended; each disconnect runs on a fresh bounded one
-	return p.unregisterApplication(context.WithoutCancel(ctx))
+	err := p.unregisterApplication(context.WithoutCancel(ctx))
+	p.endRegistration(s)
+	return err
+}
+
+// endRegistration releases the peripheral for the next RegisterService
+// once s ended; an unregister that failed stays owed (appOwed).
+func (p *peripheral) endRegistration(s *gattService) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.svc == s {
+		p.svc, p.c3 = nil, nil
+	}
 }
 
 // unregisterApplication is GattManager1.UnregisterApplication on a context
-// bounded by peripheralTimeout; the caller is the one running Serve.
-// Answered — or DoesNotExist, or the bus going away with the application —
-// the application is unexported. Any other failure keeps it exported and
-// the unregister owed to the next Serve, as unregisterAdvertisement keeps
-// the advertisement (review II, R2-P6-err-2012): no central reaches it
-// meanwhile, since connFor accepts only while Serve runs.
+// bounded by peripheralTimeout; the caller is the one that ends the
+// registration (Serve, Close, or RegisterService itself). Answered — or
+// DoesNotExist, or the bus going away with the application — the
+// application is unexported. Any other failure keeps it exported and the
+// unregister owed to the next RegisterService, as unregisterAdvertisement
+// keeps the advertisement (review II, R2-P6-err-2012): no central reaches
+// it meanwhile, since connFor accepts only while Serve runs.
 func (p *peripheral) unregisterApplication(ctx context.Context) error {
 	unregCtx, cancel := context.WithTimeout(ctx, peripheralTimeout)
 	defer cancel()
@@ -724,12 +843,34 @@ func deviceOf(options map[string]dbus.Variant) (dbus.ObjectPath, uint16, *dbus.E
 }
 
 // connFor is the connection of device, accepted at its first use of the
-// Matter service.
+// Matter service while Serve runs. A central that acquires C1 or C2 after
+// RegisterService returned but before Serve installed accept — the
+// service is registered, so bluetoothd may route it here, and the
+// contract has Serve call accept for every central that connects — is
+// held, not refused: the call waits until Serve installed accept, the
+// registration ended (refused then, as after Serve) or peripheralTimeout
+// passed (refused). A deprecated BLEPeripheral never had that gap, since
+// its Serve registered and served in one call.
 func (p *peripheral) connFor(device dbus.ObjectPath) (*pconn, *dbus.Error) {
+	refused := dbus.NewError(errFailed, []any{"No CHIPoBLE connection for the device"})
 	p.mu.Lock()
-	if !p.serving {
+	s := p.svc
+	p.mu.Unlock()
+	if s == nil {
+		return nil, refused
+	}
+	wait := time.NewTimer(peripheralTimeout)
+	select {
+	case <-s.served:
+	case <-s.ended:
+	case <-p.done:
+	case <-wait.C:
+	}
+	wait.Stop()
+	p.mu.Lock()
+	if p.svc != s || s.state != svcServing {
 		p.mu.Unlock()
-		return nil, dbus.NewError(errFailed, []any{"No CHIPoBLE connection for the device"})
+		return nil, refused
 	}
 	if c := p.conns[device]; c != nil {
 		p.mu.Unlock()
@@ -737,9 +878,13 @@ func (p *peripheral) connFor(device dbus.ObjectPath) (*pconn, *dbus.Error) {
 	}
 	c := newPConn(p, device)
 	p.conns[device] = c
-	accept := p.accept
+	accept := s.accept
+	s.accepting.Add(1)
 	p.mu.Unlock()
+	s.acceptMu.Lock()
 	accept(c)
+	s.acceptMu.Unlock()
+	s.accepting.Done()
 	c.startEvents()
 	go c.checkConnected()
 	return c, nil

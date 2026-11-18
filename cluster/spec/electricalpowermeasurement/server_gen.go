@@ -444,8 +444,7 @@ func (s *Server) RecordMeasurementPeriodRanges(data MeasurementPeriodRangesEvent
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMeasurementPeriodRanges, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMeasurementPeriodRanges(endpoint uint16, data MeasurementPeriodRangesEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMeasurementPeriodRanges, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

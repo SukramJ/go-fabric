@@ -238,8 +238,7 @@ func (s *Server) RecordPushTransportBegin(data PushTransportBeginEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPushTransportBegin, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPushTransportBegin(endpoint uint16, data PushTransportBeginEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPushTransportBegin, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -262,8 +261,7 @@ func (s *Server) RecordPushTransportEnd(data PushTransportEndEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordPushTransportEnd, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitPushTransportEnd(endpoint uint16, data PushTransportEndEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventPushTransportEnd, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }

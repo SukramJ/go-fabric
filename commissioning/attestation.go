@@ -30,14 +30,14 @@ var (
 	//
 	// Deprecated: use cluster/core.OperationalCredentials
 	// (core.NewOperationalCredentials), which answers AttestationRequest on
-	// the node; removable in the next minor release.
+	// the node; removable in v0.25.0.
 	ErrAttestationNonce = errors.New("commissioning: attestation nonce must be 32 bytes")
 	// ErrAttestationChallenge is returned when AttestationChallenge
 	// is not exactly 16 bytes.
 	//
 	// Deprecated: use cluster/core.OperationalCredentials
 	// (core.NewOperationalCredentials), which answers AttestationRequest on
-	// the node; removable in the next minor release.
+	// the node; removable in v0.25.0.
 	ErrAttestationChallenge = errors.New("commissioning: attestation challenge must be 16 bytes")
 )
 
@@ -45,7 +45,7 @@ var (
 //
 // Deprecated: use cluster/core.OperationalCredentials
 // (core.NewOperationalCredentials), which answers AttestationRequest on the
-// node; removable in the next minor release.
+// node; removable in v0.25.0.
 type AttestationInput struct {
 	// CertificationDeclaration is the CMS-signed CD bytes (Matter
 	// §6.3). Pre-flashed at the factory; the bridge stores it as
@@ -76,7 +76,7 @@ type AttestationInput struct {
 //
 // Deprecated: use cluster/core.OperationalCredentials
 // (core.NewOperationalCredentials), which answers AttestationRequest on the
-// node; removable in the next minor release.
+// node; removable in v0.25.0.
 type AttestationResult struct {
 	Elements  []byte // TLV-encoded (cert-declaration, nonce, timestamp, firmware)
 	Signature []byte // 64-byte r||s ECDSA-P256 over SHA256(elements || challenge)
@@ -90,7 +90,7 @@ type AttestationResult struct {
 //
 // Deprecated: use cluster/core.OperationalCredentials
 // (core.NewOperationalCredentials), which answers AttestationRequest on the
-// node; removable in the next minor release.
+// node; removable in v0.25.0.
 func BuildAttestation(in AttestationInput) (*AttestationResult, error) {
 	if len(in.AttestationNonce) != 32 {
 		return nil, fmt.Errorf("%w: got %d", ErrAttestationNonce, len(in.AttestationNonce))

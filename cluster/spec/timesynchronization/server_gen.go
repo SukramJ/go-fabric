@@ -348,8 +348,7 @@ func (s *Server) RecordDstTableEmpty(data DstTableEmptyEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordDstTableEmpty, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitDstTableEmpty(endpoint uint16, data DstTableEmptyEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventDstTableEmpty, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -372,8 +371,7 @@ func (s *Server) RecordDstStatus(data DstStatusEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordDstStatus, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitDstStatus(endpoint uint16, data DstStatusEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventDstStatus, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -396,8 +394,7 @@ func (s *Server) RecordTimeZoneStatus(data TimeZoneStatusEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordTimeZoneStatus, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitTimeZoneStatus(endpoint uint16, data TimeZoneStatusEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventTimeZoneStatus, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -420,8 +417,7 @@ func (s *Server) RecordTimeFailure(data TimeFailureEvent) error {
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordTimeFailure, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitTimeFailure(endpoint uint16, data TimeFailureEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventTimeFailure, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
@@ -444,8 +440,7 @@ func (s *Server) RecordMissingTrustedTimeSource(data MissingTrustedTimeSourceEve
 // spec.ErrNoEvents for a server without one.
 //
 // Deprecated: use RecordMissingTrustedTimeSource, which emits on the endpoint the server is
-// mounted on instead of one its caller names. Removable in the next
-// minor release.
+// mounted on instead of one its caller names. Removable in v0.25.0.
 func (s *Server) EmitMissingTrustedTimeSource(endpoint uint16, data MissingTrustedTimeSourceEvent) error {
 	return spec.EmitOn(s.Underlying(), endpoint, EventMissingTrustedTimeSource, data) //nolint:staticcheck // the deprecated typed emit keeps its behaviour
 }
