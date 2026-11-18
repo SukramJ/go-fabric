@@ -492,32 +492,43 @@ func (e *Entry) PeerTransportParameters() (transports uint16, maxTCPMessageSize 
 // ("baseInterval = isPeerActive ? activeInterval : idleInterval",
 // re-evaluated per transmission) and chip GetMRPBaseTimeout.
 func (e *Entry) RetransmitBaseInterval(_ time.Time) time.Duration {
+	idle, active, _, peerActive := e.PeerMRPSchedule()
+	if peerActive {
+		return active
+	}
+	return idle
+}
+
+// PeerMRPSchedule returns the peer's MRP schedule as a sender judges it
+// now: its idle and active intervals and its active threshold, each the
+// spec default where the peer advertised none, and whether the peer is
+// active — it sent a message within its active threshold.
+// [Entry.RetransmitBaseInterval] picks one interval of it; a bound on a
+// wait for the peer's answer sums the whole schedule (review II,
+// F-db021da0-13).
+func (e *Entry) PeerMRPSchedule() (idle, active, threshold time.Duration, peerActive bool) {
 	// The peer-active decision is an interval, judged on the clock's
 	// monotonic reading so a wall-clock step cannot flip it (matter.js
-	// Session.ts:149-151 on Time.nowUs); the caller's wall reading is
-	// accepted for the signature's sake and not consulted.
+	// Session.ts:149-151 on Time.nowUs).
 	e.mu.Lock()
 	lastPeer, lastPeerMono := e.lastPeerActivity, e.lastPeerActivityMono
 	idleMs, activeMs, thresholdMs := e.peerIdleIntervalMs, e.peerActiveIntervalMs, e.peerActiveThresholdMs
 	e.mu.Unlock()
 	nowMono := clock.MonotonicOf(e.clock)
 
-	idle := mrp.SessionIdleIntervalDefault
+	idle = mrp.SessionIdleIntervalDefault
 	if idleMs != 0 {
 		idle = time.Duration(idleMs) * time.Millisecond
 	}
-	active := mrp.SessionActiveIntervalDefault
+	active = mrp.SessionActiveIntervalDefault
 	if activeMs != 0 {
 		active = time.Duration(activeMs) * time.Millisecond
 	}
-	threshold := mrp.SessionActiveThresholdDefault
+	threshold = mrp.SessionActiveThresholdDefault
 	if thresholdMs != 0 {
 		threshold = time.Duration(thresholdMs) * time.Millisecond
 	}
-	if !lastPeer.IsZero() && nowMono-lastPeerMono < threshold {
-		return active
-	}
-	return idle
+	return idle, active, threshold, !lastPeer.IsZero() && nowMono-lastPeerMono < threshold
 }
 
 // MarkActiveTx updates the entry's activity timestamp after a

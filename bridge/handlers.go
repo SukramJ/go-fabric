@@ -1231,6 +1231,7 @@ type OperationalSessionLookup struct {
 	paseFor       func(sessionID uint16) (bool, bool)
 	intervalFor   func(sessionID uint16, now time.Time) (time.Duration, bool)
 	transportsFor func(sessionID uint16) (uint16, uint32, bool)
+	scheduleFor   func(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool)
 	markRx        func(sessionID uint16)
 	markTx        func(sessionID uint16)
 }
@@ -1403,6 +1404,42 @@ func (l *OperationalSessionLookup) TransportParametersFor(sessionID uint16) (tra
 		return 0, 0, false
 	}
 	return l.transportsFor(sessionID)
+}
+
+// SessionPeerScheduleResolver is an optional capability a [SessionLookup]
+// can implement so a wait for the peer's answer can be bounded by the
+// peer's whole MRP schedule: its idle and active intervals, its active
+// threshold and whether it is active now (typically
+// [operational.Entry.PeerMRPSchedule]). The bound of a chunk's
+// StatusResponse wait sums the peer's retransmissions on it, switching
+// from the active to the idle interval past the threshold, as matter.js's
+// maxResponseTimeOf does (review II, F-db021da0-13). Sessions the
+// resolver does not know answer ok false; the bound then sums one base
+// interval ([SessionRetransmitIntervalResolver]).
+type SessionPeerScheduleResolver interface {
+	PeerMRPSchedule(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool)
+}
+
+// WithPeerScheduleResolver wires the optional PeerMRPSchedule side of the
+// adapter ([SessionPeerScheduleResolver]). Pass a closure answering a known
+// session's schedule with ok true. Returns the receiver so callers can
+// chain.
+func (l *OperationalSessionLookup) WithPeerScheduleResolver(scheduleFor func(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool)) *OperationalSessionLookup {
+	if l == nil {
+		return nil
+	}
+	l.scheduleFor = scheduleFor
+	return l
+}
+
+// PeerMRPSchedule implements [SessionPeerScheduleResolver]. ok is false
+// when the adapter was built without a schedule closure or the session
+// is unknown.
+func (l *OperationalSessionLookup) PeerMRPSchedule(sessionID uint16) (idle, active, threshold time.Duration, peerActive, ok bool) {
+	if l == nil || l.scheduleFor == nil {
+		return 0, 0, 0, false, false
+	}
+	return l.scheduleFor(sessionID)
 }
 
 // RetransmitBaseInterval implements [SessionRetransmitIntervalResolver].
