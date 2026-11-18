@@ -248,7 +248,7 @@ func TestDecodeRoutesAMappedGroupMessage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("privacy=%v: %v", privacy, err)
 		}
-		if string(msg.Payload) != string(imPayload([]byte("payload"))) || msg.GroupID != 0x0101 || !msg.HasValidMapping ||
+		if !bytes.Equal(msg.Payload, imPayload([]byte("payload"))) || msg.GroupID != 0x0101 || !msg.HasValidMapping ||
 			!slices.Equal(msg.Endpoints, []uint16{3}) || msg.FabricIndex != 1 || msg.KeySetID != 0x10 || msg.Duplicate {
 			t.Fatalf("privacy=%v: decoded %+v", privacy, msg)
 		}
