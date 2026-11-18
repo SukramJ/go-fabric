@@ -104,7 +104,7 @@ func TestAttestationBlocksCommissioning(t *testing.T) {
 }
 
 // Attestation.Files are judged against the product (matter.js
-// DeviceCertification.#validateCertification, DeviceCertification.ts:107-144
+// DeviceCertification.#validateCertification, DeviceCertification.ts:107-145
 // at db021da0): a chain of another product id fails New, or blocks
 // commissioning under BlockCommissioningOnError; a config without a
 // product (the zero description) does not judge.

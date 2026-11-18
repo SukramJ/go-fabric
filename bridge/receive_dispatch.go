@@ -140,7 +140,7 @@ func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, 
 	// initiated (the peer speaks as the responder), is the last message of
 	// a report exchange: nothing of ours follows to piggyback its ack on,
 	// so the exchange closes and the ack goes out now. Mirrors matter.js
-	// packages/protocol/src/protocol/MessageExchange.ts:1150-1157 at
+	// packages/protocol/src/protocol/MessageExchange.ts:1150-1159 at
 	// db021da0 (close sends the standalone ack of the last received
 	// message at once, not after STANDALONE_ACK_TIMEOUT). Left to the ack
 	// pump's cadence, the peer's MRP layer holds the exchange open for the

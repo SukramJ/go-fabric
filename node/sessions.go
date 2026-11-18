@@ -20,7 +20,7 @@ import (
 // db021da0), which ServerNetworkRuntime.ts:364-367 hands the
 // SessionManager's sessionParameters and DeviceAdvertiser.ts:361-364 the
 // operational advertisement; omitted values fall back to
-// SessionIntervals.defaults (SessionIntervals.ts:36-50).
+// SessionIntervals.defaults (SessionIntervals.ts:36-49).
 type SessionIntervals struct {
 	// Idle is SESSION_IDLE_INTERVAL; 0 is 500 ms.
 	Idle time.Duration

@@ -24,7 +24,7 @@ import (
 // (packages/node/src/behavior/state/managed/Datasource.ts:1476-1481 at
 // db021da0). isDeepEqual compares content, not identity, so a fresh object
 // of equal content is no change
-// (packages/general/src/util/DeepEqual.ts:23-80 at db021da0). The Go value
+// (packages/general/src/util/DeepEqual.ts:23-89 at db021da0). The Go value
 // is compared in its wire form, the TLV element the bridge writes for it:
 // that is the value a subscriber sees, and it erases what the Go value
 // carries beyond it — a pointer's address, a nil slice against an empty
