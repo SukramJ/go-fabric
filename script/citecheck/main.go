@@ -22,9 +22,13 @@
 //     nearest the citation that is a matter.js commit, since a sentence may
 //     name the chip harness commit as well; a sentence naming none is
 //     checked at the pin. A sentence names a commit as `at <sha>` (or `at`
-//     before a backticked sha), as a sha opening a parenthesis or as
-//     "matter.js <sha>" — the last two only with a letter in the sha, since
-//     they frame plain numbers too (R2-P6-test-3202). A bare line part
+//     before a backticked sha), as a sha opening a parenthesis, as
+//     "matter.js <sha>" (R2-P6-test-3202), as a sha closing a parenthesis
+//     after a comma or semicolon, as "pin <sha>" or as "HEAD <sha>" (F3 of
+//     the wave-4 read) — every form but `at <sha>` only with a letter in the
+//     sha, since they frame plain numbers too: a sha abbreviated to digits
+//     only is skipped there, and the citation is checked at the pin unless
+//     the sentence names another commit. A bare line part
 //     (":12-14") whose nearest reference before it is a .ts file named
 //     without a line, or a part already bound, is bound to that file and
 //     checked as its citation; it is counted on its own (below).

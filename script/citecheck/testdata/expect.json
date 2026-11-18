@@ -17,7 +17,11 @@
     {"line": 28, "text": "Widget.ts:1", "shas": ["0123abcd"], "why": "the :3 after it follows a citation and is not bound"},
     {"line": 31, "text": "Widget.ts:2", "shas": ["0123abcd"], "why": "a sha opening a parenthesis"},
     {"line": 31, "text": "Widget.ts:3", "shas": ["4567cdef"], "why": "matter.js <sha>"},
-    {"line": 31, "text": "Widget.ts:1", "why": "a number in a parenthesis is no sha"}
+    {"line": 31, "text": "Widget.ts:1", "why": "a number in a parenthesis is no sha"},
+    {"line": 34, "text": "Widget.ts:2", "shas": ["89abcdef"], "why": "a sha closing a parenthesis after a comma"},
+    {"line": 34, "text": "Widget.ts:3", "shas": ["7654fedc"], "why": "pin <sha>"},
+    {"line": 34, "text": "Widget.ts:1", "shas": ["2345abcd"], "why": "HEAD <sha>"},
+    {"line": 34, "text": "Widget.ts:2", "why": "a sha of digits only after pin is a number"}
   ],
   "results": {
     "basename": "3 Widget.ts:40-42",

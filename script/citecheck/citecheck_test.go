@@ -129,7 +129,8 @@ const citecheckDriftRatchet = 330
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
-// (`at <sha>`, a sha opening a parenthesis, "matter.js <sha>"), so they are
+// (`at <sha>`, a sha opening or closing a parenthesis, "matter.js <sha>",
+// "pin <sha>", "HEAD <sha>"), so they are
 // measured there and not at the pin (R2-P6-test-3201, decision 123). The
 // committed summary.md carries the count and the rows per commit; exact in
 // both directions, as citecheckDriftRatchet: a new off-pin citation needs
@@ -370,8 +371,8 @@ func TestCheckAndDerive(t *testing.T) {
 	}
 
 	sum := summarise("pin", results)
-	if sum.citations != 15 || sum.files != 1 || len(sum.hard) != 4 || len(sum.drift) != 2 {
-		t.Errorf("summary: %d citations, %d files, %d hard, %d drift; want 15, 1, 4, 2", sum.citations, sum.files, len(sum.hard), len(sum.drift))
+	if sum.citations != 19 || sum.files != 1 || len(sum.hard) != 4 || len(sum.drift) != 2 {
+		t.Errorf("summary: %d citations, %d files, %d hard, %d drift; want 19, 1, 4, 2", sum.citations, sum.files, len(sum.hard), len(sum.drift))
 	}
 	// The two bare parts are checked and counted on their own: never a
 	// citation, a hard error or a drift of the run.

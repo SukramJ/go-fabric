@@ -30,3 +30,6 @@ func Parts() {}
 
 // One (0123abcd, Widget.ts:2). Two: matter.js 4567cdef Widget.ts:3. Three (1000000, Widget.ts:1).
 func Forms() {}
+
+// Four: Widget.ts:2 (packages/core/src/, 89abcdef). Five: at its pin 7654fedc (Widget.ts:3). Six (Widget.ts:1, HEAD 2345abcd). Seven: pin 12345678 Widget.ts:2.
+func MoreForms() {}

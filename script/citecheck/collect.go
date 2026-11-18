@@ -97,15 +97,21 @@ const serverName = "matterjs-server"
 
 // shaRE matches the forms in which a sentence names a commit: `at <sha>`
 // (or `at` before a backticked sha), a sha opening a parenthesis
-// ("(0ceb202d, packages/…)") and "matter.js <sha>" (R2-P6-test-3202 (b)). Each alternative has one group, the sha.
+// ("(0ceb202d, packages/…)"), "matter.js <sha>" (R2-P6-test-3202 (b)), a
+// sha closing a parenthesis after a comma or semicolon ("(packages/…/,
+// 0ceb202d)"), "pin <sha>" and "HEAD <sha>" (Fable's wave-4 read, F3). Each
+// alternative has one group, the sha.
 var shaRE = regexp.MustCompile("\\bat\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)" +
 	"|\\(`?([0-9a-f]{7,40})`?[,;)]" +
-	"|\\bmatter\\.js\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)")
+	"|\\bmatter\\.js\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)" +
+	"|[,;]\\s*`?([0-9a-f]{7,40})`?\\)" +
+	"|\\bpin\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)" +
+	"|\\bHEAD\\s+`?([0-9a-f]{7,40})`?(?:[^0-9A-Za-z]|$)")
 
-// shaSpans returns the span of the sha of every shaRE match in text. The
-// parenthesis and "matter.js <sha>" forms take a sha only when it has a
-// letter: those forms frame plain numbers too ("(1000000)"), and git
-// would resolve a number that happens to abbreviate a commit. A sha of
+// shaSpans returns the span of the sha of every shaRE match in text. Every
+// form but `at <sha>` takes a sha only when it has a letter: those forms
+// frame plain numbers too ("(1000000)", ", 1000000)", "pin 12345678"), and
+// git would resolve a number that happens to abbreviate a commit. A sha of
 // digits only is still read in the `at <sha>` form.
 func shaSpans(text string) [][2]int {
 	var out [][2]int
