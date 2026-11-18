@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// The address book's lifespans — node/client/Peers.ts:73-74 at 0ceb202d.
+// The address book's lifespans — node/client/Peers.ts:78-79 at db021da0.
 const (
 	// DefaultTTL is the lifespan of a discovered address or node whose
 	// TTL is unknown (DEFAULT_TTL, Peers.ts:73).
@@ -151,7 +151,7 @@ func (r *Registry) cull(ctx context.Context) error {
 // with id, or an allocated one when id is "" (:376; the id is the local
 // id a newly discovered node takes, matter.js Discovery.InstanceOptions.id,
 // packages/node/src/behavior/system/controller/discovery/Discovery.ts:269,
-// :355-357, :505-513 at 862ad75f — a found node keeps its own; an id
+// :355-357, :505-513 at db021da0 — a found node keeps its own; an id
 // another node holds is [ErrConfig]; a given id is reserved, so no
 // allocation hands it out again). The host runs discovery.Scanner and hands
 // the device over; Commission commissions the node. A device known by its
@@ -159,7 +159,7 @@ func (r *Registry) cull(ctx context.Context) error {
 // (controller.DeviceAt) — is a supported input: it matches no node and a
 // new one is created, as matter.js's MatterController.commission hands
 // Peers.forDescriptor a descriptor of the known address only
-// (packages/matter.js/src/MatterController.ts:545-549 at 862ad75f) and
+// (packages/matter.js/src/MatterController.ts:545-549 at db021da0) and
 // RemoteDescriptor.is matches nothing on an absent identifier
 // (RemoteDescriptor.ts:37-50).
 func (r *Registry) ForDevice(ctx context.Context, d Device, id string) (*Node, error) {
@@ -179,7 +179,7 @@ func (r *Registry) ForDevice(ctx context.Context, d Device, id string) (*Node, e
 // findOrCreate is one search of ForDevice under the registry's operation
 // mutex, so two sightings of one device find or create one node: matter.js
 // runs factory.find and factory.create in one turn of its event loop
-// (Peers.ts:371-389 at 862ad75f), a second forDescriptor finding the node
+// (Peers.ts:371-389 at db021da0), a second forDescriptor finding the node
 // the first created. A match under decommission is returned as the
 // operation to wait for.
 func (r *Registry) findOrCreate(d Device, id string) (*Node, *fabricOp, error) {

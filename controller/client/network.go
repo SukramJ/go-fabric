@@ -46,8 +46,8 @@ func (n *Node) defaultRequest() SubscribePaths {
 // endDefaultSubscription ends the default subscription and reports it not
 // subscribed if it was reported subscribed. Mirrors matter.js
 // NetworkClient.#endDefaultSubscription
-// (packages/node/src/behavior/system/network/NetworkClient.ts:238-251 at
-// 862ad75f).
+// (packages/node/src/behavior/system/network/NetworkClient.ts:239-252 at
+// db021da0).
 func (n *Node) endDefaultSubscription() {
 	n.mu.Lock()
 	s, wasActive := n.sub, n.subReported
@@ -63,7 +63,7 @@ func (n *Node) endDefaultSubscription() {
 
 // syncAutoSubscribe is NetworkClient.#syncAutoSubscribe with the node's
 // autoSubscribe, serialised with the other reactions (subSync, the
-// subscriptionChanges queue, NetworkClient.ts:113-115 at 862ad75f).
+// subscriptionChanges queue, NetworkClient.ts:114-116 at db021da0).
 func (n *Node) syncAutoSubscribe(ctx context.Context) error {
 	n.subSync.Lock()
 	defer n.subSync.Unlock()
@@ -220,8 +220,8 @@ func sameSubscribeOptions(a, b *SubscribeOptions) bool {
 // filter, it takes no data from that subscription until the switch
 // succeeds at the next start or the next change of the default
 // subscription. Mirrors matter.js NetworkClient.#adoptFabricFilter
-// (packages/node/src/behavior/system/network/NetworkClient.ts:273-298 at
-// 862ad75f): a record that failed while the filter is already the cache's
+// (packages/node/src/behavior/system/network/NetworkClient.ts:274-299 at
+// db021da0): a record that failed while the filter is already the cache's
 // is a warning, a failed switch an error. The caller holds subSync.
 //
 // Its error is ctx's and nothing else: ctx ended while the node's report
@@ -261,7 +261,7 @@ func (n *Node) adoptDefaultFabricFilter(ctx context.Context) error {
 // before it records no data version. A failed store write is returned and
 // the old record stays — written last, so the next attempt forgets the
 // versions again. Mirrors matter.js ClientStructure.adoptFabricFilter
-// (packages/node/src/node/client/ClientStructure.ts:343-390 at 862ad75f).
+// (packages/node/src/node/client/ClientStructure.ts:343-390 at db021da0).
 //
 // The drain it starts with ends with ctx, and it is the adoption's first
 // step: when ctx ends while jobs are still queued (a hook that blocks),
@@ -317,7 +317,7 @@ func (n *Node) adoptFabricFilterDrained(filtered bool) error {
 
 // recordCacheFabricFilteredLocked records the cache's fabric filter in the
 // store — ClientNodeStore.recordCacheFabricFiltered
-// (packages/node/src/storage/client/ClientNodeStore.ts:88-97 at 862ad75f),
+// (packages/node/src/storage/client/ClientNodeStore.ts:88-97 at db021da0),
 // under the settings' place. The caller holds n.mu.
 func (n *Node) recordCacheFabricFilteredLocked(filtered bool) error {
 	if n.erased {
@@ -769,7 +769,7 @@ func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 
 // evaluateSeeded marks the node seeded once its structure is known.
 // Mirrors matter.js packages/node/src/node/client/Peers.ts:760-797
-// (#evaluateSeeded at 862ad75f): BasicInformation is present and every
+// (#evaluateSeeded at db021da0): BasicInformation is present and every
 // endpoint the root's reported PartsList names (the valid endpoint
 // numbers) is installed — an empty PartsList is a node of its root only;
 // a node whose PartsList was not reported needs an endpoint beyond the

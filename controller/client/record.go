@@ -21,8 +21,8 @@ import (
 )
 
 // The node's commissioning record — matter.js CommissioningClient.State's
-// nonvolatile fields (behavior/system/commissioning/CommissioningClient.ts:927-1091
-// at 0ceb202d) — is stored with the image like the settings, on endpoint
+// nonvolatile fields (behavior/system/commissioning/CommissioningClient.ts:959-1126
+// at db021da0) — is stored with the image like the settings, on endpoint
 // 0 under a second cluster id no cluster has, one attribute id per field.
 const (
 	recordCluster uint32 = 0xFFFF_FFFE
@@ -559,7 +559,7 @@ const (
 // advertisable keeps the intervals a DNS-SD advertisement can carry and
 // drops the others, nil when none remains. Mirrors matter.js
 // SessionIntervals.advertisable (packages/protocol/src/session/
-// SessionIntervals.ts:99-118 at 862ad75f): SII and SAI whole milliseconds
+// SessionIntervals.ts:99-118 at db021da0): SII and SAI whole milliseconds
 // from 0 to an hour, SAT whole milliseconds from 1 to 65535 ("DiscoveryData
 // treats an SAT of 0 as absent, so a stored 0 must not apply either"),
 // which RemoteDescriptor applies both into the long form and out of it
@@ -604,9 +604,9 @@ func (r Record) device() *Device {
 // applyDevice refreshes the record from a commissionable device the
 // scanner found — RemoteDescriptor.toLongForm (RemoteDescriptor.ts:167-245)
 // over the device: discovered now (:191-193); the TTL unknown, so it is
-// [DefaultTTL] at expiry (Peers.ts:959-966) — as in matter.js, whose
+// [DefaultTTL] at expiry (Peers.ts:998-1005) — as in matter.js, whose
 // scanner states no TTL on a commissionable device or its addresses
-// (CommissionableMdnsScanner.ts:470-496, IpService.ts:316 at 0ceb202d); the
+// (CommissionableMdnsScanner.ts:470-496, IpService.ts:316 at db021da0); the
 // addresses only when there are any (:199-201), each discovered now; the
 // instance id (:203-205), the host (:210-212), the TXT keys (applyTXT),
 // the discriminator and commissioning mode (:236-242).

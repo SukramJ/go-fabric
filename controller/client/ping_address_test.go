@@ -40,7 +40,7 @@ func (cp *clientPair) ping(t *testing.T, n *client.Node, addr netip.AddrPort) (t
 // the session's address, the record's addresses or the peer's liveness
 // (matter.js ClientInteraction.probe with addressOverride,
 // packages/protocol/src/action/client/ClientInteraction.ts:352-412 at
-// 862ad75f).
+// db021da0).
 func TestPingAddress(t *testing.T) {
 	t.Parallel()
 	cp := newClientPair(t, clientPairOptions{rootOnly: true})
@@ -108,7 +108,7 @@ func TestPingAddressRefusals(t *testing.T) {
 
 // TestDecommissionProbeParity ports DecommissionTest "probe resolves false
 // on a destroyed node instead of throwing"
-// (packages/node/test/node/DecommissionTest.ts:301-320 at 862ad75f): the
+// (packages/node/test/node/DecommissionTest.ts:309-328 at db021da0): the
 // decommission completes with RemoveFabric's answer missing, and a late
 // ping of the removed node fails instead of panicking — matter.js's false
 // is the Go error.

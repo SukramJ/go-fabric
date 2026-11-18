@@ -39,8 +39,8 @@ func TestRegistryRecordFollowsDescriptorSave(t *testing.T) {
 	})
 }
 
-// TestRemovalConfirmedByFabricRemoved: CommissioningClient.ts:405-417 at
-// 0ceb202d counts FabricRemovedError among the causes that confirm a
+// TestRemovalConfirmedByFabricRemoved: CommissioningClient.ts:437-449 at
+// db021da0 counts FabricRemovedError among the causes that confirm a
 // RemoveFabric without a response.
 func TestRemovalConfirmedByFabricRemoved(t *testing.T) {
 	t.Parallel()

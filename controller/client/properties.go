@@ -25,7 +25,7 @@ import (
 
 // Properties are a node's physical properties — matter.js
 // PhysicalDeviceProperties (packages/protocol/src/peer/PhysicalDeviceProperties.ts:32-61
-// at 0ceb202d) as NodePhysicalProperties computes them from the image
+// at db021da0) as NodePhysicalProperties computes them from the image
 // (packages/node/src/node/NodePhysicalProperties.ts:30-194). A pointer
 // field is nil while unknown.
 type Properties struct {
@@ -52,7 +52,7 @@ type Properties struct {
 
 // Medium is the part of the properties a peer's network profile is
 // selected by (client/peer.NetworkProfiles.ForPeer, NetworkProfile.ts:184-221
-// at 862ad75f).
+// at db021da0).
 func (p Properties) Medium() peer.Medium {
 	m := peer.Medium{
 		SupportsThread: p.SupportsThread, SupportsWifi: p.SupportsWifi, SupportsEthernet: p.SupportsEthernet,

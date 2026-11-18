@@ -20,7 +20,7 @@ import (
 )
 
 // Node is the image of one remote node — matter.js ClientNode
-// (node/ClientNode.ts:55-409 at 0ceb202d) with the subscription and
+// (node/ClientNode.ts:57-414 at db021da0) with the subscription and
 // connection-state half of NetworkClient. It is safe for concurrent use.
 type Node struct {
 	cfg     Config
@@ -38,12 +38,12 @@ type Node struct {
 	s          *structure
 	// subSync serialises the default subscription's synchronisation
 	// ([Node.syncAutoSubscribe]) — matter.js's subscriptionChanges queue
-	// (NetworkClient.ts:113-115 at 862ad75f) — so Start and
+	// (NetworkClient.ts:114-116 at db021da0) — so Start and
 	// SetAutoSubscribe do not both establish one.
 	subSync sync.Mutex
 	// adoptMu runs the cache's fabric filter adoptions one after the
 	// other (ClientStructure.#adoptions, ClientStructure.ts:129, :357-358
-	// at 862ad75f).
+	// at db021da0).
 	adoptMu sync.Mutex
 
 	// mu guards the node's mutable state, every field below it, and the
@@ -208,7 +208,7 @@ func newNode(cfg Config) (*Node, error) {
 // applyIn applies a report of an interaction that started in the epoch
 // in to the image under the lock and delivers what it produced after —
 // ClientStructure.mutate with options.epoch (ClientStructure.ts:409, :427 at
-// 862ad75f); nil is the current epoch. emitEvents is mutate's
+// db021da0); nil is the current epoch. emitEvents is mutate's
 // options.emitEvents (ClientStructure.ts:412): the report's events reach
 // Hooks.Event and the cursor only when it is set. A read applies after its
 // exchange ended, so it writes and delivers on the caller's goroutine —
@@ -314,7 +314,7 @@ func (n *Node) configurationVersionsLocked() map[uint16]uint64 {
 // matter.js Peers #instrumentBasicInformation and
 // #instrumentBridgedConfigurationVersion, configurationVersion$Changed
 // emitting the endpoint's lifecycle.configurationVersionChanged
-// (packages/node/src/node/client/Peers.ts:757, :803-814 at 862ad75f).
+// (packages/node/src/node/client/Peers.ts:757, :803-814 at db021da0).
 // The caller holds the lock.
 func (n *Node) changedConfigurationVersionsLocked(before map[uint16]uint64) []*Endpoint {
 	var out []*Endpoint
@@ -707,7 +707,7 @@ func (n *Node) Disable(ctx context.Context) error {
 	// Every subscription of the node goes, not only the default one:
 	// ClientNode.disable cancels the node's interaction, which closes the
 	// subscriptions it owns (ClientNode.ts:239-253, ClientInteraction.ts:270-282
-	// at 862ad75f; ClientConnectivityTest "closes a non-sustained
+	// at db021da0; ClientConnectivityTest "closes a non-sustained
 	// subscription when the node is disabled").
 	if ia, err := n.interaction(); err == nil {
 		ia.CloseSubscriptions()
@@ -736,7 +736,7 @@ func (n *Node) Enable(ctx context.Context) error {
 
 // LoadError is why a stored node failed to load ([ErrLoadFailed] with the
 // cause), nil for a node that loaded — matter.js's construction error of
-// a peer kept unavailable (Peers.ts:144-161 at 862ad75f).
+// a peer kept unavailable (Peers.ts:144-161 at db021da0).
 func (n *Node) LoadError() error {
 	n.mu.RLock()
 	defer n.mu.RUnlock()

@@ -20,9 +20,9 @@ import (
 // (packages/node/test/node/client/PeersLoadFailureTest.ts at 862ad75f):
 // a stored node whose peer names a fabric the controller does not have —
 // a peer store and a fabric store restored from different backups — is
-// kept, unavailable with the cause (Peers.ts:144-161), the warning logged
-// once and naming it; the fabric's other node loads and is the one
-// commissioned node.
+// kept, unavailable with the cause (Peers.ts:144-161 at db021da0), the
+// warning logged once and naming it; the fabric's other node loads and is
+// the one commissioned node.
 func TestPeersLoadFailureParity(t *testing.T) {
 	t.Parallel()
 	log := &msgLog{}

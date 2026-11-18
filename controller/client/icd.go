@@ -598,7 +598,7 @@ func (c *ICDClient) flushAnnouncements() {
 // stored registration (IcdClient.ts:444-456). The caller holds commitMu.
 // The registration in memory takes reg either way; a store error is logged
 // and returned — a commit that fails in its second phase, whose state
-// stays committed in memory (IcdClientTest.ts:806-824 at 862ad75f).
+// stays committed in memory (IcdClientTest.ts:806-824 at db021da0).
 func (c *ICDClient) persist(reg *ICDRegistration) error {
 	var before bool
 	c.mu.Lock()
@@ -1175,7 +1175,7 @@ func (c *ICDClient) offerKey(op *icdOperation) error {
 		entry.PendingKey = key
 		// A pending key the store refused is not offered: the refresh
 		// fails, the key stays pending in memory and the next Check-In
-		// retries (IcdClient.ts:882-901, :860-869 at 862ad75f; the commit
+		// retries (IcdClient.ts:882-901, :860-869 at db021da0; the commit
 		// that persists it rejects).
 		if err := c.persist(&ICDRegistration{
 			Key: entry.Key, PendingKey: key, CounterStart: entry.CounterStart, LastOffset: entry.LastOffset,

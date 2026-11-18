@@ -49,11 +49,11 @@ func initiate(t *testing.T, site *fabrictest.Site, u *fabrictest.Pair, nodeID ui
 
 // TestSplitCommissioningParity ports matter.js's SplitCommissioningTest
 // (packages/node/test/node/SplitCommissioningTest.ts at 862ad75f) onto
-// Registry.CompleteCommissioning (Peers.ts:236-359). matter.js runs the
-// two halves on two controllers that share a fabric; fabrictest gives each
-// controller its own CA and fabric, so the port runs both halves on one
-// controller — the commissioner's FinalizeCommissioning hands off, the
-// registry completes — which exercises the same completion.
+// Registry.CompleteCommissioning (Peers.ts:236-359 at db021da0). matter.js
+// runs the two halves on two controllers that share a fabric; fabrictest
+// gives each controller its own CA and fabric, so the port runs both
+// halves on one controller — the commissioner's FinalizeCommissioning
+// hands off, the registry completes — which exercises the same completion.
 func TestSplitCommissioningParity(t *testing.T) {
 	t.Parallel()
 

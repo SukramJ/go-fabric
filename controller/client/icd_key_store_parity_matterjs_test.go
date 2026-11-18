@@ -32,7 +32,7 @@ func (s *failingICDStore) Save(id string, ep uint16, cluster uint32, values map[
 // TestIcdClientKeyStoreParity ports IcdClientTest's "offers no key and
 // keeps the receive path on the committed state when storing the offered
 // key fails" (packages/node/test/behavior/system/icd/IcdClientTest.ts:806-824
-// at 862ad75f): the pending key the store refused stays committed in
+// at db021da0): the pending key the store refused stays committed in
 // memory and in the Check-In receive path, but it is never offered, so
 // the device keeps the old key (IcdClient.ts:882-901, :860-869).
 func TestIcdClientKeyStoreParity(t *testing.T) {

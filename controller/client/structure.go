@@ -45,8 +45,8 @@ type emission struct {
 // (ClientStructure.ts:1634-1649).
 type pendingChange struct{ erase, install, rebuild bool }
 
-// structure is matter.js ClientStructure (node/client/ClientStructure.ts:115-1564
-// at 0ceb202d): the endpoints and clusters the peer's reports describe. Its
+// structure is matter.js ClientStructure (node/client/ClientStructure.ts:123-1773
+// at db021da0): the endpoints and clusters the peer's reports describe. Its
 // state is guarded by the node's lock; every method expects it held.
 type structure struct {
 	// mu is the owning Node's lock (Node.mu); it guards every field of the
@@ -78,7 +78,7 @@ type structure struct {
 	// recordedFabricFiltered is the fabric filter the cache records, nil
 	// before one is recorded — ClientNodeStore.cacheFabricFiltered
 	// (packages/node/src/storage/client/ClientNodeStore.ts:80-97 at
-	// 862ad75f); [structure.cacheFabricFiltered] reads it.
+	// db021da0); [structure.cacheFabricFiltered] reads it.
 	recordedFabricFiltered *bool
 	// epoch is the epoch an interaction starting now belongs to
 	// (ClientStructure.ts:128, :335-341).
@@ -116,7 +116,7 @@ func newStructure(mu *sync.RWMutex, log *slog.Logger, p *persister) *structure {
 }
 
 // epoch is ClientStructure.Epoch (ClientStructure.ts:1776-1782 at
-// 862ad75f): an interaction records the data versions it reports only if
+// db021da0): an interaction records the data versions it reports only if
 // its epoch is still the current one and trusted when its data is
 // applied; a change of the cache's fabric filter starts a new one, and
 // while the versions are forgotten the epoch is not trusted. Not
@@ -127,7 +127,7 @@ type epoch struct{ trusted bool }
 // takes data from: only they update cached values and data versions, and
 // only they get versions injected. Fabric filtered until a filter is
 // recorded. Mirrors matter.js ClientStructure.cacheFabricFiltered
-// (packages/node/src/node/client/ClientStructure.ts:326-333 at 862ad75f).
+// (packages/node/src/node/client/ClientStructure.ts:326-333 at db021da0).
 func (s *structure) cacheFabricFiltered() bool {
 	return s.recordedFabricFiltered == nil || *s.recordedFabricFiltered
 }
@@ -217,7 +217,7 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 // withKnownVersions is the version filters a read or subscription sends —
 // the caller's own, kept as given and first, then the injected ones.
 // Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-323
-// (injectVersionFilters at 862ad75f): a request with the other fabric
+// (injectVersionFilters at db021da0): a request with the other fabric
 // filter than the cache's, or one sent while the epoch is not trusted,
 // gets none injected (:288), and a cluster the caller filters gets no
 // injected filter (:293-295, :312), so the peer sees exactly the
@@ -957,7 +957,7 @@ func (s *structure) resolvePartClaims() {
 				continue
 			}
 			// The warning for the other claimants comes after the root's
-			// check of the part (ClientStructure.ts:1455-1471 at 862ad75f).
+			// check of the part (ClientStructure.ts:1455-1471 at db021da0).
 			if len(contenders) > 0 {
 				others := make([]int, 0, len(contenders))
 				for _, o := range contenders {
@@ -1008,7 +1008,7 @@ func (s *structure) isOnTheNode(ep *Endpoint) bool {
 // ownerFor is the claimant that owns a part, with the claimants that
 // conflict with that choice, nil while that cannot be told. Mirrors
 // matter.js packages/node/src/node/client/ClientStructure.ts:1509-1551
-// (#ownerFor at 862ad75f): a claimant the root does not name owns nothing
+// (#ownerFor at db021da0): a claimant the root does not name owns nothing
 // (:1513-1518), one whose composition is unknown makes the part wait
 // (:1520-1525); an ordinary claimant is closer to the part than any
 // full-family one (:1530-1533); among the candidates the closest wins
@@ -1064,7 +1064,7 @@ func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders
 // with the shorter PartsList, then the one with the lower endpoint number
 // — the choice depends on the lists, not on the order they arrived in.
 // Mirrors matter.js ClientStructure.ts:1553-1578 (#closestClaimant at
-// 862ad75f).
+// db021da0).
 func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint {
 	rank := func(c *Endpoint) [3]int {
 		parts := s.partsListOf[c]
@@ -1088,7 +1088,7 @@ func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint
 // partsAccountedFor: every endpoint ep names has reported a PartsList of
 // its own; an endpoint the root no longer names reports nothing more and
 // is not waited for. Mirrors matter.js ClientStructure.ts:1580-1599
-// (#partsAccountedFor at 862ad75f).
+// (#partsAccountedFor at db021da0).
 func (s *structure) partsAccountedFor(ep *Endpoint) bool {
 	rootParts, rootReported := s.partsListOf[s.endpoints[0]]
 	for partNo := range s.partsListOf[ep] {

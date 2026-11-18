@@ -26,8 +26,8 @@ var (
 
 // Cluster is one cluster of an endpoint of the image: its values, its
 // DataVersion and its shape — the analysis matter.js's PeerBehavior makes
-// of a discovered cluster (node/client/PeerBehavior.ts:403-467 at 0ceb202d)
-// from the cluster's global attributes (ClientStructure.ts:754-837). Its
+// of a discovered cluster (node/client/PeerBehavior.ts:403-467 at db021da0)
+// from the cluster's global attributes (ClientStructure.ts:872-955). Its
 // methods are safe for concurrent use.
 type Cluster struct {
 	// mu is the owning Node's lock (Node.mu), shared by the structure and
@@ -229,7 +229,7 @@ func (c *Cluster) Ready() bool { return c.exposed() != nil }
 // Revision is the peer's ClusterRevision; when it reported none or one
 // below 1 the model's — the snapshot's revision of the cluster, 1 for a
 // cluster the snapshot does not know (PeerBehavior.ts:426-434 at
-// 862ad75f: the revision override only for a valid, differing one;
+// db021da0: the revision override only for a valid, differing one;
 // PeerBehaviorTest "tolerates a peer that does not report a revision").
 // 0 while the cluster has no shape.
 func (c *Cluster) Revision() uint16 {

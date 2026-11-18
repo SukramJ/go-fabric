@@ -40,8 +40,8 @@ type RegistryConfig struct {
 	// the commissioner binds.
 	Subscriptions *interaction.Subscriptions
 	// AutoStart starts every commissioned, enabled node in Start —
-	// matter.js NetworkServer.autoStartCommissionedPeers (NetworkServer.ts:236,
-	// read by Peers.#nodeOnline, Peers.ts:164-175 at 862ad75f). matter.js
+	// matter.js NetworkServer.autoStartCommissionedPeers (NetworkServer.ts:242,
+	// read by Peers.#nodeOnline, Peers.ts:164-175 at db021da0). matter.js
 	// defaults it to true; the registry, a seam below the controller,
 	// leaves it to its composer: controller.New sets it unless
 	// controller.Config.ManualStart, so the controller's default is
@@ -97,7 +97,7 @@ var (
 const idPrefix = "peer"
 
 // Registry is the controller's set of client nodes — matter.js Peers
-// (node/client/Peers.ts:88-894 at 0ceb202d), the ServerNode's container
+// (node/client/Peers.ts:93-933 at db021da0), the ServerNode's container
 // of ClientNodes: it restores every stored node, starts the commissioned
 // ones, allocates local ids, finds or creates a node for a discovered
 // device or a peer address, serializes commission and decommission per
@@ -109,7 +109,7 @@ const idPrefix = "peer"
 // to it was active stays commissioned, and commissioning the device again
 // finds that node by its commissionable instance and is refused with
 // [ErrAlreadyCommissioned] until the node is erased — as matter.js at
-// 862ad75f: a leave event without an active subscription is ignored
+// db021da0: a leave event without an active subscription is ignored
 // (Peers.ts:855-862), Peers.forDescriptor hands out the node the
 // descriptor matches (Peers.ts:371-389; its `find` is Peers.ts:981-991,
 // the ClientNodeFactory implementation),
@@ -199,7 +199,7 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 		if err != nil {
 			// A node that cannot load is kept, unavailable, with the
 			// cause — its id stays visible and the others load
-			// (Peers.ts:144-161 at 862ad75f).
+			// (Peers.ts:144-161 at db021da0).
 			r.log.Warn("matter.controller.client.registry.load_failed", slog.String("node", id), slog.Any("err", err))
 			if n, err = r.unavailable(id, err); err != nil {
 				continue
@@ -415,7 +415,7 @@ func (r *Registry) bindPeer(n *Node, p *peer.Peer) {
 	// The peer's medium selects its network profile: matter.js sets the
 	// peer's physicalProperties from the client node at startup
 	// (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
-	// 862ad75f).
+	// db021da0).
 	p.SetMedium(func() peer.Medium { return n.Properties().Medium() })
 	follow := func() {
 		d := p.Descriptor()
@@ -647,7 +647,7 @@ func (r *Registry) Nodes() []*Node {
 
 // Commissioned are the operational nodes with a peer address — a group
 // address names no commissioned node — Peers.commissioned (Peers.ts:410-413
-// at 862ad75f: nodeType "client" and commissioned).
+// at db021da0: nodeType "client" and commissioned).
 func (r *Registry) Commissioned() []*Node {
 	var out []*Node
 	for _, n := range r.Nodes() {

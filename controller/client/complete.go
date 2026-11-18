@@ -39,7 +39,7 @@ type CompleteOptions struct {
 // CompleteCommissioning finishes, on this registry, a commissioning
 // another commissioner ran up to its operational hand-off (PASE, the NOC,
 // commissioner.Options.FinalizeCommissioning) — Peers.completeCommissioning
-// (packages/node/src/node/client/Peers.ts:236-359 at 862ad75f): the node
+// (packages/node/src/node/client/Peers.ts:236-359 at db021da0): the node
 // of nodeID on the shared fabric, unless it is commissioned already
 // ([ErrAlreadyCommissioned], :258-266), is created, its peer seeded with
 // the discovery data and session parameters (:278-287), set up as a

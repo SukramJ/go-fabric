@@ -74,7 +74,7 @@ func (n *Node) opCreds() *Cluster {
 // Mirrors matter.js CommissioningClient.#backfillFabricIndexOnPeer and its
 // currentFabricIndex$Changed reaction
 // (packages/node/src/behavior/system/commissioning/CommissioningClient.ts:605-630
-// at 862ad75f).
+// at db021da0).
 func (n *Node) backfillFabricIndexOnPeer() {
 	n.mu.RLock()
 	missing := n.record.PeerAddress != nil && n.record.FabricIndexOnPeer == 0 && !n.erased

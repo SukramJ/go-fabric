@@ -99,7 +99,7 @@ func (c *cache) externalSet(values map[uint32]*spec.Node, version *uint32) {
 }
 
 // externalSetUnversioned is externalSet with the version set unknown —
-// #applyUpdates' UNKNOWN_VERSION (ClientStructure.ts:674-678 at 862ad75f).
+// #applyUpdates' UNKNOWN_VERSION (ClientStructure.ts:674-678 at db021da0).
 func (c *cache) externalSetUnversioned(values map[uint32]*spec.Node) {
 	if c.erased {
 		return
@@ -113,7 +113,7 @@ func (c *cache) externalSetUnversioned(values map[uint32]*spec.Node) {
 // flush in hand lands first — and returns the store's error. Mirrors
 // matter.js DatasourceCache.forgetVersion
 // (packages/node/src/storage/client/DatasourceCache.ts:318-332 at
-// 862ad75f). The caller holds the node's lock.
+// db021da0). The caller holds the node's lock.
 func (c *cache) forgetVersion() error {
 	if c.erased {
 		return nil
@@ -146,7 +146,7 @@ func (c *cache) discard() {
 }
 
 // erase disables the cache and erases its cluster from the store
-// (DatasourceCache.ts:219-222).
+// (DatasourceCache.ts:351-354 at db021da0).
 func (c *cache) erase() {
 	c.discard()
 	if err := c.p.store.EraseCluster(c.p.nodeID, c.ep, c.cluster); err != nil {

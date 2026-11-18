@@ -277,7 +277,7 @@ func TestClientNodeParity(t *testing.T) {
 
 	// A device that leaves the fabric flushes the Leave event to its
 	// subscribers before the fabric's rows go; the controller erases the
-	// node (ClientNodeTest.ts:2953-2977 at 862ad75f, Fabric.ts:447-457).
+	// node (ClientNodeTest.ts:2953-2977 at db021da0, Fabric.ts:447-457).
 	t.Run("erases node after leave event", func(t *testing.T) {
 		t.Parallel()
 		cp := newClientPair(t, clientPairOptions{})

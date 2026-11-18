@@ -79,7 +79,7 @@ type SubscribeOptions struct {
 	// keeps the values of one fabric view: those of interactions with its
 	// recorded filter, which adopts the default subscription's at Start and
 	// at [Node.SetDefaultSubscription] (ClientStructure.ts:343-390,
-	// :573-576 at 862ad75f).
+	// :573-576 at db021da0).
 	NoFabricFilter bool
 	// KeepSubscriptions keeps our other subscriptions with the peer
 	// (keepSubscriptions true); the default subscription replaces them.
@@ -169,7 +169,7 @@ type Hooks struct {
 	// start a fabric operation of the same registry.
 	Deleted func()
 	// Commissioned: the registry commissioned the node — matter.js
-	// lifecycle.commissioned (CommissioningClient.ts:325 at 0ceb202d),
+	// lifecycle.commissioned (CommissioningClient.ts:359 at db021da0),
 	// emitted after the record and settings are saved and before the node
 	// starts.
 	Commissioned func()
@@ -224,6 +224,6 @@ var (
 	ErrConfig = errors.New("client: invalid config")
 	// ErrLoadFailed: a stored node that failed to load — [Node.LoadError]
 	// and its Start; the registry keeps it so its id stays visible
-	// (Peers.ts:144-161 at 862ad75f).
+	// (Peers.ts:144-161 at db021da0).
 	ErrLoadFailed = errors.New("client: node is unavailable because it failed to load")
 )

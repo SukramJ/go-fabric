@@ -181,7 +181,7 @@ func PatchRemoveFabric(r *Registry, fn func(fabricIndex uint8, invoke func(fabri
 // EmitLeave delivers a BasicInformation Leave event of fabricIndex to r as
 // n's subscription does (onEvent) and waits for the reaction it starts —
 // matter.js's leave.emit on the peer's BasicInformationClient events
-// (DecommissionTest.ts:231 at 862ad75f).
+// (DecommissionTest.ts:239 at db021da0).
 func EmitLeave(r *Registry, n *Node, fabricIndex uint8) {
 	r.onEvent(n, 0, basicinformation.ClusterID, basicinformation.EventLeave, basicinformation.LeaveEvent{FabricIndex: fabricIndex})
 	r.work.Wait()
