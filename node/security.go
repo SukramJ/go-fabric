@@ -10,6 +10,7 @@ package node
 // brief R migrates onto this package.
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -102,6 +103,10 @@ type caseIdentities struct {
 	groups *groups.Manager
 	// loads counts the loads: the last one's [caseFabric.gen].
 	loads uint64
+	// resumptions is the store the handshakes' resumption records go to;
+	// [caseIdentities.persistAdmitted] removes one again that an update
+	// overtook. Nil keeps every record (tests that build no node).
+	resumptions store.Resumption
 }
 
 func newCaseIdentities(logger *slog.Logger, g *groups.Manager) *caseIdentities {
@@ -354,6 +359,40 @@ func (c *caseIdentities) admitSessionAt(sessions *operational.Manager, fabricInd
 		return nil, err
 	}
 	return entry, nil
+}
+
+// persistAdmitted stores rec, the resumption record of a session admitted
+// under load gen (0: any) of its fabric's identity, and checks the
+// admission once more after the store: an UpdateNOC whose identity load
+// and RemoveResumptionsByFabric both ran between the admit and the store
+// would leave a record made under the replaced NOC (facade residual 3b of
+// R2-P6-sec-2412), which [caseIdentities.dropIfReplaced] removes again.
+// matter.js deletes a fabric's records when it replaces the fabric
+// (packages/protocol/src/common/FailsafeContext.ts:167-170 at db021da0);
+// the update's own sweep (node.fabricUpdated) closes the session. The
+// error is the store's.
+func (c *caseIdentities) persistAdmitted(ctx context.Context, sessions *operational.Manager, gen uint64, rec store.ResumptionRecord) error {
+	if err := sessions.PersistResumptionRecord(ctx, rec); err != nil {
+		return err
+	}
+	c.dropIfReplaced(ctx, gen, rec)
+	return nil
+}
+
+// dropIfReplaced removes rec from the store when its handshake's identity
+// (load gen of rec's fabric) is no longer admissible — only while the
+// peer's record is still rec: a later handshake's record stays.
+func (c *caseIdentities) dropIfReplaced(ctx context.Context, gen uint64, rec store.ResumptionRecord) {
+	if c.resumptions == nil || c.admissible(rec.FabricIndex, gen) == nil {
+		return
+	}
+	cur, err := c.resumptions.GetResumptionByPeer(ctx, rec.FabricIndex, rec.PeerNodeID)
+	if err != nil || !bytes.Equal(cur.ResumptionID, rec.ResumptionID) {
+		return
+	}
+	if err := c.resumptions.RemoveResumption(ctx, rec.FabricIndex, rec.PeerNodeID); err != nil {
+		c.logger.Warn("case.resumption.remove_failed", slog.Int("fabric_index", int(rec.FabricIndex)), slog.Any("err", err))
+	}
 }
 
 // admissible reports why a handshake that began under load gen (0: any)
@@ -736,7 +775,7 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 				if p := res.PeerSessionParams; p != nil {
 					rec.SessionParameters = *p
 				}
-				if err := sessions.PersistResumptionRecord(ctx, rec); err != nil {
+				if err := ids.persistAdmitted(ctx, sessions, gen, rec); err != nil {
 					logger.Debug("case.initiator.resumption_persist", slog.Any("err", err))
 				}
 				return nil
@@ -1139,7 +1178,8 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		// Admitted under the load the handshake answered under: an update
 		// that lands after the stake was taken refuses the install
 		// (review II, R2-P6-sec-2412).
-		entry, openErr := ids.admitSessionAt(sessions, fabricIndex, held.genOf(fabricIndex), func() (*operational.Entry, error) {
+		gen := held.genOf(fabricIndex)
+		entry, openErr := ids.admitSessionAt(sessions, fabricIndex, gen, func() (*operational.Entry, error) {
 			// The install takes this handshake's stake, not the bare id:
 			// a stake an allocation at a full table took over installs
 			// nothing (operational.ErrStakeLost, N3-findev-1).
@@ -1187,7 +1227,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 						params = prev.SessionParameters
 					}
 				}
-				if err := sessions.PersistResumptionRecord(context.Background(), store.ResumptionRecord{
+				if err := ids.persistAdmitted(context.Background(), sessions, gen, store.ResumptionRecord{
 					FabricIndex: fabricIndex, PeerNodeID: peerNodeID, ResumptionID: id, SharedSecret: secret,
 					CASEAuthTags: peerCATs, SessionParameters: params,
 				}); err != nil {

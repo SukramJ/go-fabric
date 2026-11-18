@@ -394,6 +394,7 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	}
 	n.caseIDs = newCaseIdentities(n.logger, n.groups)
 	n.caseIDs.clock = n.cfg.Clock
+	n.caseIDs.resumptions = n.st
 	// A KeySetWrite or KeySetRemove reloads the fabric's group state; the
 	// CASE identity follows key set 0 (matter.js Fabric.destinationIdsFor
 	// reads the fabric's KeySets, which GroupKeyManagementServer.keySetWrite
