@@ -25,10 +25,10 @@ import (
 // event has already happened, so an observer returns nothing.
 //
 // The name follows matter.js, whose node events are Observables that
-// observers attach to (packages/protocol/src/fabric/FabricManager.ts:
-// 41-48 `#events`); a failing observer is logged and the remaining
-// observers still run (FabricManager.ts:404-410 `unhandled`, "Log
-// unhandled errors but do not abort deletion").
+// observers attach to (packages/protocol/src/fabric/
+// FabricManager.ts:44-51 `#events`); a failing observer is logged and the
+// remaining observers still run (FabricManager.ts:405-411 `unhandled` at
+// db021da0, "Log unhandled errors but do not abort deletion").
 //
 // They follow the node's one callback rule (ADR 0025 principle 8):
 // [Config].Observers and [Node.Observe] run on the goroutine of the event
@@ -51,7 +51,8 @@ type Observers struct {
 	// the last fabric the node's own window reopens afterwards, once the
 	// node is idle — no fail-safe armed and no session left (matter.js
 	// #resetWhenIdle); OnWindowTransition reports that. Mirrors
-	// matter.js FabricManager `events.deleted` (FabricManager.ts:253).
+	// matter.js FabricManager `events.deleted` (FabricManager.ts:272 at
+	// db021da0).
 	// The removal a fail-safe rollback owes is kept in the store until it
 	// ran (store.OwedFabricEvent), so it reaches the host at least once:
 	// after a crash between the rollback and this hook — or in the
@@ -67,9 +68,10 @@ type Observers struct {
 	// fabric's other sessions, and after an UpdateFabricLabel or a
 	// SetVIDVerificationStatement changed a fabric under the same
 	// identity (nothing for the facade to move). Mirrors matter.js
-	// FabricManager `events.replaced` (FabricManager.ts:236-246, :377),
+	// FabricManager `events.replaced` (FabricManager.ts:236-249, :401),
 	// which a fabric's persist emits too, and CommissioningServer's
-	// fabricsChanged(index, "updated") (CommissioningServer.ts:118-141).
+	// fabricsChanged(index, "updated") (CommissioningServer.ts:118-141 at
+	// db021da0).
 	// The revert a fail-safe rollback of an UpdateNOC owes is delivered at
 	// least once, as OnFabricRemoved's removal is: a host may hear it
 	// twice after a crash.
@@ -102,11 +104,11 @@ type Observers struct {
 	// controller's subscription — with the session as [Node.SessionDiagnostics]
 	// lists it. A PASE session is not reported. Mirrors matter.js
 	// SessionsBehavior's `opened` event (packages/node/src/behavior/system/
-	// sessions/SessionsBehavior.ts:57-64, declared at :124).
+	// sessions/SessionsBehavior.ts:57-64, declared at :124, at db021da0).
 	OnSessionOpened func(SessionInfo)
 	// OnSessionClosed runs after a session OnSessionOpened reported closed,
 	// with its last state. Mirrors SessionsBehavior's `closed` event
-	// (SessionsBehavior.ts:66-73, :125).
+	// (SessionsBehavior.ts:66-73, :125 at db021da0).
 	OnSessionClosed func(SessionInfo)
 	// OnSubscriptionsChanged runs after a subscription was added to or
 	// closed on a session OnSessionOpened reported, with the session and

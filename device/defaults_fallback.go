@@ -18,11 +18,13 @@ import (
 // lists them.
 //
 // matter.js starts the state of a behaviour at SelectDefaultValue for every
-// attribute it supports (packages/node/src/behavior/cluster/ClusterBehaviorType.ts:314-317,
-// packages/model/src/logic/SelectDefaultValue.ts:20-27 and
-// defaultValueForMetatype :137-169 at 862ad75f): the stated default, else
-// null for a nullable attribute, 0 for a number, false for a boolean, an
-// empty list, and an empty bitmap; an enum, a string and bytes have none.
+// attribute it supports and no base or known default states
+// (packages/node/src/behavior/internal/ClusterDerivation.ts:141-144,
+// packages/model/src/logic/SelectDefaultValue.ts:22-34 and
+// defaultValueForMetatype :144-176 at db021da0): the cluster's revision for
+// ClusterRevision (:28-31), else the stated default, else null for a
+// nullable attribute, 0 for a number, false for a boolean, an empty list,
+// and an empty bitmap or struct; an enum, a string and bytes have none.
 // Then the default server's initialize fills what the state still leaves
 // unset ([initializeDefaults]).
 

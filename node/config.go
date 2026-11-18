@@ -48,7 +48,8 @@ type Groups = groups.Manager
 // the subset the reference daemon uses; the rest is what the daemon's
 // bring-up needs beyond them (examples/reference-bridge/main.go:84-497 at b4ea1f96^).
 type Config struct {
-	// Network mirrors matter.js `network` (NetworkServer.ts:202-222).
+	// Network mirrors matter.js `network` (NetworkServer.ts:202-223 at
+	// db021da0).
 	Network Network
 	// Commissioning mirrors matter.js `commissioning`
 	// (CommissioningServer.ts:409-419 at db021da0). An uncommissioned
@@ -277,7 +278,8 @@ type Config struct {
 }
 
 // Network is matter.js `network` for the keys the daemon uses
-// (NetworkServer.ts:202-222: port and listening address, ipv4, tcp).
+// (NetworkServer.ts:202-223 at db021da0: port and listening address,
+// ipv4, tcp).
 type Network struct {
 	// Listen is the UDP listen address; empty is ":5540".
 	Listen string
@@ -368,7 +370,7 @@ type TimeSynchronization struct {
 	// has no UTC clock: TimeSnapshot answers SystemTimeMs alone and
 	// PosixTimeMs null, as matter.js GeneralDiagnosticsServer.timeSnapshot
 	// does without a TimeSynchronizationBehavior
-	// (GeneralDiagnosticsServer.ts:168-182).
+	// (GeneralDiagnosticsServer.ts:235-251 at db021da0).
 	Off bool
 	// Config selects the features TZ, NTPC, NTPS and TSC after
 	// connectedhomeip ([TimeSynchronizationConfig]); nil serves UTCTime
@@ -805,8 +807,8 @@ type Attestation struct {
 	// CertificationDeclaration. Mirrors matter.js
 	// OperationalCredentialsServer.State.certification, which takes an
 	// async provider (packages/protocol/src/certificate/
-	// DeviceCertification.ts:181, built on first use by
-	// OperationalCredentialsServer.ts:560-572).
+	// DeviceCertification.ts:185, built on first use by
+	// OperationalCredentialsServer.ts:560-572 at db021da0).
 	Provider func(ctx context.Context) (chain *AttestationChain, certificationDeclaration []byte, err error)
 }
 

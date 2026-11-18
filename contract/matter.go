@@ -382,8 +382,8 @@ type ClusterCommandInvokePrivilege interface {
 // resolved server before it falls back to the module's generated table
 // (schema.IsTimedInvoke); a command it reports true for, invoked outside a
 // timed interaction, answers NEEDS_TIMED_INTERACTION. Mirrors matter.js
-// packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295
-// (`limits.timed && !this.session.timed`), which reads the flag from the
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295 at
+// db021da0 (`limits.timed && !this.session.timed`), which reads the flag from the
 // command's model for every cluster.
 type TimedCommander interface {
 	// IsTimedCommand reports whether the request command cmdID may only be
@@ -941,8 +941,8 @@ type ConcentrationReadingsSource interface {
 //
 // Mirrors matter.js's reactor-style observation of
 // `events.<attr>$Changed` (see matter.js
-// packages/node/src/behaviors/thermostat/ThermostatServer.ts:451 for
-// the canonical `reactTo(...measuredValue$Changed, handler)` pattern).
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:480-483 at
+// db021da0 for the canonical `reactTo(...measuredValue$Changed, handler)` pattern).
 // Without this push path the Subscribe engine emits only empty
 // heartbeats and Apple Home shows bridged sensors as "not responding"
 // shortly after the initial ReportData expires.

@@ -167,7 +167,7 @@ var assemblerMounted = map[uint32]string{
 //
 // Mirrors matter.js's construction of an Endpoint from its generated
 // MutableEndpoint type (packages/node/src/devices/dimmable-light.ts:103-116,
-// packages/node/src/endpoint/Endpoint.ts:596-637).
+// packages/node/src/endpoint/Endpoint.ts:596-637 at db021da0).
 func New(t *Type, opts Options, decls ...Declaration) (*Device, error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: no device type", ErrConfiguration)
@@ -759,7 +759,7 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // (its deviceType requirements, schema.DeviceTypeDefinitionOf, through its
 // base types), except under a BridgedNode, whose "Separate Endpoints"
 // pattern hosts any application device type on descendants
-// (packages/node/src/endpoints/bridged-node.ts:39-73).
+// (packages/node/src/endpoints/bridged-node.ts:39-73 at db021da0).
 //
 // A part of another device moves while it is bound to no running node:
 // it leaves its former owner's parts — and that owner's node, which has

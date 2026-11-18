@@ -1270,13 +1270,14 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // previous run installed, the re-establishment of their subscriptions,
 // the OTA requestor, their operational records, and the node's own
 // commissioning window when no fabric exists. Start is idempotent, as
-// matter.js Node.start (Node.ts:114-132); after Stop it is [ErrStopped].
+// matter.js Node.start (Node.ts:114-130); after Stop it is [ErrStopped].
 //
 // The node counts as started once Start completed. A Start that fails
 // leaves the node startable, as matter.js's Node.start does — it sets the
-// target state back to "offline" and rethrows (Node.ts:113-128): the node
-// is not started, a later Start runs the whole start path again, and
-// what New opened (the store file of Store.Path) stays open until Stop.
+// target state back to "offline" and rethrows (Node.ts:124-126 at
+// db021da0): the node is not started, a later Start runs the whole start
+// path again, and what New opened (the store file of Store.Path) stays
+// open until Stop.
 // Every step that can fail — the DataModelTest check, the PartsList
 // providers, the bridge's start (topology, sockets) — runs before
 // anything is started, and the bridge's start undoes its own partial
@@ -1322,9 +1323,9 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// The DataModelTest feature against the node's MaxPathsPerInvoke, before
 	// anything goes online. Mirrors matter.js
 	// packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts
-	// #online (:352) → #assertDataModelTest (:125-143): without the feature a
-	// MaxPathsPerInvoke above one fails the node's start, with it a limit of
-	// one is logged.
+	// #online (:414-415) → #assertDataModelTest (:186-204 at db021da0):
+	// without the feature a MaxPathsPerInvoke above one fails the node's
+	// start, with it a limit of one is logged.
 	if err := n.checkDataModelTest(); err != nil {
 		return err
 	}
