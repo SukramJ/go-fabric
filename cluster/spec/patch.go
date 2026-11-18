@@ -39,11 +39,11 @@ type EmptyListDefault struct{}
 //
 // Mirrors matter.js
 // packages/node/src/behavior/state/managed/values/ValuePatcher.ts at
-// 862ad75f: StructPatcher (:70-163; a key the schema does not declare is
+// db021da0: StructPatcher (:70-163; a key the schema does not declare is
 // refused, :124-128) and ListPatcher (:168-233; a new entry patched over
 // its defaults, :212-216) over getDefaults (:42-65), which takes each
 // member's StoredDefaultValue under the supervisor's features
-// (packages/model/src/logic/SelectDefaultValue.ts:39-58: no default
+// (packages/model/src/logic/SelectDefaultValue.ts:46-65: no default
 // without operational support, i.e. mandatory under the active features,
 // Scope.ts:202-217; the stated default, else null for a mandatory
 // nullable member). The defaults are computed per call against the
@@ -230,8 +230,8 @@ func (i *Instance) patchStruct(ctx FeatureContext, name string, s *Struct, v ref
 }
 
 // storedDefault is the value storage holds for f absent one, as a value
-// of the Go type t: matter.js StoredDefaultValue (SelectDefaultValue.ts:39-58
-// at 862ad75f) — nothing unless f is mandatory under the features, then
+// of the Go type t: matter.js StoredDefaultValue (SelectDefaultValue.ts:46-65
+// at db021da0) — nothing unless f is mandatory under the features, then
 // the stated default, else the null of a nullable f.
 func (i *Instance) storedDefault(ctx FeatureContext, f *Field, t reflect.Type) (reflect.Value, bool) {
 	if f.Conformance.Applicability(ctx) != ApplicabilityMandatory {

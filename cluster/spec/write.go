@@ -107,7 +107,7 @@ func hostStatus(err error) (contract.StatusError, bool) {
 // names ("minMeasuredValue to maxMeasuredValue", "max numberOfPositions -
 // 1"); nil resolves none. A bound computed from a name that does not
 // resolve admits every value, as matter.js's does (Constraint.ts:193-205
-// at 862ad75f); one computed from literals alone ("max 2^62 - 1") always
+// at db021da0); one computed from literals alone ("max 2^62 - 1") always
 // holds.
 type Peers func(attrID uint32) (any, bool)
 
@@ -202,7 +202,7 @@ func (i *Instance) CheckValue(attrID uint32, value any, peers Peers) (any, error
 	}
 	// The bits of a feature map are the feature selection itself, which a
 	// bit's conformance is judged against (state/validation/ValueValidator.ts:227-231 at
-	// 862ad75f).
+	// db021da0).
 	scope := nameScope{peers: peers, bits: attrID != featureMapAttributeID}
 	return i.checkValueIn(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(value), peers, scope)
 }
@@ -279,9 +279,9 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 	case t.Kind == KindBitmap && nullable && n>>(bitWidth(t.Bits)-1) != 0:
 		// A nullable bitmap reserves its most-significant bit for null
 		// (Core § 7.19.1.2). Mirrors matter.js
-		// packages/types/src/tlv/TlvNullable.ts:53-56 at 862ad75f, which
+		// packages/types/src/tlv/TlvNullable.ts:53-56 at db021da0, which
 		// wraps a nullable BitmapWrapper in withReservedMsb, and
-		// packages/types/src/tlv/TlvNumber.ts:327-330 at 862ad75f, whose
+		// packages/types/src/tlv/TlvNumber.ts:327-330 at db021da0, whose
 		// withReservedMsb bounds the value by half the base type's maximum.
 		return nil, fmt.Sprintf("0x%X sets the most-significant bit a nullable bitmap reserves", n)
 	case t.Kind == KindBitmap && t.Bitmap != nil && n&^t.Bitmap.Defined() != 0:
@@ -305,7 +305,7 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 // packages/node/src/behavior/state/validation/ValueValidator.ts:198-305
 // (createBitmapValidator, the per-member conformance from
 // astToFunction(field, supervisor, { refusalOnly: true })) and
-// conformance-compiler.ts:74-185 (refusalOnly) at 862ad75f.
+// conformance-compiler.ts:74-185 (refusalOnly) at db021da0.
 func (i *Instance) checkBitConformance(name string, b *Bitmap, n uint64) error {
 	c := &confCompiler{inst: i}
 	for mi := range b.Members {
@@ -380,7 +380,7 @@ func (i *Instance) checkLength(t Type, c Constraint, value any, peers Peers) (v 
 	}
 	// After the length, a string's codepoints against cpMax. Mirrors
 	// matter.js packages/node/src/behavior/state/validation/constraint.ts:213-232
-	// at 862ad75f ([...value].length > cpMax is a ConstraintError;
+	// at db021da0 ([...value].length > cpMax is a ConstraintError;
 	// W3-clugen-02).
 	if s, ok := value.(string); ok && c.CpMax > 0 {
 		if cp := utf8.RuneCountInString(s); cp > c.CpMax {
@@ -439,7 +439,7 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 // packages/node/src/behavior/state/validation/ValueValidator.ts:392-467
 // (createStructValidator) over conformance.ts:19-55
 // (createConformanceValidator) and conformance-compiler.ts:87-220
-// (astToFunction) at 862ad75f.
+// (astToFunction) at db021da0.
 func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScope) error {
 	if d, ok := value.(DefinitionFormer); ok {
 		value = d.DefinitionForm()
@@ -667,7 +667,7 @@ func (i *Instance) resolveName(ref string, peers Peers) (any, bool) {
 	// attribute by its first segment and a field of its value by each
 	// further one. Mirrors matter.js
 	// packages/node/src/behavior/state/managed/NameResolver.ts:107-131 at
-	// 862ad75f (resolveQualifiedName); an unresolved field admits every
+	// db021da0 (resolveQualifiedName); an unresolved field admits every
 	// value, as an unresolved bound does. Such a bound was never resolved.
 	segments := strings.Split(ref, ".")
 	a := i.def.AttributeByName(segments[0])

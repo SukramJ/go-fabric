@@ -17,7 +17,7 @@ var ErrIllegalID = errors.New("spec: illegal element id")
 // prefix and type suffix, refusing a prefix above 0xfff4 and the suffix
 // 0xffff. Mirrors matter.js
 // packages/types/src/datatype/ManufacturerExtensibleIdentifier.ts:29-52
-// at 862ad75f (Mei.fromMei).
+// at db021da0 (Mei.fromMei).
 func fromMei(mei uint32) (prefix, suffix uint32, why string) {
 	prefix, suffix = mei>>16, mei&0xffff
 	switch {
@@ -32,7 +32,7 @@ func fromMei(mei uint32) (prefix, suffix uint32, why string) {
 // CheckClusterID refuses an illegal cluster id: a standard cluster's
 // suffix is 0x0000 - 0x7fff, a vendor-specific one's 0xfc00 - 0xfffe.
 // Mirrors matter.js packages/types/src/datatype/ClusterId.ts:22-41 at
-// 862ad75f.
+// db021da0.
 func CheckClusterID(id uint32) error {
 	prefix, suffix, why := fromMei(id)
 	switch {
@@ -47,7 +47,7 @@ func CheckClusterID(id uint32) error {
 
 // CheckAttributeID refuses an illegal attribute id: a global one is
 // 0xf000 - 0xfffe, any other's suffix 0x0000 - 0x4fff. Mirrors matter.js
-// packages/types/src/datatype/AttributeId.ts:20-34 at 862ad75f.
+// packages/types/src/datatype/AttributeId.ts:20-34 at db021da0.
 func CheckAttributeID(id uint32) error {
 	if id >= 0xf000 && id <= 0xfffe {
 		return nil
@@ -61,7 +61,7 @@ func CheckAttributeID(id uint32) error {
 
 // CheckCommandID refuses an illegal command id: its suffix is 0x00 -
 // 0xff. Mirrors matter.js packages/types/src/datatype/CommandId.ts:21-32
-// at 862ad75f.
+// at db021da0.
 func CheckCommandID(id uint32) error {
 	_, suffix, why := fromMei(id)
 	if why == "" && suffix > 0xff {
@@ -72,7 +72,7 @@ func CheckCommandID(id uint32) error {
 
 // CheckEventID refuses an illegal event id: its suffix is 0x00 - 0xff.
 // Mirrors matter.js packages/types/src/datatype/EventId.ts:20-29 at
-// 862ad75f.
+// db021da0.
 func CheckEventID(id uint32) error {
 	_, suffix, why := fromMei(id)
 	if why == "" && suffix > 0xff {
@@ -93,7 +93,7 @@ func idError(why string) error {
 // ValidatedElements #validateSchema, which records a fatal error per
 // illegal id and reports them together
 // (packages/node/src/behavior/cluster/ValidatedElements.ts:190-222 at
-// 862ad75f).
+// db021da0).
 func checkElementIDs(def *Cluster) error {
 	var errs []error
 	named := func(element string, err error) {

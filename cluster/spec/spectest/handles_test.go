@@ -16,7 +16,7 @@ type unhandled struct{ *fake }
 func (unhandled) Handles(uint32) bool { return false }
 
 // TestCheckServerReportsAnUnhandledCommand: an accepted command needs an
-// implementation (ValidatedElements.ts:341-343 at 0ceb202d); CheckServer
+// implementation (ValidatedElements.ts:341-343 at db021da0); CheckServer
 // says so where the server reports it.
 func TestCheckServerReportsAnUnhandledCommand(t *testing.T) {
 	t.Parallel()

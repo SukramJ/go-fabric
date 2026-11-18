@@ -59,7 +59,7 @@ func sameJSON(t *testing.T, a, b []byte) bool {
 }
 
 // TestTlvAnyGenericDecodingParityMatterJS mirrors
-// packages/types/test/tlv/TlvAnyTest.ts:78-147 at 862ad75f (describe
+// packages/types/test/tlv/TlvAnyTest.ts:78-147 at db021da0 (describe
 // "generic decoding"): TlvAny.decodeAnyTlvStream turns an element stream
 // without a schema into a value — a structure into a record keyed by tag
 // number, an array or list into an array whatever its members' tags. The
@@ -89,7 +89,7 @@ func TestTlvAnyGenericDecodingParityMatterJS(t *testing.T) {
 }
 
 // TestTlvBoundsParityMatterJS mirrors the bounded schemas of
-// packages/types/test/tlv at 862ad75f: TlvNumberTest.ts:112-126
+// packages/types/test/tlv at db021da0: TlvNumberTest.ts:112-126
 // (TlvUInt32.bound({ min: 5, max: 10 }): 6 passes, 1 and 12 are refused),
 // TlvStringTest.ts:85-99 and :125-139 (a string and a byte string bound
 // to 4..6: 5 passes, 1 and 8 are refused) and TlvArrayTest.ts:119-150
@@ -158,7 +158,7 @@ func TestTlvBoundsParityMatterJS(t *testing.T) {
 }
 
 // TestTlvNumberRelaxParityMatterJS mirrors
-// packages/types/test/tlv/TlvNumberTest.ts:231-273 at 862ad75f (describe
+// packages/types/test/tlv/TlvNumberTest.ts:231-273 at db021da0 (describe
 // "relaxNumberTypeChecks"). matter.js decodes strictly by default and
 // relaxes the signedness check only for incoming data reports
 // (InputChunk.ts:42-48); the Go server decoders (DecodeUint, DecodeInt) are
@@ -229,7 +229,7 @@ func TestTlvNumberRelaxParityMatterJS(t *testing.T) {
 
 // nullableCluster carries the nullable values of
 // packages/types/test/tlv/TlvNullableTest.ts:101-153 and
-// TlvOfModelTest.ts:256-266 at 862ad75f.
+// TlvOfModelTest.ts:256-266 at db021da0.
 var nullableCluster = func() *spec.Cluster {
 	x := spec.Quality{Nullable: true}
 	map8 := &spec.Bitmap{Name: "Map8", Bits: 8, Members: []spec.BitmapMember{{Name: "Lsb", Bit: 0, Width: 1}, {Name: "Msb", Bit: 7, Width: 1}}}
@@ -249,7 +249,7 @@ var nullableCluster = func() *spec.Cluster {
 }()
 
 // TestTlvNullableParityMatterJS mirrors
-// packages/types/test/tlv/TlvNullableTest.ts:101-153 at 862ad75f: a
+// packages/types/test/tlv/TlvNullableTest.ts:101-153 at db021da0: a
 // nullable integer reserves the sentinel of its type whatever its bound
 // (the maximum of uint64, the minimum of int64), a bounded one admits the
 // extremes it states, and a nullable bitmap reserves its most-significant
@@ -294,7 +294,7 @@ func TestTlvNullableParityMatterJS(t *testing.T) {
 }
 
 // TestTlvObjectParityMatterJS mirrors
-// packages/types/test/tlv/TlvObjectTest.ts:117-122 at 862ad75f ("ignores
+// packages/types/test/tlv/TlvObjectTest.ts:117-122 at db021da0 ("ignores
 // unknown fields": a schema without field 1 decodes a structure carrying
 // it) and :145-185 ("encode/decodes with fabricIndex", "encode/decodes
 // with ignoring fabricIndex for write interaction": a fabric-scoped
@@ -353,7 +353,7 @@ func TestTlvObjectParityMatterJS(t *testing.T) {
 }
 
 // TestTlvOfModelParityMatterJS mirrors
-// packages/types/test/tlv/TlvOfModelTest.ts:36-129 at 862ad75f: TlvOfModel
+// packages/types/test/tlv/TlvOfModelTest.ts:36-129 at db021da0: TlvOfModel
 // derives a codec from the model, the Go form is EncodeJSON / DecodeJSON
 // over a generated definition. A struct with nullable epoch fields
 // (GroupKeySetStruct, alone and in the KeySetWrite command), a struct of

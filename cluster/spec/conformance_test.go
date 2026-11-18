@@ -110,7 +110,7 @@ func TestIsMandatory(t *testing.T) {
 
 // TestApplicabilityDeprecatedOptional: applicabilityFor's
 // deprecatedIsOptional (packages/model/src/aspects/Conformance.ts:985-987
-// at 862ad75f) makes a deprecated or obsolete term optional; a disallowed
+// at db021da0) makes a deprecated or obsolete term optional; a disallowed
 // one stays out, and a trailing "D" still leaves the terms before it to
 // decide (:936-939).
 func TestApplicabilityDeprecatedOptional(t *testing.T) {

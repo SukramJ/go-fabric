@@ -12,7 +12,7 @@ import (
 // 128{32}", Actions ActionStruct.Name) refuses more codepoints than it
 // states after the length check, as matter.js
 // packages/node/src/behavior/state/validation/constraint.ts:213-232 at
-// 862ad75f does (W3-clugen-02).
+// db021da0 does (W3-clugen-02).
 func TestCpMaxParity(t *testing.T) {
 	t.Parallel()
 	inst := &Instance{def: &Cluster{Name: "T"}}

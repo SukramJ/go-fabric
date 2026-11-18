@@ -10,7 +10,7 @@ import (
 )
 
 // EncodeTLV writes the node tree at tag, integers at their minimal width
-// (as matter.js encodes every integer, TlvNumber.ts:247-297 at 0ceb202d).
+// (as matter.js encodes every integer, TlvNumber.ts:247-297 at db021da0).
 // It makes a decoded value [Encodable] again.
 func (n Node) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { writeNode(enc, tag, n) }
 
@@ -61,7 +61,7 @@ func writeNode(enc *tlv.Encoder, tag tlv.Tag, n Node) {
 // ListElements encodes v and reports whether it is a list (a TLV array),
 // with its elements — the value side of matter.js's
 // `Array.isArray(value) && tlv instanceof ArraySchema`
-// (packages/protocol/src/action/request/Write.ts:154-155 at 0ceb202d), which
+// (packages/protocol/src/action/request/Write.ts:160-161 at db021da0), which
 // decides whether a write is list-chunked.
 func ListElements(v Encodable) (elements []Node, isList bool, err error) {
 	enc := tlv.NewEncoder()

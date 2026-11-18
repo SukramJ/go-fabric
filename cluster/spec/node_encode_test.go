@@ -58,7 +58,7 @@ func TestNodeEncodeTLVRoundTrip(t *testing.T) {
 }
 
 // TestListElements: a list value yields its elements; any other value is
-// not a list (Write.ts:154-155 at 0ceb202d).
+// not a list (Write.ts:160-161 at db021da0).
 func TestListElements(t *testing.T) {
 	t.Parallel()
 	elements, isList, err := spec.ListElements(tree{})

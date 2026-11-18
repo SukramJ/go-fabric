@@ -113,7 +113,7 @@ type Constraint struct {
 	In string
 	// CpMax bounds a string's codepoints beside its length ("max
 	// 128{32}"); 0 states none. matter.js Constraint.cpMax
-	// (packages/model/src/aspects/Constraint.ts:60 at 862ad75f).
+	// (packages/model/src/aspects/Constraint.ts:60 at db021da0).
 	CpMax int
 	// Entry constrains each entry of a list.
 	Entry *Constraint
@@ -207,7 +207,7 @@ func held(t Type, c Constraint, relaxed string) (Type, Constraint) {
 // LocationCapability, the Thermostat user limits' Abs* limits), an octet
 // string ("bytes") or a non-empty list ("list"). matter.js's model leaves
 // a reference to be resolved by the consumer
-// (packages/model/src/logic/SelectDefaultValue.ts:97-100 at 862ad75f);
+// (packages/model/src/logic/SelectDefaultValue.ts:104-107 at db021da0);
 // the runtime starts such an element without a value, as it starts one
 // with no stated default, and a hand-written server resolves it. The
 // marker tells the two apart (W3-clugen-07).
