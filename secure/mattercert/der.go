@@ -17,9 +17,9 @@ import (
 
 // MaxOperationalCertDERBytes caps a Matter operational certificate in its
 // X.509 DER form — §6.1.3; matter.js MAX_DER_CERTIFICATE_SIZE
-// (packages/protocol/src/certificate/kinds/common.ts:13 at 862ad75f),
+// (packages/protocol/src/certificate/kinds/common.ts:13 at db021da0),
 // checked before a DER certificate is parsed
-// (Certificate.ts:617-622 parseAsn1Certificate).
+// (Certificate.ts:672-677 parseAsn1Certificate).
 const MaxOperationalCertDERBytes = 600
 
 // DecodeDER parses an X.509 DER operational certificate (RCAC, ICAC or
@@ -138,7 +138,7 @@ func derVersion(field asn1.RawValue) error {
 }
 
 // EncodeDER is c as a signed X.509 DER certificate — asSignedDer
-// (Certificate.ts:183-191 at 862ad75f): the TBSCertificate rebuilt from
+// (Certificate.ts:174-182 at db021da0): the TBSCertificate rebuilt from
 // the fields ([TBSToDER] without a kept TBSDER), the ecdsa-with-SHA256
 // algorithm and the signature as a DER ECDSA-Sig-Value; refused over 600
 // bytes.

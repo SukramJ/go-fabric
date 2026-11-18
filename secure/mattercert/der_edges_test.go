@@ -385,7 +385,7 @@ func TestDecodeDERSkipsForeignExtensionsAndReadsEveryKeyPurpose(t *testing.T) {
 // derDN refuses a Matter id that is not hex, skips an attribute it cannot
 // read or does not know, and reads a domainComponent and a
 // PrintableString under their tags — parseSubjectOrIssuer
-// (Certificate.ts:296-394 at 862ad75f).
+// (Certificate.ts:302-382 at db021da0).
 func TestDERDistinguishedNameEdges(t *testing.T) {
 	t.Parallel()
 	attr := func(oid asn1.ObjectIdentifier, tag int, value string) []byte {

@@ -16,8 +16,8 @@ import (
 // in its NOCSR elements for key: version 0, the subject `O=CSR`, the
 // P-256 public key, no attributes, signed ecdsa-with-SHA256 — matter.js
 // Certificate.createCertificateSigningRequest
-// (packages/protocol/src/certificate/kinds/Certificate.ts:264-277 at
-// 862ad75f). The commissioner's CA ignores the subject and issues the
+// (packages/protocol/src/certificate/kinds/Certificate.ts:259-272 at
+// db021da0). The commissioner's CA ignores the subject and issues the
 // operational subject DN of its own. rnd is the signature's randomness;
 // nil is crypto/rand.
 func CreateCSR(key *ecdsa.PrivateKey, rnd io.Reader) ([]byte, error) {

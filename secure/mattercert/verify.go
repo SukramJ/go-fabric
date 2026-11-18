@@ -42,7 +42,7 @@ type Verifier struct {
 	// rootFabricID is the root certificate's matter-fabric-id when the
 	// certificate is known and carries one (optional on a root, §6.5.6.1):
 	// a NOC's fabric id must then equal it, as it must equal the ICAC's
-	// (matter.js Noc.ts:116-132 at 862ad75f).
+	// (matter.js Noc.ts:119-135 at db021da0).
 	rootFabricID    uint64
 	hasRootFabricID bool
 	now             TimeSource
@@ -202,8 +202,8 @@ func NewVerifier(rootPubKey []byte, ts TimeSource) (*Verifier, error) {
 // rcac (Matter TLV): its public key, as [NewVerifier], and its
 // subjectKeyIdentifier, which the chain's authorityKeyIdentifiers must
 // name — the NOC's when the root signs it directly, the ICAC's otherwise.
-// Mirrors matter.js packages/protocol/src/certificate/kinds/Noc.ts:170-184
-// and Icac.ts:159-163 at 862ad75f, which compare against
+// Mirrors matter.js packages/protocol/src/certificate/kinds/Noc.ts:174-188
+// and Icac.ts:154-158 at db021da0, which compare against
 // `root.cert.extensions.subjectKeyIdentifier`.
 func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 	if len(rcac) > MaxOperationalCertTLVBytes {
@@ -219,7 +219,7 @@ func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 // NewVerifierFromCertificate is [NewVerifierFromRCAC] on a decoded root
 // certificate: its public key, its subject key identifier, and its
 // matter-fabric-id when it carries one, which every NOC the verifier
-// accepts must then match (matter.js Noc.ts:116-125 at 862ad75f,
+// accepts must then match (matter.js Noc.ts:119-128 at db021da0,
 // rootFabricId: "When any matter-fabric-id attributes are present in
 // either the Matter Root CA Certificate or the Matter ICA Certificate,
 // the value SHALL match the one present in the NOC").
@@ -338,7 +338,7 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		return nil, fmt.Errorf("noc: %w", err)
 	}
 	// A root that names a fabric binds the NOC to it, with or without an
-	// ICAC in between — matter.js Noc.ts:116-125 at 862ad75f (the ICAC's
+	// ICAC in between — matter.js Noc.ts:119-128 at db021da0 (the ICAC's
 	// fabric id is compared in checkICACShape).
 	if v.hasRootFabricID && v.rootFabricID != nocCert.Subject.MatterFabricID {
 		return nil, fmt.Errorf("%w: FabricId in NoC certificate does not match the fabricId in the parent certificate: root 0x%016X != NOC 0x%016X",
@@ -378,12 +378,12 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		// its authorityKeyIdentifier names: the ICAC, or the root when a
 		// root-signed NOC is presented together with an ICAC; an AKID that
 		// names neither is refused. Mirrors matter.js
-		// packages/protocol/src/certificate/kinds/Noc.ts:170-184 at
-		// 862ad75f. The verifier holds the root's public key, not its
+		// packages/protocol/src/certificate/kinds/Noc.ts:174-188 at
+		// db021da0. The verifier holds the root's public key, not its
 		// certificate unless it was built by [NewVerifierFromRCAC]: without
 		// it, the root's subjectKeyIdentifier is the one the root-signed
 		// ICAC names as its authorityKeyIdentifier, which matter.js
-		// requires to be equal (Icac.ts:159-163) and the check above
+		// requires to be equal (Icac.ts:154-158) and the check above
 		// enforces when the root certificate is known.
 		rootSKID := icacCert.Extensions.AuthorityKeyID
 		if v.hasRootSKID {
@@ -404,8 +404,8 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 	} else {
 		// NOC is signed directly by the root: its authorityKeyIdentifier
 		// names the root's subjectKeyIdentifier, checked when the root
-		// certificate is known. Mirrors matter.js Noc.ts:170-184 at
-		// 862ad75f (no ICA: the issuer is the root or the NOC is refused).
+		// certificate is known. Mirrors matter.js Noc.ts:174-188 at
+		// db021da0 (no ICA: the issuer is the root or the NOC is refused).
 		if v.hasRootSKID && !bytesEqual(nocCert.Extensions.AuthorityKeyID, v.rootSKID[:]) {
 			return nil, fmt.Errorf("%w: NOC authorityKeyIdentifier does not name the root", ErrChainBroken)
 		}

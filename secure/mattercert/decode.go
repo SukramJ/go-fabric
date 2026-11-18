@@ -41,8 +41,8 @@ const (
 	// The standard X.520 attributes (Core § 6.5.6.1): tags 1-16 carry them
 	// as UTF8String — domainComponent (16) as IA5String — and tags 129-143
 	// carry the attributes 1-15 as PrintableString. Mirrors matter.js
-	// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
-	// at 862ad75f (TlvGenericMatterSubjectOrIssuerTaggedList).
+	// packages/protocol/src/certificate/kinds/definitions/operational.ts:71-111
+	// at db021da0 (TlvGenericMatterSubjectOrIssuerTaggedList).
 	dnTagStandardFirst  uint8 = 1
 	dnTagStandardLast   uint8 = 16
 	dnTagPrintableFirst uint8 = 129
@@ -215,8 +215,8 @@ type DistinguishedName struct {
 // DNAttribute is one standard X.520 attribute of a [DistinguishedName] as
 // the TLV carried it: Tag is the context tag (1-16 a UTF8String, 129-143 a
 // PrintableString), Value the string. Mirrors matter.js
-// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
-// at 862ad75f.
+// packages/protocol/src/certificate/kinds/definitions/operational.ts:71-111
+// at db021da0.
 type DNAttribute struct {
 	Tag   uint8
 	Value string
