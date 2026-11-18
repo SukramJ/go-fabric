@@ -63,11 +63,32 @@ func (s *Service) Resolve(ctx context.Context) ([]Address, error) {
 	return addrs, nil
 }
 
+// maxHostDiscoveries is how many host discoveries one service resolution
+// runs at once. A target beyond them waits, in the order the SRV records
+// named it, until one ends because its host is no longer targeted; a host
+// whose addresses are cached needs none and is never kept waiting, and an
+// address that arrives ends the resolution as before. Ahead of matter.js,
+// which starts a discovery for every SRV target without addresses
+// (packages/general/src/net/dns-sd/IpServiceResolution.ts:54-62 at
+// db021da0); the rule is this module's (review II, U3-ctl-lan-1).
+const maxHostDiscoveries = 4
+
+// hasAddress reports whether nm holds an A or AAAA record.
+func hasAddress(nm *Name) bool {
+	for _, r := range nm.records.values() {
+		if r.Type == TypeA || r.Type == TypeAAAA {
+			return true
+		}
+	}
+	return false
+}
+
 // startResolution runs IpServiceResolution on the loop; found is closed
 // when a new address appears. The returned function stops it (idempotent).
 func (s *Service) startResolution(found chan struct{}) func() {
 	hosts := newOmap[*Name, struct{}]()
 	resolvers := make(map[*Name]func())
+	waiting := newOmap[*Name, struct{}]() // beyond maxHostDiscoveries, oldest first
 	stopped := false
 	var mainCancel func()
 	var observer *changeObserver
@@ -84,33 +105,51 @@ func (s *Service) startResolution(found chan struct{}) func() {
 			cancel()
 			delete(resolvers, nm)
 		}
+		waiting.clear()
 		if observer != nil {
 			s.offChanged(observer)
 		}
 		close(found)
 	}
 
-	// A host with no A/AAAA gets its own discovery (:39-64).
+	// fill starts waiting targets while a place is free (one that found
+	// its addresses meanwhile needs none).
+	fill := func() {
+		for !stopped && len(resolvers) < maxHostDiscoveries {
+			nm, ok := waiting.first()
+			if !ok {
+				return
+			}
+			waiting.del(nm)
+			if hasAddress(nm) {
+				continue
+			}
+			cancel, _ := s.names.solicitor.discover(&solicitation{name: nm, types: []mdns.DNSType{TypeA, TypeAAAA}}, nil)
+			resolvers[nm] = cancel
+		}
+	}
+	// A host with no A/AAAA gets its own discovery (:39-64), at most
+	// maxHostDiscoveries at once.
 	addHost := func(nm *Name) {
 		if stopped || hosts.has(nm) {
 			return
 		}
 		hosts.set(nm, struct{}{})
-		for _, r := range nm.records.values() {
-			if r.Type == TypeA || r.Type == TypeAAAA {
-				return
-			}
+		if hasAddress(nm) {
+			return
 		}
-		cancel, _ := s.names.solicitor.discover(&solicitation{name: nm, types: []mdns.DNSType{TypeA, TypeAAAA}}, nil)
-		resolvers[nm] = cancel
+		waiting.set(nm, struct{}{})
+		fill()
 	}
 	// A host no longer targeted stops resolving (:66-75).
 	deleteHost := func(nm *Name) {
 		hosts.del(nm)
+		waiting.del(nm)
 		if cancel, ok := resolvers[nm]; ok {
 			delete(resolvers, nm)
 			cancel()
 		}
+		fill()
 	}
 
 	// Initial SRV targets (:77-84).
