@@ -203,7 +203,7 @@ func NewVerifier(rootPubKey []byte, ts TimeSource) (*Verifier, error) {
 // subjectKeyIdentifier, which the chain's authorityKeyIdentifiers must
 // name — the NOC's when the root signs it directly, the ICAC's otherwise.
 // Mirrors matter.js packages/protocol/src/certificate/kinds/Noc.ts:174-188
-// and Icac.ts:154-158 at db021da0, which compare against
+// and Icac.ts:154-159 at db021da0, which compare against
 // `root.cert.extensions.subjectKeyIdentifier`.
 func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 	if len(rcac) > MaxOperationalCertTLVBytes {
@@ -383,7 +383,7 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		// certificate unless it was built by [NewVerifierFromRCAC]: without
 		// it, the root's subjectKeyIdentifier is the one the root-signed
 		// ICAC names as its authorityKeyIdentifier, which matter.js
-		// requires to be equal (Icac.ts:154-158) and the check above
+		// requires to be equal (Icac.ts:154-159) and the check above
 		// enforces when the root certificate is known.
 		rootSKID := icacCert.Extensions.AuthorityKeyID
 		if v.hasRootSKID {

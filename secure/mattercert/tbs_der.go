@@ -128,7 +128,7 @@ type rdnAttribute struct {
 // localityName, stateOrProvinceName, organizationName,
 // organizationalUnitName, title, name, givenName, initials,
 // generationQualifier, dnQualifier, pseudonym. Mirrors matter.js
-// packages/general/src/crypto/X520.ts:46-76 at db021da0.
+// packages/general/src/crypto/X520.ts:46-75 at db021da0.
 var x520AttributeTypes = [...]int{3, 4, 5, 6, 7, 8, 10, 11, 12, 41, 42, 43, 44, 46, 65}
 
 // standardDNAttribute maps a standard X.520 DN TLV tag to its OID and its

@@ -27,12 +27,12 @@ var ErrNotGroupHeader = errors.New("channel: group encode needs a group-session 
 
 // ErrSourceNodeMismatch is returned by [EncryptGroup] for a sender node id
 // the header's Source Node ID disagrees with: the nonce is the header's
-// (GroupSession.ts:268-269), so the two must name the same node.
+// (GroupSession.ts:308-309), so the two must name the same node.
 var ErrSourceNodeMismatch = errors.New("channel: group encode sender node id differs from the header's source node id")
 
 // privacyHeaderOffset is where the obfuscated header region starts: the
 // Message Flags byte, the Session ID and the Security Flags stay in the
-// clear (GroupSession.ts:278, :285 — `headerBytes.slice(4)` /
+// clear (GroupSession.ts:321, :323 — `headerBytes.slice(4)` /
 // `headerBytes.slice(0, 4)`).
 const privacyHeaderOffset = 4
 
@@ -89,16 +89,16 @@ func EncryptGroup(operationalKey []byte, sourceNodeID uint64, header message.Hea
 
 // ObfuscateGroupHeader applies the privacy enhancement to a sealed group
 // message's header and returns the header as it goes on the wire. Mirrors
-// matter.js GroupSession.encode (GroupSession.ts:276-286) line by line:
+// matter.js GroupSession.encode (GroupSession.ts:319-324) line by line:
 //
-//   - :276 mic = the last CRYPTO_AEAD_MIC_LENGTH_BYTES (16) of the
+//   - :319 mic = the last CRYPTO_AEAD_MIC_LENGTH_BYTES (16) of the
 //     ciphertext;
-//   - :277 privacyNonce = MessagePrivacy.buildNonce(header.sessionId, mic)
+//   - :320 privacyNonce = MessagePrivacy.buildNonce(header.sessionId, mic)
 //     — [PrivacyNonce];
-//   - :278 region = headerBytes.slice(4);
-//   - :279-284 obfuscated = MessagePrivacy.obfuscate(privacyKey, region,
+//   - :321 region = headerBytes.slice(4);
+//   - :322 obfuscated = MessagePrivacy.obfuscate(privacyKey, region,
 //     privacyNonce) — [Obfuscate];
-//   - :285 the wire header is headerBytes[0:4] followed by the obfuscated
+//   - :323 the wire header is headerBytes[0:4] followed by the obfuscated
 //     region.
 //
 // The input slices are not modified.
