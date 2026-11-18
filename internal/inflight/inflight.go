@@ -9,7 +9,7 @@
 //
 // It is the Go reading of matter.js MockTime's dependents
 // (packages/testing/src/mocks/time.ts:32-51, :87-103 and :383-394 at
-// 862ad75f, requireHostAsync): an operation registered there withholds
+// db021da0, requireHostAsync): an operation registered there withholds
 // virtual time until it settles. A component counts work it accepts and
 // finishes; it never counts a wait on its peer or on the clock — the
 // peer's progress may itself need the clock to move (a standalone

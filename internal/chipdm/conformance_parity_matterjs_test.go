@@ -6,7 +6,7 @@ package chipdm
 import "testing"
 
 // TestConformanceTextParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:18-100 at 862ad75f
+// packages/model/test/aspects/ConformanceTest.ts:18-100 at db021da0
 // (TEST_DEFINITIONS and TEST_DEFINITIONS2, "parses" and "serializes"):
 // every conformance text matter.js parses, parsed by the module's
 // conformance parser (the one the CHIP data model cross-check reads chip's
@@ -49,7 +49,7 @@ func TestConformanceTextParityMatterJS(t *testing.T) {
 }
 
 // TestConformanceInvalidParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:106-155 at 862ad75f: a
+// packages/model/test/aspects/ConformanceTest.ts:106-155 at db021da0: a
 // text that is not conformance, a range-form choice, mixed choice
 // modifiers and partial optionality are refused.
 func TestConformanceInvalidParityMatterJS(t *testing.T) {
@@ -62,7 +62,7 @@ func TestConformanceInvalidParityMatterJS(t *testing.T) {
 }
 
 // TestConformanceRevisionParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:676-698 at 862ad75f:
+// packages/model/test/aspects/ConformanceTest.ts:676-698 at db021da0:
 // "Rev >= vN" is one revision node, "[Rev >= vN]" an optional group of it,
 // "Rev >= vN, [Rev >= vM]" a list, each serialized with its "v".
 func TestConformanceRevisionParityMatterJS(t *testing.T) {
@@ -76,7 +76,7 @@ func TestConformanceRevisionParityMatterJS(t *testing.T) {
 }
 
 // TestConformancePrecedenceParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:339-398 at 862ad75f
+// packages/model/test/aspects/ConformanceTest.ts:339-398 at db021da0
 // (describe "operator precedence") and :180-182 ("Z.Foo" a qualified
 // name): == binds tighter than |, a comparison tighter than ==, and a
 // range check is the & of two comparisons.

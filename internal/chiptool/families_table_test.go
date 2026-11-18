@@ -456,7 +456,7 @@ var chipFamilies = []family{
 		// TC-CADMIN-1.6 and 1.16 open Basic windows of
 		// PIXIT.CADMIN.CwDuration seconds. The runner passes 3, as matter.js's
 		// YAML runner does (packages/testing/src/chip/config.ts:102, :130 at
-		// 862ad75f) for a test node whose minimum window timeout it lowers to
+		// db021da0) for a test node whose minimum window timeout it lowers to
 		// one second (support/chip-testing/src/NodeTestInstance.ts:105); the
 		// daemon keeps the specification's 180 s minimum
 		// (bridge/commissioning_window.go), so these two run with the cases'

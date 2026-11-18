@@ -661,7 +661,7 @@ func (p *confParser) choice(expr *Conf) (*Conf, error) {
 	}
 	// At most one modifier, and no bare number after it: "a2+-" and the
 	// range form "a2-4" are not the grammar of § 7.3.14. Mirrors matter.js
-	// packages/model/src/aspects/Conformance.ts:741-753 at 862ad75f
+	// packages/model/src/aspects/Conformance.ts:741-753 at db021da0
 	// (INVALID_CHOICE).
 	if p.at("+") || p.at("-") {
 		return nil, fmt.Errorf("conformance: choice %q may have at most one \"+\" or \"-\" modifier", c.String())
