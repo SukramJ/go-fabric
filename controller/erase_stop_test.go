@@ -21,12 +21,12 @@ import (
 // reports to a standing subscription (node.Node.SetNodeLabel), so a
 // report carrying it reaches the controller and runs its Changed hook
 // whether the default subscription stood before the change or primes
-// after it. SoftwareVersion, which these tests changed before, is not
-// reported to a standing subscription: BasicInformation.SetSoftwareVersion
-// advances the DataVersion and notifies no subscription. It reached the
-// controller only in the priming report of a subscription that was not
-// yet established when the change landed; on a loaded machine the
-// subscription stood first, and the hook never ran.
+// after it. SoftwareVersion, which these tests changed before, was not
+// reported to a standing subscription until N-flake-1 (its setter
+// advanced the DataVersion and notified no subscription), so it reached
+// the controller only in a priming report; on a loaded machine the
+// subscription stood first and the hook never ran. The tests keep the
+// rename, which never depended on that.
 func renameDevice(t *testing.T, dev *fabrictest.Device) {
 	t.Helper()
 	if err := dev.Act(func(n *node.Node) error {
