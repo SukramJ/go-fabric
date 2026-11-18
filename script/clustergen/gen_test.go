@@ -295,7 +295,7 @@ func TestLiterals(t *testing.T) {
 		t.Errorf("boundLiteral reference %q", got)
 	}
 	// A unit bound is restated in the carrying type's encoding units
-	// (EncodedConstraint.ts:252-258 at 862ad75f): "0 to 12.7°C" of a
+	// (EncodedConstraint.ts:252-258 at db021da0): "0 to 12.7°C" of a
 	// SignedTemperature is 127, "0.01%" of a percent100ths 1; a type
 	// that scales no unit leaves the expression (W3-clugen-01).
 	for _, c := range []struct{ in, typ, meta, want string }{

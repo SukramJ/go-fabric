@@ -1579,7 +1579,7 @@ func constraintLiteral(c *constraint, typeName, metatype string) string {
 // percentage stated with its unit restated in the encoding units of the
 // carrying type — matter.js restates a constraint before it validates
 // (packages/model/src/logic/EncodedConstraint.ts:30-32, convertValue
-// :252-258 → EncodedValue at 862ad75f, applied at
+// :252-258 → EncodedValue at db021da0, applied at
 // packages/node/src/behavior/state/validation/constraint.ts:82) — and any
 // other expression as its JSON tree, which the runtime computes
 // (cluster/spec/bound_expr.go). A unit the type does not scale stays an
@@ -1736,7 +1736,7 @@ func referenceOf(raw json.RawMessage) string {
 // spec.NullDefault, and a temperature or percentage stated with its unit
 // ({"type":"celsius","value":26}) in the encoding units of the type that
 // carries it, as matter.js restates it (packages/model/src/logic/
-// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at 862ad75f; the
+// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at db021da0; the
 // scale per type name is FieldValue.ts:227-256 numericValue); the empty
 // list as spec.EmptyListDefault; a reference, an octet string or a
 // non-empty list as spec.UnresolvedDefault. It returns "" only when no
@@ -1806,7 +1806,7 @@ func compactJSON(raw json.RawMessage) string {
 
 // encodedUnit is a celsius or percent field value in the encoding units of
 // typeName — matter.js FieldValue.numericValue (FieldValue.ts:227-256 at
-// 862ad75f) — rounded to the unit an integer encoding counts
+// db021da0) — rounded to the unit an integer encoding counts
 // (EncodedValue.ts:27-40).
 func encodedUnit(fv map[string]any, typeName, metatype string) (float64, bool) {
 	value, ok := fv["value"].(float64)
