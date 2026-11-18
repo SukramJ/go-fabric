@@ -6,6 +6,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -54,7 +55,7 @@ func (p passcodeValue) Set(s string) error {
 	if err != nil {
 		// The value is not echoed: it is the passcode, and the text
 		// reaches a log.
-		return fmt.Errorf("--passcode is not a decimal number")
+		return errors.New("--passcode is not a decimal number")
 	}
 	*p.v = uint(n)
 	return nil

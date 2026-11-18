@@ -139,11 +139,11 @@ func readPipe(f *fleet, r io.Reader, logger *slog.Logger) {
 // readPipeLine reads one line: its text, trimmed, and its length in bytes.
 // A line longer than maxPipeLine is read through but not kept (its text
 // empty).
-func readPipeLine(br *bufio.Reader) (string, int, error) {
+func readPipeLine(br *bufio.Reader) (line string, n int, err error) {
 	var buf []byte
-	n := 0
 	for {
-		chunk, err := br.ReadSlice('\n')
+		var chunk []byte
+		chunk, err = br.ReadSlice('\n')
 		n += len(chunk)
 		if n <= maxPipeLine {
 			buf = append(buf, chunk...)

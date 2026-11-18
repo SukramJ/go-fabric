@@ -145,7 +145,7 @@ type flakySettings struct {
 	writes  int
 }
 
-func (s *flakySettings) GetSetting(context.Context, string) (string, bool, error) {
+func (s *flakySettings) GetSetting(context.Context, string) (value string, ok bool, err error) {
 	if s.readErr != nil {
 		return "", false, s.readErr
 	}

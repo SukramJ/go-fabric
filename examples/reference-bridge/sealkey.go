@@ -69,7 +69,7 @@ func applySealKey(cfg *node.Config, f flags, dump *dumpEnv) error {
 // readSealKey reads a key file: 64 hex digits, surrounding white space
 // ignored.
 func readSealKey(path string) ([]byte, error) {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) //nolint:gosec // G304: the operator names the key file
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func createSealKey(path string) ([]byte, error) {
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // G304: the operator names the key file
 	if err != nil {
 		return nil, err
 	}

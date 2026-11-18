@@ -141,7 +141,7 @@ func TestEveryTriggerAtEveryLevelAnswersWithoutPanic(t *testing.T) {
 	for _, level := range append([]schema.Level{""}, schema.Levels()...) {
 		for _, tr := range sweptTriggers {
 			f := newFleet()
-			f.surface = surface.Policies{Level: surface.Level(level)}
+			f.surface = surface.Policies{Level: level}
 			if _, err := f.endpoints(); err != nil {
 				t.Fatalf("level %q: endpoints: %v", level, err)
 			}

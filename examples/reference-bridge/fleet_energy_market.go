@@ -857,7 +857,7 @@ func electricalDeclarations() []device.Declaration {
 		entry(epmdef.MeasurementTypeActiveCurrent),
 		entry(epmdef.MeasurementTypeActivePower),
 	}
-	types := uint8(len(power))
+	types := uint8(len(power)) //nolint:gosec // G115: three entries
 	energy := eemdef.MeasurementAccuracyStruct{
 		MeasurementType: eemdef.MeasurementTypeElectricalEnergy, Measured: true,
 		MinMeasuredValue: accuracyMin, MaxMeasuredValue: accuracyMax,

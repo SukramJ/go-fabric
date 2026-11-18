@@ -116,7 +116,7 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	a.logger.Info("ota.applied_in_place", slog.Uint64("version", uint64(newSoftwareVersion)))
 	// The requestor returns to Idle once this returns; the start-up path
 	// runs after that, as a restart would.
-	go a.restartedWhenIdle(a.lifetime())
+	go a.restartedWhenIdle(a.lifetime()) //nolint:contextcheck // the restart outlives the apply request and ends with the daemon (R2-P6-conc-2612)
 	return nil
 }
 
