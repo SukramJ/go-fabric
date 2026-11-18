@@ -606,7 +606,7 @@ func (s *PressureServer) MatterRead(attrID uint32) (any, bool) {
 		return int16(0), true
 	case attrMaxMeasuredValue:
 		// 32766, within MaxMeasuredValue's "minMeasuredValue + 1 to
-		// 32767" (pressure-measurement.element.ts:31-33 at 862ad75f).
+		// 32767" (pressure-measurement.element.ts:31-33 at db021da0).
 		// The null of a nullable int16 is -32768, not 32767.
 		return int16(32766), true
 	case attrTolerance:
@@ -645,7 +645,7 @@ func (s *PressureServer) MatterAttributes() []uint32 { return pressureInst.Matte
 // hPaToMatter converts hPa to the wire unit, held to the
 // [MinMeasuredValue, MaxMeasuredValue] the server advertises (0, 32766):
 // MeasuredValue is "minMeasuredValue to maxMeasuredValue"
-// (pressure-measurement.element.ts:24-25 at 862ad75f), and a value below
+// (pressure-measurement.element.ts:24-25 at db021da0), and a value below
 // it used to reach the wire — -32768 is a nullable int16's null
 // (W3-club1-08).
 func hPaToMatter(hpa float64) int16 {
@@ -786,7 +786,7 @@ func (s *BooleanStateServer) MatterEvents() []uint32 { return booleanStateInst.M
 // StateChange: the server is rebuilt on every dispatch and holds no
 // state, so the change is observed where the host's notification arrives
 // (matter.js packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:67-74
-// at 862ad75f: reactTo occupancy$Changed when the feature is set). HoldTime
+// at db021da0: reactTo occupancy$Changed when the feature is set). HoldTime
 // and the delay attributes it gates are not served: the hold timer needs
 // state ([sensing.Occupancy], the device kit's server, has it).
 //
@@ -1737,7 +1737,7 @@ func NewWiredPowerSourceServer(current contract.WiredCurrent) *PowerSourceServer
 // BatReplacementNeeded only on a read. matter.js reports every change of a
 // behavior's state through its own Datasource
 // (packages/node/src/behavior/state/managed/Datasource.ts:268-270 at
-// 862ad75f, the onChange callback). Returns a no-op unsubscribe when the
+// db021da0, the onChange callback). Returns a no-op unsubscribe when the
 // source cannot notify.
 func (s *PowerSourceServer) OnMatterValueChanged(cb func()) func() {
 	var src any

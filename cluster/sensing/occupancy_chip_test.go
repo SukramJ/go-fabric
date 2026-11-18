@@ -337,7 +337,7 @@ func TestOccupancyHoldTimeChangeWithActiveTimer(t *testing.T) {
 // TestConstructorClampsInitialHoldTime (:980-1005) as matter.js decides
 // it: chip clamps a configured HoldTime outside the limits, matter.js
 // refuses to initialize with it (DotQualifiedConstraintTest.ts:189 at
-// 862ad75f), so construction fails with CONSTRAINT_ERROR; no HoldTime
+// db021da0), so construction fails with CONSTRAINT_ERROR; no HoldTime
 // starts at HoldTimeDefault.
 func TestOccupancyConstructorHoldsHoldTimeToTheLimits(t *testing.T) {
 	for _, h := range []uint16{5, 25} {
@@ -381,7 +381,7 @@ func TestOccupancyShutdownCancelsTimer(t *testing.T) {
 
 // TestOccupancySensorTypeFromFeatures: matter.js's initialize sync of the
 // sensor type and its bitmap (OccupancySensingServer.ts:34-55 at
-// 862ad75f); Ultrasonic alone leaves the type at its SelectDefaultValue.
+// db021da0); Ultrasonic alone leaves the type at its SelectDefaultValue.
 func TestOccupancySensorTypeFromFeatures(t *testing.T) {
 	for _, c := range []struct {
 		f      sensing.OccupancyFeature

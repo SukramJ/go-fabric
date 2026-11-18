@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/door-lock/DoorLockServerTest.ts
-// at 862ad75f: the `it` cases directly in describe("DoorLockServer")
+// at db021da0: the `it` cases directly in describe("DoorLockServer")
 // (:311-816) — SetCredential's statuses, the next credential index, the
 // use cases of § 5.2.10.20 and the programming PIN — on createLock
 // (DoorLockServerTest.ts:92-96). matter.js invokes on the lock's local

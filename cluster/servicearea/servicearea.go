@@ -916,5 +916,5 @@ var _ sa.Host = (*Server)(nil)
 // EstimatedEndTime throttle's deferred report ([cluster.Quieter.Stop]), the
 // one timer the server runs, so it does not report after the bridge let
 // the server go. matter.js stops a behaviour's timers on dispose
-// (SwitchServer.ts:379-384 at 862ad75f is the pattern; W3-club2-02).
+// (SwitchServer.ts:379-384 at db021da0 is the pattern; W3-club2-02).
 func (s *Server) MatterQuiesce() { s.quiet.Stop() }

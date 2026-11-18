@@ -13,7 +13,7 @@ import (
 )
 
 // setColorMode is matter.js setColorMode (ColorControlServer.ts:1411-1420
-// at 0ceb202d): a command of another colour mode first switches to it —
+// at db021da0): a command of another colour mode first switches to it —
 // every colour movement stops and the current colour is converted into
 // the new mode's attributes (switchColorMode, :1454-1540) — and ColorMode
 // and EnhancedColorMode both take the new mode. The switch changes state

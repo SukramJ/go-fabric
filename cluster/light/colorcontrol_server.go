@@ -888,7 +888,7 @@ func (s *ColorControlServer) MatterInvalidatesScenes() bool { return s.scenes.Lo
 
 // invalidateScenes is matter.js #invalidateScenes
 // (packages/node/src/behaviors/color-control/ColorControlServer.ts:1913-1916
-// at 862ad75f), called by MoveToSaturation (:597), MoveToHueAndSaturation
+// at db021da0), called by MoveToSaturation (:597), MoveToHueAndSaturation
 // (:732), MoveToColor (:779), EnhancedMoveToHueAndSaturation (:1079) and
 // ColorLoopSet (:1145), each after #optionsAllowExecution.
 func (s *ColorControlServer) invalidateScenes() {

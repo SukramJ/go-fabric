@@ -11,7 +11,7 @@ package measurement
 // matter.js serves every conformant selection of these clusters as plain
 // state and has no logic for them (packages/node/src/behaviors/air-quality/AirQualityServer.ts:14
 // and packages/node/src/behaviors/carbon-dioxide-concentration-measurement/CarbonDioxideConcentrationMeasurementServer.ts:18
-// at 862ad75f are empty subclasses). The selection's closure and the
+// at db021da0 are empty subclasses). The selection's closure and the
 // readings' feature checks follow connectedhomeip, whose server sets the
 // values the application supplies.
 

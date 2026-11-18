@@ -16,7 +16,7 @@ import (
 // ColorWriter once, with both targets — matter.js starts the two
 // transitions inside the command's transaction, so a hook on the
 // committed state sees both at once (moveToColorLogic,
-// ColorControlServer.ts:797-813 at 0ceb202d; Transitions.start
+// ColorControlServer.ts:797-813 at db021da0; Transitions.start
 // transitionImmediately, Transitions.ts:132-148, :238-241). Without a
 // transition engine (the hand-off path) the writer saw the target x with
 // the old y first (#84).

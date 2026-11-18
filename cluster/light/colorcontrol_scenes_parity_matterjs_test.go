@@ -40,7 +40,7 @@ func (c *countingScenes) count() int {
 // ExecuteIfOff gate, and takes the invalidation over from the endpoint
 // layer — matter.js
 // packages/node/src/behaviors/color-control/ColorControlServer.ts:597,
-// :732, :779, :1079, :1145 at 862ad75f (W3-club1-03).
+// :732, :779, :1079, :1145 at db021da0 (W3-club1-03).
 func TestParityMatterJS_ColorControlInvalidatesScenes(t *testing.T) {
 	t.Parallel()
 	invalidating := map[uint32]any{

@@ -517,7 +517,7 @@ func TestParityMatterJS_WindowCoveringAcceptedCommands(t *testing.T) {
 	}
 	// Lift without position awareness accepts GoToLiftPercentage too: it is
 	// "LF & PA_LF, [LF]", optional there, and matter.js's server implements
-	// it for every axis (WindowCoveringServer.ts:576-596 at 862ad75f;
+	// it for every axis (WindowCoveringServer.ts:576-596 at db021da0;
 	// W3-club1-04).
 	plain := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 1})
 	if got, want := plain.MatterAcceptedCommands(), []uint32{0x00, 0x01, 0x02, 0x05}; !slices.Equal(got, want) {

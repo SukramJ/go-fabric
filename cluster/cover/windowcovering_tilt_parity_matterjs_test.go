@@ -108,7 +108,7 @@ func TestTilt_ConfigStatusAndAttributes(t *testing.T) {
 }
 
 // TestTilt_CommandsMoveBothAxes: UpOrOpen and DownOrClose set both targets
-// (WindowCoveringServer.ts:521-535, :545-559 at 0ceb202d) and reach the
+// (WindowCoveringServer.ts:521-535, :545-559 at db021da0) and reach the
 // Mover as one GoTo with both; GoToTiltPercentage moves tilt alone
 // (:598-606); StopMotion snaps both targets to the positions (:491-496).
 func TestTilt_CommandsMoveBothAxes(t *testing.T) {
