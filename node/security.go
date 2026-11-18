@@ -250,6 +250,12 @@ var (
 	_ sigma.FabricIndexResolver = handshakeResolver{}
 )
 
+// CommitResolution implements the sigma responder's optional commit: the
+// Sigma1 the last resolution served was accepted, so the handshake answers
+// under that resolution now. A resolution for a Sigma1 the responder
+// refused after resolving it is never committed (review II, decision 244).
+func (r handshakeResolver) CommitResolution() { r.held.commit() }
+
 func (r handshakeResolver) ResolveSigma1Destination(destinationID [32]byte, initiatorRandom [sigma.RandomSize]byte) (*sigma.Identity, sigma.PeerVerifier, bool) {
 	id, ver, gen, ok := r.ids.resolveSigma1Destination(destinationID, initiatorRandom)
 	if ok {
@@ -852,13 +858,37 @@ type handshakeStake struct {
 	stake  operational.Stake
 	fabric uint8
 	gen    uint64
+	// pending is the resolution of the Sigma1 being judged, committed to
+	// fabric and gen only once the responder accepts it
+	// ([handshakeResolver.CommitResolution]).
+	pending       bool
+	pendingFabric uint8
+	pendingGen    uint64
 }
 
-// resolved records that the handshake answers under load gen of fabric's
+// answers records that the handshake answers under load gen of fabric's
 // identity.
+func (h *handshakeStake) answers(fabric uint8, gen uint64) {
+	h.mu.Lock()
+	h.fabric, h.gen, h.pending = fabric, gen, false
+	h.mu.Unlock()
+}
+
+// resolved records the resolution of the Sigma1 being judged: load gen of
+// fabric's identity. It stands for the handshake only once committed.
 func (h *handshakeStake) resolved(fabric uint8, gen uint64) {
 	h.mu.Lock()
-	h.fabric, h.gen = fabric, gen
+	h.pending, h.pendingFabric, h.pendingGen = true, fabric, gen
+	h.mu.Unlock()
+}
+
+// commit makes the pending resolution the handshake's: its Sigma1 was
+// accepted.
+func (h *handshakeStake) commit() {
+	h.mu.Lock()
+	if h.pending {
+		h.fabric, h.gen, h.pending = h.pendingFabric, h.pendingGen, false
+	}
 	h.mu.Unlock()
 }
 
@@ -940,7 +970,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	var verifier sigma.PeerVerifier
 	if current != nil {
 		identity, verifier = current.identity, current.verifier
-		held.resolved(current.identity.FabricIndex, current.gen)
+		held.answers(current.identity.FabricIndex, current.gen)
 	} else {
 		// Sigma1 before any AddNOC: give the responder an ephemeral key so
 		// the handshake fails as a signature mismatch rather than a nil

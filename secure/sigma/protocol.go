@@ -169,6 +169,25 @@ type resumptionClaimer interface {
 	ClaimResumptionID(id []byte) (release func(), ok bool)
 }
 
+// resolutionCommitter is the optional capability of an [IdentityResolver]
+// to learn when the Sigma1 its last resolution served is accepted: the
+// responder calls CommitResolution at its commit point, once that Sigma1
+// can no longer be refused, so a resolution made for a Sigma1 the
+// responder then refuses — a bad ephemeral key, no session id — never
+// stands for the handshake in progress (review II, decision 244). It runs
+// under the responder's lock and must not call back into it.
+type resolutionCommitter interface {
+	CommitResolution()
+}
+
+// commitResolutionLocked tells the resolver, when it can be told, that the
+// Sigma1 its last resolution served is accepted. Caller holds r.mu.
+func (r *Responder) commitResolutionLocked() {
+	if c, ok := r.identityResolver.(resolutionCommitter); ok {
+		c.CommitResolution()
+	}
+}
+
 // Sigma1ProcessResult is the discriminated union returned by
 // [Responder.ProcessSigma1WithResume]. Callers check IsResume to
 // decide which opcode to send.
@@ -731,6 +750,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 		return Sigma1ProcessResult{}, false, err
 	}
 	r.sessionID, r.idPending = sessionID, false
+	r.commitResolutionLocked()
 	r.identity, r.verifier = identity, verifier
 	r.peerSessionParams = sigma1.InitiatorSessionParams
 	r.sigma3Digest = nil
@@ -1011,6 +1031,7 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 	if err != nil {
 		return Sigma2{}, err
 	}
+	r.commitResolutionLocked()
 
 	// Commit. The previous handshake's shared secret and session keys
 	// end here ([zero]); whoever needed them took a copy when it

@@ -4,6 +4,7 @@
 package node
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/sigma"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // updateIdentity stands in for an UpdateNOC of fabric 1 (node.fabricUpdated):
@@ -160,6 +162,73 @@ func TestCASEResponderRefusesASessionWhoseUpdateFollowsItsStake(t *testing.T) {
 	fx.ids.testAfterStake = func() { fx.updateIdentity(sessions) }
 	if _, _, err := adapter.ProcessSigma3(sigma3); err == nil {
 		t.Fatal("Sigma3 completed although an update landed after its stake")
+	}
+	for _, s := range sessions.Sessions() {
+		if s.FabricIndex == 1 {
+			t.Fatalf("a session made under the replaced identity is open: %+v", s)
+		}
+	}
+}
+
+// TestCASEResponderKeepsTheResolutionOfItsAcceptedSigma1 (review II,
+// decision 244): a Sigma1 on the exchange of a handshake in progress that
+// resolves its destination and is then refused — here an invalid
+// ephemeral key, after an UpdateNOC of the fabric — leaves the handshake
+// answering under the load it resolved for its own Sigma1. Its Sigma3 is
+// refused as across any update; it is not admitted under the newer load
+// the refused Sigma1 resolved.
+func TestCASEResponderKeepsTheResolutionOfItsAcceptedSigma1(t *testing.T) {
+	t.Parallel()
+	fx := newCaseFabricFixture(t)
+	st := testStore(t)
+	sessions := operational.NewManager(st)
+	adapter, err := buildCaseAdapter(sessions, fx.ids, nil, slog.New(slog.DiscardHandler), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newInitiator := func(id uint16) *sigma.Initiator {
+		t.Helper()
+		in, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
+			Identity: fx.peer, Verifier: fx.verifier, SessionID: id,
+			PeerNodeID: fx.local.NodeID, RootPublicKey: fx.root,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return in
+	}
+	initiator := newInitiator(0x1001)
+	sigma1, err := initiator.GenerateSigma1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, sigma2, err := adapter.ProcessSigma1(sigma1)
+	if err != nil {
+		t.Fatalf("ProcessSigma1: %v", err)
+	}
+	sigma3, err := initiator.ProcessSigma2Bytes(sigma2)
+	if err != nil {
+		t.Fatalf("ProcessSigma2: %v", err)
+	}
+	fx.updateIdentity(sessions)
+
+	// A second Sigma1 whose destination resolves under the new load, with
+	// its ephemeral key's point prefix spoiled: refused after the resolve.
+	bad, err := newInitiator(0x1002).GenerateSigma1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := bytes.Index(bad, []byte{0x30, 0x04, 0x41, 0x04})
+	if at < 0 {
+		t.Fatal("no ephemeral key in the Sigma1")
+	}
+	bad[at+3] = 0x05
+	if op, _, err := adapter.ProcessSigma1(bad); err != nil || op != mrp.SCOpcodeStatusReport {
+		t.Fatalf("the spoiled Sigma1: opcode %#x, err %v; want a StatusReport", op, err)
+	}
+
+	if _, _, err := adapter.ProcessSigma3(sigma3); err == nil {
+		t.Fatal("Sigma3 completed under the load a refused Sigma1 resolved")
 	}
 	for _, s := range sessions.Sessions() {
 		if s.FabricIndex == 1 {
