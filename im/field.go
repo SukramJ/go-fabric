@@ -184,9 +184,8 @@ func contextMember(el tlv.Element) error {
 // (packages/types/src/tlv/TlvArray.ts:73-78 at db021da0), and
 // connectedhomeip's reader as CHIP_ERROR_INVALID_TLV_TAG
 // (src/lib/core/TLVReader.cpp:873-875 at 6170af84). Every array reader of
-// a message treats it as it treats an element of the wrong type — its
-// malformed error, or the skip of a reader that tolerates one (review
-// II, F-db021da0-48).
+// a message refuses it with its malformed error (review II,
+// F-db021da0-48).
 func taggedArrayElement(el tlv.Element) bool {
 	return !el.IsEndContainer && el.Tag.Kind != tlv.TagKindAnonymous
 }

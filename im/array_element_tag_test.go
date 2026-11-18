@@ -30,8 +30,7 @@ func tagFirstElement(t *testing.T, wire []byte, arrayTag uint8) []byte {
 // carries a tag as it treats an element of the wrong type, since array
 // elements are anonymous (matter.js TlvArray.ts:77-78, connectedhomeip
 // TLVReader.cpp:873-875). Each case decodes untagged first, so the
-// refusal is the tag's alone; the two filter arrays, which skip an element
-// of the wrong type, skip the tagged one.
+// refusal is the tag's alone.
 func TestArrayElementWithATagIsMalformed(t *testing.T) {
 	t.Parallel()
 	attrPath := []ConcreteAttributePath{{Endpoint: 1, Cluster: 6, Attribute: 0, HasEndpoint: true, HasCluster: true, HasAttribute: true}}
@@ -51,38 +50,37 @@ func TestArrayElementWithATagIsMalformed(t *testing.T) {
 		wire     []byte
 		arrayTag uint8
 		decode   func([]byte) decoded
-		skips    bool
 	}{
 		{"ReadRequest AttributeRequests", read(ReadRequest{AttributeRequests: attrPath, FabricFiltered: true}), tagReadReqAttributeRequests, func(b []byte) decoded {
 			r, err := UnmarshalReadRequestTLV(tlv.NewDecoder(b))
 			return decoded{len(r.AttributeRequests), err}
-		}, false},
+		}},
 		{"ReadRequest EventRequests", read(ReadRequest{EventRequests: eventPath, FabricFiltered: true}), tagReadReqEventRequests, func(b []byte) decoded {
 			r, err := UnmarshalReadRequestTLV(tlv.NewDecoder(b))
 			return decoded{len(r.EventRequests), err}
-		}, false},
+		}},
 		{"ReadRequest EventFilters", read(ReadRequest{EventRequests: eventPath, EventFilters: []EventMinimumNumber{{EventMin: 1}}, FabricFiltered: true}), tagReadReqEventFilters, func(b []byte) decoded {
 			r, err := UnmarshalReadRequestTLV(tlv.NewDecoder(b))
 			return decoded{len(r.EventFilters), err}
-		}, true},
+		}},
 		{"ReadRequest DataVersionFilters", read(ReadRequest{AttributeRequests: attrPath, DataVersionFilters: []DataVersionFilter{{Endpoint: 1, Cluster: 6, DataVersion: 1}}, FabricFiltered: true}), tagReadReqDataVersionFilters, func(b []byte) decoded {
 			r, err := UnmarshalReadRequestTLV(tlv.NewDecoder(b))
 			return decoded{len(r.DataVersionFilters), err}
-		}, true},
+		}},
 		{"SubscribeRequest AttributeRequests", sub(SubscribeRequest{AttributeRequests: attrPath, MaxIntervalCeiling: 10, FabricFiltered: true}), tagSubReqAttributeRequests, func(b []byte) decoded {
 			r, err := UnmarshalSubscribeRequestTLV(tlv.NewDecoder(b))
 			return decoded{len(r.AttributeRequests), err}
-		}, false},
+		}},
 		{"SubscribeRequest EventRequests", sub(SubscribeRequest{EventRequests: eventPath, MaxIntervalCeiling: 10, FabricFiltered: true}), tagSubReqEventRequests, func(b []byte) decoded {
 			r, err := UnmarshalSubscribeRequestTLV(tlv.NewDecoder(b))
 			return decoded{len(r.EventRequests), err}
-		}, false},
+		}},
 		{"WriteRequest WriteRequests", encodeWith(func(enc *tlv.Encoder) {
 			WriteRequest{Writes: []AttributeWrite{{Path: attrPath[0]}}}.MarshalTLV(enc, uintWriter)
 		}), tagWriteReqWriteRequests, func(b []byte) decoded {
 			r, err := UnmarshalWriteRequestTLV(tlv.NewDecoder(b), nil)
 			return decoded{len(r.Writes), err}
-		}, false},
+		}},
 		{"InvokeRequest InvokeRequests", encodeWith(func(enc *tlv.Encoder) {
 			MarshalInvokeRequestTLV(enc, InvokeRequest{Invokes: []CommandInvocation{{Path: cmdPath}}}, func(enc *tlv.Encoder, tag tlv.Tag, _ any) {
 				enc.StartStruct(tag)
@@ -91,29 +89,29 @@ func TestArrayElementWithATagIsMalformed(t *testing.T) {
 		}), tagInvokeReqInvokeRequests, func(b []byte) decoded {
 			r, err := UnmarshalInvokeRequestTLV(tlv.NewDecoder(b), nil)
 			return decoded{len(r.Invokes), err}
-		}, false},
+		}},
 		{"WriteResponse WriteResponses", encodeWith(WriteResponse{Responses: []AttributeStatus{{Path: attrPath[0], Status: statusIB}}}.MarshalTLV), tagWriteRespResponses, func(b []byte) decoded {
 			r, err := UnmarshalWriteResponseTLV(tlv.NewDecoder(b))
 			return decoded{len(r.Responses), err}
-		}, false},
+		}},
 		{"ReportData AttributeReports", encodeWith(func(enc *tlv.Encoder) {
 			ReportData{Reports: []AttributeReport{{Path: attrPath[0], Status: statusIB, IsStatus: true}}}.MarshalTLV(enc, uintWriter)
 		}), tagReportAttributeReports, func(b []byte) decoded {
 			r, err := UnmarshalReportDataTLV(tlv.NewDecoder(b), nil, nil)
 			return decoded{len(r.Reports), err}
-		}, false},
+		}},
 		{"ReportData EventReports", encodeWith(func(enc *tlv.Encoder) {
 			ReportData{EventReports: []EventReport{{Path: eventPath[0], Status: statusIB, IsStatus: true}}}.MarshalTLV(enc, uintWriter)
 		}), tagReportEventReports, func(b []byte) decoded {
 			r, err := UnmarshalReportDataTLV(tlv.NewDecoder(b), nil, nil)
 			return decoded{len(r.EventReports), err}
-		}, false},
+		}},
 		{"InvokeResponse InvokeResponses", encodeWith(func(enc *tlv.Encoder) {
 			InvokeResponse{Responses: []InvokeResponseEntry{{Path: cmdPath, Status: statusIB, IsStatus: true}}}.MarshalTLV(enc, nil)
 		}), tagInvokeRespResponses, func(b []byte) decoded {
 			r, err := UnmarshalInvokeResponseTLV(tlv.NewDecoder(b), nil)
 			return decoded{len(r.Responses), err}
-		}, false},
+		}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -121,11 +119,7 @@ func TestArrayElementWithATagIsMalformed(t *testing.T) {
 			if got := tc.decode(tc.wire); got.err != nil || got.n != 1 {
 				t.Fatalf("untagged: %d element(s), err %v; want 1 and nil", got.n, got.err)
 			}
-			got := tc.decode(tagFirstElement(t, tc.wire, tc.arrayTag))
-			switch {
-			case tc.skips && (got.err != nil || got.n != 0):
-				t.Fatalf("tagged: %d element(s), err %v; want the element skipped", got.n, got.err)
-			case !tc.skips && got.err == nil:
+			if got := tc.decode(tagFirstElement(t, tc.wire, tc.arrayTag)); got.err == nil {
 				t.Fatalf("tagged: decoded %d element(s), want an error", got.n)
 			}
 		})

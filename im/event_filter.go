@@ -5,6 +5,8 @@ package im
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math"
 
 	"github.com/SukramJ/go-fabric/tlv"
@@ -39,6 +41,18 @@ func MatchDataVersionFilter(filters []DataVersionFilter, endpoint uint16, cluste
 	return 0, false
 }
 
+// errFilterElement is an element of the EventFilters or DataVersionFilters
+// array that is not an anonymous structure. Both references refuse the
+// request for it: matter.js decodes either array as a TlvArray, which
+// throws on a tagged element (packages/types/src/tlv/TlvArray.ts:77-78 at
+// db021da0) and on one that is not a structure
+// (packages/types/src/tlv/TlvObject.ts:205-207); connectedhomeip's
+// ReadHandler returns CHIP_ERROR_INVALID_TLV_TAG for a tagged one
+// (src/app/ReadHandler.cpp:543-545, :597-599 at 6170af84) and fails a
+// non-structure in the filter's parser (:549, :601;
+// src/app/MessageDef/StructParser.cpp:21-24). Review II, F-db021da0-48.
+var errFilterElement = errors.New("im: malformed filter element")
+
 // readDataVersionFilterArray parses an Array of DataVersionFilter structs.
 // The array opener has already been consumed by the caller.
 // Called from [UnmarshalReadRequestTLV] and [UnmarshalSubscribeRequestTLV].
@@ -61,12 +75,9 @@ func readDataVersionFilterArray(dec *tlv.Decoder) ([]DataVersionFilter, error) {
 			return filters, nil
 		}
 		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeStructure {
-			// Not a DataVersionFilterIB: skipped whole, so its members
-			// are not read as the array's (R2-P6-wire-0504).
-			if err := skipField(dec, el); err != nil {
-				return nil, err
-			}
-			continue
+			// Not a DataVersionFilterIB: the request is malformed, as
+			// matter.js and connectedhomeip refuse it ([errFilterElement]).
+			return nil, fmt.Errorf("%w: DataVersionFilters element (type 0x%02X, tag kind %d)", errFilterElement, el.Type, el.Tag.Kind)
 		}
 		f, err := readDataVersionFilterFields(dec)
 		if err := later.keep(err); err != nil {
@@ -206,21 +217,9 @@ func readEventFilterArray(dec *tlv.Decoder) ([]EventMinimumNumber, error) {
 			return filters, nil
 		}
 		if taggedArrayElement(el) || !el.IsContainer || el.Type != tlv.TypeStructure {
-			// Skip non-struct elements — forward-compat tolerance. A
-			// scalar has already been fully consumed by dec.Next(); a
-			// container (e.g. a nested Array/List) still has its inner
-			// elements pending and must be drained via skipContainer —
-			// otherwise the next dec.Next() call reads that container's
-			// first inner element as if it were the following
-			// EventFilters array member and desyncs the rest of the
-			// message, mirroring the read.go / subscribe.go fix for the
-			// sibling EventFilters-field case.
-			if el.IsContainer {
-				if err := skipContainer(dec); err != nil {
-					return nil, err
-				}
-			}
-			continue
+			// Not an EventFilterIB: the request is malformed, as
+			// matter.js and connectedhomeip refuse it ([errFilterElement]).
+			return nil, fmt.Errorf("%w: EventFilters element (type 0x%02X, tag kind %d)", errFilterElement, el.Type, el.Tag.Kind)
 		}
 		f, err := readEventFilterFields(dec)
 		if err := later.keep(err); err != nil {

@@ -4,6 +4,7 @@
 package im
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/tlv"
@@ -249,16 +250,12 @@ func TestUnmarshalReadRequest_ScalarEventFiltersFieldIsSkipped(t *testing.T) {
 	}
 }
 
-// TestReadEventFilterArray_NestedContainerElementIsDrainedNotDesynced pins
-// the container-drain fix inside the EventFilters array itself: a peer
-// that encodes an unknown/forward-compat container element (here a
-// nested Array) ahead of a well-formed EventFilterIB must have that
-// container fully drained before the loop resumes — dropping straight
-// to `continue` without draining leaves the nested array's inner
-// elements to be misread as the next EventFilters array member, which
-// desyncs the whole decode and used to surface as "EventRequests not
-// array" further down in UnmarshalReadRequestTLV.
-func TestReadEventFilterArray_NestedContainerElementIsDrainedNotDesynced(t *testing.T) {
+// TestReadEventFilterArray_WrongTypeElementRefusesTheRequest: an
+// EventFilters element that is not a structure — here a nested Array
+// ahead of a well-formed EventFilterIB, and a scalar — refuses the
+// request, as matter.js and connectedhomeip do ([errFilterElement];
+// review II, F-db021da0-48). It used to be skipped.
+func TestReadEventFilterArray_WrongTypeElementRefusesTheRequest(t *testing.T) {
 	t.Parallel()
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -289,18 +286,22 @@ func TestReadEventFilterArray_NestedContainerElementIsDrainedNotDesynced(t *test
 		t.Fatalf("Bytes: %v", err)
 	}
 
-	req, err := UnmarshalReadRequestTLV(tlv.NewDecoder(wire))
+	if req, err := UnmarshalReadRequestTLV(tlv.NewDecoder(wire)); !errors.Is(err, errFilterElement) {
+		t.Fatalf("a nested array in EventFilters: %+v, err %v; want errFilterElement", req, err)
+	}
+	scalar := tlv.NewEncoder()
+	scalar.StartStruct(tlv.AnonymousTag())
+	scalar.StartArray(tlv.ContextTag(tagReadReqEventFilters))
+	scalar.PutUint(tlv.AnonymousTag(), 7)
+	_ = scalar.EndContainer()
+	scalar.PutBool(tlv.ContextTag(tagReadReqFabricFiltered), true)
+	_ = scalar.EndContainer()
+	wire, err = scalar.Bytes()
 	if err != nil {
-		t.Fatalf("UnmarshalReadRequestTLV: %v", err)
+		t.Fatal(err)
 	}
-	if len(req.EventFilters) != 1 {
-		t.Fatalf("EventFilters: got %d, want 1 (the unknown array element must be skipped, not counted)", len(req.EventFilters))
-	}
-	if got := req.EventFilters[0].EventMin; got != 40 {
-		t.Errorf("EventMin = %d, want 40", got)
-	}
-	if !req.FabricFiltered {
-		t.Error("FabricFiltered: got false — the field after EventFilters was not decoded, meaning the array desynced")
+	if req, err := UnmarshalReadRequestTLV(tlv.NewDecoder(wire)); !errors.Is(err, errFilterElement) {
+		t.Fatalf("a scalar in EventFilters: %+v, err %v; want errFilterElement", req, err)
 	}
 }
 
@@ -332,5 +333,46 @@ func TestUnmarshalSubscribeRequest_ScalarEventFiltersFieldIsSkipped(t *testing.T
 	}
 	if !req.FabricFiltered {
 		t.Error("FabricFiltered: got false — the field after the malformed one was not decoded")
+	}
+}
+
+// TestFilterArraysRefuseAWrongTypeElement (review II, F-db021da0-48): an
+// element of the EventFilters or DataVersionFilters array that is not a
+// structure refuses the ReadRequest and the SubscribeRequest alike.
+func TestFilterArraysRefuseAWrongTypeElement(t *testing.T) {
+	t.Parallel()
+	wire := func(arrayTag, fabricFilteredTag uint8, maxInterval bool) []byte {
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		if maxInterval {
+			enc.PutUint(tlv.ContextTag(tagSubReqMinIntervalFloor), 0)
+			enc.PutUint(tlv.ContextTag(tagSubReqMaxIntervalCeiling), 10)
+		}
+		enc.StartArray(tlv.ContextTag(arrayTag))
+		enc.PutUint(tlv.AnonymousTag(), 7)
+		_ = enc.EndContainer()
+		enc.PutBool(tlv.ContextTag(fabricFilteredTag), true)
+		_ = enc.EndContainer()
+		b, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	read := func(b []byte) error { _, err := UnmarshalReadRequestTLV(tlv.NewDecoder(b)); return err }
+	sub := func(b []byte) error { _, err := UnmarshalSubscribeRequestTLV(tlv.NewDecoder(b)); return err }
+	for _, c := range []struct {
+		name   string
+		wire   []byte
+		decode func([]byte) error
+	}{
+		{"ReadRequest EventFilters", wire(tagReadReqEventFilters, tagReadReqFabricFiltered, false), read},
+		{"ReadRequest DataVersionFilters", wire(tagReadReqDataVersionFilters, tagReadReqFabricFiltered, false), read},
+		{"SubscribeRequest EventFilters", wire(tagSubReqEventFilters, tagSubReqFabricFiltered, true), sub},
+		{"SubscribeRequest DataVersionFilters", wire(tagSubReqDataVersionFilters, tagSubReqFabricFiltered, true), sub},
+	} {
+		if err := c.decode(c.wire); !errors.Is(err, errFilterElement) {
+			t.Errorf("%s with a scalar element: err %v, want errFilterElement", c.name, err)
+		}
 	}
 }
