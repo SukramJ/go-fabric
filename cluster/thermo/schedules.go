@@ -240,8 +240,9 @@ func scheduleRequest(fields any) (tdef.SetActiveScheduleRequestRequest, error) {
 // the device (its refusal answers the command and stores nothing), the
 // handle is stored and reported, and with the Events feature the
 // ActiveScheduleChange event carries the previous and the new handle
-// (ThermostatClusterEvents.cpp:189-213: emitted only with TEVT; without it
-// the event is outside the EventList and [spec.Events.Emit] drops it).
+// (ThermostatClusterEvents.cpp:189-213 at 6170af84: emitted only with
+// TEVT; without it the event is outside the EventList and
+// [spec.Events.Emit] drops it).
 func (s *ThermostatServer) handleSetActiveScheduleRequest(ctx context.Context, fields any) error {
 	req, err := scheduleRequest(fields)
 	if err != nil {

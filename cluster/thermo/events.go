@@ -132,7 +132,7 @@ func (s *ThermostatServer) emitChanges(ctx context.Context, before, after eventS
 // bitmap — the field present, value 0 — for an unoccupied one, and nothing
 // for a user limit (no case in its switch). Mirrors connectedhomeip
 // ThermostatClusterSetpointsBase.cpp:75, :81 (BitMask<OccupancyBitmap>())
-// and ThermostatClusterEvents.cpp:109-120 at 645b267a
+// and ThermostatClusterEvents.cpp:109-120 at 6170af84
 // (event.occupancy = MakeOptional(occupancy)).
 // The caller holds s.mu; [ThermostatServer.flushSetpointEvents] emits the
 // queue once it let go.

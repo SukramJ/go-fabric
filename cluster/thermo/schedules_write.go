@@ -64,13 +64,13 @@ type scheduleRules struct {
 //
 // The staged presets may be another peer's: the atomic writes follow
 // matter.js, several peers each holding their own attribute, while chip
-// has one atomic state per endpoint (ThermostatClusterAtomic.cpp:360-363,
-// :172-191 at 645b267a), so there the case cannot arise. A peer's
-// Schedules write is therefore judged against the Presets another peer
-// staged and has not committed; a removal that peer later commits is
-// refused while a stored or staged schedule names the handle
-// (presetsInUseBySchedules). No reference defines the cross-peer answer
-// (R2-P6-par-1565).
+// has one atomic state per endpoint (ThermostatClusterAtomic.cpp:318-326,
+// :121-140 at 6170af84; :360-363, :172-191 at 645b267a), so there the
+// case cannot arise. A peer's Schedules write is therefore judged against
+// the Presets another peer staged and has not committed; a removal that
+// peer later commits is refused while a stored or staged schedule names
+// the handle (presetsInUseBySchedules). No reference defines the
+// cross-peer answer (R2-P6-par-1565).
 func (s *ThermostatServer) scheduleRules() scheduleRules {
 	presets := s.presets
 	if st := s.atomic.forAttribute(s.clk.Now(), tdef.AttrPresets); st != nil {
@@ -109,7 +109,7 @@ func (r scheduleRules) scheduleType(mode tdef.SystemModeEnum) (ScheduleType, boo
 }
 
 // heatLimits and coolLimits are chip's Setpoints::GetLimits
-// (Setpoints.cpp:41-59 at 645b267a): the user limits, with AUTO the
+// (Setpoints.cpp:41-59 at 6170af84): the user limits, with AUTO the
 // heating maximum held a deadband below the cooling maximum and the
 // cooling minimum a deadband above the heating minimum.
 func (r scheduleRules) heatLimits() (lo, hi int) {

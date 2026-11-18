@@ -5619,6 +5619,29 @@ Review II, phase 4 (2026-11-14): connectedhomeip at `645b267a`
 (`ThermostatClusterSchedules.cpp` and `.h`) is outside the exports the
 review read and was not re-read; what this entry says of it is unverified.
 
+Review II, phase 6b (2026-11-18, N6a-reg-4, measured): the connectedhomeip
+citations of this entry and of `cluster/thermo` that name `645b267a` hold at
+that commit, the newer one — its diff to the harness commit `6170af84`
+removes the schedules files. At `6170af84`,
+`src/app/clusters/thermostat-server/` has no `ThermostatClusterSchedules.h`,
+`ThermostatClusterSchedules.cpp`, `ScheduleStructWithOwnedMembers.h` or
+`tests/TestThermostatClusterSchedules.cpp` (`git ls-tree`), so a citation of
+those files holds only at `645b267a`; their text there was not re-read.
+Three constructs of files that exist at `6170af84` are absent there as well:
+the check that refuses removing a preset a schedule references,
+INVALID_IN_STATE (`IsPresetHandleInUseBySchedules`,
+`ThermostatClusterPresets.cpp:708-724` at `645b267a`; `PrecommitPresets`,
+`:624` ff. at `6170af84`, has none — choice (4)),
+`IsPresetHandlePresentInPresetsOrPending` (`:480-491` at `645b267a`; at
+`6170af84` only `IsPresetHandlePresentInPresets`, `:434` — choice (5)) and
+the virtual `IsPresetHandlePresent` (`ThermostatClusterBase.h:99-103` at
+`645b267a`, the protected constructor at `6170af84`). The atomic-write lines
+hold at `6170af84` at other lines: precommit then commit,
+`ThermostatClusterAtomic.cpp:362-367` (`:442-447` at `645b267a`, choice
+(3)); a failing `SetAtomicWrite` answers RESOURCE_EXHAUSTED, `:318-326`, and
+`InAtomicWrite` is `:121-140` — the `645b267a` branch for a write that
+belongs to another client (`:360-363`) is not there in that form.
+
 ### BD-chip-Thermostat-Suggestions — ThermostatSuggestions follows connectedhomeip; matter.js does not implement it
 
 matter.js's `ThermostatServer` has no suggestion logic: the 1782 lines of
