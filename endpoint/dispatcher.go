@@ -1085,9 +1085,11 @@ func readOne(ctx context.Context, ep *Endpoint, srv contract.ClusterServer, path
 // snapshot the generated table is the whole answer
 // ([schema.AttributeFabricScope]) — whatever the server is, a host's own
 // or the module's, and whether or not it is a
-// [contract.FabricScopedReader]. A cluster outside the snapshot is scoped
-// as its server declares ([contract.FabricScopeDeclarer]; spec.Instance
-// declares its definition's), and not at all without a declaration.
+// [contract.FabricScopedReader]. A cluster outside the snapshot, and a
+// manufacturer-specific attribute ([spec.VendorPrefix]) the table does not
+// hold on a cluster of the snapshot, is scoped as its server declares
+// ([contract.FabricScopeDeclarer]; spec.Instance declares its
+// definition's), and not at all without a declaration.
 func fabricScopeFor(ctx context.Context, srv contract.ClusterServer, attrID uint32) *im.FabricScope {
 	filtered, fabric, request := im.LookupFabricFilter(ctx)
 	if !request {
@@ -1096,22 +1098,29 @@ func fabricScopeFor(ctx context.Context, srv contract.ClusterServer, attrID uint
 	clusterID := srv.MatterClusterID()
 	var sensitive bool
 	var fields []uint32
-	if _, standard := schema.ClusterRevision(clusterID); standard {
-		s, ok := schema.AttributeFabricScope(clusterID, attrID)
-		if !ok {
-			return nil
-		}
+	_, standard := schema.ClusterRevision(clusterID)
+	s, tabled := schema.AttributeFabricScope(clusterID, attrID)
+	switch {
+	case standard && tabled:
 		sensitive, fields = s.Sensitive, s.Fields
-	} else {
+	case standard && spec.VendorPrefix(attrID) == 0:
+		// A standard attribute of a standard cluster: the table's alone.
+		return nil
+	default:
+		// A vendor cluster, or a manufacturer-specific attribute a server
+		// adds to a standard cluster: scoped as its own declaration states,
+		// as matter.js takes an element's scope from that element's own
+		// schema (packages/protocol/src/action/server/AccessControl.ts:508-525
+		// at db021da0; review II, F-db021da0-55).
 		d, ok := srv.(contract.FabricScopeDeclarer)
 		if !ok {
 			return nil
 		}
-		s, ok := d.MatterFabricScope(attrID)
+		ds, ok := d.MatterFabricScope(attrID)
 		if !ok {
 			return nil
 		}
-		sensitive, fields = s.Sensitive, slices.Clone(s.Fields)
+		sensitive, fields = ds.Sensitive, slices.Clone(ds.Fields)
 	}
 	return &im.FabricScope{Fabric: fabric, Filtered: filtered, Sensitive: sensitive, Fields: fields}
 }
