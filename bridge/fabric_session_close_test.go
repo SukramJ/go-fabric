@@ -168,7 +168,7 @@ func TestCloseFabricSessionsExcept_WithoutCapability(t *testing.T) {
 // UpdateNOC the invoking session closes as well — after its response
 // where the IM layer defers it, at once otherwise — without a
 // CloseSession, while the fabric's other sessions are told (matter.js
-// Fabric.ts:408-415 replaced → initiateForceClose, NodeSession.ts:349-352).
+// Fabric.ts:432-439 replaced → initiateForceClose, NodeSession.ts:379-382).
 func TestCloseFabricSessionsAfterUpdate_ClosesTheInvokingSessionToo(t *testing.T) {
 	t.Parallel()
 	dev := startResumeDevice(t, newMemSubscriptionStore(), nil)

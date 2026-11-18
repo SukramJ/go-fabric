@@ -1743,6 +1743,13 @@ func (b *Bridge) endHandshakeOfReplacedHandler(key HandshakeKey, hash [32]byte) 
 // record goes, what it still retransmits is dropped, and a provider's
 // adapter leaves its provider and returns its staked id. A later Sigma3 of
 // it is acknowledged and not answered ([Bridge.dropHandshakeNotBegun]).
+// connectedhomeip aborts a pending establishment on the updated fabric
+// (src/protocols/secure_channel/CASESession.h:149-153,
+// CASESession.cpp:423-433 at 6170af84); matter.js has no listener that
+// ends a handshake in flight: FabricManager.ts:401 at db021da0 emits
+// `replaced`, and its listeners are OperationalCredentialsServer.ts:596
+// (the Fabrics attribute and the commissioning state) and
+// DeviceAdvertiser.ts:80 (the operational advertisement).
 // Returns how many it ended. Review II, R2-P6-sec-2412.
 func (b *Bridge) abortFabricHandshakes(fabricIndex uint8) int {
 	type pending struct {

@@ -1921,14 +1921,15 @@ func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8
 // one session (operational.Manager.CloseFabricExcept); without one it
 // does nothing.
 //
-// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:408-415
-// `replaced(currentExchange)` (OperationalCredentialsServer.ts:373): each
-// session of the fabric runs `initiateClose`, whose close emits
-// gracefulClose and so a CloseSession (NodeSession.ts:384-393,
-// ExchangeManager.ts:693, :716-726), before `initiateForceClose`. The
+// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:432-439 at
+// db021da0 `replaced(currentExchange)` (OperationalCredentialsServer.ts:373):
+// each session of the fabric runs `initiateClose`, whose close emits
+// gracefulClose and so a CloseSession (NodeSession.ts:367-377, :414-425;
+// ExchangeManager.ts:758, :781-787), before `initiateForceClose`. The
 // invoking session is kept open here, where matter.js closes it after its
 // exchange without a CloseSession (the force close marks it peer-lost,
-// NodeSession.ts:349-352); keeping it is the existing rule of
+// NodeSession.ts:379-382, and spares the invoking exchange,
+// Session.ts:336-340); keeping it is the existing rule of
 // operational.Manager.CloseFabricExcept, which this does not change.
 func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID uint16) {
 	b.mu.RLock()
@@ -1947,11 +1948,11 @@ func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID ui
 // closed at once ([Bridge.CloseFabricSessionsExcept]), and the session
 // that carried UpdateNOC — named by ctx — is closed after its response,
 // without a CloseSession. Mirrors matter.js Fabric.replaced
-// (Fabric.ts:408-415): every session of the fabric runs
+// (Fabric.ts:432-439): every session of the fabric runs
 // initiateForceClose, the invoking one included, which closes once its
 // exchange ends and, marked peer-lost, sends nothing
-// (NodeSession.ts:349-352). The controller reconnects with CASE under the
-// new NOC.
+// (NodeSession.ts:379-382, :419-425). The controller reconnects with
+// CASE under the new NOC.
 //
 // A CASE handshake on fabricIndex that has not finished is aborted first,
 // one this node answers ([Bridge.abortFabricHandshakes]) and one it opened
@@ -2992,7 +2993,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, fabricIndex uint8, compress
 // advertiser re-announces what it still holds, so the stale
 // <compressedID>-<nodeID> instance keeps answering until its TTL and
 // commissioners resolve an identity that no longer exists. Mirrors
-// matter.js DeviceAdvertiser.ts:76-86 (close the fabric's
+// matter.js DeviceAdvertiser.ts:80-107, :109-112 at db021da0 (close the fabric's
 // advertisements on update/delete before re-advertising). fabricIndex
 // is the fabric the identity belonged to: the bridge forgets the
 // instance it recorded for it, so no broadcast event reaches it again.

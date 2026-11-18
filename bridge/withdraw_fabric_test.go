@@ -31,7 +31,8 @@ func activeOperationalInstances(noop *mdns.Noop) map[string]bool {
 // (compressedFabricID, nodeID) identity. A republish alone cannot retire
 // the record — the advertiser only re-announces what it still holds —
 // so RemoveFabric and a NodeID-changing UpdateNOC both need the explicit
-// withdraw. Mirrors matter.js DeviceAdvertiser.ts:76-86.
+// withdraw. Mirrors matter.js DeviceAdvertiser.ts:80-107, :109-112 at
+// db021da0.
 func TestWithdrawFabric_RemovesAnnouncedOperationalRecord(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()

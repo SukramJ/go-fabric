@@ -1252,7 +1252,8 @@ type SessionFabricResolver interface {
 // [SessionLookup] can implement so the outbound-reliable tracker can
 // size its retransmission backoff to the peer's advertised MRP
 // session parameters (active/idle interval selected by peer
-// activity — matter.js MRP.ts:129 retransmissionIntervalOf). Sessions
+// activity — matter.js MRP.ts:181 in retransmissionIntervalOf,
+// :162-190 at db021da0). Sessions
 // the resolver does not know (session 0 / PASE) return (_, false)
 // and the tracker falls back to the spec idle default.
 type SessionRetransmitIntervalResolver interface {
