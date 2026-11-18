@@ -72,7 +72,8 @@ const (
 	// it; a record a sender states for 136 years is gone after it.
 	maxRecordTTL = 4500 * time.Second
 	// maxCachedRecords is how many records the cache holds. Past it the
-	// record installed or refreshed longest ago is deleted, as an expiry
+	// record installed or refreshed longest ago is deleted — of a name no
+	// resolution observes first ([Names.evictOverflow]) — as an expiry
 	// would delete it, and its name goes once nothing keeps it. A
 	// legitimate responder refreshes its records whenever it answers, so a
 	// flood evicts them only if it brings more records than this between
@@ -165,16 +166,20 @@ type Names struct {
 	stagedCount int
 	filters     []*ingressFilter
 	discovered  []*discoveredObserver
-	// expiring is every cached record, each with its place in installed,
-	// the records in the order they were installed or refreshed
-	// ([maxCachedRecords]).
-	expiring     map[*Record]*list.Element
-	installed    *list.List
-	expiryTimer  stopper
-	expiryAt     time.Time
-	pruneTimer   stopper
-	currentBatch *[]*Name
-	closed       bool
+	// expiring is every cached record, each with its place in installed
+	// or resolvedInstalled, the records in the order they were installed
+	// or refreshed ([maxCachedRecords]): resolvedInstalled holds those of
+	// names a resolution observes ([Name.isResolved]), inResolved marks
+	// them, and evictOverflow takes the other list first.
+	expiring          map[*Record]*list.Element
+	installed         *list.List
+	resolvedInstalled *list.List
+	inResolved        map[*Record]bool
+	expiryTimer       stopper
+	expiryAt          time.Time
+	pruneTimer        stopper
+	currentBatch      *[]*Name
+	closed            bool
 }
 
 // namesConfig carries the knobs tests turn; production uses the defaults.
@@ -218,6 +223,9 @@ func newNames(conn mdns.QueryConn, logger *slog.Logger, cfg namesConfig) *Names 
 		stagedIPs:      newOmap[string, []stagedIP](),
 		expiring:       make(map[*Record]*list.Element),
 		installed:      list.New(),
+
+		resolvedInstalled: list.New(),
+		inResolved:        make(map[*Record]bool),
 	}
 	if n.clock == nil {
 		n.clock = fabricclock.System{}
@@ -516,9 +524,11 @@ func (n *Names) boundedTTL(rec *Record) *Record {
 // evictOverflow keeps the cached records and the staged addresses
 // together within [maxCachedRecords]: past it the staged addresses go
 // first, those of the host touched longest ago, then the records installed
-// or refreshed longest ago. A staged address is unconfirmed — no SRV has
-// named its host — so it never displaces a cached record (review II,
-// R2-P3-ctl-lan-01).
+// or refreshed longest ago — those of names no resolution observes before
+// those of names one does, so the records a peer being connected uses go
+// last (U3-ctl-lan-1, owner decision 240). A staged address is
+// unconfirmed — no SRV has named its host — so it never displaces a cached
+// record (review II, R2-P3-ctl-lan-01).
 func (n *Names) evictOverflow() {
 	unstaged := 0
 	for n.stagedCount > 0 && len(n.expiring)+n.stagedCount > maxCachedRecords {
@@ -531,7 +541,11 @@ func (n *Names) evictOverflow() {
 	}
 	evicted := 0
 	for len(n.expiring) > maxCachedRecords {
-		rec, _ := n.installed.Front().Value.(*Record)
+		front := n.installed.Front()
+		if front == nil {
+			front = n.resolvedInstalled.Front()
+		}
+		rec, _ := front.Value.(*Record)
 		n.unregisterForExpiration(rec)
 		if nm := n.maybeGet(rec.Name); nm != nil {
 			nm.deleteRecord(rec)
@@ -739,7 +753,12 @@ func (n *Names) registerForExpiration(rec *Record) {
 	if _, ok := n.expiring[rec]; ok {
 		return
 	}
-	n.expiring[rec] = n.installed.PushBack(rec)
+	if nm := n.maybeGet(rec.Name); nm != nil && nm.isResolved() {
+		n.expiring[rec] = n.resolvedInstalled.PushBack(rec)
+		n.inResolved[rec] = true
+	} else {
+		n.expiring[rec] = n.installed.PushBack(rec)
+	}
 	if n.expiryTimer == nil || rec.ExpiresAt.Before(n.expiryAt) {
 		n.armExpiry(rec.ExpiresAt)
 	}
@@ -747,8 +766,35 @@ func (n *Names) registerForExpiration(rec *Record) {
 
 func (n *Names) unregisterForExpiration(rec *Record) {
 	if e, ok := n.expiring[rec]; ok {
-		n.installed.Remove(e)
+		if n.inResolved[rec] {
+			n.resolvedInstalled.Remove(e)
+			delete(n.inResolved, rec)
+		} else {
+			n.installed.Remove(e)
+		}
 		delete(n.expiring, rec)
+	}
+}
+
+// reclassify moves nm's cached records to the order list its observation
+// now puts them in — at its back, as a refresh would — when a resolution
+// starts or stops observing it (U3-ctl-lan-1).
+func (n *Names) reclassify(nm *Name) {
+	resolved := nm.isResolved()
+	for _, rec := range nm.records.values() {
+		e, ok := n.expiring[rec]
+		if !ok || n.inResolved[rec] == resolved {
+			continue
+		}
+		if resolved {
+			n.installed.Remove(e)
+			n.expiring[rec] = n.resolvedInstalled.PushBack(rec)
+			n.inResolved[rec] = true
+		} else {
+			n.resolvedInstalled.Remove(e)
+			delete(n.inResolved, rec)
+			n.expiring[rec] = n.installed.PushBack(rec)
+		}
 	}
 }
 
@@ -815,5 +861,7 @@ func (n *Names) shutdown() {
 	n.discovered = nil
 	n.expiring = make(map[*Record]*list.Element)
 	n.installed.Init()
+	n.resolvedInstalled.Init()
+	n.inResolved = make(map[*Record]bool)
 	n.names.clear()
 }

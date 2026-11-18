@@ -162,7 +162,7 @@ func (b *browse) track(qname string) {
 	if b.instances.has(key) {
 		return
 	}
-	in := &browsed{svc: newService(b.n, qname)}
+	in := &browsed{svc: newService(b.n, qname, false)}
 	nm := in.svc.name
 	in.obs = &nameObserver{fn: func(c Changes) { b.resolveHosts(c.Name) }}
 	nm.on(in.obs)

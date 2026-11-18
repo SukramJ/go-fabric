@@ -177,6 +177,8 @@ type srvEntry struct {
 // open Service keeps its name and SRV targets in the cache.
 type Service struct {
 	names *Names
+	// resolves marks a caller's resolution ([NewService]).
+	resolves bool
 
 	// Loop-owned state below.
 	name         *Name
@@ -195,21 +197,25 @@ type Service struct {
 // names, seeded from the records already cached.
 func NewService(names *Names, qname string) *Service {
 	var s *Service
-	if err := names.loop.call(func() { s = newService(names, qname) }); err != nil {
+	if err := names.loop.call(func() { s = newService(names, qname, true) }); err != nil {
 		return &Service{names: names, name: newName(qname, names), services: newOmap[string, *srvEntry](), addresses: newOmap[netip.AddrPort, Address](), closed: true}
 	}
 	return s
 }
 
-// newService. Mirrors matter.js 0ceb202d IpService.ts:36-52.
-func newService(names *Names, qname string) *Service {
+// newService. Mirrors matter.js 0ceb202d IpService.ts:36-52. resolves
+// marks a caller's resolution (NewService): the cache evicts the records
+// of its names last (U3-ctl-lan-1); a browse's or a scanner's services
+// do not.
+func newService(names *Names, qname string, resolves bool) *Service {
 	s := &Service{
 		names:     names,
+		resolves:  resolves,
 		services:  newOmap[string, *srvEntry](),
 		addresses: newOmap[netip.AddrPort, Address](),
 	}
 	s.name = names.get(qname)
-	s.nameObserver = &nameObserver{fn: s.onServiceChanged}
+	s.nameObserver = &nameObserver{fn: s.onServiceChanged, resolution: resolves}
 	s.name.on(s.nameObserver)
 	for _, r := range s.name.records.values() {
 		if r.Type == TypeSRV {
@@ -507,7 +513,7 @@ func (s *Service) updateService(ttl time.Duration, target string, port, priority
 		priority:     priority,
 		weight:       weight,
 	}
-	e.observer = &nameObserver{fn: func(c Changes) { s.onAddressChanged(e, c) }}
+	e.observer = &nameObserver{fn: func(c Changes) { s.onAddressChanged(e, c) }, resolution: s.resolves}
 	e.name.on(e.observer)
 	s.onAddressChanged(e, Changes{Name: e.name, Updated: e.name.records.values()})
 	s.services.set(key, e)

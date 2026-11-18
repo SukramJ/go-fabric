@@ -227,6 +227,10 @@ type Changes struct {
 // alive; fn may be nil (matter.js's null observer).
 type nameObserver struct {
 	fn func(Changes)
+	// resolution marks the observer of a resolution a caller runs — an
+	// operational [Service] ([NewService]) — whose name's records the
+	// cache evicts last ([Names.evictOverflow]).
+	resolution bool
 }
 
 type pendingChange struct {
@@ -295,16 +299,29 @@ func (n *Name) isDiscovered() bool { return n.records.len() > 0 }
 
 func (n *Name) isObserved() bool { return len(n.observers) > 0 }
 
+// isResolved reports whether a resolution observes the name.
+func (n *Name) isResolved() bool {
+	return slices.ContainsFunc(n.observers, func(o *nameObserver) bool { return o.resolution })
+}
+
 func (n *Name) on(o *nameObserver) {
 	if !slices.Contains(n.observers, o) {
+		was := n.isResolved()
 		n.observers = append(n.observers, o)
+		if o.resolution && !was {
+			n.names.reclassify(n)
+		}
 	}
 }
 
 // off removes an observer and deletes the name if nothing keeps it.
 // Mirrors matter.js 0ceb202d DnssdName.ts:58-61.
 func (n *Name) off(o *nameObserver) {
+	was := n.isResolved()
 	n.observers = slices.DeleteFunc(n.observers, func(x *nameObserver) bool { return x == o })
+	if was && !n.isResolved() {
+		n.names.reclassify(n)
+	}
 	n.deleteIfUnused()
 }
 

@@ -661,7 +661,7 @@ func (s *Scanner) onDiscovered(nm *Name) {
 		}
 	}
 
-	svc := newService(s.names, nm.qname)
+	svc := newService(s.names, nm.qname, false)
 	if d, ok := buildDevice(nm); ok {
 		s.cacheDevice(lower, d, svc, nm)
 		return
