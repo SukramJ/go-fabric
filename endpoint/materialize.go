@@ -245,6 +245,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		NodeLabelStated:      stated.NodeLabel != nil,
 		SaveNodeLabel:        ep.nodeLabelSaver(),
 		OnNodeLabelWrite:     ep.nodeLabelWriter(),
+		HoldNodeLabel:        ep.holdNodeLabel,
 		ConfigurationVersion: ep.ConfigurationVersion(),
 		UniqueID:             uniqueIDFor(ep.SourceKey),
 		// Reachable mirrors the underlying CCU device's live availability

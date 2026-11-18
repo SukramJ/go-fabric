@@ -10,6 +10,10 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+
+	"github.com/SukramJ/go-fabric/cluster/core"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // labelStore is a [Persistence] that records the label it stored last
@@ -73,42 +77,87 @@ func TestSetNodeLabelReturnsTheStoresRefusal(t *testing.T) {
 	}
 }
 
+// bdbiOf is the BridgedDeviceBasicInformation server a dispatch builds
+// for ep: a new instance per call, as the dispatcher builds one per
+// dispatch.
+func bdbiOf(t *testing.T, ep *Endpoint) *core.BridgedDeviceBasicInformation {
+	t.Helper()
+	for _, srv := range ClusterServers(ep) {
+		if b, ok := srv.(*core.BridgedDeviceBasicInformation); ok {
+			return b
+		}
+	}
+	t.Fatal("no BridgedDeviceBasicInformation server")
+	return nil
+}
+
+// labelEndpoint is a bridged endpoint with a NodeLabel persistence.
+func labelEndpoint(p Persistence) *Endpoint {
+	return &Endpoint{
+		ID: 3, DeviceType: 0x0100, FriendlyName: "spec", SourceKey: StringKey("k"), persistence: p,
+		Source: deviceTypeSource{dt: 0x0100, servers: []contract.ClusterServer{dtServer{id: 0x0006}}},
+	}
+}
+
+// TestNodeLabelWritesOnTwoServerInstances (F-db021da0-43): two server
+// instances of one endpoint — built per dispatch — compare a controller's
+// NodeLabel write with the label the endpoint serves under its lock, not
+// with the label each instance was built with: a second write of the same
+// label changes nothing and stores nothing, and a write back to the label
+// both were built with changes it. Mirrors matter.js, whose write locks
+// the endpoint's datasource and compares with the held values
+// (Datasource.ts:1345-1350, :1446-1457, :1476-1481 at db021da0).
+func TestNodeLabelWritesOnTwoServerInstances(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	p := &labelStore{}
+	ep := labelEndpoint(p)
+	a, b := bdbiOf(t, ep), bdbiOf(t, ep)
+	if changed, err := a.MatterWriteChanged(ctx, bdbidef.AttrNodeLabel, "A"); err != nil || !changed {
+		t.Fatalf("first write: changed %v, %v", changed, err)
+	}
+	if changed, err := b.MatterWriteChanged(ctx, bdbidef.AttrNodeLabel, "A"); err != nil || changed {
+		t.Errorf("the same label on the second instance: changed %v, %v; want unchanged", changed, err)
+	}
+	if _, saves := p.stored(); saves != 1 {
+		t.Errorf("%d saves for two writes of one label, want 1", saves)
+	}
+	if changed, err := b.MatterWriteChanged(ctx, bdbidef.AttrNodeLabel, "spec"); err != nil || !changed {
+		t.Errorf("a write back to the built-with label: changed %v, %v; want changed", changed, err)
+	}
+	if last, _ := p.stored(); last != "spec" || ep.NodeLabel() != "spec" {
+		t.Errorf("stored %q, served %q; want spec", last, ep.NodeLabel())
+	}
+}
+
 // TestNodeLabelServedIsStoredLast (R2-P5-apidev-16, decision 226): host
 // renames and controller writes (the server's saver hook) running at once
 // end with the label served equal to the label stored last.
 func TestNodeLabelServedIsStoredLast(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 	for round := range 50 {
 		p := &labelStore{}
-		e := &Endpoint{FriendlyName: "spec", SourceKey: StringKey("k"), persistence: p}
-		save, hook := e.nodeLabelSaver(), e.nodeLabelWriter()
-		if save == nil {
-			t.Fatal("no saver for an endpoint with a persistence and a key")
-		}
+		ep := labelEndpoint(p)
 		var wg sync.WaitGroup
 		for i := range 8 {
 			label := fmt.Sprintf("label-%d", i)
 			wg.Go(func() {
 				if i%2 == 0 {
-					if err := e.SetNodeLabel(label); err != nil {
+					if err := ep.SetNodeLabel(label); err != nil {
 						t.Errorf("SetNodeLabel: %v", err)
 					}
 					return
 				}
-				// The order the BridgedDeviceBasicInformation server
-				// runs its hooks in: store, then hold.
-				if err := save(context.Background(), label); err != nil {
-					t.Errorf("save: %v", err)
-					return
-				}
-				if hook != nil {
-					hook(label)
+				// A controller's write, on a server instance of its own.
+				if _, err := bdbiOf(t, ep).MatterWriteChanged(ctx, bdbidef.AttrNodeLabel, label); err != nil {
+					t.Errorf("write: %v", err)
 				}
 			})
 		}
 		wg.Wait()
-		if stored, _ := p.stored(); e.NodeLabel() != stored {
-			t.Fatalf("round %d: served %q, stored %q", round, e.NodeLabel(), stored)
+		if stored, _ := p.stored(); ep.NodeLabel() != stored {
+			t.Fatalf("round %d: served %q, stored %q", round, ep.NodeLabel(), stored)
 		}
 	}
 }

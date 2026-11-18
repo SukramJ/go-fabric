@@ -708,32 +708,49 @@ func (e *Endpoint) storeLabel(ctx context.Context, label string) error {
 	s := e.endpointState()
 	s.labelMu.Lock()
 	defer s.labelMu.Unlock()
+	return e.storeLabelHeld(ctx, label)
+}
+
+// storeLabelHeld is [Endpoint.storeLabel] with the state's labelMu held
+// by the caller — a controller's write, which holds it across its
+// comparison ([Endpoint.holdNodeLabel]).
+func (e *Endpoint) storeLabelHeld(ctx context.Context, label string) error {
 	if e.stores() {
 		if err := e.persistence.SaveNodeLabel(ctx, e.SourceKey, label); err != nil {
 			return err
 		}
 	}
-	s.setLabel(label)
+	e.endpointState().setLabel(label)
 	return nil
 }
 
+// holdNodeLabel is the BridgedDeviceBasicInformation server's
+// [mattercore.BridgedConfig.HoldNodeLabel]: the state's labelMu, which
+// every server instance built for this endpoint and the host's rename
+// share, and the NodeLabel the endpoint serves under it (F-db021da0-43).
+func (e *Endpoint) holdNodeLabel() (string, func()) {
+	s := e.endpointState()
+	s.labelMu.Lock()
+	return e.NodeLabel(), s.labelMu.Unlock
+}
+
 // nodeLabelSaver returns the hook a BridgedDeviceBasicInformation server
-// calls with a controller's NodeLabel before it holds it: the label is
-// stored and held ([Endpoint.storeLabel]); the store's error refuses the
-// write. Nil when the endpoint does not [Endpoint.stores].
+// calls with a controller's NodeLabel before it holds it, under
+// [Endpoint.holdNodeLabel]: the label is stored and held
+// ([Endpoint.storeLabelHeld]); the store's error refuses the write. Nil
+// when the endpoint does not [Endpoint.stores].
 func (e *Endpoint) nodeLabelSaver() func(context.Context, string) error {
 	if !e.stores() {
 		return nil
 	}
-	return e.storeLabel
+	return e.storeLabelHeld
 }
 
 // nodeLabelWriter returns the hook a BridgedDeviceBasicInformation server
-// calls with a written NodeLabel once it is stored: the label goes to the
-// endpoint's state, which outlives the per-dispatch server. Nil when the
-// endpoint [Endpoint.stores]: the saver already held the label under the
-// lock that stored it, and a second, unlocked set could serve a label
-// another write has since replaced.
+// calls with a written NodeLabel once it is stored, under
+// [Endpoint.holdNodeLabel]: the label goes to the endpoint's state, which
+// outlives the per-dispatch server. Nil when the endpoint
+// [Endpoint.stores]: the saver already set it.
 func (e *Endpoint) nodeLabelWriter() func(string) {
 	if e.stores() {
 		return nil

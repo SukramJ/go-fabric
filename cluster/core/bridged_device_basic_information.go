@@ -48,6 +48,7 @@ type BridgedDeviceBasicInformation struct {
 
 	onNodeLabelWrite func(string)
 	saveNodeLabel    func(context.Context, string) error
+	holdNodeLabel    func() (string, func())
 	// writeMu serialises controller NodeLabel writes: the comparison, the
 	// save, the store and the OnNodeLabelWrite call are one step, so the
 	// hooks hear the labels in the order they are stored. It is never held with mu
@@ -196,6 +197,23 @@ type BridgedConfig struct {
 	// serving the label it held, and OnNodeLabelWrite does not run. The
 	// store-error rule of store/doc.go.
 	SaveNodeLabel func(ctx context.Context, label string) error
+	// HoldNodeLabel, when set, locks the NodeLabel of the endpoint this
+	// server serves, across every server instance built for it (a server
+	// rebuilt per dispatch cannot hold the label itself), and returns the
+	// label the endpoint serves now with the unlock. A controller's
+	// NodeLabel write holds it across the comparison, SaveNodeLabel and
+	// OnNodeLabelWrite, and compares with the label it returns, not the
+	// NodeLabel this instance was built with — so two writes on two
+	// instances compare one after the other against one label. Mirrors
+	// matter.js, where a write locks the endpoint's datasource for its
+	// transaction and the commit compares with the held values
+	// (packages/node/src/behavior/state/managed/Datasource.ts:1345-1350,
+	// :1446-1457, :1476-1481; packages/general/src/transaction/ResourceSet.ts:82-98
+	// at db021da0); a second write waits here where matter.js's
+	// synchronous path refuses it, the label being the same either way
+	// (F-db021da0-43). The hooks run under it: a hook that renames the
+	// endpoint deadlocks.
+	HoldNodeLabel func() (label string, unlock func())
 	// Logger receives the cluster's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
 }
@@ -244,6 +262,7 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 		reachable:         reachable,
 		onNodeLabelWrite:  cfg.OnNodeLabelWrite,
 		saveNodeLabel:     cfg.SaveNodeLabel,
+		holdNodeLabel:     cfg.HoldNodeLabel,
 		configVersion:     max(cfg.ConfigurationVersion, 1),
 	}
 	validateBridgedBasicInfoAttributes(cfg, b.log)
@@ -478,7 +497,8 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(ctx context.Context, attrID 
 // a NodeLabel that differs from the one held, in the order the labels are
 // stored; the held label reaches no hook (matter.js observes no equal
 // field, Datasource.ts:1406-1407 and :1479). A hook that writes NodeLabel
-// to this server again deadlocks.
+// to this server again deadlocks, and so does one that renames the
+// endpoint under [BridgedConfig.HoldNodeLabel].
 func (b *BridgedDeviceBasicInformation) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != bridgedBasicInfoAttrNodeLabel || !b.nodeLabelServed {
 		// UNSUPPORTED_WRITE for a served read-only attribute,
@@ -505,9 +525,15 @@ func (b *BridgedDeviceBasicInformation) MatterWriteChanged(ctx context.Context, 
 	b.writeMu.Lock()
 	defer b.writeMu.Unlock()
 	b.mu.Lock()
-	changed := b.nodeLabel != s
-	hook, save := b.onNodeLabelWrite, b.saveNodeLabel
+	held := b.nodeLabel
+	hook, save, hold := b.onNodeLabelWrite, b.saveNodeLabel, b.holdNodeLabel
 	b.mu.Unlock()
+	if hold != nil {
+		label, unlock := hold()
+		defer unlock()
+		held = label
+	}
+	changed := held != s
 	if !changed {
 		return false, nil
 	}
