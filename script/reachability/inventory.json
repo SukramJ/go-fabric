@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10014,
+  "entry_points": 10015,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27724,
+    "total_exported": 27725,
     "reachable": 20837,
-    "whitelisted": 6864,
+    "whitelisted": 6865,
     "unreachable": 23
   },
   "by_package": [
@@ -8040,7 +8040,7 @@
       "identifier": "TestTMR37",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/tmr37_internal_test.go",
-      "line": 58
+      "line": 60
     },
     {
       "package": "bridge",
@@ -42383,6 +42383,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/issue89_internal_test.go",
       "line": 30
+    },
+    {
+      "package": "node",
+      "identifier": "TestRetransmitIntervalFollowsThePeer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/retransmit_interval_internal_test.go",
+      "line": 24
     },
     {
       "package": "node",

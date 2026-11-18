@@ -640,6 +640,7 @@ Findings of review II, phases 0 to 2 (`notes/review/2026-11-13/`).
 
 ### Fixed
 
+- `node`: a secure session's retransmissions follow the peer's advertised MRP intervals — the active one while the peer is active, the idle one otherwise — as matter.js does; every retransmission of a node-built device ran on the 500 ms idle default whatever the peer advertised (review II, Fable round 2 of phase 6b wave 3).
 - `store.Apply` upgrades a database at schema v7, v8 or v9 that holds an ICD key in clear; it failed with "no such column: sealed" (review II).
 - `handshake.StoreResumption.DeleteResumptionRecord` removes a stored record that does not open (`store.ErrUnseal`) instead of reporting the read error and keeping it (review II).
 - `store/memstore`: `Erase` keeps the last owed fabric event ID, so an ID is never assigned again, as the SQLite store does (review II).

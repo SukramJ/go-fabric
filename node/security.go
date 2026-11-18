@@ -512,10 +512,12 @@ func (c *caseIdentities) load(ctx context.Context, st fabricIdentities, fabricIn
 // are returned so Stop can stop the ones that own goroutines.
 type security struct {
 	sessions *operational.Manager
-	subs     *subscription.Manager
-	pase     *bridge.PerExchangePaseProvider
-	salts    *windowSalt
-	casep    *bridge.PerExchangeCaseProvider
+	// lookup is the session lookup the bridge reads every session through.
+	lookup *bridge.OperationalSessionLookup
+	subs   *subscription.Manager
+	pase   *bridge.PerExchangePaseProvider
+	salts  *windowSalt
+	casep  *bridge.PerExchangeCaseProvider
 	// responderParams is what every PASE and CASE responder advertises.
 	responderParams *sessionparams.Parameters
 }
@@ -595,7 +597,8 @@ func wireSecurity(
 		}
 		tr, mx := e.PeerTransportParameters()
 		return tr, mx, tr != 0 || mx != 0
-	}).WithPeerScheduleResolver(peerScheduleOf(sessions)).WithFabricResolver(func(id uint16) (uint8, bool) {
+	}).WithPeerScheduleResolver(peerScheduleOf(sessions)).
+		WithRetransmitIntervalResolver(retransmitIntervalOf(sessions)).WithFabricResolver(func(id uint16) (uint8, bool) {
 		entry, err := sessions.Get(id)
 		if err != nil || entry == nil {
 			return 0, false
@@ -687,7 +690,7 @@ func wireSecurity(
 	br.AttachOperationalResolver(operationalResolver(logger, br.Clock()))
 	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger, events.opened))
 
-	return &security{sessions: sessions, subs: subs, pase: paseProvider, salts: pase.salts, casep: caseProvider, responderParams: responderParams}
+	return &security{sessions: sessions, lookup: lookup, subs: subs, pase: paseProvider, salts: pase.salts, casep: caseProvider, responderParams: responderParams}
 }
 
 // start runs the subscription engine and the session, PASE and CASE
@@ -782,6 +785,26 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 			},
 			OnAbandoned: func() { sessions.ReleaseStake(stake) },
 		}, nil
+	}
+}
+
+// retransmitIntervalOf answers the base interval of a (re)transmission on
+// a session from its entry: the interval the peer advertised for its
+// state now, active or idle, the spec default where it advertised none
+// ([operational.Entry.RetransmitBaseInterval]). Without it the bridge's
+// tracker sent every secure-session retransmission on the 500 ms idle
+// default whatever the peer advertised. Mirrors matter.js
+// packages/protocol/src/protocol/MessageChannel.ts:268-275 at db021da0
+// (every transmission takes the peer's session parameters and
+// isPeerActive) into packages/protocol/src/protocol/MRP.ts:162-190 (the
+// base `isPeerActive ? activeInterval : idleInterval`, :181).
+func retransmitIntervalOf(sessions *operational.Manager) func(uint16, time.Time) (time.Duration, bool) {
+	return func(id uint16, now time.Time) (time.Duration, bool) {
+		e, err := sessions.Get(id)
+		if err != nil || e == nil {
+			return 0, false
+		}
+		return e.RetransmitBaseInterval(now), true
 	}
 }
 
