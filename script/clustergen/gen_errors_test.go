@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -282,13 +283,19 @@ func TestTableMergeRefusesADuplicate(t *testing.T) {
 // "answers FAILURE" without naming that rule tells a host a specific
 // status cannot be answered; the doc states the rule as the camera ports
 // do: "an error answers its status, FAILURE without one"
-// (R2-P6-doc-2750).
+// (R2-P6-doc-2750). "answers" and "FAILURE" may stand apart ("answers the
+// command or write FAILURE", the ThreadNetworkStore doc the first form of
+// the check missed); the Oven port states the rule as "an error wrapping
+// an IM status answers it".
+// answersFailure finds a sentence that says an error answers FAILURE.
+var answersFailure = regexp.MustCompile(`answers[^.]*FAILURE`)
+
 func TestPortDocsStateTheStatusRule(t *testing.T) {
 	t.Parallel()
 	for cluster, ps := range ports {
 		for _, p := range ps.ports {
 			text := strings.Join(strings.Fields(strings.Join(p.doc, " ")), " ")
-			if strings.Contains(text, "answers FAILURE") && !strings.Contains(text, "its status") {
+			if answersFailure.MatchString(text) && !strings.Contains(text, "its status") && !strings.Contains(text, "wrapping an IM status") {
 				t.Errorf("%s %s: the doc says an error answers FAILURE without the status rule:\n%s", cluster, p.name, text)
 			}
 		}

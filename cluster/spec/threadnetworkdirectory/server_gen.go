@@ -235,9 +235,10 @@ func (s *Server) Host() Host {
 // one and RemoveNetwork drops one; LoadPreferred returns the saved
 // PreferredExtendedPanID (ok false when none was saved) and
 // SavePreferred stores it (nil or empty for null). An error answers
-// the command or write FAILURE and changes nothing. Without one the
-// kit's server keeps both in memory (cluster/netinfra
-// ThreadNetworkStore).
+// the command or write with its status, FAILURE without one
+// (RESOURCE_EXHAUSTED for a SaveNetwork refused with
+// netinfra.ErrStoreFull), and changes nothing. Without one the kit's
+// server keeps both in memory (cluster/netinfra ThreadNetworkStore).
 type ThreadNetworkStore interface {
 	Capacity() uint8
 	LoadNetworks(ctx context.Context) (datasets [][]byte, err error)
