@@ -130,7 +130,7 @@ import (
 // it corrected go, two heuristic rows come (client/interaction/server.go,
 // cluster/spec/decode_value.go: a name the sentence gives for another
 // part); none is a moved citation.
-const citecheckDriftRatchet = 305
+const citecheckDriftRatchet = 304
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit

@@ -144,7 +144,7 @@ func (e *Encoder) PutUint(tag Tag, v uint64) {
 //
 // matter.js never encodes at a fixed width: its TlvUInt8/16/32/64 all
 // take the smallest length that fits the value
-// (packages/types/src/tlv/TlvNumber.ts:271-297 at db021da0, through
+// (packages/types/src/tlv/TlvNumber.ts:271-300 at db021da0, through
 // TlvCodec.getUIntTlvLength). This helper exists for the documented
 // fixed-width divergences only (see [Encoder.PutUint16]); a spec field
 // has no width of its own on the wire. Wire example:

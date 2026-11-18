@@ -1072,7 +1072,7 @@ func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSc
 	// checks only SceneID and TransitionTime (:283); see
 	// notes/parity/by_design.md BD-chip-ScenesManagement-SceneNameLength.
 	// The length counts UTF-16 units, as matter.js's string constraint
-	// counts them (constraint.ts:199-211).
+	// counts them (constraint.ts:200-211).
 	if req.SceneID > scenesMaxSceneID || req.TransitionTime > scenesMaxTransition || len(utf16.Encode([]rune(req.SceneName))) > scenesMaxNameLength {
 		resp.Status = im.StatusConstraintError
 		return resp

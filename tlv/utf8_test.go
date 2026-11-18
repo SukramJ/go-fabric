@@ -56,7 +56,7 @@ func TestDecoder_IllFormedUTF8StringElement(t *testing.T) {
 
 // TestBoundedWriters_SmallestFit pins the nullable-bounded writers to
 // matter.js's encoding: the nullable schema wraps a TlvNumber schema
-// whose length follows the value (packages/types/src/tlv/TlvNumber.ts:247-297
+// whose length follows the value (packages/types/src/tlv/TlvNumber.ts:247-300
 // at db021da0), so 1 goes out as a one-byte integer whatever the type.
 func TestBoundedWriters_SmallestFit(t *testing.T) {
 	writes := map[string]func(*Encoder) error{

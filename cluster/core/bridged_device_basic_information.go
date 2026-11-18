@@ -516,7 +516,7 @@ func (b *BridgedDeviceBasicInformation) MatterWriteChanged(ctx context.Context, 
 	// 32" (basic-information.element.ts:36); a longer label is refused
 	// with CONSTRAINT_ERROR as the root cluster's checkLabelWrite refuses
 	// it. Mirrors matter.js
-	// packages/node/src/behavior/state/validation/constraint.ts:199-211 at
+	// packages/node/src/behavior/state/validation/constraint.ts:200-211 at
 	// db021da0 (ConstraintError, "String length of … is not within
 	// bounds"); the refusal used to surface as FAILURE.
 	if _, err := b.inst().CheckValue(attrID, s, nil); err != nil {

@@ -48,7 +48,7 @@ func (n rawNode) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { spec.Node(n).EncodeT
 type WriteOptions struct {
 	// Timed sends a TimedRequest first (ClientInteraction.ts:369-371). An
 	// attribute [schema.IsTimedWrite] names is written timed without it
-	// (Write.ts:198).
+	// (Write.ts:188).
 	Timed bool
 	// TimedTimeout is the TimedRequest's timeout; 0 is
 	// [DefaultTimedRequestTimeout]. A timeout marks the write timed

@@ -54,15 +54,6 @@
     "occurrences": 3
   },
   {
-    "file": "bdx/transfer_parity_matterjs_test.go",
-    "line": 613,
-    "citation": "BdxTest.ts:1307-1308",
-    "resolved": "packages/protocol/test/bdx/BdxTest.ts",
-    "identifier": "tailSize",
-    "nearest": 1331,
-    "occurrences": 8
-  },
-  {
     "file": "binding/manager.go",
     "line": 83,
     "citation": "BindingManager.ts:333",

@@ -717,7 +717,7 @@ func TestPutUint16Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at db021da0).
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-300 at db021da0).
 		if wire[0]&0x1F > byte(TypeUnsignedInt2) {
 			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt2 0x%02X", v, wire[0], TypeUnsignedInt2)
 		}
@@ -753,7 +753,7 @@ func TestPutUint32Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at db021da0).
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-300 at db021da0).
 		if wire[0]&0x1F > byte(TypeUnsignedInt4) {
 			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt4 0x%02X", v, wire[0], TypeUnsignedInt4)
 		}
@@ -789,7 +789,7 @@ func TestPutUint64Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at db021da0).
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-300 at db021da0).
 		if wire[0]&0x1F > byte(TypeUnsignedInt8) {
 			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt8 0x%02X", v, wire[0], TypeUnsignedInt8)
 		}

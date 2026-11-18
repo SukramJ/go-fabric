@@ -610,7 +610,7 @@ func TestBdxSuccessfulTransfers(t *testing.T) {
 // Result are values, so an observer altering its copy cannot reach the
 // session's.
 func TestBdxPerBlockDebugLogging(t *testing.T) {
-	const blockSize, tailSize = 500, 116 // BdxTest.ts:1307-1308
+	const blockSize, tailSize = 500, 116 // BdxTest.ts:1330-1331
 
 	t.Run("a responder reports what it received and granted, and an observer cannot alter either", func(t *testing.T) {
 		var responder *bdx.ServerSession
