@@ -105,3 +105,17 @@ func TestConformancePrecedenceParityMatterJS(t *testing.T) {
 		t.Errorf("parses \"Z.Foo\" as a qualified name: op %s", c.Op)
 	}
 }
+
+// TestConformanceSecondOrIsRefused: matter.js reads the first " or " as "|"
+// (Conformance.ts:554 at db021da0) and that one only; the module's parser
+// does the same, and a second "or" is an error instead of a name that makes
+// the text an otherwise list (R2-P6-test-2851, a module rule).
+func TestConformanceSecondOrIsRefused(t *testing.T) {
+	t.Parallel()
+	if c, err := ParseConformance("A or B"); err != nil || c.String() != "A | B" {
+		t.Errorf("ParseConformance(%q) = %v, %v; want A | B", "A or B", c, err)
+	}
+	if c, err := ParseConformance("A or B or C"); err == nil {
+		t.Errorf("ParseConformance(%q) = %q, want an error", "A or B or C", c.String())
+	}
+}
