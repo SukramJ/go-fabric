@@ -630,7 +630,7 @@
   },
   {
     "file": "client/handshake/server_test.go",
-    "line": 323,
+    "line": 383,
     "citation": "SessionManager.ts:205",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "at": "db021da0",

@@ -152,7 +152,7 @@ const citecheckDriftRatchet = 304
 // wave-4 units; 122 after the Fable wave-4 read applied, with the forms
 // of F3 (a sha closing a parenthesis after a comma, "pin <sha>",
 // "HEAD <sha>") counted.
-const citecheckOffPinRatchet = 122
+const citecheckOffPinRatchet = 124
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

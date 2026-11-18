@@ -3361,6 +3361,33 @@ which the responder answers. The brief asked for the symmetric rule.
 
 The device side does the same since R2-P6-sec-3320 (`BD-Matter-CASEServer-ResumptionRecordSingleUse`).
 
+### BD-Matter-CASEServer-ResumedSessionBeforeSigma2Resume — the controller's CASE responder registers a resumed session before Sigma2_Resume
+
+matter.js `CaseServer.ts` at `db021da0` creates the resumed session before
+Sigma2_Resume with `delayManagerRegistration` (`:175-188`, `:187`;
+`NodeSession.ts:153-155` skips the manager) and adds it to the manager
+only after the send (`:211`); a message for it before then is dropped as
+one of an unknown session (`ExchangeManager.ts:331-342`).
+`handshake.CASEServer.resume` registers it before the send and closes it
+when the send fails (`client/handshake/server.go`), the order matter.js
+takes after the pin: at `c41eb7da` the session is registered from its
+construction (`NodeSession.ts:163-165`), created establishing before the
+send (`CaseServer.ts:177-190`) and receives messages in every state
+(`NodeSession.ts:223-225`). connectedhomeip drops a message on the
+session until the initiator's Success activates it
+(`CASESession.cpp:2315-2340` → `PairingSession.cpp:62-66`,
+`SessionManager.cpp:1007-1012` at `6170af84`). Reasoning: the initiator sends its first request right after
+its Success, and the controller's manager reads it on another goroutine
+than the responder's, so a session registered after the send lost that
+request over TCP, where nothing retransmits it (release v0.23.0, the
+camera tests' "expected message missing after 35s"); only a holder of the
+record's shared secret can send on the session (`CaseServer.ts:162-182`
+at `db021da0`). Reconciled at the pin lift: the order is matter.js's then,
+and `c41eb7da` also closes a resumed session whose Success does not
+arrive (`CaseServer.ts:205-211`), which ends the resume half of
+`BD-Matter-CASEServer-CloseOnUnfinishedEstablishment`. Pinned by
+`TestCASEServerRegistersTheResumedSessionBeforeSigma2Resume`.
+
 ### BD-Matter-CASEServer-NoReportOnShutdown — a handshake the responder's Close cut short reports nothing
 
 matter.js `CaseServer.ts:68-77` logs a `ShutdownError` at info and still

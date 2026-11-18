@@ -435,21 +435,33 @@ func (c *CASEServer) handleSigma1(ctx context.Context, x *exchange.Exchange, fir
 }
 
 // resume is CaseServer.#resume (CaseServer.ts:148-222) after the MIC
-// check: Sigma2_Resume with a fresh resumption id, our session id and
-// parameters (:190-201); the session from the record, registered once
-// Sigma2_Resume is out (matter.js creates it before and closes it when
-// the send fails, :172-206); the record's id replaced (:213); the
-// initiator's Success awaited (:216); the record saved (:218-219). A
-// Success that does not arrive closes the session: matter.js keeps it
-// registered (:211, before :216), a divergence the report names.
+// check: the session from the record (:172-188); Sigma2_Resume with a
+// fresh resumption id, our session id and parameters (:190-201), the
+// session closed when it cannot be sent (:202-206); the record's id
+// replaced (:213); the initiator's Success awaited (:216); the record
+// saved (:218-219). A Success that does not arrive closes the session:
+// matter.js keeps it registered at the pin (:211, before :216), a
+// divergence the report names (BD-Matter-CASEServer-CloseOnUnfinishedEstablishment).
+//
+// The session is registered in the manager before Sigma2_Resume goes
+// out; matter.js at the pin creates it before the send but adds it to the
+// manager only after it (:187 delayManagerRegistration, :211). The
+// initiator holds the session once Sigma2_Resume reached it and sends on
+// it at once, its Success first and then its first request, which this
+// manager reads on another goroutine while this one still returns from
+// the send. A request that met no session was dropped as one of an
+// unknown session; over UDP MRP sent it again, over TCP nothing does, and
+// the initiator's exchange waited out its response timeout (the camera's
+// first signal over its own CASE session after a restart). matter.js
+// after the pin registers the session before the send, in the
+// establishing state, and processes its messages in every state
+// (CaseServer.ts:177-206, NodeSession.ts:223-225 at c41eb7da);
+// BD-Matter-CASEServer-ResumedSessionBeforeSigma2Resume.
 func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder *sigma.Responder, fabrics *responderFabrics, record *ResumptionRecord, sigma1 sigma.Sigma1, result sigma.Sigma1ProcessResult) error {
 	if !fabrics.found {
 		return fmt.Errorf("%w: resumption record of an unknown fabric", ErrUnexpectedData)
 	}
 	fabric := fabrics.chosen
-	if err := c.sendAnswer(ctx, x, sigma1.InitiatorRandom, mrp.SCOpcodeSigma2Resume, sigma.MarshalSigma2Resume(*result.Sigma2Resume)); err != nil {
-		return err
-	}
 	keys := result.ResumeKeys
 	s, err := c.mgr.NewSecureSession(exchange.SecureSessionConfig{
 		ID:   responder.SessionID(),
@@ -471,6 +483,10 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 		Responder:             true,
 	})
 	if err != nil {
+		return err
+	}
+	if err := c.sendAnswer(ctx, x, sigma1.InitiatorRandom, mrp.SCOpcodeSigma2Resume, sigma.MarshalSigma2Resume(*result.Sigma2Resume)); err != nil {
+		s.Close()
 		return err
 	}
 	if _, err := nextMessage(ctx, x, mrp.SCOpcodeStatusReport, ExpectedCryptoProcessingTime); err != nil {
