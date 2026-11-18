@@ -252,8 +252,17 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	}
 	prev, had, err := st.GetSetting(ctx, key)
 	// A value the store holds already is not written again: the write
-	// changes nothing stored (review II, R2-P5-write-04).
+	// changes nothing stored (review II, R2-P5-write-04). Nor is one the
+	// server holds under a key never stored: a write of the held value
+	// changes nothing, which matter.js neither notes nor stores
+	// (Datasource.ts:1446-1452, :1476-1481 at db021da0; F-db021da0-47) —
+	// a restart serves the same value from the declaration.
 	wrote := !had || prev != stored
+	if err == nil && !had && !k.label {
+		if held, ok := v.heldForm(k); ok && held == stored {
+			wrote = false
+		}
+	}
 	if err == nil && wrote {
 		err = st.SetSetting(ctx, key, stored)
 	}
@@ -307,6 +316,25 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	}, nil
 }
 
+// heldForm is the stored form (hex of its TLV) of the value k's server
+// holds; false without a server, for an attribute it serves no value of,
+// and for a value the codec does not take (logged).
+func (v *nonVolatile) heldForm(k *nvKey) (string, bool) {
+	if k.srv == nil {
+		return "", false
+	}
+	val, ok := k.srv.MatterRead(k.attrID)
+	if !ok {
+		return "", false
+	}
+	b, err := bridge.AttributeValueTLV(val)
+	if err != nil {
+		v.n.logger.Debug("nonvolatile.persist", slog.Uint64("attribute", uint64(k.attrID)), slog.Any("err", err))
+		return "", false
+	}
+	return hex.EncodeToString(b), true
+}
+
 // storeHeld stores the value k's server holds under key when the store
 // does not hold it already; a store that refuses it is logged and the key
 // owed (written again at the next change and when the node stops). The
@@ -317,20 +345,10 @@ func (v *nonVolatile) storeHeld(ctx context.Context, k *nvKey, key string) {
 		v.storeLabel(ctx, k, key)
 		return
 	}
-	if k.srv == nil {
-		return
-	}
-	val, ok := k.srv.MatterRead(k.attrID)
+	held, ok := v.heldForm(k)
 	if !ok {
 		return
 	}
-	b, err := bridge.AttributeValueTLV(val)
-	if err != nil {
-		// A form the codec does not take: what is stored stays.
-		v.n.logger.Debug("nonvolatile.persist", slog.String("key", key), slog.Any("err", err))
-		return
-	}
-	held := hex.EncodeToString(b)
 	if k.known && !k.owed && held == k.stored {
 		return
 	}
