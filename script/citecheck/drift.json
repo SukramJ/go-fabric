@@ -2663,7 +2663,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 1139,
+    "line": 1169,
     "citation": "packages/protocol/src/session/case/CaseServer.ts:219",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "at": "db021da0",
