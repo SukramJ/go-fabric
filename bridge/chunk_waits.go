@@ -51,7 +51,7 @@ import (
 // this module's: matter.js bounds a session's outgoing exchanges only
 // (packages/protocol/src/protocol/ExchangeManager.ts:63 at db021da0);
 // connectedhomeip reserves read and subscription resources per fabric
-// (src/app/InteractionModelEngine.h:113-116, :674-686 at 6170af84).
+// (src/app/InteractionModelEngine.h:113-116, :674-687 at 6170af84).
 
 // maxChunkWaitsPerSession bounds the interactions of one session that
 // may wait for the peer's StatusResponse to a chunk at once — a
