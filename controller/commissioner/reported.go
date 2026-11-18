@@ -4,9 +4,18 @@
 package commissioner
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+)
+
+// The shapes a decoded value can take that the flow's typed field cannot:
+// each is logged as the skipped value's error.
+var (
+	errReportedNullStruct = errors.New("null for a struct")
+	errReportedNullList   = errors.New("null for a list")
+	errReportedNullEntry  = errors.New("null entry")
 )
 
 // reportedValue decodes an attribute value the device reported by its
@@ -60,7 +69,7 @@ func reportedStruct(log *slog.Logger, what string, def *spec.Struct, n spec.Node
 	}
 	m, ok := v.(map[uint32]any)
 	if !ok {
-		log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", what), slog.String("err", "null for a struct"))
+		log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", what), slog.Any("err", errReportedNullStruct))
 	}
 	return m, ok
 }
@@ -75,14 +84,14 @@ func reportedStructList(log *slog.Logger, what string, def *spec.Struct, n spec.
 	}
 	entries, ok := v.([]any)
 	if !ok {
-		log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", what), slog.String("err", "null for a list"))
+		log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", what), slog.Any("err", errReportedNullList))
 		return nil, false
 	}
 	out := make([]map[uint32]any, 0, len(entries))
 	for _, e := range entries {
 		m, ok := e.(map[uint32]any)
 		if !ok {
-			log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", what), slog.String("err", "null entry"))
+			log.Warn("matter.controller.commissioning.reported_value_skipped", slog.String("attribute", what), slog.Any("err", errReportedNullEntry))
 			return nil, false
 		}
 		out = append(out, m)
