@@ -49,13 +49,6 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "tree": "matterjs-server",
-    "line": 1015,
-    "citation": "packages/ws-controller/src/server/WebSocketControllerHandler.ts:144",
-    "error": "no matterjs-server commit"
-  },
-  {
-    "file": "notes/parity/by_design.md",
     "line": 1050,
     "citation": "packages/protocol/src/interaction/SubscriptionHandler.ts:284",
     "error": "file not found"

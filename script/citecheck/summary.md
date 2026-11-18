@@ -6,14 +6,46 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 
 | Metric | Count |
 |---|---|
-| Citations | 10444 |
+| Citations | 10447 |
 | Go files citing | 1743 |
 | Resolved: exact path from a tree root (packages/, support/, examples/) | 2898 |
 | Resolved: unique suffix | 249 |
-| Resolved: unique basename | 7297 |
-| Checked at their own `at <sha>` | 3600 |
+| Resolved: unique basename | 7300 |
+| Checked at their own `at <sha>`, the pin | 2548 |
+| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 1216 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 678 |
-| Drift-checked (the sentence names a name the file contains) | 4613 |
-| Hard-checked only | 5831 |
+| Drift-checked (the sentence names a name the file contains) | 4596 |
+| Hard-checked only | 5851 |
 | **Hard errors** | 0 |
-| **Drift** | 343 |
+| **Drift** | 340 |
+
+## Off the pin, by commit
+
+Line citations whose sentence names a matter.js commit other than the pin are checked at that commit; their count is held by `citecheckOffPinRatchet`, exactly. The bound bare parts are counted beside them, not ratcheted.
+
+| Commit | Line citations | Bare parts bound to a file |
+|---|---|---|
+| `0ceb202d` | 329 | 8 |
+| `862ad75f` | 882 | 140 |
+| `9892fa39` | 2 | 0 |
+| `d87d1de4` | 2 | 0 |
+| `e812bd07` | 1 | 0 |
+
+## Counted, not ratcheted
+
+| Reference | Count |
+|---|---|
+| A .ts file named without a line part | 2599 |
+| … whose sentence names another matter.js commit | 528 |
+| A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 531 |
+| … checked at another matter.js commit | 148 |
+| … with a hard error at the commit it was checked at | 3 |
+| A bare line part after a .ts citation or after no file (not checked) | 2578 |
+| A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 1799 |
+| … naming a commit that is no matter.js commit | 816 |
+| … at a commit other than the harness commit `6170af84` (Makefile CHIP_TEST_IMAGE_COMMIT) | 32 |
+
+| chip commit | chip citations |
+|---|---|
+| `645b267a` | 31 |
+| `6feac778f196483b6355d35fc529f183b293b71f` | 1 |

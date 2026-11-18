@@ -154,16 +154,6 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 903,
-    "citation": "ExchangeManager.ts:480-486",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "at": "db021da0",
-    "identifier": "CloseSession",
-    "nearest": 758,
-    "occurrences": 0
-  },
-  {
-    "file": "bridge/bridge.go",
     "line": 1888,
     "citation": "NodeSession.ts:384-393",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
@@ -475,15 +465,6 @@
     "identifier": "onChange",
     "nearest": 737,
     "occurrences": 9
-  },
-  {
-    "file": "bridge/subscribe_dispatch.go",
-    "line": 95,
-    "citation": "ServerSubscription.ts:674",
-    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
-    "identifier": "AttributeReadResponse",
-    "nearest": 644,
-    "occurrences": 2
   },
   {
     "file": "bridge/subscribe_dispatch.go",
@@ -1464,6 +1445,7 @@
     "line": 934,
     "citation": "window-covering-cluster.element.ts:128-131",
     "resolved": "packages/model/src/standard/elements/window-covering-cluster.element.ts",
+    "at": "db021da0",
     "identifier": "OperationalStatus",
     "nearest": 55,
     "occurrences": 1
@@ -1485,15 +1467,6 @@
     "identifier": "MoveMode",
     "nearest": 389,
     "occurrences": 3
-  },
-  {
-    "file": "cluster/levelcontrol/native.go",
-    "line": 468,
-    "citation": "LevelControlServer.ts:624-627",
-    "resolved": "packages/node/src/behaviors/level-control/LevelControlServer.ts",
-    "identifier": "targetValue",
-    "nearest": 543,
-    "occurrences": 1
   },
   {
     "file": "cluster/levelcontrol/scenes.go",
@@ -1528,6 +1501,7 @@
     "line": 349,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "at": "0ceb202d",
     "identifier": "occupiedHeatingSetpoint",
     "nearest": 762,
     "occurrences": 4
@@ -1537,6 +1511,7 @@
     "line": 363,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:614",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "at": "0ceb202d",
     "identifier": "systemMode",
     "nearest": 781,
     "occurrences": 2
@@ -2305,6 +2280,7 @@
     "line": 169,
     "citation": "GroupSession.ts:431-433",
     "resolved": "packages/protocol/src/session/GroupSession.ts",
+    "at": "db021da0",
     "identifier": "GroupKeyMap",
     "nearest": 334,
     "occurrences": 2
@@ -2838,7 +2814,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 676,
+    "line": 677,
     "citation": "packages/protocol/src/session/SessionManager.ts:213",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "#nextSessionId",
@@ -2847,7 +2823,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1076,
+    "line": 1077,
     "citation": "NodeSession.ts:403",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -2856,7 +2832,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1078,
+    "line": 1079,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -2865,7 +2841,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1267,
+    "line": 1268,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -2874,7 +2850,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1293,
+    "line": 1294,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -2883,7 +2859,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1358,
+    "line": 1359,
     "citation": "NodeSession.ts:305-309",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -2892,7 +2868,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1847,
+    "line": 1848,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",

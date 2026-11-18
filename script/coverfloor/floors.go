@@ -303,8 +303,8 @@ var floors = []packageFloor{
 	// BX4's forward generator; main() only writes the files its test compares.
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/citecheck",
-		min: 85,
-		why: "the collector, resolver, checker, summary and the derived corrections run against testdata and an in-memory tree, and since brief M9-module the git plumbing and run against two temporary repositories (TestCitecheckSecondTree); main needs the clones, which make cite-check and its CI job provide",
+		min: 88,
+		why: "the collector, resolver, checker, summary and the derived corrections run against testdata and an in-memory tree, and since brief M9-module the git plumbing and run against two temporary repositories (TestCitecheckSecondTree); since review II 6b wave 4 (R2-P6-test-3201) the off-pin counts run end to end against a two-commit repository (TestCitecheckOffPinCounts), measured 88.5; main needs the clones, which make cite-check and its CI job provide",
 	},
 	// This tool. Its parser and comparison are covered; main() — flag
 	// parsing, file opening, printing, the exit codes — is not, because

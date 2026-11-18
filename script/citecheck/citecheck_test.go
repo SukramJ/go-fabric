@@ -115,7 +115,17 @@ import (
 // next to the cited line (lowerCamel). 31 rows go, among them
 // controller/commissioner/wire.go's re-cited AddNoc sentence, whose line
 // 1466 is the icacValue field of the addNoc invoke; none is new.
-const citecheckDriftRatchet = 343
+//
+// 340 after review II, phase 6b wave 4, unit sec: a .ts file a sentence
+// names without a line now takes the names nearest to it, as a bare part or
+// another language's citation does (R2-P6-test-3202), so a name given for
+// it no longer drifts the citation beside it. Three rows go —
+// bridge/bridge.go (CloseSession, beside Session.ts),
+// bridge/subscribe_dispatch.go (AttributeReadResponse, its own file named
+// with its lines broken off) and cluster/levelcontrol/native.go
+// (targetValue, beside Transitions.ts); none is new. Rows whose sentence
+// now names its commit carry it in "at".
+const citecheckDriftRatchet = 340
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -665,7 +675,12 @@ func TestCitecheckOffPinCounts(t *testing.T) {
 // with the phase's re-read of the register (13 left there, 3 in the
 // findings register; 7 "file not found", 5 "ambiguous", 3 "line beyond end
 // of file" and 1 "no matterjs-server commit").
-const citecheckRegisterRatchet = 16
+//
+// 15 after review II, phase 6b wave 4, unit sec: the collector reads a sha
+// opening a parenthesis, so by_design.md's controller-diagnostics row
+// ("matterjs-server (`0bd06f2`)") names its matterjs-server commit and its
+// WebSocketControllerHandler citation resolves.
+const citecheckRegisterRatchet = 15
 
 func TestCitecheckRegistersOnRatchet(t *testing.T) {
 	data, err := os.ReadFile("registers.json")
