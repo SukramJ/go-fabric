@@ -27,15 +27,15 @@ import (
 
 // MaxConcurrentExchangesPerSession is the number of open exchanges one
 // secure session keeps; opening one more closes the least recently active
-// one. Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:54
+// one. Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:63
 // (MAXIMUM_CONCURRENT_OUTGOING_EXCHANGES_PER_SESSION = 30) and the
-// eviction of :494-531 at 0ceb202d; the unsecured session is exempt
-// (:511-514).
+// eviction of :551-566, :578-596 at db021da0; the unsecured session is
+// exempt (:579-582).
 const MaxConcurrentExchangesPerSession = 30
 
 // initiatedExchangeFlag sets an initiated exchange's table index apart
 // from a received exchange with the same id — matter.js
-// ExchangeManager.ts:147 (`exchangeId | 0x10000`) and :333-335.
+// ExchangeManager.ts:172 (`exchangeId | 0x10000`) and :400 at db021da0.
 const initiatedExchangeFlag uint32 = 0x10000
 
 // sessionIDUpperBound is the largest local session id; ids cycle through
@@ -759,7 +759,7 @@ func (m *Manager) removeExchange(x *Exchange) {
 
 // cleanupSessionExchanges closes the least recently active exchange of s
 // once it has more than [MaxConcurrentExchangesPerSession] open ones —
-// matter.js ExchangeManager.ts:510-531.
+// matter.js ExchangeManager.ts:578-596 at db021da0.
 func (m *Manager) cleanupSessionExchanges(s *Session) {
 	if s.secure == nil {
 		return

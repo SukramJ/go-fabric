@@ -27,12 +27,12 @@ func (r *Subscriptions) Register(mgr *exchange.Manager) {
 
 // HandleExchange handles an IM exchange a peer opened with first. Mirrors
 // matter.js ClientSubscriptionHandler (ClientSubscriptionHandler.ts:33-145)
-// at 0ceb202d:
+// at db021da0:
 //
 //   - a first message other than a ReportData is not a client operation:
 //     the controller serves no Interaction Model server, so it is answered
 //     InvalidAction as InteractionServerMessenger answers an unsupported
-//     message (InteractionMessenger.ts:357-361);
+//     message (InteractionMessenger.ts:415-419);
 //   - while the registry is blocked a report is answered
 //     InvalidSubscription (:33-43);
 //   - a report without a subscription id is answered InvalidSubscription
@@ -43,11 +43,11 @@ func (r *Subscriptions) Register(mgr *exchange.Manager) {
 //     acknowledgement, further chunks read over (:114-128); a report with
 //     data is assembled and handed to Updated, a later chunk naming no or
 //     another subscription answered InvalidSubscription and ending it
-//     (:129-138, processReports :163-196);
+//     (:129-138, processReports :155-188);
 //   - in every case the liveness deadline restarts (:139-144).
 //
 // The chunks are acknowledged as readDataReports does
-// (InteractionMessenger.ts:938-972).
+// (InteractionMessenger.ts:1012-1053).
 func (r *Subscriptions) HandleExchange(x *exchange.Exchange, first *exchange.Message) {
 	m := &messenger{x: x, maxReport: r.maxReport}
 	ctx := r.readingCtx

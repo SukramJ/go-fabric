@@ -45,7 +45,7 @@ const (
 // exchange closes, and pads the exchange with margin — the probe network
 // PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at db021da0)
 // and the medium margin PeerExchangeProvider.initiateExchange applies
-// (PeerExchangeProvider.ts:87-92, :132-137).
+// (PeerExchangeProvider.ts:87-92, :133-138).
 //
 // Its log record matter.controller.peer.probe names the probed address in
 // target — override, else the session's — beside the caller's address, so

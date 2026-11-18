@@ -111,25 +111,26 @@ var ErrMalformedRequest = errors.New("interaction: malformed request")
 // (interaction/InteractionMessenger.ts:1269-1317) at db021da0:
 //
 //   - a DataVersion needs a concrete endpoint, and a write needs at least
-//     one attribute (Write.ts:64-69, :105-107);
+//     one attribute (Write.ts:70-75, :111-113);
 //   - a list value becomes the empty list (REPLACE-ALL) and one append per
 //     element with a null ListIndex, unless chunking is off or the path is
-//     AccessControl ACL or Extension (:149-171);
+//     AccessControl ACL or Extension (Write.ts:155-177);
 //   - a timed write first sends a TimedRequest on the same exchange and
-//     waits for its Success (:369-371; the timeout defaults to 10 s, :159);
+//     waits for its Success (ClientInteraction.ts:421-423; the timeout
+//     defaults to 10 s, :175);
 //   - the write goes in WriteRequest messages that each fit the session's
 //     payload and whose WriteResponse — every status at its largest —
 //     fits it too, each answered by its WriteResponse, the statuses
-//     concatenated (sendWriteCommand, InteractionMessenger.ts:1269-1450 at
-//     862ad75f; [chunkWrite]); a timed or suppressed write that does not
-//     fit one message, or a value that fits none, is an
-//     ErrRequestTooLarge before anything is sent;
+//     concatenated (sendWriteCommand, InteractionMessenger.ts:1269-1317,
+//     #chunkWriteRequest :1332-1438; [chunkWrite]); a timed or suppressed
+//     write that does not fit one message, or a value that fits none, is
+//     an ErrRequestTooLarge before anything is sent;
 //   - with SuppressResponse the send expects an acknowledgement only; a
 //     message in its place is tolerated unless it is a StatusResponse
-//     with an error (IM:1138-1162, the "Matter-SDK bug" of :1156), and the
-//     result is nil (:382-384);
+//     with an error (InteractionMessenger.ts:1454-1478, the "Matter-SDK bug"
+//     of :1473), and the result is nil (ClientInteraction.ts:434-436);
 //   - otherwise the WriteResponse's statuses are the result, an empty one
-//     an empty result (:385-387).
+//     an empty result (:437-439).
 func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts WriteOptions) (WriteStatuses, error) {
 	req, err := formulateWrite(writes, opts)
 	if err != nil {

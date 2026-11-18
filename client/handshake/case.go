@@ -80,26 +80,26 @@ type CASEOptions struct {
 // Mirrors matter.js packages/protocol/src/session/case/CaseClient.ts:54-385
 // (pair, #doPair) at db021da0:
 //
-// 1. a free session id; with a resumption record for (fabric, peer)
-// Sigma1 offers resumption, otherwise it is the plain Sigma1, the
-// destination id the fabric's for the peer and the random
-// (:119-165) — secure/sigma's peer initiator builds both;
-// 2. Sigma2Resume (:169-234): refused without a record; the peer's
-// parameters are the unsecured session's overlaid by the record's
-// and by the responder's; the resume MIC is checked; the session
-// salt uses the old resumption id and the record takes the new one;
-// Success is sent and a failure to send it only logged;
-// 3. Sigma2 (:235-370): the responder's parameters become the unsecured
-// session's timing; the NOC must name the expected node on our
-// fabric and its chain verify (an ICAC's fabric must match the NOC's,
-// mattercert's chain check, so the fabric's); Sigma3 and the Success
-// status; the session's CATs are the responder NOC's (:285, :355 at
-// db021da0, matter.js #4884 — the subject CATs of the requests the
-// peer sends over this session), as are the channel's peer CATs; a
-// new record with the responder's resumption id and those CATs
-// (:360-366);
-// 4. the record is saved after the session exists, a failure only
-// logged (:372-384).
+//  1. a free session id; with a resumption record for (fabric, peer)
+//     Sigma1 offers resumption, otherwise it is the plain Sigma1, the
+//     destination id the fabric's for the peer and the random
+//     (:119-165) — secure/sigma's peer initiator builds both;
+//  2. Sigma2Resume (:169-234): refused without a record; the peer's
+//     parameters are the unsecured session's overlaid by the record's
+//     and by the responder's; the resume MIC is checked; the session
+//     salt uses the old resumption id and the record takes the new one;
+//     Success is sent and a failure to send it only logged;
+//  3. Sigma2 (:235-370): the responder's parameters become the unsecured
+//     session's timing; the NOC must name the expected node on our
+//     fabric and its chain verify (an ICAC's fabric must match the NOC's,
+//     mattercert's chain check, so the fabric's); Sigma3 and the Success
+//     status; the session's CATs are the responder NOC's (:285, :355 at
+//     db021da0, matter.js #4884 — the subject CATs of the requests the
+//     peer sends over this session), as are the channel's peer CATs; a
+//     new record with the responder's resumption id and those CATs
+//     (:360-366);
+//  4. the record is saved after the session exists, a failure only
+//     logged (:372-384).
 //
 // On an error InvalidParam is sent unless ctx was cancelled, our last
 // message is unacknowledged, or the error is a network, transient or

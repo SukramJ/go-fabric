@@ -20,7 +20,7 @@ import (
 // ServerConfig is the Interaction Model server the client stack serves on
 // endpoints of its own — matter.js's one InteractionServer on a node that
 // is also a controller: the ClientSubscriptionHandler is installed into
-// it (Peers.ts:589-590, InteractionServer.ts:218-228 at 862ad75f) and its
+// it (Peers.ts:589-590, InteractionServer.ts:302-304 at db021da0) and its
 // onNewExchange hands a first ReportData to the client
 // handler and every other first message to the server
 // (InteractionServer.ts:240-249). The

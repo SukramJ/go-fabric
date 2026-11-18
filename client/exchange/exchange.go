@@ -459,20 +459,20 @@ func (x *Exchange) notifySentLocked() {
 // returns once the peer acknowledged it. Mirrors matter.js
 // MessageExchange.ts:635-858 (send, #send) at db021da0:
 //
-// - a closed exchange refuses (:636-638);
-// - the message asks for an acknowledgement unless SuppressAck
-// (:692); a StatusReport travels on the Secure Channel protocol
-// whatever the exchange's protocol (:696-697);
-// - a send while the previous message is unacknowledged is an
-// [ErrFlow] (:701-705);
-// - the acknowledgement owed for the last received message rides
-// along, and its standalone-ack timer stops (:711-718);
-// - the message is retransmitted on the MRP schedule until
-// acknowledged; after the last transmission and the final wait the
-// send fails with a [*PeerUnresponsiveError] (:784-799);
-// - a failure with nothing received on the exchange that shows the
-// peer gone reports it to the manager's PeerLost hook (:643-654,
-// :661-668).
+//   - a closed exchange refuses (:636-638);
+//   - the message asks for an acknowledgement unless SuppressAck
+//     (:692); a StatusReport travels on the Secure Channel protocol
+//     whatever the exchange's protocol (:696-697);
+//   - a send while the previous message is unacknowledged is an
+//     [ErrFlow] (:701-705);
+//   - the acknowledgement owed for the last received message rides
+//     along, and its standalone-ack timer stops (:711-718);
+//   - the message is retransmitted on the MRP schedule until
+//     acknowledged; after the last transmission and the final wait the
+//     send fails with a [*PeerUnresponsiveError] (:784-799, :934-1018);
+//   - a failure with nothing received on the exchange that shows the
+//     peer gone reports it to the manager's PeerLost hook (:643-654,
+//     :661-668).
 //
 // A ctx already done sends nothing; a ctx done while waiting for the
 // acknowledgement stops the retransmissions and leaves the message

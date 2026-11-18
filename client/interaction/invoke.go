@@ -45,8 +45,8 @@ type InvokeOptions struct {
 	// expects an acknowledgement only and Invoke returns the zero Result.
 	SuppressResponse bool
 	// BatchDuration is how long a single command waits for others to
-	// share its InvokeRequest — matter.js Invoke.Definition.batchDuration
-	// (packages/protocol/src/action/request/Invoke.ts:50 at 862ad75f);
+	// share its InvokeRequest — matter.js Invoke.batchDuration
+	// (packages/protocol/src/action/request/Invoke.ts:50 at db021da0);
 	// 0 is matter.js's default, Instant (ClientInteraction.ts:796): the
 	// commands invoked concurrently. A queued batch flushes at the
 	// earliest deadline of its commands. Only [Interaction.Invoke] batches.
@@ -117,19 +117,19 @@ type Result struct {
 // answer; a status other than Success is a *StatusError. fields is the
 // request payload (a generated request's value), nil for an empty one.
 // Mirrors matter.js ClientInteraction.#invokeSingle
-// (ClientInteraction.ts:434-474) with InteractionClientMessenger
-// .sendInvokeCommand (interaction/InteractionMessenger.ts:1061-1108) at
-// 0ceb202d:
+// (ClientInteraction.ts:487-527) with InteractionClientMessenger
+// .sendInvokeCommand (interaction/InteractionMessenger.ts:1206-1253) at
+// db021da0:
 //
 //   - a timed invoke first sends a TimedRequest and waits for its Success
-//     StatusResponse (:438-440, InteractionMessenger.ts:1124-1136);
-//   - the single command goes without a commandRef (:457-464);
+//     StatusResponse (:491-493, InteractionMessenger.ts:1440-1452);
+//   - the single command goes without a commandRef (:510-517);
 //   - the processing time is ExpectedProcessingTime, else 30 s with the
-//     extended failsafe timeout, else the exchange's default (:466-474),
+//     extended failsafe timeout, else the exchange's default (:519-527),
 //     for the send's final wait and the wait for the response;
 //   - a chunked InvokeResponse is acknowledged with a StatusResponse
 //     Success after every chunk with more to come and its entries are
-//     accumulated (InteractionMessenger.ts:1082-1105);
+//     accumulated (InteractionMessenger.ts:1227-1250);
 //   - the first entry is the answer, as the flow's #invokeCommand reads it
 //     (ControllerCommissioningFlow.ts:506-530): a CommandStatusIB other
 //     than Success is a *StatusError.

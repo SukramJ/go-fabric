@@ -140,7 +140,7 @@ type Config struct {
 	Rand func() float64
 	// Network is the network profile of every request that names none —
 	// matter.js ClientInteractionContext.network
-	// (ClientInteraction.ts:146, :231, :250 at 862ad75f), applied as
+	// (ClientInteraction.ts:162, :231, :250 at db021da0), applied as
 	// `request.network ?? this.#network` to the exchange (:1250) and to the
 	// batch lane of a command (:765): a command without a network and one
 	// naming this network share a batch. "" is the peer's medium profile.
