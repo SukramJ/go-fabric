@@ -80,6 +80,12 @@ type FailSafeHooksForTest = failSafeHooks
 // waits for the node to become idle (reopenWhenIdle).
 func ReopenPending(n *Node) bool { return n.reopenPending.Load() }
 
+// HasCASEIdentity reports whether the node answers CASE for fabricIndex.
+func HasCASEIdentity(n *Node, fabricIndex uint8) bool {
+	_, ok := n.caseIDs.forFabric(fabricIndex)
+	return ok
+}
+
 // FabricUpdated runs the node's UpdateNOC hook for fabricIndex
 // (OperationalCredentials' OnFabricUpdated → fabricUpdated).
 func FabricUpdated(ctx context.Context, n *Node, fabricIndex uint8) {

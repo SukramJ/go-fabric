@@ -959,6 +959,21 @@ func (n *Node) goKeeper(fn func()) bool {
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
 	loadErr := n.caseIDs.load(ctx, n.st, fabricIndex)
+	if loadErr != nil {
+		// The identity the store holds could not be read: the one in
+		// memory is not the committed one any more (the replaced NOC, or
+		// after a rolled-back update the new one), so it answers no
+		// Sigma1 and is no longer advertised until a later load succeeds
+		// — the next update, a rollback or the next start. Follows
+		// connectedhomeip, which never goes on serving an identity it
+		// cannot match with the stored fabric (FabricTable.cpp:2064-2070
+		// at 6170af84 removes the fabric then); the stored fabric is kept
+		// here, a failed read being one a later read may serve
+		// (judgement; fix-fxo-node Q3, Fable D3).
+		if c, nd, ok := n.caseIDs.forget(fabricIndex); ok {
+			n.br.WithdrawFabric(ctx, fabricIndex, c, nd)
+		}
+	}
 	// The identity moved first: a handshake from here on runs under the
 	// new NOC, a handshake in flight that began under the old one admits
 	// no session (caseIdentities.admitSessionAt, handshakeStake.of; review

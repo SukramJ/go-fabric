@@ -16,7 +16,11 @@ import (
 // UpdateNOC whose identity reload fails still ends the fabric's sessions
 // (and aborts its pending handshakes, the same bridge call): what the
 // update replaced is gone whether or not the new identity could be read
-// (review II, dev6a "seen, not judged", node.go fabricUpdated).
+// (review II, dev6a "seen, not judged", node.go fabricUpdated) — and the
+// identity in memory is withdrawn, so the node answers no CASE under an
+// identity the store does not hold, as connectedhomeip never serves one
+// it cannot match with the stored fabric (FabricTable.cpp:2064-2070 at
+// 6170af84; Fable D3).
 func TestFabricUpdateWithAFailedReloadStillEndsTheFabricsSessions(t *testing.T) {
 	t.Parallel()
 	ctx := parityCtx(t)
@@ -52,5 +56,8 @@ func TestFabricUpdateWithAFailedReloadStillEndsTheFabricsSessions(t *testing.T) 
 	node.FabricUpdated(ctx, n, fabric.FabricIndex)
 	if got := onFabric(); got != 0 {
 		t.Errorf("%d session(s) of the updated fabric outlived an update whose reload failed", got)
+	}
+	if node.HasCASEIdentity(n, fabric.FabricIndex) {
+		t.Error("the node still answers CASE for the fabric under the identity the failed reload left")
 	}
 }
