@@ -4,11 +4,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -198,5 +200,27 @@ func TestSweptTriggersAreEveryTriggerConstant(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Errorf("trigger constants not in sweptTriggers: %s", strings.Join(missing, ", "))
+	}
+}
+
+// TestStateForecastEsaTakesNoPowerAdjustmentCapability holds
+// R2-P6-err-2655: the ESA without PowerAdjustment runs the shared DEM
+// trigger handler, and its PowerAdjustment triggers write no capability
+// it does not serve — nothing is refused, nothing is logged. Not
+// parallel: it replaces the default logger.
+func TestStateForecastEsaTakesNoPowerAdjustmentCapability(t *testing.T) {
+	var logs bytes.Buffer
+	saved := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(saved) })
+	e := newDemoEsa("Charger ESA")
+	if _, err := e.device(bridged("esa", e.name)); err != nil {
+		t.Fatal(err)
+	}
+	for _, tr := range []uint64{triggerDemPowerAdjustment, triggerDemPowerAdjustmentClear, triggerDemPausableClear, triggerDemForecastAdjustmentClear, triggerDemConstraintBasedAdjustmentClear} {
+		e.testEventTrigger(tr)
+	}
+	if strings.Contains(logs.String(), "evse.dem.capability") {
+		t.Fatalf("the ESA was handed a capability it does not serve:\n%s", logs.String())
 	}
 }

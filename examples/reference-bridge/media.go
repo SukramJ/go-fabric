@@ -41,13 +41,15 @@ import (
 //     ContentAppPlatform and PhysicalInputs: OnOff, MediaPlayback (AS, VS, TT, AT, AA),
 //     KeypadInput (NV, LK, NK), ContentLauncher (CS, UP), ApplicationLauncher
 //     (AP), MediaInput (NU), AudioOutput (NU), Channel (CL, LI),
-//     TargetNavigator, LowPower, WakeOnLan and Messages.
+//     TargetNavigator, LowPower and WakeOnLan, and Messages with
+//     --media-messages.
 //   - "app" is a ContentApp (tv-app endpoint 3, ma_contentapp,
 //     tv-app.matter's endpoint 3): ApplicationBasic, ApplicationLauncher
 //     (no AP), AccountLogin and KeypadInput — the test suite's app, catalog
 //     vendor 123 and application "exampleid" (AppTv.cpp
 //     ConvertToPlatformCatalogVendorApp and InstallContentApp: "Vendor1",
-//     version "Version1", setup PIN "34567890").
+//     version "Version1"). Its setup PIN is mediaAppSetupPIN, not the
+//     "34567890" chip's installed app carries (see mediaAppSetupPIN).
 //
 // Each cluster is declared (<cluster>def.Declare) with the manager as its
 // port and the manager's state as its Initial: the device kit mounts the
