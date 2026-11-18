@@ -174,7 +174,7 @@ type Config struct {
 	// RootServers are mounted on the root endpoint after the root's own
 	// servers — a PowerSource on a battery node's root, say: matter.js's
 	// ServerNode.RootEndpoint.with(...) (ClientNodeTest.ts:3192-3205 at
-	// 862ad75f puts PowerSourceServer.with("Battery") there). A cluster
+	// db021da0 puts PowerSourceServer.with("Battery") there). A cluster
 	// the root already serves is refused.
 	RootServers []contract.ClusterServer
 	// specificationVersion is the SpecificationVersion the node reports,
@@ -490,7 +490,7 @@ type Commissioning struct {
 	// WindowStatus BasicWindowOpen, where the enhanced command carries its
 	// own verifier. Off by default, as matter.js serves the feature only
 	// through AdministratorCommissioningServer.with("Basic")
-	// (AdministratorCommissioningServer.ts:55-57, :105-117 at 862ad75f);
+	// (AdministratorCommissioningServer.ts:59-61, :105-117 at db021da0);
 	// a host that turns it on offers the weaker method knowingly (the
 	// window's PASE runs against the fixed setup passcode).
 	BasicCommissioning bool
@@ -499,7 +499,7 @@ type Commissioning struct {
 	// SetTCAcknowledgements before CommissioningComplete succeeds, after
 	// connectedhomeip (register row
 	// BD-chip-GeneralCommissioning-TermsAndConditions; matter.js serves no
-	// terms, GeneralCommissioningServer.ts:31 at 862ad75f). nil leaves the
+	// terms, GeneralCommissioningServer.ts:31 at db021da0). nil leaves the
 	// feature off. The node keeps the acceptance in its store, reverts a
 	// tentative one with the fail-safe and resets it with the last fabric.
 	// The row is served behind [Config].Surface's Extensions (ADR 0030).
@@ -942,7 +942,7 @@ func (c *Config) Validate() error {
 	// A mode that is none of warn, strict and off fails the node's
 	// construction. Mirrors matter.js
 	// packages/node/src/node/server/DeviceTypeConformanceService.ts:674-685
-	// at 862ad75f (modeOf: an unknown endpoint.validation value throws).
+	// at db021da0 (modeOf: an unknown endpoint.validation value throws).
 	switch c.DeviceTypeValidation {
 	case endpoint.DeviceTypeValidationWarn, endpoint.DeviceTypeValidationStrict, endpoint.DeviceTypeValidationOff:
 	default:

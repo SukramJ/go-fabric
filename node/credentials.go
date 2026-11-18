@@ -55,7 +55,7 @@ func NewCommissioningCredentials() (Commissioning, error) {
 //
 // Mirrors matter.js PaseClient.generateRandomPasscode and
 // generateRandomDiscriminator (packages/protocol/src/session/pase/
-// PaseClient.ts:55-71 at 862ad75f; the rule is PairingCodeSchema.ts:
+// PaseClient.ts:55-71 at db021da0; the rule is PairingCodeSchema.ts:
 // 171-178 isValidPasscode) and the random 32-byte salt and 1000
 // iterations of CommissioningClient.openEnhancedCommissioningWindow
 // (packages/node/src/behavior/system/commissioning/

@@ -218,7 +218,7 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		// commissionable record under the configured discriminator, CM=1
 		// — matter.js allowBasicCommissioning builds the PASE server from
 		// the node's own passcode (DeviceCommissioner.ts:130-137 at
-		// 862ad75f) and #open advertises the configured discriminator
+		// db021da0) and #open advertises the configured discriminator
 		// (:236-256), the status BasicWindowOpen.
 		h.renewSalt(window)
 		h.attachPase(h.baseline)

@@ -2,8 +2,8 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behavior/internal/MarkChangedTest.ts
-// at 862ad75f: a server reporting an attribute it computes on read, which
-// change detection never sees change (ServerBehaviorBacking.ts:186-221
+// at db021da0: a server reporting an attribute it computes on read, which
+// change detection never sees change (ServerBehaviorBacking.ts:174-209
 // markChanged).
 //
 // matter.js serves onOff from an accessor of the behavior's State

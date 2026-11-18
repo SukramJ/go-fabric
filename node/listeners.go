@@ -17,7 +17,7 @@ import (
 // goroutine, and both return the unsubscribe function — as matter.js's
 // node events are Observables a handler attaches to with `on` and
 // detaches from with `off` (packages/general/src/util/Observable.ts:55,
-// :70 at 862ad75f).
+// :70 at db021da0).
 type listeners[T any] struct {
 	mu   sync.Mutex
 	list []*func(T)

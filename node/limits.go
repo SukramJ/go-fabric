@@ -42,7 +42,7 @@ type Limits struct {
 	// subscription: a subscriber asking for more is negotiated down to it,
 	// never below its own MinIntervalFloor. Mirrors matter.js
 	// network.subscriptionOptions.maxInterval (NetworkServer.ts:210,
-	// applied in ServerSubscription.ts:314-344 at 862ad75f). 0 is one
+	// applied in ServerSubscription.ts:314-344 at db021da0). 0 is one
 	// hour (subscription.DefaultMaxIntervalCeilingSeconds, matter.js's
 	// MAX_INTERVAL_PUBLISHER_LIMIT and chip's publisher limit); matter.js
 	// defaults to three minutes instead. Bound: whole seconds, 1 s to 1 h
@@ -79,7 +79,7 @@ type Limits struct {
 	// base interval on the exchange of every inbound BDX transfer its BDX
 	// responder accepts (an OTA requestor's image download); the backoff
 	// amplifies it. Mirrors matter.js LimitsConfig.bdxAdditionalMrpDelay
-	// (NetworkServer.ts:152-153 at 862ad75f), the BDX class of the network
+	// (NetworkServer.ts:152-153 at db021da0), the BDX class of the network
 	// profile's MRP margins (NetworkProfile.ts:156-159), applied as the
 	// exchange's peerAdditionalMrpDelay (BdxProtocol.ts:139-142). 0 adds
 	// none. Bound: not negative (SoftwareUpdateManager.ts:60-67,
@@ -88,7 +88,7 @@ type Limits struct {
 }
 
 // Access-control capacity bounds (Matter, access-control.element.ts:38-49
-// at 862ad75f).
+// at db021da0).
 const (
 	minAccessControlEntriesPerFabric = 4
 	minSubjectsPerAccessControlEntry = 4

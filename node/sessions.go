@@ -17,7 +17,7 @@ import (
 // (SII, SAI, SAT): how long a peer waits before it retransmits to this
 // node. A zero field is the Matter default. Mirrors matter.js
 // SessionsBehavior.State.intervals (SessionsBehavior.ts:115-120 at
-// 862ad75f), which ServerNetworkRuntime.ts:357-363 hands the
+// db021da0), which ServerNetworkRuntime.ts:364-367 hands the
 // SessionManager's sessionParameters and DeviceAdvertiser.ts:361-364 the
 // operational advertisement; omitted values fall back to
 // SessionIntervals.defaults (SessionIntervals.ts:36-50).

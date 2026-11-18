@@ -149,7 +149,7 @@ func (n *Node) eraseStores(ctx context.Context) error {
 // DeriveUniqueID's shape — in the erased store, so the node that comes back
 // serves another one (persisted.uniqueID reads a stored pin first). matter.js
 // draws one when the erased state holds none (BasicInformationServer.ts:89-91,
-// createUniqueId :161-170 at 862ad75f), so its reset node serves a new
+// createUniqueId :161-170 at db021da0), so its reset node serves a new
 // UniqueID (testing/node-helpers.ts:164-165). With UniqueID rotation on the
 // pin is never read, and none is written.
 func (n *Node) pinFreshUniqueID(ctx context.Context, st store.Settings) error {

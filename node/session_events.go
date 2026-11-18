@@ -8,7 +8,7 @@ import "sync"
 // sessionEvents turns the session table's and the subscription engine's
 // changes into the Observers' session hooks, as matter.js's
 // SessionsBehavior turns its SessionManager's (packages/node/src/behavior/
-// system/sessions/SessionsBehavior.ts:49-93 at 862ad75f): a CASE session
+// system/sessions/SessionsBehavior.ts:49-93 at db021da0): a CASE session
 // is announced when it opens and remembered, so its close and its
 // subscription changes are reported only for a session that was
 // announced; a PASE session is never.

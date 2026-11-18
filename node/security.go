@@ -68,7 +68,7 @@ type caseFabric struct {
 // peerVerifier is the verifier rooted at a fabric's trust anchor: built
 // from the root certificate when the fabric row holds it, so a root-signed
 // NOC's authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:170-184 at 862ad75f); from the
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db021da0); from the
 // root's public key alone for a legacy row without it.
 func peerVerifier(rcac, rootPublicKey []byte, ts mattercert.TimeSource) (*mattercert.Verifier, error) {
 	if len(rcac) > 0 {

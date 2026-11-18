@@ -136,9 +136,9 @@ type Observers struct {
 	// priority, path, time and payload. It runs on the emitter's
 	// goroutine. matter.js emits each event on its endpoint's behavior and
 	// broadcasts the occurrence node-wide through the
-	// ChangeNotificationService (packages/node/src/behavior/Events.ts:219,
-	// packages/node/src/node/integration/ChangeNotificationService.ts:71-87
-	// at 862ad75f) — this hook is that broadcast for a host.
+	// ChangeNotificationService (packages/node/src/behavior/Events.ts:221,
+	// packages/node/src/node/integration/ChangeNotificationService.ts:97-113
+	// at db021da0) — this hook is that broadcast for a host.
 	OnEvent func(Event)
 }
 
@@ -188,7 +188,7 @@ func fabricInfoOf(rec store.FabricRecord) FabricInfo {
 // at any time. matter.js keeps the same state in DeviceCommissioner's
 // window — its status, byAdministrator and its timer
 // (packages/protocol/src/protocol/DeviceCommissioner.ts:344-350,
-// :236-266 #openWindow at 862ad75f) — and the advertised discriminator
+// :236-266 #openWindow at db021da0) — and the advertised discriminator
 // (`discriminator ?? commissioningConfig.discriminator`, :252).
 type WindowSnapshot struct {
 	// Open reports whether a window is open, whoever opened it.
@@ -232,7 +232,7 @@ const (
 	// ([Config].Commissioning): the one an uncommissioned node opens, or
 	// one the host opened through CommissioningWindow().OpenOwnWindow —
 	// matter.js's window with byAdministrator false
-	// (DeviceCommissioner.ts:236-266 at 862ad75f).
+	// (DeviceCommissioner.ts:236-266 at db021da0).
 	WindowOwn
 	// WindowBasic is the node's own window [Node.OpenBasicWindow] opened
 	// with the host's credentials (a host extension; see there).
@@ -325,7 +325,7 @@ func (n *Node) eventEmitted(rec im.EventRecord) {
 //
 // matter.js's node events are Observables a handler attaches to and
 // detaches from at any time (packages/general/src/util/Observable.ts:55
-// `on`, :70 `off` at 862ad75f — the FabricManager events of
+// `on`, :70 `off` at db021da0 — the FabricManager events of
 // packages/protocol/src/fabric/FabricManager.ts:41-48 among them);
 // Config.Observers is the attach at construction, Observe the attach later.
 func (n *Node) Observe(o Observers) (unsubscribe func()) {

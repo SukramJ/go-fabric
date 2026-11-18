@@ -818,7 +818,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
 	// The removed fabric's fabric-sensitive events leave the log
-	// (FabricScopedDataHandler.ts:114-170 at 862ad75f).
+	// (FabricScopedDataHandler.ts:114-170 at db021da0).
 	if log := n.br.EventLog(); log != nil {
 		log.DropFabric(fabricIndex)
 	}

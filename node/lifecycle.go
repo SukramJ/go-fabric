@@ -253,7 +253,7 @@ func (n *Node) Topology() BridgeTopology {
 // the same from the endpoint's behaviors — DescriptorServer's serverList
 // is the endpoint's supported cluster behaviors
 // (packages/node/src/behaviors/descriptor/DescriptorServer.ts:275
-// #serverList at 862ad75f).
+// #serverList at db021da0).
 func mountedClusters(ep *endpoint.Endpoint) []ClusterInfo {
 	servers := endpoint.ClusterServers(ep)
 	out := make([]ClusterInfo, 0, len(servers))

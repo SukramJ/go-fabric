@@ -178,7 +178,7 @@ type surfaceDrift struct {
 //
 // matter.js provides the raise and leaves the "when" to the application
 // (packages/node/src/behaviors/basic-information/BasicInformationServer.ts:35-37
-// at 862ad75f, "When the node's configuration changes in a way clients
+// at db021da0, "When the node's configuration changes in a way clients
 // should detect, bump it with increaseConfigurationVersion"; the method at
 // :132-138). Its only production caller at the pin is the bridged node's
 // coupled raise

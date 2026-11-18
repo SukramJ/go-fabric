@@ -13,7 +13,7 @@ import (
 )
 
 // TestServerNodeAttestationProviderParityMatterJS ports matter.js
-// packages/node/test/node/ServerNodeTest.ts:409-459 at 862ad75f
+// packages/node/test/node/ServerNodeTest.ts:409-459 at db021da0
 // ("commissions with delayed provided certificates"): the certification
 // provider is called neither when the node is created nor when it starts,
 // only when the commissioner asks for the attestation material — matter.js

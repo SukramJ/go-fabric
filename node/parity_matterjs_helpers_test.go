@@ -4,7 +4,7 @@
 package node_test
 
 // Shared support of the ports of matter.js packages/node/test/node at
-// 862ad75f: the Go counterparts of MockServerNode.createOnline
+// db021da0: the Go counterparts of MockServerNode.createOnline
 // (packages/node/src/testing/mock-server-node.ts:195-240) and of
 // read-helpers.ts countAttrs, on fabrictest.
 

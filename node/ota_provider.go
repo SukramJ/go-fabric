@@ -172,7 +172,7 @@ func (n *Node) OTAProviderEndpoint() (uint16, bool) {
 // BDX is the BDX responder the provider serves its images through — the
 // transfers a controller's update manager reads the liveness of and
 // closes (matter.js SoftwareUpdateManager.#bdxSessionFor,
-// SoftwareUpdateManager.ts:322-328 at 862ad75f); nil without a provider.
+// SoftwareUpdateManager.ts:322-328 at db021da0); nil without a provider.
 func (n *Node) BDX() *BDXResponder { return n.bdx }
 
 // placeOTAProvider turns the provider's assembled endpoint from a bridged
@@ -249,7 +249,7 @@ func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, ep
 	// AccessControlEntryChanged is emitted, because matter.js's
 	// setStateOf(AccessControlServer) runs without a remote actor and
 	// #handleAccessControlListChange returns before its events
-	// (AccessControlServer.ts:284-302 at 862ad75f).
+	// (AccessControlServer.ts:284-302 at db021da0).
 	n.root.AccessControl.NotifyLocalEntryInstalled()
 	n.logger.Info("ota.provider.acl_added", slog.Int("fabric_index", int(fabricIndex)), slog.Int("endpoint", int(epID)),
 		slog.String("hint", "anyone in the fabric may access the OTA Software Update Provider cluster"))

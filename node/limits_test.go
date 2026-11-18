@@ -73,7 +73,7 @@ func TestLimitsAttributes(t *testing.T) {
 // MaxInterval is granted Limits.SubscriptionMaxInterval, one hour when it is
 // zero (subscription.DefaultMaxIntervalCeilingSeconds) — matter.js
 // subscriptionOptions.maxInterval and MAX_INTERVAL_PUBLISHER_LIMIT
-// (ServerSubscription.ts:71, :314-344 at 862ad75f).
+// (ServerSubscription.ts:71, :314-344 at db021da0).
 //
 // The subtests run one after the other: a fake site clock moves only while
 // the process is quiet (holdSite).

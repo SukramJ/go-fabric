@@ -19,7 +19,7 @@ import (
 // matter.js reserves an endpoint number per endpoint store: "Each number
 // is reserved for one store. An installed endpoint keeps its number"
 // (packages/node/src/storage/server/ServerEndpointStores.ts:20-22 at
-// 862ad75f), a closed endpoint keeps its reservation
+// db021da0), a closed endpoint keeps its reservation
 // (packages/node/src/node/server/ServerEndpointInitializer.ts:67-69), an
 // endpoint that returns gets its stored number back
 // (ServerEndpointStores.ts:117-123), and only an erased store frees it
@@ -329,7 +329,7 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 // nonvolatile attribute values the module holds and the UserLabel lists —
 // so the later Add starts from its declaration. It is the counterpart of [Aggregator.Remove], which keeps them —
 // matter.js's `delete()` beside `close()` (endpoint/Endpoint.ts:987-992,
-// :1024-1032 at 862ad75f; ServerEndpointInitializer.ts:59-65
+// :1024-1032 at db021da0; ServerEndpointInitializer.ts:59-65
 // eraseDescendant). A key no partition holds and nothing is stored for is
 // no error; a key another partition holds is [ErrUnknownKey]. A key the
 // specification level withheld loses its withheld record in
