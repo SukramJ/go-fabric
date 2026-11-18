@@ -173,8 +173,8 @@ func copyUint8(v *uint8) *uint8 {
 // settings.
 //
 // It serves Presets (PRES) in the shape of matter.js's CHIP test
-// thermostat (support/chip-testing/src/AllClustersTestInstance.ts:1058-1103
-// at 862ad75f): three preset types — UserDefined, Occupied, Unoccupied —
+// thermostat (support/chip-testing/src/AllClustersTestInstance.ts:1070-1115
+// at db021da0): three preset types — UserDefined, Occupied, Unoccupied —
 // of one preset each, Automatic and SupportsNames, NumberOfPresets 5, and
 // two presets shipped with the device ("UD", UserDefined; "Occ", Occupied,
 // built-in), kept in the daemon's store. TC-TSTAT-4.2 fills each scenario

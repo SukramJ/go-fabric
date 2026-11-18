@@ -14,7 +14,7 @@ import (
 )
 
 // TestICDLITFlag: with --icd-lit the node is a LIT-capable ICD that starts
-// in SIT (registration driven, IcdTestInstance.ts:189 at 862ad75f), the
+// in SIT (registration driven, IcdTestInstance.ts:189 at db021da0), the
 // cadence takes it idle after the active window and wakes it after the
 // idle window (IcdTestEventServer.ts:89-122), and the ICD test event
 // triggers move the Check-In counter by CHIP's amounts and switch the

@@ -15,7 +15,7 @@ import "context"
 //
 // matter.js's IdentifyServer runs the application's override of identify
 // and triggerEffect (packages/node/src/behaviors/identify/IdentifyServer.ts:129-135
-// at 862ad75f) and emits startIdentifying, stopIdentifying and
+// at db021da0) and emits startIdentifying, stopIdentifying and
 // effectTriggered (:91-105, :133-135); here the assembler's server keeps
 // the IdentifyTime countdown and the host's handler runs first.
 //

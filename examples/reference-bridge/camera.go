@@ -811,7 +811,7 @@ func camFirst(ids *[]uint16) *spec.Nullable[uint16] {
 const camMaxWebRTCSessions = 5
 
 // camEndOutOfResources is WebRTCEndReasonEnum OutOfResources (matter.js
-// web-rtc-transport-definitions.element.ts:26 at 862ad75f).
+// web-rtc-transport-definitions.element.ts:26 at db021da0).
 const camEndOutOfResources = 8
 
 // SolicitOffer answers DeferredOffer as --camera-deferred-offer says

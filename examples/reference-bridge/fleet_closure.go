@@ -77,7 +77,7 @@ func newDemoGarage(name string) *demoGarage { return &demoGarage{name: name} }
 func (g *demoGarage) device(opts device.Options) (*device.Closure, error) {
 	closed, stopped := ccldef.CurrentPositionFullyClosed, ccldef.MainStateStopped
 	// The Descriptor's TagList, which matter.js's Closure device enables
-	// (packages/node/src/devices/closure.ts:91 at 862ad75f): Closure
+	// (packages/node/src/devices/closure.ts:91 at db021da0): Closure
 	// namespace (0x44), GarageDoor (0x05). The device kit leaves it off
 	// unless a host opts in (BD-Matter-ClosureWithoutTagList).
 	opts.Tags = []device.SemanticTag{{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x44, Tag: 0x05}}
@@ -358,7 +358,7 @@ func (p *demoPanel) device(opts device.Options) (*device.ClosurePanel, error) {
 	axis, overflow := cdim.RotationAxisCenteredVertical, cdim.OverflowTopInside
 	latching := cdim.LatchControlModesRemoteLatching | cdim.LatchControlModesRemoteUnlatching
 	// The Descriptor's TagList, which matter.js's ClosurePanel device
-	// enables (packages/node/src/devices/closure-panel.ts:59 at 862ad75f):
+	// enables (packages/node/src/devices/closure-panel.ts:59 at db021da0):
 	// ClosurePanel namespace (0x45), Rotate (0x03).
 	opts.Tags = []device.SemanticTag{{MfgCode: spec.NullOf[uint16](), NamespaceId: 0x45, Tag: 0x03}}
 	d, err := device.NewClosurePanel(opts, cdim.Declare{

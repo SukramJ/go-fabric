@@ -179,7 +179,7 @@ func (a *otaApplier) verify(version uint32, file string) (node.OTAImageHeader, e
 // StartUp with the version now running — the event a node emits on every
 // start (node.Node.Start), which the matter.js cert requestor's restart
 // into its applied image emits too and TC-SU-2.5 waits for
-// (support/chip-testing/test/cert/TC-SU-2.5.test.ts:89-107 at 862ad75f) —
+// (support/chip-testing/test/cert/TC-SU-2.5.test.ts:89-107 at db021da0) —
 // then the requestor's own. It gives up, emitting nothing, once ctx — the
 // daemon's lifetime — ends.
 func (a *otaApplier) restartedWhenIdle(ctx context.Context) {

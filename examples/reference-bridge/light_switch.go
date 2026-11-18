@@ -26,12 +26,12 @@ import (
 // --light-switch (TESTING ONLY): an On/Off Light Switch for the binding
 // certification cases (TC-BIND-2.1, TC-BIND-2.3), after matter.js's cert
 // light switch (support/chip-testing/src/LightSwitchTestInstance.ts at
-// 862ad75f): the device type with its Binding server and OnOff client,
+// db021da0): the device type with its Binding server and OnOff client,
 // whose entries the node's binding manager resolves (node.Node.Bindings),
 // and the app-pipe command SendOnOffToBindings that has it send OnOff On or
 // Off to every target its Binding attribute names — matter.js's
 // backchannel sendOnOffToBindings (packages/testing/src/device/
-// backchannel.ts:161-165), which the cases' trigger(dut, "on"|"off")
+// backchannel.ts:163-167), which the cases' trigger(dut, "on"|"off")
 // sends (support/chip-testing/test/cert/tc-bind-support.ts:600-606).
 //
 // The flag turns on the node's client stack (node.Config.Client) the

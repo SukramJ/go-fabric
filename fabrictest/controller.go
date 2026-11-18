@@ -73,7 +73,7 @@ type ControllerOptions struct {
 	// carries the DclServiceUnavailable warning. It overrides Attestation.
 	NoAttestationStore bool
 	// Networks overrides the network profiles' templates (matter.js
-	// `network: { profiles }`, NetworkServer.ts:248 at 862ad75f); nil keeps
+	// `network: { profiles }`, NetworkServer.ts:254 at db021da0); nil keeps
 	// the defaults.
 	Networks *peer.ProfilesConfig
 	// OwnNetworkProfile is the profile of our own network, whose margin

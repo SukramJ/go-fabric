@@ -21,14 +21,14 @@ import (
 )
 
 // bridgeSimCommands are the five backchannel names
-// (packages/testing/src/device/backchannel.ts:143-150 at 862ad75f).
+// (packages/testing/src/device/backchannel.ts:145-152 at db021da0).
 var bridgeSimCommands = []string{
 	"toggleBridgedLights", "warmBridgedTemperatureSensors", "renameBridgedLights", "addBridgedLight", "removeBridgedLight",
 }
 
 // TestBridgeSimFlag: with --bridge-sim the node bridges matter.js's bridge
 // test instance's devices after every other device
-// (BridgeTestInstance.ts:148-172 at 862ad75f). They mount free of
+// (BridgeTestInstance.ts:148-172 at db021da0). They mount free of
 // device-type violations — the composed sensors tell each other apart by
 // their CommonNumberTag (:306-317); the composed
 // device lists Bridged Node and then Power Source (:330-335), its sensors are its own

@@ -78,7 +78,7 @@ func cmdOTAServe(e *env, args []string) error {
 		return fmt.Errorf("%s: %w", imagePath, err)
 	}
 	// The update manager offers an image by its header (matter.js's OTA
-	// store keys it so, DclOtaUpdateService.ts:534-536 at 862ad75f).
+	// store keys it so, DclOtaUpdateService.ts:534-536 at db021da0).
 	if (version != 0 && version != uint(h.SoftwareVersion)) || (vendor != 0 && vendor != uint(h.VendorID)) || (product != 0 && product != uint(h.ProductID)) {
 		return fmt.Errorf("--version, --vendor and --product must match the image header (%d, %04X, %04X)", h.SoftwareVersion, h.VendorID, h.ProductID)
 	}
@@ -133,7 +133,7 @@ func cmdOTAServe(e *env, args []string) error {
 }
 
 // pushTo starts the node, waits for its subscription — the manager updates
-// a node on current data only (OtaAnnouncements.ts:221-253 at 862ad75f) —
+// a node on current data only (OtaAnnouncements.ts:221-253 at db021da0) —
 // asks the console unless yes, and hands the consent to the manager, which
 // announces the provider (SoftwareUpdateManager.addUpdateConsent, :1153-1196).
 func pushTo(ctx context.Context, e *env, s *stack, mgr *softwareupdate.Manager, arg string, t softwareupdate.Target, versionString string, yes bool) error {

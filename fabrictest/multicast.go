@@ -259,8 +259,8 @@ func (s *socket) LeaveGroup(group net.IP) error {
 // group on port, through the network's filter and delivery options, and
 // reaches the socket on that port of every host holding the group. Mirrors
 // matter.js MockUdpSocket.send (packages/general/src/net/mock/
-// MockUdpSocket.ts:87-97 at 862ad75f), which hands the packet to the
-// simulator's router, and MockNetwork.shouldReceive (MockNetwork.ts:79-81),
+// MockUdpSocket.ts:87-97 at db021da0), which hands the packet to the
+// simulator's router, and MockNetwork.shouldReceive (MockNetwork.ts:67-69),
 // which takes it for a host that joined its group.
 func (s *socket) SendMulticast(group net.IP, port int, payload []byte) error {
 	if _, ok := groupKey(group); !ok {
