@@ -76,7 +76,6 @@ type chunkWaitClaims struct {
 	mu       sync.Mutex
 	n        map[uint16]int
 	byFabric map[uint8]int
-	fabricOf map[uint16]uint8
 	total    int
 	// fabrics counts the fabrics the node holds ([Bridge.SetFabricCounter]).
 	fabrics atomic.Pointer[func(context.Context) (int, error)]
@@ -96,11 +95,10 @@ func (c *chunkWaitClaims) claim(sessionID uint16, fabric uint8, share int) bool 
 		return false
 	}
 	if c.n == nil {
-		c.n, c.byFabric, c.fabricOf = map[uint16]int{}, map[uint8]int{}, map[uint16]uint8{}
+		c.n, c.byFabric = map[uint16]int{}, map[uint8]int{}
 	}
 	c.n[sessionID]++
 	c.byFabric[fabric]++
-	c.fabricOf[sessionID] = fabric
 	c.total++
 	return true
 }
@@ -120,7 +118,6 @@ func (c *chunkWaitClaims) release(sessionID uint16, fabric uint8) {
 	}
 	if c.n[sessionID] <= 1 {
 		delete(c.n, sessionID)
-		delete(c.fabricOf, sessionID)
 		return
 	}
 	c.n[sessionID]--
