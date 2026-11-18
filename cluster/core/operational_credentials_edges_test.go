@@ -125,8 +125,9 @@ func TestOpcredsAttestationMaterialEdges(t *testing.T) {
 		"no PAI":     {DACPrivateKey: dacKey, DAC: full.DAC, CertificationDeclaration: full.CertificationDeclaration},
 		"no CD":      {DACPrivateKey: dacKey, DAC: full.DAC, PAI: full.PAI},
 	} {
-		if _, err := with(m, nil).MatterInvoke(ctx, 0x00, attest); err == nil {
-			t.Errorf("%s: AttestationRequest answered over incomplete material", name)
+		// resolveAttestation's plain error: the IM layer's FAILURE.
+		if _, err := with(m, nil).MatterInvoke(ctx, 0x00, attest); spec.StatusOf(err) != im.StatusFailure {
+			t.Errorf("%s: AttestationRequest over incomplete material: %v (status %v), want FAILURE", name, err, spec.StatusOf(err))
 		}
 	}
 	if _, err := with(full, nil).MatterInvoke(ctx, 0x00, attest); err != nil {
