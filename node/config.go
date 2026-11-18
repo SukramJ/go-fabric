@@ -490,7 +490,7 @@ type Commissioning struct {
 	// WindowStatus BasicWindowOpen, where the enhanced command carries its
 	// own verifier. Off by default, as matter.js serves the feature only
 	// through AdministratorCommissioningServer.with("Basic")
-	// (AdministratorCommissioningServer.ts:59-61, :105-117 at db021da0);
+	// (AdministratorCommissioningServer.ts:59-61, :115-127 at db021da0);
 	// a host that turns it on offers the weaker method knowingly (the
 	// window's PASE runs against the fixed setup passcode).
 	BasicCommissioning bool

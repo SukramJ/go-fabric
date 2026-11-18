@@ -681,7 +681,7 @@ func (t *outboundReliableTracker) abandonUnsecuredExchange(hk HandshakeKey) (cle
 // belong to handshakes, which end on their own clock. matter.js stops
 // retransmitting when the send fails with SessionClosedError
 // (MessageExchange.ts:1008-1014 at db021da0, the lines
-// [outboundReliableTracker.Tick] cites at 862ad75f); review II,
+// [outboundReliableTracker.Tick] cites); review II,
 // R2-P2-sess-06.
 func (t *outboundReliableTracker) DropSession(sessionID uint16) int {
 	if t == nil || sessionID == 0 {
@@ -820,7 +820,7 @@ type outboundTickResult struct {
 // error is surfaced via the result slice and counts as the transmission:
 // the entry keeps the backoff the sweep scheduled, so a failing socket
 // spends the retry budget on the MRP schedule, not at the pump's cadence.
-// Mirrors matter.js MessageExchange.ts:941-942 and :975-981 at db021da0
+// Mirrors matter.js MessageExchange.ts:941-942 and :1008-1014 at db021da0
 // (#retransmitMessage counts the retransmission before it sends, and a
 // failed send that is not SessionClosedError still runs
 // #initializeResubmission with the computed backoff).
