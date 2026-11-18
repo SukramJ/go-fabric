@@ -860,7 +860,7 @@
   {
     "file": "client/interaction/write.go",
     "line": 26,
-    "citation": "Write.ts:204-218",
+    "citation": "Write.ts:207-217",
     "resolved": "packages/protocol/src/action/request/Write.ts",
     "identifier": "WriteRequest",
     "nearest": 29,
@@ -1495,7 +1495,7 @@
   },
   {
     "file": "controller/attestation/validate.go",
-    "line": 467,
+    "line": 469,
     "citation": "Certificate.ts:650",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "serialNumber",
