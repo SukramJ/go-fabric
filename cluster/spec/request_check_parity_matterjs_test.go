@@ -155,33 +155,78 @@ func TestDoorLockRefusalKindsParityMatterJS(t *testing.T) {
 	})
 }
 
-// TestDoorLockRefusalKindsThatDifferParityMatterJS (F-db021da0-20): three
-// kinds matter.js's validator refuses for the ten refusal commands pass
-// this module's request check at this HEAD — a difference reported back,
-// not fixed without a reference item on the check.
-func TestDoorLockRefusalKindsThatDifferParityMatterJS(t *testing.T) {
+// TestDoorLockRequestGateRefusalKindsParityMatterJS (F-db021da0-20): the
+// three kinds matter.js's model validator refuses before the handler — an
+// enum value that is no member (ValueValidator.ts:176-180), a member
+// outside the field's member list (OperationType "add, modify",
+// door-lock-cluster.element.ts:428; the names become member ids,
+// EncodedConstraint.ts:205-212, :236-241, and a list constraint fails when
+// every part fails, Constraint.ts:172-191, :207-209), and a bit no member
+// defines (ValueValidator.ts:209-225, :307-311; DaysMaskBitmap,
+// door-lock-cluster.element.ts:581-588) — answer INVALID_COMMAND for the
+// ten refusal commands (DoorLockServer.ts:1494-1511 at db021da0). The
+// decoder passes them (decision 64's split: types and constraints at the
+// decoder, conformance and enums at the gate); the server's request gate
+// (Instance.CheckRequest, answered with the command's stated Refusal)
+// refuses them before any handler. A valid request of each command passes.
+func TestDoorLockRequestGateRefusalKindsParityMatterJS(t *testing.T) {
 	t.Parallel()
-	t.Skip("F-db021da0-20: the request check passes these kinds; matter.js refuses them — a difference reported back")
-	assertInvalidCommand(t, []refusalKind{
-		// An enum value that is no member and in no range member
-		// (ValueValidator.ts:176-180).
-		{"SetUser CredentialRule 9, no member", lockdef.CmdSetUser, userRequest(func(r *lockdef.SetUserRequest) {
+	inst, err := spec.New(lockdef.Definition, spec.Options{
+		Features: uint32(lockdef.FeaturePinCredential | lockdef.FeatureUser | lockdef.FeatureWeekDayAccessSchedules),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// gate is the server's request gate (admitRequest): the check, and a
+	// refusal answered with the command's stated Refusal.
+	gate := func(t *testing.T, cmd uint32, req spec.Encodable) im.StatusCode {
+		t.Helper()
+		fields, err := decodeRequest(t, lockdef.ClusterID, cmd, req)
+		if err != nil {
+			t.Fatalf("the decoder refused the payload: %v", err)
+		}
+		if err := inst.CheckRequest(cmd, fields, nil); err != nil {
+			return lockdef.Definition.Command(cmd, spec.Request).Check.Refusal
+		}
+		return im.StatusSuccess
+	}
+	// A valid UserStatus (null): a zero UserStatus is refused on its own
+	// ("occupiedEnabled, occupiedDisabled"), which would hide the kind.
+	user := func(mod func(*lockdef.SetUserRequest)) lockdef.SetUserRequest {
+		return userRequest(func(r *lockdef.SetUserRequest) {
+			r.UserStatus = spec.Nullable[lockdef.UserStatusEnum]{Null: true}
+			mod(r)
+		})
+	}
+	for _, c := range []struct {
+		name  string
+		cmd   uint32
+		req   spec.Encodable
+		valid bool
+	}{
+		{"SetUser valid", lockdef.CmdSetUser, user(func(*lockdef.SetUserRequest) {}), true},
+		{"SetUser CredentialRule 9, no member", lockdef.CmdSetUser, user(func(r *lockdef.SetUserRequest) {
 			r.CredentialRule = spec.ValueOf(lockdef.CredentialRuleEnum(9))
-		})},
-		// A member outside the field's member list: OperationType
-		// "add, modify" (door-lock-cluster.element.ts:428; the
-		// constraint states the values the enum may take,
-		// constraint.ts:182-189 and ValueValidator.ts:182 — that the
-		// names resolve to their numbers before the test is inferred).
-		{"SetUser OperationType Clear, outside add, modify", lockdef.CmdSetUser, userRequest(func(r *lockdef.SetUserRequest) {
+		}), false},
+		{"SetUser OperationType Clear, outside add, modify", lockdef.CmdSetUser, user(func(r *lockdef.SetUserRequest) {
 			r.OperationType = lockdef.DataOperationTypeClear
-		})},
-		// A bit no member defines (ValueValidator.ts:202-209, :307-311;
-		// DaysMaskBitmap, door-lock-cluster.element.ts:261).
+		}), false},
+		{"SetWeekDaySchedule valid", lockdef.CmdSetWeekDaySchedule, weekDayRequest(func(*lockdef.SetWeekDayScheduleRequest) {}), true},
 		{"SetWeekDaySchedule DaysMask bit 7", lockdef.CmdSetWeekDaySchedule, weekDayRequest(func(r *lockdef.SetWeekDayScheduleRequest) {
 			r.DaysMask = lockdef.DaysMaskBitmap(1 << 7)
-		})},
-	})
+		}), false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			got := gate(t, c.cmd, c.req)
+			switch {
+			case c.valid && got == im.StatusInvalidCommand:
+				t.Errorf("a valid request was refused at the gate (INVALID_COMMAND)")
+			case !c.valid && got != im.StatusInvalidCommand:
+				t.Errorf("status %v, want INVALID_COMMAND", got)
+			}
+		})
+	}
 }
 
 // TestRelaxedAttributeIsHeldToItsWidth: a written value of an attribute
