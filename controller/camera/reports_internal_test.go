@@ -87,19 +87,20 @@ func TestReportsForgetDeletedNode(t *testing.T) {
 	}
 }
 
-// TestNewRefusesReportsInUse (review II, R2-P6-api-2208): New refuses a
-// Reports a live Service holds (ErrInvalidArgument), which would have
-// stopped the first Service's reports silently; once that Service closed,
-// the Reports serves a new one.
+// TestNewRefusesReportsInUse (review II, R2-P6-api-2208, decision 248):
+// New refuses a Reports a live Service holds with ErrReportsInUse, which
+// also matches ErrInvalidArgument as before; the refusal would otherwise
+// have stopped the first Service's reports silently. Once that Service
+// closed, the Reports serves a new one.
 func TestNewRefusesReportsInUse(t *testing.T) {
 	t.Parallel()
 	d := newDevSite(t)
 	d.startService()
-	if svc, err := New(context.Background(), d.c, Config{Reports: d.rep}); !errors.Is(err, ErrInvalidArgument) {
+	if svc, err := New(context.Background(), d.c, Config{Reports: d.rep}); !errors.Is(err, ErrReportsInUse) || !errors.Is(err, ErrInvalidArgument) {
 		if svc != nil {
 			d.run(svc.Close)
 		}
-		t.Fatalf("New with the Reports of a live Service = %v, want ErrInvalidArgument", err)
+		t.Fatalf("New with the Reports of a live Service = %v, want ErrReportsInUse and ErrInvalidArgument", err)
 	}
 	d.run(d.svc.Close)
 	svc, err := New(context.Background(), d.c, Config{Reports: d.rep})

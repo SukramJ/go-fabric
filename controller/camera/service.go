@@ -34,6 +34,11 @@ var (
 	ErrReportsNotInstalled = errors.New("camera: Config.Reports is not installed on the controller's configuration")
 	// ErrClosed: the service was closed.
 	ErrClosed = errors.New("camera: the service is closed")
+	// ErrReportsInUse: Config.Reports is held by a Service that is not
+	// closed. The refusal also matches [ErrInvalidArgument] with
+	// errors.Is, as it did before this sentinel existed (review II,
+	// R2-P6-api-2208, decision 248).
+	ErrReportsInUse = errors.New("camera: Config.Reports is held by a camera Service that is not closed")
 )
 
 // Signal is one command a camera invoked on the controller's requestor:
@@ -177,8 +182,9 @@ type Service struct {
 // refuses a controller without a requestor ([ErrNoRequestor]), without
 // outgoing TCP ([ErrTCPRequired]), a Config whose Reports were not
 // installed ([ErrReportsNotInstalled]) and one whose Reports a Service
-// that is not closed holds ([ErrInvalidArgument]): the first would stop
-// getting its reports (review II, R2-P6-api-2208).
+// that is not closed holds ([ErrReportsInUse], which also matches
+// [ErrInvalidArgument]): the first would stop getting its reports (review
+// II, R2-P6-api-2208).
 func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service, error) {
 	switch {
 	case ctrl.CameraRequestor() == nil:
@@ -188,7 +194,7 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 	case cfg.Reports == nil || !cfg.Reports.installed():
 		return nil, ErrReportsNotInstalled
 	case !cfg.Reports.claim():
-		return nil, invalidArguments("Config.Reports is held by a camera Service that is not closed; close that Service first, or give this one its own Reports")
+		return nil, &argumentError{msg: "Config.Reports is held by a camera Service that is not closed; close that Service first, or give this one its own Reports", also: ErrReportsInUse}
 	}
 	log := cfg.Logger
 	if log == nil {
