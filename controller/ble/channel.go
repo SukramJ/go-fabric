@@ -560,9 +560,8 @@ func (c *Channel) endLost() {
 // maxInboundMessage is the largest reassembled message deliver hands on:
 // the module's datagram bound, [udp.MaxDatagramSize] — the UDP listener
 // reads into a buffer of that plus 64 bytes (transport/udp/listener.go
-// Serve) — so a BLE peer reaches the exchange layer with no more than a
-// UDP peer can send, and a full exchange queue holds at most 16 such
-// messages (TM R5 5a.5). connectedhomeip reassembles a BTP message in one
+// Serve) — so a message over BLE is held to the size of one over UDP
+// (TM R5 5a.5). connectedhomeip reassembles a BTP message in one
 // packet buffer and refuses a larger one, CHIP_ERROR_INBOUND_MESSAGE_TOO_BIG
 // (src/ble/BtpEngine.cpp:305, :312-314, :328-330 at 6170af84); matter.js
 // bounds it by the declared 16-bit length only
