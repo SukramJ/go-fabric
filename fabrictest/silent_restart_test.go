@@ -149,8 +149,8 @@ func TestControllerRecoversFromASilentRestart(t *testing.T) {
 		// The subscription persisted before the restart: the restarted
 		// device re-establishes it (node.go ReestablishFormerSubscriptions)
 		// on a session the device opens, and the report arrives there. The
-		// session from before the restart is not asserted on: a peer's new
-		// session does not close it (R2-P6-par-3102).
+		// session from before the restart is not asserted on
+		// (R2-P6-par-3102).
 		t.Run("device resumes", func(t *testing.T) {
 			t.Parallel()
 			site, p, pl, ep, old, reports := subscribedPair(t)
