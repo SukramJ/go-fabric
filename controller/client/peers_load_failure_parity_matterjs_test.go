@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // TestPeersLoadFailureParity ports matter.js's PeersLoadFailureTest
@@ -71,5 +72,56 @@ func TestPeersLoadFailureParity(t *testing.T) {
 	// The stored data stays until the node is erased.
 	if stored, err := sr.store.Load("peer2"); err != nil || len(stored) == 0 {
 		t.Fatalf("the unavailable node's store: %v, %d endpoints", err, len(stored))
+	}
+}
+
+// TestPeersLoadFailureByAddressParity ports PeersLoadFailureTest.ts:147-169
+// at b25ed960 (a37a502c3), "finds a peer that cannot load and the peers
+// after it by address": peer1's stored commissionedAt is not a timestamp,
+// so it loads unavailable; its stored peer address still finds it
+// (ClientNode.peerAddress reads storage when the commissioning state did
+// not load, ClientNode.ts:387-421), and peer2 after it is found too.
+func TestPeersLoadFailureByAddressParity(t *testing.T) {
+	t.Parallel()
+	address1, address2 := scriptedAddr, handshake.PeerAddress{FabricIndex: scriptedAddr.FabricIndex, NodeID: 0x3333}
+	sr := newScriptedRegistry(t, func(st *client.MemoryStore) {
+		seedCommissioned(1)(st)
+		_ = client.SaveRecord(st, "peer2", client.Record{
+			PeerAddress:  &address2,
+			Addresses:    []client.NetworkAddress{{IP: netip.MustParseAddr("fd00::2"), Port: 5540}},
+			DiscoveredAt: time.UnixMilli(1_800_000_000_000),
+		})
+		// The record is cluster 0xFFFF_FFFE on endpoint 0, commissionedAt
+		// its field 5 (record.go:28, :39), a uint64 of milliseconds.
+		e := tlv.NewEncoder()
+		e.PutUTF8(tlv.AnonymousTag(), "not a timestamp")
+		b, err := e.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.Save("peer1", 0, 0xFFFF_FFFE, map[uint32][]byte{5: b}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}, nil)
+
+	broken, healthy := sr.reg.Get("peer1"), sr.reg.Get("peer2")
+	if broken == nil || healthy == nil {
+		t.Fatalf("nodes %v, %v", broken, healthy)
+	}
+	if !errors.Is(broken.LoadError(), client.ErrLoadFailed) {
+		t.Fatalf("load error %v, want ErrLoadFailed", broken.LoadError())
+	}
+	if got := sr.reg.GetByAddress(address1); got != broken {
+		t.Fatalf("by address1: %v, want the node that failed to load", got)
+	}
+	if got := sr.reg.GetByAddress(address2); got != healthy {
+		t.Fatalf("by address2: %v, want the healthy node", got)
+	}
+	if got, err := sr.reg.ForAddress(address2, ""); err != nil || got != healthy {
+		t.Fatalf("ForAddress(address2): %v, %v; want the healthy node", got, err)
+	}
+	// Peers.commissioned lists the healthy node alone (PeersLoadFailureTest.ts:125).
+	if c := sr.reg.Commissioned(); len(c) != 1 || c[0] != healthy {
+		t.Fatalf("commissioned %v, want the healthy node alone", c)
 	}
 }

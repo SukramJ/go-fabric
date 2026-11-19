@@ -130,9 +130,15 @@ type Registry struct {
 	// a leave and Erase (D8).
 	op sync.Mutex
 
-	// mu guards bound, closed, nextID and nodes.
+	// mu guards bound, closed, nextID, nodes and storedAddress.
 	mu     sync.Mutex
 	nodes  []*Node
+	// storedAddress is the peer address stored for a node that failed to
+	// load, read from its record's peer address field alone — matter.js
+	// ClientNode.peerAddress, which reads storage when the commissioning
+	// state did not load (ClientNode.ts:387-421 at b25ed960). Only
+	// GetByAddress reads it: such a node is not commissioned.
+	storedAddress map[*Node]PeerAddress
 	bound  map[*Node]func()
 	ops    map[*Node]*fabricOp
 	leaves map[*Node]*leaveLatch
@@ -195,7 +201,7 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 	}
 	for _, id := range ids {
 		r.reserveID(id)
-		n, err := r.restore(id)
+		n, stored, err := r.restore(id)
 		if err != nil {
 			// A node that cannot load is kept, unavailable, with the
 			// cause — its id stays visible and the others load
@@ -203,6 +209,14 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 			r.log.Warn("matter.controller.client.registry.load_failed", slog.String("node", id), slog.Any("err", err))
 			if n, err = r.unavailable(id, err); err != nil {
 				continue
+			}
+			if stored != nil {
+				r.mu.Lock()
+				if r.storedAddress == nil {
+					r.storedAddress = map[*Node]PeerAddress{}
+				}
+				r.storedAddress[n] = *stored
+				r.mu.Unlock()
 			}
 		}
 		r.add(n)
@@ -251,18 +265,20 @@ func (r *Registry) nodeConfig(id string) Config {
 }
 
 // restore builds a stored node, bound to its peer when its record has a
-// peer address.
-func (r *Registry) restore(id string) (*Node, error) {
+// peer address. addr is the record's peer address field decoded alone,
+// also when restore fails on another field or on the peer.
+func (r *Registry) restore(id string) (n *Node, addr *PeerAddress, err error) {
 	stored, err := r.store.Load(id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var rec Record
 	for _, ep := range stored {
 		for _, c := range ep.Clusters {
 			if ep.Number == 0 && c.ID == recordCluster {
+				addr = storedPeerAddress(c.Values)
 				if rec, err = decodeRecord(c.Values); err != nil {
-					return nil, err
+					return nil, addr, err
 				}
 			}
 		}
@@ -270,10 +286,32 @@ func (r *Registry) restore(id string) (*Node, error) {
 	var p *peer.Peer
 	if rec.PeerAddress != nil {
 		if p, err = r.cfg.Peers.AddKnownPeer(rec.knownDescriptor()); err != nil {
-			return nil, err
+			return nil, addr, err
 		}
 	}
-	return r.build(id, p)
+	n, err = r.build(id, p)
+	return n, addr, err
+}
+
+// storedPeerAddress is the peer address field of a stored record decoded
+// on its own, nil when it is absent or does not decode. Mirrors matter.js
+// packages/node/src/node/ClientNode.ts:407-418 at b25ed960
+// (ClientNode.peerAddress): with the commissioning state not loaded, the
+// address is read from storage, whatever else the state holds.
+func storedPeerAddress(values map[uint32][]byte) *PeerAddress {
+	b := values[recPeerAddress]
+	if b == nil {
+		return nil
+	}
+	v, err := decodeValue(b)
+	if err != nil {
+		return nil
+	}
+	var rec Record
+	if rec.decodeField(recPeerAddress, v) != nil {
+		return nil
+	}
+	return rec.PeerAddress
 }
 
 // unavailable is the node of id that failed to load with cause: no image,
@@ -461,6 +499,7 @@ func (r *Registry) remove(n *Node) {
 	held := len(r.nodes)
 	r.nodes = slices.DeleteFunc(r.nodes, func(x *Node) bool { return x == n })
 	removed := len(r.nodes) < held
+	delete(r.storedAddress, n)
 	r.mu.Unlock()
 	r.manageExpiration()
 	if h := n.cfg.Hooks.Deleted; removed && h != nil {
@@ -680,13 +719,19 @@ func (r *Registry) Get(id string) *Node {
 	return nil
 }
 
-// GetByAddress is the commissioned node with peer address addr, nil when
-// there is none (Peers.ts:425-441). matter.js finds a peer that failed to
-// load there too, by its ClientNode.peerAddress; this lookup does not
-// (pin-lift unit P1-D).
+// GetByAddress is the node with peer address addr, nil when there is none:
+// a commissioned node, or a node that failed to load whose stored record
+// names addr. Mirrors matter.js packages/node/src/node/client/Peers.ts:421-445
+// at b25ed960 (Peers.get by address, through ClientNode.peerAddress).
 func (r *Registry) GetByAddress(addr PeerAddress) *Node {
 	for _, n := range r.Nodes() {
-		if a, ok := n.PeerAddress(); ok && a == addr {
+		a, ok := n.PeerAddress()
+		if !ok {
+			r.mu.Lock()
+			a, ok = r.storedAddress[n]
+			r.mu.Unlock()
+		}
+		if ok && a == addr {
 			return n
 		}
 	}
