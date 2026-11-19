@@ -682,10 +682,26 @@ func (m *Manager) forget(s *Session) {
 // SecureChannelMessenger.ts:193-195 (sendCloseSession, suppressAck). A
 // failure to send is logged, never returned: the session is gone either
 // way.
+//
+// The session is closing from the entry on, before the CloseSession goes
+// out: a CASE responder session still establishing is then never
+// established by its handshake ([Session.completeEstablishment]) — not
+// counted for the per-peer cap, not handed over, its record not saved.
+// The mark is taken under s.mu, the lock that completion checks and flips
+// under. Mirrors matter.js packages/protocol/src/session/Session.ts:311
+// before :319 at b25ed960 (initiateClose: closing, then the close), whose
+// close alone emits the graceful close that sends CloseSession
+// (NodeSession.ts:490-492), with completeEstablishment declining from :311
+// on (NodeSession.ts:245-247). [Manager.Initiate] refuses only a closed
+// session, so the CloseSession's own exchange still opens.
 func (m *Manager) CloseSession(ctx context.Context, s *Session) {
-	if s.IsClosed() {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
 		return
 	}
+	s.markClosing()
+	s.mu.Unlock()
 	if s.secure != nil && !s.IsPeerLost() {
 		if x, err := m.Initiate(s, mrp.SecureChannelProtocolID, Options{}); err == nil {
 			report := StatusReport{

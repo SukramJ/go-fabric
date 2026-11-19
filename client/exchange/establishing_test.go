@@ -5,6 +5,7 @@ package exchange
 
 import (
 	"context"
+	"net"
 	"slices"
 	"testing"
 	"time"
@@ -144,5 +145,66 @@ func TestEstablishingSessionClosedDeliversNothing(t *testing.T) {
 	case id := <-served:
 		t.Fatalf("exchange %d served on a session whose handshake failed", id)
 	default:
+	}
+}
+
+// gateConn holds every datagram's send until release is closed, and
+// reports on entered that a send began.
+type gateConn struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (c *gateConn) Send(*net.UDPAddr, []byte) error {
+	select {
+	case c.entered <- struct{}{}:
+	default:
+	}
+	<-c.release
+	return nil
+}
+
+// TestCloseSessionMarksClosingBeforeItsCloseSession: a graceful close
+// records that the session is closing before its CloseSession goes out, so
+// a CASE responder session the close reaches while it still establishes is
+// never established in between — not handed over, not counted for the
+// per-peer cap, its record not saved. Mirrors matter.js
+// packages/protocol/src/session/Session.ts:311 before :319 at b25ed960
+// (initiateClose: closing first, then the close) with NodeSession.ts:490-492
+// (only the close emits the graceful close that sends CloseSession) and
+// :245-247 (completeEstablishment declines from :311 on).
+func TestCloseSessionMarksClosingBeforeItsCloseSession(t *testing.T) {
+	t.Parallel()
+	conn := &gateConn{entered: make(chan struct{}, 1), release: make(chan struct{})}
+	m, err := NewManager(conn, Config{Clock: newFakeClock(), Rand: func() float64 { return 0.5 }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(m.Close)
+	establishing, _ := newResponderSession(t, m, 0x0501, true)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		m.CloseSession(context.Background(), establishing)
+	}()
+	select {
+	case <-conn.entered:
+	case <-time.After(5 * time.Second):
+		close(conn.release)
+		t.Fatal("CloseSession sent nothing")
+	}
+	// The CloseSession is on the wire and the session not yet closed.
+	established := establishing.completeEstablishment()
+	closing := establishing.IsClosing()
+	close(conn.release)
+	<-done
+	if !closing {
+		t.Error("the session was not closing while its CloseSession went out")
+	}
+	if established {
+		t.Error("a session under a graceful close was established before its CloseSession returned")
+	}
+	if !establishing.IsClosed() {
+		t.Error("the session is not closed after CloseSession")
 	}
 }
