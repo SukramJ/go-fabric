@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10081,
+  "entry_points": 10089,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27777,
-    "reachable": 20846,
-    "whitelisted": 6908,
+    "total_exported": 27787,
+    "reachable": 20850,
+    "whitelisted": 6914,
     "unreachable": 23
   },
   "by_package": [
@@ -2462,6 +2462,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reassemble_quiesce_test.go",
       "line": 163
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestConcurrentWritesStampTheirOwnAttributeData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_hold_phase_test.go",
+      "line": 154
     },
     {
       "package": "bridge",
@@ -8275,6 +8282,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestUnattributedHeldChangeAdvancesOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_hold_phase_test.go",
+      "line": 199
+    },
+    {
+      "package": "bridge",
       "identifier": "TestUnchangedWriteOverTheWireIsNotReported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
@@ -10854,14 +10868,14 @@
       "identifier": "TestPeerAddressMonitorBackoff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 209
+      "line": 210
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerAddressMonitorCoalescing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 192
+      "line": 193
     },
     {
       "package": "client/peer",
@@ -27983,14 +27997,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1153
+      "line": 1168
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1149
+      "line": 1164
     },
     {
       "package": "controller",
@@ -28040,6 +28054,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/diagnostics_internal_test.go",
       "line": 199
+    },
+    {
+      "package": "controller",
+      "identifier": "TestCommissionBoundNamesOnlyItsOwnEnd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commission_bound_internal_test.go",
+      "line": 20
     },
     {
       "package": "controller",
@@ -33248,6 +33269,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
       "line": 212
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestProductCheckErrorNamesTheProductAndItsNodes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/check_error_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestProductCheckErrorsWalksTheJoin",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/check_error_test.go",
+      "line": 38
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestQueryUpdatesNamesTheFailedProducts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/check_error_test.go",
+      "line": 58
     },
     {
       "package": "controller/softwareupdate",

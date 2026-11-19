@@ -63,7 +63,7 @@ red-then-green test confirmed.
 | R2-P7-acl-06 | note, unverified | no change: no guess is gained, Pake1 and Pake3 meet the lockout (`bridge/securechannel.go:551`) | `bridge/securechannel.go:958-992`: the PBKDFParamRequest whose expired claim engages the lockout is still answered |
 | R2-P7-acl-07 | note | not a finding in the shipped wiring (verify V2); the `Claim` doc sentence written on `review2/p7c` | `bridge/handlers.go:942-984`: the handler does not release a resume claim when `onEstablished` fails; node's callback releases it itself (`node/security.go:1223-1227`), a host's own claiming store would not be told to |
 | R2-P7-req-01 | low (medium as reported; low by the verify) | fixed `4245fdef` | `bridge/subscribe.go:2220-2221`, `bridge/chunk_waits.go:252-254`: the priming report's deferred forget deleted the abort channel of the first ongoing report; the forget is a compare-and-delete of its own channel |
-| R2-P7-req-02 | low, unverified | open → backlog | `bridge/write_hold.go:394-424`: the write-hold phase is one value per table, so concurrent writes of two sessions stamp each other's phase |
+| R2-P7-req-02 | low, unverified | fixed on `review2/p7e`: the open attribute data are a list; a held change takes the one on its endpoint, an unattributable one advances once (`phaseUnattributed`) | `bridge/write_hold.go:394-424`: the write-hold phase is one value per table, so concurrent writes of two sessions stamp each other's phase |
 | R2-P7-req-03 | low | fixed `83c75408` | `bridge/outbound_reliable.go:102-106`: the secure retransmission slot was keyed without the exchange's role, so one role's message superseded the other's on a shared id; the slot carries the role |
 | R2-P7-req-04 | low | fixed `83c75408` | `bridge/ackpump.go:676-680`: a given-up retransmission ended the exchange of the other role on the same id; the tick result carries the role |
 | R2-P7-req-05 | low, unverified | fixed on `review2/p7c` (decisions 275, 280, 280a, 281) | `bridge/chunk_waits.go:94`, `:177-183`: the per-fabric chunk-wait share admits one claim beyond the share, and pools every unresolved session under fabric 0 |
@@ -156,3 +156,17 @@ Sigma3 after the report's acknowledgement) in its own pull request; req-02,
 the `node` race flake `TestPeerPathWithoutTCPRefusesTheSignal` (times out
 under `-race` at a9658f58 too, not traced), the citation remnants and the
 full-cut run 2 stay in the backlog.
+
+## Backlog round `review2/p7e` (2026-11-19)
+
+Closed: R2-P7-req-02 (row above; tests `TestConcurrentWritesStampTheirOwnAttributeData`,
+`TestUnattributedHeldChangeAdvancesOnce`); go-fabric#554
+(`PairOptions.CommissionTimeout`) and #555 (`softwareupdate.ProductCheckError`,
+`ProductCheckErrors`), the two issues go-fabric-ui's review phase 4 handed
+over; the `client/peer` test `TestPeerAddressMonitorVerifyReachability`
+("close left the debounce armed", once in `make ci` under `-race`, not
+reproduced in 30 isolated and 8 package runs) read the timers after one
+`Yield` that may come before `close` ran — inferred from the code, the test
+now waits for the stop. Left in the backlog: R2-P7-V3-giveup, the citation remnants, the
+full-cut run 2, and the Fable note on `dropHandshakeNotBegun`'s "nothing is
+sent".

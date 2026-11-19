@@ -141,14 +141,15 @@ func TestPeerAddressMonitorVerifyReachability(t *testing.T) {
 			defer m.mu.Unlock()
 			closed <- m.running == nil
 		}()
+		// close stops the debounce first, on its own goroutine: wait for
+		// that rather than read the timers after one Yield, which may come
+		// before close ran (the -race flake of make ci on 2026-11-19).
+		eventually(t, "close stopping the debounce", func() bool { return !h.clock.hasTimer(99 * time.Hour) })
 		h.clock.Yield()
 		select {
 		case <-closed:
 			t.Fatal("close returned while the run was in flight")
 		default:
-		}
-		if h.clock.hasTimer(99 * time.Hour) {
-			t.Fatal("close left the debounce armed")
 		}
 		n.answer(t, probe)
 		select {

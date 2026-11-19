@@ -273,7 +273,10 @@ below. Its `OnAttestationFailure` defaults to `attestation.Reject()`, and
 context without a deadline the search for the device ends after
 `controller.DefaultPairTimeout` (one minute) with `ErrNoDevice`; the
 commissioning of a device that was found is not bounded by it, only by
-the commissioner's own budgets and the context.
+the commissioner's own budgets and the context — and by
+`PairOptions.CommissionTimeout` when set, which bounds the commissioning
+after the search on its own (its end is an error that is
+`context.DeadlineExceeded`).
 
 1. **Decode the code.** `setup.DecodeQRCode` reads an `MT:` payload and
    gives the long discriminator. `setup.DecodeManualCode` reads 11 or 21
@@ -880,9 +883,11 @@ software-update manager: `Controller.SoftwareUpdates()` is a
 announces the provider to it, `ForceUpdate` announces at once,
 `RemoveConsent` cancels, `QueryUpdates` and `CheckForUpdates` look for
 updates in the `softwareupdate.Images` store and the DCL ledgers (a product
-whose check fails is passed over; its failure joins the returned error,
-which is nil only when every product's check succeeded, while the updates
-found for the others are still returned), `QueuedUpdates` shows the queue. The provider is the controller itself: the
+whose check fails is passed over; its failure joins the returned error
+as a `*softwareupdate.ProductCheckError` naming the product and its nodes,
+which `softwareupdate.ProductCheckErrors` lists; the error is nil only when
+every product's check succeeded, while the updates found for the others are
+still returned), `QueuedUpdates` shows the queue. The provider is the controller itself: the
 OTA provider server sits at `controller.OTAProviderEndpoint` of the
 controller's own endpoint tree, served as RootNodeID over the sessions the
 controller holds (matter.js's provider on the controller's node), and the

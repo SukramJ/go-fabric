@@ -88,10 +88,20 @@ func (c *Controller) pairDiscovered(ctx context.Context, st stack, pc PairingCod
 // BTP channel to the peripheral first (ble.Dial); the commissioner's
 // ClaimNodeIDAfterPASE is the race's gate (matter.js's
 // continueCommissioningAfterPase, CommissioningDiscovery.ts:66-74). The
-// attempt ends with Pair's ctx as well as with the race.
+// attempt ends with Pair's ctx as well as with the race, and after
+// [PairOptions].CommissionTimeout when one is set.
 func (c *Controller) pairAttempt(actx, pairCtx context.Context, reg *client.Registry, cand discovery.Candidate, win func() bool, bsc *ble.Scanner, passcode uint32, opts PairOptions, r *pairRace) (*client.Node, error) {
 	actx, stop := bothContexts(actx, pairCtx)
 	defer stop()
+	actx, cancel, ended := opts.commissionContext(actx, c.clock)
+	defer cancel()
+	n, err := c.commissionCandidate(actx, reg, cand, bsc, passcode, opts, r, win)
+	return n, ended(err)
+}
+
+// commissionCandidate dials the candidate over BLE when it was found
+// there, and commissions it.
+func (c *Controller) commissionCandidate(actx context.Context, reg *client.Registry, cand discovery.Candidate, bsc *ble.Scanner, passcode uint32, opts PairOptions, r *pairRace, win func() bool) (*client.Node, error) {
 	r.attemptStarted()
 	dev := cand.Device
 	var channel commissioner.Channel

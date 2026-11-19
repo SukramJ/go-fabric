@@ -123,16 +123,73 @@ type writeHoldTable struct {
 	// phase numbers the attribute data of the writes being applied
 	// ([writeHoldTable.beginAttributeData]); it only grows.
 	phase uint64
-	// open is the attribute data being applied, which a held change is
-	// stamped with; 0 outside one — before the first, between two, after
-	// the last, or for a dispatcher that does not number them (a group
-	// write) — so such a change is settled against the whole record
-	// (Fable's read of sub round 2, F56-1).
-	open uint64
+	// open are the attribute data being applied, with the endpoint each
+	// names; a held change is stamped by [writeHoldTable.stampFor]. None
+	// is open before the first, between two, after the last, or for a
+	// dispatcher that does not number them (a group write), so such a
+	// change is settled against the whole record (Fable's read of sub
+	// round 2, F56-1). Writes of two sessions apply their attribute data
+	// at once, so the open ones are a list, not one value (review II,
+	// R2-P7-req-02).
+	open []openAttributeData
 	// changedIn are the clusters each attribute data changed, which the
 	// dispatcher advanced with it; kept while a write holds the cluster's
 	// endpoint ([writeHoldTable.end]).
 	changedIn map[phasedCluster]struct{}
+}
+
+// openAttributeData is one attribute data being applied: its phase and
+// the endpoint its path names (none for a path without one, which the
+// dispatcher applies to every endpoint).
+type openAttributeData struct {
+	phase       uint64
+	endpoint    uint16
+	hasEndpoint bool
+}
+
+// phaseUnattributed stamps a change held while attribute data of more
+// than one write are open and none or several of them name its endpoint:
+// it cannot be told which caused it, so it is settled as a change of its
+// own — its cluster advanced once, whatever the record changed. An
+// advance too many costs a subscriber one report of an unchanged
+// version; one too few leaves a cache that filters on the version stale
+// (review II, R2-P7-req-02). [writeHoldTable.beginAttributeData] never
+// reaches it.
+const phaseUnattributed = ^uint64(0)
+
+// stampFor is the phase a change of endpoint held now is stamped with:
+// the one attribute data open, 0 when none is, and with several open the
+// one that names endpoint (or names none), else [phaseUnattributed]. The
+// caller holds t.mu.
+//
+// With several open the attribution is by endpoint, not by cause: a host
+// that moves an attribute of endpoint 2 because write A changed endpoint
+// 1, while write B's attribute data on endpoint 2 is open, has its change
+// stamped with B's — and when B changed that cluster, not advanced again.
+// The cause would have to travel with the write to the host's
+// notification, which the host port does not carry (review II,
+// R2-P7-req-02, Fable's read).
+func (t *writeHoldTable) stampFor(endpoint uint16) uint64 {
+	switch len(t.open) {
+	case 0:
+		return 0
+	case 1:
+		return t.open[0].phase
+	}
+	stamp := uint64(0)
+	for _, o := range t.open {
+		if o.hasEndpoint && o.endpoint != endpoint {
+			continue
+		}
+		if stamp != 0 {
+			return phaseUnattributed
+		}
+		stamp = o.phase
+	}
+	if stamp == 0 {
+		return phaseUnattributed
+	}
+	return stamp
 }
 
 // phasedCluster names a cluster of an endpoint in one attribute data.
@@ -169,7 +226,7 @@ type heldPath struct {
 	// report view): the hold marks it and advances nothing.
 	markOnly bool
 	// phase is the attribute data open when the change arrived (0: none
-	// was).
+	// was; [phaseUnattributed]: several were, none of them its own).
 	phase uint64
 }
 
@@ -265,7 +322,7 @@ func (t *writeHoldTable) holdPaths(ep *endpointpkg.Endpoint, mgr *subscription.M
 	}
 	h := t.entry(ep.ID)
 	for _, p := range paths {
-		h.add(heldPath{ep: ep, mgr: mgr, path: p, phase: t.open})
+		h.add(heldPath{ep: ep, mgr: mgr, path: p, phase: t.stampFor(ep.ID)})
 	}
 	return nil
 }
@@ -284,7 +341,7 @@ func (t *writeHoldTable) holdAdvance(ep *endpointpkg.Endpoint, cluster uint32, a
 	}
 	h := t.entry(ep.ID)
 	for _, a := range attrs {
-		h.add(heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true, phase: t.open})
+		h.add(heldPath{ep: ep, path: attributeOf(ep.ID, cluster, a), advanceOnly: true, phase: t.stampFor(ep.ID)})
 	}
 	return true
 }
@@ -303,7 +360,7 @@ func (t *writeHoldTable) holdMarks(ep *endpointpkg.Endpoint, mgr *subscription.M
 	}
 	h := t.entry(ep.ID)
 	for _, a := range attrs {
-		h.add(heldPath{ep: ep, mgr: mgr, path: attributeOf(ep.ID, cluster, a), markOnly: true, phase: t.open})
+		h.add(heldPath{ep: ep, mgr: mgr, path: attributeOf(ep.ID, cluster, a), markOnly: true, phase: t.stampFor(ep.ID)})
 	}
 	return true
 }
@@ -317,7 +374,7 @@ func (t *writeHoldTable) holdQuiet(endpoint uint16, qp *quietPath) bool {
 		return false
 	}
 	h := t.entry(endpoint)
-	if hq := (heldQuiet{qp: qp, phase: t.open}); !slices.Contains(h.quiet, hq) {
+	if hq := (heldQuiet{qp: qp, phase: t.stampFor(endpoint)}); !slices.Contains(h.quiet, hq) {
 		h.quiet = append(h.quiet, hq)
 	}
 	return true
@@ -390,12 +447,12 @@ func (t *writeHoldTable) end(s writeScope, rec writeRecord) map[uint16]*heldWrit
 }
 
 // beginAttributeData starts the next attribute data of the writes being
-// applied and returns its number.
-func (t *writeHoldTable) beginAttributeData() uint64 {
+// applied, the one of path, and returns its number.
+func (t *writeHoldTable) beginAttributeData(path im.ConcreteAttributePath) uint64 {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.phase++
-	t.open = t.phase
+	t.open = append(t.open, openAttributeData{phase: t.phase, endpoint: path.Endpoint, hasEndpoint: path.HasEndpoint})
 	return t.phase
 }
 
@@ -418,9 +475,7 @@ func (t *writeHoldTable) noteAttributeData(phase uint64, results []im.WriteResul
 		}
 		t.changedIn[phasedCluster{phase, res.Path.Endpoint, res.Path.Cluster}] = struct{}{}
 	}
-	if t.open == phase {
-		t.open = 0
-	}
+	t.open = slices.DeleteFunc(t.open, func(o openAttributeData) bool { return o.phase == phase })
 }
 
 // phasedWriter is the bridge's dispatcher as a write message is applied
@@ -435,14 +490,14 @@ type phasedWriter struct {
 }
 
 func (w phasedWriter) Write(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue) []im.WriteResult {
-	phase := w.holds.beginAttributeData()
+	phase := w.holds.beginAttributeData(path)
 	results := w.TopologyDispatcher.Write(ctx, path, value)
 	w.holds.noteAttributeData(phase, results)
 	return results
 }
 
 func (w phasedWriter) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult {
-	phase := w.holds.beginAttributeData()
+	phase := w.holds.beginAttributeData(path)
 	results := w.TopologyDispatcher.WriteAuthorized(ctx, path, value, authorize)
 	w.holds.noteAttributeData(phase, results)
 	return results
@@ -495,7 +550,9 @@ func (b *Bridge) holdWrite(scope writeScope, run func() []im.WriteResult) {
 //     :1476-1481). A change held while no attribute data was open (a
 //     dispatcher that does not number them, a group write, or between two)
 //     is settled against the whole record, once per cluster (review II,
-//     F-db021da0-56, owner decision 146; F56-1).
+//     F-db021da0-56, owner decision 146; F56-1); one held while the
+//     attribute data of several writes were open, none of them its own,
+//     advances its cluster once ([phaseUnattributed], R2-P7-req-02).
 //
 // The rule rests on the record alone: a verdict that did not name a value
 // that moved leaves a notification's change of it to be advanced and
