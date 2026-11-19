@@ -1055,7 +1055,7 @@ func caseFailureProtocolCode(err error) uint16 {
 // established it included — is not answered: it is acknowledged, as the
 // router acknowledges a Sigma3 of a completed handshake, and it neither
 // reaches the responder nor changes the session (review II,
-// R2-P3-rr-dev-01, R2-P4-nv-03, R2-P4-nw-01; phase 7, decision 284;
+// R2-P3-rr-dev-01, R2-P4-nv-03, R2-P4-nw-01; phase 7, decisions 284, 286;
 // [Bridge.dispatchSigma3]).
 func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload []byte, err error) {
 	opcode, respPayload, _, err = a.processSigma3(payload)
@@ -1093,11 +1093,11 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	if a.established {
 		// Every Sigma3 after establishment is acknowledged and not
 		// answered, the bytes that established the session included
-		// (review II, phase 7, decision 284): matter.js's CASE server reads
-		// one Sigma3 per handshake, and a repeat on its exchange is a
-		// duplicate that does not reach it
-		// (packages/protocol/src/protocol/MessageExchange.ts:501-511 at
-		// db021da0).
+		// (review II, phase 7, decision 286): matter.js's CASE server reads
+		// one Sigma3 per handshake
+		// (packages/protocol/src/session/case/CaseServer.ts:275-279 at
+		// db021da0), and a repeat on its exchange is a duplicate that does
+		// not reach it (packages/protocol/src/protocol/MessageExchange.ts:501-511).
 		a.mu.Unlock()
 		return 0, nil, sigma3OfCompleted, nil
 	}

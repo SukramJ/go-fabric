@@ -174,7 +174,7 @@ func TestCaseAdapter_Sigma1ReplayDoesNotReopenTheEstablishedGate(t *testing.T) {
 		t.Fatalf("calls after the handshake = %d, want 1", calls)
 	}
 	// The establishing Sigma3 again is not answered (review II, phase 7,
-	// decision 284).
+	// decision 286).
 	if op, reply, err := a.ProcessSigma3(sigma3Bytes); err != nil || op != 0 || reply != nil {
 		t.Fatalf("the establishing Sigma3 again: op=%#x reply=%x err=%v, want no answer", op, reply, err)
 	}
