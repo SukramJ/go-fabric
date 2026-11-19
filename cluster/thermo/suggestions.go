@@ -303,8 +303,11 @@ func (s *ThermostatServer) handleAddThermostatSuggestion(ctx context.Context, fi
 		s.mu.Unlock()
 		return nil, spec.Errorf(im.StatusInvalidCommand, "thermo: EffectiveTime %d is more than 24 h after %d", req.EffectiveTime.Value, now)
 	}
-	_, currentGone := s.removeExpiredLocked(now)
+	// The id is taken against the list as stored, expired entries
+	// included; they go after (matter.js ThermostatServer.ts:624, :637 at
+	// b25ed960, pruning only in the re-evaluation, :2429-2432).
 	id := s.nextSuggestionIDLocked()
+	_, currentGone := s.removeExpiredLocked(now)
 	effective := now
 	if !req.EffectiveTime.Null {
 		effective = req.EffectiveTime.Value

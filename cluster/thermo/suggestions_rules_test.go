@@ -151,6 +151,41 @@ func TestSuggestionUniqueIDs(t *testing.T) {
 	}
 }
 
+// TestSuggestionUniqueIDSkipsAnExpiredEntryNotYetRemoved pins the next
+// UniqueID taken against the list as stored, expired entries included,
+// before the Add removes them — matter.js ThermostatServer.ts:624, :637 at
+// b25ed960 (addThermostatSuggestion), which prunes only in the
+// re-evaluation (:2429-2432): after the wrap, id 1 is still held by an
+// expired entry and is skipped.
+func TestSuggestionUniqueIDSkipsAnExpiredEntryNotYetRemoved(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	if id, err := addSuggestion(srv, handleB, nil, 30); err != nil || id != 1 {
+		t.Fatalf("first id %d, %v; want 1", id, err)
+	}
+	for want := 2; want <= 255; want++ {
+		id, err := addSuggestion(srv, handleB, nil, 30)
+		if err != nil || int(id) != want {
+			t.Fatalf("id %d, %v; want %d", id, err, want)
+		}
+		if err := removeSuggestion(srv, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if id, err := addSuggestion(srv, handleB, nil, 30); err != nil || id != 0 {
+		t.Fatalf("after 255: id %d, %v; want 0", id, err)
+	}
+	clk.StepWall(31 * time.Minute) // 1 and 0 expire; the timer does not fire
+	id, err := addSuggestion(srv, handleB, nil, 30)
+	if err != nil || id != 2 {
+		t.Errorf("with 1 held by an expired entry: id %d, %v; want 2", id, err)
+	}
+	if got := readSuggestions(t, srv); len(got) != 1 || got[0].UniqueId != id {
+		t.Errorf("ThermostatSuggestions %v, want only the new one", got)
+	}
+}
+
 // TestSetpointOfTheOtherOccupancyIsNoOverride pins that only a setpoint of
 // the occupancy in effect, written in the change that ends the hold, makes
 // the current suggestion an override — matter.js ThermostatServer.ts:803-808
