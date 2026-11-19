@@ -124,6 +124,10 @@ func TestBDXBlockWaitsForTheAcceptsAck(t *testing.T) {
 			break
 		}
 	}
+	// The responder waits for the acknowledgement as it waits for a
+	// message: the acknowledgement is dispatched at once, not after the
+	// session's turn on the ReceiveInit ran out ([responderTurnBound]).
+	ackedAt := time.Now()
 	peer.sendSecureAck(message.ProtocolHeader{Initiator: false, ExchangeID: x, ProtocolID: mrp.SecureChannelProtocolID}, accept.counter, mrp.StandaloneAckOpcode, nil)
 	var block0 bdxSeen
 	for {
@@ -139,6 +143,9 @@ func TestBDXBlockWaitsForTheAcceptsAck(t *testing.T) {
 	}
 	if blk, err := bdx.DecodeBlock(block0.payload); block0.opcode != bdx.MessageBlock || err != nil || blk.BlockCounter != 0 {
 		t.Fatalf("after the acknowledgement the device sent %v %+v (%v), want Block 0", block0.opcode, blk, err)
+	}
+	if d := time.Since(ackedAt); d > 700*time.Millisecond {
+		t.Fatalf("Block 0 left %v after the ReceiveAccept's acknowledgement, want at once", d)
 	}
 
 	blockAck := bdx.CounterOnly{BlockCounter: 0}.Encode()
