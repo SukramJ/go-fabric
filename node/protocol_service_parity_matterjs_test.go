@@ -57,7 +57,7 @@ const (
 	tagFabricIndex         = 0xFE
 )
 
-// adminEntry is AcesWithoutFabric (ProtocolServiceTest.ts:97-102) for an
+// adminEntry is AcesWithoutFabric (ProtocolServiceTest.ts:105-110 at b25ed960) for an
 // Administer CASE entry with no subjects and no targets: the ACL a fabric
 // writes, its fabric index the device's.
 type adminEntry struct{}
@@ -115,7 +115,7 @@ func readWith(t *testing.T, p *fabrictest.Pair, noFabricFilter bool, path im.Con
 }
 
 // The synthetic TestCluster of the command-validation cases
-// (ProtocolServiceTest.ts:498-532): TestRequest (Enable, Value max 10)
+// (ProtocolServiceTest.ts:693-727 at b25ed960): TestRequest (Enable, Value max 10)
 // answered by TestResponse, whose Result is mandatory when
 // TestRequest.Enable.
 const testClusterID = 0xFFF1FC01
@@ -193,7 +193,7 @@ func testDevice(t *testing.T, handler func(req testRequest) testResponse) (p *fa
 	return p, ep
 }
 
-// testRequestFields is TlvTestRequest (ProtocolServiceTest.ts:500).
+// testRequestFields is TlvTestRequest (ProtocolServiceTest.ts:693 at b25ed960).
 type testRequestFields testRequest
 
 func (r testRequestFields) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
@@ -358,9 +358,9 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 			}
 		})
 
-		// describe("invoke") (:317-536 at b25ed960): the request is held to
+		// describe("invoke") (:317-540 at b25ed960): the request is held to
 		// the model before the handler, every error collected
-		// (ProtocolService.ts:671-704 at b25ed960).
+		// (ProtocolService.ts:671-705 at b25ed960).
 		t.Run("invoke", func(t *testing.T) {
 			// invokeOffWithEffect is :318-350: OnOff with Lighting, its
 			// OffWithEffect handler recording the request.
@@ -558,7 +558,7 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 		})
 
 		t.Run("tags manufacturer-specific attributes in a standard cluster with skipCustomElements", func(t *testing.T) {
-			// ProtocolServiceTest.ts:379-414: an attribute with an MEI prefix
+			// ProtocolServiceTest.ts:572-607 at b25ed960: an attribute with an MEI prefix
 			// in a standard-range cluster (0x1234) is skipped by
 			// skipCustomElements and not by skipGlobalAttributes — the
 			// per-attribute branch of im.ApplyWildcardPathFlags (matter.js
@@ -581,10 +581,10 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 			}
 		})
 		t.Run("shares one state reference between local reads without a transaction", func(t *testing.T) {
-			t.Skip("ProtocolServiceTest.ts:416: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")
+			t.Skip("ProtocolServiceTest.ts:609 at b25ed960: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")
 		})
 		t.Run("requires a transaction to read cluster state for a remote subject", func(t *testing.T) {
-			t.Skip("ProtocolServiceTest.ts:437: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")
+			t.Skip("ProtocolServiceTest.ts:630 at b25ed960: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")
 		})
 
 		t.Run("all attribute TLV schemas can encode their values", func(t *testing.T) {
@@ -621,7 +621,7 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 		})
 
 		t.Run("rejects request with constraint violation", func(t *testing.T) {
-			// ProtocolServiceTest.ts:574-606: value 99 against "max 10" is
+			// ProtocolServiceTest.ts:767-800 at b25ed960: value 99 against "max 10" is
 			// answered CONSTRAINT_ERROR, not with a command response; the
 			// handler never runs.
 			var ran atomic.Bool

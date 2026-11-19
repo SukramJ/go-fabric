@@ -170,8 +170,8 @@ func enumListAdmits(t Type, c Constraint, v uint64) bool {
 // hand-written definition states a Refusal for a command whose requests
 // the gate is to refuse.
 //
-// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:641-705
-// at b25ed960 (invokeCommand: the errors collected :675-689, then
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:671-705
+// at b25ed960 (the gate in invokeCommand, :641-797: the errors collected :675-689, then
 // onValidationError(errors[0]) :693-694, a thrown UnknownEnumValueError
 // :692, :695-696, else a warning :697-702).
 func (i *Instance) admitRequest(ctx context.Context, cmdID uint32, fields any, peers Peers) error {

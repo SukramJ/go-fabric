@@ -356,7 +356,7 @@ type Command struct {
 // applies before the server runs (requestTlv.validate,
 // packages/protocol/src/action/server/CommandInvokeResponse.ts:474-488,
 // and the model's validation, packages/node/src/node/integration/
-// ProtocolService.ts:671-704, at b25ed960). Written by script/clustergen
+// ProtocolService.ts:671-705, at b25ed960). Written by script/clustergen
 // from its relaxation table.
 type RequestCheck struct {
 	// Unchecked: the request is not judged by the gate, and a generated

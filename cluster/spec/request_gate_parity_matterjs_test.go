@@ -135,7 +135,7 @@ func gateCluster() *spec.Cluster {
 }
 
 // TestRequestGateParityMatterJS holds the request gate to matter.js's
-// decision over the collected errors (ProtocolService.ts:671-704 at
+// decision over the collected errors (ProtocolService.ts:671-705 at
 // b25ed960): a command with its own refusal answers with it; else a
 // value an enum does not define, wherever it sits among the errors, is
 // CONSTRAINT_ERROR and the handler does not run; else the errors are

@@ -123,7 +123,7 @@ var serverRelaxations = []struct {
 		// Fifteen commands answer every validation error of their request
 		// with INVALID_COMMAND (onValidationError, "Invalid field value");
 		// the cluster's other commands are held to the request schema and
-		// the model as every command is (ProtocolService.ts:671-704).
+		// the model as every command is (ProtocolService.ts:671-705 at b25ed960).
 		{kind: relaxRefusal, key: "DoorLock.SetUser", refusal: statusInvalidCommand, ref: doorLockRefusal},
 		{kind: relaxRefusal, key: "DoorLock.GetUser", refusal: statusInvalidCommand, ref: doorLockRefusal},
 		{kind: relaxRefusal, key: "DoorLock.ClearUser", refusal: statusInvalidCommand, ref: doorLockRefusal},

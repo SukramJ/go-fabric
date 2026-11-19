@@ -437,8 +437,8 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 	if !i.satisfies(c, float64(rv.Len()), peers) {
 		// The list's own constraint, then its entries: each error to
 		// scope.reject (matter.js
-		// packages/node/src/behavior/state/validation/ValueValidator.ts:481-507
-		// at b25ed960).
+		// packages/node/src/behavior/state/validation/ValueValidator.ts:500-508,
+		// the entries :481-493, at b25ed960).
 		if err := scope.reject(Errorf(im.StatusConstraintError, "%s: %s length %d violates %q", i.def.Name, name, rv.Len(), c.Text)); err != nil {
 			return err
 		}
