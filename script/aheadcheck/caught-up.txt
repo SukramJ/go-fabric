@@ -6,6 +6,6 @@
 # pin; a line whose sha is not the current pin's is a finding, so a row may
 # not ride across another lift. The closing unit removes its line together
 # with the row.
-BD-chip-Thermostat-Suggestions b25ed960 P1-E
+BD-chip-Thermostat-Suggestions b25ed960 P2-thermo-suggestions # P1-E reconciled five items; decisions 316-318 (C-9)
 BD-chip-Commissioner-CsrNonceEchoed b25ed960 P2-D
 BD-chip-EnergyReporting-FakeReadings b25ed960 P3-E
