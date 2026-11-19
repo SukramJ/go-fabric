@@ -316,10 +316,14 @@ func TestGivenUpInitiatedMessageLeavesTheRespondedExchange(t *testing.T) {
 	}
 	tr.mu.Unlock()
 	r.dev.br.tickOutboundReliable(tr, now.Add(time.Hour))
+	// The peer's next message on its exchange reaches the responder only
+	// while the exchange is open: whichever of the two arrives first is
+	// the verdict, with no wall-clock window.
+	sendBDX(r.peer, r.peerXID, bdx.MessageBlockQuery, []byte{0x00})
 	select {
 	case err := <-r.responder.ended:
 		t.Fatalf("the peer's exchange ended (%v) with a message of this node's exchange of the same id", err)
-	case <-time.After(200 * time.Millisecond):
+	case <-r.responder.got:
 	}
 }
 

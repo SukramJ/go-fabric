@@ -359,7 +359,7 @@ func (a *AccessControl) loadExtensions(ctx context.Context) {
 	}
 	if failed > 0 {
 		a.logger().Warn("matter.access_control.extension_load_failed",
-			slog.Int("failed", failed), slog.Int("fabric_index", firstIndex), slog.Any("err", firstErr))
+			slog.Int("count", failed), slog.Int("fabric_index", firstIndex), slog.Any("err", firstErr))
 	}
 }
 
