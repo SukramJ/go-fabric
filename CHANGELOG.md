@@ -20,6 +20,9 @@ Findings of review II, phase 7.
 
 - `cluster/core`: AccessControl's AuxiliaryAccessUpdated of a fabric names no node of another fabric's request — a change of fabric B signalled under fabric A's request while a Groupcast batch was open named A's administrator; a write of Acl or Extension while the store's fabric listing fails is refused with FAILURE instead of stored; `MatterDropFabric` clears a fabric's stored Extension also when it could not be read at construction, so the next start no longer loads it again (review II, R2-P7-acl-01, -02, -03).
 - `groups`: a group message whose fabric was forgotten or reloaded while it was decrypted is dropped instead of being taken into a fresh replay window (review II, R2-P7-sec-02).
+### Fixed
+
+- `client/handshake`: the CASE initiator registers its session before it sends Sigma3 and holds what arrives on it until the responder's Success, then delivers it in order; it registered the session only after the Success, and a message the responder sent on the new session right after its Success was dropped as one of an unknown session — for good over TCP or when sent without an acknowledgement asked. A Sigma3 that cannot be sent, a failure StatusReport or a Success that does not arrive closes the session; `exchange.Manager.SessionsFor` does not list it before the Success. Ahead of matter.js (`BD-Matter-CASEClient-SessionBeforeSigma3`, owner decision 269).
 
 ### Changed
 

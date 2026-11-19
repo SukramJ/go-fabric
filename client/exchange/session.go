@@ -4,6 +4,7 @@
 package exchange
 
 import (
+	"log/slog"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -45,6 +46,10 @@ type Session struct {
 	peerMargins atomic.Pointer[func() *Margins]
 	// addrChanged observes SetAddr's moves (OnAddressChanged).
 	addrChanged atomic.Pointer[func(*net.UDPAddr)]
+	// establishing marks a secure session registered before its
+	// handshake finished (Manager.newSecureSession): not listed by
+	// SessionsFor until activate clears it.
+	establishing atomic.Bool
 
 	// Unsecured session state: the initiator's ephemeral node id — ours,
 	// or the peer's on an inbound session — and the reception window of
@@ -80,7 +85,13 @@ type Session struct {
 	exchanges  map[*Exchange]struct{}
 	// handshakes counts the exchanges in exchanges a Sigma1 opened on an
 	// inbound unsecured session ([maxInboundUnsecuredHandshakes]).
-	handshakes    int
+	handshakes int
+	// holding and held are the messages received while the session
+	// establishes, delivered in order by activate; holding stays set
+	// while activate drains them, so a message that arrives meanwhile
+	// queues behind them.
+	holding       bool
+	held          []func()
 	closed        bool
 	peerLost      bool
 	deferredClose bool
@@ -591,5 +602,46 @@ func (s *Session) closeWith(cause error) {
 	}
 	if s.channel != nil {
 		s.m.closeChannelIfLast(s.channel)
+	}
+}
+
+// holdWhileEstablishing queues deliver while the session holds its
+// messages and reports whether it did (or dropped the message beyond
+// [maxHeldWhileEstablishing]); false means deliver it now.
+func (s *Session) holdWhileEstablishing(deliver func()) bool {
+	if s.secure == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.holding {
+		return false
+	}
+	if len(s.held) >= maxHeldWhileEstablishing {
+		s.m.log.Debug("matter.controller.drop", slog.String("reason", "session establishing, hold full"), slog.Int("session_id", int(s.id)))
+		return true
+	}
+	s.held = append(s.held, deliver)
+	return true
+}
+
+// activate ends the session's establishment: it is listed from now on and
+// the messages it held are delivered, in the order received, before any
+// that follows. A no-op on a session that was not establishing.
+func (s *Session) activate() {
+	s.establishing.Store(false)
+	for {
+		s.mu.Lock()
+		held := s.held
+		s.held = nil
+		if len(held) == 0 {
+			s.holding = false
+			s.mu.Unlock()
+			return
+		}
+		s.mu.Unlock()
+		for _, deliver := range held {
+			deliver()
+		}
 	}
 }

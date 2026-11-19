@@ -225,6 +225,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-Transition-StepErrorEndsAsCancel | `Transitions.ts:594-600` at `db021da0`: a step error → `this.stop()`, and `stop` reports nothing (`:263-284`) (presence) | `packages/node/src/behavior/Transitions.ts` | `"\"Aborting transition due to unhandled error during step management:\","` | the rule connectedhomeip quotes and implements, "When it changes to 0." (`src/app/clusters/level-control/LevelControlCluster.cpp:688-691`, `:706` at `6170af84`); applying it to a step error is this module's (review II, R2-P6-err-1415, owner decision 209) | no |
 | BD-Matter-Example-SkipForwardSaturates | `MediaPlaybackServer.ts:14` at `db021da0`: matter.js has no server logic (absence: the class line) | `packages/node/src/behaviors/media-playback/MediaPlaybackServer.ts` | `"export class MediaPlaybackServer extends MediaPlaybackBehavior {}"` | this module's own rule for the reference daemon (review II, R2-P6-wire-2654, owner decision 207); connectedhomeip's tv-app example wraps (`examples/tv-app/tv-common/clusters/media-playback/MediaPlaybackManager.cpp:249-250` at `6170af84`) | no |
 | BD-Matter-Commissioner-FailSafeKeptThroughConsent | `ControllerCommissioningFlow.ts:293` at `db021da0`: the BLE re-arm period is the constant `BTP_IDLE_ALIVE_INTERVAL = Seconds(25)`, the period of the timer `:922-926`, which runs on BLE only (`:920`) (presence); the flow has no joint-fabric trust-verification stage (absence: no `jcm`/`JointFabric` under `packages/protocol/src/peer/`, re-checked by that grep) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts`<br>`packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"const BTP_IDLE_ALIVE_INTERVAL = Seconds(25);"`<br>`"if (this.interaction.channelType === ChannelType.BLE) {"` | connectedhomeip for the consent wait (`src/controller/jcm/DeviceCommissioner.cpp:430-441`, `:63-73` at `6170af84`); the period min(25 s, half the fail-safe) and the re-arm off BLE while Consent waits are this module's own (review II, R2-P6-fsm-1860, owner decision 215) | no |
+| BD-Matter-CASEClient-SessionBeforeSigma3 | `CaseClient.ts:336-369` at `db021da0`: the initiator awaits the responder's Success (`:336`) before it creates the session (`:343-358`, `delayManagerRegistration` at `:356`) and adds it to the manager (`:369`) (presence) | `packages/protocol/src/session/case/CaseClient.ts` | `"            await abort.attempt(messenger.waitForSuccess({ description: \"Sigma3-Success\" }));"` | connectedhomeip, which activates the initiator's session on the Success (`src/protocols/secure_channel/CASESession.cpp:2315-2339` at `6170af84`); registered here before Sigma3, held until the Success (owner decision 269). Fable read pending (coordinator) | no |
 
 ---
 
@@ -3387,6 +3388,37 @@ and `c41eb7da` also closes a resumed session whose Success does not
 arrive (`CaseServer.ts:205-211`), which ends the resume half of
 `BD-Matter-CASEServer-CloseOnUnfinishedEstablishment`. Pinned by
 `TestCASEServerRegistersTheResumedSessionBeforeSigma2Resume`.
+
+### BD-Matter-CASEClient-SessionBeforeSigma3 — the CASE initiator registers its session before Sigma3 and holds it until the Success
+
+<!-- Fable read pending: the coordinator's read of this entry and its register row (review II, phase 7, decision 269). -->
+
+matter.js `CaseClient.ts` at `db021da0` sends Sigma3 and awaits the
+responder's Success (`:335-336`), then creates the session with
+`delayManagerRegistration` (`:343-358`, `:356`) and adds it to the
+manager (`:369`); a message for the session before then is dropped as one
+of an unknown session (`ExchangeManager.ts:331-341`). connectedhomeip
+activates the initiator's session when the Success arrives
+(`src/protocols/secure_channel/CASESession.cpp:2315-2339` at `6170af84`).
+`handshake.CASE`'s full handshake (`client/handshake/case.go`) registers
+the session before Sigma3 goes out, establishing (through
+`internal/exchangeseam`): what decrypts on it is held, in order and at
+most 16 messages, and `exchange.Manager.SessionsFor` does not list it,
+until the Success activates it; then the held messages are delivered
+before any that follows, and the caller gets the session. A Sigma3 that
+cannot be sent, a failure StatusReport and a Success that does not arrive
+(timeout, cancellation) close it. Reasoning: the responder holds its
+session from before its Success and may send on it at once, and the
+manager reads that message on its listener goroutine while the
+handshake's goroutine still waits for the Success; registered after it,
+the message met no session and was dropped — for good over TCP or for a
+message sent without an acknowledgement asked. The keys are final once
+Sigma2 is processed, so only the responder the handshake authenticated
+can send on the session early. The resumption branch is unchanged: its
+session is registered before our Success goes out. The row closes when
+matter.js's initiator registers the session before Sigma3. Pinned by
+`TestCASEInitiatorReceivesTheResponderMessageBeforeSuccess` and
+`TestCASEInitiatorClosesTheEstablishingSessionWithoutSuccess`.
 
 ### BD-Matter-CASEServer-NoReportOnShutdown — a handshake the responder's Close cut short reports nothing
 

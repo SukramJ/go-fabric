@@ -469,6 +469,26 @@ type SecureSessionConfig struct {
 // NewSecureSession registers the secure session a handshake established.
 // It counts the peer as active from the start (NodeSession.ts:119).
 func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
+	return m.newSecureSession(cfg, false)
+}
+
+// maxHeldWhileEstablishing bounds the messages a session still
+// establishing holds ([Session.holdWhileEstablishing]); one beyond it is
+// dropped, as a message for an unknown session is. Only the peer the
+// handshake authenticated can produce a message that decrypts on the
+// session, and it sends its first request after its Success, so the
+// bound is never reached by a peer that keeps to the protocol.
+const maxHeldWhileEstablishing = 16
+
+// newSecureSession registers the session; establishing registers it
+// before the handshake finished — the CASE initiator's, before Sigma3
+// goes out (installed through internal/exchangeseam): it decrypts what
+// the peer sends on it but holds every message until [Session.activate],
+// and [Manager.SessionsFor] does not list it until then. The module's own
+// rule, ahead of matter.js, whose initiator registers the session only
+// after the responder's Success (CaseClient.ts:336-369 at db021da0;
+// BD-Matter-CASEClient-SessionBeforeSigma3).
+func (m *Manager) newSecureSession(cfg SecureSessionConfig, establishing bool) (*Session, error) {
 	if cfg.ID == UnsecuredSessionID {
 		return nil, errors.New("exchange: secure session id 0")
 	}
@@ -500,6 +520,10 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 		activeTimestamp:      now,
 		activeMono:           clock.MonotonicOf(m.clock),
 		exchanges:            make(map[*Exchange]struct{}),
+	}
+	if establishing {
+		s.establishing.Store(true)
+		s.holding = true
 	}
 	if cfg.ReportedParameters != nil {
 		p := *cfg.ReportedParameters
@@ -815,6 +839,15 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 		// it unless a handler took an exchange on it (ExchangeManager.ts:205-217).
 		defer m.releaseInbound(s)
 	}
+	counter := hdr.MessageCounter
+	if s.holdWhileEstablishing(func() { m.deliver(s, counter, body, duplicate, src) }) {
+		return
+	}
+	m.deliver(s, counter, body, duplicate, src)
+}
+
+// deliver routes the decoded body of a message received on s.
+func (m *Manager) deliver(s *Session, counter uint32, body []byte, duplicate bool, src *net.UDPAddr) {
 	proto, pl, err := message.UnmarshalProtocolHeader(body)
 	if err != nil {
 		m.log.Debug("matter.controller.drop", slog.String("reason", "protocol header"), slog.Any("err", err))
@@ -824,7 +857,7 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 	// (ExchangeManager.ts:290-292).
 	s.notifyActivity(true)
 	msg := &Message{
-		Counter:     hdr.MessageCounter,
+		Counter:     counter,
 		ProtocolID:  proto.ProtocolID,
 		Opcode:      proto.Opcode,
 		ExchangeID:  proto.ExchangeID,
@@ -1416,12 +1449,16 @@ type PeerAddress struct {
 }
 
 // SessionsFor returns the open secure sessions with peer — matter.js
-// SessionManager.sessionsFor.
+// SessionManager.sessionsFor. A session whose handshake has not finished
+// is not one of them.
 func (m *Manager) SessionsFor(peer PeerAddress) []*Session {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []*Session
 	for _, s := range m.sessions {
+		if s.establishing.Load() {
+			continue
+		}
 		if s.fabricIndex == peer.FabricIndex && s.secure.PeerNodeID() == peer.NodeID && peer.FabricIndex != 0 {
 			out = append(out, s)
 		}
