@@ -4,6 +4,7 @@
 package exchange
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
@@ -15,6 +16,7 @@ import (
 	"net"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -154,6 +156,13 @@ type Manager struct {
 	checkIn   CheckInReceiver
 	sessions  map[uint16]*Session
 	unsecured map[uint64]*Session
+	// registrations counts the secure sessions registered so far: the
+	// next one's registration position ([Session].position). Written
+	// under mu with the session table, read without it by an exchange
+	// taking its peer-loss cutoff. Mirrors matter.js
+	// SessionManager.ts:1260-1298 at b25ed960 (RegisteredSessions: #count,
+	// positionOf, isRegisteredBefore).
+	registrations atomic.Uint64
 	// inboundOrder is the inbound unsecured sessions, oldest first
 	// ([maxInboundUnsecuredSessions]); ackWaits the messages sent on them
 	// that wait for an acknowledgement, oldest first
@@ -483,13 +492,27 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 const maxHeldWhileEstablishing = 16
 
 // newSecureSession registers the session; establishing registers it
-// before the handshake finished — the CASE initiator's, before Sigma3
-// goes out (installed through internal/exchangeseam): it decrypts what
-// the peer sends on it but holds every message until [Session.activate],
-// and [Manager.SessionsFor] does not list it until then. The module's own
-// rule, ahead of matter.js, whose initiator registers the session only
-// after the responder's Success (CaseClient.ts:336-369 at db021da0;
-// BD-Matter-CASEClient-SessionBeforeSigma3).
+// before the handshake finished (installed through internal/exchangeseam).
+// The establishing state has two forms, told apart by the session's role
+// (cfg.Responder):
+//
+//   - the CASE initiator's, before Sigma3 goes out: it decrypts what the
+//     peer sends on it but holds every message until [Session.activate],
+//     and [Manager.SessionsFor] does not list it until then. The module's
+//     own rule, ahead of matter.js, whose initiator registers the session
+//     only after the responder's Success
+//     (BD-Matter-CASEClient-SessionBeforeSigma3);
+//   - the CASE responder's, from its creation until
+//     [Session.completeEstablishment]: its messages are processed, and
+//     [Manager.SessionsFor] — routing, peer loss and close — sees it; only
+//     the per-peer cap neither counts nor evicts it until it is
+//     established. Mirrors matter.js NodeSession.ts:205-251 at b25ed960
+//     (isEstablishing, its state table, completeEstablishment) and
+//     SessionManager.ts:1266-1284 (RegisteredSessions.add: an establishing
+//     session joins the established view only once established).
+//
+// Each registered session takes the next registration position, which
+// peer loss compares (SessionManager.ts:1271 at b25ed960).
 func (m *Manager) newSecureSession(cfg SecureSessionConfig, establishing bool) (*Session, error) {
 	if cfg.ID == UnsecuredSessionID {
 		return nil, errors.New("exchange: secure session id 0")
@@ -525,7 +548,7 @@ func (m *Manager) newSecureSession(cfg SecureSessionConfig, establishing bool) (
 	}
 	if establishing {
 		s.establishing.Store(true)
-		s.holding = true
+		s.holding = !cfg.Responder
 	}
 	if cfg.ReportedParameters != nil {
 		p := *cfg.ReportedParameters
@@ -542,37 +565,65 @@ func (m *Manager) newSecureSession(cfg SecureSessionConfig, establishing bool) (
 		ch.Close()
 		return nil, fmt.Errorf("exchange: session id %d is taken", cfg.ID)
 	}
+	s.position = m.registrations.Load()
+	m.registrations.Add(1)
 	m.sessions[cfg.ID] = s
-	victims := m.excessPeerSessionsLocked(s)
+	var victims []*Session
+	if !establishing {
+		victims = m.excessPeerSessionsLocked(s)
+	}
 	m.mu.Unlock()
+	m.evict(victims)
+	return s, nil
+}
+
+// sessionEstablished runs what an established session sets off: the
+// per-peer cap for a responder session that was establishing until now.
+// Mirrors matter.js SessionManager.ts:757-769 at b25ed960
+// (#sessionEstablished, the eviction half; supersession is not modelled
+// here). A session that left the table meanwhile is not checked.
+func (m *Manager) sessionEstablished(s *Session) {
+	m.mu.Lock()
+	var victims []*Session
+	if m.sessions[s.id] == s {
+		victims = m.excessPeerSessionsLocked(s)
+	}
+	m.mu.Unlock()
+	m.evict(victims)
+}
+
+// evict closes the sessions the per-peer cap chose.
+func (m *Manager) evict(victims []*Session) {
 	for _, v := range victims {
 		m.log.Info("matter.controller.session_evicted",
 			slog.Int("session_id", int(v.id)), slog.Int("fabric_index", int(v.fabricIndex)),
 			slog.Uint64("node_id", v.secure.PeerNodeID()), slog.Int("max", maxSessionsPerPeer))
 		// Closed without a CloseSession: the graceful path would wait on a
-		// peer the eviction typically cannot reach (SessionManager.ts:721-723).
+		// peer the eviction typically cannot reach (SessionManager.ts:806-808
+		// at b25ed960).
 		v.Close()
 	}
-	return s, nil
 }
 
 // excessPeerSessionsLocked returns the least recently used sessions of
 // added's peer beyond [maxSessionsPerPeer], for the caller to close
-// outside m.mu. Only sessions the peer established claim a slot; added
-// itself is never chosen, so a burst of new sessions cannot evict the one
-// that prompted the check; a session already closing still counts but is
-// not chosen again. Mirrors matter.js SessionManager.ts:779-808
-// (#evictExcessSessionsFor) and :600-608 (#leastRecentlyUsedSession on
+// outside m.mu. Only established sessions the peer established claim a
+// slot — a session still establishing neither counts nor is chosen, nor
+// does a closing added prompt a check; added itself is never chosen, so a
+// burst of new sessions cannot evict the one that prompted the check; a
+// session already closing still counts but is not chosen again. Mirrors
+// matter.js SessionManager.ts:779-808 at b25ed960 (#evictExcessSessionsFor
+// over #establishedSessions) and :600-608 (#leastRecentlyUsedSession on
 // the session's timestamp, the time of its last traffic).
 func (m *Manager) excessPeerSessionsLocked(added *Session) []*Session {
-	if !added.responder || added.fabricIndex == 0 {
+	if !added.responder || added.fabricIndex == 0 || added.IsClosing() {
 		return nil
 	}
 	peer := added.secure.PeerNodeID()
 	count := 1
 	var candidates []*Session
 	for _, s := range m.sessions {
-		if s == added || !s.responder || s.fabricIndex != added.fabricIndex || s.secure.PeerNodeID() != peer {
+		if s == added || !s.responder || s.fabricIndex != added.fabricIndex || s.secure.PeerNodeID() != peer || s.establishing.Load() {
 			continue
 		}
 		count++
@@ -584,13 +635,13 @@ func (m *Manager) excessPeerSessionsLocked(added *Session) []*Session {
 	if excess <= 0 {
 		return nil
 	}
-	// Least recently used first; the older session breaks a tie, as
-	// matter.js's iteration in insertion order does.
+	// Least recently used first; the earlier registered session breaks a
+	// tie, as matter.js's iteration in insertion order does.
 	slices.SortFunc(candidates, func(a, b *Session) int {
 		if c := a.lastTimestamp().Compare(b.lastTimestamp()); c != 0 {
 			return c
 		}
-		return a.createdAt.Compare(b.createdAt)
+		return cmp.Compare(a.position, b.position)
 	})
 	return candidates[:min(excess, len(candidates))]
 }
@@ -1430,11 +1481,12 @@ func (m *Manager) reportPeerLost(s *Session, cause error) {
 }
 
 // exchangePeerLost is the peer loss an exchange observed. Mirrors matter.js
-// ExchangeManager.ts:556-579 (MessageExchangeContext.peerLost): ignored
-// off a secure session; a session without a peer address (PASE, or no
-// node id) alone is lost, sparing the exchange; otherwise every session of
-// the peer created before the exchange is (SessionManager.ts:636-638,
-// asOf the exchange's context creation, :549).
+// ExchangeManager.ts:622-651 at b25ed960 (#messageExchangeContextFor,
+// peerLost): ignored off a secure session; a session without a peer
+// address (PASE, or no node id) alone is lost, sparing the exchange;
+// otherwise every session of the peer registered before the exchange was
+// created is (registeredBefore, the registration count the exchange took
+// at its creation, :623, :650): a session registered since is kept.
 func (m *Manager) exchangePeerLost(x *Exchange, cause error) {
 	s := x.session
 	if s.secure == nil {
@@ -1444,7 +1496,7 @@ func (m *Manager) exchangePeerLost(x *Exchange, cause error) {
 		s.handlePeerLoss(cause, x)
 		return
 	}
-	m.handlePeerLoss(PeerAddress{FabricIndex: s.fabricIndex, NodeID: s.PeerNodeID()}, cause, x.createdAt, x)
+	m.handlePeerLoss(PeerAddress{FabricIndex: s.fabricIndex, NodeID: s.PeerNodeID()}, cause, x.registeredBefore, time.Time{}, x)
 }
 
 // PeerAddress names a peer on one of our fabrics: our fabric index and
@@ -1456,44 +1508,70 @@ type PeerAddress struct {
 	NodeID      uint64
 }
 
-// SessionsFor returns the open secure sessions with peer — matter.js
-// SessionManager.sessionsFor. A session whose handshake has not finished
-// is not one of them.
+// SessionsFor returns the open secure sessions with peer, in the order
+// they registered — matter.js SessionManager.sessionsFor over the
+// registered sessions (SessionManager.ts:702-705 at b25ed960). A CASE
+// responder session still establishing is one of them, as in matter.js;
+// a CASE initiator session still establishing is not
+// (BD-Matter-CASEClient-SessionBeforeSigma3, [Manager.newSecureSession]).
 func (m *Manager) SessionsFor(peer PeerAddress) []*Session {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out []*Session
 	for _, s := range m.sessions {
-		if s.establishing.Load() {
+		if s.establishing.Load() && !s.responder {
 			continue
 		}
 		if s.fabricIndex == peer.FabricIndex && s.secure.PeerNodeID() == peer.NodeID && peer.FabricIndex != 0 {
 			out = append(out, s)
 		}
 	}
-	slices.SortFunc(out, func(a, b *Session) int { return a.createdAt.Compare(b.createdAt) })
+	slices.SortFunc(out, func(a, b *Session) int { return cmp.Compare(a.position, b.position) })
 	return out
 }
 
 // HandlePeerLoss gives up every secure session with peer created before
-// asOf (a zero asOf: all of them) — each as [Session.HandlePeerLoss] does.
-// Mirrors matter.js SessionManager.ts:636-638 (handlePeerLoss, asOf
-// defaulting to now) and :677-696 (#handlePeerLoss: a session created at
-// or after asOf is kept).
+// asOf (a zero asOf: every session registered now) — each as
+// [Session.HandlePeerLoss] does. A session created in the same instant
+// as asOf counts as newer and is kept.
+//
+// Deprecated: two sessions may have the same creation time; use
+// [Manager.HandlePeerLossBefore], which cuts by registration order.
+// Mirrors matter.js SessionManager.ts:722-735 at b25ed960
+// (handlePeerShutdown with a Timestamp, deprecated) and :832-834, and
+// PeerLossContext.asOf (packages/protocol/src/peer/PeerLossContext.ts:34-48,
+// deprecated).
 func (m *Manager) HandlePeerLoss(peer PeerAddress, cause error, asOf time.Time) {
-	m.handlePeerLoss(peer, cause, asOf, nil)
+	m.handlePeerLoss(peer, cause, m.registrations.Load(), asOf, nil)
 }
 
-func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, current *Exchange) {
+// HandlePeerLossBefore gives up every secure session with peer that
+// registered before keep — each as [Session.HandlePeerLoss] does; keep and
+// every session registered after it are kept, whatever their creation
+// times. A nil keep, or a session that never registered with m, keeps
+// none: every session registered at the call is given up. A session that
+// registers while the call runs is kept. Mirrors matter.js
+// SessionManager.ts:722-735 at b25ed960 (handlePeerShutdown: registeredBefore
+// = keep's registration position, else the registration count now),
+// :742-748 (handlePeerLoss: the count now by default) and :812-838
+// (#handlePeerLoss: a session not registered before the cutoff is kept).
+func (m *Manager) HandlePeerLossBefore(peer PeerAddress, cause error, keep *Session) {
+	before := m.registrations.Load()
+	if keep != nil && keep.m == m && keep.secure != nil {
+		before = keep.position
+	}
+	m.handlePeerLoss(peer, cause, before, time.Time{}, nil)
+}
+
+// handlePeerLoss gives up the sessions with peer registered before
+// registeredBefore and, for a non-zero asOf, created before asOf; current
+// is the exchange that observed the loss, spared until it ends.
+func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, registeredBefore uint64, asOf time.Time, current *Exchange) {
 	for _, s := range m.SessionsFor(peer) {
-		// The exchange that observed the loss runs on a session that
-		// existed before it, so that session is never spared by the
-		// cutoff, even when the clock did not move between the two (a
-		// fake clock, a coarse one): matter.js compares the same instants
-		// (SessionManager.ts:740-742 against ExchangeManager.ts:614 and
-		// Session.ts:60) and relies on the clock moving.
-		own := current != nil && s == current.session
-		if !own && !asOf.IsZero() && !s.createdAt.Before(asOf) {
+		if s.position >= registeredBefore {
+			continue
+		}
+		if !asOf.IsZero() && !s.createdAt.Before(asOf) {
 			continue
 		}
 		s.handlePeerLoss(cause, current)

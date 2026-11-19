@@ -5,8 +5,8 @@ package client
 
 import (
 	"log/slog"
-	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/internal/inflight"
@@ -149,12 +149,12 @@ func (r *Registry) onLeave(n *Node, fabricIndex uint8) {
 	}
 }
 
-// onShutdown is Peers.#onShutdown (Peers.ts:837-858): a node that is
-// closing or not started is left alone (:838-840), a shutdown without an
-// active subscription ignored (:842-851); the device reboots, so every
-// session with it is given up — SessionManager.handlePeerShutdown with
-// asOf now (SessionManager.ts:624-631), which the Go HandlePeerLoss reads
-// as a zero asOf: no session can be created after now.
+// onShutdown is Peers.#onShutdown (Peers.ts:894-915 at b25ed960): a node
+// that is closing or not started is left alone, a shutdown without an
+// active subscription ignored; the device reboots, so every session with
+// it is given up — SessionManager.handlePeerShutdown without a session to
+// keep (Peers.ts:913, SessionManager.ts:722-735), every session registered
+// now.
 func (r *Registry) onShutdown(n *Node) {
 	if n.isClosing() || !n.isStarted() {
 		return
@@ -164,17 +164,18 @@ func (r *Registry) onShutdown(n *Node) {
 		return
 	}
 	if addr, ok := n.PeerAddress(); ok {
-		r.cfg.Exchanges.HandlePeerLoss(addr, ErrPeerShutdown, time.Time{})
+		r.cfg.Exchanges.HandlePeerLossBefore(addr, ErrPeerShutdown, nil)
 	}
 }
 
-// onStartUp is Peers.#onStartUp (Peers.ts:860-893): with the same guards
-// (:868-881) and a peer address (:883-886), the sessions created before
-// the peer's most recently active one are given up — that one and newer
-// ones are kept (:888-892, SessionManager.maybeSessionFor :589-606 is
-// peer.Peer.NewestSession). Without a session matter.js cuts at now; the
-// Go HandlePeerLoss reads a zero asOf as the same cut, on the exchange
-// manager's own clock.
+// onStartUp is Peers.#onStartUp (Peers.ts:921-948 at b25ed960): with the
+// same guards and a peer address, the sessions registered before the
+// peer's most recently active one are given up — that one and every
+// session registered after it are kept, whatever their creation times
+// (:945-947, SessionManager.handlePeerShutdown with that session,
+// SessionManager.ts:722-735; SessionManager.maybeSessionFor :683-700 is
+// peer.Peer.NewestSession). Without a session every session registered
+// now is given up.
 func (r *Registry) onStartUp(n *Node) {
 	if n.isClosing() || !n.isStarted() {
 		return
@@ -187,11 +188,9 @@ func (r *Registry) onStartUp(n *Node) {
 	if !ok {
 		return
 	}
-	var asOf time.Time
+	var keep *exchange.Session
 	if p := n.peer(); p != nil {
-		if s := p.NewestSession(); s != nil {
-			asOf = s.CreatedAt()
-		}
+		keep = p.NewestSession()
 	}
-	r.cfg.Exchanges.HandlePeerLoss(addr, ErrPeerShutdown, asOf)
+	r.cfg.Exchanges.HandlePeerLossBefore(addr, ErrPeerShutdown, keep)
 }

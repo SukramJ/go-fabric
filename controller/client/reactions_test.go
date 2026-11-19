@@ -179,32 +179,43 @@ func (sr *scriptedRegistry) sendOn(t *testing.T, ch *channel.Session, id uint16,
 	sr.mgr.HandleDatagram(append(hdr.Marshal(), sealed.Ciphertext...), peerAddr)
 }
 
-// TestReactionStartUp: Peers.#onStartUp — the sessions created before the
-// peer's most recently active one are lost; that one stays
-// (SessionManager.ts:690-692).
+// TestReactionStartUp: Peers.#onStartUp — the sessions registered before
+// the peer's most recently active one are lost; that one and every session
+// registered after it stay, whatever their creation times
+// (Peers.ts:945-947, SessionManager.ts:722-735 at b25ed960). The port of
+// ClientStartUpTest.ts's "closes the sessions registered before the
+// current session when startUp fires" on the registry's scripted peer: the
+// old session and the new one are created in the same instant, so a cut by
+// creation time would keep both.
 func TestReactionStartUp(t *testing.T) {
 	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		sr := newScriptedRegistry(t, seedCommissioned(3), nil)
-		n := sr.reg.Get("peer1")
-		sr.subscribe(t, n, sr.imageWithOpCreds("ours"), 33)
-		sr.clock.Advance(time.Second)
-		b, ch := sr.secondSession(t)
-		sr.clock.Advance(time.Second)
-		// The rebooted device reports its StartUp over its new session.
-		sr.sendOn(t, ch, 0x0102, message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: 0x7101, ProtocolID: im.InteractionModelProtocolID},
-			dataReport(t, 33, nil, eventReport(uint64(basicinfo.EventStartUp), 40)))
-		waitUntil(t, "the old session's loss", sr.session.IsPeerLost)
-		// The going-live alive may still start the label reconciliation: the
-		// bubble settles first (see client.WaitRegistry).
-		synctest.Wait()
-		client.WaitRegistry(sr.reg)
-		if b.IsPeerLost() || b.IsClosed() {
-			t.Fatal("the newest session was lost")
-		}
-		if got := sr.mgr.SessionsFor(scriptedAddr); len(got) != 1 || got[0] != b {
-			t.Fatalf("sessions %v", got)
-		}
+	t.Run("closes the sessions registered before the current session when startUp fires", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			sr := newScriptedRegistry(t, seedCommissioned(3), nil)
+			n := sr.reg.Get("peer1")
+			sr.subscribe(t, n, sr.imageWithOpCreds("ours"), 33)
+			b, ch := sr.secondSession(t)
+			if !b.CreatedAt().Equal(sr.session.CreatedAt()) {
+				t.Fatalf("created at %v and %v, want the same instant", sr.session.CreatedAt(), b.CreatedAt())
+			}
+			sr.clock.Advance(time.Second)
+			// The rebooted device reports its StartUp over its new session,
+			// which makes that one the most recently active.
+			sr.sendOn(t, ch, 0x0102, message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: im.OpcodeReportData, ExchangeID: 0x7101, ProtocolID: im.InteractionModelProtocolID},
+				dataReport(t, 33, nil, eventReport(uint64(basicinfo.EventStartUp), 40)))
+			waitUntil(t, "the old session's loss", sr.session.IsPeerLost)
+			// The going-live alive may still start the label reconciliation: the
+			// bubble settles first (see client.WaitRegistry).
+			synctest.Wait()
+			client.WaitRegistry(sr.reg)
+			if b.IsPeerLost() || b.IsClosed() {
+				t.Fatal("the newest session was lost")
+			}
+			if got := sr.mgr.SessionsFor(scriptedAddr); len(got) != 1 || got[0] != b {
+				t.Fatalf("sessions %v", got)
+			}
+		})
 	})
 }
 

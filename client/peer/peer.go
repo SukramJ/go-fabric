@@ -723,7 +723,7 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 func (p *Peer) Disconnect(ctx context.Context, cause error) {
 	p.stopConnecting(ctx)
 	if cause != nil {
-		p.set.ctx.Exchanges.HandlePeerLoss(p.address, cause, time.Time{})
+		p.set.ctx.Exchanges.HandlePeerLossBefore(p.address, cause, nil)
 	}
 }
 

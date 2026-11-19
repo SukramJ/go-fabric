@@ -47,9 +47,17 @@ type Session struct {
 	// addrChanged observes SetAddr's moves (OnAddressChanged).
 	addrChanged atomic.Pointer[func(*net.UDPAddr)]
 	// establishing marks a secure session registered before its
-	// handshake finished (Manager.newSecureSession): not listed by
-	// SessionsFor until activate clears it.
+	// handshake finished (Manager.newSecureSession): the initiator's is
+	// not listed by SessionsFor until activate clears it, the responder's
+	// is not counted by the per-peer cap until completeEstablishment
+	// clears it.
 	establishing atomic.Bool
+	// position is the secure session's registration position in its
+	// manager ([Manager].registrations), fixed at registration and kept
+	// after the session leaves — matter.js
+	// RegisteredSessions.positionOf (SessionManager.ts:1290-1293 at
+	// b25ed960).
+	position uint64
 
 	// Unsecured session state: the initiator's ephemeral node id — ours,
 	// or the peer's on an inbound session — and the reception window of
@@ -275,9 +283,11 @@ func (s *Session) FabricIndex() uint8 { return s.fabricIndex }
 // Resumed reports that a CASE session came from Sigma2_Resume.
 func (s *Session) Resumed() bool { return s.resumed }
 
-// CreatedAt is when the session was established — matter.js
-// Session.createdAt, the cutoff SessionManager.#handlePeerLoss compares
-// (SessionManager.ts:740-742 at db021da0).
+// CreatedAt is when the session was registered — matter.js
+// Session.createdAt, the cutoff the deprecated asOf of
+// SessionManager.#handlePeerLoss compares (SessionManager.ts:832-834 at
+// b25ed960); peer loss otherwise cuts by registration order
+// ([Manager.HandlePeerLossBefore]).
 func (s *Session) CreatedAt() time.Time { return s.createdAt }
 
 // IsPeerActive reports whether the peer sent a message within its active
@@ -642,6 +652,32 @@ func (s *Session) holdWhileEstablishing(duplicate bool, deliver func()) bool {
 		return true
 	}
 	s.held = append(s.held, deliver)
+	return true
+}
+
+// completeEstablishment ends the establishment of a CASE responder
+// session and reports whether the session is established: true when it
+// was already (also when it is closing now), false when it is closing
+// and so stays establishing — a session closed during its handshake is
+// never established. Once established, the per-peer cap counts it and
+// may evict another session of the peer for it. Mirrors matter.js
+// NodeSession.ts:233-251 at b25ed960 (completeEstablishment) and
+// SessionManager.ts:757-769 (#sessionEstablished, its eviction).
+func (s *Session) completeEstablishment() bool {
+	s.mu.Lock()
+	if !s.establishing.Load() {
+		s.mu.Unlock()
+		return true
+	}
+	// isClosing (Session.ts:190-192): the closing flag or a deferred
+	// close; a lost session is closing from the moment it is marked.
+	if s.closed || s.peerLost || s.deferredClose || s.IsClosing() {
+		s.mu.Unlock()
+		return false
+	}
+	s.establishing.Store(false)
+	s.mu.Unlock()
+	s.m.sessionEstablished(s)
 	return true
 }
 

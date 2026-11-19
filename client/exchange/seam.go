@@ -38,4 +38,8 @@ func init() {
 			s.activate()
 		}
 	}
+	exchangeseam.CompleteSecureSessionEstablishment = func(sess any) bool {
+		s, ok := sess.(*Session)
+		return ok && s.completeEstablishment()
+	}
 }

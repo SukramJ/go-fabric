@@ -6,7 +6,9 @@
 // sessions (Peers.ts #onStartUp; client.Registry.onStartUp). The case with
 // a live session and an active subscription runs on fabrictest; the other
 // two are the registry's scripted tests (TestReactionsNeedSubscription,
-// TestReactionStartUp), named in the register.
+// TestReactionStartUp — at b25ed960 "closes the sessions registered before
+// the current session when startUp fires", by registration order), named
+// in the register.
 package client_test
 
 import (
