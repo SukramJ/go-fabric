@@ -22,6 +22,7 @@ Findings of review II, phase 7.
 - `groups`: a group message whose fabric was forgotten or reloaded while it was decrypted is dropped instead of being taken into a fresh replay window (review II, R2-P7-sec-02).
 ### Fixed
 
+- `client/peer`: a peer's descriptor saves run one after another on one worker; a change made while a save was in the `Store` started a second, concurrent save, and when the older copy reached the store last it overwrote the newer — an adopted session's learned `OperationalHost` could be lost from the stored descriptor (review II phase 7 backlog).
 - `client/handshake`: the CASE initiator registers its session before it sends Sigma3 and holds what arrives on it until the responder's Success, then delivers it in order; it registered the session only after the Success, and a message the responder sent on the new session right after its Success was dropped as one of an unknown session — for good over TCP or when sent without an acknowledgement asked. A Sigma3 that cannot be sent, a failure StatusReport or a Success that does not arrive closes the session; `exchange.Manager.SessionsFor` does not list it before the Success. Ahead of matter.js (`BD-Matter-CASEClient-SessionBeforeSigma3`, owner decision 269).
 
 ### Changed
