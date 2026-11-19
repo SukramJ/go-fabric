@@ -3418,7 +3418,9 @@ can send on the session early. The resumption branch is unchanged: its
 session is registered before our Success goes out. The row closes when
 matter.js's initiator registers the session before Sigma3. Pinned by
 `TestCASEInitiatorReceivesTheResponderMessageBeforeSuccess` and
-`TestCASEInitiatorClosesTheEstablishingSessionWithoutSuccess`.
+`TestCASEInitiatorClosesTheEstablishingSessionWithoutSuccess`, and in
+`client/exchange` by `TestEstablishingSessionHoldsUntilActivated` and
+`TestEstablishingSessionClosedDeliversNothing`.
 
 ### BD-Matter-CASEServer-NoReportOnShutdown — a handshake the responder's Close cut short reports nothing
 
