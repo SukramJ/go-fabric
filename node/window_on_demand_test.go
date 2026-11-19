@@ -50,7 +50,7 @@ func assertNoWindow(t *testing.T, n *node.Node, adv *mdns.Noop, when string) {
 // uncommissioned node with WindowOnDemand starts with no window, no
 // commissionable record and no PASE acceptor, and opens its own window on
 // the host's OpenOwnWindow — matter.js `commissioning.enabled: false`
-// (CommissioningServer.ts:266-273 at db021da0).
+// (CommissioningServer.ts:266-273 at b25ed960).
 func TestWindowOnDemandStartOpensNothing(t *testing.T) {
 	t.Parallel()
 	adv := mdns.NewNoop()

@@ -15,7 +15,7 @@ import (
 )
 
 // TestFallbackIDs: parseMatterFallbackVidPid (DistinguishedName.ts:63-72
-// at db021da0) and the OID values' parseMatterRdnHex.
+// at b25ed960) and the OID values' parseMatterRdnHex.
 func TestFallbackIDs(t *testing.T) {
 	t.Parallel()
 	id, err := fallbackID("Matter Mvid:FFF1 Mpid:8000", "Mvid:")
@@ -32,7 +32,7 @@ func TestFallbackIDs(t *testing.T) {
 		t.Fatal("lowercase hex was accepted")
 	}
 	// The OID values are parseMatterRdnHex(field, text, 2)
-	// (Certificate.ts:242-249 at db021da0): exactly 4 uppercase hex digits.
+	// (Certificate.ts:242-249 at b25ed960): exactly 4 uppercase hex digits.
 	for in, want := range map[string]int{"FFF1": 0xFFF1, "0000": 0, "8000xyz": -1, "zz": -1, "": -1, "fff1": -1, "FFF": -1, "0FFF1": -1, "-FFF": -1} {
 		got, ok := parseHexID(in)
 		if (want >= 0) != ok || (ok && int(got) != want) {

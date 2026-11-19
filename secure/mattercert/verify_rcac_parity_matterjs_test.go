@@ -17,7 +17,7 @@ import (
 
 // A verifier built from the root certificate checks the authorityKeyIdentifier
 // of a NOC the root signs directly against the root's subjectKeyIdentifier:
-// matter.js Noc.ts:174-188 at db021da0 picks the issuer by
+// matter.js Noc.ts:174-188 at b25ed960 picks the issuer by
 // `Bytes.areEqual(authorityKeyIdentifier, root.cert.extensions.subjectKeyIdentifier)`
 // and throws a CertificateError when neither the root nor an ICA matches. A
 // verifier built from the root's public key alone cannot, and keeps
@@ -64,7 +64,7 @@ func TestVerifierFromRCACRefusesARootSignedNOCWithAForeignAKID(t *testing.T) {
 }
 
 // With an ICAC, the ICAC's authorityKeyIdentifier must name the root
-// (matter.js Icac.ts:154-158 at db021da0), checked once the root
+// (matter.js Icac.ts:154-158 at b25ed960), checked once the root
 // certificate is known.
 func TestVerifierFromRCACRefusesAnICACWithAForeignAKID(t *testing.T) {
 	t.Parallel()

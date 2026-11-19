@@ -392,7 +392,7 @@ func nullComparedNames(c spec.Conformance, into *[]string) {
 
 // isMandatory is matter.js's Conformance.isMandatory: M, or an otherwise
 // list whose first M comes before any P (packages/model/src/aspects/Conformance.ts:84-100
-// of matter.js at db021da0).
+// of matter.js at b25ed960).
 func isMandatory(c spec.Conformance) bool {
 	switch c.Op {
 	case spec.ConfMandatory:

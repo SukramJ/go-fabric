@@ -14,7 +14,7 @@ import (
 // CurrentLevel, any other value is the level — except after a software
 // update and on a bridged endpoint, one row per branch of matter.js
 // packages/node/src/behaviors/level-control/LevelControlServer.ts:222-245
-// at db021da0 (initializeLighting; W3-clua2-02). matter.js's tests do not
+// at b25ed960 (initializeLighting; W3-clua2-02). matter.js's tests do not
 // cover it; the rows follow the code.
 func TestParityMatterJS_StartUpCurrentLevel(t *testing.T) {
 	t.Parallel()

@@ -119,7 +119,7 @@ func (s *Session) Addr() *net.UDPAddr {
 //
 // A session bound to a TCP connection stays on it: its address names the
 // connection (matter.js probes and migrates UDP sessions only,
-// PeerAddressMonitor.ts:138-139 at db021da0).
+// PeerAddressMonitor.ts:138-139 at b25ed960).
 //
 // A move to a different address notifies the observer OnAddressChanged
 // installed — matter.js MessageChannel's networkAddressChanged, which the

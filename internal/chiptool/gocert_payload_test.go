@@ -16,7 +16,7 @@ import (
 
 // The onboarding payloads the DD cases hand the DUT, built field by field
 // as matter.js's harness builds them (support/chip-testing/test/cert/
-// tc-dd-support.ts at db021da0): the negative cases need values the
+// tc-dd-support.ts at b25ed960): the negative cases need values the
 // module's own encoders refuse to write — a reserved version, a trivial
 // passcode, a product id of 0 — so the bits and digits are laid out here,
 // not encoded through secure/setup, and read back without judging them.

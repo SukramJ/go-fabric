@@ -93,7 +93,7 @@ func TestChunkLimitsForRoute(t *testing.T) {
 // one within it is sent; over UDP the check does not apply. matter.js
 // MessageChannel.send throws MessageTooLargeError on a TCP channel before
 // the write (packages/protocol/src/protocol/MessageChannel.ts:104-112 at
-// db021da0).
+// b25ed960).
 func TestTCPSendAboveThePeerLimitIsRefused(t *testing.T) {
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
 	conn := &sizedConn{size: 64_000}

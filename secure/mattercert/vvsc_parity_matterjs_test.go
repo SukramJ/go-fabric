@@ -5,7 +5,7 @@ package mattercert_test
 
 // The VVSC rows of matter.js
 // packages/protocol/test/certificate/OperationalCertificateVerifyTest.ts at
-// db021da0 ("conformant certificates" :469-471, "VVSC extensions"
+// b25ed960 ("conformant certificates" :469-471, "VVSC extensions"
 // :787-826, "VVSC subject DN" :828-862): the profile of a Vendor ID
 // Verification Signer Certificate (Vvsc.ts, matter.js #4880). matter.js
 // checks is-ca at construction and the rest in Vvsc.verify; here

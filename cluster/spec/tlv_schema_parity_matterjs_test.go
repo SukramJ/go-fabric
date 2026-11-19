@@ -59,7 +59,7 @@ func sameJSON(t *testing.T, a, b []byte) bool {
 }
 
 // TestTlvAnyGenericDecodingParityMatterJS mirrors
-// packages/types/test/tlv/TlvAnyTest.ts:78-147 at db021da0 (describe
+// packages/types/test/tlv/TlvAnyTest.ts:78-147 at b25ed960 (describe
 // "generic decoding"): TlvAny.decodeAnyTlvStream turns an element stream
 // without a schema into a value — a structure into a record keyed by tag
 // number, an array or list into an array whatever its members' tags. The
@@ -158,7 +158,7 @@ func TestTlvBoundsParityMatterJS(t *testing.T) {
 }
 
 // TestTlvNumberRelaxParityMatterJS mirrors
-// packages/types/test/tlv/TlvNumberTest.ts:231-273 at db021da0 (describe
+// packages/types/test/tlv/TlvNumberTest.ts:231-273 at b25ed960 (describe
 // "relaxNumberTypeChecks"). matter.js decodes strictly by default and
 // relaxes the signedness check only for incoming data reports
 // (InputChunk.ts:42-48); the Go server decoders (DecodeUint, DecodeInt) are
@@ -229,7 +229,7 @@ func TestTlvNumberRelaxParityMatterJS(t *testing.T) {
 
 // nullableCluster carries the nullable values of
 // packages/types/test/tlv/TlvNullableTest.ts:101-153 and
-// TlvOfModelTest.ts:256-266 at db021da0.
+// TlvOfModelTest.ts:256-266 at b25ed960.
 var nullableCluster = func() *spec.Cluster {
 	x := spec.Quality{Nullable: true}
 	map8 := &spec.Bitmap{Name: "Map8", Bits: 8, Members: []spec.BitmapMember{{Name: "Lsb", Bit: 0, Width: 1}, {Name: "Msb", Bit: 7, Width: 1}}}
@@ -249,7 +249,7 @@ var nullableCluster = func() *spec.Cluster {
 }()
 
 // TestTlvNullableParityMatterJS mirrors
-// packages/types/test/tlv/TlvNullableTest.ts:101-153 at db021da0: a
+// packages/types/test/tlv/TlvNullableTest.ts:101-153 at b25ed960: a
 // nullable integer reserves the sentinel of its type whatever its bound
 // (the maximum of uint64, the minimum of int64), a bounded one admits the
 // extremes it states, and a nullable bitmap reserves its most-significant
@@ -353,7 +353,7 @@ func TestTlvObjectParityMatterJS(t *testing.T) {
 }
 
 // TestTlvOfModelParityMatterJS mirrors
-// packages/types/test/tlv/TlvOfModelTest.ts:36-129 at db021da0: TlvOfModel
+// packages/types/test/tlv/TlvOfModelTest.ts:36-129 at b25ed960: TlvOfModel
 // derives a codec from the model, the Go form is EncodeJSON / DecodeJSON
 // over a generated definition. A struct with nullable epoch fields
 // (GroupKeySetStruct, alone and in the KeySetWrite command), a struct of

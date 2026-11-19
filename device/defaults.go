@@ -317,7 +317,7 @@ func newLevelControlServer(b defaultBuild) (contract.ClusterServer, error) {
 // levelcontrol.HeldConfig are: every device the kit builds is added under
 // the Aggregator, where matter.js does not apply
 // StartUpColorTemperatureMireds (ColorControlServer.ts:378-381 at
-// db021da0, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
+// b25ed960, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
 func newColorControlServer(b defaultBuild) (contract.ClusterServer, error) {
 	cfg := light.ColorControlServerConfig{Features: light.ColorFeature(b.opts.Features), Clock: b.clock, ManageTransitions: b.transitions, Bridged: true}
 	if srv := b.sibling(onoffdef.ClusterID); srv != nil {

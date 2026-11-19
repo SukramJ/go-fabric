@@ -606,7 +606,7 @@ func (s *PressureServer) MatterRead(attrID uint32) (any, bool) {
 		return int16(0), true
 	case attrMaxMeasuredValue:
 		// 32766, within MaxMeasuredValue's "minMeasuredValue + 1 to
-		// 32767" (pressure-measurement.element.ts:31-33 at db021da0).
+		// 32767" (pressure-measurement.element.ts:31-33 at b25ed960).
 		// The null of a nullable int16 is -32768, not 32767.
 		return int16(32766), true
 	case attrTolerance:
@@ -645,7 +645,7 @@ func (s *PressureServer) MatterAttributes() []uint32 { return pressureInst.Matte
 // hPaToMatter converts hPa to the wire unit, held to the
 // [MinMeasuredValue, MaxMeasuredValue] the server advertises (0, 32766):
 // MeasuredValue is "minMeasuredValue to maxMeasuredValue"
-// (pressure-measurement.element.ts:24-25 at db021da0), and a value below
+// (pressure-measurement.element.ts:24-25 at b25ed960), and a value below
 // it used to reach the wire — -32768 is a nullable int16's null
 // (W3-club1-08).
 func hPaToMatter(hpa float64) int16 {
@@ -786,7 +786,7 @@ func (s *BooleanStateServer) MatterEvents() []uint32 { return booleanStateInst.M
 // StateChange: the server is rebuilt on every dispatch and holds no
 // state, so the change is observed where the host's notification arrives
 // (matter.js packages/node/src/behaviors/occupancy-sensing/OccupancySensingServer.ts:67-74
-// at db021da0: reactTo occupancy$Changed when the feature is set). HoldTime
+// at b25ed960: reactTo occupancy$Changed when the feature is set). HoldTime
 // and the delay attributes it gates are not served: the hold timer needs
 // state ([sensing.Occupancy], the device kit's server, has it).
 //
@@ -864,7 +864,7 @@ func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 	case attrOccupancy:
 		// Occupancy is a map8 with conformance M and no quality X
 		// (matter.js packages/model/src/standard/elements/
-		// occupancy-sensing.element.ts:36 at db021da0), so an unobserved
+		// occupancy-sensing.element.ts:36 at b25ed960), so an unobserved
 		// source reads 0, unoccupied — matter.js's default of a
 		// non-nullable bitmap, `{}` with no bit set (packages/model/src/
 		// logic/SelectDefaultValue.ts:155-171) — as
@@ -1333,7 +1333,7 @@ func (s *ElectricalEnergyServer) MatterAttributes() []uint32 {
 // CumulativeEnergyMeasured, mandatory with the CumulativeEnergy feature
 // ("CUME", matter.js
 // packages/model/src/standard/elements/electrical-energy-measurement.element.ts:56-59
-// at db021da0). The server is rebuilt on every dispatch and keeps no
+// at b25ed960). The server is rebuilt on every dispatch and keeps no
 // reading, so the bridge emits the event when the source's cumulative
 // value changes (review II, R2-P4-nv-05a).
 func (s *ElectricalEnergyServer) MatterEvents() []uint32 { return electricalEnergyInst.MatterEvents() }
@@ -1675,7 +1675,7 @@ func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10Concen
 // A mains-powered device's source states [contract.PowerSourceSelection]
 // Wired ([NewWiredPowerSourceServer]): the Wired feature in place of
 // Battery, as the model's "O.a" admits one of the two per cluster
-// (power-source-cluster.element.ts:24-25 at db021da0). It serves no
+// (power-source-cluster.element.ts:24-25 at b25ed960). It serves no
 // battery reading; its current type and its Description "Mains power" are
 // matter.js PowerSourceServer.initialize's defaults for WIRED
 // (packages/node/src/behaviors/power-source/PowerSourceServer.ts:40-46,
@@ -1786,7 +1786,7 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 	case attrPwrDescription:
 		// matter.js PowerSourceServer.initialize's defaults for WIRED and
 		// BAT (packages/node/src/behaviors/power-source/
-		// PowerSourceServer.ts:40-46 at db021da0).
+		// PowerSourceServer.ts:40-46 at b25ed960).
 		if s.wired {
 			return "Mains power", true
 		}

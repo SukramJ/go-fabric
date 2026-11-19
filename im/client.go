@@ -228,7 +228,7 @@ func UnmarshalWriteResponseTLV(dec *tlv.Decoder) (WriteResponse, error) {
 // readAttributeStatusFields reads an AttributeStatusIB after its opener,
 // with its path's EnableTagCompression flag.
 // Its path and its status are mandatory (matter.js TlvAttributeStatus.ts:
-// 16-17 at db021da0, both TlvField; review II, R2-P1-req2-09).
+// 16-17 at b25ed960, both TlvField; review II, R2-P1-req2-09).
 func readAttributeStatusFields(dec *tlv.Decoder) (st AttributeStatus, compressed bool, err error) {
 	sawPath, sawStatus := false, false
 	for {
@@ -361,7 +361,7 @@ type EventDataReader func(path ConcreteEventPath, el tlv.Element, dec *tlv.Decod
 
 // UnmarshalReportDataTLV decodes a ReportDataMessage as a client receives
 // it — matter.js packages/types/src/protocol/messages/TlvDataReport.ts:17-31
-// at db021da0: SubscriptionId (0), AttributeReports (1), EventReports (2),
+// at b25ed960: SubscriptionId (0), AttributeReports (1), EventReports (2),
 // MoreChunkedMessages (3), SuppressResponse (4). An AttributeReportIB is
 // a status (AttributeStatusIB) or data (AttributeDataIB: DataVersion (0,
 // optional), Path (1), Data (2), the value read through valueReader); an

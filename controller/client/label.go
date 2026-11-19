@@ -18,7 +18,7 @@ const nocStatusLabelConflict uint8 = 10
 
 // latchLabel sets the node's once-per-start latch of the fabric-label
 // reconciliation; false when it was set already (NetworkClient.ts:429-433
-// at db021da0).
+// at b25ed960).
 func (n *Node) latchLabel() bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()

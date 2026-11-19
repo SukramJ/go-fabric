@@ -89,7 +89,7 @@ func (r *Registry) sourcesOf(xa string) []string {
 func makeXA(i int) string { return fmt.Sprintf("%016X", 0xAA00000000000000+uint64(i)) }
 
 // TestBorderRouterRegistryParityMatterJS ports matter.js
-// packages/thread-br-client/test/BorderRouterRegistryTest.ts at db021da0 by
+// packages/thread-br-client/test/BorderRouterRegistryTest.ts at b25ed960 by
 // meaning, for the fields this registry keeps: TXT parsing, the TREL
 // fallback, merging, the meshcop precedence, source loss, expiry,
 // eviction and the events. The address, port and TXT-version cases have

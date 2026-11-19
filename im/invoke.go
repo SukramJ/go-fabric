@@ -75,7 +75,7 @@ type InvokeRequest struct {
 	// (BD-Matter-DelayReportData).
 	DelayReportData *DelayReportData
 	// InteractionModelRevision is the request's InteractionModelRevision
-	// (tag 0xFF, TlvInvokeRequest.ts:30 at db021da0):
+	// (tag 0xFF, TlvInvokeRequest.ts:30 at b25ed960):
 	// [MarshalInvokeRequestTLV] writes it, 0 writing
 	// [MatterInteractionModelRevision]; [UnmarshalInvokeRequestTLV] fills
 	// it, 0 when the field is absent. The server acts on neither.
@@ -328,7 +328,7 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			}
 			// CommandPath is mandatory: matter.js
 			// packages/types/src/protocol/types/TlvCommandData.ts:17 at
-			// db021da0 (TlvField).
+			// b25ed960 (TlvField).
 			if !hasPath {
 				return CommandInvocation{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagCmdDataPath, "CommandDataIB.CommandPath"))
 			}
@@ -677,7 +677,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	// fabric 0 without PASE is no grant either, the implicit Administer is
 	// keyed on the auth mode alone (matter.js
 	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191 at
-	// db021da0, `authMode === Pase && isCommissioning`).
+	// b25ed960, `authMode === Pase && isCommissioning`).
 	ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
 		if g.pase {
 			return StatusSuccess

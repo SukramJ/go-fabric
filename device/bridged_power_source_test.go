@@ -24,7 +24,7 @@ import (
 
 // TestBridgedDeviceDeclaresPowerSource: a device whose type does not list
 // PowerSource declares it, as BridgedNode allows under the condition
-// BridgedPowerSourceInfo (bridged-node.element.ts:23 at db021da0); a
+// BridgedPowerSourceInfo (bridged-node.element.ts:23 at b25ed960); a
 // controller reads its BatPercentRemaining and an EndpointList naming the
 // device's own endpoint, and the host's Set reaches the next read.
 func TestBridgedDeviceDeclaresPowerSource(t *testing.T) {

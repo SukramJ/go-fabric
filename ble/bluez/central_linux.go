@@ -709,7 +709,7 @@ func (k *connection) mtuSettled() bool {
 // ATTMTU implements ble.Connection: C1's MTU property once settled, 0
 // before and where BlueZ has none — 0 with the exchange pending makes
 // controller/ble wait for ATTMTUExchanged, 0 settled selects the BTP
-// minimum (NobleBleChannel.ts:679-681 at db021da0).
+// minimum (NobleBleChannel.ts:679-681 at b25ed960).
 func (k *connection) ATTMTU() int { return int(k.mtu.Load()) }
 
 // ATTMTUExchanged implements ble.MTUExchange: closed once the ATT_MTU is

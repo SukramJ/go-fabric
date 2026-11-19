@@ -7,7 +7,7 @@ package core
 // GroupKeyManagement servers, and the defaults a zero value takes. matter.js
 // keeps each of them as server state the node's configuration may set
 // (AccessControlServer.ts:56-66 initialize,
-// GroupKeyManagementServer.ts:613-614 at db021da0); the constants below are
+// GroupKeyManagementServer.ts:613-614 at b25ed960); the constants below are
 // those defaults.
 const (
 	// DefaultAccessControlEntriesPerFabric is the attribute's value when

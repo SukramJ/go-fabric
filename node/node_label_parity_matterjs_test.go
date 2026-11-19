@@ -168,7 +168,7 @@ func TestSetNodeLabelReportedPersistedParity(t *testing.T) {
 // the node is online, a facade decision); a
 // label over 32 bytes is refused with the status a controller's write of
 // it gets, CONSTRAINT_ERROR ("max 32", basic-information.element.ts:35-38
-// at db021da0), and the served label stays.
+// at b25ed960), and the served label stays.
 func TestSetNodeLabelBeforeStartAndRefusedParity(t *testing.T) {
 	t.Parallel()
 	site := quietSite(t)

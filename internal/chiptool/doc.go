@@ -118,7 +118,7 @@
 // matter.js automated 68 certification cases in
 // support/chip-testing/test/cert/TC-*.test.ts, and in most of them its own
 // controller is the DUT and a device app the TH
-// (support/chip-testing/README.md:112-118): the controller halves of the
+// (support/chip-testing/README.md:114-120): the controller halves of the
 // CHIP test plans, which CHIP's harness has as manual cases and the
 // families therefore leave as "manual" rows. gocert_test.go reads those
 // files mirrored: the reference daemon is the DUT, the module's own

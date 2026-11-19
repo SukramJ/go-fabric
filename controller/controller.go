@@ -227,7 +227,7 @@ type Config struct {
 	// Sessions sets the session intervals the controller reports in its
 	// handshakes (PBKDFParamRequest / Sigma1 SessionParameters) —
 	// matter.js's sessions.intervals fed into the SessionManager
-	// (ServerNetworkRuntime.ts:362-367 at db021da0), the controller-side
+	// (ServerNetworkRuntime.ts:362-367 at b25ed960), the controller-side
 	// counterpart of node.Config.Sessions. nil is the Matter defaults
 	// (500 ms / 300 ms / 4000 ms); an interval outside whole milliseconds
 	// from 0 to the field's bound is [ErrConfiguration].
@@ -236,7 +236,7 @@ type Config struct {
 	// connections: exchange.TransportTCP is a soft hint — a connection
 	// falls back to UDP when the peer does not serve TCP — and needs
 	// TCP.Outgoing; anything else is UDP (NetworkServer.ts:225-228,
-	// NetworkClient.ts:73-79 at db021da0).
+	// NetworkClient.ts:73-79 at b25ed960).
 	TransportPreference exchange.Transport
 	// PeerTiming sets the connection timing of the controller's peer set,
 	// every parameter [client.Timing] names: the connection timeout, the

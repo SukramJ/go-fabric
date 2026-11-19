@@ -151,7 +151,7 @@ var errBridgedBasicInfoUnknown = spec.Errorf(im.StatusUnsupportedWrite, "core: B
 // BridgedConfig carries the bridged device's static metadata. Reachable +
 // UniqueID are mandatory; the rest, NodeLabel included, are optional —
 // matter.js: "All attributes are optional except for the "reachable"
-// attribute" (BridgedDeviceBasicInformationServer.ts:20 at db021da0),
+// attribute" (BridgedDeviceBasicInformationServer.ts:20 at b25ed960),
 // NodeLabel conformance "O" (bridged-device-basic-information.element.ts:30).
 // An empty NodeLabel is served as the empty string; a controller may write
 // its own.
@@ -512,7 +512,7 @@ func (b *BridgedDeviceBasicInformation) MatterWriteChanged(ctx context.Context, 
 		return false, fmt.Errorf("core: NodeLabel write expected string, got %T", value)
 	}
 	// NodeLabel is BasicInformation's by reference
-	// (bridged-device-basic-information.element.ts:30 at db021da0), "max
+	// (bridged-device-basic-information.element.ts:30 at b25ed960), "max
 	// 32" (basic-information.element.ts:36); a longer label is refused
 	// with CONSTRAINT_ERROR as the root cluster's checkLabelWrite refuses
 	// it. Mirrors matter.js

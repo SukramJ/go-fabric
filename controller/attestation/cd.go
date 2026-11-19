@@ -6,9 +6,9 @@ package attestation
 // The Certification Declaration as the validator reads it: the CMS
 // SignedData walk with its encoding rules of matter.js
 // packages/protocol/src/certificate/kinds/CertificationDeclaration.ts:
-// 58-206 (CertificationDeclaration.parse) at db021da0 and the TLV content
+// 58-206 (CertificationDeclaration.parse) at b25ed960 and the TLV content
 // of kinds/definitions/certification-declaration.ts:31-48 (TlvDc) at
-// db021da0. secure/attestation/cd.go:62-135 is the device's encoder of the
+// b25ed960. secure/attestation/cd.go:62-135 is the device's encoder of the
 // same structure.
 
 import (
@@ -99,7 +99,7 @@ func nodeOf(raw asn1.RawValue) (derNode, error) {
 }
 
 // cdFormatError is matter.js CertificationDeclarationFormatError
-// (CertificationDeclaration.ts:58-59 at db021da0): the CD breaks an
+// (CertificationDeclaration.ts:58-59 at b25ed960): the CD breaks an
 // encoding rule of Matter Core §6.3.1. The validator reports it as
 // CertificationDeclarationFormatInvalid, any other parse failure as
 // CertificationDeclarationUnparseable (DeviceAttestationValidator.ts:
@@ -109,7 +109,7 @@ type cdFormatError struct{ msg string }
 func (e *cdFormatError) Error() string { return e.msg }
 
 // The CMS constants of a CD (CertificationDeclaration.ts:61-64 at
-// db021da0) and the algorithm OIDs it requires: sha256
+// b25ed960) and the algorithm OIDs it requires: sha256
 // (2.16.840.1.101.3.4.2.1) and ecdsa-with-SHA256 (1.2.840.10045.4.3.2).
 const (
 	cmsVersion        = 3
@@ -133,7 +133,7 @@ const (
 	derSetTag      = 0x31
 )
 
-// requireOID is requireOid (CertificationDeclaration.ts:66-71 at db021da0).
+// requireOID is requireOid (CertificationDeclaration.ts:66-71 at b25ed960).
 func requireOID(n *derNode, want []byte, rule string) error {
 	if n == nil || n.tag != derOIDTag || !bytes.Equal(n.bytes, want) {
 		found := "none"

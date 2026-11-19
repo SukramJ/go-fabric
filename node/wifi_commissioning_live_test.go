@@ -173,7 +173,7 @@ func (a *joinReannouncer) joins() int {
 // DNS-SD records — the ConnectNetwork command's (commissioning over IP)
 // once, and the rejoin of the committed network at the next Start once —
 // and a failed join does not (matter.js
-// DummyWifiNetworkCommissioningServer.ts:132-133 at db021da0).
+// DummyWifiNetworkCommissioningServer.ts:132-133 at b25ed960).
 func TestLiveWiFiJoinReannounces(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()

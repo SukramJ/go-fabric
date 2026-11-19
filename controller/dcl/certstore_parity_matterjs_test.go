@@ -1041,7 +1041,7 @@ func TestDclCertificateServiceAddCertificate(t *testing.T) {
 
 // TestDclCertificateServiceLookupCdSigner ports describe("lookupCdSigner"),
 // "addCertificate as CD signer" and "getOrFetchCdSigner"
-// (DclCertificateServiceTest.ts:1580-1903 at db021da0) on CDSigner and
+// (DclCertificateServiceTest.ts:1580-1903 at b25ed960) on CDSigner and
 // AddCertificate. The Matter test CD signer, which lookupCdSigner returns
 // marked, is the validator's here (attestation.KnownCDSigner): CDSigner
 // has no isTestSigner to carry, so it leaves that key identifier alone. The

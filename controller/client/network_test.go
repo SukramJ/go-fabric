@@ -255,7 +255,7 @@ func TestDefaultSubscription(t *testing.T) {
 		// (W4-ctlim-04): the event arrives after the image changed, and
 		// SubscriptionAlive after the report's own hooks, the event among
 		// them (client_alive_order_parity_matterjs_test.go; matter.js
-		// NetworkClient.ts:179-190 at db021da0 emits subscriptionAlive once
+		// NetworkClient.ts:179-190 at b25ed960 emits subscriptionAlive once
 		// the whole update is read) — the wait is for both (issue 467).
 		waitUntil(t, "the priming report's event and the alive hook", func() bool {
 			hl.mu.Lock()

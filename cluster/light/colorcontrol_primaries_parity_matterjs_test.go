@@ -16,7 +16,7 @@ import (
 // TestParityMatterJS_ColorControlPrimaries ports matter.js's "accepts a
 // primary a light supplies without stating the number of primaries"
 // (packages/node/test/behaviors/color-control/ColorControlServerTest.ts:72-87
-// at db021da0) by meaning: a light that supplies Primary1X serves it with
+// at b25ed960) by meaning: a light that supplies Primary1X serves it with
 // the value supplied. matter.js leaves NumberOfPrimaries null there; the
 // server here derives it from the supplied primaries, as connectedhomeip
 // does (BD-chip-ColorControl-NumberOfPrimaries).

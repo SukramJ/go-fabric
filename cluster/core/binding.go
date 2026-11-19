@@ -141,7 +141,7 @@ const (
 // src/lib/core/CHIPConfig.h:1149 and :799 at 6170af84). connectedhomeip's
 // table is the node's; this bound is each endpoint's server's. The
 // definition gives the list no maximum (constraint "desc", matter.js
-// packages/model/src/standard/elements/binding.element.ts:23 at db021da0).
+// packages/model/src/standard/elements/binding.element.ts:23 at b25ed960).
 const bindingMaxEntries = 4 * 16
 
 // bindingMaxEntriesPerFabric bounds one fabric's share of the list, beside

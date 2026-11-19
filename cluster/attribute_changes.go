@@ -169,7 +169,7 @@ const QuietMinimumInterval = time.Second
 // by Report. The throttle stands in front of the wire only: the host's
 // listeners see every change at once ([AttributeChanges.ChangedFrom]), as
 // every observer of a QuietEvent itself does (Events.ts:269-296 at
-// db021da0, the QuietObservable is only its `online` view); Report is the
+// b25ed960, the QuietObservable is only its `online` view); Report is the
 // wire's ([AttributeChanges.ReportFrom]).
 //
 // A last report later than the clock's now — the clock changed beneath
@@ -188,7 +188,7 @@ type Quieter struct {
 	// QuietObservable's minimumEmitInterval — ten seconds for PowerSource's
 	// BatPercentRemaining, BatTimeRemaining and BatTimeToFullCharge
 	// (packages/node/src/behaviors/power-source/PowerSourceServer.ts:25-34
-	// at db021da0). Set before the first change.
+	// at b25ed960). Set before the first change.
 	Interval time.Duration
 
 	// mu guards gen, lastEmit, pending and timer.

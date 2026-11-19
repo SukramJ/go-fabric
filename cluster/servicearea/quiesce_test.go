@@ -15,7 +15,7 @@ import (
 // TestMatterQuiesceStopsTheEndTimeThrottle: the bridge's MatterQuiesce
 // disarms the EstimatedEndTime throttle's deferred report, the server's
 // one timer, so nothing is reported after the server left the topology;
-// the pattern of matter.js SwitchServer.ts:379-384 at db021da0
+// the pattern of matter.js SwitchServer.ts:379-384 at b25ed960
 // (W3-club2-02).
 func TestMatterQuiesceStopsTheEndTimeThrottle(t *testing.T) {
 	t.Parallel()

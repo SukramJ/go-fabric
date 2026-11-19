@@ -300,7 +300,7 @@ func (k *connection) ATTMTU() int { return k.mtu }
 // So does a write the proxy answers with BluetoothGATTErrorResponse: the
 // error wraps btp.ErrDisconnected and the [*GATTError]. Mirrors matter.js
 // isNobleDisconnectError (packages/nodejs-ble/src/NobleBleChannel.ts:50-59
-// at db021da0), which takes a failed C1 write of any status from 2 for the
+// at b25ed960), which takes a failed C1 write of any status from 2 for the
 // peripheral's disconnect. A proxy has three such answers, none of them
 // told apart from a lost link by its code alone: the stack's status of a
 // write it had sent (bluetooth_connection_bluedroid.cpp:776-781), the

@@ -35,7 +35,7 @@ func (lowBattery) MatterPowerSourceSelection() contract.PowerSourceSelection {
 // TestPowerSourceProjectionWired: a source whose selection is Wired
 // materialises the Wired PowerSource — FeatureMap WIRED, WiredCurrentType
 // from the selection (AC for the zero value, matter.js's default,
-// PowerSourceServer.ts:57-61 at db021da0), Description "Mains power", no
+// PowerSourceServer.ts:57-61 at b25ed960), Description "Mains power", no
 // battery attribute, EndpointList its endpoint; a source stating the zero
 // selection stays the battery it was.
 func TestPowerSourceProjectionWired(t *testing.T) {

@@ -26,7 +26,7 @@ import (
 //
 // This is the deadline form of matter.js's Time port: every timer and
 // timeout of the stack goes through the injectable Time
-// (packages/general/src/time/Time.ts:73-118 at db021da0, getTimer and
+// (packages/general/src/time/Time.ts:73-118 at b25ed960, getTimer and
 // sleep), so MockTime decides when it fires.
 func WithTimeout(parent context.Context, c Clock, d time.Duration) (context.Context, context.CancelFunc) {
 	if c == nil {

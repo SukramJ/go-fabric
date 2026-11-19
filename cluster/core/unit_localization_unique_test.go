@@ -14,7 +14,7 @@ import (
 // TestUnitLocalizationRefusesADuplicateUnit (review II, R2-P6-err-1268):
 // SupportedTemperatureUnits holds each unit once — the model's text "Each
 // entry in the list shall be unique" (matter.js
-// unit-localization.resource.ts:43-45 at db021da0) — so a configuration
+// unit-localization.resource.ts:43-45 at b25ed960) — so a configuration
 // with a duplicate is refused at construction.
 func TestUnitLocalizationRefusesADuplicateUnit(t *testing.T) {
 	t.Parallel()

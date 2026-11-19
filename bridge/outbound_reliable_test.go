@@ -179,7 +179,7 @@ func TestOutboundReliable_AbandonExchange(t *testing.T) {
 // Bounds are computed from the deterministic min/max of
 // [mrp.BackoffDuration] at transmission 0 (jitter ∈ [0, 0.25)) so the
 // due/not-due boundary is asserted without sleeping or depending on
-// the jitter draw. Mirrors matter.js MRP.ts:181 at db021da0
+// the jitter draw. Mirrors matter.js MRP.ts:181 at b25ed960
 // retransmissionIntervalOf's per-peer base-interval selection.
 func TestOutboundReliable_PerSessionBaseInterval(t *testing.T) {
 	t.Parallel()

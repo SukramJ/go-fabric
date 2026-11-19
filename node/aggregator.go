@@ -209,7 +209,7 @@ func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
 // next assembly first erases every endpoint number stored for scope name
 // and their reservations — matter.js erasing each endpoint's store
 // (packages/node/src/node/server/ServerEndpointInitializer.ts:59-65
-// eraseDescendant at db021da0) — and the name is then forgotten. A running node reassembles at once; before [Node.Start]
+// eraseDescendant at b25ed960) — and the name is then forgotten. A running node reassembles at once; before [Node.Start]
 // the retirement rides on Start's assembly. The default partition is
 // refused ([ErrRetireDefault]), and so is a partition that still holds
 // endpoints ([ErrPartitionNotEmpty]): Remove them first, or in a
@@ -275,7 +275,7 @@ func (a *Aggregator) Replace(ctx context.Context, key device.SourceKey, ep Endpo
 // no other device is given them. [Aggregator.Forget] frees them. It
 // mirrors matter.js closing an endpoint, which keeps its number
 // reservation (packages/node/src/node/server/ServerEndpointInitializer.ts:
-// 67-69 at db021da0) and hands it back to the endpoint that returns
+// 67-69 at b25ed960) and hands it back to the endpoint that returns
 // (packages/node/src/storage/server/ServerEndpointStores.ts:117-123). It
 // acts on the default partition.
 func (a *Aggregator) Remove(ctx context.Context, key device.SourceKey) error {

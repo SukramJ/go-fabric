@@ -130,7 +130,14 @@ import (
 // it corrected go, two heuristic rows come (client/interaction/server.go,
 // cluster/spec/decode_value.go: a name the sentence gives for another
 // part); none is a moved citation.
-const citecheckDriftRatchet = 304
+//
+// 441 at the pin lift db021da0 → b25ed960: the pin moved, and every
+// citation whose sentence names no commit is now read at b25ed960, where
+// 448 drifted before the lift's re-cites (17 hard errors, the stale
+// comments of the lift's P0 list); 441 after them. The remaining rows are
+// citations into files the lift moved that their reconcile units (P1–P5)
+// re-read, not new citations.
+const citecheckDriftRatchet = 441
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -152,7 +159,30 @@ const citecheckDriftRatchet = 304
 // wave-4 units; 122 after the Fable wave-4 read applied, with the forms
 // of F3 (a sha closing a parenthesis after a comma, "pin <sha>",
 // "HEAD <sha>") counted.
-const citecheckOffPinRatchet = 124
+//
+// 3946 at the pin lift db021da0 → b25ed960: the 3822 line citations
+// labelled "at db021da0", checked at the pin until now, are checked at a
+// commit other than the pin from this lift on, with no text changed; the
+// other 124 are the earlier rows at older commits. Re-reading them at
+// b25ed960 lowers the ratchet, unit by unit.
+//
+// 2889 after the scripted relabel of the same lift, by the whole-file
+// rule: an "at db021da0" became "at b25ed960" only where every citation,
+// bound bare part and file-only mention the collector binds to that one
+// label (those whose commit moves when that label alone is rewritten)
+// names a matter.js file byte-identical between the two commits (git diff
+// --quiet) that resolves to the same path at b25ed960 — no range-identity
+// shortcut, as a claim of absence reads the whole file. 1057 line
+// citations relabelled (1001 labels in 499 Go files; 238 more in the
+// registers); 2765 remain at db021da0: 2067 cite a file that changed
+// upstream (130 files, most of them the Datasource, MessageExchange,
+// ServerSubscription and ExchangeManager sources), 693 cite an identical
+// file but share their label with a changed one or with a bare line part
+// after a citation, whose file the collector does not carry (313 labels
+// held by such a part alone), and 5 no longer resolve at b25ed960. A label
+// binding no .ts file stays as written. The registers' 308 citations moved
+// with the same rule; their ratchet did not move.
+const citecheckOffPinRatchet = 2889
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

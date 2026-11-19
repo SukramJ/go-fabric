@@ -27,7 +27,7 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
-// deviceTypeThermostat is the Thermostat device type (thermostat.element.ts).
+// deviceTypeThermostat is the Thermostat device type (thermostat-device.element.ts).
 const deviceTypeThermostat = 0x0301
 
 // presetsAttribute is preset-helpers.ts:18 PRESETS_ATTRIBUTE.

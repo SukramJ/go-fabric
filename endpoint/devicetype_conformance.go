@@ -569,7 +569,7 @@ func (s *dtScopeConditions) conditionsOf(ep uint16) map[string]bool {
 // names among ep's conditions that hold only because an endpoint of the
 // node scope asserts them at Root; none for any endpoint but the node
 // endpoint. Mirrors packages/model/src/logic/device-types/
-// ConditionAssertions.ts:411-417 at db021da0.
+// ConditionAssertions.ts:411-417 at b25ed960.
 func (s *dtScopeConditions) rootAssertedOf(ep uint16) map[string]bool {
 	if ep != s.nodeEp {
 		return nil
@@ -583,7 +583,7 @@ func (s *dtScopeConditions) rootAssertedOf(ep uint16) map[string]bool {
 // Descendant, and, for the node endpoint, by any endpoint of the scope at
 // Root. Chains are not followed. A name only a Root assertion makes true
 // is recorded for rootAssertedOf (ConditionAssertions.ts:449-471 at
-// db021da0, #assertedOn).
+// b25ed960, #assertedOn).
 func (s *dtScopeConditions) assertedOn(ep uint16) map[string]bool {
 	conds := map[string]bool{}
 	for c := range s.underivedOf(ep) {
@@ -686,7 +686,7 @@ type dtContext struct {
 // node endpoint is above: matter.js's service judges the endpoints of a
 // node scope and leaves any other unjudged
 // (packages/node/src/node/server/DeviceTypeConformanceService.ts:480-484
-// at db021da0, #judge). check judges any endpoint, as
+// at b25ed960, #judge). check judges any endpoint, as
 // DeviceTypeConformance.check does.
 func (p *dtPass) judged(ep uint16) []DeviceTypeViolation {
 	if _, ok := p.nodeEndpointOf(ep); !ok {
@@ -709,7 +709,7 @@ func (p *dtPass) check(ep uint16) []DeviceTypeViolation {
 	if rootAsserted := collection.rootAssertedOf(ep); len(rootAsserted) > 0 {
 		// A requirement only Root assertions make mandatory is one whose
 		// violation goes away without them (DeviceTypeConformance.ts:65-79
-		// at db021da0).
+		// at b25ed960).
 		unasserted := map[string]bool{}
 		for name := range conditions {
 			if !rootAsserted[name] {
@@ -748,7 +748,7 @@ func (p *dtPass) check(ep uint16) []DeviceTypeViolation {
 // their cluster requirements and the composition each requires.
 // memoize reads the components from the pass's cache, which holds them
 // under the endpoint's own conditions; a re-check under others groups
-// them afresh. Mirrors DeviceTypeConformance.ts:256-282 at db021da0,
+// them afresh. Mirrors DeviceTypeConformance.ts:256-282 at b25ed960,
 // checkDeviceTypes.
 func (p *dtPass) checkDeviceTypes(facts *dtResolved, conditions map[string]bool, collection *dtScopeConditions, memoize bool) []DeviceTypeViolation {
 	var violations []DeviceTypeViolation

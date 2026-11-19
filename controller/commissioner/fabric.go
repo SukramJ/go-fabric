@@ -484,7 +484,7 @@ const (
 )
 
 // Operational node id range — matter.js packages/types/src/datatype/
-// NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at db021da0.
+// NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at b25ed960.
 const (
 	operationalNodeMin uint64 = 0x0000_0000_0000_0001
 	operationalNodeMax uint64 = 0xFFFF_FFEF_FFFF_FFFF

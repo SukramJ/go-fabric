@@ -56,7 +56,10 @@ import (
 // InitialContactScheduleTest.ts and VendorIdVerificationTest.ts, merged
 // with wave P3: 3.
 // Issue 441 (wave W7) ports CommissionableMdnsScannerWindowChangeTest.ts: 2.
-const testparityPlannedRatchet = 2
+// Pin lift b25ed960 (P0) plans the 20 new upstream test files a unit of the
+// lift owns as a whole (eleven outside packages/node/test/node, nine in it),
+// each entry naming its unit; the other eight new files are excluded: 22.
+const testparityPlannedRatchet = 22
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -160,9 +163,15 @@ const testparityPlannedRatchet = 2
 // strict node over BLE without NetworkCommissioning (endpoint) and
 // ProtocolServiceTest.ts's request constraint violation (node) ported:
 // 918 missing.
+// Pin lift b25ed960 (P0): 300 new matter.js it cases in moved files go to
+// missing, each list's reason naming the lift unit that takes it (103 of
+// them OtaTest.ts's rewritten update flow; ThermostatBehaviorTest.ts's six
+// ControlSequenceOfOperation cases have no unit yet, findings F-b25ed960-22),
+// and 16 ported files become partial by their new cases or by a case upstream
+// renamed with the opposite outcome: 146 ported, 1218 missing.
 const (
-	testparityPortedRatchet  = 162
-	testparityMissingRatchet = 918
+	testparityPortedRatchet  = 146
+	testparityMissingRatchet = 1218
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -221,7 +230,14 @@ const (
 // Wave 28a (#498) ports the two DeviceTypeConformanceTest.ts cases of a
 // node that commissions over BLE, left as device-ble-thread until the
 // device side had Bluetooth (endpoint:TestTopologyCommissionsOverBLE): 630.
-const testparityLeftRatchet = 630
+// Pin lift b25ed960 (P0) leaves 87 new matter.js cases, each with class and
+// reason — JavaScript state-layer proxies and observers, log-line text,
+// legacy record migration, outbound client-peer validation and the
+// ClientNode write-through cache (BD-Matter-ClientNode-WriteNotThroughCache),
+// the mDNS pre-filter and always-emitted keys (BD-Matter-MdnsRelevancePreFilter,
+// BD-mDNS-SAT-AlwaysEmitted) — and removes the two ValueValidatorTest.ts and
+// one ClientNodeTest.ts rows whose cases are gone upstream: 714.
+const testparityLeftRatchet = 714
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

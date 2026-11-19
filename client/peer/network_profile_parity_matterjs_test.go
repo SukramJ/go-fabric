@@ -4,7 +4,7 @@
 package peer
 
 // A port of matter.js packages/protocol/test/peer/NetworkProfileTest.ts at
-// db021da0 (12 cases), plus the medium selection of NetworkProfiles.forPeer
+// b25ed960 (12 cases), plus the medium selection of NetworkProfiles.forPeer
 // (packages/protocol/src/peer/NetworkProfile.ts:184-221) and the
 // Semaphore's cooldown and timeout (packages/general/src/util/Semaphore.ts)
 // the profiles throttle with.
@@ -264,7 +264,7 @@ func TestSemaphoreParity(t *testing.T) {
 // TestConnectionThrottledByTheConnectProfile: a connection process holds a
 // slot of its profile's connect sub-profile for its whole run, and its CASE
 // exchange is padded with the medium's connect margin — matter.js
-// PeerConnection.ts:112-123 at db021da0. With the default profiles a
+// PeerConnection.ts:112-123 at b25ed960. With the default profiles a
 // peer of unknown medium connects on "unknown:connect" (4 slots, 1.5 s).
 func TestConnectionThrottledByTheConnectProfile(t *testing.T) {
 	t.Parallel()

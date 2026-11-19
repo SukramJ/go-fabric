@@ -17,7 +17,7 @@ import (
 )
 
 // The cases of matter.js packages/node/test/behaviors/general-diagnostics/
-// GeneralDiagnosticsNetworkInterfacesTest.ts at db021da0 (#4842), ported by
+// GeneralDiagnosticsNetworkInterfacesTest.ts at b25ed960 (#4842), ported by
 // meaning: matter.js's node is online while its Network is observed; the Go
 // server compares the interfaces while its attribute changes are observed
 // (the bridge's listener on the root endpoint), on the fake clock.

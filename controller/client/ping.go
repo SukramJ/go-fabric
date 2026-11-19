@@ -26,7 +26,7 @@ var (
 // pingMaxRetransmissions caps a ping's MRP transmissions — matter.js
 // PROBE_MAX_RETRANSMISSIONS, "A liveness probe does not need the full MRP
 // retransmission budget" (packages/protocol/src/peer/PeerAddressMonitor.ts:26-27
-// at db021da0), the cap of the probe's only caller there.
+// at b25ed960), the cap of the probe's only caller there.
 const pingMaxRetransmissions = 2
 
 // PingAddress probes one operational address of the node over the session

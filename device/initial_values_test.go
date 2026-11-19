@@ -35,7 +35,7 @@ import (
 // The values a host states for the attributes New refuses a type without
 // (Type.RequiredInitial, decision 17). Each is taken from the fixtures of
 // matter.js packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts
-// at db021da0, the line cited; a value matter.js gives none for — a server
+// at b25ed960, the line cited; a value matter.js gives none for — a server
 // its corpus does not build (:366-384) — is the lowest valid value of the
 // type or constraint, marked "test input, no reference value".
 

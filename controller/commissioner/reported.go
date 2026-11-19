@@ -21,7 +21,7 @@ var (
 // reportedValue decodes an attribute value the device reported by its
 // shape alone: spec.DecodeValue checks no length or range constraint
 // beyond the type's width (matter.js checks not even that,
-// packages/types/src/tlv/TlvNumber.ts:142 at db021da0 — a difference),
+// packages/types/src/tlv/TlvNumber.ts:142 at b25ed960 — a difference),
 // takes an integer of the other signedness and bounds-checks it, and
 // leaves out a struct field the value does not carry. A value whose shape
 // does not decode is logged and reported absent (false), and the read goes

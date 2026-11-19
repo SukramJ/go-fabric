@@ -40,7 +40,8 @@ type Context struct {
 }
 
 // Data is the device's attestation data — matter.js DeviceAttestationData
-// (DAV:214-222).
+// (DAV:214-222 at db021da0; at b25ed960 its VendorID and ProductID are
+// optional, DAV:240-243 — pin-lift unit P2-D).
 type Data struct {
 	// DAC and PAI are the X.509 DER certificates of CertificateChainRequest.
 	DAC, PAI []byte
@@ -75,7 +76,9 @@ type Result struct {
 
 // Validate validates the device's attestation. Mirrors matter.js
 // packages/protocol/src/certificate/DeviceAttestationValidator.ts:258-645
-// (validate) at db021da0, check for check and in its order; each step
+// (validate) at db021da0, check for check and in its order (at b25ed960
+// validate wraps validateCollecting, :283-293 and :295-684 — pin-lift unit
+// P2-D); each step
 // cites the DAV lines it ports. A hard failure is an [*Error]; any other
 // error is the trust store's (a stored PAA that does not parse, a
 // revocation lookup that fails), which the commissioner reports as a

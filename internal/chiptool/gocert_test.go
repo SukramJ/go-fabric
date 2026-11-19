@@ -54,7 +54,7 @@ import (
 //
 // In matter.js's cert suite the DUT is, in most cases, a controller — its
 // own CommissioningController — and the TH a device app
-// (support/chip-testing/README.md:112-118). The CHIP test plans these
+// (support/chip-testing/README.md:114-120). The CHIP test plans these
 // files implement are the controller halves CHIP's harness runs as manual
 // cases, which is why the families leave them as "manual" rows. Read
 // mirrored, the same files describe the device half: the step list and
@@ -83,7 +83,7 @@ import (
 // citations were read at: the snapshot's pin, whose case list
 // testdata/matterjs-cert-cases.json holds. A case with a readAt of its own
 // is read at that commit instead.
-const goCertReadAt = "db021da0"
+const goCertReadAt = "b25ed960"
 
 // goCertEnv narrows the leg to families or case ids ("IDM,SC/4.2"), or
 // leaves some out ("-CADMIN,-DD"); selectGoCert reads it, and an entry
@@ -114,7 +114,7 @@ const (
 	// file's controller actions as TH.
 	roleTH goRole = iota
 	// roleDUT: the Go controller is the DUT, the daemon is the TH device
-	// the TS file names (support/chip-testing/README.md:112-118).
+	// the TS file names (support/chip-testing/README.md:114-120).
 	roleDUT
 )
 
@@ -219,7 +219,7 @@ const (
 	goSkipped goVerdict = "skipped"
 )
 
-// goStepRecord is one recorded step, as tc-support.ts:104 record keeps it.
+// goStepRecord is one recorded step, as tc-support.ts:105 record keeps it.
 type goStepRecord struct {
 	step    goStep
 	verdict goVerdict
@@ -227,7 +227,7 @@ type goStepRecord struct {
 }
 
 // errGoSkip is a step that skips itself at run time (matter.js
-// notApplicableAtRun, cert-dsl.ts:163-213), with its reason.
+// notApplicableAtRun, cert-dsl.ts:169-219), with its reason.
 type errGoSkip struct{ reason string }
 
 func (e errGoSkip) Error() string { return "skipped: " + e.reason }
@@ -579,7 +579,7 @@ func newGoTH(ctx context.Context, t *testing.T, bin string, flags map[string]boo
 	}
 	pipe := filepath.Join(t.TempDir(), "app-pipe")
 	// The Matter port: a group message goes to it (groups/sender.go
-	// groupPort, GroupSession.ts:190-193), and the cases run one at a time.
+	// groupPort, GroupSession.ts:191-194), and the cases run one at a time.
 	listen := c.listen
 	if listen == "" {
 		listen = fmt.Sprintf(":%d", matterPort)
@@ -641,7 +641,7 @@ func (th *goTH) note(format string, args ...any) {
 
 // device starts the run's index-th further device as matter.js's
 // identityFor gives it its identity (packages/testing/src/chip/cert/
-// cert-dsl.ts:304-319): the primary's discriminator and passcode plus the
+// cert-dsl.ts:310-325): the primary's discriminator and passcode plus the
 // index, with the daemon's further flags (bridgeOptions.extraArgs), on a
 // port of its own.
 func (th *goTH) device(index int, args ...string) *bridgeProcess {
@@ -750,8 +750,9 @@ func (th *goTH) undeclared(expr string) []string {
 // and BDX sender and responder, the administrator that announces a
 // provider, the commissioner that scans a QR code or reads a manual code,
 // the ICD client — after matter.js's declarations for its own controller
-// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:179-462,
-// MATTERJS_CONTROLLER_PICS), each with the line matter.js declares it at.
+// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:179-462 at
+// db021da0, MATTERJS_CONTROLLER_PICS), each with the line matter.js
+// declares it at there.
 // A code matter.js leaves to the CHIP PICS file its runs load
 // (src/app/tests/suites/certification/ci-pics-values at connectedhomeip
 // 6170af84, packages/testing/src/chip/config.ts:22) is marked "own" with

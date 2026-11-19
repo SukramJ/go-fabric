@@ -53,7 +53,7 @@ func init() {
 }
 
 // The adapter's budgets (support/chip-testing/src/cert/
-// InProcessControllerAdapter.ts:574-591) and the staged image's size
+// InProcessControllerAdapter.ts:592-609) and the staged image's size
 // (support/chip-testing/src/OtaTestIdentity.ts:30).
 const (
 	otaTransferTimeout = 90 * time.Second
@@ -78,7 +78,7 @@ func otaTestPayload(size int) []byte {
 // serving the provider, the answers a case scripts per requestor, and the
 // record of what the provider answered and what its BDX transfers carried
 // — matter.js's RecordingOtaProviderServer and OtaExchangeRecording
-// (InProcessControllerAdapter.ts:610-916).
+// (InProcessControllerAdapter.ts:610-916 at db021da0).
 type otaTH struct {
 	th       *goTH
 	ctrl     *gocontroller.Controller
@@ -97,7 +97,7 @@ type otaTH struct {
 // observeEvents has fn told of every event the default subscription of a
 // node reports — matter.js's observeEvents, which watches the subscription
 // its controller sustains rather than opening one of its own
-// (InProcessControllerAdapter.ts:2330-2341): a second subscription is
+// (InProcessControllerAdapter.ts:2377-2388): a second subscription is
 // cleared when the default one is set up again on a new session.
 func (o *otaTH) observeEvents(fn func(cluster, event uint32, number uint64, value any)) {
 	o.mu.Lock()
@@ -170,7 +170,7 @@ func (o *otaTH) commission(code string) (*client.Node, softwareupdate.Peer, erro
 
 // script installs a requestor's scripted answers, replacing earlier ones:
 // one entry per command, in order; a spent list lets the provider answer
-// for itself (scriptOtaProvider, InProcessControllerAdapter.ts:1877-1888).
+// for itself (scriptOtaProvider, InProcessControllerAdapter.ts:1906-1917).
 func (o *otaTH) script(p softwareupdate.Peer, queries []softwareupdate.QueryImageScript, applies []softwareupdate.ApplyUpdateScript) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -357,7 +357,7 @@ type serveOpts struct {
 
 // otaIdentity is the requestor's vendor, product and running version, read
 // from its BasicInformation (#otaIdentity, InProcessControllerAdapter.ts:
-// 2128-2140).
+// 2157-2169).
 type otaIdentity struct {
 	vendor, product uint16
 	version         uint32
@@ -386,7 +386,8 @@ func (o *otaTH) identity(n *client.Node) (otaIdentity, error) {
 // update manager push it (forceUpdate: the consent and the announcement)
 // and waits for the transfer, the apply decision and the notification —
 // serveOtaUpdate and #serveStagedImage (InProcessControllerAdapter.ts:
-// 2009-2117), stageOtaImage (:996-1034) and #runOtaTransfer (:2178-2245).
+// 2038-2146), stageOtaImage (:1018-1056) and #runOtaTransfer (:2178-2245
+// at db021da0).
 func (o *otaTH) serve(n *client.Node, p softwareupdate.Peer, opts serveOpts) (*otaServed, error) {
 	id, err := o.identity(n)
 	if err != nil {
@@ -435,7 +436,7 @@ func (o *otaTH) serve(n *client.Node, p softwareupdate.Peer, opts serveOpts) (*o
 	})
 	if !done || t == nil {
 		// Anything but a completed transfer leaves the update queued
-		// (:2221-2243): the consent goes.
+		// (:2221-2243 at db021da0): the consent goes.
 		mgr.RemoveConsent(p, version)
 		if t == nil {
 			return nil, fmt.Errorf("node %d did not take the offered OTA image within %s — it opened no BDX transfer at all", p.NodeID, budget)
@@ -452,7 +453,7 @@ func (o *otaTH) serve(n *client.Node, p softwareupdate.Peer, opts serveOpts) (*o
 		if at == 0 {
 			at = otaApplyTimeout
 		}
-		// awaitApplyDecision (:862-869): the last answer that is not an
+		// awaitApplyDecision (:884-891): the last answer that is not an
 		// AwaitNextAction decides.
 		waitFor(o.th.ctx, at, func() bool {
 			for _, x := range o.since(p, mark).apply {
@@ -509,8 +510,8 @@ type announced struct {
 
 // announce sends AnnounceOTAProvider to the requestor — this TH's provider
 // unless opts names another — and waits for its QueryImage
-// (announceOtaProvider, InProcessControllerAdapter.ts:1890-1952; the
-// default reason UpdateAvailable, :1959-1961).
+// (announceOtaProvider, InProcessControllerAdapter.ts:1919-1981; the
+// default reason UpdateAvailable, :1988-1990).
 func (o *otaTH) announce(n *client.Node, p softwareupdate.Peer, opts announceOpts) (*announced, error) {
 	reason := opts.reason
 	req := otar.AnnounceOtaProviderRequest{
@@ -758,7 +759,7 @@ func caseSU11() goCertCase {
 
 // ownFabricIndex is the fabric index the node's CASE session runs on — the
 // accessing fabric's CurrentFabricIndex (readOwnFabricIndex,
-// tc-support.ts:755).
+// tc-support.ts:778).
 func (th *goTH) ownFabricIndex(n *client.Node) (uint8, error) {
 	v, err := th.readValue(n, attrPath(0, operationalcredentials.ClusterID, operationalcredentials.AttrCurrentFabricIndex))
 	return uint8(v.El.Uint), err //nolint:gosec // a fabric index
@@ -1085,10 +1086,10 @@ func isHex16(s string) bool {
 	return true
 }
 
-// unheldUpdate is #unheldUpdate (InProcessControllerAdapter.ts:706-727):
+// unheldUpdate is #unheldUpdate (InProcessControllerAdapter.ts:724-745):
 // an UpdateAvailable for an image the provider does not hold, its open
 // fields filled as the provider fills its own — version, an "ota/unheld-<v>"
-// BDX URI naming the provider, a 32-byte token (:919).
+// BDX URI naming the provider, a 32-byte token (:941).
 func (o *otaTH) unheldUpdate(version uint32, uri string) *provdef.QueryImageResponse {
 	if uri == "" {
 		uri = bdx.FileDesignator(fmt.Sprintf("ota/unheld-%d", version)).BdxURI(o.nodeID)

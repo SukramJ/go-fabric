@@ -86,7 +86,7 @@ func EncodePake1(pA []byte) []byte {
 // is not looked at (5a-3 S-5, pinned by
 // TestPASEDecodersTakeBytesAfterTheMessageEnd).
 // Mirrors matter.js packages/types/src/tlv/TlvSchema.ts:48-50
-// (decodeInternal) and TlvObject.ts:205-211 at db021da0: one top-level
+// (decodeInternal) and TlvObject.ts:205-211 at b25ed960: one top-level
 // element is decoded and the reader is dropped; bytes after the
 // structure's end-of-container are not inspected.
 
@@ -255,7 +255,7 @@ func isUnsignedInt(t tlv.ElementType) bool {
 // never gets here, the tlv decoder refuses it — is [ErrWireMalformed]:
 // matter.js's TlvObject decode throws for it at the member's position,
 // before it looks the field up
-// (packages/types/src/tlv/TlvObject.ts:212-214 at db021da0). A context tag
+// (packages/types/src/tlv/TlvObject.ts:212-214 at b25ed960). A context tag
 // the structure does not declare, 0 included, is the caller's to skip
 // ([skipMember]).
 func memberTag(el tlv.Element, name string) (uint8, error) {
@@ -534,7 +534,7 @@ func (resp PBKDFParamResponse) Marshal() []byte {
 // bridge itself only encodes responses (it never receives them).
 //
 // ResponderSessionID (tag 3) is mandatory and a UInt16
-// (PaseMessages.ts:85 at db021da0), so a response without it, or with
+// (PaseMessages.ts:85 at b25ed960), so a response without it, or with
 // one of another type or width, is [ErrWireMalformed], never session 0.
 func DecodePBKDFParamResponse(payload []byte) (PBKDFParamResponse, error) {
 	var resp PBKDFParamResponse

@@ -10,7 +10,7 @@ import (
 )
 
 // ccmVectors are the vectors of matter.js
-// packages/general/test/crypto/aes/CcmTest.ts:34-143 at db021da0: NIST
+// packages/general/test/crypto/aes/CcmTest.ts:34-143 at b25ed960: NIST
 // CCM vectors within Matter's constraints (13-byte nonce, 16-byte tag) and
 // the ones matter.js added during diagnostics. Fields: name, key, nonce,
 // adata, pt, ct, tag.
@@ -39,7 +39,7 @@ func unhex(t *testing.T, s string) []byte {
 }
 
 // TestCcmVectorsParityMatterJS mirrors
-// packages/general/test/crypto/aes/CcmTest.ts:145-181 at db021da0: each
+// packages/general/test/crypto/aes/CcmTest.ts:145-181 at b25ed960: each
 // vector encrypts to its ciphertext and tag and decrypts back.
 func TestCcmVectorsParityMatterJS(t *testing.T) {
 	t.Parallel()
@@ -67,7 +67,7 @@ func TestCcmVectorsParityMatterJS(t *testing.T) {
 }
 
 // TestCcmTagVerificationParityMatterJS mirrors
-// packages/general/test/crypto/aes/CcmTest.ts:200-227 at db021da0: NIST
+// packages/general/test/crypto/aes/CcmTest.ts:200-227 at b25ed960: NIST
 // tcId 10 refused with a byte flipped in each 32-bit word of its tag, and
 // with the wrong key.
 func TestCcmTagVerificationParityMatterJS(t *testing.T) {
@@ -102,7 +102,7 @@ func TestCcmTagVerificationParityMatterJS(t *testing.T) {
 
 // TestStandardCryptoAeadParityMatterJS mirrors the AEAD vectors of
 // packages/general/test/crypto/StandardCryptoTest.ts:42-52 and
-// packages/nodejs/test/crypto/NodeJsCryptoTest.ts:47-74 at db021da0
+// packages/nodejs/test/crypto/NodeJsCryptoTest.ts:47-74 at b25ed960
 // ("encrypts", "decrypts"): the same two message vectors, sealed and
 // opened with Matter's AES-CCM.
 func TestStandardCryptoAeadParityMatterJS(t *testing.T) {

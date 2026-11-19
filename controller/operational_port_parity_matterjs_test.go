@@ -33,7 +33,7 @@ func offlineNames(log *slog.Logger) (*discovery.Names, error) {
 }
 
 // TestOperationalPortParityMatterJS ports the controller-node cases of
-// matter.js packages/node/test/node/ServerNodeTest.ts:339-376 at db021da0:
+// matter.js packages/node/test/node/ServerNodeTest.ts:339-376 at b25ed960:
 // a controller without an explicit port takes an ephemeral one, not the
 // standard 5540, and an explicit port is honoured. The Go controller role
 // is controller.Controller ([Config].Listen, "" is "[::]:0").

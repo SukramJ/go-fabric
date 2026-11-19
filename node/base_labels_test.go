@@ -21,7 +21,7 @@ import (
 
 // TestBaseLabelsByDeclaration: FixedLabel and UserLabel, which the Base
 // device type allows on every endpoint (matter.js
-// packages/model/src/standard/elements/base.element.ts:46-47 at db021da0),
+// packages/model/src/standard/elements/base.element.ts:46-47 at b25ed960),
 // declared on an OnOffLight: a controller reads the fixed labels, its
 // UserLabel write reaches the host's OnChanged, and the written list
 // survives the device's restart.
@@ -77,7 +77,7 @@ func TestBaseLabelsByDeclaration(t *testing.T) {
 // TestBridgedUserLabelPersisted: a bridged device's UserLabel list is kept
 // in the node's store under its stable key — LabelList is nonvolatile
 // (matter.js packages/model/src/standard/elements/user-label.element.ts:21-22
-// at db021da0) — and a new node on the same store with a new device of the
+// at b25ed960) — and a new node on the same store with a new device of the
 // same key serves it again.
 func TestBridgedUserLabelPersisted(t *testing.T) {
 	t.Parallel()

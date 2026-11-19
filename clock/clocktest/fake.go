@@ -37,7 +37,7 @@ type Fake struct {
 	// [Fake.Monotonic] measures from start; wall is the wall-clock
 	// offset [Fake.StepWall] accumulates, which [Fake.Now] adds and
 	// nothing else sees (MockTime's monotonicMs and wallClockOffsetMs,
-	// packages/testing/src/mocks/time.ts:455-478 at db021da0).
+	// packages/testing/src/mocks/time.ts:455-478 at b25ed960).
 	now     time.Time
 	start   time.Time
 	wall    time.Duration
@@ -96,7 +96,7 @@ func (f *Fake) Set(t time.Time) {
 // StepWall moves the wall clock by d, forwards or backwards, as an NTP
 // step or a manual clock set does: [Fake.Now] changes, [Fake.Monotonic]
 // and the armed timers do not — MockTime.stepWallClock
-// (packages/testing/src/mocks/time.ts:472-478 at db021da0).
+// (packages/testing/src/mocks/time.ts:472-478 at b25ed960).
 func (f *Fake) StepWall(d time.Duration) {
 	f.mu.Lock()
 	f.wall += d

@@ -11,7 +11,7 @@
 // Controller.PASE) to an uncommissioned node whose LocationCapability is
 // Indoor (node.Commissioning.IndoorOnly), as matter.js's
 // IndoorOnlyCommissioning sets it (SetRegulatoryConfigSideEffectTest.ts:12-14
-// at db021da0).
+// at b25ed960).
 package node_test
 
 import (

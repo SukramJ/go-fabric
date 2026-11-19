@@ -4,7 +4,7 @@
 package attestation
 
 // A port of matter.js packages/protocol/test/certificate/
-// AttestationCertificateProfileTest.ts at db021da0: the DAC and PAI
+// AttestationCertificateProfileTest.ts at b25ed960: the DAC and PAI
 // certificate profile on connectedhomeip's commissioner DUT vectors and on
 // edited certificates, the encoding the parser keeps, and the validator's
 // DacFormatInvalid / PaiFormatInvalid. The "VendorID and ProductID in the
@@ -489,7 +489,7 @@ func asCommonName(t *testing.T, name *derNode, oidHex, text string) {
 // without acceptMalformedVidPid — every caller in this package does. The
 // cases with acceptMalformedVidPid are the device's read of its own chain,
 // secure/attestation's TestProductIDsAcceptMalformed (DeviceCertification.ts
-// :116-120 at db021da0); "cuts a commonName with invalid UTF-8 at byte 64"
+// :116-120 at b25ed960); "cuts a commonName with invalid UTF-8 at byte 64"
 // is not ported: crypto/x509 refuses a UTF8String DN value that is not
 // UTF-8, so that DAC does not parse here.
 func TestProfileVendorProductIDInTheDN(t *testing.T) {

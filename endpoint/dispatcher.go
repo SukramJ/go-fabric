@@ -771,10 +771,10 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 // endpoint does not serve, UNSUPPORTED_EVENT for an event its server does
 // not list, Success otherwise — the existence checks of matter.js
 // packages/protocol/src/action/server/EventReadResponse.ts:158-221 at
-// db021da0 (#addConcrete), in their order. A path that names no event is
+// b25ed960 (#addConcrete), in their order. A path that names no event is
 // UNSUPPORTED_EVENT when the server lists none: matter.js registers a
 // wildcard event path per event of the cluster (EventReadResponse.ts:277-284
-// at db021da0), so such a cluster selects nothing (review II,
+// at b25ed960), so such a cluster selects nothing (review II,
 // R2-P4-imread-08). A server without a [contract.ClusterEventLister] lists
 // no event, as the contract states, so neither shape of path exists on it
 // (EventReadResponse.ts:216-218 for a named one; review II, R2-P4-nw-05).
@@ -1111,7 +1111,7 @@ func fabricScopeFor(ctx context.Context, srv contract.ClusterServer, attrID uint
 		// adds to a standard cluster: scoped as its own declaration states,
 		// as matter.js takes an element's scope from that element's own
 		// schema (packages/protocol/src/action/server/AccessControl.ts:508-525
-		// at db021da0; review II, F-db021da0-55).
+		// at b25ed960; review II, F-db021da0-55).
 		d, ok := srv.(contract.FabricScopeDeclarer)
 		if !ok {
 			return nil
@@ -1382,7 +1382,7 @@ func writeOne(ctx context.Context, srv contract.ClusterServer, path im.ConcreteA
 // its message (ADR 0026 principle 8). A status error naming Success
 // answers FAILURE. Mirrors matter.js's answer to a StatusResponseError a
 // behaviour throws, its code and clusterCode
-// (packages/types/src/common/StatusResponseError.ts:18-25 at db021da0).
+// (packages/types/src/common/StatusResponseError.ts:18-25 at b25ed960).
 // Returns (status, clusterStatus, hasClusterStatus).
 func classifyError(err error) (im.StatusCode, uint8, bool) {
 	if err == nil {

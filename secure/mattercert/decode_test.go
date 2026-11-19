@@ -494,7 +494,7 @@ func TestDecode_PublicKeyAbsentOrEmptyRejected(t *testing.T) {
 
 // A validity time beyond 32 bits is refused: the TLV schema carries
 // notBefore and notAfter as TlvUInt32 (operational.ts:138-139 at
-// db021da0), which matter.js's Schema.decode validates (review II,
+// b25ed960), which matter.js's Schema.decode validates (review II,
 // R2-P1-sec-04).
 func TestDecode_ValidityBeyond32BitsRejected(t *testing.T) {
 	t.Parallel()
@@ -522,7 +522,7 @@ func TestDecode_ValidityBeyond32BitsRejected(t *testing.T) {
 }
 
 // A basic-constraints pathLen that does not fit its TlvUInt8 is refused,
-// not cut to its low byte (operational.ts:42 at db021da0, as
+// not cut to its low byte (operational.ts:42 at b25ed960, as
 // TestDecode_ValidityBeyond32BitsRejected; review II, core2 item 3).
 func TestDecode_PathLenBeyond8BitsRejected(t *testing.T) {
 	t.Parallel()

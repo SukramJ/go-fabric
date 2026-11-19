@@ -303,7 +303,7 @@ func (p *peripheral) dropAll(disconnect bool) {
 // changes its properties, which BlueZ applies to the running
 // advertisement (:144-152; BLEManagerImpl.cpp:770-790). matter.js hands
 // bleno the payload's AD structures as they are and sets no name
-// (BlenoBleServer.ts:352-387 at db021da0); BlueZ composes the
+// (BlenoBleServer.ts:352-387 at b25ed960); BlueZ composes the
 // advertisement from properties, so the service data is taken from them.
 func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisement) error {
 	sd, ok := matterServiceData(adv.Data)
@@ -1202,7 +1202,7 @@ func (c *pconn) setWrite(f *os.File) bool {
 // HandleTXCharCCCDWrite posts an unsubscription only for a connection
 // without NotifyAcquired (BLEManagerImpl.cpp:699-712), which no caller at
 // the pin produces — but matter.js closes on the unsubscription
-// (BlenoBleServer.ts:81-84 at db021da0), so the port reports it.
+// (BlenoBleServer.ts:81-84 at b25ed960), so the port reports it.
 func (c *pconn) setNotify(f *os.File, mtu uint16) bool {
 	c.order.Lock()
 	c.mu.Lock()

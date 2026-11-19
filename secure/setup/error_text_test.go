@@ -13,7 +13,7 @@ import (
 // logs and in a controller's diagnostics, so none of them carries the
 // passcode it refuses — it names the rule (review II, R2-P0-sec-E04).
 // matter.js prints the value (packages/types/src/schema/PairingCodeSchema.ts:183
-// at db021da0, `Invalid passcode ${passcode}`); the text is where this
+// at b25ed960, `Invalid passcode ${passcode}`); the text is where this
 // package departs from it.
 func TestErrorsDoNotRenderThePasscode(t *testing.T) {
 	t.Parallel()

@@ -97,7 +97,7 @@ func (n *Node) PairingCodesFor(creds WindowCredentials) (qr, manual string, err 
 // and the manual code. The QR code's discovery capabilities are on-network
 // and, for a node with a BLE radio, BLE — matter.js's
 // discoveryCapabilities, whose `ble` follows `network.ble` and whose
-// `onIpNetwork` defaults to true (NetworkServer.ts:36-51 at db021da0),
+// `onIpNetwork` defaults to true (NetworkServer.ts:36-51 at b25ed960),
 // encoded into every QR code (CommissioningServer.ts:430-443). The manual
 // code carries none. The flow ([Commissioning].Flow) goes into the QR
 // code, and a flow other than Standard takes the long manual code with

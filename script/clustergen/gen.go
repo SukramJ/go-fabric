@@ -1736,7 +1736,7 @@ func referenceOf(raw json.RawMessage) string {
 // spec.NullDefault, and a temperature or percentage stated with its unit
 // ({"type":"celsius","value":26}) in the encoding units of the type that
 // carries it, as matter.js restates it (packages/model/src/logic/
-// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at db021da0; the
+// DefaultValue.ts:37-59 castValue → EncodedValue.ts:21-43 at b25ed960; the
 // scale per type name is FieldValue.ts:227-256 numericValue); the empty
 // list as spec.EmptyListDefault; a reference, an octet string or a
 // non-empty list as spec.UnresolvedDefault. It returns "" only when no
@@ -1751,7 +1751,7 @@ func referenceOf(raw json.RawMessage) string {
 // (R2-P6-par-2703, wizard-6b §2 gen Q1). "none" is matter.js's "no
 // default" — FieldValue.cast answers undefined for it, so an override
 // can remove a default the specification states (FieldValue.ts:458-462 at
-// db021da0; Fable fable-read-6b-gen) — and its rendering is then no
+// b25ed960; Fable fable-read-6b-gen) — and its rendering is then no
 // default (""); none occurs at the pin, so it is refused until one does
 // and that rendering is decided with it.
 func defaultLiteral(raw json.RawMessage, typeName, metatype string) string {
@@ -1806,7 +1806,7 @@ func compactJSON(raw json.RawMessage) string {
 
 // encodedUnit is a celsius or percent field value in the encoding units of
 // typeName — matter.js FieldValue.numericValue (FieldValue.ts:227-256 at
-// db021da0) — rounded to the unit an integer encoding counts
+// b25ed960) — rounded to the unit an integer encoding counts
 // (EncodedValue.ts:27-40).
 func encodedUnit(fv map[string]any, typeName, metatype string) (float64, bool) {
 	value, ok := fv["value"].(float64)
@@ -2206,7 +2206,7 @@ func sortedClusterNames(s *snapshot) []string {
 // structDefault is the default of a struct-typed element that states none
 // of its own, built from the defaults its fields state. matter.js builds an
 // object's default from every conformant child that has one
-// (packages/model/src/logic/DefaultValue.ts:153-179 at db021da0, reached
+// (packages/model/src/logic/DefaultValue.ts:153-179 at b25ed960, reached
 // through ClusterDerivation.ts:144 and SelectDefaultValue.ts:144); for
 // OperationalError, whose ErrorStateStruct.ErrorStateId has `default: 0`
 // (operational-state.element.ts:110-111), that is {errorStateId: 0}. This

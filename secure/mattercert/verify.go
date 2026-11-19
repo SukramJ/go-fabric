@@ -42,7 +42,7 @@ type Verifier struct {
 	// rootFabricID is the root certificate's matter-fabric-id when the
 	// certificate is known and carries one (optional on a root, §6.5.6.1):
 	// a NOC's fabric id must then equal it, as it must equal the ICAC's
-	// (matter.js Noc.ts:119-135 at db021da0).
+	// (matter.js Noc.ts:119-135 at b25ed960).
 	rootFabricID    uint64
 	hasRootFabricID bool
 	now             TimeSource
@@ -203,7 +203,7 @@ func NewVerifier(rootPubKey []byte, ts TimeSource) (*Verifier, error) {
 // subjectKeyIdentifier, which the chain's authorityKeyIdentifiers must
 // name — the NOC's when the root signs it directly, the ICAC's otherwise.
 // Mirrors matter.js packages/protocol/src/certificate/kinds/Noc.ts:174-188
-// and Icac.ts:154-159 at db021da0, which compare against
+// and Icac.ts:154-159 at b25ed960, which compare against
 // `root.cert.extensions.subjectKeyIdentifier`.
 func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 	if len(rcac) > MaxOperationalCertTLVBytes {
@@ -219,7 +219,7 @@ func NewVerifierFromRCAC(rcac []byte, ts TimeSource) (*Verifier, error) {
 // NewVerifierFromCertificate is [NewVerifierFromRCAC] on a decoded root
 // certificate: its public key, its subject key identifier, and its
 // matter-fabric-id when it carries one, which every NOC the verifier
-// accepts must then match (matter.js Noc.ts:119-128 at db021da0,
+// accepts must then match (matter.js Noc.ts:119-128 at b25ed960,
 // rootFabricId: "When any matter-fabric-id attributes are present in
 // either the Matter Root CA Certificate or the Matter ICA Certificate,
 // the value SHALL match the one present in the NOC").
@@ -338,7 +338,7 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		return nil, fmt.Errorf("noc: %w", err)
 	}
 	// A root that names a fabric binds the NOC to it, with or without an
-	// ICAC in between — matter.js Noc.ts:119-128 at db021da0 (the ICAC's
+	// ICAC in between — matter.js Noc.ts:119-128 at b25ed960 (the ICAC's
 	// fabric id is compared in checkICACShape).
 	if v.hasRootFabricID && v.rootFabricID != nocCert.Subject.MatterFabricID {
 		return nil, fmt.Errorf("%w: FabricId in NoC certificate does not match the fabricId in the parent certificate: root 0x%016X != NOC 0x%016X",
@@ -379,7 +379,7 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		// root-signed NOC is presented together with an ICAC; an AKID that
 		// names neither is refused. Mirrors matter.js
 		// packages/protocol/src/certificate/kinds/Noc.ts:174-188 at
-		// db021da0. The verifier holds the root's public key, not its
+		// b25ed960. The verifier holds the root's public key, not its
 		// certificate unless it was built by [NewVerifierFromRCAC]: without
 		// it, the root's subjectKeyIdentifier is the one the root-signed
 		// ICAC names as its authorityKeyIdentifier, which matter.js
@@ -405,7 +405,7 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		// NOC is signed directly by the root: its authorityKeyIdentifier
 		// names the root's subjectKeyIdentifier, checked when the root
 		// certificate is known. Mirrors matter.js Noc.ts:174-188 at
-		// db021da0 (no ICA: the issuer is the root or the NOC is refused).
+		// b25ed960 (no ICA: the issuer is the root or the NOC is refused).
 		if v.hasRootSKID && !bytesEqual(nocCert.Extensions.AuthorityKeyID, v.rootSKID[:]) {
 			return nil, fmt.Errorf("%w: NOC authorityKeyIdentifier does not name the root", ErrChainBroken)
 		}
@@ -441,13 +441,13 @@ const (
 // maxDNRDNs is the RDN count a Matter certificate's subject or issuer may
 // carry — "All implementations SHALL reject Matter certificates with more
 // than 5 RDNs in a single DN" (matter.js OperationalBase.ts:92-97 at
-// db021da0; chip CHIP_CONFIG_CERT_MAX_RDN_ATTRIBUTES).
+// b25ed960; chip CHIP_CONFIG_CERT_MAX_RDN_ATTRIBUTES).
 const maxDNRDNs = 5
 
 // checkDNLimits applies the DN rules every operational certificate shares:
 // at most [maxDNRDNs] RDNs in the subject and the issuer, and no
 // matter-vvs-id — "The subject DN SHALL NOT encode any matter-vvs-id
-// attribute" for a NOC (Noc.ts:109-111 at db021da0), an ICAC
+// attribute" for a NOC (Noc.ts:109-111 at b25ed960), an ICAC
 // (Icac.ts:93-95) and an RCAC (Rcac.ts:89-90).
 func checkDNLimits(c *Certificate, kind string) error {
 	if n := len(c.Subject.Order); n > maxDNRDNs {
@@ -498,7 +498,7 @@ func (c *Certificate) CheckCASEAuthTags() error {
 // not a CA, only the four operational identifiers in the subject, an
 // operational node id, a non-zero fabric id, at most three CATs each with
 // a non-zero version, keyUsage digitalSignature, extendedKeyUsage carrying
-// serverAuth (Noc.ts:148-154 at db021da0: "CHIP requires only serverAuth
+// serverAuth (Noc.ts:148-154 at b25ed960: "CHIP requires only serverAuth
 // and accepts other purposes", so clientAuth alone is refused — until the
 // db021da0 lift either purpose passed here), and a 20-byte
 // subjectKeyIdentifier. Every one of them is what keeps a
@@ -519,7 +519,7 @@ func checkNOCShape(c *Certificate) error {
 	}
 	// The DN limits after the CAT rules: a NOC with four CATs is "too many
 	// CATs" (matter.js validateFields at decode, Noc.ts), not "too many
-	// RDNs" (generalVerify, OperationalBase.ts:92-97 at db021da0).
+	// RDNs" (generalVerify, OperationalBase.ts:92-97 at b25ed960).
 	if err := checkDNLimits(c, "NOC"); err != nil {
 		return err
 	}

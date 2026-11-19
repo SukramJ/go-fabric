@@ -77,7 +77,7 @@ type Peer struct {
 // holds nothing. It does not depend on Timing.ProvenAddressRetention.
 //
 // Ahead of matter.js, which waits the Busy delay inside the attempt that
-// received it (PeerConnection.ts:700-701 at db021da0): an abort of that
+// received it (PeerConnection.ts:700-701 at b25ed960): an abort of that
 // attempt ends the wait with it, and an attempt at another address — or
 // the same address again, once discovery advertised it anew — sends a
 // fresh Sigma1 inside the window the node asked for (issue 507: a border
@@ -134,7 +134,7 @@ func (p *Peer) busyRemaining() time.Duration {
 // properties its network profile is selected by — matter.js
 // Peer.physicalProperties, which the client node sets
 // (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
-// db021da0). nil removes it: the peer's medium is unknown.
+// b25ed960). nil removes it: the peer's medium is unknown.
 func (p *Peer) SetMedium(fn func() Medium) {
 	if fn == nil {
 		p.mediumOf.Store(nil)

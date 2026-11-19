@@ -12,7 +12,7 @@ import (
 // content bytes as text, whatever its DER string tag — matter.js
 // parseSubjectOrIssuer, `Bytes.toString(Bytes.of(valueNode._bytes))` with
 // no look at the tag (packages/protocol/src/certificate/kinds/Certificate.ts:321-326
-// at db021da0). So "FFF1" in UTF8String, PrintableString, IA5String,
+// at b25ed960). So "FFF1" in UTF8String, PrintableString, IA5String,
 // T61String, NumericString or OCTET STRING is 0xFFF1, and in BMPString
 // (UTF-16) or UniversalString (UTF-32) it is malformed. Before, the value
 // came from crypto/x509's decoded name: BMPString read as 0xFFF1, OCTET

@@ -306,18 +306,18 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	// Subscribe-Initial. The default is the decimal rendering of the
 	// numeric version, one byte even for 0. Mirrors matter.js
 	// packages/node/src/behaviors/basic-information/BasicInformationServer.ts:70
-	// at db021da0 — setDefault("hardwareVersionString",
+	// at b25ed960 — setDefault("hardwareVersionString",
 	// state.hardwareVersion.toString()).
 	hwStr := cfg.HardwareVersionStr
 	if hwStr == "" {
 		hwStr = strconv.FormatUint(uint64(cfg.HardwareVersion), 10)
 	}
 	// ProductLabel defaults to the ProductName, and is then served. Mirrors
-	// matter.js BasicInformationServer.ts:67 at db021da0 —
+	// matter.js BasicInformationServer.ts:67 at b25ed960 —
 	// setDefault("productLabel", state.productName).
 	productLabel := cmp.Or(cfg.ProductLabel, cfg.ProductName)
 	// NodeLabel defaults to the ProductName as well. Mirrors matter.js
-	// BasicInformationServer.ts:68 at db021da0 —
+	// BasicInformationServer.ts:68 at b25ed960 —
 	// setDefault("nodeLabel", state.productName).
 	nodeLabel := cmp.Or(cfg.NodeLabel, cfg.ProductName)
 	// SoftwareVersion (0x0009) and SoftwareVersionString (0x000A) must
@@ -939,9 +939,9 @@ func (b *BasicInformation) MatterAttributes() []uint32 { return b.inst().MatterA
 // is the host's. A host reaches it as node.Node.SetNodeLabel.
 // matter.js has no separate host API: a host assigns
 // state.basicInformation.nodeLabel, which BasicInformationServer.ts:68 at
-// db021da0 only defaults (setDefault to the productName), and the
+// b25ed960 only defaults (setDefault to the productName), and the
 // datasource persists the non-volatile attribute (quality N,
-// basic-information.element.ts:35-38 at db021da0, NodeLabel "max 32") and
+// basic-information.element.ts:35-38 at b25ed960, NodeLabel "max 32") and
 // reports the change as it does a controller's write.
 //
 // [BasicInformation.RestoreNodeLabel] is the boot-time restore and stays
@@ -1128,7 +1128,7 @@ func (b *BasicInformation) EmitStartUp() {
 // EmitShutDown fires the Matter §11.1.8.2 ShutDown event (id 0x0001,
 // priority Critical, no fields). No-op when the emitter has not been
 // wired yet — the daemon calls this in its shutdown hook. Mirrors
-// matter.js basic-information.element.ts:111 at db021da0.
+// matter.js basic-information.element.ts:111 at b25ed960.
 func (b *BasicInformation) EmitShutDown() {
 	b.mu.RLock()
 	emitter := b.emitter

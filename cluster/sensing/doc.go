@@ -12,7 +12,7 @@
 // ClusterRevision, privileges, the codecs and the write checks come from
 // there. matter.js serves the cluster with the generated behaviour only
 // (packages/node/src/behaviors/ambient-context-sensing/
-// AmbientContextSensingServer.ts:14 at db021da0 is the empty subclass), so
+// AmbientContextSensingServer.ts:14 at b25ed960 is the empty subclass), so
 // the rules are connectedhomeip's at the harness commit 6170af84
 // (src/app/clusters/ambient-context-sensing-server/
 // AmbientContextSensingCluster.cpp), cited by line; the Ahead-of-matter.js

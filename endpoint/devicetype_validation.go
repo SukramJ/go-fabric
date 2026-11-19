@@ -43,7 +43,7 @@ const (
 	// ViolationUnimplemented: a command the conformance of a server
 	// cluster requires is the server's unimplemented stub — matter.js's
 	// "Throws unimplemented exception" of #validateRequiredCommands
-	// (ValidatedElements.ts:357-372 at db021da0), which matter.js logs, and
+	// (ValidatedElements.ts:357-372 at b25ed960), which matter.js logs, and
 	// under strict validation refuses, when it constructs the behavior,
 	// not as a device-type violation. Its DeviceType names the cluster,
 	// its Requirement "<cluster>.<command>".
@@ -98,7 +98,7 @@ type DeviceTypeViolation struct {
 	// refuses it and reports it apart ([DeviceTypeVerdict].FreshAssertedAtRoot).
 	// Mirrors matter.js DeviceTypeViolation.assertedAtRoot
 	// (packages/model/src/logic/device-types/DeviceTypeViolation.ts:53-59
-	// at db021da0).
+	// at b25ed960).
 	AssertedAtRoot bool
 }
 
@@ -310,7 +310,7 @@ func featureMapOf(srv contract.ClusterServer) uint32 {
 // assembledNodeConditions: CustomNetworkConfig for a node that does not
 // commission over BLE, none for one that does — matter.js
 // ServerEndpointFacts.nodeConditionsOf (ServerEndpointFacts.ts:131-145 at
-// db021da0): "a node that does not commission over BLE only supports
+// b25ed960): "a node that does not commission over BLE only supports
 // out-of-band-configured networking".
 func assembledNodeConditions(overBLE bool) func(uint16) []string {
 	if overBLE {
@@ -532,7 +532,7 @@ func (v *DeviceTypeValidator) judge(all []DeviceTypeViolation, shape treeShape) 
 		byEndpoint[viol.Endpoint][viol.Key()] = viol.AssertedAtRoot
 		// A violation that loses its Root-assertion flag now binds, so it
 		// is reported again (#judge, DeviceTypeConformanceService.ts:479-494
-		// at db021da0).
+		// at b25ed960).
 		if flagged, ok := v.reported[viol.Endpoint][viol.Key()]; ok && (!flagged || viol.AssertedAtRoot) {
 			continue
 		}
@@ -570,7 +570,7 @@ func (v *DeviceTypeValidator) judge(all []DeviceTypeViolation, shape treeShape) 
 // endpoint in tree order that has one (of those within names, when within
 // is not nil): matter.js refuses that endpoint alone, before the behaviors
 // initialize and before the pass judges anything else
-// (DeviceTypeConformanceService.ts:371-382 #assertPlacement at db021da0,
+// (DeviceTypeConformanceService.ts:371-382 #assertPlacement at b25ed960,
 // DeviceTypeConformance.misplacedSingletons' first entry).
 func firstMisplacing(vs []DeviceTypeViolation, within map[uint16]bool) []DeviceTypeViolation {
 	var out []DeviceTypeViolation

@@ -12,7 +12,7 @@ import (
 
 // TestStructDefaultIsServed: the generated server starts a struct
 // attribute at the default its fields state — OperationalError at
-// {ErrorStateId: 0} (operational-state.element.ts:110-111 at db021da0).
+// {ErrorStateId: 0} (operational-state.element.ts:110-111 at b25ed960).
 func TestStructDefaultIsServed(t *testing.T) {
 	t.Parallel()
 	srv, err := spec.NewServer(opdef.Definition, spec.Options{}, spec.ServerConfig{Unimplemented: true})

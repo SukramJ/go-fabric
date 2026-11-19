@@ -6,7 +6,7 @@
 // SpecificationVersion a BasicInformation server reports — a test stands
 // in for a node of an older release with it, as matter.js's IcdClientTest
 // sets basicInformation.specificationVersion (IcdClientTest.ts:567-582 at
-// db021da0); a release node always reports the release the module
+// b25ed960); a release node always reports the release the module
 // implements — and a hook on an ICDManagement server's RegisterClient and
 // UnregisterClient commands, which counts or refuses them as matter.js's
 // CountingIcdServer and RefusingIcdServer do (IcdClientTest.ts:265-274,

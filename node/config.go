@@ -49,10 +49,10 @@ type Groups = groups.Manager
 // bring-up needs beyond them (examples/reference-bridge/main.go:84-497 at b4ea1f96^).
 type Config struct {
 	// Network mirrors matter.js `network` (NetworkServer.ts:202-223 at
-	// db021da0).
+	// b25ed960).
 	Network Network
 	// Commissioning mirrors matter.js `commissioning`
-	// (CommissioningServer.ts:409-419 at db021da0). An uncommissioned
+	// (CommissioningServer.ts:409-419 at b25ed960). An uncommissioned
 	// node's own window closes after 48 h and nothing reopens it: the node
 	// is then not commissionable until the host calls [Node.OpenOwnWindow]
 	// ([Observers].OnWindowTransition reports the close).
@@ -97,7 +97,7 @@ type Config struct {
 	// whatever this states: the requestor's record of the update in
 	// progress names the version that now runs, the record the requestor
 	// reports VersionApplied on (OtaSoftwareUpdateRequestorServer.ts:255-280
-	// at db021da0).
+	// at b25ed960).
 	BootReason uint8
 	// ICD makes the node an intermittently connected device: ICD
 	// Management on the root, Check-Ins to its registered clients, the
@@ -278,7 +278,7 @@ type Config struct {
 }
 
 // Network is matter.js `network` for the keys the daemon uses
-// (NetworkServer.ts:202-223 at db021da0: port and listening address,
+// (NetworkServer.ts:202-223 at b25ed960: port and listening address,
 // ipv4, tcp).
 type Network struct {
 	// Listen is the UDP listen address; empty is ":5540".
@@ -296,7 +296,7 @@ type Network struct {
 	// it an uncommissioned node is commissionable over BLE, and the
 	// onboarding payload says so (the QR code's BLE discovery bit) —
 	// matter.js `network.ble` and `discoveryCapabilities.ble`
-	// (NetworkServer.ts:28-51 at db021da0). While the node has no fabric,
+	// (NetworkServer.ts:28-51 at b25ed960). While the node has no fabric,
 	// its own window (and a [Node.OpenBasicWindow] window) advertises over
 	// BLE as well as over DNS-SD and serves PASE over BTP. The window's end
 	// (its timeout, [Node.CloseWindow]) stops only the BLE advertisement
@@ -341,7 +341,7 @@ type Network struct {
 	// a lost address and announce the current ones, and GeneralDiagnostics
 	// while NetworkInterfaces is observed, to report the change. Zero is
 	// matter.js's 60 s (INTERFACE_CHECK_INTERVAL, Network.ts:91-95 at
-	// db021da0); negative disables the periodic check — a host that
+	// b25ed960); negative disables the periodic check — a host that
 	// learns of changes itself calls [Node.TriggerReannounce], which
 	// re-announces the mDNS records; GeneralDiagnostics' NetworkInterfaces
 	// is then current on each read and reports no change of its own.
@@ -404,7 +404,7 @@ type WiFi struct {
 	// After a successful ConnectNetwork command the node re-announces its
 	// DNS-SD records at once ([Node.TriggerReannounce]), as matter.js's
 	// example does after its connect
-	// (DummyWifiNetworkCommissioningServer.ts:132-133 at db021da0); after
+	// (DummyWifiNetworkCommissioningServer.ts:132-133 at b25ed960); after
 	// the rejoin at Start the trigger finds nothing published yet, and the
 	// start sequence publishes the records right after it.
 	// wifi/wpasupplicant is the Linux driver; nil mounts the Ethernet
@@ -453,7 +453,7 @@ func (c *Config) rootDeviceConditions() []string {
 }
 
 // Commissioning is matter.js `commissioning` (the State of
-// CommissioningServer.ts:409-419 at db021da0: passcode, discriminator)
+// CommissioningServer.ts:409-419 at b25ed960: passcode, discriminator)
 // plus the SPAKE2+ PBKDF parameters the daemon configures
 // (main.go:91-92 at b4ea1f96^).
 type Commissioning struct {
@@ -478,7 +478,7 @@ type Commissioning struct {
 	// and the RegulatoryConfig the node starts with: [RegulatoryOutdoor] or
 	// [RegulatoryIndoorOutdoor]. The zero value is IndoorOutdoor, matter.js's
 	// default (packages/model/src/standard/elements/
-	// general-commissioning.element.ts:31-38 at db021da0, LocationCapability
+	// general-commissioning.element.ts:31-38 at b25ed960, LocationCapability
 	// `default: 2`, RegulatoryConfig defaulting to it) — so
 	// [RegulatoryIndoor], which is 0, reads as the default here; a node
 	// that supports indoor operation alone sets [Commissioning].IndoorOnly.
@@ -529,7 +529,7 @@ type Commissioning struct {
 	// (src/setup_payload/BUILD.gn:19-22 at 6170af84,
 	// chip_enable_rotating_device_id = false); matter.js emits no RI
 	// (packages/protocol/src/advertisement/mdns/
-	// CommissionableMdnsAdvertisement.ts:84-97 at db021da0). A store
+	// CommissionableMdnsAdvertisement.ts:84-97 at b25ed960). A store
 	// failure leaves RI out of that window's record rather than advertise
 	// a value that does not rotate.
 	RotatingDeviceID bool
@@ -578,7 +578,7 @@ const (
 // locationCapability is the LocationCapability the root's
 // GeneralCommissioning serves: Indoor with IndoorOnly, IndoorOutdoor for the
 // zero value (matter.js's model default,
-// general-commissioning.element.ts:35-38 at db021da0), else the value set.
+// general-commissioning.element.ts:35-38 at b25ed960), else the value set.
 func (c Commissioning) locationCapability() uint8 {
 	switch {
 	case c.IndoorOnly:
@@ -640,7 +640,7 @@ type BasicInformation struct {
 	ProductLabel string
 	// NodeLabel is the label the node serves on its first boot; empty is
 	// the ProductName, as matter.js's BasicInformationServer.ts:68 at
-	// db021da0 (setDefault("nodeLabel", state.productName)).
+	// b25ed960 (setDefault("nodeLabel", state.productName)).
 	NodeLabel    string
 	SerialNumber string
 	// UniqueID pins BasicInformation.UniqueID (quality F, Matter
@@ -711,7 +711,7 @@ func (b BasicInformation) constraintErrors() []error {
 // advertises it when ProductDescription.Name is empty, and the first
 // boot derives UniqueID from it. Mirrors matter.js
 // packages/node/src/behaviors/basic-information/BasicInformationServer.ts:68
-// at db021da0 — setDefault("nodeLabel", state.productName).
+// at b25ed960 — setDefault("nodeLabel", state.productName).
 func (b *BasicInformation) defaultNodeLabel() {
 	if b.NodeLabel == "" {
 		b.NodeLabel = b.ProductName
@@ -944,7 +944,7 @@ func (c *Config) Validate() error {
 	// A mode that is none of warn, strict and off fails the node's
 	// construction. Mirrors matter.js
 	// packages/node/src/node/server/DeviceTypeConformanceService.ts:674-685
-	// at db021da0 (modeOf: an unknown endpoint.validation value throws).
+	// at b25ed960 (modeOf: an unknown endpoint.validation value throws).
 	switch c.DeviceTypeValidation {
 	case endpoint.DeviceTypeValidationWarn, endpoint.DeviceTypeValidationStrict, endpoint.DeviceTypeValidationOff:
 	default:

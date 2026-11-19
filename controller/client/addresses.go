@@ -21,7 +21,7 @@ const (
 	ExpirationInterval = time.Minute
 )
 
-// expirationOf is when a lifespan ends — Peers.ts:959-966: never without
+// expirationOf is when a lifespan ends — Peers.ts:1014-1021: never without
 // a discovery time (ok false), DefaultTTL after it when the TTL is
 // unknown.
 func expirationOf(discoveredAt time.Time, ttl time.Duration) (time.Time, bool) {

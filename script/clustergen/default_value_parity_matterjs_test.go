@@ -6,7 +6,7 @@ package main
 import "testing"
 
 // TestDefaultValueParityMatterJS mirrors
-// packages/model/test/logic/DefaultValueTest.ts:49-70 at db021da0: a
+// packages/model/test/logic/DefaultValueTest.ts:49-70 at b25ed960: a
 // default stated in a unit is counted in the units of its type (1 % of
 // 0.01 % steps is 1), a floating-point default keeps its fraction, and a
 // value with no unit stays as it is — the literal script/clustergen
@@ -34,10 +34,10 @@ func TestDefaultValueParityMatterJS(t *testing.T) {
 // TestStructDefaultFromItsFields: a struct-typed attribute without a
 // default of its own gets the one its fields state — OperationalState's
 // OperationalError starts as {errorStateId: 0}
-// (operational-state.element.ts:110-111 at db021da0) — and only a
+// (operational-state.element.ts:110-111 at b25ed960) — and only a
 // mandatory, non-nullable field with a scalar default enters it — this
 // generator's narrowing of matter.js's rule (DefaultValue.ts:153-179 at
-// db021da0 takes every conformant child with a default).
+// b25ed960 takes every conformant child with a default).
 func TestStructDefaultFromItsFields(t *testing.T) {
 	t.Parallel()
 	mk := func(name string, k kind, mandatory, nullable bool, def string) *fieldInfo {

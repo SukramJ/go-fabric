@@ -8,7 +8,7 @@ import csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement
 // cameraRequired is the CameraAvStreamManagement state device.New requires
 // of a Camera (decision 17), with the values of matter.js's corpus
 // fixtures (packages/node/test/endpoint/validation/StandardDeviceTypeCorpusTest.ts
-// at db021da0: the microphone :132-137, the video sensor :139-143, the
+// at b25ed960: the microphone :132-137, the video sensor :139-143, the
 // minimum viewport :162, the viewport :166).
 func cameraRequired() csdef.Declare {
 	return csdef.Declare{Initial: csdef.Patch{

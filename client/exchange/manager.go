@@ -46,8 +46,8 @@ const sessionIDUpperBound uint16 = 0xFFFF
 // maxSessionsPerPeer is the number of sessions one peer may hold that it
 // established with us (the CASE responder's): a new CASE does not close
 // the peer's previous sessions, so beyond it the least recently used is
-// closed. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:205
-// (MAX_SESSIONS_PER_PEER = 5) at db021da0; the device side's counterpart is
+// closed. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:206
+// (MAX_SESSIONS_PER_PEER = 5); the device side's counterpart is
 // secure/operational.MaxSessionsPerPeer.
 const maxSessionsPerPeer = 5
 
@@ -99,7 +99,7 @@ type Config struct {
 	// sender-side axis every exchange's backoff takes the larger of it and
 	// the peer's margin for — matter.js SessionManager.localAdditionalMrpDelay,
 	// set from the node's own network profile ("fast" by default, so 0;
-	// ServerNetworkRuntime.ts:409-410, NetworkServer.ts:248 at db021da0).
+	// ServerNetworkRuntime.ts:409-410, NetworkServer.ts:248 at b25ed960).
 	LocalAdditionalMrpDelay time.Duration
 	// LocalFixedMrpBackoff is the flat pad added after every exchange's
 	// backoff, not amplified by it — matter.js
@@ -256,7 +256,7 @@ func (m *Manager) Reliable() bool { return m.reliable }
 // x acknowledges any message, and not returned by [Exchange.Next], which
 // waits for the message after it. It is matter.js
 // ProtocolHandler.onNewExchange (packages/protocol/src/protocol/ProtocolHandler.ts:22-23
-// at db021da0). It runs on a goroutine of its own, one per exchange, so
+// at b25ed960). It runs on a goroutine of its own, one per exchange, so
 // the receive path never waits for it; the exchange is closed when it
 // returns, if the handler did not close it.
 type ProtocolHandler func(x *Exchange, first *Message)
@@ -297,7 +297,7 @@ type CheckInReceiver func(payload []byte) bool
 // Channel opcode 0x50) peers send unsecured: each one goes to fn, nothing is
 // answered and, the Check-In being unreliable, nothing is acknowledged; the
 // exchange closes once fn returns. nil drops them again. Mirrors matter.js
-// packages/protocol/src/securechannel/SecureChannelProtocol.ts:149-180
+// packages/protocol/src/securechannel/SecureChannelProtocol.ts:135-166
 // (#handleIcdCheckIn), where the fabrics' ICD state is fn.
 func (m *Manager) SetCheckInReceiver(fn CheckInReceiver) {
 	m.mu.Lock()
@@ -305,7 +305,7 @@ func (m *Manager) SetCheckInReceiver(fn CheckInReceiver) {
 	m.mu.Unlock()
 }
 
-// receiveCheckIn hands a Check-In to the receiver (SecureChannelProtocol.ts:164-180).
+// receiveCheckIn hands a Check-In to the receiver (SecureChannelProtocol.ts:150-166).
 func (m *Manager) receiveCheckIn(_ *Exchange, msg *Message) {
 	m.mu.Lock()
 	fn := m.checkIn
@@ -461,8 +461,8 @@ type SecureSessionConfig struct {
 	// were the responder). Such sessions are capped per peer: registering
 	// one beyond [maxSessionsPerPeer] closes the peer's least recently used
 	// one — matter.js NodeSession.isInitiator false, the sessions
-	// SessionManager.ts:312-318 hands to #evictExcessSessionsFor (:697-725)
-	// at db021da0.
+	// SessionManager.ts:764-768 (#sessionEstablished) hands to
+	// #evictExcessSessionsFor (:779-808).
 	Responder bool
 }
 
@@ -561,9 +561,9 @@ func (m *Manager) newSecureSession(cfg SecureSessionConfig, establishing bool) (
 // outside m.mu. Only sessions the peer established claim a slot; added
 // itself is never chosen, so a burst of new sessions cannot evict the one
 // that prompted the check; a session already closing still counts but is
-// not chosen again. Mirrors matter.js SessionManager.ts:697-725
-// (#evictExcessSessionsFor) and :554-562 (#leastRecentlyUsedSession on
-// the session's timestamp, the time of its last traffic) at db021da0.
+// not chosen again. Mirrors matter.js SessionManager.ts:779-808
+// (#evictExcessSessionsFor) and :600-608 (#leastRecentlyUsedSession on
+// the session's timestamp, the time of its last traffic).
 func (m *Manager) excessPeerSessionsLocked(added *Session) []*Session {
 	if !added.responder || added.fabricIndex == 0 {
 		return nil
@@ -1243,7 +1243,7 @@ func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 
 // Secure Channel status codes of a Busy answer: matter.js
 // GeneralStatusCode.Busy (packages/types/src/protocol/definitions/general.ts:33
-// at db021da0) and SecureChannelStatusCode.Busy
+// at b25ed960) and SecureChannelStatusCode.Busy
 // (packages/types/src/protocol/definitions/secure-channel.ts:65-79), the
 // codes client/peer reads.
 const (

@@ -69,7 +69,7 @@ func createNode(t *testing.T, cfg servicearea.Config) error {
 	rvc, err := devicelayer.NewRoboticVacuumCleaner(devicelayer.Options{StableKey: endpoint.StringKey("rvc:1"), Name: "rvc"},
 		sadef.Declare{HostServer: srv},
 		// createNode's run mode and operational state
-		// (ServiceAreaServerTest.ts:27-49 at db021da0), which device.New
+		// (ServiceAreaServerTest.ts:27-49 at b25ed960), which device.New
 		// requires (decision 17).
 		rvcrundef.Declare{Initial: rvcrundef.Patch{SupportedModes: &[]rvcrundef.ModeOptionStruct{
 			{Label: "Idle", Mode: 0, ModeTags: []rvcrundef.ModeTagStruct{{Value: rvcrundef.ModeTagIdle}}},

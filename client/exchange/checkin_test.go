@@ -13,7 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
-// TestCheckInReachesTheReceiver holds SecureChannelProtocol.ts:149-180: an
+// TestCheckInReachesTheReceiver holds SecureChannelProtocol.ts:135-166: an
 // unsecured ICD Check-In goes to the receiver, nothing is sent back, the
 // exchange and the inbound session close; without a receiver it is
 // dropped.

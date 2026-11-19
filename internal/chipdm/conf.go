@@ -444,7 +444,7 @@ func atomFromJSON(raw json.RawMessage) (string, error) {
 // (comparisons, then equality, then "&", then "|" and "^").
 //
 // "or" is "|" once: matter.js rewrites the first " or " only
-// (Conformance.ts:554 at db021da0, a string pattern), and the parser does the
+// (Conformance.ts:554 at b25ed960, a string pattern), and the parser does the
 // same. A further "or" is left as a word, which this parser lexes as a name;
 // white space separating the terms (Conformance.ts:598-615), the text would
 // parse as an otherwise list nobody wrote. It is an error instead
@@ -661,7 +661,7 @@ func (p *confParser) choice(expr *Conf) (*Conf, error) {
 	}
 	// At most one modifier, and no bare number after it: "a2+-" and the
 	// range form "a2-4" are not the grammar of § 7.3.14. Mirrors matter.js
-	// packages/model/src/aspects/Conformance.ts:741-753 at db021da0
+	// packages/model/src/aspects/Conformance.ts:741-753 at b25ed960
 	// (INVALID_CHOICE).
 	if p.at("+") || p.at("-") {
 		return nil, fmt.Errorf("conformance: choice %q may have at most one \"+\" or \"-\" modifier", c.String())

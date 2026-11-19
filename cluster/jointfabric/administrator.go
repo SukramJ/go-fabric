@@ -123,7 +123,7 @@ type AdministratorConfig struct {
 // The rules are connectedhomeip's joint-fabric-administrator-server.cpp
 // (:172-449) and JointFabricAdministrator.h at 6170af84; matter.js's
 // JointFabricAdministratorServer is the generated behaviour
-// (JointFabricAdministratorServer.ts:14 at db021da0).
+// (JointFabricAdministratorServer.ts:14 at b25ed960).
 type Administrator struct {
 	*spec.Instance
 	spec.SelfHeld

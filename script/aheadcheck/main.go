@@ -35,6 +35,20 @@
 //  4. At the ref (-ref, default $MATTERJS_REF, else HEAD). A marker text
 //     absent there, or a marker file gone, is the finding "caught up?"
 //     naming the row, the file and the ref.
+//  5. Caught up. A pin lift can move the pin onto a matter.js that closed a
+//     row's gap before the unit that reconciles the two implementations
+//     lands. Such a row is listed in caught-up.txt next to this file, one
+//     line `<entry> <pin sha> <unit>` ('#' starts a comment; a missing
+//     file is an empty list), and its marker stays as it stood, recording
+//     what vanished. For a listed row the check at the pin inverts: its
+//     marker must no longer hold there (at least one of its markers
+//     absent, or a class marker's class gone), and the run prints "caught
+//     up at <sha>, reconciled by <unit>" instead of failing. A listed row
+//     whose marker still holds, a line whose sha is not a prefix of the
+//     current pin (a caught-up row closes within its lift's waves, never
+//     across another lift) and a line naming no row are findings. The ref
+//     is not read for a listed row. A malformed line means the check could
+//     not run.
 //
 // All git access is `git rev-parse` and `git show <rev>:<path>` on the
 // matter.js clone given by -matterjs (default $MATTERJS_DIR, else
@@ -72,15 +86,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/SukramJ/go-fabric/parity"
 )
 
-// registerPath and allowancePath are relative to the module root.
+// registerPath, allowancePath and caughtUpPath are relative to the module
+// root.
 const (
 	registerPath  = "notes/parity/by_design.md"
 	allowancePath = "script/aheadcheck/todo-marker.txt"
+	caughtUpPath  = "script/aheadcheck/caught-up.txt"
 )
 
 func main() {
@@ -139,6 +156,11 @@ func run(out, errOut io.Writer, root, matterDir, pin, ref string) int {
 		_, _ = fmt.Fprintln(errOut, "aheadcheck:", err)
 		return 2
 	}
+	caught, err := readCaughtUp(filepath.Join(root, caughtUpPath))
+	if err != nil {
+		_, _ = fmt.Fprintln(errOut, "aheadcheck:", err)
+		return 2
+	}
 	rows, err := parseRegister(string(reg))
 	if err != nil {
 		_, _ = fmt.Fprintln(errOut, "aheadcheck:", registerPath+":", err)
@@ -155,7 +177,7 @@ func run(out, errOut io.Writer, root, matterDir, pin, ref string) int {
 		_, _ = fmt.Fprintf(errOut, "aheadcheck: the ref %s in %s: %v\n", ref, matterDir, err)
 		return 2
 	}
-	return report(out, errOut, rows, allow, repo.show, revision{name: "the pin", sha: pinSha}, revision{name: ref, sha: refSha})
+	return report(out, errOut, rows, allow, caught, repo.show, revision{name: "the pin", sha: pinSha}, revision{name: ref, sha: refSha})
 }
 
 // report checks the rows through show and returns the exit status. A read
@@ -163,7 +185,7 @@ func run(out, errOut io.Writer, root, matterDir, pin, ref string) int {
 // fetch of CI's blobless clone that failed, a broken repository — is exit
 // 2, "could not run", not a finding (R2-P6-err-2812): a failed fetch read as
 // "caught up?" or "the row is wrong".
-func report(out, errOut io.Writer, rows []row, allow map[string]bool, show showFunc, pin, ref revision) int {
+func report(out, errOut io.Writer, rows []row, allow map[string]bool, caught map[string]caughtUp, show showFunc, pin, ref revision) int {
 	var readErr error
 	recording := func(sha, path string) (string, error) {
 		content, err := show(sha, path)
@@ -172,10 +194,13 @@ func report(out, errOut io.Writer, rows []row, allow map[string]bool, show showF
 		}
 		return content, err
 	}
-	findings := check(rows, allow, recording, pin, ref)
+	findings, notes := check(rows, allow, caught, recording, pin, ref)
 	if readErr != nil {
 		_, _ = fmt.Fprintln(errOut, "aheadcheck: could not read the clone:", readErr)
 		return 2
+	}
+	for _, n := range notes {
+		_, _ = fmt.Fprintln(out, n)
 	}
 	for _, f := range findings {
 		_, _ = fmt.Fprintln(out, f)
@@ -189,9 +214,48 @@ func report(out, errOut io.Writer, rows []row, allow map[string]bool, show showF
 			marked++
 		}
 	}
-	_, _ = fmt.Fprintf(out, "aheadcheck: %d rows, %d with a marker, %d in todo-marker.txt; every marker holds at the pin %s and at %s (%s)\n",
-		len(rows), marked, len(rows)-marked, short(pin.sha), ref.name, short(ref.sha))
+	every := "every marker"
+	if len(notes) > 0 {
+		every = "every other row's marker"
+	}
+	_, _ = fmt.Fprintf(out, "aheadcheck: %d rows, %d with a marker, %d in todo-marker.txt, %d in caught-up.txt; %s holds at the pin %s and at %s (%s)\n",
+		len(rows), marked, len(rows)-marked, len(notes), every, short(pin.sha), ref.name, short(ref.sha))
 	return 0
+}
+
+// shaPrefix is the pin as caught-up.txt names it: a commit id of at least
+// eight hex digits, matched as a prefix of the full pin.
+var shaPrefix = regexp.MustCompile(`^[0-9a-f]{8,40}$`)
+
+// readCaughtUp reads caught-up.txt: one line per caught-up row, `<entry>
+// <pin sha> <unit>`, blank lines and '#' comments ignored. A missing file
+// is an empty list; a malformed line, or an entry named twice, is an error.
+func readCaughtUp(path string) (map[string]caughtUp, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // G304: fixed path under the module root
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]caughtUp{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	caught := map[string]caughtUp{}
+	for i, line := range strings.Split(string(data), "\n") {
+		if j := strings.IndexByte(line, '#'); j >= 0 {
+			line = line[:j]
+		}
+		f := strings.Fields(line)
+		if len(f) == 0 {
+			continue
+		}
+		if len(f) != 3 || !shaPrefix.MatchString(f[1]) {
+			return nil, fmt.Errorf("%s:%d: want \"<entry> <pin sha> <unit>\" with a commit id of 8 to 40 lower-case hex digits, have %q", filepath.Base(path), i+1, strings.TrimSpace(line))
+		}
+		if _, dup := caught[f[0]]; dup {
+			return nil, fmt.Errorf("%s:%d: %s is listed twice", filepath.Base(path), i+1, f[0])
+		}
+		caught[f[0]] = caughtUp{pin: f[1], unit: f[2]}
+	}
+	return caught, nil
 }
 
 // readAllowance reads the TODO-marker allowance: one row name per line,

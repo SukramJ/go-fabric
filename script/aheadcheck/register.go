@@ -203,17 +203,29 @@ type revision struct{ name, sha string }
 // the path does not exist there.
 type showFunc func(sha, path string) (string, error)
 
+// caughtUp is a line of caught-up.txt: a row whose marker no longer holds
+// at the pin it names, open until the pin-lift unit it names reconciles
+// the implementations and closes the row.
+type caughtUp struct {
+	pin, unit string
+}
+
 // check returns one line per finding, in register order, then the
-// allowance's own findings sorted.
-func check(rows []row, allow map[string]bool, show showFunc, pin, ref revision) []string {
+// allowance's and caught-up.txt's own findings sorted; and one note per
+// caught-up row that holds as listed.
+func check(rows []row, allow map[string]bool, caught map[string]caughtUp, show showFunc, pin, ref revision) (findings, notes []string) {
 	var out []string
 	seen := map[string]bool{}
 	for _, r := range rows {
 		seen[r.entry] = true
 		at := fmt.Sprintf("aheadcheck: %s (by_design.md:%d)", r.entry, r.line)
+		c, isCaught := caught[r.entry]
 		switch {
 		case r.problem != "":
 			out = append(out, fmt.Sprintf("%s: %s", at, r.problem))
+			continue
+		case r.noMarker && isCaught:
+			out = append(out, at+": has no marker but is in caught-up.txt — a row without a marker cannot have been caught up")
 			continue
 		case r.noMarker && !allow[r.entry]:
 			out = append(out, at+": no marker, and the row is not in todo-marker.txt — read it from the tree at the pin and record it")
@@ -222,6 +234,14 @@ func check(rows []row, allow map[string]bool, show showFunc, pin, ref revision) 
 			continue
 		case allow[r.entry]:
 			out = append(out, at+": has a marker but is still in todo-marker.txt — remove its line")
+		}
+		if isCaught {
+			if f, ok := checkCaught(r, c, show, pin); ok {
+				notes = append(notes, fmt.Sprintf("%s: caught up at %s, reconciled by %s", at, c.pin, c.unit))
+			} else {
+				out = append(out, at+": "+f)
+			}
+			continue
 		}
 		for _, m := range r.markers {
 			m, f := resolve(show, pin, m)
@@ -246,8 +266,35 @@ func check(rows []row, allow map[string]bool, show showFunc, pin, ref revision) 
 			stale = append(stale, "aheadcheck: todo-marker.txt names "+name+", which is no row of the register — remove its line")
 		}
 	}
+	for name := range caught {
+		if !seen[name] {
+			stale = append(stale, "aheadcheck: caught-up.txt names "+name+", which is no row of the register — remove its line")
+		}
+	}
 	sort.Strings(stale)
-	return append(out, stale...)
+	return append(out, stale...), notes
+}
+
+// checkCaught holds a row listed in caught-up.txt: the line names the
+// current pin (a caught-up row closes within its lift's waves and does not
+// ride across another lift), and at the pin the row's marker no longer
+// holds — at least one of its markers is absent, or a class marker's
+// class is gone. ok is false with the finding when either fails. The ref
+// is not read: the row is already known caught up.
+func checkCaught(r row, c caughtUp, show showFunc, pin revision) (finding string, ok bool) {
+	if !strings.HasPrefix(pin.sha, c.pin) {
+		return fmt.Sprintf("caught-up.txt lists it caught up at %s, but the pin is %s — close the row with %s, or re-read it at the new pin and record the verdict there", c.pin, short(pin.sha), c.unit), false
+	}
+	for _, m := range r.markers {
+		m, f := resolve(show, pin, m)
+		if f == "" {
+			f = holds(show, pin, m)
+		}
+		if f != "" {
+			return "", true
+		}
+	}
+	return fmt.Sprintf("listed caught up in caught-up.txt but the marker still holds at %s (%s) — remove its line", pin.name, short(pin.sha)), false
 }
 
 // resolve turns a class marker into a text marker: the class's body as it

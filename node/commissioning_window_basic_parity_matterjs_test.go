@@ -15,7 +15,7 @@ import (
 )
 
 // openBasicWindowRequest is OpenBasicCommissioningWindow with a 180 s
-// timeout (CommissioningWindowLifetimeTest.ts:157-176 at db021da0).
+// timeout (CommissioningWindowLifetimeTest.ts:157-176 at b25ed960).
 type openBasicWindowRequest struct{ timeout uint16 }
 
 func (r openBasicWindowRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {

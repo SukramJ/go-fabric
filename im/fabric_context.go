@@ -154,7 +154,7 @@ type localNodeIDCtxKey struct{}
 // subscribe path that names a node is then answered for this node only
 // ([AttributeExpansion]): matter.js filters a path's nodeId against that
 // id (packages/protocol/src/action/server/DataResponse.ts:57-62 at
-// db021da0, UNSPECIFIED_NODE_ID without a fabric).
+// b25ed960, UNSPECIFIED_NODE_ID without a fabric).
 func WithLocalNodeID(ctx context.Context, nodeID uint64) context.Context {
 	return context.WithValue(ctx, localNodeIDCtxKey{}, nodeID)
 }
@@ -222,9 +222,9 @@ func (deniedReads) Read(_ context.Context, path ConcreteAttributePath) []ReadRes
 // subject's access check, the fabric-scoped write and invoke gates, the
 // group authorizer. Matter constrains a fabric index to "1 to 254" (matter.js
 // packages/model/src/standard/elements/fabric-index.element.ts:12-14 at
-// db021da0); 0 is a session without a fabric — PASE before AddNOC,
+// b25ed960); 0 is a session without a fabric — PASE before AddNOC,
 // matter.js FabricIndex.NO_FABRIC (packages/types/src/datatype/FabricIndex.ts:28
-// at db021da0) — and anything above 254 an index the caller could not
+// at b25ed960) — and anything above 254 an index the caller could not
 // resolve (endpoint.FabricIndexUnresolvable). Neither is an accessing
 // fabric. No reference models an index it cannot resolve; reading it as no
 // fabric is this module's fail-closed rule.

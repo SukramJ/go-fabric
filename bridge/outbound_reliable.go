@@ -77,7 +77,7 @@ type outboundReliableTracker struct {
 	rtt mrpRTTWindow
 	// baseIntervalFor resolves the peer-appropriate MRP base interval
 	// for the session (peer-advertised active/idle interval selected
-	// by peer activity — matter.js MRP.ts:181 at db021da0). nil, or a
+	// by peer activity — matter.js MRP.ts:181 at b25ed960). nil, or a
 	// session the resolver does not know, falls back to the spec idle
 	// default.
 	// Set once at construction; read without the mutex.
@@ -393,7 +393,7 @@ func (t *outboundReliableTracker) forgetInstalled(sessionID uint16) {
 // having authenticated: every PBKDFParamResponse, Pake2, Sigma2 and
 // StatusReport of a handshake is one, paced by the intervals that peer
 // stated, which neither reference clamps (matter.js
-// packages/protocol/src/session/SessionIntervals.ts:52-53 at db021da0; chip
+// packages/protocol/src/session/SessionIntervals.ts:52-53 at b25ed960; chip
 // src/protocols/secure_channel/PairingSession.cpp:175-189 at 6170af84).
 //
 // The rule is this module's own (review II, owner decision 23): a message
@@ -548,7 +548,7 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
-	// formula at transmission 0 — matter.js MRP.ts:181 (at db021da0)
+	// formula at transmission 0 — matter.js MRP.ts:181 (at b25ed960)
 	// evaluates the peer-appropriate base interval for every
 	// transmission including the first.
 	delay := mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())

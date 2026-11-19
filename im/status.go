@@ -212,7 +212,7 @@ func (s StatusIB) MarshalTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // src/lib/core/TLVReader.cpp:204-214 at 6170af84,
 // CHIP_ERROR_INVALID_INTEGER_VALUE); matter.js reads both as a 32-bit enum
 // (packages/types/src/protocol/types/TlvStatus.ts:15-16,
-// packages/types/src/tlv/TlvNumber.ts:303 at db021da0) and keeps the
+// packages/types/src/tlv/TlvNumber.ts:303 at b25ed960) and keeps the
 // number, which the 8-bit [StatusCode] cannot.
 func statusIBField(el tlv.Element) (uint8, error) {
 	return uint8Field(el)

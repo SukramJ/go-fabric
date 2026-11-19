@@ -12,7 +12,7 @@ import (
 )
 
 // TestDerCodecDecodeRefusalsParityMatterJS mirrors
-// packages/general/test/codec/DerCodecTest.ts:102-130 at db021da0: the
+// packages/general/test/codec/DerCodecTest.ts:102-130 at b25ed960: the
 // element shapes matter.js's DerCodec.decode refuses — empty data, a
 // declared length past the buffer, a 4-byte long-form length with its
 // high bit set, the BER indefinite-length marker DER forbids, a long-form
@@ -43,7 +43,7 @@ func TestDerCodecDecodeRefusalsParityMatterJS(t *testing.T) {
 }
 
 // TestDerCodecTimeParityMatterJS mirrors
-// packages/general/test/codec/DerCodecTest.ts:84-90 at db021da0: a date
+// packages/general/test/codec/DerCodecTest.ts:84-90 at b25ed960: a date
 // before 2050 is a UTCTime, and the "no well-defined expiration" date
 // (X520.NON_WELL_DEFINED_DATE, 99991231235959Z) a GeneralizedTime — the
 // Validity encoding of a certificate's NotAfter of 0

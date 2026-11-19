@@ -21,7 +21,7 @@ import (
 type Dialer struct {
 	// MaxPayloadSize is the largest message a connection sends or
 	// receives, the length prefix not counted (TcpChannel.ts:37-41 at
-	// db021da0). Zero means [DefaultMaxPayloadSize].
+	// b25ed960). Zero means [DefaultMaxPayloadSize].
 	MaxPayloadSize int
 	// Logger receives the connections' log lines. nil means
 	// slog.Default.

@@ -1355,7 +1355,7 @@ func TestCapabilityMinimaRev6Defaults(t *testing.T) {
 // TestBasicInfo_LocalConfigDisabledWriteIsUnsupportedAttribute: the root
 // BasicInformation does not serve the optional LocalConfigDisabled (matter.js's
 // bridge sample leaves it off the root, basic-information.element.ts:79 at
-// db021da0, "O"), so a write answers UNSUPPORTED_ATTRIBUTE, as the
+// b25ed960, "O"), so a write answers UNSUPPORTED_ATTRIBUTE, as the
 // dispatcher answers it for an unlisted attribute. The arm that accepted
 // and discarded the value was unreachable (W3-clucore-10).
 func TestBasicInfo_LocalConfigDisabledWriteIsUnsupportedAttribute(t *testing.T) {

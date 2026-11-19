@@ -63,7 +63,7 @@ func escaped(b []byte) string {
 
 // TestRegistryOnTheCache runs the registry on a real DNS-SD cache, in a
 // synctest bubble: it asks for both service types once
-// (BorderRouterRegistry.ts:128-131 of matter.js at db021da0) and lists a
+// (BorderRouterRegistry.ts:128-131 of matter.js at b25ed960) and lists a
 // border router from its _meshcop answer, binary xa and xp included.
 func TestRegistryOnTheCache(t *testing.T) {
 	t.Parallel()

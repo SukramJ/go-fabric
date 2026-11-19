@@ -207,7 +207,7 @@ func (w *PeerWakefulness) observe(o wakeObserver) func() {
 // reading and converted at the current wall-clock offset, as matter.js's
 // IcdClient.nextExpectedCheckin exposes it: "The wakefulness runs on the
 // monotonic clock; expose the deadline on the wall clock"
-// (packages/node/src/behavior/system/icd/IcdClient.ts:83-87 at db021da0).
+// (packages/node/src/behavior/system/icd/IcdClient.ts:83-87 at b25ed960).
 func (w *PeerWakefulness) NextCheckInDue() (time.Time, bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()

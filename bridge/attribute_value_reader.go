@@ -244,7 +244,7 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 		// undecodable, the write interaction ends with FAILURE (owner
 		// decision 161), as matter.js's TlvArray throws for an array
 		// element with a tag (packages/types/src/tlv/TlvArray.ts:78 at
-		// db021da0, the class of G3).
+		// b25ed960, the class of G3).
 		return im.AttributeValue{Value: im.UndecodableValue{Err: fmt.Errorf("%s: %w", def.Name, err)}}, nil
 	}
 	if err != nil {

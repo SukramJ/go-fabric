@@ -4,7 +4,7 @@
 package interaction
 
 // A port of the "resolved timestamps" describe matter.js #4832 added to
-// packages/protocol/test/action/client/InputChunkTest.ts at db021da0
+// packages/protocol/test/action/client/InputChunkTest.ts at b25ed960
 // (:613-746): a delta timestamp resolves against the event directly
 // before it in the same ReportData message when that event used the same
 // clock (InputChunk.ts:360-405 EventTimestampChain); the chain never spans
@@ -147,7 +147,7 @@ func TestInputChunkResolvedTimestampsParity(t *testing.T) {
 
 // TestInputChunkTimestampsSkipEmptyEntry: an EventReportIB with neither
 // data nor a status is skipped without touching the chain, as matter.js
-// yields nothing for it (InputChunk.ts:341-351 at db021da0).
+// yields nothing for it (InputChunk.ts:341-351 at b25ed960).
 func TestInputChunkTimestampsSkipEmptyEntry(t *testing.T) {
 	t.Parallel()
 	p := icEventPath(0, icBasic, icStartUp)

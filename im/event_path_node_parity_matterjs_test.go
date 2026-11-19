@@ -12,7 +12,7 @@ import (
 
 // An event path's node id is evaluated as an attribute path's is. Mirrors
 // matter.js packages/protocol/src/action/server/EventReadResponse.ts at
-// db021da0: a concrete path naming another node answers UnsupportedNode
+// b25ed960: a concrete path naming another node answers UnsupportedNode
 // before any access check (#addConcrete :159-162), a wildcard path naming
 // another node selects nothing (#addWildcard :138-140); the node's id is
 // its id on the session's fabric, UNSPECIFIED without one

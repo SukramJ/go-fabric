@@ -18,7 +18,7 @@ import (
 
 // probeMaxRetransmissions caps a liveness probe's transmissions — matter.js
 // PROBE_MAX_RETRANSMISSIONS (packages/protocol/src/peer/PeerAddressMonitor.ts:26-27
-// at db021da0).
+// at b25ed960).
 const probeMaxRetransmissions = 2
 
 // Tags of ReportDataMessage the probe reads (Matter §10.7.3).

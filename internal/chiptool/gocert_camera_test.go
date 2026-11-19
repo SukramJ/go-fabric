@@ -34,8 +34,8 @@ import (
 // controller with the camera service (controller/camera) is the DUT — the
 // WebRtcTransportRequestor and the stream manager — and chip-camera-app,
 // built at 6170af84, the TH_SERVER, as matter.js's TC-WEBRTCR cases place
-// them (support/chip-testing/test/cert/tc-webrtcr-support.ts:142-148 at
-// db021da0). It is no matter.js case file: matter.js's WEBRTCR files drive
+// them (support/chip-testing/test/cert/tc-webrtcr-support.ts:139-145 at
+// b25ed960). It is no matter.js case file: matter.js's WEBRTCR files drive
 // chip's prompt-driven Python scripts, which stay the harness's follow-up
 // (families_table_test.go requestorServed). The family key CAMERA-GO names
 // this module's own acceptance; it is no chip case prefix, so

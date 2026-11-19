@@ -41,7 +41,7 @@ func init() {
 // icdDeclare are the --icd-lit composition's ICD Management codes, which
 // the committed slices (generated without the flag, ICDM.S=0) do not
 // describe: the server on the root with the four features matter.js's
-// lit-icd app has (IcdTestInstance.ts:67-72; examples/reference-bridge
+// lit-icd app has (IcdTestInstance.ts:52-57; examples/reference-bridge
 // icd.go icdConfig).
 var icdDeclare = map[string]string{
 	"ICDM.S": "1", "ICDM.S.F00": "1", "ICDM.S.F01": "1", "ICDM.S.F02": "1", "ICDM.S.F03": "1",
@@ -52,7 +52,7 @@ const icdCheckInTimeout = 90 * time.Second
 
 // icdRun is an ICD case's DUT controller and the node it commissioned the
 // TH as, with the ICD client's events in arrival order (matter.js
-// InProcessIcdClient's #events, InProcessControllerAdapter.ts:1292-1325, :1422-1427).
+// InProcessIcdClient's #events, InProcessControllerAdapter.ts:1321-1354, :1451-1456).
 type icdRun struct {
 	ctrl *gocontroller.Controller
 	n    *client.Node
@@ -79,7 +79,7 @@ func (r *icdRun) snapshot() []icdEvent {
 	return append([]icdEvent(nil), r.events...)
 }
 
-// waitFor is InProcessIcdClient.waitFor (:1379-1420): the first event of
+// waitFor is InProcessIcdClient.waitFor (:1408-1449): the first event of
 // the kind at or after index from, within the timeout.
 func (r *icdRun) waitFor(th *goTH, checkIn bool, from int, d time.Duration) (icdEvent, int, error) {
 	var found icdEvent
@@ -206,7 +206,7 @@ func caseICDM61() goCertCase {
 	r := &icdRun{}
 	return goCertCase{
 		tc: "TC-ICDM-6.1", line: 79, role: roleDUT, pics: []string{"ICDM.C"},
-		// --icd-lit alone: the app's default timings (IcdTestInstance.ts:107-108),
+		// --icd-lit alone: the app's default timings (IcdTestInstance.ts:92-93),
 		// as matter.js starts its lit-icd TH for this case without app args.
 		daemonArgs: []string{"--icd-lit"}, declare: icdDeclare,
 		finalize: func(th *goTH) {

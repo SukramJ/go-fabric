@@ -129,7 +129,7 @@ func queryQNames(id Identifier) []string {
 
 // CommissionedIdentity identifies a commissioned device independently of
 // the transport that discovered it — matter.js CommissionableDeviceIdentity
-// (packages/protocol/src/common/Scanner.ts:222-239 at db021da0): the long
+// (packages/protocol/src/common/Scanner.ts:222-239 at b25ed960): the long
 // discriminator and "<vendor>+<product>" or only "<vendor>".
 type CommissionedIdentity struct {
 	D  uint16
@@ -201,7 +201,7 @@ func (id Identifier) matches(d *Device) bool {
 	case identifyInstance:
 		// A DNS label, matched without regard to case, as the cache keys
 		// its names (Names.get) — ahead of matter.js, which compares it as
-		// received (CommissionableMdnsScanner.ts:535 at db021da0);
+		// received (CommissionableMdnsScanner.ts:535 at b25ed960);
 		// connectedhomeip resolves the instance name and compares DNS
 		// names case-insensitively (src/lib/dnssd/wire/QName.cpp:141 at
 		// 6170af84) (review II, R2-P6-par-2152).

@@ -154,7 +154,7 @@ const (
 // generated server with connectedhomeip's command handling, the
 // reference of ADR 0020 stage 6 — matter.js has none
 // (packages/node/src/behaviors/commissioner-control/
-// CommissionerControlServer.ts:14, an empty class at db021da0).
+// CommissionerControlServer.ts:14, an empty class at b25ed960).
 //
 // Mirrors connectedhomeip CommissionerControlCluster.cpp at the harness
 // pin 6170af8461b10b1766044122ac83332c6d00ab20 (CCC below) and the

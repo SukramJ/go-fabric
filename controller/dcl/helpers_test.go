@@ -464,7 +464,7 @@ const futureSKID = "C0FFEE00C0FFEE00C0FFEE00C0FFEE00C0FFEE00"
 
 // csaFutureSigner is CSA signing key 001 with another subject key
 // identifier, a stand-in for a CSA key that is not built in
-// (DclCertificateServiceTest.ts:1758-1777 at db021da0); the CSA root
+// (DclCertificateServiceTest.ts:1758-1777 at b25ed960); the CSA root
 // cannot sign it here, so standInCSA accepts exactly its DER.
 func csaFutureSigner(t *testing.T) testCert {
 	t.Helper()

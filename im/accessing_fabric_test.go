@@ -76,7 +76,7 @@ var (
 // TestHasAccessingFabric pins the one predicate every gate of this package
 // asks: a fabric index names a fabric from 1 to 254 (matter.js
 // packages/model/src/standard/elements/fabric-index.element.ts:12-14 at
-// db021da0, constraint "1 to 254"); 0 is a session without one and 255 the
+// b25ed960, constraint "1 to 254"); 0 is a session without one and 255 the
 // index of a session whose fabric the bridge could not name
 // (endpoint.FabricIndexUnresolvable).
 func TestHasAccessingFabric(t *testing.T) {

@@ -410,7 +410,7 @@ func TestReceiveOverReliableServesUnsecuredDropsGroup(t *testing.T) {
 
 // TestBindSessionRouteNeverSwitchesTransport: matter.js replaces a
 // session's channel only UDP-for-UDP (MessageChannel.ts:155-164 at
-// db021da0); a
+// b25ed960); a
 // reused session id binds afresh.
 func TestBindSessionRouteNeverSwitchesTransport(t *testing.T) {
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)

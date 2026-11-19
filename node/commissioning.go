@@ -367,7 +367,7 @@ const bleStopTimeout = 5 * time.Second
 
 // followOnBLE advertises the own window adv announces over BLE while the
 // node has no fabric — matter.js adds the BLE advertiser only to an
-// uncommissioned node (ServerNetworkRuntime.ts:255-275 at db021da0), and
+// uncommissioned node (ServerNetworkRuntime.ts:255-275 at b25ed960), and
 // its peripheral registers the GATT service only once it advertises
 // (BlenoBleServer.ts:224-231). A node with a fabric — committed or still
 // under the fail-safe — advertises nothing over BLE; the GATT service and

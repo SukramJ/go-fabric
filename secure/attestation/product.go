@@ -22,7 +22,7 @@ var ErrProductMismatch = errors.New("attestation: the chain's vendor or product 
 // must be the product's; an id a certificate does not carry is not
 // judged. Mirrors matter.js DeviceCertification.#validateCertification
 // (packages/protocol/src/certificate/DeviceCertification.ts:107-145 at
-// db021da0), which runs after the servable-size check of the chain
+// b25ed960), which runs after the servable-size check of the chain
 // (#assertServable — [LoadChainFiles] here). The ids are read as that
 // method's Dac.fromAsn1 and Pai.fromAsn1 read them, with
 // acceptMalformedVidPid (:116-120): see [productIDsOf]; the issuer of

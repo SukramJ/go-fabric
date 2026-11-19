@@ -38,7 +38,7 @@ type Node struct {
 	s          *structure
 	// subSync serialises the default subscription's synchronisation
 	// ([Node.syncAutoSubscribe]) — matter.js's subscriptionChanges queue
-	// (NetworkClient.ts:114-116 at db021da0) — so Start and
+	// (NetworkClient.ts:114-116 at b25ed960) — so Start and
 	// SetAutoSubscribe do not both establish one.
 	subSync sync.Mutex
 	// adoptMu runs the cache's fabric filter adoptions one after the
@@ -92,7 +92,7 @@ type Node struct {
 	// current default subscription — subscriptionActive as
 	// #endDefaultSubscription reads it (NetworkClient.ts:242-250).
 	subReported bool
-	// likelyOffline is the latch of NetworkClient.ts:404-407 at db021da0.
+	// likelyOffline is the latch of NetworkClient.ts:404-407 at b25ed960.
 	likelyOffline bool
 	seeded        bool
 	// labelReconciled is NetworkClient's fabricLabelReconciled latch
@@ -493,7 +493,7 @@ func (n *Node) start(ctx context.Context) (started bool, err error) {
 	}
 	// The cache adopts the default subscription's fabric filter before
 	// the default subscription syncs, one reaction at a time
-	// (NetworkClient.ts:93-98 at db021da0). matter.js binds the peer's
+	// (NetworkClient.ts:93-98 at b25ed960). matter.js binds the peer's
 	// signals before that reaction and awaits it without a deadline
 	// (NetworkClient.ts:85-88, :93-98 at db021da0); here the adoption,
 	// whose drain ends with ctx, comes before the node goes online, so a

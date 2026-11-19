@@ -14,7 +14,7 @@ import (
 )
 
 // TestEndpointNumberWrapParityMatterJS ports matter.js
-// packages/node/test/node/ServerNodeTest.ts:1153-1176 at db021da0 ("wraps
+// packages/node/test/node/ServerNodeTest.ts:1153-1176 at b25ed960 ("wraps
 // new endpoint numbers to the lowest free number"): with the persisted next
 // number at 0xFFFE, the next endpoint takes 0xFFFE, the one after it wraps
 // to the lowest number no endpoint holds — matter.js
@@ -67,7 +67,7 @@ func TestEndpointNumberWrapParityMatterJS(t *testing.T) {
 }
 
 // TestEndpointNumberAfterPresetParityMatterJS ports ServerNodeTest.ts:
-// 1144-1151 at db021da0 ("continues new endpoint numbers after the highest
+// 1144-1151 at b25ed960 ("continues new endpoint numbers after the highest
 // preset number"): a number placed by hand (matter.js's preset, a Go
 // record with its EndpointID set) lifts the counter, and the next automatic
 // number follows it (ServerEndpointStores.ts:156-158).

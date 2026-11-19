@@ -17,7 +17,7 @@ func noop(context.Context, any) (any, error) { return nil, nil }
 
 // TestNewServer_MandatoryCommandWithoutHandler: a command the
 // conformance requires and the configuration gives no handler is fatal at
-// construction — matter.js ValidatedElements.ts:357-370 at db021da0
+// construction — matter.js ValidatedElements.ts:357-370 at b25ed960
 // ("Implementation missing").
 func TestNewServer_MandatoryCommandWithoutHandler(t *testing.T) {
 	t.Parallel()

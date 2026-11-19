@@ -651,7 +651,7 @@ const (
 // caseSWTCH32 mirrors TC-SWTCH-3.2: the TH observes the daemon's momentary
 // switch by reads and events while the switch is operated through the
 // app pipe — matter.js's backchannel (packages/testing/src/device/
-// backchannel.ts:10-28) is the daemon's --app-pipe here.
+// backchannel.ts:10-28 at db021da0) is the daemon's --app-pipe here.
 func caseSWTCH32() goCertCase {
 	var (
 		n  *client.Node
@@ -726,6 +726,10 @@ func caseSWTCH32() goCertCase {
 	}
 	return goCertCase{
 		tc: "TC-SWTCH-3.2", line: 394, pics: []string{"SWTCH.C", "MCORE.IDM.C.SubscribeEvent"}, at: "SWTCH.S",
+		// At b25ed960 step 0h is not applicable (DEVICE_EXCLUSION_RULE, TC-SWTCH-3.2.test.ts:150-152,
+		// :471-473), 0d and 0f require MSR and MSM without the AS alternative (:435-441, :453-459)
+		// and 4b gates on MS and eventing (:670); mirroring 0h moves the goCert golden (one step run -> skipped).
+		readAt: "db021da0",
 		steps: []goStep{
 			{n: "0a", line: 399, title: "at least one of LS and MS", run: consistency(func(th *goTH) bool { return !pics(th, "SWTCH.S.F00") && !pics(th, "SWTCH.S.F01") }, "neither a latching nor a momentary switch")},
 			{n: "0b", line: 408, title: "MSR needs MS", run: consistency(func(th *goTH) bool { return pics(th, "SWTCH.S.F02") && !pics(th, "SWTCH.S.F01") }, "momentary switch release without a momentary switch")},

@@ -68,7 +68,7 @@ type caseFabric struct {
 // peerVerifier is the verifier rooted at a fabric's trust anchor: built
 // from the root certificate when the fabric row holds it, so a root-signed
 // NOC's authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db021da0); from the
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at b25ed960); from the
 // root's public key alone for a legacy row without it.
 func peerVerifier(rcac, rootPublicKey []byte, ts mattercert.TimeSource) (*mattercert.Verifier, error) {
 	if len(rcac) > 0 {
@@ -529,7 +529,7 @@ type security struct {
 // — so a peer learns them during the handshake and may open TCP to us,
 // and a bitmap of 0 when TCP is off. Mirrors matter.js
 // packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:204-210
-// at db021da0 (`sessions.sessionParameters = {supportedTransports:
+// at b25ed960 (`sessions.sessionParameters = {supportedTransports:
 // {tcpClient: tcpConfig.outgoing, tcpServer: tcpConfig.incoming}, …}`
 // whatever the roles; review II, R2-P6-par-2905); the size bound is
 // sessionparams.DefaultMaxTCPMessageSize (bridge.SessionParametersFor).
@@ -806,7 +806,7 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 // ([operational.Entry.RetransmitBaseInterval]). Without it the bridge's
 // tracker sent every secure-session retransmission on the 500 ms idle
 // default whatever the peer advertised. Mirrors matter.js
-// packages/protocol/src/protocol/MessageChannel.ts:268-275 at db021da0
+// packages/protocol/src/protocol/MessageChannel.ts:268-275 at b25ed960
 // (every transmission takes the peer's session parameters and
 // isPeerActive) into packages/protocol/src/protocol/MRP.ts:162-190 (the
 // base `isPeerActive ? activeInterval : idleInterval`, :181).

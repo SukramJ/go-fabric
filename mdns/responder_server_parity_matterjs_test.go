@@ -255,7 +255,7 @@ func TestMdnsServerHandleDuplicateMessages(t *testing.T) {
 		expectSent(t, w.take(), 0)
 	})
 	// "server defers an additional record multicast less than a second
-	// ago" (MdnsServerTest.ts:841-922 at db021da0): the ANY answer leaves
+	// ago" (MdnsServerTest.ts:841-922 at b25ed960): the ANY answer leaves
 	// the A record out while its second runs and sends it alone, as the
 	// deferred answer, once the second has passed.
 	t.Run("server defers an additional record multicast less than a second ago", func(t *testing.T) {
@@ -330,7 +330,7 @@ func TestMdnsServerRespondsAsUnicast(t *testing.T) {
 }
 
 // twelve or sixteen distinct "foo" quadruples, as MdnsServerTest.ts at
-// db021da0 builds them (:1054-1071, :1110-1127): PTR to abcd<i+10>, SRV
+// b25ed960 builds them (:1054-1071, :1110-1127): PTR to abcd<i+10>, SRV
 // on port 1234+i, TXT A=<i+10>, A 1.2.3.<i+10> — distinct records, since
 // an answer carries each record once.
 func quadruples(n int) (records, answers, additional []dns.RR) {
@@ -529,7 +529,7 @@ func TestMdnsServerClose(t *testing.T) {
 		}
 		// The goodbye of "foo": its records with TTL 0, the cache-flush
 		// bit on the unique ones whose set is left empty
-		// (InterfaceResponder.ts:503-507 at db021da0).
+		// (InterfaceResponder.ts:503-507 at b25ed960).
 		got := w.take()
 		expectSent(t, got, 1)
 		expectResponse(t, got[0], 1, nil, goodbyeOf([]dns.RR{fooPTR(), fooSRV(), fooTXT(), fooA()}), nil)

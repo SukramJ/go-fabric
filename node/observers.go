@@ -129,7 +129,7 @@ type Observers struct {
 	// ChangeNotificationService.change reports each state update with the
 	// endpoint, the behavior, the data version and the property names, no
 	// values (packages/node/src/node/integration/ChangeNotificationService.ts:79-94
-	// at db021da0). This hook is its counterpart, for a host that shows
+	// at b25ed960). This hook is its counterpart, for a host that shows
 	// every change.
 	OnAttributeChanged func(AttributeChange)
 	// OnEvent runs after a cluster server on any endpoint emitted an
@@ -140,7 +140,7 @@ type Observers struct {
 	// broadcasts the occurrence node-wide through the
 	// ChangeNotificationService (packages/node/src/behavior/Events.ts:221,
 	// packages/node/src/node/integration/ChangeNotificationService.ts:97-113
-	// at db021da0) — this hook is that broadcast for a host.
+	// at b25ed960) — this hook is that broadcast for a host.
 	OnEvent func(Event)
 }
 

@@ -21,7 +21,7 @@ import (
 // The answer engine: one inbound query against the record sets of the
 // published services on the interface it arrived on. It mirrors matter.js
 // packages/protocol/src/mdns/InterfaceResponder.ts answer and #sendAnswer
-// (:247-396 at db021da0) and MdnsServer.ts #handleMessage and
+// (:247-396 at b25ed960) and MdnsServer.ts #handleMessage and
 // #prepareMessage (:103-121, :463-503):
 //
 //   - a query for no name the responder owns is dropped before anything
@@ -51,7 +51,7 @@ import (
 const (
 	// maxMessageSize is the largest message the responder sends,
 	// matter.js MAX_MDNS_MESSAGE_SIZE (packages/general/src/codec/
-	// DnsCodec.ts:26 at db021da0): the IPv6 minimum MTU less the IPv6 and
+	// DnsCodec.ts:26 at b25ed960): the IPv6 minimum MTU less the IPv6 and
 	// UDP headers.
 	maxMessageSize = 1232
 	// dnsHeaderSize is the fixed DNS header.
@@ -60,7 +60,7 @@ const (
 	// reused before the interface's addresses are read again, and how long
 	// an interface whose peers cache nothing stays unused before its state
 	// goes — matter.js INTERFACE_LIFETIME (InterfaceResponder.ts:37-40 at
-	// db021da0, Minutes(15)).
+	// b25ed960, Minutes(15)).
 	recordCacheLifetime = 15 * time.Minute
 
 	// truncatedWait and truncatedWaitJitter are the wait for the
@@ -104,7 +104,7 @@ type answerState struct {
 // multicasts of a record, applied to the destination of a unicast answer,
 // so QU queries whose source is spoofed are not each reflected to it.
 // matter.js answers every QU query by unicast while the quarter-TTL rule
-// allows (InterfaceResponder.ts:352-354 at db021da0); within the interval
+// allows (InterfaceResponder.ts:352-354 at b25ed960); within the interval
 // this responder answers by multicast instead, which the one-second rule
 // paces (review II, R2-P3-lan-dev-06).
 const unicastInterval = time.Second
@@ -180,7 +180,7 @@ type linkRecords struct {
 	owned     map[string]bool
 	// byKey holds every record by its identity (recordIdentity), setKeys
 	// the set (setKeyOf) of every record — matter.js's View.byKey and
-	// View.setKeys (InterfaceResponder.ts:880-892 at db021da0); complete
+	// View.setKeys (InterfaceResponder.ts:880-892 at b25ed960); complete
 	// is every record once, in order.
 	byKey    map[string]dns.RR
 	setKeys  map[string]bool
@@ -298,7 +298,7 @@ func (r *Responder) receiveLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) {
 //
 // matter.js gets the same filter from how it finds a packet's interface
 // when its socket has none configured (packages/nodejs/src/net/
-// NodeJsUdpSocket.ts:227 at db021da0): the source's zone, else the
+// NodeJsUdpSocket.ts:227 at b25ed960): the source's zone, else the
 // interface whose address and netmask contain the source
 // (NodeJsNetwork.ts:144-166, onSameNetwork packages/general/src/util/
 // Ip.ts:108-130), else "" for an IPv6 ULA source and undefined otherwise.
@@ -319,7 +319,7 @@ func onLink(ip net.IP, nets []*net.IPNet) bool {
 }
 
 // truncatedKey is matter.js's `${transactionId}-${sourceIntf}-${sourceIp}`
-// (MdnsServer.ts:514 at db021da0).
+// (MdnsServer.ts:514 at b25ed960).
 func truncatedKey(msg *dns.Msg, ifIndex int, src *net.UDPAddr) string {
 	s := ""
 	if src != nil {
@@ -329,7 +329,7 @@ func truncatedKey(msg *dns.Msg, ifIndex int, src *net.UDPAddr) string {
 }
 
 // prepareLocked is matter.js #prepareMessage (MdnsServer.ts:506-546 at
-// db021da0): only queries are handled; a truncated query is held for
+// b25ed960): only queries are handled; a truncated query is held for
 // 400–500 ms (RFC 6762 §7.2) and merged with its continuation packets; nil
 // when there is nothing to answer yet. Caller holds r.mu.
 //
@@ -385,7 +385,7 @@ func (r *Responder) prepareLocked(msg *dns.Msg, ifIndex int, src *net.UDPAddr) *
 }
 
 // processTruncated answers a truncated query whose wait ran out
-// (#processTruncatedQuery, MdnsServer.ts:489-501 at db021da0).
+// (#processTruncatedQuery, MdnsServer.ts:489-501 at b25ed960).
 func (r *Responder) processTruncated(key string, ifIndex int, src *net.UDPAddr) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -497,7 +497,7 @@ func (r *Responder) answerNextLocked(query *dns.Msg, ifIndex int, src *net.UDPAd
 }
 
 // queryRecords is matter.js queryRecords (InterfaceResponder.ts:924-932 at
-// db021da0): the records whose name matches the question's
+// b25ed960): the records whose name matches the question's
 // case-insensitively (RFC 6762 §16) and whose type is the question's, or
 // any type for ANY.
 func queryRecords(q dns.Question, all []dns.RR) []dns.RR {
@@ -537,7 +537,7 @@ func knownTo(known []dns.RR, rr dns.RR) bool {
 // response carries (RFC 6762 §10.2 and §6.7): on every record of a unicast
 // response, and on a record whose set (name, type, class) is sent
 // incompletely, the complete set counted with each record once (matter.js
-// InterfaceResponder.ts `sendable`, :934-962 at db021da0).
+// InterfaceResponder.ts `sendable`, :934-962 at b25ed960).
 func sendable(sent, complete []dns.RR, unicast bool) []dns.RR {
 	if len(sent) == 0 {
 		return nil
@@ -621,7 +621,7 @@ func splitResponse(id uint16, answers, additional []dns.RR) []*dns.Msg {
 // cache (noteSentLocked; answered are the answers to a query, which count
 // as the records' last multicast), logs a miss, and reports how far the
 // message reached (InterfaceResponder.ts #transmit, #sendFailed and
-// #multicastMissed, :694-789 at db021da0). Caller holds r.mu.
+// #multicastMissed, :694-789 at b25ed960). Caller holds r.mu.
 func (r *Responder) sendLocked(msgs []*dns.Msg, l link, dst *net.UDPAddr, answered []dns.RR) reach {
 	if len(msgs) == 0 {
 		return reachAll

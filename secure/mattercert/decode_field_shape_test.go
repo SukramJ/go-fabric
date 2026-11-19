@@ -262,7 +262,7 @@ func TestDecodeTakesWellFormedOptionalExtensions(t *testing.T) {
 // TestDecodeRefusesATaggedExtendedKeyUsageEntry holds the anonymous-element
 // rule of the extended key usage array: an entry that carries a context
 // tag is refused, as matter.js's array decoder refuses it
-// (packages/types/src/tlv/TlvArray.ts:78 at db021da0, "Array element tags
+// (packages/types/src/tlv/TlvArray.ts:78 at b25ed960, "Array element tags
 // should be anonymous"). The encoder cannot write such an entry, so the
 // test writes the anonymous one and patches its control byte and tag in;
 // the unpatched certificate is the control.

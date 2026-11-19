@@ -168,7 +168,7 @@ func copyUint8(v *uint8) *uint8 {
 // trade between.
 //
 // Its display settings are a ThermostatUserInterfaceConfiguration, the
-// optional cluster the Thermostat device type offers (thermostat.element.ts),
+// optional cluster the Thermostat device type offers (thermostat-device.element.ts),
 // with matter.js's defaults; KeypadLockout persists in the daemon's
 // settings.
 //

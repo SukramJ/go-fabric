@@ -1441,7 +1441,7 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	}
 	// An arm for a session leaves a fail-safe another fabric armed alone,
 	// in the same lock hold as its check (matter.js extend refuses another
-	// fabric, FailsafeTimer.ts:53-57 at db021da0; review II,
+	// fabric, FailsafeTimer.ts:53-57 at b25ed960; review II,
 	// R2-P2-comm-08).
 	if forSession && g.failSafeArmed && g.failSafeFabricIndex != fabricIndex {
 		return nil

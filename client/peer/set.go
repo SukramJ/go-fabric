@@ -97,7 +97,7 @@ type Context struct {
 	SessionAdded func(p *Peer, s *exchange.Session)
 	// DialTCP opens a TCP connection for a connection attempt over TCP;
 	// nil is no TCP interface — an attempt over TCP fails as a network
-	// error (PeerSet.ts:284-288 at db021da0).
+	// error (PeerSet.ts:284-288 at b25ed960).
 	DialTCP DialTCP
 	// TransportPreference is the transport preference each new peer takes
 	// (PeerSet.ts:151-157, :178-180): [exchange.TransportTCP] or UDP.
@@ -105,13 +105,13 @@ type Context struct {
 	// Networks are the network profiles that throttle the peers'
 	// connections and exchanges and pad their MRP backoff; nil is
 	// NewNetworkProfiles over the defaults on Clock (matter.js PeerSet's
-	// env.get(NetworkProfiles), PeerSet.ts:212 at db021da0).
+	// env.get(NetworkProfiles), PeerSet.ts:212 at b25ed960).
 	Networks *NetworkProfiles
 }
 
 // Set manages the peers on our fabrics and their operational connections.
 // It is matter.js PeerSet (packages/protocol/src/peer/PeerSet.ts:56-339 at
-// db021da0), without the transport preference and group lookups. It is
+// b25ed960), without the transport preference and group lookups. It is
 // safe for concurrent use.
 type Set struct {
 	ctx   Context

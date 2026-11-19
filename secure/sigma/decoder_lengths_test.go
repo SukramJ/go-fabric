@@ -179,7 +179,7 @@ func TestSigma1RefusesMalformedSessionParameters(t *testing.T) {
 // Sigma2_Resume the session-parameters member must be a structure — a
 // non-container element or an array refuses the message, as matter.js
 // refuses an element of another type at a structure field
-// (packages/types/src/tlv/TlvObject.ts:206-207 at db021da0) — and the
+// (packages/types/src/tlv/TlvObject.ts:206-207 at b25ed960) — and the
 // session-id member must be an unsigned integer that fits 16 bits; a wider
 // encoding of a fitting value is taken.
 func TestSigmaMessagesRefuseMalformedSessionMembers(t *testing.T) {

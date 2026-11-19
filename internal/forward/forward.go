@@ -4,7 +4,7 @@
 // Package forward holds the switches of Matter behaviour implemented
 // ahead of a released specification revision — matter.js
 // Specification.ForwardFeature and isForwardFeatureEnabled
-// (packages/model/src/common/Specification.ts:78-105 at db021da0): off in
+// (packages/model/src/common/Specification.ts:77-106): off in
 // every release, with no supported configuration or API to change them;
 // matter.js's tests enable one feature through the MatterHooks harness
 // hook, this module's through [Enable], which only its own tests reach
@@ -16,11 +16,13 @@ package forward
 
 import "sync"
 
-// Feature names a forward feature (Specification.ForwardFeature, :93).
+// Feature names a forward feature (Specification.ForwardFeature, :95).
 type Feature string
 
-// The forward features this module guards. matter.js's other one,
-// "delay-report-data", is acted on always (BD-Matter-DelayReportData).
+// The forward features this module guards. matter.js names three more:
+// "delay-report-data" is acted on always (BD-Matter-DelayReportData), and
+// "thermostat-msch" and "thermostat-events" are gated here through the
+// Ahead-of-matter.js register instead (cluster/thermo/ahead.go).
 const (
 	// PQCPhase1 admits ML-DSA-44 and ML-DSA-65 in attestation
 	// certificates (controller/attestation).

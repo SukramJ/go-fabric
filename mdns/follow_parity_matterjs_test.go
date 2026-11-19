@@ -17,7 +17,7 @@ import (
 )
 
 // The cases of matter.js packages/protocol/test/mdns/
-// MdnsServerAddressChangeTest.ts at db021da0 (#4842), ported by meaning:
+// MdnsServerAddressChangeTest.ts at b25ed960 (#4842), ported by meaning:
 // the fake wire's addresses are the test network's interface details, and
 // CheckInterfaces is Network.checkInterfaces. The service's broadcast run
 // is ended after its first announcement (ServiceConnected), as the matter.js

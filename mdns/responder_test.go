@@ -177,7 +177,7 @@ func TestResponder_ScheduleEndsAtTheCommissioningTimeout(t *testing.T) {
 // is announced in one message that first says goodbye to the record that
 // left — the old TXT, without the cache-flush bit as its set still has a
 // record — and then carries the new set (InterfaceResponder.ts:445-490 at
-// db021da0; MdnsServerTest.ts "announces a changed record on the broadcast
+// b25ed960; MdnsServerTest.ts "announces a changed record on the broadcast
 // after a refresh and says goodbye to its old value").
 func TestResponder_RepublishChangedSaysGoodbyeFirst(t *testing.T) {
 	t.Parallel()
@@ -211,7 +211,7 @@ func TestResponder_RepublishChangedSaysGoodbyeFirst(t *testing.T) {
 
 // TestResponder_TriggerReannounce announces every service now, in one
 // message per interface (MdnsServer.broadcast, MdnsServer.ts:210-223 at
-// db021da0).
+// b25ed960).
 func TestResponder_TriggerReannounce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -262,7 +262,7 @@ func TestResponder_HostQuestions(t *testing.T) {
 	// A mixed query carries the rest of the set (except the PTRs) as
 	// additionals — a second later, once the one-second rule no longer
 	// holds the address records back (InterfaceResponder.ts:59-75 at
-	// db021da0).
+	// b25ed960).
 	clk.Advance(multicastInterval)
 	w.take() // the schedule's second announcement
 	deliver(t, r, queryMsg([]dns.Question{question(host, dns.TypeA, false), question("other.local", dns.TypeSRV, false)}), 1, dummySource)
