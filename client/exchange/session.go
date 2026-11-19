@@ -591,6 +591,7 @@ func (s *Session) closeWith(cause error) {
 		return
 	}
 	s.closed = true
+	s.held = nil // what an establishing session held is never delivered
 	s.mu.Unlock()
 	s.markClosing()
 	for _, x := range s.liveExchanges() {
@@ -605,10 +606,25 @@ func (s *Session) closeWith(cause error) {
 	}
 }
 
+// holdFull reports that the session holds its messages and holds
+// [maxHeldWhileEstablishing] already: the next one is dropped before it is
+// decrypted.
+func (s *Session) holdFull() bool {
+	if s.secure == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.holding && len(s.held) >= maxHeldWhileEstablishing
+}
+
 // holdWhileEstablishing queues deliver while the session holds its
-// messages and reports whether it did (or dropped the message beyond
-// [maxHeldWhileEstablishing]); false means deliver it now.
-func (s *Session) holdWhileEstablishing(deliver func()) bool {
+// messages and reports whether it did, or dropped the message: a duplicate
+// (the original is queued and acknowledged when it is delivered), or one
+// beyond [maxHeldWhileEstablishing] when datagrams of the session are
+// handled on several goroutines and passed holdFull together. false means
+// deliver it now.
+func (s *Session) holdWhileEstablishing(duplicate bool, deliver func()) bool {
 	if s.secure == nil {
 		return false
 	}
@@ -616,6 +632,10 @@ func (s *Session) holdWhileEstablishing(deliver func()) bool {
 	defer s.mu.Unlock()
 	if !s.holding {
 		return false
+	}
+	if duplicate {
+		s.m.log.Debug("matter.controller.drop", slog.String("reason", "session establishing, duplicate"), slog.Int("session_id", int(s.id)))
+		return true
 	}
 	if len(s.held) >= maxHeldWhileEstablishing {
 		s.m.log.Debug("matter.controller.drop", slog.String("reason", "session establishing, hold full"), slog.Int("session_id", int(s.id)))

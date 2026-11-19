@@ -472,12 +472,14 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 	return m.newSecureSession(cfg, false)
 }
 
-// maxHeldWhileEstablishing bounds the messages a session still
-// establishing holds ([Session.holdWhileEstablishing]); one beyond it is
-// dropped, as a message for an unknown session is. Only the peer the
-// handshake authenticated can produce a message that decrypts on the
-// session, and it sends its first request after its Success, so the
-// bound is never reached by a peer that keeps to the protocol.
+// maxHeldWhileEstablishing bounds the distinct messages a session still
+// establishing holds ([Session.holdWhileEstablishing]). One beyond it is
+// dropped before it is decrypted ([Session.holdFull]), as a message for an
+// unknown session is, so its counter is not recorded and its
+// retransmission is taken; a retransmission of a held message is dropped
+// and takes no place. Only the peer the handshake authenticated can
+// produce a message that decrypts on the session, and a peer is expected
+// to send its first request after its Success.
 const maxHeldWhileEstablishing = 16
 
 // newSecureSession registers the session; establishing registers it
@@ -840,7 +842,7 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 		defer m.releaseInbound(s)
 	}
 	counter := hdr.MessageCounter
-	if s.holdWhileEstablishing(func() { m.deliver(s, counter, body, duplicate, src) }) {
+	if s.holdWhileEstablishing(duplicate, func() { m.deliver(s, counter, body, duplicate, src) }) {
 		return
 	}
 	m.deliver(s, counter, body, duplicate, src)
@@ -909,6 +911,12 @@ func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAdd
 	}
 	if s = m.Session(hdr.SessionID); s == nil {
 		m.log.Debug("matter.controller.drop", slog.String("reason", "unknown session"), slog.Int("session_id", int(hdr.SessionID)))
+		return nil, false, false, false
+	}
+	if s.holdFull() {
+		// Before the decryption, so the message's counter is not recorded
+		// and its retransmission is not taken for a duplicate.
+		m.log.Debug("matter.controller.drop", slog.String("reason", "session establishing, hold full"), slog.Int("session_id", int(s.id)))
 		return nil, false, false, false
 	}
 	plain, dup, err := s.secure.Decrypt(hdr, hdr.NonceSecurityFlags(), *body)

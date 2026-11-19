@@ -59,9 +59,17 @@ func TestEstablishingSessionHoldsUntilActivated(t *testing.T) {
 	if m.Session(21) != s {
 		t.Fatal("the establishing session is not registered under its id")
 	}
-	sent := maxHeldWhileEstablishing + 2
-	for i := range sent {
-		p.send(t, 21, message.ProtocolHeader{Initiator: true, ExchangeID: uint16(100 + i), ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeStatusResponse}, []byte{0x15, 0x18})
+	// 100..117 sent, and exchange 100's datagram once more after 114, as
+	// the peer's MRP retransmits it: the retransmission takes no place in
+	// the hold, so 100..115 are held; 116 and 117 find the hold full and
+	// are dropped before they are decrypted, so their retransmissions
+	// after the activation are fresh, not duplicates.
+	raw := map[int][]byte{}
+	for i := range maxHeldWhileEstablishing + 2 {
+		raw[i] = p.send(t, 21, message.ProtocolHeader{Initiator: true, ExchangeID: uint16(100 + i), ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeStatusResponse}, []byte{0x15, 0x18})
+		if i == maxHeldWhileEstablishing-2 {
+			m.HandleDatagram(raw[0], peerAddr)
+		}
 	}
 	select {
 	case id := <-served:
@@ -87,6 +95,23 @@ func TestEstablishingSessionHoldsUntilActivated(t *testing.T) {
 	slices.Sort(ids)
 	if ids[0] != 100 || ids[len(ids)-1] != uint16(100+maxHeldWhileEstablishing-1) {
 		t.Fatalf("served exchanges %v, want the first %d sent", ids, maxHeldWhileEstablishing)
+	}
+
+	// The retransmissions of the two dropped at the cap are served.
+	m.HandleDatagram(raw[maxHeldWhileEstablishing], peerAddr)
+	m.HandleDatagram(raw[maxHeldWhileEstablishing+1], peerAddr)
+	var late []uint16
+	for len(late) < 2 {
+		select {
+		case id := <-served:
+			late = append(late, id)
+		case <-ctx.Done():
+			t.Fatalf("served %v of the retransmitted exchanges 116 and 117: a message dropped at the hold's cap was recorded as received", late)
+		}
+	}
+	slices.Sort(late)
+	if late[0] != 116 || late[1] != 117 {
+		t.Fatalf("served %v after the retransmissions, want [116 117]", late)
 	}
 
 	// Activated, the session serves at once.

@@ -298,18 +298,21 @@ func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, sessionID 
 	// The peer's CATs from its NOC are the session's (CaseClient.ts:285,
 	// :355 at db021da0); a configured set is not applied (:396-404).
 	cats := res.PeerCATs
-	// The session is registered before Sigma3 goes out, establishing: the
-	// responder holds its own from before its Success and may send on it
-	// at once, and this manager reads that message on its listener
-	// goroutine while this one still waits for the Success — registered
-	// after the Success, as matter.js does (CaseClient.ts:336-369 at
-	// db021da0), the message met no session and was dropped, for good
-	// over TCP. Until the Success activates it the session delivers
-	// nothing it receives (it holds it) and is not listed among the
-	// peer's sessions; a Sigma3 that cannot be sent, a failure
+	// The session is registered before Sigma3 goes out, establishing: a
+	// responder can send on its session as soon as its Success is out
+	// (matter.js registers it before sending the Success, CaseServer.ts:316,
+	// :332 at db021da0; connectedhomeip activates right after,
+	// CASESession.cpp:2138, :2150 at 6170af84), and this manager reads
+	// that message on its listener goroutine while this one still waits
+	// for the Success — registered after the Success, as matter.js does
+	// (CaseClient.ts:336-369 at db021da0), the message met no session and
+	// was dropped, for good over TCP. Until the Success activates it the
+	// session delivers nothing it receives (it holds it) and is not listed
+	// among the peer's sessions; a Sigma3 that cannot be sent, a failure
 	// StatusReport and a Success that does not arrive close it, and the
 	// caller never sees it. connectedhomeip activates on the Success too
-	// (CASESession.cpp:2315-2339 at 6170af84).
+	// (CASESession.cpp:2315-2339 → PairingSession.cpp:42-66 at 6170af84)
+	// and drops what arrives before (SessionManager.cpp:1007-1012).
 	// BD-Matter-CASEClient-SessionBeforeSigma3, owner decision 269.
 	registered, err := exchangeseam.NewEstablishingSecureSession(c.mgr, exchange.SecureSessionConfig{
 		ID:   sessionID,
