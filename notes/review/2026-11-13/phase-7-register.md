@@ -163,6 +163,10 @@ Closed: R2-P7-req-02 (row above; tests `TestConcurrentWritesStampTheirOwnAttribu
 `TestUnattributedHeldChangeAdvancesOnce`); go-fabric#554
 (`PairOptions.CommissionTimeout`) and #555 (`softwareupdate.ProductCheckError`,
 `ProductCheckErrors`), the two issues go-fabric-ui's review phase 4 handed
-over. Left in the backlog: R2-P7-V3-giveup, the citation remnants, the
+over; the `client/peer` test `TestPeerAddressMonitorVerifyReachability`
+("close left the debounce armed", once in `make ci` under `-race`, not
+reproduced in 30 isolated and 8 package runs) read the timers after one
+`Yield` that may come before `close` ran — inferred from the code, the test
+now waits for the stop. Left in the backlog: R2-P7-V3-giveup, the citation remnants, the
 full-cut run 2, and the Fable note on `dropHandshakeNotBegun`'s "nothing is
 sent".
