@@ -110,7 +110,18 @@ func (s *peerPathSession) serverSession(req bridge.PeerSessionRequirement) *brid
 
 // clientPeer is the client stack's peer, connected for req: a live session
 // that meets it, else a new one with the required transport.
+//
+// A Large Message command needs TCP, and the client stack dials TCP only
+// when the node takes the TCP client role (Network.TCP.Outgoing,
+// [Node.newClientStack]); without it the stack holds no TCP session and
+// can establish none, so the signal is refused here, before a stack is
+// built or anything is sent (docs/adr/0032, decision 5). Handed to the
+// connection process instead, every attempt ended in [peer.ErrNoTCP] and
+// was retried until the connection timeout.
 func (s *peerPathSession) clientPeer(ctx context.Context, req bridge.PeerSessionRequirement) (*peer.Peer, error) {
+	if req.LargeMessage && !s.n.cfg.Network.TCP.Outgoing {
+		return nil, fmt.Errorf("%w: peer %d:%#x: %w", camera.ErrNoLargeMessageTransport, s.addr.FabricIndex, s.addr.NodeID, peer.ErrNoTCP)
+	}
 	cs, err := s.n.peerStack() //nolint:contextcheck // the stack runs for the node's lifetime, not the call's
 	if err != nil {
 		return nil, err
