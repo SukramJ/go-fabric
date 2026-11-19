@@ -14,8 +14,17 @@ pseudo-version of `main`.
 
 - `clock/clocktest`: `Fake.AdvanceToNext`, a step to the earliest armed deadline and no further — the step for a test that waits on timers, where a fixed step also fires whatever the woken work arms inside it while `Advance` still runs, depending on the scheduler (the cause of `controller/client`'s flaky `TestDefaultSubscription`). It reports the step, and false when nothing is armed.
 
+### Security
+
+Findings of review II, phase 7.
+
+- `cluster/core`: AccessControl's AuxiliaryAccessUpdated of a fabric names no node of another fabric's request — a change of fabric B signalled under fabric A's request while a Groupcast batch was open named A's administrator; a write of Acl or Extension while the store's fabric listing fails is refused with FAILURE instead of stored; `MatterDropFabric` clears a fabric's stored Extension also when it could not be read at construction, so the next start no longer loads it again (review II, R2-P7-acl-01, -02, -03).
+- `groups`: a group message whose fabric was forgotten or reloaded while it was decrypted is dropped instead of being taken into a fresh replay window (review II, R2-P7-sec-02).
+
 ### Changed
 
+- `cluster/core`: AccessControl answers a host's `MatterWrite` of Acl or Extension with a value of the wrong Go type INVALID_DATA_TYPE, and a write of any other attribute UNSUPPORTED_WRITE (both FAILURE before), as the other security-path servers do; a settings store that fails at construction logs one `matter.access_control.extension_load_failed` with the count instead of one per fabric index (review II, R2-P7-acl-04, -05).
+- `secure/spake2`: `Prover.GeneratePake1` returns a copy of X, as `Verifier.ProcessPake1` returns one of Y (review II, R2-P7-sec-06).
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.23.0` (before `v0.22.1`) and are tagged `ble/bluez/v0.23.0`, `ble/esphome/v0.23.0` and `wifi/wpasupplicant/v0.23.0` at this commit — `ble/bluez` with its move onto `contract.GATTPeripheral` (see `[0.23.0]`); `examples/ble-wifi-light` requires the three at `v0.23.0` (owner decisions 261, 266).
 
 ### Fixed
