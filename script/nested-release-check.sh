@@ -31,7 +31,17 @@
 # and first that the tag names it: a directory with a go.mod whose module
 # path is the root's path plus the directory, and a Go module version.
 #
-# Usage: script/nested-release-check.sh [--tag <tag> | <module-dir> ...]
+# With --released <dir>/vX.Y.Z (repeatable) a nested release pull request
+# names a tag its merge commit will carry (owner decision 266): a require of
+# that sibling at that version, untagged until the merge, is not an error
+# when the sibling was checked earlier in the same run and is in release
+# shape — the module builds against the sibling's checked copy, its own
+# replaces dropped, which is the code the tag will name. A require of any
+# other untagged version stays an error. chiptool.yml's nested-release job
+# derives the tags from the pull request (its head branch
+# release/nested-vX.Y.Z and the nested go.mod files it changes).
+#
+# Usage: script/nested-release-check.sh [--tag <tag> | [--released <tag>]... <module-dir> ...]
 # Exit 1: a module fails the release shape; 2: the environment or the
 # arguments (no git, no go, no jq, a directory without a go.mod, a module
 # that cannot be downloaded).
@@ -45,31 +55,69 @@ root=$(git rev-parse --show-toplevel) || exit 2
 cd "$root"
 rootmod=$(GOWORK=off go list -m) || exit 2
 
-modules=()
-if [ "${1:-}" = "--tag" ]; then
-	tag="${2:-}"
+# nested_tag checks that $1, given to option $2, names a nested module of
+# this repository with a Go module version; on failure it says why and
+# returns 1, or 2 when the argument is not of the form <dir>/vX.Y.Z at all.
+nested_tag() {
+	local tag="$1" opt="$2" dir version path
 	dir="${tag%/*}"
 	version="${tag##*/}"
 	if [ -z "$tag" ] || [ "$dir" = "$tag" ]; then
-		echo "nested-release-check: --tag wants <dir>/vX.Y.Z, got '$tag'"
-		exit 2
+		echo "nested-release-check: $opt wants <dir>/vX.Y.Z, got '$tag'"
+		return 2
 	fi
 	if ! grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$' <<<"$version"; then
 		echo "nested-release-check: tag '$tag': '$version' is not a Go module version"
-		exit 1
+		return 1
 	fi
 	if [ ! -f "$dir/go.mod" ]; then
 		echo "nested-release-check: tag '$tag' names '$dir', which holds no go.mod"
-		exit 1
+		return 1
 	fi
-	path=$(cd "$dir" && GOWORK=off go list -m)
+	path=$(cd "$dir" && GOWORK=off go list -m) || return 2
 	if [ "$path" != "$rootmod/$dir" ]; then
 		echo "nested-release-check: tag '$tag': the module in $dir is '$path', not '$rootmod/$dir'"
-		exit 1
+		return 1
 	fi
-	modules=("$dir")
+}
+
+modules=()
+# released: the tags this change makes at its merge (--released), one per
+# line; read with a here-string, never a pipe into grep -q (see
+# script/release-provenance.sh, TestNoQuietGrepAfterPipeUnderPipefail).
+released=""
+if [ "${1:-}" = "--tag" ]; then
+	if [ $# -gt 2 ]; then
+		echo "nested-release-check: --tag checks one module and takes no further arguments"
+		exit 2
+	fi
+	rc=0
+	nested_tag "${2:-}" --tag || rc=$?
+	if [ "$rc" -ne 0 ]; then exit "$rc"; fi
+	modules=("${2%/*}")
 else
-	modules=("$@")
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--released)
+			if [ $# -lt 2 ]; then
+				echo "nested-release-check: --released wants <dir>/vX.Y.Z"
+				exit 2
+			fi
+			# A wrong --released is the arguments, never the module: exit 2.
+			nested_tag "$2" --released || exit 2
+			released="$released$2"$'\n'
+			shift 2
+			;;
+		--tag)
+			echo "nested-release-check: --tag is the first and only argument"
+			exit 2
+			;;
+		*)
+			modules+=("$1")
+			shift
+			;;
+		esac
+	done
 fi
 if [ ${#modules[@]} -eq 0 ]; then
 	modules=(ble/bluez ble/esphome wifi/wpasupplicant examples/ble-wifi-light)
@@ -79,6 +127,8 @@ scratch=$(mktemp -d)
 trap 'rm -rf -- "${scratch:?}"' EXIT
 
 failed=()
+# passed: the modules this run found in release shape, one per line.
+passed=""
 for dir in "${modules[@]}"; do
 	if [ ! -f "$dir/go.mod" ]; then
 		echo "nested-release-check: no go.mod in '$dir'"
@@ -89,6 +139,9 @@ for dir in "${modules[@]}"; do
 	mkdir -p "$work"
 	cp -R "$dir/." "$work/"
 	ok=true
+	# siblings: the requires built against a sibling's checked copy, as
+	# released by this change; their replace stays, to that copy.
+	siblings=""
 	while read -r path version; do
 		[ -n "$path" ] || continue
 		rel="${path#"$rootmod"}"
@@ -96,8 +149,19 @@ for dir in "${modules[@]}"; do
 		want="$version"
 		if [ -n "$rel" ]; then want="$rel/$version"; fi
 		if ! git rev-parse -q --verify "refs/tags/$want" >/dev/null; then
-			echo "   requires $path $version, but this repository has no tag $want"
-			ok=false
+			if [ -z "$rel" ] || ! grep -Fxq -- "$want" <<<"$released"; then
+				echo "   requires $path $version, but this repository has no tag $want, and this change does not release it (--released)"
+				ok=false
+				continue
+			fi
+			if ! grep -Fxq -- "$rel" <<<"$passed"; then
+				echo "   requires $path $version, released by this change (tag $want), but $rel is not checked before $dir in this run, or is not in release shape"
+				ok=false
+				continue
+			fi
+			echo "   requires $path $version, released by this change (tag $want at its merge): built against $rel as checked above"
+			(cd "$work" && go mod edit -replace="$path=$scratch/$rel")
+			siblings="$siblings$path"$'\n'
 			continue
 		fi
 		echo "   requires $path $version (tag $want): resolved without the replace"
@@ -105,7 +169,7 @@ for dir in "${modules[@]}"; do
 	done < <(cd "$work" && go mod edit -json |
 		jq -r --arg root "$rootmod" '.Require[]? | select(.Path == $root or (.Path | startswith($root + "/"))) | .Path + " " + .Version')
 	if [ "$ok" = true ]; then
-		local_replaces=$(cd "$work" && go mod edit -json | jq -r '.Replace[]? | select(.New.Path | startswith(".") or startswith("/")) | .Old.Path + " => " + .New.Path')
+		local_replaces=$(cd "$work" && go mod edit -json | jq -r --arg keep "$siblings" '($keep | split("\n")) as $k | .Replace[]? | select(.New.Path | startswith(".") or startswith("/")) | select(.Old.Path as $o | ($k | index([$o])) == null) | .Old.Path + " => " + .New.Path')
 		if [ -n "$local_replaces" ]; then
 			echo "   a replace to a local path remains, which a consumer's build ignores:"
 			printf '     %s\n' "$local_replaces"
@@ -122,7 +186,12 @@ for dir in "${modules[@]}"; do
 			ok=false
 		fi
 	fi
-	if [ "$ok" = true ]; then echo "   ok"; else failed+=("$dir"); fi
+	if [ "$ok" = true ]; then
+		echo "   ok"
+		passed="$passed$dir"$'\n'
+	else
+		failed+=("$dir")
+	fi
 done
 
 if [ ${#failed[@]} -ne 0 ]; then

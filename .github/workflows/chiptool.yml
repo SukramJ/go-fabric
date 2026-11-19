@@ -678,6 +678,14 @@ jobs:
   # nested release must bump its require — unless the pull request changes
   # a nested go.mod, which is a nested release in all but its branch name,
   # and is held as strictly (owner decision 103 of review II).
+  #
+  # A nested release pull request tags its merge commit <dir>/vX.Y.Z, the
+  # version its branch name release/nested-vX.Y.Z carries, for each nested
+  # module whose go.mod it changes and that this repository tags (one with
+  # a <dir>/v* tag already; an example is not tagged). Those tags are
+  # passed as --released: a sibling's require of such a version is built
+  # against the sibling's checked copy instead of failing for a tag only
+  # the merge can make (owner decision 266, the example of #546).
   nested-release:
     name: nested modules against the versions they require
     needs: changes
@@ -701,13 +709,22 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -uo pipefail
-          rc=0
-          script/nested-release-check.sh || rc=$?
-          if [ "$rc" -eq 0 ]; then exit 0; fi
           if ! changed=$(git diff --name-only "origin/${BASE_REF}...HEAD"); then
             echo "::error::cannot list the files this pull request changes"
             exit 1
           fi
+          released=()
+          if [[ "$HEAD_REF" == release/nested-* ]]; then
+            version="${HEAD_REF#release/nested-}"
+            while IFS= read -r f; do
+              case "$f" in */go.mod) dir="${f%/go.mod}" ;; *) continue ;; esac
+              if [ -n "$(git tag -l "$dir/v*")" ]; then released+=(--released "$dir/$version"); fi
+            done <<<"$changed"
+            echo "released by this pull request: ${released[*]:-none}"
+          fi
+          rc=0
+          script/nested-release-check.sh "${released[@]}" || rc=$?
+          if [ "$rc" -eq 0 ]; then exit 0; fi
           nested_gomod=false
           if grep -qE '^.+/go\.mod$' <<<"$changed"; then nested_gomod=true; fi
           if [ "$rc" -eq 1 ] && [[ "$HEAD_REF" != release/nested-* ]] && [ "$nested_gomod" = false ]; then
