@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10091,
+  "entry_points": 10095,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -2167,7 +2167,7 @@
       "identifier": "TestChunkedWriteAcrossMessagesParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/interaction_protocol_parity_matterjs_test.go",
-      "line": 292
+      "line": 293
     },
     {
       "package": "bridge",
@@ -4883,7 +4883,7 @@
       "identifier": "TestInteractionProtocolBridgeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/interaction_protocol_parity_matterjs_test.go",
-      "line": 189
+      "line": 181
     },
     {
       "package": "bridge",
@@ -12905,7 +12905,7 @@
       "identifier": "TestParityMatterJS_LocalizationConfiguration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/localization_test.go",
-      "line": 25
+      "line": 26
     },
     {
       "package": "cluster/core",
@@ -12989,14 +12989,14 @@
       "identifier": "TestParityMatterJS_TimeFormatLocalization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/localization_test.go",
-      "line": 83
+      "line": 84
     },
     {
       "package": "cluster/core",
       "identifier": "TestParityMatterJS_UnitLocalization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/localization_test.go",
-      "line": 144
+      "line": 147
     },
     {
       "package": "cluster/core",
@@ -30692,28 +30692,28 @@
       "identifier": "TestPhysicalDevicePropertiesICDCeilingParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/physical_device_properties_parity_matterjs_internal_test.go",
-      "line": 178
+      "line": 176
     },
     {
       "package": "controller/client",
       "identifier": "TestPhysicalDevicePropertiesMaxIntervalCeilingParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/physical_device_properties_parity_matterjs_internal_test.go",
-      "line": 111
+      "line": 109
     },
     {
       "package": "controller/client",
       "identifier": "TestPhysicalDevicePropertiesMinIntervalFloorParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/physical_device_properties_parity_matterjs_internal_test.go",
-      "line": 65
+      "line": 63
     },
     {
       "package": "controller/client",
       "identifier": "TestPhysicalDevicePropertiesParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/physical_device_properties_parity_matterjs_internal_test.go",
-      "line": 55
+      "line": 53
     },
     {
       "package": "controller/client",
@@ -39015,7 +39015,7 @@
       "identifier": "TestHandleInvokeRequest_ResponseSuppressResponseAlwaysFalse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_batch_test.go",
-      "line": 164
+      "line": 162
     },
     {
       "package": "im",
@@ -39323,7 +39323,7 @@
       "identifier": "TestInvokeResponse_HasCommandData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_batch_test.go",
-      "line": 139
+      "line": 137
     },
     {
       "package": "im",
