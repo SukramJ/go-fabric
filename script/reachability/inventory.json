@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10061,
+  "entry_points": 10064,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27759,
+    "total_exported": 27762,
     "reachable": 20843,
-    "whitelisted": 6893,
+    "whitelisted": 6896,
     "unreachable": 23
   },
   "by_package": [
@@ -932,6 +932,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestAcknowledgingMessagesUnderAHandshakeInProgressChangeNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_handshake_in_progress_test.go",
+      "line": 91
+    },
+    {
+      "package": "bridge",
       "identifier": "TestActiveSubscriptionSubjectsSkipsPASEAndDuplicates",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/icd_test.go",
@@ -1264,14 +1271,14 @@
       "identifier": "TestBDXBlockWaitsForTheAcceptsAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_ack_wait_test.go",
-      "line": 86
+      "line": 88
     },
     {
       "package": "bridge",
       "identifier": "TestBDXInitiatedExchangeWaitsAndRefuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_ack_wait_test.go",
-      "line": 195
+      "line": 197
     },
     {
       "package": "bridge",
@@ -1300,6 +1307,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
       "line": 175
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXSendAfterAGiveUpSendsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_ack_wait_test.go",
+      "line": 340
     },
     {
       "package": "bridge",
@@ -5030,7 +5044,7 @@
       "identifier": "TestMessagesUnderAHandshakeInProgressChangeNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_handshake_in_progress_test.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "bridge",
@@ -7312,7 +7326,7 @@
       "identifier": "TestSigma1OverARecordIsJudgedOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_handshake_in_progress_test.go",
-      "line": 86
+      "line": 134
     },
     {
       "package": "bridge",
@@ -8398,6 +8412,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/decode_error_reply_test.go",
       "line": 47
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_ack_wait_test.go",
+      "line": 269
     },
     {
       "package": "bridge",
