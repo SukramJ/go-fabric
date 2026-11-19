@@ -39,6 +39,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/fabrictest"
@@ -258,6 +259,16 @@ func TestParityMatterJS_PresetsLocalWriteTest(t *testing.T) {
 		l.wantNoneStored(t)
 	})
 
+	t.Run("refuses more presets for a scenario than its preset type allows", func(t *testing.T) {
+		cfg := thermostatConfig(5, []thermo.Preset{})
+		cfg.PresetTypes[0].NumberOfPresets = 1
+		cfg.PresetTypes[0].PresetTypeFeatures = tdef.PresetTypeFeaturesSupportsNames
+		site, dev, srv := onlineThermostat(t, cfg)
+		l := &localThermostat{site: site, dev: dev, srv: srv}
+		wantStatusCode(t, l.writePresets(t, []thermo.Preset{newPreset(withName("Home")), newPreset(withName("Office"))}),
+			im.StatusResourceExhausted, "Number of presets (2) for scenario Occupied exceeds allowed number (1)")
+	})
+
 	t.Run("rejects more presets than the thermostat supports", func(t *testing.T) {
 		// At b25ed960 the scenario admits three named presets, so only the
 		// total count can refuse the third.
@@ -346,6 +357,17 @@ func TestParityMatterJS_PresetsLocalWriteTest(t *testing.T) {
 		wantStatusCode(t, l.writePresets(t, []thermo.Preset{}), im.StatusInvalidInState, "while it is the active preset")
 		if n := len(l.srv.Presets()); n != 1 {
 			t.Errorf("%d stored presets, want 1", n)
+		}
+	})
+
+	t.Run("keeps a built-in preset that a write sends with a null builtIn", func(t *testing.T) {
+		builtIn := newPreset(withHandle(filled(16, 7)), func(p *thermo.Preset) { p.BuiltIn.Value = true })
+		l := newLocalThermostat(t, 5, []thermo.Preset{builtIn})
+		nullBuiltIn := builtIn
+		nullBuiltIn.BuiltIn = spec.NullOf[bool]()
+		l.mustWrite(t, []thermo.Preset{nullBuiltIn})
+		if stored := l.srv.Presets(); len(stored) != 1 || stored[0].BuiltIn.Null || !stored[0].BuiltIn.Value {
+			t.Errorf("stored presets %+v, want the built-in one", stored)
 		}
 	})
 
