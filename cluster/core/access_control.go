@@ -335,16 +335,31 @@ func aclExtensionSettingKey(fabric uint8) string {
 }
 
 // loadExtensions restores the persisted Extension entries, one per fabric
-// at most (the attribute's per-fabric constraint).
+// at most (the attribute's per-fabric constraint). The failures are logged
+// once, with their count and the first: a store failing at construction
+// fails every index, and the per-fabric record is extLoadErr (review II,
+// R2-P7-acl-05).
 func (a *AccessControl) loadExtensions(ctx context.Context) {
 	p, ok := a.store.(ACLExtensionPersistence)
 	if !ok {
 		return
 	}
+	var (
+		failed     int
+		firstIndex int
+		firstErr   error
+	)
 	for f := 1; f <= 254; f++ {
 		if err := a.loadExtension(ctx, p, uint8(f)); err != nil {
-			a.logger().Warn("matter.access_control.extension_load_failed", slog.Int("fabric_index", f), slog.Any("err", err))
+			if failed == 0 {
+				firstIndex, firstErr = f, err
+			}
+			failed++
 		}
+	}
+	if failed > 0 {
+		a.logger().Warn("matter.access_control.extension_load_failed",
+			slog.Int("failed", failed), slog.Int("fabric_index", firstIndex), slog.Any("err", firstErr))
 	}
 }
 
