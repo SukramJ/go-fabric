@@ -8702,12 +8702,11 @@ deletion that runs while the session already exists closes it: the session
 is in its fabric's set from its creation (`NodeSession.ts:166`),
 `Fabric.delete` force-closes that set (`Fabric.ts:493-496`) and the
 responder refuses the closed session at completion (`CaseServer.ts:206`,
-`:344`, `:367-376`) — so on a full handshake the window from Sigma1
-(`:237`) to the session's creation (`:314`) stays unchecked. On resumption
-the fabric comes from the record (`:155`) and the session is created at
-`:177` after awaits (`:157`, `:175`), a window not traced, and a deletion
-after the Success's first transmission is not refused (`:337-357`;
-findings F-b25ed960-34). The initiator
+`:344`, `:367-376`). A deletion before the session exists was not traced
+for the full handshake nor for resumption (where the fabric comes from the
+record, `:155`, and the session is created at `:177`), and a deletion after
+the Success's first transmission is not refused (`:337-357`; findings
+F-b25ed960-34). The initiator
 (`packages/protocol/src/session/case/CaseClient.ts`) was not read for it
 (unverified); connectedhomeip was not read (unverified). In this module
 `caseIdentities.admitSession` (`node/security.go`) checks that the
