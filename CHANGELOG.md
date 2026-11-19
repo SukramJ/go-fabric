@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.23.0` (before `v0.22.1`) and are tagged `ble/bluez/v0.23.0`, `ble/esphome/v0.23.0` and `wifi/wpasupplicant/v0.23.0` at this commit — `ble/bluez` with its move onto `contract.GATTPeripheral` (see `[0.23.0]`); `examples/ble-wifi-light` requires the three at `v0.23.0` (owner decisions 261, 266).
+
 ## [0.23.0] — 2026-11-18
 
 Review II (`notes/review/2026-11-13/`), phases 0 to 6b: the request path, the cluster servers, the security paths, the client, the controller and the facade read against matter.js and connectedhomeip at their pins, with the fixes in #524 to #538 and the owner decisions 1 to 261; beside it the controller's onboarding-code inventory and peer timing, and the certification cases over BLE onto Wi-Fi (#514 to #523). The release breaks the API in the places marked **Breaking** below, each with its migration in [`docs/guides/migrating-to-the-facade.md`](docs/guides/migrating-to-the-facade.md); every identifier it deprecates keeps its behaviour and is removable in `v0.25.0`, since the deprecation window of README §API stability is in force again. The nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` are not tagged with this release: they follow it, requiring `v0.23.0` (owner decision 261).
