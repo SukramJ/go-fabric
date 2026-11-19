@@ -179,11 +179,12 @@ func pendingCounterOfExchange(b *Bridge, sessionID, exchangeID uint16) (uint32, 
 // TestSubscribeResponseWaitsForThePrimingReportsAck (review II, hs 4b;
 // phase 7, V3): a peer whose StatusResponse does not acknowledge the
 // priming report gets no SubscribeResponse and the subscription is not
-// established. The StatusResponse is refused on receive, never processed
+// established. A message that does not acknowledge the exchange's
+// outstanding reliable message is refused on receive, never processed
 // (matter.js packages/protocol/src/protocol/MessageExchange.ts:521-525 at
-// db021da0), so the priming report's chunk wait runs out; were it
-// processed, the SubscribeResponse would be refused at the send
-// (:701-705).
+// db021da0). The peer's answer here is such a message, so the priming
+// report's chunk wait runs out; were it processed, the reply would be
+// refused at the send (:701-705).
 func TestSubscribeResponseWaitsForThePrimingReportsAck(t *testing.T) {
 	t.Parallel()
 	const (
