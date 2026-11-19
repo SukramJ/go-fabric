@@ -52,7 +52,8 @@ the first. `Config` takes:
   once sets it.
 - `Clock` and `Listener`: the stack's time source (nil is the system
   clock) and a UDP socket to serve on in place of opening `Listen`. A test
-  passes both: `fabrictest.Site.ControllerConfig(opts)` returns a `Config`
+  passes both (on a loopback site `Listen` in place of the socket):
+  `fabrictest.Site.ControllerConfig(opts)` returns a `Config`
   wired to the site — its network, its DNS-SD answers, its fake clock and
   a database of its own — so the program's own `controller.New` runs on
   the site (see [testing in process](../guides/testing-in-process.md)).

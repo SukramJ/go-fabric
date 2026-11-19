@@ -45,7 +45,7 @@ func TestControllerAdvertiser(t *testing.T) {
 		t.Fatal("Active is not a copy")
 	}
 
-	if !a.answersOperational(cfid, 0x42) || a.answersOperational(cfid, 0x43) {
+	if a.answersOperational(cfid, 0x42) == nil || a.answersOperational(cfid, 0x43) != nil {
 		t.Fatal("answersOperational")
 	}
 	got, err := siteResolver{s: s}.ResolveOperational(ctx, cfid, 0x42)
@@ -62,11 +62,24 @@ func TestControllerAdvertiser(t *testing.T) {
 	if err := a.Withdraw(ctx, operational.InstanceName, mdns.ServiceTypeOperational); err != nil || len(a.Active()) != 1 {
 		t.Fatalf("Withdraw: %v, %d left", err, len(a.Active()))
 	}
-	if a.answersOperational(cfid, 0x42) {
+	if a.answersOperational(cfid, 0x42) != nil {
 		t.Fatal("a withdrawn record still answers")
 	}
 	if err := a.Close(); err != nil || len(a.Active()) != 0 {
 		t.Fatalf("Close: %v, %d left", err, len(a.Active()))
+	}
+
+	// On loopback the controller binds its own socket: the advertiser
+	// answers at [::1] and the port the record publishes.
+	loop := (&Site{}).controllerAdvertiser(2, nil)
+	if err := loop.Publish(ctx, mdns.Service{InstanceName: operational.InstanceName, ServiceType: mdns.ServiceTypeOperational, Port: 49999}); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if got := loop.answersOperational(cfid, 0x42); got == nil || !got.IP.Equal(net.IPv6loopback) || got.Port != 49999 {
+		t.Fatalf("a loopback controller answers at %v, want [::1]:49999", got)
+	}
+	if !loop.ip().Equal(net.IPv6loopback) {
+		t.Fatalf("a loopback controller's records name %v, want ::1", loop.ip())
 	}
 }
 

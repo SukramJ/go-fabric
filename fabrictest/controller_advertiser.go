@@ -21,6 +21,9 @@ import (
 // controller's browser sees the records. The real network's responder is
 // what [mdns.NewResponder] gives a program.
 type controllerAdvertiser struct {
+	// addr is the controller's socket on the in-memory network; nil on a
+	// loopback site, where New binds its own and the address is the one
+	// its records publish (address).
 	addr  *net.UDPAddr
 	index int
 
@@ -68,17 +71,37 @@ func (a *controllerAdvertiser) Close() error {
 	return nil
 }
 
-// answersOperational reports whether the controller published the
-// operational record of nodeID on compressedFabricID.
-func (a *controllerAdvertiser) answersOperational(compressedFabricID [8]byte, nodeID uint64) bool {
+// ip is the controller's address in the records the site answers: its
+// socket's on the in-memory network, [::1] on loopback.
+func (a *controllerAdvertiser) ip() net.IP {
+	if a.addr != nil {
+		return a.addr.IP
+	}
+	return net.IPv6loopback
+}
+
+// address is where the controller of svc is reached: its socket on the
+// in-memory network, or on loopback [::1] at the port svc publishes —
+// the controller's own socket's (controller/serve.go, advertise.go).
+func (a *controllerAdvertiser) address(svc *mdns.Service) *net.UDPAddr {
+	if a.addr != nil {
+		return a.addr
+	}
+	return &net.UDPAddr{IP: net.IPv6loopback, Port: int(svc.Port)}
+}
+
+// answersOperational returns the address of the controller when it
+// published the operational record of nodeID on compressedFabricID, nil
+// when it did not.
+func (a *controllerAdvertiser) answersOperational(compressedFabricID [8]byte, nodeID uint64) *net.UDPAddr {
 	want := fmt.Sprintf("%016X-%016X", compressedFabricID, nodeID)
 	services := a.Active()
 	for i := range services {
 		if services[i].ServiceType == mdns.ServiceTypeOperational && strings.EqualFold(services[i].InstanceName, want) {
-			return true
+			return a.address(&services[i])
 		}
 	}
-	return false
+	return nil
 }
 
 // controllerAdvertiser returns the advertiser a controller of index on
