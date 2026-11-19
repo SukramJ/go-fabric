@@ -2,9 +2,9 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/thermostat/PresetsLocalWriteTest.ts
-// at 862ad75f: local writes of the presets — handles, the announcement,
-// persistence across a restart, the write rules, the active preset and the
-// built-in presets.
+// at b25ed960 (355798964 added the check-order cases): local writes of the
+// presets — handles, the announcement, persistence across a restart, the
+// write rules, the active preset and the built-in presets.
 //
 // matter.js writes on a MockServerNode (`deviceEp.set({ thermostat:
 // { presets } })`); the port runs a fabrictest device and writes with the
@@ -35,9 +35,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
+	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
@@ -257,9 +259,39 @@ func TestParityMatterJS_PresetsLocalWriteTest(t *testing.T) {
 	})
 
 	t.Run("rejects more presets than the thermostat supports", func(t *testing.T) {
-		l := newLocalThermostat(t, 2, []thermo.Preset{})
-		wantStatusCode(t, l.writePresets(t, []thermo.Preset{newPreset(), newPreset(), newPreset()}), im.StatusResourceExhausted, "exceeds NumberOfPresets")
+		// At b25ed960 the scenario admits three named presets, so only the
+		// total count can refuse the third.
+		cfg := thermostatConfig(2, []thermo.Preset{})
+		cfg.PresetTypes[0].NumberOfPresets = 3
+		cfg.PresetTypes[0].PresetTypeFeatures = tdef.PresetTypeFeaturesSupportsNames
+		site, dev, srv := onlineThermostat(t, cfg)
+		l := &localThermostat{site: site, dev: dev, srv: srv}
+		wantStatusCode(t, l.writePresets(t, []thermo.Preset{newPreset(withName("a")), newPreset(withName("b")), newPreset(withName("c"))}), im.StatusResourceExhausted, "exceeds NumberOfPresets")
 		l.wantNoneStored(t)
+	})
+
+	t.Run("rejects an unknown handle before the count it would exceed", func(t *testing.T) {
+		l := newLocalThermostat(t, 1, []thermo.Preset{})
+		l.mustWrite(t, []thermo.Preset{newPreset()})
+		stored := l.srv.Presets()
+		err := l.writePresets(t, append(slices.Clone(stored), newPreset(withHandle([]byte{1, 2, 3, 4}))))
+		wantStatusCode(t, err, im.StatusNotFound, "does not exist in old Presets")
+		if after := l.srv.Presets(); len(after) != 1 || !bytes.Equal(after[0].PresetHandle.Value, stored[0].PresetHandle.Value) {
+			t.Errorf("stored presets %+v, want %+v", after, stored)
+		}
+	})
+
+	t.Run("rejects one more unnamed preset for a full scenario as exhausted, not as a duplicate name", func(t *testing.T) {
+		cfg := thermostatConfig(2, []thermo.Preset{})
+		cfg.PresetTypes[0].NumberOfPresets = 1
+		site, dev, srv := onlineThermostat(t, cfg)
+		l := &localThermostat{site: site, dev: dev, srv: srv}
+		l.mustWrite(t, []thermo.Preset{newPreset()})
+		stored := l.srv.Presets()
+		wantStatusCode(t, l.writePresets(t, append(slices.Clone(stored), newPreset())), im.StatusResourceExhausted, "for scenario")
+		if after := l.srv.Presets(); len(after) != 1 || !bytes.Equal(after[0].PresetHandle.Value, stored[0].PresetHandle.Value) {
+			t.Errorf("stored presets %+v, want %+v", after, stored)
+		}
 	})
 
 	t.Run("rejects a named preset when the preset type does not support names", func(t *testing.T) {

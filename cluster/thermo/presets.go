@@ -156,14 +156,15 @@ func (s *ThermostatServer) presetRules() presetRules {
 }
 
 // validatePresetWrite is matter.js #validatePresetWriteRequest
-// (ThermostatServer.ts:1367-1493): presets a client wants to store, against
-// the presets they replace (seeding — old undefined — admits the handles
-// the application states). issued are the handles this write's
-// normalisation issued.
+// (ThermostatServer.ts:1850-1975 at b25ed960): presets a client wants to
+// store, against the presets they replace (seeding — old undefined —
+// admits the handles the application states). issued are the handles this
+// write's normalisation issued. Each appended preset is checked in order:
+// its handle, scenario and name support, then the total and per-scenario
+// counts, then the duplicate name (:1913-1943 at b25ed960), so an unknown
+// handle in an over-long list is NOT_FOUND and one more unnamed preset for
+// a full scenario RESOURCE_EXHAUSTED.
 func (r presetRules) validatePresetWrite(presets, old []Preset, seeding bool, issued map[string]bool) error {
-	if len(presets) > r.numberOfPresets {
-		return spec.Errorf(im.StatusResourceExhausted, "Number of presets (%d) exceeds NumberOfPresets (%d)", len(presets), r.numberOfPresets)
-	}
 	oldByHandle := map[string]Preset{}
 	for _, p := range old {
 		if !p.PresetHandle.Null {
@@ -177,7 +178,7 @@ func (r presetRules) validatePresetWrite(presets, old []Preset, seeding bool, is
 	names := map[tdef.PresetScenarioEnum][]*string{}
 	counts := map[tdef.PresetScenarioEnum]int{}
 	seen := map[string]bool{}
-	for _, p := range presets {
+	for index, p := range presets {
 		name := presetName(p)
 		builtIn := !p.BuiltIn.Null && p.BuiltIn.Value
 		scenario := presetScenarioName(p.PresetScenario)
@@ -211,19 +212,25 @@ func (r presetRules) validatePresetWrite(presets, old []Preset, seeding bool, is
 		if !ok {
 			return spec.Errorf(im.StatusConstraintError, "No PresetType defined for scenario %s", scenario)
 		}
-		// The specification counts null — "no name" — as a value that may
-		// not repeat within a scenario.
-		if slices.ContainsFunc(names[p.PresetScenario], func(n *string) bool { return equalName(n, name) }) {
-			return spec.Errorf(im.StatusConstraintError, "Duplicate preset name %s for scenario %s", nameJSON(name), scenario)
-		}
 		if name != nil && t.PresetTypeFeatures&tdef.PresetTypeFeaturesSupportsNames == 0 {
 			return spec.Errorf(im.StatusConstraintError, "Preset names are not supported for scenario %s", scenario)
 		}
-		names[p.PresetScenario] = append(names[p.PresetScenario], name)
-		if counts[p.PresetScenario] == int(t.NumberOfPresets) {
-			return spec.Errorf(im.StatusResourceExhausted, "Number of presets (%d) for scenario %s exceeds allowed number (%d)", counts[p.PresetScenario], scenario, t.NumberOfPresets)
+		// Mirrors matter.js ThermostatServer.ts:1919-1932 at b25ed960
+		// (#validatePresetWriteRequest): the total and the per-scenario
+		// count, for this appended preset.
+		if index+1 > r.numberOfPresets {
+			return spec.Errorf(im.StatusResourceExhausted, "Number of presets (%d) exceeds NumberOfPresets (%d)", len(presets), r.numberOfPresets)
+		}
+		if count := counts[p.PresetScenario]; count == int(t.NumberOfPresets) {
+			return spec.Errorf(im.StatusResourceExhausted, "Number of presets (%d) for scenario %s exceeds allowed number (%d)", count+1, scenario, t.NumberOfPresets)
 		}
 		counts[p.PresetScenario]++
+		// The specification counts null — "no name" — as a value that may
+		// not repeat within a scenario (:1934-1943 at b25ed960).
+		if slices.ContainsFunc(names[p.PresetScenario], func(n *string) bool { return equalName(n, name) }) {
+			return spec.Errorf(im.StatusConstraintError, "Duplicate preset name %s for scenario %s", nameJSON(name), scenario)
+		}
+		names[p.PresetScenario] = append(names[p.PresetScenario], name)
 
 		if r.cool {
 			if p.CoolingSetpoint == nil {
