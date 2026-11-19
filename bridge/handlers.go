@@ -608,8 +608,8 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 // resumptionId + initiatorResumeMic triggers a one-round-trip resume
 // instead of Full Sigma.
 type CaseAdapter struct {
-	// mu guards established, establishedSessionID, lastSigma2, sigma3Digest,
-	// sigma3Accepted and responder.
+	// mu guards established, establishedSessionID, lastSigma2 and
+	// responder.
 	mu            sync.RWMutex
 	responder     *sigma.Responder
 	onEstablished CaseSessionEstablished
@@ -636,13 +636,6 @@ type CaseAdapter struct {
 	// a Sigma1 that yields the same bytes is recognised as the
 	// responder's idempotent replay rather than a restart.
 	lastSigma2 []byte
-	// sigma3Digest is the SHA-256 of the Sigma3 that established the
-	// current session, when sigma3Accepted: a Sigma3 of the same bytes is
-	// its retransmission, any other Sigma3 on the established handshake is
-	// refused ([CaseAdapter.ProcessSigma3]). A resume establishes without
-	// a Sigma3 and accepts none.
-	sigma3Digest   [32]byte
-	sigma3Accepted bool
 	// resumeInstalled is the session the last Sigma1 installed by
 	// resumption, until the router takes it for the Sigma2_Resume's
 	// retransmission entry ([CaseAdapter.takeResumeInstall]); zero for
@@ -832,7 +825,6 @@ func (a *CaseAdapter) SetResponder(r *sigma.Responder) {
 	a.established = false
 	a.establishedSessionID = 0
 	a.lastSigma2 = nil
-	a.sigma3Accepted = false
 	a.mu.Unlock()
 }
 
@@ -945,10 +937,9 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		sessionID := r.SessionID()
 		a.mu.Lock()
 		install := !a.established || sessionID != a.establishedSessionID
-		prevEstablished, prevSessionID, prevAccepted := a.established, a.establishedSessionID, a.sigma3Accepted
+		prevEstablished, prevSessionID := a.established, a.establishedSessionID
 		a.established = true
 		a.establishedSessionID = sessionID
-		a.sigma3Accepted = false
 		a.mu.Unlock()
 		if !install || a.onEstablished == nil {
 			// No session is installed for this resume, so nobody replaces
@@ -973,7 +964,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 				// provider and returns its staked id — rather than wait
 				// for the reaper (review II, R2-P6-sec-0301).
 				a.mu.Lock()
-				a.established, a.establishedSessionID, a.sigma3Accepted = prevEstablished, prevSessionID, prevAccepted
+				a.established, a.establishedSessionID = prevEstablished, prevSessionID
 				begun := a.established || a.lastSigma2 != nil
 				a.mu.Unlock()
 				if !begun {
@@ -1004,7 +995,6 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	a.mu.Lock()
 	if !bytes.Equal(out, a.lastSigma2) {
 		a.established = false
-		a.sigma3Accepted = false
 		a.lastSigma2 = out
 	}
 	a.mu.Unlock()
@@ -1061,16 +1051,12 @@ func caseFailureProtocolCode(err error) uint16 {
 // retransmits Sigma1 every ~30s and the pairing UI hangs at
 // "verbinden …".
 //
-// Once the handshake established its session, a Sigma3 of the same bytes
-// as the one that established it is answered with the success report
-// again, and any other Sigma3 is not answered — it is acknowledged, as the
-// router acknowledges a Sigma3 of a completed handshake that is not the
-// completing one ([Bridge.handleSigma3OfCompleted]); neither reaches the
-// responder or changes the session (review II, R2-P3-rr-dev-01,
-// R2-P4-nv-03). The bridge's router does not send that report on: it
-// answers a Sigma3 of a completed handshake itself, for the bytes and the
-// route that completed it, and a Sigma3 that reaches the adapter after
-// establishment is acknowledged and not answered (R2-P4-nw-01).
+// Once the handshake established its session, a Sigma3 — the bytes that
+// established it included — is not answered: it is acknowledged, as the
+// router acknowledges a Sigma3 of a completed handshake, and it neither
+// reaches the responder nor changes the session (review II,
+// R2-P3-rr-dev-01, R2-P4-nv-03, R2-P4-nw-01; phase 7, decisions 284, 286;
+// [Bridge.dispatchSigma3]).
 func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload []byte, err error) {
 	opcode, respPayload, _, err = a.processSigma3(payload)
 	return opcode, respPayload, err
@@ -1086,9 +1072,7 @@ const (
 	// sigma3Established: this Sigma3 established the session.
 	sigma3Established
 	// sigma3OfCompleted: the handshake had established its session
-	// before; the Sigma3 changed nothing (answered with the success
-	// report when it is the accepted Sigma3's retransmission, not
-	// answered otherwise).
+	// before; the Sigma3 changed nothing and is not answered.
 	sigma3OfCompleted
 )
 
@@ -1097,7 +1081,6 @@ const (
 // establishment by: read back from shared state it could belong to
 // another, concurrent Sigma3.
 func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload []byte, outcome sigma3Outcome, err error) {
-	digest := sha256.Sum256(payload)
 	// Held across the responder's step so the check of an established
 	// handshake and the establishment itself are one step for concurrent
 	// Sigma3 datagrams; released before the callbacks.
@@ -1108,11 +1091,14 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		return 0, nil, sigma3Failed, errors.New("bridge: CaseAdapter without responder")
 	}
 	if a.established {
-		retransmitted := a.sigma3Accepted && digest == a.sigma3Digest
+		// Every Sigma3 after establishment is acknowledged and not
+		// answered, the bytes that established the session included
+		// (review II, phase 7, decision 286): matter.js's CASE server reads
+		// one Sigma3 per handshake
+		// (packages/protocol/src/session/case/CaseServer.ts:275-279 at
+		// db021da0), and a repeat on its exchange is a duplicate that does
+		// not reach it (packages/protocol/src/protocol/MessageExchange.ts:501-511).
 		a.mu.Unlock()
-		if retransmitted {
-			return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3OfCompleted, nil
-		}
 		return 0, nil, sigma3OfCompleted, nil
 	}
 	if err := r.ProcessSigma3(payload); err != nil {
@@ -1131,7 +1117,6 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	// session table.
 	a.established = true
 	a.establishedSessionID = r.SessionID()
-	a.sigma3Digest, a.sigma3Accepted = digest, true
 	a.mu.Unlock()
 	if a.onEstablished != nil {
 		keys, ok := r.SessionKeys()

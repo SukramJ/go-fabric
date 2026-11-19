@@ -288,48 +288,69 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 	}
 }
 
-// TestSigma3RetransmissionIsAnsweredOnlyForItsBytesAndRoute: after a CASE
-// handshake completed, the success report is sent again only for the
-// Sigma3 that completed it — the same bytes — arriving over the route it
-// completed on; a Sigma3 of other bytes, or the same bytes from another
-// address, is acknowledged and not answered, and takes nothing from the
-// retransmission that follows (review II, R2-P3-rr-dev-01, R2-P4-nv-03).
-// That is once the success report was acknowledged and the provider still
-// holds the handshake: while the report waits for its acknowledgement, the
-// retransmission — which acknowledges the Sigma2, not the report — is
-// refused on receive (review II, phase 7, decision 277).
+// TestSigma3OfACompletedHandshakeIsAcknowledgedOnly: once a CASE
+// handshake completed and its success report was acknowledged, a Sigma3
+// under its initiator and exchange — other bytes, the completing bytes from
+// another address, and the initiator's retransmission of the completing
+// Sigma3 over its route — is acknowledged and not answered while the
+// provider still holds the handshake, and installs no second session; it
+// was answered with the success report again until review II, phase 7,
+// decision 284 (R2-P3-dr-dev-02, R2-P3-rr-dev-01, R2-P4-nv-03). While the
+// report waits for its acknowledgement the retransmission, which
+// acknowledges the Sigma2 and not the report, is refused on receive, and
+// the report's own retransmission serves the initiator (decision 277).
 // Neither reference answers it: in matter.js it is a duplicate on the
 // handshake's live exchange, an error that is only logged, or an opening
 // message SecureChannel does not take (packages/protocol/src/protocol/
 // MessageExchange.ts:501-511 and :522-534, ExchangeManager.ts:435-437 and
 // :491-494, packages/protocol/src/securechannel/
 // SecureChannelProtocol.ts:152-153 at db021da0); connectedhomeip takes only
-// Sigma1 unsolicited (src/protocols/secure_channel/CASEServer.cpp:54 at
+// Sigma1 unsolicited (src/protocols/secure_channel/CASEServer.cpp:54-55 at
 // 6170af84) and acknowledges the rest (src/messaging/ExchangeMgr.cpp:437).
-func TestSigma3RetransmissionIsAnsweredOnlyForItsBytesAndRoute(t *testing.T) {
+func TestSigma3OfACompletedHandshakeIsAcknowledgedOnly(t *testing.T) {
 	t.Parallel()
-	c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), true)
+	for _, tc := range []struct {
+		name        string
+		viaProvider bool
+	}{
+		{"through a provider, its record standing", true},
+		{"through the singleton handler, its record ended", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), tc.viaProvider)
 
-	err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter)
-	c.expectRefused(t, err, errIncorrectAck, 1, "the retransmission while the success report waits for its acknowledgement")
-	c.acknowledgeReport(t)
+			err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter)
+			c.expectRefused(t, err, errIncorrectAck, 1, "the retransmission while the success report waits for its acknowledgement")
+			c.acknowledgeReport(t)
+			if got := c.recordHeld(); got != tc.viaProvider {
+				t.Fatalf("after the report's acknowledgement the record is held: %v, want %v", got, tc.viaProvider)
+			}
 
-	pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
-	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, append([]byte(nil), c.sigma3[:len(c.sigma3)-1]...), nil); err != nil {
-		t.Fatal(err)
+			pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
+			if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, append([]byte(nil), c.sigma3[:len(c.sigma3)-1]...), nil); err != nil {
+				t.Fatal(err)
+			}
+			c.expectAcknowledgedOnly(t, pending, "other bytes over the completing route")
+
+			other := c.otherPeer(t)
+			if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
+				t.Fatal(err)
+			}
+			c.expectAcknowledgedOnly(t, pending, "the same bytes from another address")
+
+			if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
+				t.Fatal(err)
+			}
+			c.expectAcknowledgedOnly(t, pending, "the retransmission over the completing route")
+			if got := c.recordHeld(); got != tc.viaProvider {
+				t.Fatalf("after the Sigma3s the record is held: %v, want %v", got, tc.viaProvider)
+			}
+			if got := c.sessions.Load(); got != 1 {
+				t.Fatalf("the handshake installed %d sessions, want 1", got)
+			}
+		})
 	}
-	c.expectAcknowledgedOnly(t, pending, "other bytes over the completing route")
-
-	other := c.otherPeer(t)
-	if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
-		t.Fatal(err)
-	}
-	c.expectAcknowledgedOnly(t, pending, "the same bytes from another address")
-
-	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
-		t.Fatal(err)
-	}
-	c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the retransmission over the completing route")
 }
 
 // TestSigma3RetransmissionKeepsNoRecordAlive: the Sigma3 retransmissions of
@@ -344,12 +365,14 @@ func TestSigma3RetransmissionKeepsNoRecordAlive(t *testing.T) {
 	const ttl = 30 * time.Second
 	clk.Advance(ttl - time.Second)
 	// While the report waits for its acknowledgement a retransmission is
-	// refused on receive (decision 277); the record answers it after.
+	// refused on receive (decision 277); after, it is acknowledged only
+	// (decision 284).
 	c.acknowledgeReport(t)
+	pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
 	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
 		t.Fatal(err)
 	}
-	c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the retransmission before the TTL")
+	c.expectAcknowledgedOnly(t, pending, "the retransmission before the TTL")
 	clk.Advance(2 * time.Second)
 	c.provider.reapLocked(ttl)
 	if got := c.provider.Active(); got != 0 {
@@ -422,7 +445,7 @@ func TestSigma3AfterCompletionKeepsTheSuccessReportPending(t *testing.T) {
 					t.Fatalf("opcode %#x of %d bytes from another sender left the replies waiting for an acknowledgement going to %v, want the report to %s", tc.opcode, len(payload), got, want)
 				}
 			}
-			if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
+			if ok := c.r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
 				t.Fatal("the completed handshake's record did not outlive the messages from another sender")
 			}
 			err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter)
@@ -447,12 +470,12 @@ func TestSingletonCompletedRecordEndsWithItsHandler(t *testing.T) {
 	c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), false)
 	err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter)
 	c.expectRefused(t, err, errIncorrectAck, 1, "the retransmission over the completing route")
-	if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
+	if ok := c.r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
 		t.Fatal("the completed handshake's record did not outlive the refused retransmission")
 	}
 
 	c.r.b.AttachCaseHandler(nil)
-	if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); ok {
+	if ok := c.r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); ok {
 		t.Fatal("the completed handshake's record outlived the handler that completed it")
 	}
 	pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
@@ -467,9 +490,9 @@ func TestSingletonCompletedRecordEndsWithItsHandler(t *testing.T) {
 // and not answered (review II, phase 7, decision 277), and leaves the
 // completed handshake as it was: its record stands, and the success report
 // waiting for the initiator's acknowledgement stays in retransmission;
-// once that is acknowledged, the provider's record answers the
-// retransmission of the completing Sigma3 over its route with the success
-// report again. Through a PerExchangeCaseProvider and through the singleton
+// once that is acknowledged, the provider's record still stands, and the
+// retransmission of the completing Sigma3 over its route is acknowledged
+// and not answered (decision 284). Through a PerExchangeCaseProvider and through the singleton
 // handler alike (review II, R2-P4-rr-sec-04; l1 item 3). In matter.js a message on the
 // handshake's live exchange that does not acknowledge the pending report
 // fails before the retransmission timer is touched
@@ -492,7 +515,7 @@ func TestSigma1ThatBeginsNothingKeepsACompletedHandshake(t *testing.T) {
 			other := c.otherPeer(t)
 			err := other.send(mrp.SCOpcodeSigma1, completedCaseExchange, []byte{0x15, 0x18}, nil)
 			c.expectRefused(t, err, errPreviousAckMissing, 1, "a Sigma1 that began nothing")
-			if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
+			if ok := c.r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
 				t.Fatal("a Sigma1 that began nothing ended the completed handshake's record")
 			}
 			if !c.successReportPending() {
@@ -501,10 +524,14 @@ func TestSigma1ThatBeginsNothingKeepsACompletedHandshake(t *testing.T) {
 			}
 			if tc.viaProvider {
 				c.acknowledgeReport(t)
+				pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
 				if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
 					t.Fatal(err)
 				}
-				c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the retransmission of the completing Sigma3 over its route")
+				c.expectAcknowledgedOnly(t, pending, "the retransmission of the completing Sigma3 over its route")
+				if !c.recordHeld() {
+					t.Fatal("the retransmission of the completing Sigma3 ended the provider's record")
+				}
 			}
 			if got := c.sessions.Load(); got != 1 {
 				t.Fatalf("the handshake installed %d sessions, want 1", got)
