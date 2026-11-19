@@ -129,6 +129,9 @@ var ErrForeignKeysOff = errors.New("store: the database handle has PRAGMA foreig
 //     matter_resumption its write_seq, with v11's statements; the rows they
 //     hold take 0 (the key map reads by GroupID as before, the old
 //     resumption records are evicted first).
+//   - matter_resumption gains migration v12's initiator, with v12's
+//     statement; the records it holds did not record their role and take
+//     0, the responder's, so they stay under the per-fabric cap.
 //   - matter_icd_registrations' icd_key, stored in clear before v0.12.1,
 //     is sealed under the store's ICD key ([SettingICDKey]); the schema is
 //     unchanged, so the step has no migration of its own. It runs last,
@@ -154,6 +157,9 @@ func Upgrade(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	if err := addMigrationColumns(ctx, db, "v11"); err != nil {
+		return fmt.Errorf("store: upgrade: %w", err)
+	}
+	if err := addMigrationColumns(ctx, db, "v12"); err != nil {
 		return fmt.Errorf("store: upgrade: %w", err)
 	}
 	// After v10: the ICD key's setting is read with its seal mark.

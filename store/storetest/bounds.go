@@ -24,7 +24,8 @@ func resumptionRecordID(f uint8, peer uint64) store.ResumptionRecord {
 }
 
 // resumptionCapPerFabric (R2-P6-bound-0106): a fabric holds at most
-// resumptionCap resumption records (store/port.go, Resumption); the record written
+// resumptionCap resumption records of the responder (store/port.go,
+// Resumption; resumptionCapRespondersOnly for the client's); the record written
 // least recently goes when one more peer's is written, a rewritten record
 // counts as just written, and another fabric's records are not touched.
 func resumptionCapPerFabric(ctx context.Context, t *testing.T, p store.Port) {
@@ -62,6 +63,76 @@ func resumptionCapPerFabric(ctx context.Context, t *testing.T, p store.Port) {
 		if !held(two, peer) {
 			t.Errorf("a write on fabric %d evicted fabric %d's peer %d", one, two, peer)
 		}
+	}
+}
+
+// resumptionCapRespondersOnly (R2-P7-sec-01, decision 270): the cap bounds
+// the records the CASE responder wrote — those a foreign peer can make the
+// node write — and leaves the records the node's own CASE client wrote
+// (ResumptionRecord.Initiator) neither counted nor evicted. The role reads
+// back by peer and by id, and a rewrite by the other role takes its role.
+func resumptionCapRespondersOnly(ctx context.Context, t *testing.T, p store.Port) {
+	const clients, responders = 40, 20
+	f := addFabric(ctx, t, p, 1)
+	client := func(peer uint64) store.ResumptionRecord {
+		rec := resumptionRecordID(f, peer)
+		rec.Initiator = true
+		return rec
+	}
+	// The client's records are written around the responder's, so the
+	// oldest and the newest records of the fabric are the client's.
+	for peer := range uint64(clients / 2) {
+		must(t, p.UpsertResumption(ctx, client(peer)))
+	}
+	for i := range uint64(responders) {
+		must(t, p.UpsertResumption(ctx, resumptionRecordID(f, clients+i)))
+	}
+	for peer := uint64(clients / 2); peer < clients; peer++ {
+		must(t, p.UpsertResumption(ctx, client(peer)))
+	}
+	role := func(peer uint64) (initiator, held bool) {
+		rec, err := p.GetResumptionByPeer(ctx, f, peer)
+		if errors.Is(err, store.ErrResumptionNotFound) {
+			return false, false
+		}
+		if err != nil {
+			t.Fatalf("GetResumptionByPeer(%d): %v", peer, err)
+		}
+		return rec.Initiator, true
+	}
+	for peer := range uint64(clients) {
+		if initiator, held := role(peer); !held || !initiator {
+			t.Errorf("the client's record of peer %d: held %v, Initiator %v; want held, true", peer, held, initiator)
+		}
+	}
+	const evicted = responders - resumptionCap
+	for i := range uint64(responders) {
+		initiator, held := role(clients + i)
+		if want := i >= evicted; held != want || initiator {
+			t.Errorf("the responder's record %d (peer %d): held %v, Initiator %v; want held %v, false", i, clients+i, held, initiator, want)
+		}
+	}
+	if rec, err := p.GetResumptionByID(ctx, client(0).ResumptionID); err != nil || !rec.Initiator {
+		t.Errorf("GetResumptionByID of a client's record: Initiator %v, %v; want true", rec.Initiator, err)
+	}
+	// The responder rewrites the client's record of peer 0: it is the
+	// responder's now, the newest, and the oldest responder's record goes.
+	must(t, p.UpsertResumption(ctx, resumptionRecordID(f, 0)))
+	if initiator, held := role(0); !held || initiator {
+		t.Errorf("peer 0 after the responder's rewrite: held %v, Initiator %v; want held, false", held, initiator)
+	}
+	if _, held := role(clients + evicted); held {
+		t.Errorf("the responder's oldest record (peer %d) survived a %dth responder record", clients+evicted, resumptionCap+1)
+	}
+	// The client rewrites the responder's newest: it leaves the cap, and the
+	// next responder record evicts none.
+	must(t, p.UpsertResumption(ctx, client(clients+responders-1)))
+	must(t, p.UpsertResumption(ctx, resumptionRecordID(f, clients+responders)))
+	if _, held := role(clients + evicted + 1); !held {
+		t.Errorf("a responder record (peer %d) was evicted while the fabric held %d of the responder's", clients+evicted+1, resumptionCap)
+	}
+	if initiator, held := role(clients + responders - 1); !held || !initiator {
+		t.Errorf("peer %d after the client's rewrite: held %v, Initiator %v; want held, true", clients+responders-1, held, initiator)
 	}
 }
 

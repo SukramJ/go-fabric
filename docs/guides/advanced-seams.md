@@ -166,13 +166,14 @@ private key a pending UpdateNOC replaced, and to
 `matter_server_subscriptions` the save order (`save_seq`). Version 9
 added `matter_resumption`'s session parameters and the table
 `matter_owed_fabric_events`, version 10 the seal mark of every table that
-holds a secret and the DoorLock records' source, and version 11
+holds a secret and the DoorLock records' source, version 11
 `matter_group_key_map`'s `position` and `matter_resumption`'s
-`write_seq`. `store.Store` reads and writes on a database at the last
-version only (v11); a host that runs `store.Migrations()` with its own
-tool runs every step, through `v11`, and then calls `store.Upgrade` once,
+`write_seq`, and version 12 `matter_resumption`'s `initiator`.
+`store.Store` reads and writes on a database at the last
+version only (v12); a host that runs `store.Migrations()` with its own
+tool runs every step, through `v12`, and then calls `store.Upgrade` once,
 which moves the per-fabric VID settings keys into their fabric's columns.
-`store/migrations/v5.up.sql` to `v11.up.sql` hold the statements; the
+`store/migrations/v5.up.sql` to `v12.up.sql` hold the statements; the
 tables per version are in [Persistence](persistence.md#tables-of-store-the-matter_-schema).
 
 **Costs.** The node writes the same tables. A host that writes a fabric,
@@ -181,7 +182,7 @@ the command that writes it (the CASE identity, the operational record,
 the sessions and subscriptions, the group routing). Read; write only
 settings of the host's own.
 
-*Source: `node/node.go` (`Node.Store`, `openStores`), `store/settings.go`, `store/migrations/` (`v5.up.sql` … `v11.up.sql`), `store/migrations.go` (`migrationVersions`), `examples/reference-bridge/persist.go`.*
+*Source: `node/node.go` (`Node.Store`, `openStores`), `store/settings.go`, `store/migrations/` (`v5.up.sql` … `v12.up.sql`), `store/migrations.go` (`migrationVersions`), `examples/reference-bridge/persist.go`.*
 
 ## `mdns`
 

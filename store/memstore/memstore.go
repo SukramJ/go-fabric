@@ -757,8 +757,9 @@ func (s *Store) ListGroupcastGroups(_ context.Context, fabricIndex uint8) ([]sto
 
 // UpsertResumption implements [store.Resumption]. A resumption id is unique
 // across the table, as SQLite's index on it makes it; a fabric keeps at
-// most resumptionRecordsPerFabric records, the least recently
-// written evicted first.
+// most resumptionRecordsPerFabric of the responder's records (Initiator
+// false), the least recently written evicted first; the client's records
+// are neither counted nor evicted.
 func (s *Store) UpsertResumption(_ context.Context, rec store.ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
 		return fmt.Errorf("memstore: resumption_id length=%d (want 16)", len(rec.ResumptionID))
@@ -788,12 +789,13 @@ func (s *Store) UpsertResumption(_ context.Context, rec store.ResumptionRecord) 
 	return nil
 }
 
-// resumptionRecordsPerFabric is the port's per-fabric cap on resumption
-// records (store/port.go, Resumption); storetest's resumption/cap-per-fabric
-// holds it to the SQLite store's.
+// resumptionRecordsPerFabric is the port's per-fabric cap on the
+// responder's resumption records (store/port.go, Resumption); storetest's
+// resumption/cap-per-fabric and resumption/cap-counts-responders-only hold
+// it to the SQLite store's.
 const resumptionRecordsPerFabric = 16
 
-// evictResumptions deletes the fabric's records beyond
+// evictResumptions deletes the fabric's responder records beyond
 // resumptionRecordsPerFabric, the least recently written first, as
 // SQLite's UpsertResumption does; the caller holds mu.
 func (s *Store) evictResumptions(fabricIndex uint8) {
@@ -801,7 +803,7 @@ func (s *Store) evictResumptions(fabricIndex uint8) {
 		n := 0
 		var oldest resumptionKey
 		for k := range s.resumption {
-			if k.fabric != fabricIndex {
+			if k.fabric != fabricIndex || s.resumption[k].Initiator {
 				continue
 			}
 			n++

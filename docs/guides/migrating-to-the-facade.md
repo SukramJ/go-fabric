@@ -161,6 +161,18 @@ func (r myReach) ReadFabrics(ctx context.Context, peer jfadef.Peer) ([]opcreds.F
 A node with `Config.Client` on needs no reach of its own: it mounts one
 over its client stack where the declaration names none.
 
+## Changed in the next release: the resumption record's role (schema v12)
+
+The per-fabric cap of 16 resumption records counts only the CASE
+responder's records; the records the node's own CASE client writes are
+kept (review II, R2-P7-sec-01, owner decision 270).
+
+| Before | Now |
+| --- | --- |
+| a host that carries the schema in its own migrations | applies `store/migrations/v12.up.sql` (`matter_resumption.initiator`); `store.Migrations()` has 12 steps |
+| a host's own `store.Port` implementation | stores `store.ResumptionRecord.Initiator` and reads it back; the cap of 16 per fabric counts and evicts only the records with `Initiator` false (storetest `resumption/cap-counts-responders-only`) |
+| a host's own `handshake.ResumptionStore` | keeps `handshake.ResumptionRecord.Initiator` as saved; `handshake.CASE` saves with it true, `handshake.CASEServer` with it false |
+
 ## Added after v0.13.6: `<cluster>def.Server.Host()`
 
 A host that type-asserts a typed server's `Underlying()` to reach the

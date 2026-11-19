@@ -205,7 +205,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS matter_acl_position
 -- The session_* and following columns (migration v9) are the peer's
 -- session parameters a CASE client resumes with
 -- (store.ResumptionRecord.SessionParameters); 0 is absent, and a record
--- the responder wrote carries none. One record per peer serves both roles.
+-- the responder wrote carries none. One record per peer serves both roles;
+-- initiator (migration v12) is the role that wrote it last, 1 for the
+-- node's own CASE client, and the per-fabric cap of write_seq (v11)
+-- counts and evicts only the responder's rows (initiator = 0).
 --
 -- case_authenticated_tags carries the CATs from the initiator's NOC
 -- subject as JSON (e.g. [1099511627777]); NULL and '[]' both mean
@@ -230,6 +233,7 @@ CREATE TABLE IF NOT EXISTS matter_resumption (
     max_tcp_message_size INTEGER NOT NULL DEFAULT 0 CHECK(max_tcp_message_size BETWEEN 0 AND 4294967295),
     sealed INTEGER NOT NULL DEFAULT 0 CHECK(sealed IN (0, 1)),
     write_seq INTEGER NOT NULL DEFAULT 0 CHECK(write_seq >= 0),
+    initiator INTEGER NOT NULL DEFAULT 0 CHECK(initiator IN (0, 1)),
     PRIMARY KEY(fabric_index, peer_node_id),
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );

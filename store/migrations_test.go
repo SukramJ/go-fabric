@@ -115,11 +115,11 @@ func TestMigrationsMatchApply(t *testing.T) {
 func TestMigrationsPin(t *testing.T) {
 	t.Parallel()
 	ms := store.Migrations()
-	if len(ms) != 11 {
-		t.Fatalf("len(Migrations()) = %d, want 11", len(ms))
+	if len(ms) != 12 {
+		t.Fatalf("len(Migrations()) = %d, want 12", len(ms))
 	}
-	if last := ms[len(ms)-1].Version; last != "v11" {
-		t.Errorf("last migration = %s, want v11", last)
+	if last := ms[len(ms)-1].Version; last != "v12" {
+		t.Errorf("last migration = %s, want v12", last)
 	}
 	seen := map[string]bool{}
 	for _, m := range ms {
@@ -135,7 +135,7 @@ func TestMigrationsPin(t *testing.T) {
 // it: record the new value in the CHANGELOG entry of that change.
 func TestSchemaFingerprintRelease(t *testing.T) {
 	t.Parallel()
-	const want = "891c60c399943bef8c2d5962e2a6b7f783a119bb740b975226c893be817f47b5"
+	const want = "167854abd59e365d9a63fe15ae5864ba2b88268ec46ef934d1651086569cddf7"
 	if got := fingerprint(t, openTestDB(t)); got != want {
 		t.Errorf("SchemaFingerprint after Apply = %s, want %s", got, want)
 	}
@@ -453,5 +453,60 @@ func TestMigrationV11KeepsKeyMapRows(t *testing.T) {
 	}
 	if n, _ := legacyMappings(t, db, 2); n != 2 {
 		t.Errorf("fabric 2's entries after v11 down = %d, want 2", n)
+	}
+}
+
+// TestMigrationV12KeepsResumptionRowsAsResponders (R2-P7-sec-01, decision
+// 270): the resumption records a v11 database holds carry no role, and
+// after Apply they read back as the responder's (Initiator false), the
+// safe default — they stay under the per-fabric cap, as every record was
+// before v12; the next responder write evicts the oldest beyond it. v12's
+// Down keeps the records and drops their role.
+func TestMigrationV12KeepsResumptionRowsAsResponders(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	db := openEmptyDB(t)
+	applyUp(t, db, "v11")
+	insertLegacyFabric(t, db, 1, 1)
+	const legacy = 20
+	for peer := range legacy {
+		if _, err := db.ExecContext(ctx, `INSERT INTO matter_resumption (fabric_index, peer_node_id, resumption_id, shared_secret, write_seq)
+VALUES (1, ?, ?, ?, ?)`, []byte{0, 0, 0, 0, 0, 0, 0, byte(peer)}, bytes.Repeat([]byte{byte(peer + 1)}, 16), bytes.Repeat([]byte{0xCD}, 32), peer+1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	s := store.New(db)
+	for peer := range uint64(legacy) {
+		rec, err := s.GetResumptionByPeer(ctx, 1, peer)
+		if err != nil || rec.Initiator {
+			t.Fatalf("the v11 record of peer %d after Apply: Initiator %v, %v; want the responder's", peer, rec.Initiator, err)
+		}
+	}
+	if err := s.UpsertResumption(ctx, store.ResumptionRecord{
+		FabricIndex: 1, PeerNodeID: 100,
+		ResumptionID: bytes.Repeat([]byte{0xF0}, 16), SharedSecret: bytes.Repeat([]byte{0xF1}, 32),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const evicted = legacy + 1 - 16
+	for peer := range uint64(legacy) {
+		_, err := s.GetResumptionByPeer(ctx, 1, peer)
+		if held := err == nil; held != (peer >= evicted) {
+			t.Errorf("the v11 record of peer %d after a responder write: held %v (%v), want %v", peer, held, err, peer >= evicted)
+		}
+	}
+	m := store.Migrations()[11]
+	if m.Version != "v12" {
+		t.Fatalf("step 12 is %s", m.Version)
+	}
+	if _, err := db.ExecContext(ctx, m.Down); err != nil {
+		t.Fatalf("v12 down: %v", err)
+	}
+	var rows int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM matter_resumption WHERE fabric_index = 1`).Scan(&rows); err != nil || rows != 16 {
+		t.Errorf("resumption rows after v12 down = %d, %v; want 16", rows, err)
 	}
 }

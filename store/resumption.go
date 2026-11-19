@@ -31,6 +31,15 @@ import (
 // is optional: zero is absent, and a record a responder wrote carries
 // none.
 //
+// Initiator records which role wrote the record last: true for the node's
+// own CASE client — the initiator, which chooses the peers it connects to —
+// false for the CASE responder, whose records a foreign peer can make the
+// node write. Only the responder's records count against and are evicted by
+// the per-fabric cap ([Resumption].UpsertResumption). A rewrite by the
+// other role takes that role. False is the zero value, so a writer that
+// does not set it — and every record stored before schema v12, whose role
+// was not recorded — stays under the cap.
+//
 // matter.js ref: packages/protocol/src/session/case/
 type ResumptionRecord struct {
 	FabricIndex       uint8
@@ -39,14 +48,15 @@ type ResumptionRecord struct {
 	SharedSecret      []byte   // 32 bytes (HKDF input for resumed sessions)
 	CASEAuthTags      []uint32 // optional; nil == no CATs (Matter §6.6.5.1)
 	SessionParameters sessionparams.Parameters
+	Initiator         bool // the node's CASE client wrote it (schema v12)
 }
 
 // resumptionColumns are the matter_resumption columns a record reads back,
-// in scanResumption's order, the seal mark last.
+// in scanResumption's order, the role and the seal mark last.
 const resumptionColumns = `fabric_index, peer_node_id, resumption_id, shared_secret, case_authenticated_tags,
     session_idle_interval, session_active_interval, session_active_threshold,
     data_model_revision, interaction_model_revision, specification_version,
-    max_paths_per_invoke, supported_transports, max_tcp_message_size, sealed`
+    max_paths_per_invoke, supported_transports, max_tcp_message_size, initiator, sealed`
 
 // scanResumption reads one row of resumptionColumns, its shared secret
 // opened.
@@ -61,7 +71,7 @@ func (s *Store) scanResumption(r scanRow) (ResumptionRecord, error) {
 	if err := r.Scan(&rec.FabricIndex, &nodeBlob, &rec.ResumptionID, &rec.SharedSecret, &catsJSON,
 		&p.SessionIdleInterval, &p.SessionActiveInterval, &p.SessionActiveThreshold,
 		&p.DataModelRevision, &p.InteractionModelRevision, &p.SpecificationVersion,
-		&p.MaxPathsPerInvoke, &p.SupportedTransports, &p.MaxTCPMessageSize, &sealed); err != nil {
+		&p.MaxPathsPerInvoke, &p.SupportedTransports, &p.MaxTCPMessageSize, &rec.Initiator, &sealed); err != nil {
 		return ResumptionRecord{}, err
 	}
 	if len(nodeBlob) != 8 {
@@ -86,13 +96,18 @@ func (s *Store) scanResumption(r scanRow) (ResumptionRecord, error) {
 // and every read.
 const resumptionSecretSize = 32
 
-// resumptionRecordsPerFabric is how many resumption records the store
-// keeps for one fabric ([Resumption]): UpsertResumption of one more peer's
-// record evicts the fabric's record written least recently. The cap is per
-// fabric, so a fabric's administrator, who mints the node ids its peers
-// authenticate with, cannot grow the table for every fabric or evict
-// another fabric's records. store/memstore keeps the same number, and
-// storetest's resumption/cap-per-fabric holds both to 16.
+// resumptionRecordsPerFabric is how many of the CASE responder's
+// resumption records the store keeps for one fabric ([Resumption]):
+// UpsertResumption of one more peer's record evicts the fabric's
+// responder record written least recently. The cap is per fabric, so a
+// fabric's administrator, who mints the node ids its peers authenticate
+// with, cannot grow the table for every fabric or evict another fabric's
+// records. It bounds the responder's records only — those a foreign peer
+// can make the node write; the records the node's own CASE client writes
+// ([ResumptionRecord].Initiator) are of peers the node chose and are
+// neither counted nor evicted. store/memstore keeps the same number, and
+// storetest's resumption/cap-per-fabric and
+// resumption/cap-counts-responders-only hold both to it.
 const resumptionRecordsPerFabric = 16
 
 // ErrResumptionNotFound is returned when a lookup misses.
@@ -102,9 +117,10 @@ var ErrResumptionNotFound = errors.New("store: resumption record not found")
 // peer_node_id) in one transaction: the old row deleted, the new one
 // inserted with a write sequence one above the table's highest (write_seq,
 // the store's own count — not the clock, which may step back), and then the
-// fabric's rows beyond resumptionRecordsPerFabric deleted, the lowest write
-// sequence first. The row just written holds the highest, so it is never
-// the one evicted. CASEAuthTags is
+// fabric's responder rows (initiator 0) beyond resumptionRecordsPerFabric
+// deleted, the lowest write sequence first; a row the client wrote
+// (initiator 1) is never deleted by the cap. The row just written holds the
+// highest, so it is never the one evicted. CASEAuthTags is
 // serialised as JSON; nil and empty slice both persist as '[]'.
 func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
@@ -142,18 +158,18 @@ func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) erro
 		ctx, `
 INSERT INTO matter_resumption
     (`+resumptionColumns+`, last_used_at, write_seq)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'),
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%f', 'now'),
     (SELECT COALESCE(MAX(write_seq), 0) + 1 FROM matter_resumption))`,
 		rec.FabricIndex, peer, rec.ResumptionID, secret, catsJSON,
 		p.SessionIdleInterval, p.SessionActiveInterval, p.SessionActiveThreshold,
 		p.DataModelRevision, p.InteractionModelRevision, p.SpecificationVersion,
-		p.MaxPathsPerInvoke, p.SupportedTransports, p.MaxTCPMessageSize, s.sealer != nil,
+		p.MaxPathsPerInvoke, p.SupportedTransports, p.MaxTCPMessageSize, rec.Initiator, s.sealer != nil,
 	); err != nil {
 		return fmt.Errorf("store: upsert resumption: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
-DELETE FROM matter_resumption WHERE fabric_index = ? AND peer_node_id NOT IN (
-    SELECT peer_node_id FROM matter_resumption WHERE fabric_index = ?
+DELETE FROM matter_resumption WHERE fabric_index = ? AND initiator = 0 AND peer_node_id NOT IN (
+    SELECT peer_node_id FROM matter_resumption WHERE fabric_index = ? AND initiator = 0
     ORDER BY write_seq DESC LIMIT ?)`,
 		rec.FabricIndex, rec.FabricIndex, resumptionRecordsPerFabric); err != nil {
 		return fmt.Errorf("store: upsert resumption: evict: %w", err)

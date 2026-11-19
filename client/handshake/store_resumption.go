@@ -19,7 +19,10 @@ import (
 // assumed of the peer for the handshake's exchange (case.go, the resume
 // branch) — overlaid by the record's and then by those the peer states in
 // Sigma2Resume (matter.js CaseClient.ts:184-188 at db021da0). Each save
-// replaces the peer's record, whichever role made it.
+// replaces the peer's record, whichever role made it, and stores the role
+// of the save ([ResumptionRecord].Initiator): the store's per-fabric cap
+// counts the responder's records only, so the records the client saves —
+// of the peers the node chose — are not evicted by it.
 //
 // matter.js keeps one resumption record per peer address for both roles:
 // packages/protocol/src/session/SessionManager.ts:261 at db021da0, read by
@@ -67,6 +70,7 @@ func (s *StoreResumption) SaveResumptionRecord(rec ResumptionRecord) error {
 		SharedSecret:      append([]byte(nil), rec.SharedSecret...),
 		CASEAuthTags:      append([]uint32(nil), rec.CaseAuthenticatedTags...),
 		SessionParameters: rec.SessionParameters,
+		Initiator:         rec.Initiator,
 	})
 }
 
@@ -97,5 +101,6 @@ func recordFromStore(rec store.ResumptionRecord) ResumptionRecord {
 		ResumptionID:          append([]byte(nil), rec.ResumptionID...),
 		SessionParameters:     rec.SessionParameters,
 		CaseAuthenticatedTags: cats,
+		Initiator:             rec.Initiator,
 	}
 }
