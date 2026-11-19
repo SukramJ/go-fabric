@@ -480,3 +480,11 @@ go-fabric-ui's test `fabricui/error_branches_test.go:22` names
 value is what the opener returns); go-ha2fabric and go-fabric-server use
 none. Read with `git grep -w` of every deprecated identifier's last name
 over `*.go`, tests included, each hit read by hand.
+
+## 2026-11-19, phase 7
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 268 | Phase 7 (README: "repeat a full-cut run until one yields no new high or medium") under a token shortage | **Priorities 1–3 only, one pull request**: the CI flakes, the CASE initiator's window, a delta review of phase 6's fixes (`0ed3dbf3..26fe6211`, the security paths and the request path); no full-cut run 2, so phase 7 does not claim convergence — "two runs, the fixes of run 1 read in their delta". Priorities 4–7 (the `nested-release-check` sibling, the mutation survivors, the citation and by_design remnants, the full-cut run 2) stay in the plan and are caught up in small pull requests; the pin lift follows as its own pull request (decision 187) and does not wait for them |
+| 269 | The CASE initiator registers its session only after the responder's Success (`client/handshake/case.go:304` at `26fe6211`; matter.js `CaseClient.ts:336-369` has the same order) — a responder's first message is delayed meanwhile over UDP and lost over TCP | **Ahead of matter.js**, as the responder's `f2527f32`: the session is registered establishing before Sigma3, holds what arrives, is handed out only after the Success and closed on a failed or missing one; `BD-Matter-CASEClient-SessionBeforeSigma3` and a deterministic test (`0d5d1132`, rework `4f4bf9e5`) |
+| 270 | R2-P7-sec-01: the per-fabric resumption cap of 16 (decision 134) also evicts the records the CASE client writes | **Documentation now, the role column in the backlog**: `BD-Matter-ResumptionRecordsPerFabric` (`4f4bf9e5`) and `store/port.go` (`6843e1eb`) name the consequence for a controller; a role column with eviction of responder rows only is a small pull request of its own. The first choice — the cap bounds responder-role records only — cannot be done without a schema change: the store keeps one record per fabric and peer for both roles and carries no role (`store/resumption.go:29-42`), and it needs an exported field on `store.ResumptionRecord` |
