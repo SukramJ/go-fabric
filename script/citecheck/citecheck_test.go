@@ -182,7 +182,7 @@ const citecheckDriftRatchet = 441
 // held by such a part alone), and 5 no longer resolve at b25ed960. A label
 // binding no .ts file stays as written. The registers' 308 citations moved
 // with the same rule; their ratchet did not move.
-const citecheckOffPinRatchet = 2889
+const citecheckOffPinRatchet = 2884
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

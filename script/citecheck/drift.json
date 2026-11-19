@@ -261,7 +261,7 @@
   },
   {
     "file": "bridge/interaction_protocol_parity_matterjs_test.go",
-    "line": 184,
+    "line": 192,
     "citation": "InteractionProtocolTest.ts:2135-2147",
     "resolved": "packages/node/test/endpoint/server/InteractionProtocolTest.ts",
     "at": "db021da0",
