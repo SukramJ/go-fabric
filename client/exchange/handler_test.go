@@ -271,6 +271,13 @@ func TestPBKDFParamRequestIsRefused(t *testing.T) {
 // TestPeerOpenedExchangeOnClosingSessionDeclined: a session that is lost
 // declines a new exchange (ExchangeManager.ts:441-444 at db021da0) — no handler call,
 // no ack.
+//
+// The session is lost the way the manager loses one — handlePeerLoss,
+// which marks it closing — with an exchange of ours still open, so it
+// stays registered and the datagram reaches route. Setting peerLost alone
+// left it not closing: the handler ran on its goroutine and acknowledged,
+// and the assertions passed only when they ran before it (the flake of
+// phase 7, an ack on 0x7403). synctest.Wait lets that goroutine run first.
 func TestPeerOpenedExchangeOnClosingSessionDeclined(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -278,6 +285,10 @@ func TestPeerOpenedExchangeOnClosingSessionDeclined(t *testing.T) {
 		s, p := newSecurePair(t, m, 0x0403, false)
 		h, calls := recordingHandler(nil)
 		m.SetProtocolHandler(im.InteractionModelProtocolID, h)
+		ours, err := m.Initiate(s, im.InteractionModelProtocolID, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
 		b := func() []byte {
 			hdr := message.Header{SessionID: s.ID()}
 			sealed, err := p.ch.Encrypt(&hdr, hdr.SecurityFlags(), append(peerOpens(0x6400, im.InteractionModelProtocolID, im.OpcodeReportData, true).Marshal(), 0x15, 0x18))
@@ -286,16 +297,19 @@ func TestPeerOpenedExchangeOnClosingSessionDeclined(t *testing.T) {
 			}
 			return append(hdr.Marshal(), sealed.Ciphertext...)
 		}()
-		s.mu.Lock()
-		s.peerLost = true
-		s.mu.Unlock()
+		s.handlePeerLoss(errors.New("peer gone"), ours)
+		if !s.IsPeerLost() || !s.IsClosing() || s.IsClosed() {
+			t.Fatalf("lost %v closing %v closed %v, want lost and closing, not closed", s.IsPeerLost(), s.IsClosing(), s.IsClosed())
+		}
 		m.HandleDatagram(b, peerAddr)
+		synctest.Wait()
 		conn.none(t)
 		select {
 		case c := <-calls:
 			t.Fatalf("handler called on a lost session: %+v", c.first)
 		default:
 		}
+		ours.Close()
 	})
 }
 
