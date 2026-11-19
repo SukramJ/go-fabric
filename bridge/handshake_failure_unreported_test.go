@@ -226,9 +226,13 @@ func TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged(t *testing.T) {
 
 // TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged: a
 // handshake this node opened gets a Sigma2 that does not decode and does
-// not acknowledge the Sigma1. It ends without a StatusReport, and the
-// Sigma1 goes on being retransmitted until it is acknowledged (review II,
-// F-db021da0-7, owner decision 173). The acknowledged case is
+// not acknowledge the Sigma1. The message is refused on receive — not
+// acknowledged, never reaching the handshake — so no StatusReport is sent,
+// the handshake goes on waiting, and the Sigma1 goes on being
+// retransmitted until it is acknowledged (review II, F-db021da0-7, owner
+// decision 173; phase 7, decision 277: matter.js throws "Previous message
+// ack is missing", packages/protocol/src/protocol/MessageExchange.ts:521-525
+// at db021da0). The acknowledged case is
 // TestInitiatedHandshakeKeepsItsFailureReportTracked.
 func TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged(t *testing.T) {
 	t.Parallel()
@@ -267,16 +271,13 @@ func TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged(t *testi
 	}
 	datagram := append(hdr.Marshal(), proto.Marshal()...)
 	datagram = append(datagram, 0xFF)
-	if err := r.b.dispatch(ctx, datagram, r.peer.LocalAddr()); err != nil {
-		t.Fatalf("dispatch(Sigma2): %v", err)
+	if err := r.b.dispatch(ctx, datagram, r.peer.LocalAddr()); !errors.Is(err, errPreviousAckMissing) {
+		t.Fatalf("dispatch(Sigma2): %v, want errPreviousAckMissing", err)
 	}
 	select {
 	case err := <-done:
-		if err == nil {
-			t.Fatal("the handshake accepted a Sigma2 that does not decode")
-		}
-	case <-ctx.Done():
-		t.Fatal("the handshake did not end")
+		t.Fatalf("the handshake ended (%v) on a Sigma2 refused on receive", err)
+	case <-time.After(200 * time.Millisecond):
 	}
 	r.wantUnreportedRetransmitting(t, HandshakeKey{InitiatorNodeID: sigma1Hdr.SourceNodeID, ExchangeID: sigma1.ExchangeID}, mrp.SCOpcodeSigma1)
 }

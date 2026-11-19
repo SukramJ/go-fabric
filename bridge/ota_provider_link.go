@@ -671,7 +671,21 @@ func (e *initiatedSecureExchange) Reliable() bool {
 // when the MRP tracker is wired and the route is not a reliable
 // connection (MRP is off over TCP, [routeUsesMRP]), piggybacking the
 // acknowledgement owed on the exchange.
-func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opcode uint8, payload []byte) error {
+//
+// A reliable send first waits until the exchange's previous message is
+// acknowledged — or given up, its session gone — or the exchange or ctx
+// ends: an exchange has one message in flight, and the newer one never
+// takes the older one's retransmissions (a ReceiveAccept lost before the
+// first Block of a sender-driven transfer is retransmitted). Mirrors
+// matter.js packages/protocol/src/protocol/MessageExchange.ts:786 and
+// :822-830 at db021da0 (send sets #sentMessageToAck and does not return
+// before its acknowledgement; a send while one is set throws, :701-705,
+// which the tracker's refusal keeps for a concurrent send —
+// [outboundReliableTracker.trackExchangeMessage]); review II, phase 7,
+// decision 276. While it waits, the responder counts as waiting for the
+// peer ([responderTurn]), so the session's next message — the
+// acknowledgement — is dispatched.
+func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, opcode uint8, payload []byte) error {
 	select {
 	case <-e.done:
 		return e.closedErr()
@@ -686,6 +700,17 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	dest := e.route()
 	if !routeUsesMRP(dest) {
 		tracker = nil
+	}
+	if tracker != nil {
+		// The counter is taken after the wait: the encryption below
+		// allocates it.
+		if err := tracker.waitExchangeFree(ctx, e.sessionID, e.exchangeID, roleOf(!e.responder), e.done, e.turn.waiting); err != nil {
+			if e.ended() {
+				return e.closedErr()
+			}
+			return err
+		}
+		dest = e.route()
 	}
 	if listener == nil && !isConnRoute(dest) {
 		return ErrUnsolicitedListenerMissing
@@ -722,7 +747,11 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
 	if tracker != nil {
-		tracker.trackExchangeMessage(hdr.MessageCounter, e.sessionID, e.exchangeID, !e.responder, datagram, dest, e.b.clk().Now(), time.Duration(e.peerMargin.Load()))
+		if err := tracker.trackExchangeMessage(hdr.MessageCounter, e.sessionID, e.exchangeID, !e.responder, datagram, dest, e.b.clk().Now(), time.Duration(e.peerMargin.Load())); err != nil {
+			// A concurrent send on the exchange took its place since the
+			// wait: this message is not sent.
+			return err
+		}
 		// The session may have closed since the check above, its entries
 		// dropped by the purge before this one was tracked: the entry is
 		// taken back and the exchange ends, so none of a closed session

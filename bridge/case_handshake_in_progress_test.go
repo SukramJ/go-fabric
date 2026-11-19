@@ -19,8 +19,9 @@ import (
 // the Sigma3 of a CASE handshake, a Sigma1 under its initiator node id and
 // exchange that begins nothing — one that does not decode, or a well-formed
 // one whose destination id names no fabric of the node — or a
-// Sigma2_Resume under them, from another sender, is acknowledged and not
-// answered: the handshake's record stays,
+// Sigma2_Resume under them, from another sender, does not acknowledge the
+// Sigma2 and is refused on receive, not acknowledged and not answered
+// (review II, phase 7, decision 277): the handshake's record stays,
 // its Sigma2 stays in retransmission to the controller, and the
 // controller's Sigma3 completes the handshake — through a
 // PerExchangeCaseProvider and through the singleton handler alike (review
@@ -52,14 +53,10 @@ func TestMessagesUnderAHandshakeInProgressChangeNothing(t *testing.T) {
 			if tc.foreign {
 				payload = foreignSigma1(t)
 			}
-			if err := other.send(tc.opcode, completedCaseExchange, payload, nil); err != nil {
-				t.Fatal(err)
-			}
+			err := other.send(tc.opcode, completedCaseExchange, payload, nil)
+			c.expectRefused(t, err, errPreviousAckMissing, 1, "a message from another sender")
 			if got := pendingDestsOnUnsecuredExchange(c.r.b, completedCaseExchange); len(got) != 1 || got[0] != want {
 				t.Fatalf("after opcode %#x from another sender the replies waiting for an acknowledgement go to %v, want the Sigma2 to %s", tc.opcode, got, want)
-			}
-			if !c.r.b.ackTracker.Owes(0, completedCaseExchange, false) {
-				t.Fatal("no acknowledgement owed for the message from another sender — a reply carried it")
 			}
 			if !c.recordHeld() {
 				t.Fatal("the message from another sender ended the handshake's record")

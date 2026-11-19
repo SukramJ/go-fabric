@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"crypto/rand"
+	"errors"
 	"runtime"
 	"testing"
 	"time"
@@ -102,9 +103,13 @@ func TestPaseClaimRunsFromItsFirstRequest(t *testing.T) {
 // exchange: it counts one PASE failure, and the pairing ends — the slot is
 // free for the next commissioner at once, and a Pake1 of the ended
 // handshake begins nothing. It is answered with a StatusReport
-// InvalidParameter when the PBKDFParamResponse was acknowledged, and not
-// answered while that response still waits for its acknowledgement
-// (review II, R2-P6-sec-0304, rounds 2 and 4).
+// InvalidParameter (review II, R2-P6-sec-0304, rounds 2 and 4). While the
+// PBKDFParamResponse still waits for its acknowledgement, a repeated
+// request that does not acknowledge it is refused on receive — not
+// acknowledged, not processed — and the pairing goes on: matter.js throws
+// "Previous message ack is missing" before the message reaches the PASE
+// server (packages/protocol/src/protocol/MessageExchange.ts:521-525 at
+// db021da0; review II, phase 7, decision 277).
 func TestRepeatedPBKDFParamRequestEndsThePairing(t *testing.T) {
 	for _, acked := range []bool{true, false} {
 		t.Run(map[bool]string{true: "the response acknowledged", false: "the response unacknowledged"}[acked], func(t *testing.T) {
@@ -119,16 +124,26 @@ func TestRepeatedPBKDFParamRequestEndsThePairing(t *testing.T) {
 			if acked {
 				ack = &counter
 			}
-			if err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), ack); err != nil {
+			err := holder.send(mrp.SCOpcodePBKDFParamRequest, xid, freshPBKDFParamRequest(t), ack)
+			if !acked {
+				if !errors.Is(err, errPreviousAckMissing) {
+					t.Fatalf("a repeated PBKDFParamRequest that does not acknowledge the response: dispatch %v, want errPreviousAckMissing", err)
+				}
+				holder.none(300*time.Millisecond, "a repeated PBKDFParamRequest while the response waits for its acknowledgement")
+				if got := r.b.paseFailures.Load(); got != 0 {
+					t.Fatalf("PASE failures after a refused PBKDFParamRequest: %d, want 0", got)
+				}
+				if !r.b.paseHandshakeOfAnother(HandshakeKey{InitiatorNodeID: 0x600D, ExchangeID: 0x0202}) {
+					t.Fatal("the refused message freed the pairing's slot")
+				}
+				return
+			}
+			if err != nil {
 				t.Fatal(err)
 			}
-			if acked {
-				report, _, _ := holder.recv(mrp.SCOpcodeStatusReport, "the answer to a repeated PBKDFParamRequest")
-				if general, _, code, ok := decodeStatusReport(report); !ok || general != mrp.SCStatusGeneralFailure || code != mrp.SCStatusProtocolInvalidParameter {
-					t.Fatalf("report general %#x code %#x, want failure / InvalidParameter", general, code)
-				}
-			} else {
-				holder.none(300*time.Millisecond, "a repeated PBKDFParamRequest while the response waits for its acknowledgement")
+			report, _, _ := holder.recv(mrp.SCOpcodeStatusReport, "the answer to a repeated PBKDFParamRequest")
+			if general, _, code, ok := decodeStatusReport(report); !ok || general != mrp.SCStatusGeneralFailure || code != mrp.SCStatusProtocolInvalidParameter {
+				t.Fatalf("report general %#x code %#x, want failure / InvalidParameter", general, code)
 			}
 			if got := r.b.paseFailures.Load(); got != 1 {
 				t.Fatalf("PASE failures after a repeated PBKDFParamRequest: %d, want 1", got)
