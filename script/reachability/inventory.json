@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10089,
+  "entry_points": 10090,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -32932,7 +32932,7 @@
       "identifier": "ConsentState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 160
+      "line": 161
     },
     {
       "package": "controller/softwareupdate",
@@ -32946,7 +32946,7 @@
       "identifier": "QueryImageRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 549
+      "line": 550
     },
     {
       "package": "controller/softwareupdate",
@@ -40842,7 +40842,7 @@
       "identifier": "TestMatterJSCertCasesCountOnlyRegisteredPorts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/matterjs_cert_cases_test.go",
-      "line": 304
+      "line": 309
     },
     {
       "package": "internal/chiptool",
