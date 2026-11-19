@@ -1215,7 +1215,7 @@ func (s *ThermostatServer) writePresets(ctx context.Context, v any) error {
 // derives or which forbid nothing the enum allows.
 //
 // With a [Sink] the mode goes to the host first (matter.js
-// systemMode$Changing, ThermostatServer.ts:614 at db021da0, runs before
+// systemMode$Changing, ThermostatServer.ts:1104 at b25ed960, runs before
 // the state changes); a refusal stores nothing. The Sink runs without
 // s.mu; once it consented the mode is stored over whatever
 // [ThermostatServer.SetSystemMode] stored meanwhile. The caller holds
@@ -1245,7 +1245,8 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) (change
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrSystemMode)
 	if running {
-		// matter.js sets it as a local actor (asLocalActor, :1196).
+		// matter.js sets it as a local actor (asLocalActor,
+		// ThermostatServer.ts:1671 at b25ed960).
 		s.changes.NotifyFrom(contract.OriginHostSet, tdef.AttrThermostatRunningMode)
 	}
 	s.emitChanges(ctx, before, after)

@@ -257,8 +257,8 @@ func (s *ThermostatServer) SetThermostatRunningMode(mode uint8) error {
 // reports whether it moved; the caller holds s.mu and emits the
 // RunningModeChange through emitChanges. Auto and the other modes leave
 // it to the host ([ThermostatServer.SetThermostatRunningMode]). Mirrors
-// matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:1185,
-// :1194-1206 at db021da0 (#handleSystemModeChange on systemMode$Changed;
+// matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:1661,
+// :1669-1681 at b25ed960 (#handleSystemModeChange on systemMode$Changed;
 // W3-clua1-01).
 func (s *ThermostatServer) followSystemModeLocked(mode uint8) bool {
 	if !s.inst.Serves(tdef.AttrThermostatRunningMode) {
