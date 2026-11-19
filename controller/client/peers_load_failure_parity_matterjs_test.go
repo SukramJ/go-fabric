@@ -128,3 +128,50 @@ func TestPeersLoadFailureByAddressParity(t *testing.T) {
 		t.Fatalf("commissioned %v, want the healthy node alone", c)
 	}
 }
+
+// TestCompleteCommissioningOnNodeThatFailedToLoad is a characterization
+// test, not a port: it pins what CompleteCommissioning does now on the
+// address of a stored node that failed to load. GetByAddress finds that
+// node, which is not commissioned, so the already-commissioned check
+// passes; ForAddress returns it instead of creating a second node; its
+// Start fails with the load error; and the failure deletes it, its stored
+// data erased. matter.js's behaviour for a ClientNode whose construction
+// failed (whether node.act / node.start throw and node.delete() succeeds
+// there) is UNVERIFIED; this test claims no parity with it.
+func TestCompleteCommissioningOnNodeThatFailedToLoad(t *testing.T) {
+	t.Parallel()
+	sr := newScriptedRegistry(t, func(st *client.MemoryStore) {
+		seedCommissioned(1)(st)
+		// commissionedAt (field 5 of the record, cluster 0xFFFF_FFFE on
+		// endpoint 0) not a timestamp: peer1 loads unavailable.
+		e := tlv.NewEncoder()
+		e.PutUTF8(tlv.AnonymousTag(), "not a timestamp")
+		b, err := e.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.Save("peer1", 0, 0xFFFF_FFFE, map[uint32][]byte{5: b}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}, nil)
+	broken := sr.reg.Get("peer1")
+	if broken == nil || !errors.Is(broken.LoadError(), client.ErrLoadFailed) {
+		t.Fatalf("peer1 %v, want a node that failed to load", broken)
+	}
+	if got := sr.reg.GetByAddress(scriptedAddr); got != broken {
+		t.Fatalf("by address: %v, want the node that failed to load", got)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	n, err := sr.reg.CompleteCommissioning(ctx, scriptedAddr.NodeID, client.CompleteOptions{})
+	if !errors.Is(err, client.ErrLoadFailed) || n != nil {
+		t.Fatalf("CompleteCommissioning: %v, %v; want the load error of the node ForAddress returned", n, err)
+	}
+	if sr.reg.Get("peer1") != nil || sr.reg.GetByAddress(scriptedAddr) != nil || sr.reg.Size() != 0 {
+		t.Fatalf("after the failure: peer1 kept %v, found by address %v, %d nodes; want the node deleted and none created",
+			sr.reg.Get("peer1") != nil, sr.reg.GetByAddress(scriptedAddr) != nil, sr.reg.Size())
+	}
+	if stored, err := sr.store.Load("peer1"); err == nil && len(stored) != 0 {
+		t.Fatalf("the node's store kept %d endpoints, want it erased", len(stored))
+	}
+}
