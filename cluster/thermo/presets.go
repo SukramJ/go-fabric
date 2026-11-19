@@ -618,7 +618,8 @@ func (s *ThermostatServer) limitCoveringStored(name string, limit uint8, require
 	}
 	raised := uint8(min(required, math.MaxUint8)) //nolint:gosec // clamped to a uint8
 	s.logger().Info("matter.thermostat.limit_raised",
-		slog.String("attribute", name), slog.Int("configured", int(limit)), slog.String("found", found), slog.Int("raised_to", int(raised)))
+		slog.String("attribute", name), slog.Int("value", int(raised)),
+		slog.String("reason", fmt.Sprintf("%s is %d but %s", name, limit, found)))
 	return raised
 }
 

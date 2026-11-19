@@ -27,7 +27,7 @@ import (
 // it does not (ThermostatSuggestionNotFollowingReason).
 //
 // Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts
-// at b25ed960 (a4df212a5, #4993; class doc :196-213): the commands
+// at b25ed960 (#4993; class doc :196-213): the commands
 // (:613-660), the re-evaluation (#reevaluateSuggestions and
 // #determineCurrentSuggestion, :2368-2484), the timer (#restartSuggestionTimer,
 // :2497-2529), the unique ids (#nextSuggestionUniqueId, :2532-2540), the

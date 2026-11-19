@@ -2,7 +2,7 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/thermostat/ThermostatSuggestionsTest.ts
-// at b25ed960 (a4df212a5, #4993): the commands, the unique ids, the
+// at b25ed960 (#4993): the commands, the unique ids, the
 // selection, the timer, time synchronisation, following, the manual
 // override, the setpoint hold, the suggestions of a removed preset,
 // MaxThermostatSuggestions and the preset activation.
