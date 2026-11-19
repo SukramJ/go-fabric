@@ -1690,7 +1690,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 45,
+    "line": 46,
     "citation": "ThermostatServer.ts:1526",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "randomBytes",
@@ -1699,7 +1699,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 49,
+    "line": 50,
     "citation": "ThermostatServer.ts:64-74",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "ActivePresetHandle",
@@ -1708,16 +1708,17 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 159,
-    "citation": "ThermostatServer.ts:1367-1493",
+    "line": 219,
+    "citation": "ThermostatServer.ts:1919-1932",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
+    "at": "b25ed960",
     "identifier": "#validatePresetWriteRequest",
-    "nearest": 1761,
+    "nearest": 1850,
     "occurrences": 4
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 264,
+    "line": 272,
     "citation": "ThermostatServer.ts:1516-1537",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#validatePresetCommit",
@@ -1726,7 +1727,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 340,
+    "line": 348,
     "citation": "ThermostatServer.ts:1300-1320",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#handlePersistedPresetsChanging",
@@ -1735,7 +1736,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 365,
+    "line": 373,
     "citation": "ThermostatServer.ts:1508-1510",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#handlePersistedPresetsChanged",
@@ -1744,7 +1745,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 372,
+    "line": 380,
     "citation": "ThermostatServer.ts:1289-1291",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "AtomicChanging",
@@ -1753,7 +1754,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 383,
+    "line": 391,
     "citation": "ThermostatServer.ts:1687-1690",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "hasLocalActor",
@@ -1762,7 +1763,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 502,
+    "line": 526,
     "citation": "ThermostatServer.ts:281-316",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "setActivePresetRequest",
@@ -1880,17 +1881,17 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1216,
-    "citation": "ThermostatServer.ts:614",
+    "line": 1218,
+    "citation": "ThermostatServer.ts:1104",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
-    "at": "db021da0",
+    "at": "b25ed960",
     "identifier": "systemMode",
-    "nearest": 781,
-    "occurrences": 2
+    "nearest": 1233,
+    "occurrences": 36
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1509,
+    "line": 1502,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1899,7 +1900,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1651,
+    "line": 1644,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "db021da0",
@@ -1909,7 +1910,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1827,
+    "line": 1820,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
