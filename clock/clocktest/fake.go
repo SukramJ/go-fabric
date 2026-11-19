@@ -220,6 +220,46 @@ func (f *Fake) Advance(d time.Duration) {
 	f.mu.Lock()
 	target := f.now.Add(d)
 	f.mu.Unlock()
+	f.advanceToLocked(target)
+}
+
+// AdvanceToNext moves the fake to the earliest armed deadline and no
+// further: what is due at that instant fires as [Fake.Advance] fires it,
+// a timer a callback arms for the same instant included; a timer armed
+// for later waits for the next call. It reports the step and true, or
+// zero and false when nothing is armed — the clock then stays where it
+// is. An overdue deadline (after [Fake.Set] moved the reading past it)
+// is a step of zero.
+//
+// It is the step for a test that waits on timers: a fixed step, a minute
+// say, also fires every timer the woken work arms inside that minute
+// while Advance still runs, and whether the work armed it in time is up
+// to the scheduler — the replacement subscription of
+// controller/client's TestDefaultSubscription timed out inside one such
+// step before the test could answer it. Stepping deadline by deadline,
+// with the test's own wait for the effect in between, fires one instant
+// at a time.
+func (f *Fake) AdvanceToNext() (time.Duration, bool) {
+	f.advancing.Lock()
+	defer f.advancing.Unlock()
+
+	f.mu.Lock()
+	e := f.earliestLocked()
+	if e == nil {
+		f.mu.Unlock()
+		return 0, false
+	}
+	target, step := e.at, max(e.at.Sub(f.now), 0)
+	if target.Before(f.now) {
+		target = f.now
+	}
+	f.mu.Unlock()
+	f.advanceToLocked(target)
+	return step, true
+}
+
+// advanceToLocked is Advance to the reading target; f.advancing is held.
+func (f *Fake) advanceToLocked(target time.Time) {
 	for {
 		f.mu.Lock()
 		e := f.earliestLocked()
@@ -292,11 +332,12 @@ func (f *Fake) Resolve(ctx context.Context, wait func() error) error {
 			return err
 		default:
 		}
-		at, ok := f.Next()
-		if !ok {
+		// The step is measured on the advanced reading, not on Now: a
+		// StepWall offset would shorten it — forwards to nothing, so the
+		// work never resolved.
+		if _, ok := f.AdvanceToNext(); !ok {
 			continue // Yield paced the loop; nothing to advance
 		}
-		f.Advance(max(at.Sub(f.Now()), 0))
 	}
 }
 

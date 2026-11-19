@@ -10,9 +10,17 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `clock/clocktest`: `Fake.AdvanceToNext`, a step to the earliest armed deadline and no further — the step for a test that waits on timers, where a fixed step also fires whatever the woken work arms inside it while `Advance` still runs, depending on the scheduler (the cause of `controller/client`'s flaky `TestDefaultSubscription`). It reports the step, and false when nothing is armed.
+
 ### Changed
 
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.23.0` (before `v0.22.1`) and are tagged `ble/bluez/v0.23.0`, `ble/esphome/v0.23.0` and `wifi/wpasupplicant/v0.23.0` at this commit — `ble/bluez` with its move onto `contract.GATTPeripheral` (see `[0.23.0]`); `examples/ble-wifi-light` requires the three at `v0.23.0` (owner decisions 261, 266).
+
+### Fixed
+
+- `clock/clocktest`: `Fake.Resolve` measures each step on the advanced reading; after a forward `Fake.StepWall` it measured on the wall reading, every step came out zero, and a wait on a timer never resolved.
 
 ## [0.23.0] — 2026-11-18
 
