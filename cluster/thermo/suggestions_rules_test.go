@@ -151,9 +151,9 @@ func TestSuggestionUniqueIDs(t *testing.T) {
 	}
 }
 
-// TestSuggestionUniqueIDSkipsAnExpiredEntryNotYetRemoved pins the next
-// UniqueID taken against the list as stored, expired entries included,
-// before the Add removes them — matter.js ThermostatServer.ts:624, :637 at
+// TestSuggestionUniqueIDSkipsAnExpiredEntryNotYetRemoved pins the next id
+// taken against the list as stored, expired entries included, before the
+// Add removes them — matter.js ThermostatServer.ts:624, :637 at
 // b25ed960 (addThermostatSuggestion), which prunes only in the
 // re-evaluation (:2429-2432): after the wrap, id 1 is still held by an
 // expired entry and is skipped.
