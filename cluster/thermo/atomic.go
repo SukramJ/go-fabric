@@ -461,6 +461,12 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 	}
 	done := run("precommitting", func(attr uint32, v any) error { return s.precommitAtomic(attr, v) }) &&
 		s.commitAll(ctx, st, req.AttributeRequests, statuses)
+	if _, staged := st.staged(tdef.AttrPresets); done && staged {
+		// Once the whole unit committed: a reverted Presets commit leaves
+		// the suggestions as they were, as matter.js's rolled-back
+		// transaction does (ThermostatServer.ts:1792-1794 at b25ed960).
+		s.reevaluateOnPresetsChange(ctx)
+	}
 	command := tdef.StatusSuccess
 	if !done {
 		command = tdef.StatusFailure

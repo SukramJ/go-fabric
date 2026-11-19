@@ -401,7 +401,11 @@ func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) err
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
-	return s.applyPresets(ctx, deepcopy.Each(presets))
+	if err := s.applyPresets(ctx, deepcopy.Each(presets)); err != nil {
+		return err
+	}
+	s.reevaluateOnPresetsChange(ctx)
+	return nil
 }
 
 // Presets returns a copy of the stored presets (matter.js
@@ -433,12 +437,18 @@ func (s *ThermostatServer) SetActivePresetHandle(ctx context.Context, handle []b
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
-	return s.storeActiveHandle(ctx, bytes.Clone(handle))
+	reevaluate, err := s.storeActiveHandle(ctx, bytes.Clone(handle))
+	if reevaluate {
+		s.reevaluateSuggestions(ctx)
+	}
+	return err
 }
 
-// storeActiveHandle saves and stores the active handle; the caller holds
-// s.op.
-func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte) error {
+// storeActiveHandle saves and stores the active handle and reports
+// whether the change started or ended a thermostat suggestion's override
+// (trackOverrideLocked): the caller then re-evaluates the suggestions,
+// once it holds no persist. The caller holds s.op.
+func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte) (reevaluate bool, err error) {
 	s.lockPersist()
 	defer s.unlockPersist()
 	s.mu.RLock()
@@ -446,16 +456,17 @@ func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte)
 	same := bytes.Equal(s.activePresetHandle, handle) && (s.activePresetHandle == nil) == (handle == nil)
 	s.mu.RUnlock()
 	if same {
-		return nil
+		return false, nil
 	}
 	if err := s.savePresets(ctx, presets, handle); err != nil {
-		return err
+		return false, err
 	}
 	s.mu.Lock()
 	s.activePresetHandle = handle
+	reevaluate = s.trackOverrideLocked(handle, false)
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
-	return nil
+	return reevaluate, nil
 }
 
 // clearActivePresetOnDirectWrite clears the active preset after a direct
@@ -464,20 +475,24 @@ func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte)
 // :1203-1220 at b25ed960) through #leavePresetOnSetpointWrite (:764-789):
 // a setpoint someone set by hand is no longer the preset's. It takes persist and s.mu, never s.op, so the inbound setters
 // may call it while a write waits on the Sink (issue #63); persist keeps
-// its save from overtaking a preset write's (R2-P6-store-1501).
-func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, unoccupied bool) {
+// its save from overtaking a preset write's (R2-P6-store-1501). It
+// reports whether the cleared handle started a thermostat suggestion's
+// override (trackOverrideLocked): the caller re-evaluates the suggestions
+// then — at once when it holds s.op, else scheduled.
+func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, unoccupied bool) (reevaluate bool) {
 	if s.features&ThermostatFeaturePRES == 0 {
-		return
+		return false
 	}
 	s.lockPersist()
 	s.mu.Lock()
 	if s.activePresetHandle == nil || s.occupiedLocked() == unoccupied {
 		s.mu.Unlock()
 		s.unlockPersist()
-		return
+		return false
 	}
 	previous := s.activePresetHandle
 	s.activePresetHandle = nil
+	reevaluate = s.trackOverrideLocked(nil, true)
 	presets := s.presets
 	s.mu.Unlock()
 	err := s.savePresets(ctx, presets, nil)
@@ -490,6 +505,7 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 	// through SetActivePreset(null), which emits ActivePresetChange
 	// (ThermostatCluster.h:215-224, ThermostatClusterPresets.cpp:499).
 	s.emitActivePresetChange(ctx, previous, nil)
+	return reevaluate
 }
 
 // presetRequest normalises the SetActivePresetRequest payload: the bridge
@@ -578,12 +594,16 @@ func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) er
 			return err
 		}
 	}
-	if err := s.storeActiveHandle(ctx, handle); err != nil {
+	reevaluate, err := s.storeActiveHandle(ctx, handle)
+	if err != nil {
 		return err
 	}
 	// chip's SetActivePreset emits the event on every accepted request,
 	// the unchanged handle included (ThermostatClusterPresets.cpp:461-500).
 	s.emitActivePresetChange(ctx, previous, handle)
+	if reevaluate {
+		s.reevaluateSuggestions(ctx)
+	}
 	return nil
 }
 

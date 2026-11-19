@@ -159,6 +159,11 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	}
 	s.setOptionalLocked(checked, note)
 	reevaluate := s.setSuggestionReasonLocked(checked) || slices.Contains(changed, thermoAttrTemperatureSetpointHold)
+	if reevaluate && len(direct) > 0 && s.features&ThermostatFeatureTSUGGEST != 0 {
+		// The re-evaluation this change schedules belongs to the same
+		// change as the setpoint written here (suggest.setpointWritten).
+		s.suggest.setpointWritten = true
+	}
 	after := s.eventStateLocked()
 	s.mu.Unlock()
 	s.emitChanges(context.Background(), before, after)
@@ -198,13 +203,17 @@ func directSetpointWrites(st setpointState, checked map[uint32]any) []uint32 {
 // b25ed960 (#leavePresetOnSetpointWrite skips a value
 // #noteReconciledSetpoints recorded, :1447-1479).
 func (s *ThermostatServer) clearActivePresetAfterSet(direct []uint32) {
+	reevaluate := false
 	for _, id := range direct {
 		switch id {
 		case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint:
-			s.clearActivePresetOnDirectWrite(context.Background(), false)
+			reevaluate = s.clearActivePresetOnDirectWrite(context.Background(), false) || reevaluate
 		case thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint:
-			s.clearActivePresetOnDirectWrite(context.Background(), true)
+			reevaluate = s.clearActivePresetOnDirectWrite(context.Background(), true) || reevaluate
 		}
+	}
+	if reevaluate {
+		s.scheduleSuggestionReevaluation()
 	}
 }
 

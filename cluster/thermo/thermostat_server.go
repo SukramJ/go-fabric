@@ -892,8 +892,8 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 	// active preset (ThermostatServer.ts:764-789, :1203-1220 at b25ed960);
 	// changed is empty unless the written setpoint itself moved, so a
 	// companion the reconcile moved never ends it on its own.
-	if len(changed) > 0 {
-		s.clearActivePresetOnDirectWrite(context.Background(), false)
+	if len(changed) > 0 && s.clearActivePresetOnDirectWrite(context.Background(), false) {
+		s.scheduleSuggestionReevaluation()
 	}
 }
 
@@ -1352,8 +1352,8 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		changed := s.commitSetpoints(st)
 		s.mu.Unlock()
 		s.flushSetpointEvents(ctx)
-		if !t.limit {
-			s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
+		if !t.limit && s.clearActivePresetOnDirectWrite(ctx, t.unoccu) {
+			s.reevaluateSuggestions(ctx)
 		}
 		// A setpoint the limit's reconcile moved keeps the active preset:
 		// it only moved to keep the limits or the deadband. Mirrors
@@ -1407,7 +1407,9 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	changed := s.commitSetpoints(next)
 	s.mu.Unlock()
 	s.flushSetpointEvents(ctx)
-	s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
+	if s.clearActivePresetOnDirectWrite(ctx, t.unoccu) {
+		s.reevaluateSuggestions(ctx)
+	}
 	return changed, nil
 }
 
