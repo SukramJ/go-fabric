@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10064,
+  "entry_points": 10065,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27762,
+    "total_exported": 27763,
     "reachable": 20843,
-    "whitelisted": 6896,
+    "whitelisted": 6897,
     "unreachable": 23
   },
   "by_package": [
@@ -1271,14 +1271,14 @@
       "identifier": "TestBDXBlockWaitsForTheAcceptsAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_ack_wait_test.go",
-      "line": 88
+      "line": 123
     },
     {
       "package": "bridge",
       "identifier": "TestBDXInitiatedExchangeWaitsAndRefuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_ack_wait_test.go",
-      "line": 197
+      "line": 232
     },
     {
       "package": "bridge",
@@ -1310,10 +1310,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestBDXSendAfterAGiveUpBeforeTheExchangeEndsSendsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_ack_wait_test.go",
+      "line": 439
+    },
+    {
+      "package": "bridge",
       "identifier": "TestBDXSendAfterAGiveUpSendsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_ack_wait_test.go",
-      "line": 340
+      "line": 379
     },
     {
       "package": "bridge",
@@ -4624,7 +4631,7 @@
       "identifier": "TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
-      "line": 191
+      "line": 194
     },
     {
       "package": "bridge",
@@ -4645,7 +4652,7 @@
       "identifier": "TestHandshakeMessageWithAnIncorrectAckIsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_incorrect_ack_test.go",
-      "line": 189
+      "line": 190
     },
     {
       "package": "bridge",
@@ -4792,7 +4799,7 @@
       "identifier": "TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
-      "line": 237
+      "line": 241
     },
     {
       "package": "bridge",
@@ -8320,7 +8327,7 @@
       "identifier": "TestUnreportedRetransmissionEndsWithStop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
-      "line": 288
+      "line": 293
     },
     {
       "package": "bridge",
@@ -8418,7 +8425,7 @@
       "identifier": "TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_ack_wait_test.go",
-      "line": 269
+      "line": 306
     },
     {
       "package": "bridge",

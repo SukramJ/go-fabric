@@ -713,7 +713,7 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 		// A give-up of the exchange's last message ends every later send,
 		// also one that begins between the tracker's drop and the
 		// exchange's end, where there is nothing left to wait on.
-		if last := e.lastTracked.Load(); last != 0 && tracker.Abandoned(e.sessionID, uint32(last-1)) {
+		if last := e.lastTracked.Load(); last != 0 && tracker.Abandoned(e.sessionID, uint32(last-1)) { //nolint:gosec // last-1 is a counter stored from a uint32
 			if e.ended() {
 				return e.closedErr()
 			}
