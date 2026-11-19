@@ -55,14 +55,49 @@ func newReliableBDXHarness(t *testing.T, responder BDXResponder) (*resumeDevice,
 	return dev, peer, got
 }
 
-// nextBDX returns the next BDX message the device sent within d.
-func nextBDX(got chan bdxSeen, d time.Duration) (bdxSeen, bool) {
+// nextBDX returns the next BDX message the device sent before ctx ends.
+func nextBDX(ctx context.Context, got chan bdxSeen) (bdxSeen, bool) {
 	select {
 	case m := <-got:
 		return m, true
-	case <-time.After(d):
+	case <-ctx.Done():
 		return bdxSeen{}, false
 	}
+}
+
+// dispatchBDXFrom hands one BDX message of the peer, sealed on its session,
+// to the device's receive path and returns the path's verdict — the
+// refusal of the receive rules is synchronous, so a test reads it without
+// waiting for an absence.
+func dispatchBDXFrom(ctx context.Context, t *testing.T, dev *resumeDevice, peer *fakeController, exchangeID uint16, initiator bool, ack uint32, opcode uint8, payload []byte) error {
+	t.Helper()
+	peer.mu.Lock()
+	sess, peerSID := peer.sess, peer.peerSID
+	peer.mu.Unlock()
+	proto := message.ProtocolHeader{
+		Initiator: initiator, Opcode: opcode, ExchangeID: exchangeID, ProtocolID: bdx.ProtocolID,
+		NeedsAck: true, HasAck: ack != 0, AckCounter: ack,
+	}
+	hdr := message.Header{SessionID: peerSID}
+	enc, err := sess.Encrypt(&hdr, hdr.NonceSecurityFlags(), append(proto.Marshal(), payload...))
+	if err != nil {
+		t.Fatalf("peer encrypt: %v", err)
+	}
+	return dev.br.dispatch(ctx, append(hdr.Marshal(), enc.Ciphertext...), peer.addr)
+}
+
+// pendingOnBDXExchange is the counter of the device's message on exchange
+// x, in role, that waits for its acknowledgement, if one does.
+func pendingOnBDXExchange(dev *resumeDevice, x uint16, role exchangeRole) (uint32, bool) {
+	tr := dev.br.outboundReliable
+	tr.mu.Lock()
+	defer tr.mu.Unlock()
+	for key, e := range tr.pending {
+		if key.sessionID != 0 && e.exchangeID == x && e.role == role {
+			return key.counter, true
+		}
+	}
+	return 0, false
 }
 
 // sendBDXAck sends a BDX message on exchange id, the peer in role
@@ -108,14 +143,14 @@ func TestBDXBlockWaitsForTheAcceptsAck(t *testing.T) {
 		t.Fatal(err)
 	}
 	sendBDXAck(peer, x, true, 0, uint8(bdx.MessageReceiveInit), init)
-	accept, ok := nextBDX(got, 5*time.Second)
+	accept, ok := nextBDX(ctx, got)
 	if !ok || accept.opcode != bdx.MessageReceiveAccept {
 		t.Fatalf("first answer %v (ok %t), want ReceiveAccept", accept.opcode, ok)
 	}
 	// Unacknowledged, the ReceiveAccept is retransmitted and no Block goes
 	// out.
 	for {
-		m, ok := nextBDX(got, 8*time.Second)
+		m, ok := nextBDX(ctx, got)
 		if !ok {
 			t.Fatal("the unacknowledged ReceiveAccept was not retransmitted")
 		}
@@ -133,7 +168,7 @@ func TestBDXBlockWaitsForTheAcceptsAck(t *testing.T) {
 	peer.sendSecureAck(message.ProtocolHeader{Initiator: false, ExchangeID: x, ProtocolID: mrp.SecureChannelProtocolID}, accept.counter, mrp.StandaloneAckOpcode, nil)
 	var block0 bdxSeen
 	for {
-		m, ok := nextBDX(got, 5*time.Second)
+		m, ok := nextBDX(ctx, got)
 		if !ok {
 			t.Fatal("no Block after the ReceiveAccept was acknowledged")
 		}
@@ -151,28 +186,28 @@ func TestBDXBlockWaitsForTheAcceptsAck(t *testing.T) {
 	}
 
 	blockAck := bdx.CounterOnly{BlockCounter: 0}.Encode()
-	// noBlock1 fails t when the device sends anything but Block 0's
-	// retransmission within 400ms.
-	noBlock1 := func(what string) {
+	// held fails t unless Block 0 still waits for its acknowledgement: a
+	// refused BlockAck drove nothing, and Block 1, which would wait for it,
+	// is not sent.
+	held := func(what string) {
 		t.Helper()
-		deadline := time.Now().Add(400 * time.Millisecond)
-		for {
-			m, ok := nextBDX(got, time.Until(deadline))
-			if !ok {
-				return
-			}
-			if m.counter != block0.counter {
-				t.Fatalf("%s drove the transfer: the device sent %v", what, m.opcode)
-			}
+		if c, ok := pendingOnBDXExchange(dev, x, exchangeResponder); !ok || c != block0.counter {
+			t.Fatalf("after %s the exchange's outstanding message is %d (held %t), want Block 0's %d", what, c, ok, block0.counter)
 		}
 	}
-	sendBDXAck(peer, x, true, 0, uint8(bdx.MessageBlockAck), blockAck)
-	noBlock1("a BlockAck without the Block's acknowledgement")
-	sendBDXAck(peer, x, true, block0.counter+1, uint8(bdx.MessageBlockAck), blockAck)
-	noBlock1("a BlockAck acknowledging another counter")
-	sendBDXAck(peer, x, true, block0.counter, uint8(bdx.MessageBlockAck), blockAck)
+	if err := dispatchBDXFrom(ctx, t, dev, peer, x, true, 0, uint8(bdx.MessageBlockAck), blockAck); !errors.Is(err, errPreviousAckMissing) {
+		t.Fatalf("a BlockAck without the Block's acknowledgement: %v, want errPreviousAckMissing", err)
+	}
+	held("a BlockAck without the Block's acknowledgement")
+	if err := dispatchBDXFrom(ctx, t, dev, peer, x, true, block0.counter+1, uint8(bdx.MessageBlockAck), blockAck); !errors.Is(err, errIncorrectAck) {
+		t.Fatalf("a BlockAck acknowledging another counter: %v, want errIncorrectAck", err)
+	}
+	held("a BlockAck acknowledging another counter")
+	if err := dispatchBDXFrom(ctx, t, dev, peer, x, true, block0.counter, uint8(bdx.MessageBlockAck), blockAck); err != nil {
+		t.Fatalf("the BlockAck that acknowledges Block 0: %v", err)
+	}
 	for {
-		m, ok := nextBDX(got, 5*time.Second)
+		m, ok := nextBDX(ctx, got)
 		if !ok {
 			t.Fatal("no Block 1 after the BlockAck that acknowledges Block 0")
 		}
@@ -211,7 +246,7 @@ func TestBDXInitiatedExchangeWaitsAndRefuses(t *testing.T) {
 	if err := ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageSendInit), []byte{0x01}); err != nil {
 		t.Fatalf("SendInit: %v", err)
 	}
-	sendInit, ok := nextBDX(got, 5*time.Second)
+	sendInit, ok := nextBDX(ctx, got)
 	if !ok || sendInit.opcode != bdx.MessageSendInit {
 		t.Fatalf("the peer got %v (ok %t), want SendInit", sendInit.opcode, ok)
 	}
@@ -219,33 +254,35 @@ func TestBDXInitiatedExchangeWaitsAndRefuses(t *testing.T) {
 
 	second := make(chan error, 1)
 	go func() { second <- ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageBlockQuery), []byte{0x02}) }()
+	tr := dev.br.outboundReliable
+	// The second Send waits once the tracker holds its wake channel.
+	waitFor(t, "the second Send's wait on the SendInit", func() bool {
+		tr.mu.Lock()
+		defer tr.mu.Unlock()
+		return len(tr.freed) == 1
+	})
 	select {
 	case err := <-second:
 		t.Fatalf("a second Send returned (%v) while the SendInit waits for its acknowledgement", err)
-	case <-time.After(300 * time.Millisecond):
+	default:
 	}
 
-	receive := func() (bdx.Message, error) {
-		t.Helper()
-		rctx, rcancel := context.WithTimeout(ctx, 300*time.Millisecond)
-		defer rcancel()
-		return ex.Receive(rctx)
+	queued := func() int { return len(ex.(*initiatedSecureExchange).in) }
+	if err := dispatchBDXFrom(ctx, t, dev, peer, xid, false, 0, uint8(bdx.MessageSendAccept), []byte{0x03}); !errors.Is(err, errPreviousAckMissing) || queued() != 0 {
+		t.Fatalf("a SendAccept without the SendInit's acknowledgement: %v, %d queued; want errPreviousAckMissing, none", err, queued())
 	}
-	sendBDXAck(peer, xid, false, 0, uint8(bdx.MessageSendAccept), []byte{0x03})
-	if m, err := receive(); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("a SendAccept without the SendInit's acknowledgement reached the exchange: %+v, %v", m, err)
-	}
-	sendBDXAck(peer, xid, false, sendInit.counter+1, uint8(bdx.MessageSendAccept), []byte{0x03})
-	if m, err := receive(); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("a SendAccept acknowledging another counter reached the exchange: %+v, %v", m, err)
+	if err := dispatchBDXFrom(ctx, t, dev, peer, xid, false, sendInit.counter+1, uint8(bdx.MessageSendAccept), []byte{0x03}); !errors.Is(err, errIncorrectAck) || queued() != 0 {
+		t.Fatalf("a SendAccept acknowledging another counter: %v, %d queued; want errIncorrectAck, none", err, queued())
 	}
 	select {
 	case err := <-second:
 		t.Fatalf("the second Send returned (%v) on a refused answer", err)
 	default:
 	}
-	sendBDXAck(peer, xid, false, sendInit.counter, uint8(bdx.MessageSendAccept), []byte{0x03})
-	if m, err := receive(); err != nil || bdx.MessageType(m.Opcode) != bdx.MessageSendAccept {
+	if err := dispatchBDXFrom(ctx, t, dev, peer, xid, false, sendInit.counter, uint8(bdx.MessageSendAccept), []byte{0x03}); err != nil {
+		t.Fatalf("the acknowledging SendAccept: %v", err)
+	}
+	if m, err := ex.Receive(ctx); err != nil || bdx.MessageType(m.Opcode) != bdx.MessageSendAccept {
 		t.Fatalf("the acknowledging SendAccept: %+v, %v", m, err)
 	}
 	select {
@@ -253,7 +290,7 @@ func TestBDXInitiatedExchangeWaitsAndRefuses(t *testing.T) {
 		if err != nil {
 			t.Fatalf("the second Send: %v", err)
 		}
-	case <-time.After(5 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("the second Send still waits after the SendInit was acknowledged")
 	}
 }
@@ -283,12 +320,14 @@ func TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd(t *testing.T) {
 		}
 		return out
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	result := func(out chan error) error {
 		t.Helper()
 		select {
 		case err := <-out:
 			return err
-		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
 			t.Fatal("the wait did not end")
 			return nil
 		}
@@ -354,13 +393,18 @@ func TestBDXSendAfterAGiveUpSendsNothing(t *testing.T) {
 	if err := ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageSendInit), []byte{0x01}); err != nil {
 		t.Fatalf("SendInit: %v", err)
 	}
-	if m, ok := nextBDX(got, 5*time.Second); !ok || m.opcode != bdx.MessageSendInit {
+	if m, ok := nextBDX(ctx, got); !ok || m.opcode != bdx.MessageSendInit {
 		t.Fatalf("the peer got %v (ok %t), want SendInit", m.opcode, ok)
 	}
 	second := make(chan error, 1)
 	go func() { second <- ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageBlockQuery), []byte{0x02}) }()
-	time.Sleep(200 * time.Millisecond)
 	tr := dev.br.outboundReliable
+	// The second Send waits once the tracker holds its wake channel.
+	waitFor(t, "the second Send's wait on the SendInit", func() bool {
+		tr.mu.Lock()
+		defer tr.mu.Unlock()
+		return len(tr.freed) == 1
+	})
 	tr.mu.Lock()
 	for _, e := range tr.pending {
 		e.retries = mrp.MaxRetransmissions
@@ -373,17 +417,13 @@ func TestBDXSendAfterAGiveUpSendsNothing(t *testing.T) {
 		if err == nil {
 			t.Fatal("the Send waiting on the given-up SendInit returned nil")
 		}
-	case <-time.After(5 * time.Second):
+	case <-ctx.Done():
 		t.Fatal("the Send waiting on the given-up SendInit did not end")
 	}
-	for {
-		m, ok := nextBDX(got, 400*time.Millisecond)
-		if !ok {
-			break
-		}
-		if m.opcode != bdx.MessageSendInit {
-			t.Fatalf("after the give-up the device sent %v", m.opcode)
-		}
+	// Every reliable message is tracked before it is sent: none tracked
+	// is none sent.
+	if c, ok := pendingOnBDXExchange(dev, ex.(*initiatedSecureExchange).exchangeID, exchangeInitiator); ok {
+		t.Fatalf("after the give-up the device tracked message %d on the exchange", c)
 	}
 }
 
@@ -413,7 +453,7 @@ func TestBDXSendAfterAGiveUpBeforeTheExchangeEndsSendsNothing(t *testing.T) {
 	if err := ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageSendInit), []byte{0x01}); err != nil {
 		t.Fatalf("SendInit: %v", err)
 	}
-	if m, ok := nextBDX(got, 5*time.Second); !ok || m.opcode != bdx.MessageSendInit {
+	if m, ok := nextBDX(ctx, got); !ok || m.opcode != bdx.MessageSendInit {
 		t.Fatalf("the peer got %v (ok %t), want SendInit", m.opcode, ok)
 	}
 	// The tracker's give-up alone: its result is not handed to the bridge,
@@ -432,13 +472,9 @@ func TestBDXSendAfterAGiveUpBeforeTheExchangeEndsSendsNothing(t *testing.T) {
 	if err := ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageBlockQuery), []byte{0x02}); !errors.Is(err, mrp.ErrMaxRetransmissionsReached) {
 		t.Fatalf("a Send after the give-up: %v, want ErrMaxRetransmissionsReached", err)
 	}
-	for {
-		m, ok := nextBDX(got, 400*time.Millisecond)
-		if !ok {
-			break
-		}
-		if m.opcode != bdx.MessageSendInit {
-			t.Fatalf("after the give-up the device sent %v", m.opcode)
-		}
+	// Every reliable message is tracked before it is sent: none tracked
+	// is none sent.
+	if c, ok := pendingOnBDXExchange(dev, ex.(*initiatedSecureExchange).exchangeID, exchangeInitiator); ok {
+		t.Fatalf("after the give-up the device tracked message %d on the exchange", c)
 	}
 }

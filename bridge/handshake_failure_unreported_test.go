@@ -233,9 +233,10 @@ func TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged(t *testing.T) {
 // acknowledged, never reaching the handshake — so no StatusReport is sent,
 // the handshake goes on waiting, and the Sigma1 goes on being
 // retransmitted until it is acknowledged (review II, F-db021da0-7, owner
-// decision 173; phase 7, decision 277: matter.js throws "Previous message
-// ack is missing", packages/protocol/src/protocol/MessageExchange.ts:521-525
-// at db021da0). The acknowledged case is
+// decision 173; phase 7, decision 277). matter.js throws "Previous message
+// ack is missing" for such a message
+// (packages/protocol/src/protocol/MessageExchange.ts:521-525 at db021da0).
+// The acknowledged case is
 // TestInitiatedHandshakeKeepsItsFailureReportTracked.
 func TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged(t *testing.T) {
 	t.Parallel()
@@ -277,10 +278,11 @@ func TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged(t *testi
 	if err := r.b.dispatch(ctx, datagram, r.peer.LocalAddr()); !errors.Is(err, errPreviousAckMissing) {
 		t.Fatalf("dispatch(Sigma2): %v, want errPreviousAckMissing", err)
 	}
+	// The refusal is synchronous: the Sigma2 never reached the handshake.
 	select {
 	case err := <-done:
 		t.Fatalf("the handshake ended (%v) on a Sigma2 refused on receive", err)
-	case <-time.After(200 * time.Millisecond):
+	default:
 	}
 	r.wantUnreportedRetransmitting(t, HandshakeKey{InitiatorNodeID: sigma1Hdr.SourceNodeID, ExchangeID: sigma1.ExchangeID}, mrp.SCOpcodeSigma1)
 }

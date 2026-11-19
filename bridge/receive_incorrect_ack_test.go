@@ -184,8 +184,9 @@ func TestAckOnExchangeIsExchangeScoped(t *testing.T) {
 // PBKDFParamResponse waiting for one is refused — not acknowledged, not
 // answered, the response kept; a standalone acknowledgement of another
 // counter is ignored. matter.js runs PASE and CASE exchanges through the
-// same MessageExchange.onMessageReceived (Fable's note, Q1;
-// packages/protocol/src/protocol/MessageExchange.ts:521-534 at db021da0).
+// same MessageExchange.onMessageReceived
+// (packages/protocol/src/protocol/MessageExchange.ts:475-563 at db021da0,
+// the rules at :521-534; Fable's note, Q1).
 func TestHandshakeMessageWithAnIncorrectAckIsRefused(t *testing.T) {
 	t.Parallel()
 	r, _ := newPaseClaimRig(t)
