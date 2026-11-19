@@ -1,5 +1,5 @@
 {
-  "commit": "db021da06bafe6766cd1a05d505cea03b9ec5081",
+  "commit": "b25ed9604f2825857b8de28a3c29cae8124a7e49",
   "roots": [
     "packages/general/test",
     "packages/model/test",
@@ -282,8 +282,8 @@
     },
     {
       "path": "packages/general/test/net/dns-sd/MdnsSocketTest.ts",
-      "lines": 987,
-      "sha": "b0e591986d1557095ca0d76415b729e20a72a9d0",
+      "lines": 1107,
+      "sha": "3b96d9fecdbc740b05ac65d9668e9bd2c6803a99",
       "describes": [
         "MdnsSocket"
       ]
@@ -478,8 +478,8 @@
     },
     {
       "path": "packages/general/test/time/TimestampTest.ts",
-      "lines": 77,
-      "sha": "d890b451384995ccb4f3658c8f44530099284f44",
+      "lines": 83,
+      "sha": "3954f86d7152960f230de9c97b94532e88d5d934",
       "describes": [
         "Timestamp"
       ]
@@ -527,8 +527,8 @@
     },
     {
       "path": "packages/general/test/util/BytesTest.ts",
-      "lines": 104,
-      "sha": "7771ed20270fadad56a3ea4d1377b6df96991db0",
+      "lines": 157,
+      "sha": "6e58f39f99608db4266ac3c8bf1f4e15437c10c2",
       "describes": [
         "ByteArray"
       ]
@@ -896,8 +896,8 @@
     },
     {
       "path": "packages/model/test/decoration/semantics/FieldSemanticsTest.ts",
-      "lines": 230,
-      "sha": "f9b68d90e0b2df6f7a59a9c53f5c75b37f4b0e5d",
+      "lines": 260,
+      "sha": "5df84c570b617920794cff5cb05120535739a580",
       "describes": [
         "FieldSemantics"
       ]
@@ -1011,6 +1011,14 @@
       ]
     },
     {
+      "path": "packages/model/test/logic/SecretRedactionTest.ts",
+      "lines": 244,
+      "sha": "a0371e04b9724f70d5515a5183b6bca906ad952e",
+      "describes": [
+        "SecretRedaction"
+      ]
+    },
+    {
       "path": "packages/model/test/logic/SelectDefaultValueTest.ts",
       "lines": 149,
       "sha": "f99a4168d33b85da0716569737eaed4e31d2c764",
@@ -1085,6 +1093,14 @@
       ]
     },
     {
+      "path": "packages/model/test/models/AttributeModelTest.ts",
+      "lines": 47,
+      "sha": "7f58bfcf5a401d8ab1383cc0ac82413cf47e2b09",
+      "describes": [
+        "AttributeModel"
+      ]
+    },
+    {
       "path": "packages/model/test/models/ClusterModelTest.ts",
       "lines": 223,
       "sha": "4a145c86d92a08e5d5ff0069085eb9b1c7a7bfeb",
@@ -1102,8 +1118,8 @@
     },
     {
       "path": "packages/model/test/models/FieldModelTest.ts",
-      "lines": 42,
-      "sha": "30da8c1d3b3ebe612ba0422e93962553bb7916d7",
+      "lines": 64,
+      "sha": "3f99e6214ce692f2bc678df16dafb84d016cecfe",
       "describes": [
         "FieldModel"
       ]
@@ -1200,8 +1216,8 @@
     },
     {
       "path": "packages/node/test/behavior/cluster/BehaviorSchemaValidationTest.ts",
-      "lines": 133,
-      "sha": "9fcb4f6a449cbe5ad2f1e0871d7c4702d9a9cbb4",
+      "lines": 137,
+      "sha": "fda59726da092bd45a883730b2eafb24df1d826b",
       "describes": [
         "BehaviorSchemaValidation"
       ]
@@ -1216,8 +1232,8 @@
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorFeaturesTest.ts",
-      "lines": 233,
-      "sha": "223fcd05a368c9a8fb7ebe3079ffa671276528da",
+      "lines": 236,
+      "sha": "963e5672f0f7fe9e6371f0f78c83abd96d549499",
       "describes": [
         "cluster behavior feature selection"
       ]
@@ -1327,39 +1343,47 @@
     {
       "path": "packages/node/test/behavior/state/managed/ClientMirrorWriteTest.ts",
       "lines": 77,
-      "sha": "66d13d6e42bd6ee1679d5befdd124d3d7172275d",
+      "sha": "7779a824f8e668d0a6f10f9ca9aff4f41d854cf2",
       "describes": [
         "Client Mirror Writes"
       ]
     },
     {
       "path": "packages/node/test/behavior/state/managed/DatasourceTest.ts",
-      "lines": 2712,
-      "sha": "836759594e947362518af426f68762e6a7ca92f9",
+      "lines": 3074,
+      "sha": "9bf40762a56cf52166ae684e33c0a362d3510572",
       "describes": [
         "Datasource"
       ]
     },
     {
+      "path": "packages/node/test/behavior/state/managed/InternalTest.ts",
+      "lines": 38,
+      "sha": "782d367441627dd935dc3d791c0494e83198c0cb",
+      "describes": [
+        "Internal"
+      ]
+    },
+    {
       "path": "packages/node/test/behavior/state/managed/ManagedReferenceTest.ts",
-      "lines": 522,
-      "sha": "22a407db70400d189b7c9fd1f82b25167453079e",
+      "lines": 537,
+      "sha": "e904f90fea0b6d57ed9ea9be07d32a7774ffdd0c",
       "describes": [
         "ManagedReference"
       ]
     },
     {
       "path": "packages/node/test/behavior/state/managed/values/ListManagerTest.ts",
-      "lines": 1350,
-      "sha": "a617489e440896989b68542eae7c3da834701d31",
+      "lines": 1727,
+      "sha": "bfae57dda24ac217537523810032adf09f4bf59f",
       "describes": [
         "ListManager"
       ]
     },
     {
       "path": "packages/node/test/behavior/state/managed/values/StructManagerTest.ts",
-      "lines": 917,
-      "sha": "aed4755d2bec02dc4d89777563762ef5e841db1b",
+      "lines": 1507,
+      "sha": "62613aff4625cc92b24d590e0d222fd1b974606e",
       "describes": [
         "StructManager"
       ]
@@ -1374,8 +1398,8 @@
     },
     {
       "path": "packages/node/test/behavior/state/validation/ValueValidatorTest.ts",
-      "lines": 567,
-      "sha": "a8df8b2d2f071d9163c64edd4acbad5fe3641648",
+      "lines": 800,
+      "sha": "e4575641a4273a86bd13ba7afc66c99ae97fe445",
       "describes": [
         "ValueValidator"
       ]
@@ -1390,8 +1414,8 @@
     },
     {
       "path": "packages/node/test/behavior/state/validation/constraintTest.ts",
-      "lines": 573,
-      "sha": "85960491aac9c05b7e4864acec6262f63e859932",
+      "lines": 588,
+      "sha": "5eaa02019d5683777044a85181fce454fe5eadae",
       "describes": [
         "constraint"
       ]
@@ -1446,8 +1470,8 @@
     },
     {
       "path": "packages/node/test/behavior/system/commissioning/RemoteDescriptorTest.ts",
-      "lines": 229,
-      "sha": "64d0b890a223fb1fc667c650d3146458aa626cf7",
+      "lines": 253,
+      "sha": "da1e39e79876b6d48b2e8dcbaa83a301ffc38b83",
       "describes": [
         "RemoteDescriptor"
       ]
@@ -1575,16 +1599,16 @@
     },
     {
       "path": "packages/node/test/behavior/system/remote/ApiTest.ts",
-      "lines": 79,
-      "sha": "43ee208bd68801ad348514c1fddfd12913e3733e",
+      "lines": 103,
+      "sha": "d8f2b94b332c49b1e289327906796b8ef8f3e738",
       "describes": [
         "Api"
       ]
     },
     {
       "path": "packages/node/test/behavior/system/remote/PeerApiTest.ts",
-      "lines": 220,
-      "sha": "e920899080f5901a2110f10c8d3a1e2bbd98129e",
+      "lines": 393,
+      "sha": "46195df7c747dfdc3ae185091cafd3012d0c9671",
       "describes": [
         "remote API on a peer"
       ]
@@ -1631,8 +1655,8 @@
     },
     {
       "path": "packages/node/test/behaviors/administrator-commissioning/AdministratorCommissioningServerTest.ts",
-      "lines": 532,
-      "sha": "f1fceac45a0a7a478e08967fa76e234f0f6593df",
+      "lines": 548,
+      "sha": "9cc9e3e4c99adcb84b70d5528cf3ed29e0933670",
       "describes": [
         "AdministratorCommissioningServer"
       ]
@@ -1662,9 +1686,17 @@
       ]
     },
     {
+      "path": "packages/node/test/behaviors/basic-information/StoredNodeLabelTest.ts",
+      "lines": 34,
+      "sha": "20c3a77f0ce1e645808b6f6d6a3b3fddd29d2082",
+      "describes": [
+        "BasicInformationServer stored nodeLabel"
+      ]
+    },
+    {
       "path": "packages/node/test/behaviors/binding/BindingIntegrationTest.ts",
-      "lines": 857,
-      "sha": "12d2db88432bfd7bab871aae408d06551a7cfa24",
+      "lines": 894,
+      "sha": "d4807cf9c2ee54741c94d00d84858d557c9484a4",
       "describes": [
         "Binding integration",
         "Binding integration, group sends"
@@ -1754,8 +1786,8 @@
     },
     {
       "path": "packages/node/test/behaviors/door-lock/DoorLockServerTest.ts",
-      "lines": 1946,
-      "sha": "b56582b0263eb069b28554616645021a9e18d060",
+      "lines": 2037,
+      "sha": "978448f0403d2851b727a867901fe956f70a8d64",
       "describes": [
         "DoorLockServer"
       ]
@@ -1834,8 +1866,8 @@
     },
     {
       "path": "packages/node/test/behaviors/groups/GroupsServerSchemaTest.ts",
-      "lines": 100,
-      "sha": "7f2c62836c279045fb929da047b7a806b5aea784",
+      "lines": 107,
+      "sha": "a094dc99372ba1b389352572e5e1dcd88a75892f",
       "describes": [
         "GroupsServer schema relaxation"
       ]
@@ -1911,8 +1943,8 @@
     },
     {
       "path": "packages/node/test/behaviors/localization-configuration/LocalizationConfigurationServerTest.ts",
-      "lines": 25,
-      "sha": "46be92b7ac7c39322d25b71eae41afa7c8e7cb31",
+      "lines": 201,
+      "sha": "621fa9fc5a417560709aa4a04a36c168d78792f3",
       "describes": [
         "LocalizationConfigurationServer"
       ]
@@ -1959,8 +1991,8 @@
     },
     {
       "path": "packages/node/test/behaviors/ota/OtaTest.ts",
-      "lines": 2819,
-      "sha": "a6e773f32ed4c1c3eb3a3c00ca1d8b474cd448ae",
+      "lines": 6336,
+      "sha": "35c61e6a697fb2570f2623fb5675fc88673d1ddb",
       "describes": [
         "Ota"
       ]
@@ -1983,8 +2015,8 @@
     },
     {
       "path": "packages/node/test/behaviors/scenes-management/ScenesManagementServerTest.ts",
-      "lines": 99,
-      "sha": "ef606063b6cd1ee8010f79c9f0d3ea58af6f3fb5",
+      "lines": 276,
+      "sha": "f73f1c3d3a4d590162c70d809a1dc000454f3cb0",
       "describes": [
         "ScenesManagementServer"
       ]
@@ -2015,8 +2047,8 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/AtomicWriteHandlerTest.ts",
-      "lines": 519,
-      "sha": "169b7cc8fea0d7a2db31d147679b19a13463772d",
+      "lines": 545,
+      "sha": "8f76d9d476de93a37f2bfe43e6292f345faa3d75",
       "describes": [
         "AtomicWriteHandler"
       ]
@@ -2031,34 +2063,76 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsAtomicWriteTest.ts",
-      "lines": 256,
-      "sha": "ea1e170c28406ba5770398f18b2a7684afd14afe",
+      "lines": 259,
+      "sha": "8892977012c8e4877f91491f776168d16d0057d0",
       "describes": [
         "Presets atomic write"
       ]
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsConfigurationTest.ts",
-      "lines": 150,
-      "sha": "e95224b86692e0d1e33d3f2b69063b6dd3c87f46",
+      "lines": 201,
+      "sha": "fb72a0040647a9a7782d0d01d88cc89948e88902",
       "describes": [
         "Presets configuration"
       ]
     },
     {
       "path": "packages/node/test/behaviors/thermostat/PresetsLocalWriteTest.ts",
-      "lines": 470,
-      "sha": "d562cb6396c6c1683af3d2b8df6f0cdf1aee8cd4",
+      "lines": 619,
+      "sha": "fac5fc804aebf922782e900a84468bc7d454ac51",
       "describes": [
         "Presets local write"
       ]
     },
     {
+      "path": "packages/node/test/behaviors/thermostat/SchedulesAtomicWriteTest.ts",
+      "lines": 574,
+      "sha": "d0f0bb2eb0a59fd33d8dcb130cd3d53a51209c8e",
+      "describes": [
+        "Schedules atomic write"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/thermostat/SchedulesConfigurationTest.ts",
+      "lines": 340,
+      "sha": "5c5cf03cdf5945ded0f988e6f74c24f9f14e0314",
+      "describes": [
+        "MatterScheduleConfiguration without the thermostat-msch forward feature",
+        "Schedules configuration"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/thermostat/SchedulesLocalWriteTest.ts",
+      "lines": 931,
+      "sha": "91c305f9170077193576e820d519632f31b7f413",
+      "describes": [
+        "Schedules local write"
+      ]
+    },
+    {
       "path": "packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts",
-      "lines": 391,
-      "sha": "87ef846ade095d3775da6f593c48a0009f0399d8",
+      "lines": 531,
+      "sha": "11e14b7fde55b5074a44d7f08d49e7e0ba1cd3ab",
       "describes": [
         "ThermostatBehavior"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/thermostat/ThermostatEventsTest.ts",
+      "lines": 923,
+      "sha": "d0308bd5290ee4b9a9057e628ef8bfb578a609bf",
+      "describes": [
+        "Thermostat events",
+        "Thermostat events without the thermostat-events forward feature"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/thermostat/ThermostatSuggestionsTest.ts",
+      "lines": 1842,
+      "sha": "3439897dea94cb7b4e5b5d1f591a75d1c65fd76f",
+      "describes": [
+        "Thermostat suggestions"
       ]
     },
     {
@@ -2071,32 +2145,32 @@
     },
     {
       "path": "packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts",
-      "lines": 85,
-      "sha": "037beeb02e73304c170205049e4bf0997ed5dbe8",
+      "lines": 317,
+      "sha": "8fa44075d5ef8a50461f06067cd8a7479591a7e5",
       "describes": [
         "TimeFormatLocalizationServer"
       ]
     },
     {
       "path": "packages/node/test/behaviors/unit-localization/UnitLocalizationServerTest.ts",
-      "lines": 20,
-      "sha": "7cffd9224f08a54b27262f89ef6d0c526a61dd76",
+      "lines": 171,
+      "sha": "203c24dccb58e827be47fed55fea2335098a19b1",
       "describes": [
         "UnitLocalizationServer"
       ]
     },
     {
       "path": "packages/node/test/behaviors/user-label/UserLabelServerTest.ts",
-      "lines": 358,
-      "sha": "0e2154923651d15c7747cf8224f53253fd2c4c45",
+      "lines": 368,
+      "sha": "2d7c6b76f52fc5ab9db6b12cd29d00b1e3de1f8a",
       "describes": [
         "UserLabelServer"
       ]
     },
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
-      "lines": 605,
-      "sha": "b2f3d0d4396de6304fc14b4663892bacfa4c8f3c",
+      "lines": 731,
+      "sha": "b66454fc910134053cca43849ba3dd9aa729c00b",
       "describes": [
         "WebRtcTransportRequestorServer"
       ]
@@ -2108,6 +2182,14 @@
       "describes": [
         "WindowCoveringServer",
         "WindowCoveringServer type"
+      ]
+    },
+    {
+      "path": "packages/node/test/behaviors/zone-management/ZoneManagementServerTest.ts",
+      "lines": 779,
+      "sha": "ca5889200efd74d72138b3a470272bb733c19799",
+      "describes": [
+        "ZoneManagementServer"
       ]
     },
     {
@@ -2228,16 +2310,16 @@
     },
     {
       "path": "packages/node/test/endpoint/server/InteractionProtocolTest.ts",
-      "lines": 2803,
-      "sha": "b8b8f4f62f5855ac21735b463dd7182d41ce76af",
+      "lines": 2769,
+      "sha": "35735557f10029f24896788242447a6db8cb9879",
       "describes": [
         "InteractionProtocol"
       ]
     },
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
-      "lines": 641,
-      "sha": "87df1e9a341a4b7e9ea9320fac2faccd0e64a34f",
+      "lines": 834,
+      "sha": "a1874e4c26cfc2f639a2d3af4dc3442decfc4199",
       "describes": [
         "ProtocolServiceTest",
         "command validation"
@@ -2448,20 +2530,21 @@
     },
     {
       "path": "packages/node/test/node/ClientAttestationTest.ts",
-      "lines": 740,
-      "sha": "744f3ff7bff86003701e8ebd58be625e9e9b2270",
+      "lines": 795,
+      "sha": "7c8ce4d9b7c67d834fcc8aa5736a771f5645680b",
       "describes": [
         "device attestation during commissioning"
       ]
     },
     {
       "path": "packages/node/test/node/ClientBridgeStructureTest.ts",
-      "lines": 1310,
-      "sha": "383dcabbcfeadb8c3ff816583d859c91d6267cb7",
+      "lines": 1618,
+      "sha": "aa02f0a0c940e11ad3d153b739b1b1c7146bfdf7",
       "describes": [
         "a peer that is a bridge",
         "a peer that reports its bridge across two interactions",
-        "a peer whose root omits an endpoint it serves",
+        "a peer that serves an endpoint no PartsList on the node names",
+        "a peer whose root names only its aggregator",
         "a peer that changes what it says between interactions",
         "a peer that nests an aggregator below an aggregator",
         "a peer that reports an aggregator below an aggregator",
@@ -2494,32 +2577,40 @@
     },
     {
       "path": "packages/node/test/node/ClientConnectivityTest.ts",
-      "lines": 828,
-      "sha": "3dda3d0109c1d6ed85f5da3832c848b7a7ff3171",
+      "lines": 864,
+      "sha": "436f7020d3096f94939c16b820c0e45432850fde",
       "describes": [
         "ClientConnectivityTest"
       ]
     },
     {
       "path": "packages/node/test/node/ClientEventNotificationTest.ts",
-      "lines": 1260,
-      "sha": "fa5b481efe35f50215d352674667b90e6df420c2",
+      "lines": 1290,
+      "sha": "ecbc8fd99b9a8c1953544b108f0bb65a4126f379",
       "describes": [
         "Client Event Notification"
       ]
     },
     {
+      "path": "packages/node/test/node/ClientFabricScopedListWriteTest.ts",
+      "lines": 1178,
+      "sha": "291476de591ba264cb572afce2c9856dcc4e2bde",
+      "describes": [
+        "ClientNode fabric-scoped list write"
+      ]
+    },
+    {
       "path": "packages/node/test/node/ClientGroupTest.ts",
-      "lines": 37,
-      "sha": "17cce1c3c474ef82443ce97dd1352a4d66b01f98",
+      "lines": 170,
+      "sha": "11a2406561a62d7f73d1dc938a7c676e6e2fd55f",
       "describes": [
         "ClientGroup"
       ]
     },
     {
       "path": "packages/node/test/node/ClientInvokeTest.ts",
-      "lines": 1004,
-      "sha": "a743554ce3a6060f13492259bb66a152d9bfca31",
+      "lines": 1005,
+      "sha": "981d5fb9dafc6ec7505f1b5c2940d1ea62ccd96d",
       "describes": [
         "ClientInvoke"
       ]
@@ -2558,16 +2649,24 @@
     },
     {
       "path": "packages/node/test/node/ClientNodeTest.ts",
-      "lines": 5120,
-      "sha": "4f11d42a658c25c213e95faafbfa1947e26de112",
+      "lines": 5301,
+      "sha": "7b456db38f64c2d106b2efdecdd78f7f197ab9fe",
       "describes": [
         "ClientNode"
       ]
     },
     {
+      "path": "packages/node/test/node/ClientRequireExistingSessionTest.ts",
+      "lines": 69,
+      "sha": "b4454fdb8218fdb5947f6c1aaae7fd63236cb5b2",
+      "describes": [
+        "ClientRequest.requireExistingSession"
+      ]
+    },
+    {
       "path": "packages/node/test/node/ClientStartUpTest.ts",
-      "lines": 154,
-      "sha": "2d1de94216bbfe2670fc201f2cb7d5aec49743fd",
+      "lines": 155,
+      "sha": "5d655676134846a85112850fe8039e6acb7317d1",
       "describes": [
         "Client startUp event handling"
       ]
@@ -2597,11 +2696,27 @@
       ]
     },
     {
+      "path": "packages/node/test/node/ClientUncachedMandatoryWriteTest.ts",
+      "lines": 542,
+      "sha": "f3dc3596376747636ff477793ccf72d4df9f9122",
+      "describes": [
+        "ClientNode change of a mandatory value its cache does not hold"
+      ]
+    },
+    {
       "path": "packages/node/test/node/CommandInvokeResponseTest.ts",
-      "lines": 865,
-      "sha": "1ff5c131ac0cbf5b4f620b77a9af7db32a97617d",
+      "lines": 863,
+      "sha": "7a608d06c0c577a418a72819984344b6a20ac9ee",
       "describes": [
         "CommandInvokeResponse"
+      ]
+    },
+    {
+      "path": "packages/node/test/node/CommissioningAttemptLimitTest.ts",
+      "lines": 179,
+      "sha": "f5ffae1edecf26ffec59bfd5cc5d9e2112783317",
+      "describes": [
+        "Commissioning attempt limit"
       ]
     },
     {
@@ -2613,11 +2728,27 @@
       ]
     },
     {
+      "path": "packages/node/test/node/CommissioningFailsafeExpiryTest.ts",
+      "lines": 203,
+      "sha": "de0fb0b540bc0dc97c8bce3416ad518867e1c335",
+      "describes": [
+        "Commissioning failsafe expiry"
+      ]
+    },
+    {
       "path": "packages/node/test/node/CommissioningPaseLifetimeTest.ts",
       "lines": 65,
       "sha": "f0d47ddd295a239f55020671bc3f3b0a2eb5fe0e",
       "describes": [
         "Commissioning PASE session lifetime"
+      ]
+    },
+    {
+      "path": "packages/node/test/node/CsrNonceCommissioningTest.ts",
+      "lines": 52,
+      "sha": "88eb201fa1fa2c695fba0e7ad0286754e4ea8e80",
+      "describes": [
+        "CSR nonce check during commissioning"
       ]
     },
     {
@@ -2631,7 +2762,7 @@
     {
       "path": "packages/node/test/node/DelayReportDataTest.ts",
       "lines": 533,
-      "sha": "613143fd04bb2ce7a3cc44fe052f9347b076ff00",
+      "sha": "6b443572e37a38b23ef06c114159a461c70cf58b",
       "describes": [
         "DelayReportData"
       ]
@@ -2677,6 +2808,14 @@
       ]
     },
     {
+      "path": "packages/node/test/node/MdnsServiceLifecycleTest.ts",
+      "lines": 78,
+      "sha": "6b27d1438fe1c477b68751b6a86f727e7f63ffa6",
+      "describes": [
+        "MdnsServiceLifecycle"
+      ]
+    },
+    {
       "path": "packages/node/test/node/MockServerNodeTest.ts",
       "lines": 31,
       "sha": "7e63c77e3300b19d00a4ba3af47d3dcdefe64e22",
@@ -2694,10 +2833,11 @@
     },
     {
       "path": "packages/node/test/node/NodeLifecycleSeededTest.ts",
-      "lines": 423,
-      "sha": "87a08ef46981063bb00f80dfaa949b2d2a2dd15b",
+      "lines": 637,
+      "sha": "e037c87521b89ae9eddf56c890938bb8c99e0da1",
       "describes": [
         "NodeLifecycle#isSeeded/seeded",
+        "ClientNode with a root that reports no device type",
         "client/server lifecycle split"
       ]
     },
@@ -2710,17 +2850,33 @@
       ]
     },
     {
+      "path": "packages/node/test/node/OperationalCertificateUpdateTest.ts",
+      "lines": 2317,
+      "sha": "1b4f8d6d2d5c14853503e103cd76e9480633ecb2",
+      "describes": [
+        "OperationalCertificateUpdate"
+      ]
+    },
+    {
+      "path": "packages/node/test/node/PaseBleChannelCloseTest.ts",
+      "lines": 253,
+      "sha": "34afabb9dde56c1791bc10911a35e1457c90e508",
+      "describes": [
+        "PASE over BLE"
+      ]
+    },
+    {
       "path": "packages/node/test/node/PeerBehaviorTest.ts",
-      "lines": 359,
-      "sha": "aa253cbd1374b4704ffecad0539b2dd746afbb76",
+      "lines": 361,
+      "sha": "8961944aa01eadac0d0e2ae2857d58cc52396b73",
       "describes": [
         "PeerBehavior"
       ]
     },
     {
       "path": "packages/node/test/node/PeerDescriptorTest.ts",
-      "lines": 438,
-      "sha": "5ee3894c828d2d9058e8634f79050b767cd07446",
+      "lines": 519,
+      "sha": "44893a69e911625ee185e40671c623021f9b45fb",
       "describes": [
         "Peer descriptor"
       ]
@@ -2764,6 +2920,14 @@
       ]
     },
     {
+      "path": "packages/node/test/node/SecretLoggingTest.ts",
+      "lines": 331,
+      "sha": "67fbefe13ddc735968f04e3b4fa0f20afa3f8243",
+      "describes": [
+        "SecretLogging"
+      ]
+    },
+    {
       "path": "packages/node/test/node/ServerNodeTest.ts",
       "lines": 1969,
       "sha": "6b898f522247220a2d2ea42014fcef4e230e0499",
@@ -2772,11 +2936,27 @@
       ]
     },
     {
+      "path": "packages/node/test/node/ServerSubscriptionSessionTest.ts",
+      "lines": 715,
+      "sha": "221d0abfacf7b1bde7012f019404b8763d932cec",
+      "describes": [
+        "ServerSubscriptionSession"
+      ]
+    },
+    {
       "path": "packages/node/test/node/ServerSubscriptionTest.ts",
-      "lines": 1321,
-      "sha": "aca0653ea64fdb3c221af4ac3ac55d3eaf1e4820",
+      "lines": 1958,
+      "sha": "dcbced15be4acf1ed7686c0a1ee2d399850259b3",
       "describes": [
         "ServerSubscription"
+      ]
+    },
+    {
+      "path": "packages/node/test/node/SessionViewsTest.ts",
+      "lines": 353,
+      "sha": "0e89c2168cdfb70c564c146ab78c3c230d30f275",
+      "describes": [
+        "SessionViews"
       ]
     },
     {
@@ -2813,8 +2993,8 @@
     },
     {
       "path": "packages/node/test/node/client/CacheFabricFilterTest.ts",
-      "lines": 333,
-      "sha": "cc0320644b211441e34a4726d3d1cbc8813e25cc",
+      "lines": 345,
+      "sha": "9c54cafa2bdc1d0a44bc9f207bc06bfabe6b3e3e",
       "describes": [
         "cache fabric filter"
       ]
@@ -2870,7 +3050,7 @@
     {
       "path": "packages/node/test/node/client/PeersInstrumentBasicInformationTest.ts",
       "lines": 88,
-      "sha": "70e0c807c8ec310de708b2097f829e5c6526fc57",
+      "sha": "998fea04843c325b797a19e1c7cee026426a11bb",
       "describes": [
         "Peers#instrumentBasicInformation"
       ]
@@ -2885,16 +3065,16 @@
     },
     {
       "path": "packages/node/test/node/client/PeersLoadFailureTest.ts",
-      "lines": 146,
-      "sha": "d9dd1bd67c3bbce5693ec21654053b12010f0547",
+      "lines": 170,
+      "sha": "2fe273483c118756e6c91e220a2139780ff52553",
       "describes": [
         "Peers load failures"
       ]
     },
     {
       "path": "packages/node/test/node/client/WireChangeKeysTest.ts",
-      "lines": 92,
-      "sha": "3ab2369d912b9609d6498761090ff9fbc9e2ca80",
+      "lines": 93,
+      "sha": "64526e74eab28e465b5f352e6e57e732fd638957",
       "describes": [
         "wire change keys"
       ]
@@ -2925,20 +3105,37 @@
     },
     {
       "path": "packages/node/test/storage/DatasourceCacheErrorTest.ts",
-      "lines": 561,
-      "sha": "437015037e90719e4b9aaa291fd76f26ccd2e4f1",
+      "lines": 705,
+      "sha": "36aea0bffd342395ee80976a164cce4ad0954050",
       "describes": [
         "DatasourceCache error handling",
         "settlement errors",
+        "remote write preparation",
         "ClientCacheBuffer error handling"
       ]
     },
     {
       "path": "packages/node/test/storage/DatasourceCacheTest.ts",
-      "lines": 230,
-      "sha": "0410e508daf80044172d5af720f4de4695609770",
+      "lines": 362,
+      "sha": "5ed7ca6408e475e1ea880d3917daabe2417a63d7",
       "describes": [
         "DatasourceCache settlement order"
+      ]
+    },
+    {
+      "path": "packages/node/test/storage/FabricScopedListWriteTest.ts",
+      "lines": 324,
+      "sha": "3d9ea0a1c73d36ffc84ed67d3698f6003157e5b0",
+      "describes": [
+        "FabricScopedListWrite"
+      ]
+    },
+    {
+      "path": "packages/node/test/testing/MockServerNodeTest.ts",
+      "lines": 51,
+      "sha": "b14f701d14115165654bd8c016e9e205bff43be8",
+      "describes": [
+        "MockServerNode"
       ]
     },
     {
@@ -3110,8 +3307,8 @@
     },
     {
       "path": "packages/nodejs/test/storage/StorageDriverTest.ts",
-      "lines": 346,
-      "sha": "495b6bd624de140cfd857e4f73abd81da16a4243",
+      "lines": 411,
+      "sha": "025521583454e1f526b24bb2f7b9dd8bb34b7857",
       "describes": [
         "StorageDrivers"
       ]
@@ -3156,8 +3353,8 @@
     },
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
-      "lines": 352,
-      "sha": "8a0fabd64c26bf89368d2a5fb75bc39d9f23a1a3",
+      "lines": 424,
+      "sha": "3208cf7822dfaeb118e49e676e0a10565016f343",
       "describes": [
         "ClientInteraction subscribe"
       ]
@@ -3187,11 +3384,27 @@
       ]
     },
     {
+      "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionHandlerTest.ts",
+      "lines": 157,
+      "sha": "15da7483d8ab539dd4de5c4f962a856e303add3e",
+      "describes": [
+        "ClientSubscriptionHandler"
+      ]
+    },
+    {
       "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionsTest.ts",
-      "lines": 150,
-      "sha": "33a8e50b002c5d12f06f719efdce5abac617ddf3",
+      "lines": 181,
+      "sha": "0a900e12f928a8687e2a602e1e27acd81929c889",
       "describes": [
         "ClientSubscriptions"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/action/client/subscription/PeerSubscriptionTest.ts",
+      "lines": 105,
+      "sha": "c38a12eee3806a38c9dc5d01ec9657d50c16929e",
+      "describes": [
+        "PeerSubscription"
       ]
     },
     {
@@ -3204,8 +3417,8 @@
     },
     {
       "path": "packages/protocol/test/action/request/InvokeTest.ts",
-      "lines": 182,
-      "sha": "026eb52ce02c51eb6b014ccf2406452db0e68bc5",
+      "lines": 252,
+      "sha": "17f1034af2903c6a91ddc2fa6a747f4bb1a72d8e",
       "describes": [
         "Invoke"
       ]
@@ -3244,8 +3457,8 @@
     },
     {
       "path": "packages/protocol/test/action/request/WriteTest.ts",
-      "lines": 327,
-      "sha": "bb77eb48f28402b301c386e2ba33394002d8a4c6",
+      "lines": 347,
+      "sha": "6fa95b7cd28e80cabd81e8714fd9eded1c8e1a1b",
       "describes": [
         "Write"
       ]
@@ -3380,8 +3593,8 @@
     },
     {
       "path": "packages/protocol/test/certificate/DeviceAttestationValidatorTest.ts",
-      "lines": 947,
-      "sha": "b64ff9db7b831c50e5bc89527fcc4cddbb45f3a8",
+      "lines": 1019,
+      "sha": "0106b91119d6a9f9fa1c247824f6a765ee960835",
       "describes": [
         "DeviceAttestationValidator"
       ]
@@ -3392,6 +3605,14 @@
       "sha": "c7dc86645ecae3b3946d51b3ecdcb08a773ba3f0",
       "describes": [
         "Certificate distinguished name"
+      ]
+    },
+    {
+      "path": "packages/protocol/test/certificate/NocsrValidatorTest.ts",
+      "lines": 207,
+      "sha": "84475a5dde09d2878f3ac5641ca92121774b019e",
+      "describes": [
+        "NocsrValidator"
       ]
     },
     {
@@ -3421,8 +3642,8 @@
     },
     {
       "path": "packages/protocol/test/codec/MessageCodecTest.ts",
-      "lines": 355,
-      "sha": "ac02b942325e78ffea839b4da622359fb4b14749",
+      "lines": 390,
+      "sha": "a0967de0ed816a70fc2d7bbd4b978ff391102b08",
       "describes": [
         "MessageCodec"
       ]
@@ -3558,8 +3779,8 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclOtaUpdateServiceTest.ts",
-      "lines": 2043,
-      "sha": "117d4880582471fa355cb7c37aefe7f9ed22be18",
+      "lines": 2052,
+      "sha": "da2c838d95f32a71a4cf0cbd7a74f4f3a62a8182",
       "describes": [
         "DclOtaUpdateService"
       ]
@@ -3614,16 +3835,16 @@
     },
     {
       "path": "packages/protocol/test/fabric/FabricManagerTest.ts",
-      "lines": 281,
-      "sha": "f3219676eb1a53723a29154f45b19c411c2c256a",
+      "lines": 417,
+      "sha": "cc956c2491bcc44b885290b52099f6f19ef9a856",
       "describes": [
         "FabricManager"
       ]
     },
     {
       "path": "packages/protocol/test/fabric/FabricTest.ts",
-      "lines": 265,
-      "sha": "91d24e93b23d859880613ae2dc8f8fc13083b9f5",
+      "lines": 326,
+      "sha": "6b6f02fa0090d5fc1c9107da4f2b672243c510a9",
       "describes": [
         "FabricBuilder",
         "Fabric"
@@ -3735,8 +3956,8 @@
     },
     {
       "path": "packages/protocol/test/interaction/InteractionClientMessengerTest.ts",
-      "lines": 803,
-      "sha": "89392f25092ecabc32ce49513ea6c3f0bc0add26",
+      "lines": 806,
+      "sha": "f55d0921b2a0e9d917cc846ad2266ada1e3413b1",
       "describes": [
         "InteractionClientMessenger"
       ]
@@ -3782,9 +4003,17 @@
       ]
     },
     {
+      "path": "packages/protocol/test/mdns/MdnsServiceTest.ts",
+      "lines": 79,
+      "sha": "3b509d187b0800305a2fdc43e7a94806d69975d1",
+      "describes": [
+        "MdnsService"
+      ]
+    },
+    {
       "path": "packages/protocol/test/mdns/MdnsTest.ts",
-      "lines": 1036,
-      "sha": "9e34ca2034f477f94c46da52247ef3d2e324abaa",
+      "lines": 1082,
+      "sha": "aeadedc23563954d5d62a38ba98056a3d320880c",
       "describes": [
         "MDNS announcement overflow",
         "MDNS goodbye of one advertisement among several"
@@ -3808,8 +4037,8 @@
     },
     {
       "path": "packages/protocol/test/peer/CommissioningConnectionTest.ts",
-      "lines": 797,
-      "sha": "7733004c6b3613f0fff0ff0d45a9baa688ab3e17",
+      "lines": 837,
+      "sha": "d3586377ccff4baf8eba7579339e8ba55ce72ca5",
       "describes": [
         "CommissioningConnection"
       ]
@@ -3906,16 +4135,16 @@
     },
     {
       "path": "packages/protocol/test/peer/PhysicalDevicePropertiesTest.ts",
-      "lines": 308,
-      "sha": "05a12bae66a0294e57cd4b483431f04ee23c4004",
+      "lines": 335,
+      "sha": "267fa04265be9d62f993a8e59cac15e002d14bfa",
       "describes": [
         "PhysicalDeviceProperties"
       ]
     },
     {
       "path": "packages/protocol/test/peer/RebootResubscribeArmerTest.ts",
-      "lines": 529,
-      "sha": "9bb466928aabe62ec0f56bb215d217c223096c49",
+      "lines": 656,
+      "sha": "fc3bed1dd9aaddc0f0af1d1e35ea626072abc625",
       "describes": [
         "RebootResubscribeArmer"
       ]
@@ -3930,16 +4159,16 @@
     },
     {
       "path": "packages/protocol/test/protocol/DeviceAdvertiserTest.ts",
-      "lines": 391,
-      "sha": "4c439c1a8d84ebe34ea7716e87ef4bc4be608c09",
+      "lines": 392,
+      "sha": "d97f23cdc7aa5fec7ceaf7d1cec6ccaf1f56e856",
       "describes": [
         "DeviceAdvertiser"
       ]
     },
     {
       "path": "packages/protocol/test/protocol/ExchangeManagerTest.ts",
-      "lines": 1635,
-      "sha": "29a2e3cabe1983ba202fbd56883cbf5b762f1b2d",
+      "lines": 1737,
+      "sha": "cdd62acd976ece63628644c7ce7b5445458b317f",
       "describes": [
         "ExchangeManager"
       ]
@@ -3973,8 +4202,8 @@
     },
     {
       "path": "packages/protocol/test/protocol/MessageExchangeTest.ts",
-      "lines": 972,
-      "sha": "cb0854d0c154eff327c28217659b4cdc6fb1bdbf",
+      "lines": 1071,
+      "sha": "0a27eba01e86d924fed19976de23e2f6002ffa5b",
       "describes": [
         "MessageExchange"
       ]
@@ -3998,7 +4227,7 @@
     {
       "path": "packages/protocol/test/protocol/TcpSessionBindingTest.ts",
       "lines": 542,
-      "sha": "088544374dc6f4f411f779db8aef663d0eae36f1",
+      "sha": "ab88337d1d04aebf539b9dea13084287744eb65d",
       "describes": [
         "TCP Session-Connection Binding"
       ]
@@ -4045,8 +4274,8 @@
     },
     {
       "path": "packages/protocol/test/session/SecureSessionTest.ts",
-      "lines": 925,
-      "sha": "f736c901abc4ab113280135ebfc84d25398add4f",
+      "lines": 947,
+      "sha": "9532ed4c74542694066cb3bbe83cc1fb67de9e92",
       "describes": [
         "SecureSession"
       ]
@@ -4061,8 +4290,8 @@
     },
     {
       "path": "packages/protocol/test/session/SessionManagerTest.ts",
-      "lines": 1159,
-      "sha": "3d85323af65f1aa93437af27387a33155487c059",
+      "lines": 1606,
+      "sha": "a2f189858045a968dbb38c27baf6a0438ed50cdf",
       "describes": [
         "SessionManager"
       ]
@@ -5009,8 +5238,8 @@
     },
     {
       "path": "packages/types/test/tlv/TlvStringTest.ts",
-      "lines": 161,
-      "sha": "10cc7d66e25872c8586930eba25cf7e7545a63f5",
+      "lines": 207,
+      "sha": "8427cef413ef020969ae798d4415e05a3066ed12",
       "describes": [
         "TlvString",
         "TlvByteString"

@@ -4,7 +4,7 @@
     "specificationVersion": 17170688,
     "interactionModelRevision": 12,
     "dataModelRevision": 21,
-    "sourceCommit": "db021da06bafe6766cd1a05d505cea03b9ec5081"
+    "sourceCommit": "b25ed9604f2825857b8de28a3c29cae8124a7e49"
   },
   "deviceTypes": [
     {
@@ -30344,6 +30344,7 @@
           "type": "TempUnitEnum",
           "conformance": "TEMP",
           "access": "RW VM",
+          "constraint": "in supportedTemperatureUnits",
           "quality": "N",
           "effective": {
             "type": "TempUnitEnum",
@@ -30364,6 +30365,13 @@
             },
             "quality": {
               "nonvolatile": true
+            },
+            "constraint": {
+              "text": "in supportedTemperatureUnits",
+              "in": {
+                "type": "reference",
+                "name": "supportedTemperatureUnits"
+              }
             }
           }
         },

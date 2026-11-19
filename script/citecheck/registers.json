@@ -103,5 +103,11 @@
     "line": 491,
     "citation": "ValueValidatorTest.ts:478-480",
     "error": "ambiguous"
+  },
+  {
+    "file": "notes/parity/pin-lifts.md",
+    "line": 83,
+    "citation": "PeerExchangeProvider.ts:19-159",
+    "error": "line beyond end of file"
   }
 ]
