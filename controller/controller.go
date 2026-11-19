@@ -1335,38 +1335,38 @@ func (c *Controller) pair(ctx context.Context, opts PairOptions, prepare func() 
 		return req.search(ctx, st, opts)
 	}
 	commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
-	ctx, cancel := opts.commissionContext(ctx, c.clock)
+	ctx, cancel, ended := opts.commissionContext(ctx, c.clock)
 	defer cancel()
 	n, err := st.reg.ForDevice(ctx, *known, "")
 	if err != nil {
-		return nil, commissionErr(ctx, err)
+		return nil, ended(err)
 	}
 	o := c.pairOptions(req.passcode, nil, opts, opts.Progress)
 	if err := st.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, req.passcode)}); err != nil {
-		return n, commissionErr(ctx, err)
+		return n, ended(err)
 	}
 	return n, nil
 }
 
 // commissionContext is ctx bounded by [PairOptions].CommissionTimeout on
-// clk, or ctx itself when none is set.
-func (opts PairOptions) commissionContext(ctx context.Context, clk clock.Clock) (context.Context, context.CancelFunc) {
+// clk, or ctx itself when none is set; ended says of an error of the
+// commissioning run under it whether the bound ended it — an error that
+// is then context.DeadlineExceeded: the code below reads the end from
+// contexts derived from the bounded one, whose Err is context.Canceled
+// with the deadline only as their cause. The bound alone ended it when ctx
+// had not ended, so a caller's own deadline or cancellation keeps its
+// error as it is.
+func (opts PairOptions) commissionContext(ctx context.Context, clk clock.Clock) (bounded context.Context, cancel context.CancelFunc, ended func(error) error) {
 	if opts.CommissionTimeout <= 0 {
-		return ctx, func() {}
+		return ctx, func() {}, func(err error) error { return err }
 	}
-	return clock.WithTimeout(ctx, clk, opts.CommissionTimeout)
-}
-
-// commissionErr is err of a commissioning run under cctx, a
-// [PairOptions.commissionContext]: once cctx's deadline passed, an error
-// that is context.DeadlineExceeded — the code below reads the end from
-// contexts derived from cctx, whose Err is context.Canceled with the
-// deadline only as their cause.
-func commissionErr(cctx context.Context, err error) error {
-	if err == nil || errors.Is(err, context.DeadlineExceeded) || !errors.Is(context.Cause(cctx), context.DeadlineExceeded) {
-		return err
+	bounded, cancel = clock.WithTimeout(ctx, clk, opts.CommissionTimeout)
+	return bounded, cancel, func(err error) error {
+		if err == nil || ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || !errors.Is(context.Cause(bounded), context.DeadlineExceeded) {
+			return err
+		}
+		return fmt.Errorf("%w (PairOptions.CommissionTimeout): %w", context.DeadlineExceeded, err)
 	}
-	return fmt.Errorf("%w (PairOptions.CommissionTimeout): %w", context.DeadlineExceeded, err)
 }
 
 // keptCode is the code to keep for a commissioning with the options o:

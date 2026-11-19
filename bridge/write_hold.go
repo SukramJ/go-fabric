@@ -161,6 +161,14 @@ const phaseUnattributed = ^uint64(0)
 // the one attribute data open, 0 when none is, and with several open the
 // one that names endpoint (or names none), else [phaseUnattributed]. The
 // caller holds t.mu.
+//
+// With several open the attribution is by endpoint, not by cause: a host
+// that moves an attribute of endpoint 2 because write A changed endpoint
+// 1, while write B's attribute data on endpoint 2 is open, has its change
+// stamped with B's — and when B changed that cluster, not advanced again.
+// The cause would have to travel with the write to the host's
+// notification, which the host port does not carry (review II,
+// R2-P7-req-02, Fable's read).
 func (t *writeHoldTable) stampFor(endpoint uint16) uint64 {
 	switch len(t.open) {
 	case 0:
