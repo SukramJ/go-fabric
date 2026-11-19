@@ -40,11 +40,13 @@ func decodeRequest(t *testing.T, clusterID, cmdID uint32, req spec.Encodable) (a
 // TestRequestCheckParityMatterJS holds the request check a definition
 // makes before the server runs to matter.js's: the request schema refuses
 // a field outside its constraint with CONSTRAINT_ERROR
-// (packages/protocol/src/action/server/CommandInvokeResponse.ts:474-487
-// at db021da0), and a server that departs from it says so in the
-// relaxation table (script/clustergen/relaxed.go) — DoorLock skips the
-// schema's validation for every command (ProtocolService.ts:343-348) and
-// answers INVALID_COMMAND for ten of them (DoorLockServer.ts:1493-1511).
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:474-488
+// at b25ed960), and a server that departs from it says so in the
+// relaxation table (script/clustergen/relaxed.go) — DoorLock answers
+// INVALID_COMMAND for fifteen commands (onValidationError,
+// DoorLockServer.ts:1494-1516 at b25ed960) and leaves the get*Schedule
+// indexes to the handler (constraint = false, :1518-1526); its other
+// commands are held to the schema as every command is.
 func TestRequestCheckParityMatterJS(t *testing.T) {
 	t.Parallel()
 	status := spec.StatusOf
@@ -64,23 +66,55 @@ func TestRequestCheckParityMatterJS(t *testing.T) {
 	if _, err := decodeRequest(t, lockdef.ClusterID, lockdef.CmdSetUser, lockdef.SetUserRequest{OperationType: lockdef.DataOperationTypeAdd, UserIndex: 1, UserName: long}); status(err) != im.StatusInvalidCommand {
 		t.Errorf("SetUser with an 11-character UserName: %v, want INVALID_COMMAND", err)
 	}
-	// DoorLock, an unchecked command: a SigningKey of 31 bytes reaches the
-	// server.
-	got, err := decodeRequest(t, lockdef.ClusterID, lockdef.CmdSetAliroReaderConfig, lockdef.SetAliroReaderConfigRequest{
+	// DoorLock, a command without configuration: the schema holds it, a
+	// SigningKey of 31 bytes against "32" is CONSTRAINT_ERROR (the
+	// cluster-wide skip of db021da0 is gone at b25ed960).
+	if _, err := decodeRequest(t, lockdef.ClusterID, lockdef.CmdSetAliroReaderConfig, lockdef.SetAliroReaderConfigRequest{
 		SigningKey: make([]byte, 31), VerificationKey: make([]byte, 65), GroupIdentifier: make([]byte, 16),
-	})
-	if err != nil || len(got.(lockdef.SetAliroReaderConfigRequest).SigningKey) != 31 {
-		t.Errorf("SetAliroReaderConfig with a 31-byte SigningKey: %v %v, want it decoded", got, err)
+	}); status(err) != im.StatusConstraintError {
+		t.Errorf("SetAliroReaderConfig with a 31-byte SigningKey: %v, want CONSTRAINT_ERROR", err)
 	}
-	// DoorLock, an unchecked command: an index of 0 reaches the server,
-	// which answers it in its response (DoorLockServer.ts:887-893); the
+	// DoorLock, a get*Schedule index: 0 reaches the server, which answers
+	// it in its response (DoorLockServer.ts:1518-1526 at b25ed960); the
 	// type's width still holds.
 	if _, err := decodeRequest(t, lockdef.ClusterID, lockdef.CmdGetHolidaySchedule, lockdef.GetHolidayScheduleRequest{HolidayIndex: 0}); err != nil {
 		t.Errorf("GetHolidaySchedule index 0: %v, want it decoded", err)
 	}
-	cmd := lockdef.Definition.Command(lockdef.CmdGetHolidaySchedule, spec.Request)
-	if !cmd.Check.Unchecked || cmd.Check.Ref == "" {
-		t.Errorf("GetHolidaySchedule check %+v, want unchecked with its reference", cmd.Check)
+	refusal := map[uint32]bool{
+		lockdef.CmdSetUser: true, lockdef.CmdGetUser: true, lockdef.CmdClearUser: true, lockdef.CmdSetCredential: true,
+		lockdef.CmdSetWeekDaySchedule: true, lockdef.CmdClearWeekDaySchedule: true, lockdef.CmdSetYearDaySchedule: true,
+		lockdef.CmdClearYearDaySchedule: true, lockdef.CmdSetHolidaySchedule: true, lockdef.CmdClearHolidaySchedule: true,
+		lockdef.CmdGetWeekDaySchedule: true, lockdef.CmdGetYearDaySchedule: true, lockdef.CmdGetHolidaySchedule: true,
+		lockdef.CmdClearCredential: true, lockdef.CmdGetCredentialStatus: true,
+	}
+	for ci := range lockdef.Definition.Commands {
+		cmd := &lockdef.Definition.Commands[ci]
+		if cmd.Direction != spec.Request {
+			continue
+		}
+		want := spec.RequestCheck{}
+		if refusal[cmd.ID] {
+			want = spec.RequestCheck{Refusal: im.StatusInvalidCommand, Ref: cmd.Check.Ref}
+		}
+		if cmd.Check != want || refusal[cmd.ID] && cmd.Check.Ref == "" {
+			t.Errorf("DoorLock %s check %+v, want %+v with its reference", cmd.Name, cmd.Check, want)
+		}
+	}
+	relaxed := map[string]bool{
+		"GetWeekDaySchedule.WeekDayIndex": true, "GetWeekDaySchedule.UserIndex": true,
+		"GetYearDaySchedule.YearDayIndex": true, "GetYearDaySchedule.UserIndex": true,
+		"GetHolidaySchedule.HolidayIndex": true,
+	}
+	for ci := range lockdef.Definition.Commands {
+		cmd := &lockdef.Definition.Commands[ci]
+		if cmd.Direction != spec.Request {
+			continue
+		}
+		for fi := range cmd.Fields {
+			if f := &cmd.Fields[fi]; (f.Relaxed != "") != relaxed[cmd.Name+"."+f.Name] {
+				t.Errorf("DoorLock %s.%s relaxed %q", cmd.Name, f.Name, f.Relaxed)
+			}
+		}
 	}
 }
 
@@ -124,7 +158,7 @@ func userRequest(mod func(*lockdef.SetUserRequest)) lockdef.SetUserRequest {
 	return r
 }
 
-// TestDoorLockRefusalKindsParityMatterJS (F-db021da0-20): DoorLock's ten
+// TestDoorLockRefusalKindsParityMatterJS (F-db021da0-20): DoorLock's
 // refusal commands answer INVALID_COMMAND for a value over its bound and a
 // missing mandatory field, as matter.js answers the ten's validation
 // errors with StatusResponseError("Invalid field value",

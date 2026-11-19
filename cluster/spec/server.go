@@ -955,9 +955,10 @@ func (s *Server) MatterGeneratedCommands() []uint32 {
 // is UNSUPPORTED_COMMAND. The request's types and constraints are the
 // decoder's to refuse, before the server runs (decision 64). Before the
 // handler the request is held to the definition again
-// ([Instance.CheckRequest]): a misfit is refused only where the command
-// states a refusal ([RequestCheck.Refusal]), else it is logged and the
-// handler runs. A response
+// ([Instance.admitRequest]): a misfit is refused with the command's
+// stated refusal ([RequestCheck.Refusal]), else a value an enum does not
+// define with CONSTRAINT_ERROR, else it is logged and the handler runs. A
+// response
 // that breaks its fields' types, constraints or conformance — a field
 // mandatory by the request's ("TestRequest.Enable") left out — is FAILURE
 // ([Instance.checkResponse]).

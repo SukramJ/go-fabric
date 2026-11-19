@@ -1085,7 +1085,9 @@ func (v GetWeekDayScheduleRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *GetWeekDayScheduleRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "GetWeekDaySchedule",
+		// WeekDayIndex: the constraint "1 to numberOfWeekDaySchedulesSupportedPerUser" is the server's to judge (matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960).
 		spec.Bind(0, "WeekDayIndex", true, &v.WeekDayIndex, spec.DecodeUint[uint8](8)),
+		// UserIndex: the constraint "1 to numberOfTotalUsersSupported" is the server's to judge (matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960).
 		spec.Bind(1, "UserIndex", true, &v.UserIndex, spec.DecodeUint[uint16](16)),
 	)
 }
@@ -1245,7 +1247,9 @@ func (v GetYearDayScheduleRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *GetYearDayScheduleRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "GetYearDaySchedule",
+		// YearDayIndex: the constraint "1 to numberOfYearDaySchedulesSupportedPerUser" is the server's to judge (matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960).
 		spec.Bind(0, "YearDayIndex", true, &v.YearDayIndex, spec.DecodeUint[uint8](8)),
+		// UserIndex: the constraint "1 to numberOfTotalUsersSupported" is the server's to judge (matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960).
 		spec.Bind(1, "UserIndex", true, &v.UserIndex, spec.DecodeUint[uint16](16)),
 	)
 }
@@ -1373,6 +1377,7 @@ func (v GetHolidayScheduleRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *GetHolidayScheduleRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "GetHolidaySchedule",
+		// HolidayIndex: the constraint "1 to numberOfHolidaySchedulesSupported" is the server's to judge (matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960).
 		spec.Bind(0, "HolidayIndex", true, &v.HolidayIndex, spec.DecodeUint[uint8](8)),
 	)
 }
@@ -1866,10 +1871,10 @@ func (v SetAliroReaderConfigRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *SetAliroReaderConfigRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "SetAliroReaderConfig",
-		spec.Bind(0, "SigningKey", true, &v.SigningKey, spec.DecodeBytes),
-		spec.Bind(1, "VerificationKey", true, &v.VerificationKey, spec.DecodeBytes),
-		spec.Bind(2, "GroupIdentifier", true, &v.GroupIdentifier, spec.DecodeBytes),
-		spec.Bind(3, "GroupResolvingKey", false, &v.GroupResolvingKey, spec.DecodeOptional(spec.DecodeBytes)),
+		spec.Bind(0, "SigningKey", true, &v.SigningKey, spec.DecodeBytesIn(32, 32)),
+		spec.Bind(1, "VerificationKey", true, &v.VerificationKey, spec.DecodeBytesIn(65, 65)),
+		spec.Bind(2, "GroupIdentifier", true, &v.GroupIdentifier, spec.DecodeBytesIn(16, 16)),
+		spec.Bind(3, "GroupResolvingKey", false, &v.GroupResolvingKey, spec.DecodeOptional(spec.DecodeBytesIn(16, 16))),
 	)
 }
 
@@ -2599,7 +2604,6 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
 			Decode: decodeLockDoorRequest,
 		},
 		{
@@ -2610,7 +2614,6 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
 			Decode: decodeUnlockDoorRequest,
 		},
 		{
@@ -2618,7 +2621,6 @@ var Definition = &spec.Cluster{
 			Response:    "status",
 			Conformance: spec.Conformance{Text: "X", Op: spec.ConfDisallowed},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeOperate, Write: spec.PrivilegeOperate, Timed: true},
-			Check:       spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
 			Decode:      decodeToggleRequest,
 		},
 		{
@@ -2630,7 +2632,6 @@ var Definition = &spec.Cluster{
 				{ID: 0, Name: "Timeout", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 1, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
 			Decode: decodeUnlockWithTimeoutRequest,
 		},
 		{
@@ -2647,7 +2648,7 @@ var Definition = &spec.Cluster{
 				{ID: 5, Name: "EndHour", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 23", Max: &spec.Bound{Int: 23}}},
 				{ID: 6, Name: "EndMinute", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 59", Max: &spec.Bound{Int: 59}}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeSetWeekDayScheduleRequest,
 		},
 		{
@@ -2656,10 +2657,10 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "WDSCH", Op: spec.ConfName, Name: "WDSCH"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Fields: []spec.Field{
-				{ID: 0, Name: "WeekDayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfWeekDaySchedulesSupportedPerUser", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfWeekDaySchedulesSupportedPerUser"}}},
-				{ID: 1, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}},
+				{ID: 0, Name: "WeekDayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfWeekDaySchedulesSupportedPerUser", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfWeekDaySchedulesSupportedPerUser"}}, Relaxed: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960"},
+				{ID: 1, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}, Relaxed: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960"},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeGetWeekDayScheduleRequest,
 		},
 		{
@@ -2687,7 +2688,7 @@ var Definition = &spec.Cluster{
 				{ID: 0, Name: "WeekDayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfWeekDaySchedulesSupportedPerUser, 254", Parts: []spec.Constraint{{Text: "1 to numberOfWeekDaySchedulesSupportedPerUser", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfWeekDaySchedulesSupportedPerUser"}}, {Text: "254", Value: &spec.Bound{Int: 254}}}}},
 				{ID: 1, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeClearWeekDayScheduleRequest,
 		},
 		{
@@ -2701,7 +2702,7 @@ var Definition = &spec.Cluster{
 				{ID: 2, Name: "LocalStartTime", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 3, Name: "LocalEndTime", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeSetYearDayScheduleRequest,
 		},
 		{
@@ -2710,10 +2711,10 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "YDSCH", Op: spec.ConfName, Name: "YDSCH"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Fields: []spec.Field{
-				{ID: 0, Name: "YearDayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfYearDaySchedulesSupportedPerUser", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfYearDaySchedulesSupportedPerUser"}}},
-				{ID: 1, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}},
+				{ID: 0, Name: "YearDayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfYearDaySchedulesSupportedPerUser", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfYearDaySchedulesSupportedPerUser"}}, Relaxed: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960"},
+				{ID: 1, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}, Relaxed: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960"},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeGetYearDayScheduleRequest,
 		},
 		{
@@ -2738,7 +2739,7 @@ var Definition = &spec.Cluster{
 				{ID: 0, Name: "YearDayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfYearDaySchedulesSupportedPerUser, 254", Parts: []spec.Constraint{{Text: "1 to numberOfYearDaySchedulesSupportedPerUser", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfYearDaySchedulesSupportedPerUser"}}, {Text: "254", Value: &spec.Bound{Int: 254}}}}},
 				{ID: 1, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeClearYearDayScheduleRequest,
 		},
 		{
@@ -2752,7 +2753,7 @@ var Definition = &spec.Cluster{
 				{ID: 2, Name: "LocalEndTime", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 3, Name: "OperatingMode", Type: spec.Type{Name: "OperatingModeEnum", Kind: spec.KindEnum, Bits: 8, Enum: OperatingModeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeSetHolidayScheduleRequest,
 		},
 		{
@@ -2761,9 +2762,9 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "HDSCH", Op: spec.ConfName, Name: "HDSCH"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Fields: []spec.Field{
-				{ID: 0, Name: "HolidayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfHolidaySchedulesSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfHolidaySchedulesSupported"}}},
+				{ID: 0, Name: "HolidayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfHolidaySchedulesSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfHolidaySchedulesSupported"}}, Relaxed: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960"},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeGetHolidayScheduleRequest,
 		},
 		{
@@ -2787,7 +2788,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "HolidayIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfHolidaySchedulesSupported, 254", Parts: []spec.Constraint{{Text: "1 to numberOfHolidaySchedulesSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfHolidaySchedulesSupported"}}, {Text: "254", Value: &spec.Bound{Int: 254}}}}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeClearHolidayScheduleRequest,
 		},
 		{
@@ -2804,7 +2805,7 @@ var Definition = &spec.Cluster{
 				{ID: 5, Name: "UserType", Type: spec.Type{Name: "UserTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: UserTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "unrestrictedUser, nonAccessUser, forcedUser, disposableUser, expiringUser, scheduleRestrictedUser, remoteOnlyUser", Parts: []spec.Constraint{{Text: "unrestrictedUser", Value: &spec.Bound{Ref: "unrestrictedUser"}}, {Text: "nonAccessUser", Value: &spec.Bound{Ref: "nonAccessUser"}}, {Text: "forcedUser", Value: &spec.Bound{Ref: "forcedUser"}}, {Text: "disposableUser", Value: &spec.Bound{Ref: "disposableUser"}}, {Text: "expiringUser", Value: &spec.Bound{Ref: "expiringUser"}}, {Text: "scheduleRestrictedUser", Value: &spec.Bound{Ref: "scheduleRestrictedUser"}}, {Text: "remoteOnlyUser", Value: &spec.Bound{Ref: "remoteOnlyUser"}}}}},
 				{ID: 6, Name: "CredentialRule", Type: spec.Type{Name: "CredentialRuleEnum", Kind: spec.KindEnum, Bits: 8, Enum: CredentialRuleEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeSetUserRequest,
 		},
 		{
@@ -2815,7 +2816,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeGetUserRequest,
 		},
 		{
@@ -2844,7 +2845,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported, 65534", Parts: []spec.Constraint{{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}, {Text: "65534", Value: &spec.Bound{Int: 65534}}}}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeClearUserRequest,
 		},
 		{
@@ -2860,7 +2861,7 @@ var Definition = &spec.Cluster{
 				{ID: 4, Name: "UserStatus", Type: spec.Type{Name: "UserStatusEnum", Kind: spec.KindEnum, Bits: 8, Enum: UserStatusEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "occupiedEnabled, occupiedDisabled", Parts: []spec.Constraint{{Text: "occupiedEnabled", Value: &spec.Bound{Ref: "occupiedEnabled"}}, {Text: "occupiedDisabled", Value: &spec.Bound{Ref: "occupiedDisabled"}}}}},
 				{ID: 5, Name: "UserType", Type: spec.Type{Name: "UserTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: UserTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "unrestrictedUser, programmingUser, nonAccessUser, forcedUser, disposableUser, expiringUser, remoteOnlyUser", Parts: []spec.Constraint{{Text: "unrestrictedUser", Value: &spec.Bound{Ref: "unrestrictedUser"}}, {Text: "programmingUser", Value: &spec.Bound{Ref: "programmingUser"}}, {Text: "nonAccessUser", Value: &spec.Bound{Ref: "nonAccessUser"}}, {Text: "forcedUser", Value: &spec.Bound{Ref: "forcedUser"}}, {Text: "disposableUser", Value: &spec.Bound{Ref: "disposableUser"}}, {Text: "expiringUser", Value: &spec.Bound{Ref: "expiringUser"}}, {Text: "remoteOnlyUser", Value: &spec.Bound{Ref: "remoteOnlyUser"}}}}},
 			},
-			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeSetCredentialRequest,
 		},
 		{
@@ -2882,7 +2883,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "Credential", Type: spec.Type{Name: "CredentialStruct", Kind: spec.KindStruct, Struct: CredentialStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeGetCredentialStatusRequest,
 		},
 		{
@@ -2907,7 +2908,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "Credential", Type: spec.Type{Name: "CredentialStruct", Kind: spec.KindStruct, Struct: CredentialStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"},
 			Decode: decodeClearCredentialRequest,
 		},
 		{
@@ -2918,7 +2919,6 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
 			Decode: decodeUnboltDoorRequest,
 		},
 		{
@@ -2932,7 +2932,6 @@ var Definition = &spec.Cluster{
 				{ID: 2, Name: "GroupIdentifier", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
 				{ID: 3, Name: "GroupResolvingKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "ALBU", Op: spec.ConfName, Name: "ALBU"}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
 			},
-			Check:  spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
 			Decode: decodeSetAliroReaderConfigRequest,
 		},
 		{
@@ -2940,7 +2939,6 @@ var Definition = &spec.Cluster{
 			Response:    "status",
 			Conformance: spec.Conformance{Text: "ALIRO", Op: spec.ConfName, Name: "ALIRO"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister, Timed: true},
-			Check:       spec.RequestCheck{Unchecked: true, Ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
 			Decode:      decodeClearAliroReaderConfigRequest,
 		},
 	},

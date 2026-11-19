@@ -19,9 +19,11 @@ type listReq struct {
 	Level *uint8
 }
 
-// TestCheckRequestShapes: the payloads CheckRequest does not judge (nil,
-// a nil pointer, no struct, a type without the definition's fields, a
-// command the definition does not state), a pointer payload, an absent
+// TestCheckRequestShapes: the payloads CheckRequest does not judge (a nil
+// pointer, no struct, a type without the definition's fields, a command
+// the definition does not state), a nil payload judged as a request
+// without fields (ProtocolService.ts:624-625 at b25ed960), a pointer
+// payload, an absent
 // optional field, the enum-member-list constraint, and the gate of
 // InvokeHeld refusing before the host's handler.
 func TestCheckRequestShapes(t *testing.T) {
@@ -47,11 +49,14 @@ func TestCheckRequestShapes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, fields := range map[string]any{
-		"nil": nil, "nil pointer": (*listReq)(nil), "no struct": 7, "other type": struct{ X int }{},
+		"nil pointer": (*listReq)(nil), "no struct": 7, "other type": struct{ X int }{},
 	} {
 		if err := srv.CheckRequest(0, fields, nil); err != nil {
 			t.Errorf("%s: %v, want not judged", name, err)
 		}
+	}
+	if err := srv.CheckRequest(0, nil, nil); !errors.Is(err, spec.ErrConformance) {
+		t.Errorf("nil: %v, want the mandatory Op missing", err)
 	}
 	if err := srv.CheckRequest(9, listReq{}, nil); err != nil {
 		t.Errorf("an unstated command: %v", err)

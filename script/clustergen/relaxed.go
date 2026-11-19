@@ -10,8 +10,9 @@ import "fmt"
 // entry with the reference line that justifies it. matter.js relaxes a
 // field by extending its server's schema (constraint "none",
 // packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-75
-// at db021da0) or by a Supervision config of a command
-// (DoorLockServer.ts:1493-1521); connectedhomeip's behaviour stands in for
+// at b25ed960) or by a Supervision config of a command or a field
+// (packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1526 at
+// b25ed960); connectedhomeip's behaviour stands in for
 // an Ahead server under an owner decision. The generator writes each entry
 // into the cluster's definition (spec.Field.Relaxed, spec.Attribute.Relaxed,
 // spec.Command.Check) and drops the relaxed constraint from the generated
@@ -29,9 +30,6 @@ const (
 	relaxStructField
 	// relaxAttribute: a controller's written value ("Cluster.Attribute").
 	relaxAttribute
-	// relaxUnchecked: no request field of the cluster is held to its
-	// constraint ("Cluster"), except a command with a refusal entry.
-	relaxUnchecked
 	// relaxRefusal: a request of the command the definition refuses
 	// answers refusal in place of the schema's status ("Cluster.Command").
 	relaxRefusal
@@ -67,6 +65,26 @@ var serverRelaxations = []struct {
 		// behavior can validate and return InvalidCommand".
 		{kind: relaxRequestField, key: "OperationalCredentials.AttestationRequest.AttestationNonce", ref: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:53-66 at db021da0"},
 		{kind: relaxRequestField, key: "OperationalCredentials.CsrRequest.CsrNonce", ref: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:53-66 at db021da0"},
+		// "The cluster requires INVALID_COMMAND for a CertificateType that
+		// CertificateChainTypeEnum does not define": the command's
+		// onValidationError answers every validation error with it.
+		{kind: relaxRefusal, key: "OperationalCredentials.CertificateChainRequest", refusal: statusInvalidCommand, ref: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:635-638 at b25ed960"},
+	}},
+	{"cluster/core GeneralCommissioning", []relaxation{
+		// "The cluster answers an unknown regulatory location with
+		// ValueOutsideRange in the response, which the handler sets": the
+		// field's validation is off (validate = false); the TLV check of
+		// its presence stays.
+		{kind: relaxRequestField, key: "GeneralCommissioning.SetRegulatoryConfig.NewRegulatoryConfig", ref: "matter.js packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:288-289 at b25ed960"},
+	}},
+	{"cluster/core Identify", []relaxation{
+		// The fields' validation is off (validate = false) until CHIP
+		// refuses an effect its enum does not define; the server answers
+		// SUCCESS and runs an undefined EffectVariant as Default
+		// (IdentifyServer.ts:134-139, cluster/core/identify.go
+		// triggerEffectOf).
+		{kind: relaxRequestField, key: "Identify.TriggerEffect.EffectIdentifier", ref: identifyRelaxed},
+		{kind: relaxRequestField, key: "Identify.TriggerEffect.EffectVariant", ref: identifyRelaxed},
 	}},
 	{"cluster/wire AdministratorCommissioning", []relaxation{
 		// "relax constraints on OpenCommissioningWindow fields … so the
@@ -97,11 +115,10 @@ var serverRelaxations = []struct {
 		{kind: relaxRequestField, key: "ScenesManagement.CopyScene.SceneIdentifierTo", ref: scenesRelaxed},
 	}},
 	{"cluster/lock DoorLockServer", []relaxation{
-		// A cluster with a Supervision-configured command skips the request
-		// schema's validation for every command (ProtocolService.ts:343-348);
-		// the model's validation then only logs (:662-679), except for the
-		// ten commands whose onValidationError answers INVALID_COMMAND.
-		{kind: relaxUnchecked, key: "DoorLock", ref: "matter.js packages/node/src/node/integration/ProtocolService.ts:343-348 and :662-679 at db021da0"},
+		// Fifteen commands answer every validation error of their request
+		// with INVALID_COMMAND (onValidationError, "Invalid field value");
+		// the cluster's other commands are held to the request schema and
+		// the model as every command is (ProtocolService.ts:671-704).
 		{kind: relaxRefusal, key: "DoorLock.SetUser", refusal: statusInvalidCommand, ref: doorLockRefusal},
 		{kind: relaxRefusal, key: "DoorLock.GetUser", refusal: statusInvalidCommand, ref: doorLockRefusal},
 		{kind: relaxRefusal, key: "DoorLock.ClearUser", refusal: statusInvalidCommand, ref: doorLockRefusal},
@@ -112,6 +129,19 @@ var serverRelaxations = []struct {
 		{kind: relaxRefusal, key: "DoorLock.ClearYearDaySchedule", refusal: statusInvalidCommand, ref: doorLockRefusal},
 		{kind: relaxRefusal, key: "DoorLock.SetHolidaySchedule", refusal: statusInvalidCommand, ref: doorLockRefusal},
 		{kind: relaxRefusal, key: "DoorLock.ClearHolidaySchedule", refusal: statusInvalidCommand, ref: doorLockRefusal},
+		{kind: relaxRefusal, key: "DoorLock.GetWeekDaySchedule", refusal: statusInvalidCommand, ref: doorLockRefusal},
+		{kind: relaxRefusal, key: "DoorLock.GetYearDaySchedule", refusal: statusInvalidCommand, ref: doorLockRefusal},
+		{kind: relaxRefusal, key: "DoorLock.GetHolidaySchedule", refusal: statusInvalidCommand, ref: doorLockRefusal},
+		{kind: relaxRefusal, key: "DoorLock.ClearCredential", refusal: statusInvalidCommand, ref: doorLockRefusal},
+		{kind: relaxRefusal, key: "DoorLock.GetCredentialStatus", refusal: statusInvalidCommand, ref: doorLockRefusal},
+		// The get*Schedule commands answer an index outside the supported
+		// range with a status in their response: the index fields' constraint
+		// is off (constraint = false), so the handler receives the raw value.
+		{kind: relaxRequestField, key: "DoorLock.GetWeekDaySchedule.WeekDayIndex", ref: doorLockIndex},
+		{kind: relaxRequestField, key: "DoorLock.GetWeekDaySchedule.UserIndex", ref: doorLockIndex},
+		{kind: relaxRequestField, key: "DoorLock.GetYearDaySchedule.YearDayIndex", ref: doorLockIndex},
+		{kind: relaxRequestField, key: "DoorLock.GetYearDaySchedule.UserIndex", ref: doorLockIndex},
+		{kind: relaxRequestField, key: "DoorLock.GetHolidaySchedule.HolidayIndex", ref: doorLockIndex},
 	}},
 	{"cluster/energy EvseServer", []relaxation{
 		// matter.js answers more than ten targets with the model's "max 10"
@@ -161,7 +191,9 @@ const (
 	groupsRelaxed    = "matter.js packages/node/src/behaviors/groups/GroupsServer.ts:20-50 at db021da0"
 	scenesRelaxed    = "matter.js packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:128-159 at db021da0"
 	thermostatAtomic = "matter.js packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:239-266 at db021da0"
-	doorLockRefusal  = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1493-1511 at db021da0"
+	doorLockRefusal  = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1494-1516 at b25ed960"
+	doorLockIndex    = "matter.js packages/node/src/behaviors/door-lock/DoorLockServer.ts:1518-1526 at b25ed960"
+	identifyRelaxed  = "matter.js packages/node/src/behaviors/identify/IdentifyServer.ts:162-166 at b25ed960"
 	pavstEmptyLists  = "connectedhomeip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:672-678 at 6170af84 (owner decision 69, BD-chip-PushAvStreamTransport-RulesInServer)"
 )
 
@@ -183,7 +215,6 @@ func relaxationsOf(cluster string) []relaxation {
 // an error.
 func (g *generator) relax() error {
 	name := g.c.Name
-	var unchecked string
 	refusals := map[string]relaxation{}
 	for _, e := range relaxationsOf(name) {
 		switch e.kind {
@@ -205,8 +236,6 @@ func (g *generator) relax() error {
 			if !found {
 				return fmt.Errorf("relaxation %s names no attribute", e.key)
 			}
-		case relaxUnchecked:
-			unchecked = e.ref
 		case relaxRefusal:
 			refusals[e.key] = e
 		default:
@@ -220,8 +249,6 @@ func (g *generator) relax() error {
 		if e, ok := refusals[name+"."+p.what]; ok {
 			p.check = &requestCheck{refusal: e.refusal, ref: e.ref}
 			delete(refusals, e.key)
-		} else if unchecked != "" {
-			p.check = &requestCheck{unchecked: true, ref: unchecked}
 		}
 	}
 	for key := range refusals {
@@ -270,8 +297,6 @@ func (c *requestCheck) literal() string {
 		return ""
 	case c.refusal != 0:
 		return fmt.Sprintf("spec.RequestCheck{Refusal: 0x%02X, Ref: %q}", c.refusal, c.ref)
-	case c.unchecked:
-		return fmt.Sprintf("spec.RequestCheck{Unchecked: true, Ref: %q}", c.ref)
 	default:
 		return ""
 	}

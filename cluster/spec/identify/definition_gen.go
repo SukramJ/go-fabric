@@ -151,7 +151,9 @@ func (v TriggerEffectRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 // DecodeTLV decodes the structure n into v.
 func (v *TriggerEffectRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "TriggerEffect",
+		// EffectIdentifier: the constraint "desc" is the server's to judge (matter.js packages/node/src/behaviors/identify/IdentifyServer.ts:162-166 at b25ed960).
 		spec.Bind(0, "EffectIdentifier", true, &v.EffectIdentifier, spec.DecodeUint[EffectIdentifierEnum](8)),
+		// EffectVariant: the constraint "desc" is the server's to judge (matter.js packages/node/src/behaviors/identify/IdentifyServer.ts:162-166 at b25ed960).
 		spec.Bind(1, "EffectVariant", true, &v.EffectVariant, spec.DecodeUint[EffectVariantEnum](8)),
 	)
 }
@@ -199,8 +201,8 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage},
 			Fields: []spec.Field{
-				{ID: 0, Name: "EffectIdentifier", Type: spec.Type{Name: "EffectIdentifierEnum", Kind: spec.KindEnum, Bits: 8, Enum: EffectIdentifierEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
-				{ID: 1, Name: "EffectVariant", Type: spec.Type{Name: "EffectVariantEnum", Kind: spec.KindEnum, Bits: 8, Enum: EffectVariantEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
+				{ID: 0, Name: "EffectIdentifier", Type: spec.Type{Name: "EffectIdentifierEnum", Kind: spec.KindEnum, Bits: 8, Enum: EffectIdentifierEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Relaxed: "matter.js packages/node/src/behaviors/identify/IdentifyServer.ts:162-166 at b25ed960"},
+				{ID: 1, Name: "EffectVariant", Type: spec.Type{Name: "EffectVariantEnum", Kind: spec.KindEnum, Bits: 8, Enum: EffectVariantEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Relaxed: "matter.js packages/node/src/behaviors/identify/IdentifyServer.ts:162-166 at b25ed960"},
 			},
 			Decode: decodeTriggerEffectRequest,
 		},

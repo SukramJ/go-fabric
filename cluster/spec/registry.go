@@ -31,7 +31,9 @@ var registry sync.Map // uint32 → *Cluster
 // the server then holds the decoded request to the definition before any
 // handler ([Instance.CheckRequest], [Server.MatterInvoke], [InvokeHeld]):
 // a command whose [RequestCheck] states a Refusal answers a request that
-// does not fit with it, every other command logs the failure and runs.
+// does not fit with it, every other command refuses a value an enum does
+// not define with CONSTRAINT_ERROR and logs any other failure and runs
+// ([Instance.admitRequest]).
 func Register(defs ...*Cluster) {
 	for _, d := range defs {
 		if held, loaded := registry.LoadOrStore(d.ID, d); loaded && held != d {
