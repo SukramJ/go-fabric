@@ -1064,13 +1064,13 @@ func caseFailureProtocolCode(err error) uint16 {
 // Once the handshake established its session, a Sigma3 of the same bytes
 // as the one that established it is answered with the success report
 // again, and any other Sigma3 is not answered — it is acknowledged, as the
-// router acknowledges a Sigma3 of a completed handshake that is not the
-// completing one ([Bridge.handleSigma3OfCompleted]); neither reaches the
-// responder or changes the session (review II, R2-P3-rr-dev-01,
-// R2-P4-nv-03). The bridge's router does not send that report on: it
-// answers a Sigma3 of a completed handshake itself, for the bytes and the
-// route that completed it, and a Sigma3 that reaches the adapter after
-// establishment is acknowledged and not answered (R2-P4-nw-01).
+// router acknowledges a Sigma3 of a completed handshake; neither reaches
+// the responder or changes the session (review II, R2-P3-rr-dev-01,
+// R2-P4-nv-03). The bridge's router does not send that report on: a Sigma3
+// of a handshake its record holds as completed reaches no handler, and one
+// that reaches the adapter after establishment is acknowledged and not
+// answered (R2-P4-nw-01; [Bridge.dispatchSigma3], review II, phase 7,
+// decision 284).
 func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload []byte, err error) {
 	opcode, respPayload, _, err = a.processSigma3(payload)
 	return opcode, respPayload, err

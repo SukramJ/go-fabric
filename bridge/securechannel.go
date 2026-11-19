@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"net"
 	"strconv"
 	"time"
@@ -314,10 +313,6 @@ func (b *Bridge) caseHandlerSwappedSince(gen uint64) bool {
 	return b.caseHandlerGen != gen
 }
 
-// errHandshakeNotBegun is the failure of a CASE message the router's own
-// stand-in handler ([completedCaseHandler]) is not there to answer.
-var errHandshakeNotBegun = errors.New("bridge: no Sigma1 or PBKDFParamRequest began this handshake")
-
 // errSigma1OverCompleted stands in for the outcome of a Sigma1 on the key of
 // a handshake the router holds — in progress or completed — that began
 // nothing ([Bridge.handleSigma1]): the handler's failure — an error or a
@@ -413,10 +408,9 @@ func (b *Bridge) refusePaseWindowClosed(src net.Addr, requestHdr *message.Header
 // message is acknowledged — the MRP layer owes the acknowledgement already
 // — and no more: no StatusReport, no counted PASE failure, nothing of
 // another handshake touched (review II, R2-P4-cert-02, owner decision 70).
-// A Sigma3 of a completed handshake that is not the retransmission of the
-// one that completed it ends here too ([Bridge.handleSigma3OfCompleted]),
-// and so does a Sigma1 on a completed handshake's key that begins nothing
-// ([Bridge.handleSigma1]).
+// A Sigma3 of a completed handshake ends here too ([Bridge.dispatchSigma3];
+// review II, phase 7, decision 284), and so does a Sigma1 on a completed
+// handshake's key that begins nothing ([Bridge.handleSigma1]).
 // Mirrors matter.js
 // packages/protocol/src/securechannel/SecureChannelProtocol.ts:152-153 and
 // :43-50 at db021da0 (any other opening message goes to the base handler,
@@ -631,10 +625,30 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 	}
 }
 
-// dispatchSigma3 routes a Sigma3: to the router's answer when its handshake
-// completed ([Bridge.handleSigma3OfCompleted]), to nothing but the
-// acknowledgement when no Sigma1 began it ([Bridge.dropHandshakeNotBegun]),
-// else to the handler of its handshake.
+// dispatchSigma3 routes a Sigma3: to nothing but the acknowledgement when
+// its handshake completed or no Sigma1 began it
+// ([Bridge.dropHandshakeNotBegun]), else to the handler of its handshake.
+//
+// A Sigma3 of a completed handshake — the bytes and the route that
+// completed it included — is acknowledged and not answered, and nothing
+// about the established session changes: not its route, not the record of
+// its establishment (review II, R2-P3-rr-dev-01, phase 7, decision 284).
+// While the success report waits for its acknowledgement the initiator's
+// retransmission of that Sigma3, which acknowledges the Sigma2 and not the
+// report, is refused on receive, and the report's own retransmission
+// serves the initiator whose report was lost (decision 277). In matter.js
+// a Sigma3 again on the handshake's exchange is a duplicate, acknowledged
+// and not handed to CASE again
+// (packages/protocol/src/protocol/MessageExchange.ts:501-511 at db021da0),
+// an error of that exchange that is only logged (:522-534,
+// ExchangeManager.ts:435-437 and :538-549), a new exchange of a closing
+// session that is declined (ExchangeManager.ts:441-444), or an opening
+// message SecureChannel does not take
+// (packages/protocol/src/securechannel/SecureChannelProtocol.ts:152-153,
+// :43-50; ExchangeManager.ts:491-494) — no path sends a report;
+// connectedhomeip takes only Sigma1 unsolicited
+// (src/protocols/secure_channel/CASEServer.cpp:54-55 at 6170af84) and
+// acknowledges the rest (src/messaging/ExchangeMgr.cpp:437).
 func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	// The initiator has moved past Sigma2: a Sigma2 still waiting for
 	// its acknowledgement is done — its retransmissions are wasted
@@ -662,8 +676,8 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// N4-rwsub-3). Nor does a Sigma3 that fails: an unacknowledged Sigma2
 	// goes on being retransmitted (F-db021da0-7, owner decision 173).
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
-	if done, ok := b.completedHandshake(key); ok {
-		return b.handleSigma3OfCompleted(src, requestHdr, proto, payload, key, done)
+	if _, ok := b.completedHandshake(key); ok {
+		return b.dropHandshakeNotBegun(src, proto)
 	}
 	ch, provided, begun := b.resolveCaseContinuation(key)
 	if !begun {
@@ -686,10 +700,9 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 			// singleton handler by resumption: the route a completed
 			// handshake completed on is the router's knowledge, not
 			// the handler's. The Sigma3 is acknowledged and not
-			// answered, as one of a completed handshake that is not its
-			// retransmission ([Bridge.handleSigma3OfCompleted]; review
-			// II, R2-P4-nw-01); its record ends at the wait for Sigma3
-			// ([Bridge.sigma1RecordOver]).
+			// answered, as one of a completed handshake is (review II,
+			// R2-P4-nw-01, decision 284); its record ends at the wait
+			// for Sigma3 ([Bridge.sigma1RecordOver]).
 			return 0, nil, nil
 		}
 		return op, reply, err
@@ -699,12 +712,7 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// outcome is sigma3Failed — and ends the record with it (review II,
 	// R2-P4-fr-sec-02); a Sigma3 that established the session is recorded
 	// as completed even when its report could not be sent.
-	b.sigma3Handled(key, step.outcome, completedSigma3{
-		digest:      sha256.Sum256(payload),
-		route:       src,
-		params:      step.PeerSessionParams(),
-		bySingleton: !provided,
-	})
+	b.sigma3Handled(key, step.outcome, completedSigma3{bySingleton: !provided})
 	if err != nil {
 		return err
 	}
@@ -1077,20 +1085,11 @@ func (b *Bridge) paseHandshakeOfAnother(key HandshakeKey) bool {
 //
 // A reply that installed a secure session the peer has not acknowledged
 // yet — a Sigma2_Resume — ends with its handshake, so the session is
-// closed ([Bridge.closeUnacknowledgedResume]); [Bridge.replaceHandshakeReplies]
-// is the one caller that drops replies to send them again.
+// closed ([Bridge.closeUnacknowledgedResume]).
 func (b *Bridge) abandonHandshakeReplies(key HandshakeKey) {
 	for _, id := range b.dropHandshakeReplies(key) {
 		b.closeUnacknowledgedResume(id)
 	}
-}
-
-// replaceHandshakeReplies drops the replies of the handshake key names
-// because one is sent again in their place ([Bridge.handleSigma3OfCompleted]):
-// the handshake goes on and the peer has just spoken on its exchange, so a
-// session a reply installed stays.
-func (b *Bridge) replaceHandshakeReplies(key HandshakeKey) {
-	_ = b.dropHandshakeReplies(key)
 }
 
 // dropHandshakeReplies drops the replies of the handshake key names and
@@ -1680,8 +1679,8 @@ func handshakePeerTimingOf(handler any, rxAt time.Time) *handshakePeerTiming {
 // completed — stays while a Sigma1 of other bytes is judged: overRecord
 // reports it, and the record is replaced only once that Sigma1 began a
 // handshake ([Bridge.handleSigma1]). A Sigma1 that begins nothing ends no
-// handshake: a completed one's record answers the retransmission of its
-// Sigma3 ([Bridge.handleSigma3OfCompleted]; review II, R2-P4-rr-sec-04),
+// handshake: a completed one's record keeps a Sigma3 of it from a handler
+// ([Bridge.dispatchSigma3]; review II, R2-P4-rr-sec-04, decision 284),
 // and one in progress still takes its initiator's Sigma3 (R2-P4-fr-sec-03).
 // The Sigma1 being judged is marked on the record, so its concurrent copies
 // are dropped as those of a first Sigma1 are.
@@ -1811,29 +1810,6 @@ func (b *Bridge) abortFabricHandshakes(fabricIndex uint8) int {
 	return ended
 }
 
-// holdCompletedRecord keeps the record of the completed handshake key from
-// ending ([Bridge.sigma1RecordOver], [Bridge.endSigma1Record]) until the
-// returned release runs: while its success report is sent again, the old
-// one abandoned and the new one not tracked yet, nothing marks the record
-// live, and a liveness check in that gap ended it — the next retransmitted
-// Sigma3 was then acknowledged and not answered (review II, U4-fr-sec-1).
-func (b *Bridge) holdCompletedRecord(key HandshakeKey) (release func()) {
-	b.mu.Lock()
-	if rec, ok := b.sigma1Replied[key]; ok && rec.resending < math.MaxUint8 {
-		rec.resending++
-		b.sigma1Replied[key] = rec
-	}
-	b.mu.Unlock()
-	return func() {
-		b.mu.Lock()
-		if rec, ok := b.sigma1Replied[key]; ok && rec.resending > 0 {
-			rec.resending--
-			b.sigma1Replied[key] = rec
-		}
-		b.mu.Unlock()
-	}
-}
-
 // sigma1BeganNothingOverRecord follows a Sigma1 of hash that began nothing
 // over the record of another handshake: the record stays as it was, without
 // the mark of that Sigma1 ([Bridge.markSigma1Replied]).
@@ -1879,12 +1855,6 @@ type sigma1Record struct {
 	// bySingleton is set once the Sigma1 began a handshake the singleton
 	// handler runs, not a provider's ([Bridge.AttachCaseHandler]).
 	bySingleton bool
-	// resending counts the success reports being sent again for the
-	// handshake ([Bridge.holdCompletedRecord]); the record does not end
-	// while it is positive. A byte, beside bySingleton, so the record
-	// stays the size it was; one Sigma3's retransmissions at a time come
-	// nowhere near 255.
-	resending uint8
 	// judged is the hash of a Sigma1 of other bytes while it is judged
 	// over this record ([Bridge.markSigma1Replied]), else nil.
 	judged *[32]byte
@@ -1979,13 +1949,8 @@ func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto me
 		// The reply established the session — a Sigma2_Resume: the
 		// handshake is complete, and its record ends as a Sigma3-completed
 		// one does ([Bridge.sigma1RecordOver]; review II,
-		// R2-P4-fr-sec-02). No Sigma3 completed it, so none is answered
-		// with the success report ([completedSigma3.matches]).
-		done := completedSigma3{bySingleton: !provided}
-		if p, ok := ch.(peerSessionParamsSource); ok {
-			done.params = p.PeerSessionParams()
-		}
-		b.sigma3Handled(key, sigma3Established, done)
+		// R2-P4-fr-sec-02).
+		b.sigma3Handled(key, sigma3Established, completedSigma3{bySingleton: !provided})
 	}
 	b.boundSigma1Records(key)
 	return err
@@ -2010,9 +1975,9 @@ func sigma1Began(respOpcode uint8, respPayload []byte, err error) bool {
 // answered: a Sigma3 that failed the handshake ends the handshake's
 // Sigma1 record, as Sigma3 closes the CASE handshake on the wire. A
 // completed one keeps its record, completed by done, whatever the wiring:
-// a Sigma3 of it that arrives again is answered by the router
-// ([Bridge.handleSigma3OfCompleted]), not by the handler of a handshake no
-// Sigma1 began (review II, R2-P3-dr-dev-02, R2-P4-nw-01). The record ends
+// a Sigma3 of it that arrives again is acknowledged by the router and
+// reaches no handler ([Bridge.dispatchSigma3]; review II, R2-P4-nw-01,
+// phase 7, decision 284). The record ends
 // when the provider lets its adapter go ([Bridge.ForgetSigma1Replied]), when
 // another Sigma1 on the key begins a handshake and replaces it
 // ([Bridge.markSigma1Replied]; one that begins nothing leaves it), when
@@ -2103,7 +2068,7 @@ func (b *Bridge) sigma1RecordHeld(key HandshakeKey) bool {
 //     [unsecuredEntryLifetime] after it was sent, the longest the tracker
 //     would have kept it.
 func (b *Bridge) sigma1RecordOver(key HandshakeKey, rec sigma1Record, tracker *outboundReliableTracker) bool {
-	if !rec.runBySingleton() || rec.resending > 0 {
+	if !rec.runBySingleton() {
 		return false
 	}
 	if tracker != nil && tracker.holdsUnsecuredExchange(key) {
@@ -2130,7 +2095,7 @@ func (b *Bridge) sigma1RecordOver(key HandshakeKey, rec sigma1Record, tracker *o
 func (b *Bridge) endSigma1Record(key HandshakeKey, rec sigma1Record) {
 	b.mu.Lock()
 	cur, held := b.sigma1Replied[key]
-	ended := held && cur.seq == rec.seq && cur.completed == rec.completed && cur.resending == 0
+	ended := held && cur.seq == rec.seq && cur.completed == rec.completed
 	if ended {
 		delete(b.sigma1Replied, key)
 	}
@@ -2255,32 +2220,12 @@ func (b *Bridge) caseSigma3Wait(overConn bool) time.Duration {
 	return own + caseExpectedCryptoProcessingTime + casePeerResponseTimeBuffer
 }
 
-// completedSigma3 identifies the Sigma3 that completed a handshake: the
-// SHA-256 of its payload and the route it arrived on, with the initiator's
-// SessionParameters its handler kept, which pace the success report's
-// retransmissions as they paced the first one.
+// completedSigma3 is how a handshake was completed: by the singleton
+// handler or by a provider's adapter ([Bridge.AttachCaseHandler]).
 type completedSigma3 struct {
-	digest [32]byte
-	route  net.Addr
-	params *sessionparams.Parameters
 	// bySingleton is set when the singleton handler completed the
 	// handshake, not a provider's ([Bridge.AttachCaseHandler]).
 	bySingleton bool
-}
-
-// matches reports whether a Sigma3 of payload over src is the
-// retransmission of the completing Sigma3: the same bytes over the same
-// route — the same connection, or the same UDP address. A handshake a
-// resumption completed has no completing Sigma3 and no route: nothing
-// matches.
-func (c *completedSigma3) matches(src net.Addr, payload []byte) bool {
-	if sha256.Sum256(payload) != c.digest || src == nil || c.route == nil {
-		return false
-	}
-	if isConnRoute(src) || isConnRoute(c.route) {
-		return src == c.route
-	}
-	return src.Network() == c.route.Network() && src.String() == c.route.String()
 }
 
 // completedHandshake returns how the handshake key names was completed,
@@ -2294,67 +2239,6 @@ func (b *Bridge) completedHandshake(key HandshakeKey) (*completedSigma3, bool) {
 	}
 	return rec.completed, true
 }
-
-// handleSigma3OfCompleted answers a Sigma3 of a handshake that completed:
-// the success report again for the retransmission of the Sigma3 that
-// completed it over the route it completed on. Anything else is
-// acknowledged and not answered, as a Sigma3 no Sigma1 began
-// ([Bridge.dropHandshakeNotBegun]; review II, R2-P4-nv-03): in matter.js it
-// is a duplicate on the handshake's live exchange
-// (packages/protocol/src/protocol/MessageExchange.ts:501-511 at db021da0),
-// an error of that exchange that is only logged (:522-534,
-// ExchangeManager.ts:435-437 and :538-549), a new exchange of a closing
-// session that is declined (ExchangeManager.ts:441-444), or an opening
-// message SecureChannel does not take
-// (packages/protocol/src/securechannel/SecureChannelProtocol.ts:152-153,
-// :43-50; ExchangeManager.ts:491-494) — no path sends a report;
-// connectedhomeip takes only Sigma1 unsolicited
-// (src/protocols/secure_channel/CASEServer.cpp:54-55 at 6170af84) and
-// acknowledges the rest (src/messaging/ExchangeMgr.cpp:437). The provider is not
-// asked — a retransmission does not keep the handshake's adapter, nor so
-// its record, past the provider's TTL — and the answer names no session,
-// so nothing about the established session changes: not its route, not
-// the record of its establishment. In matter.js a Sigma3 that repeats one
-// on the exchange the handshake ran on is a duplicate there, acknowledged
-// and not handed to CASE again
-// (packages/protocol/src/protocol/MessageExchange.ts:501-511 at db021da0),
-// and the unsecured session the handshake ran on is closed when the
-// handshake ends (packages/protocol/src/session/case/CaseServer.ts:95-98)
-// (review II, R2-P3-rr-dev-01).
-func (b *Bridge) handleSigma3OfCompleted(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey, done *completedSigma3) error {
-	if !done.matches(src, payload) {
-		return b.dropHandshakeNotBegun(src, proto)
-	}
-	// The report sent again replaces the one still waiting for its
-	// acknowledgement; the record holds until the new one is tracked.
-	release := b.holdCompletedRecord(key)
-	defer release()
-	b.replaceHandshakeReplies(key)
-	h := completedCaseHandler{params: done.params}
-	return b.handleCase(src, requestHdr, proto, payload, "sigma3", h.ProcessSigma3, h)
-}
-
-// completedCaseHandler answers the retransmission of the Sigma3 that
-// completed a handshake with the success report, paced by the initiator's
-// SessionParameters the handshake kept. It names no session.
-type completedCaseHandler struct {
-	params *sessionparams.Parameters
-}
-
-func (completedCaseHandler) ProcessSigma1([]byte) (opcode uint8, payload []byte, err error) {
-	return 0, nil, errHandshakeNotBegun
-}
-
-func (completedCaseHandler) ProcessSigma3([]byte) (opcode uint8, payload []byte, err error) {
-	return mrp.SCOpcodeStatusReport, caseEstablishedReport(), nil
-}
-
-func (completedCaseHandler) ProcessSigma2Resume([]byte) (opcode uint8, payload []byte, err error) {
-	return 0, nil, errHandshakeNotBegun
-}
-
-// PeerSessionParams implements [peerSessionParamsSource].
-func (h completedCaseHandler) PeerSessionParams() *sessionparams.Parameters { return h.params }
 
 // sigma3Step is the handler a Sigma3 is settled with
 // ([Bridge.settleHandshake]): it names the established session only when
