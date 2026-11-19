@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -607,6 +608,42 @@ func (t *outboundReliableTracker) holdsUnsecuredExchange(hk HandshakeKey) bool {
 		}
 	}
 	return false
+}
+
+// errPreviousAckMissing is the receive path's refusal of a message that
+// does not acknowledge this node's outstanding message of its exchange
+// ([Bridge.awaitsAckOn]).
+var errPreviousAckMissing = errors.New("bridge: previous message ack is missing")
+
+// awaitsAckOn reports whether this node's earlier message of the exchange
+// proto names, on the secure session sessionID, still waits for its
+// acknowledgement. The node's role is the other one of the sender's.
+func (b *Bridge) awaitsAckOn(sessionID uint16, proto message.ProtocolHeader) bool {
+	b.mu.RLock()
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	role := exchangeResponder
+	if !proto.Initiator {
+		role = exchangeInitiator
+	}
+	return tracker.holdsSecureExchange(sessionID, proto.ExchangeID, role)
+}
+
+// holdsSecureExchange reports whether a message this node sent in role on
+// the secure session's exchange still waits for its acknowledgement — one
+// tracked through [outboundReliableTracker.TrackOnExchange].
+func (t *outboundReliableTracker) holdsSecureExchange(sessionID, exchangeID uint16, role exchangeRole) bool {
+	if t == nil || sessionID == 0 || role == exchangeRoleUnnamed {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	key, ok := t.secureByExchange[secureSlot{sessionID, exchangeID}]
+	if !ok {
+		return false
+	}
+	e := t.pending[key]
+	return e != nil && e.role == role
 }
 
 // Untrack drops a message Track registered whose send then failed: there is

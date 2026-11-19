@@ -200,6 +200,24 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		b.bindUnsecuredWindow(&hdr, proto.ExchangeID)
 	}
 
+	// A new message on a secure session's exchange whose earlier reliable
+	// message from this node still waits for its acknowledgement, and
+	// which carries no acknowledgement itself, is refused here: not
+	// acknowledged, not processed. Mirrors matter.js
+	// packages/protocol/src/protocol/MessageExchange.ts:521-525 at db021da0
+	// (onMessageReceived: with #sentMessageToAck set and no ackedMessageId,
+	// throw "Previous message ack is missing"). Processed, a Write or Invoke
+	// took effect and only its reply was refused at the send
+	// ([outboundReliableTracker.TrackOnExchange]; review II, phase 7, V3).
+	if !duplicate && hdr.SessionID != 0 && !proto.HasAck && b.awaitsAckOn(hdr.SessionID, proto) {
+		b.logger.Debug("matter.rx.previous_ack_missing",
+			slog.String("src", srcString(src)),
+			slog.Int("session_id", int(hdr.SessionID)),
+			slog.Int("exchange_id", int(proto.ExchangeID)),
+			slog.Uint64("counter", uint64(hdr.MessageCounter)))
+		return fmt.Errorf("%w: session=%d exchange=%d", errPreviousAckMissing, hdr.SessionID, proto.ExchangeID)
+	}
+
 	// Reliable inbound traffic: register an ACK obligation. The
 	// pump goroutine fires a StandaloneAck if no piggyback opportunity
 	// arises within the grace window; sendReply paths discharge the

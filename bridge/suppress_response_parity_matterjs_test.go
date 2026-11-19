@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -322,7 +323,13 @@ func TestSuppressedRequestAcknowledgedParity(t *testing.T) {
 				}
 				want = append(want, c.firstReply)
 			}
-			if err := p.sendReliable(x, c.opcode, true, c.payload); (err != nil) != c.undecoded {
+			// The suppressed message acknowledges the first one's reply,
+			// as a peer does (MessageExchange.ts:521-525 at db021da0).
+			proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: c.opcode, ExchangeID: x, Initiator: true, NeedsAck: true}
+			if counter, ok := pendingCounterOfExchange(b, paseTestSessionID, x); ok {
+				proto.HasAck, proto.AckCounter = true, counter
+			}
+			if err := b.dispatch(context.Background(), secureTestDatagram(t, b, proto.Marshal(), c.payload), p.conn.LocalAddr()); (err != nil) != c.undecoded {
 				t.Fatalf("dispatch: %v", err)
 			}
 			b.RunAckPumpOnce(b.clk().Now())
