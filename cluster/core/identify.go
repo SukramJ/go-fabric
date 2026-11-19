@@ -528,21 +528,41 @@ func (i *Identify) tick(done <-chan struct{}) (over, zero bool) {
 
 // triggerEffectOf reads TriggerEffect's EffectIdentifier and EffectVariant
 // from the generated request the bridge decodes, or from the tag-keyed map
-// of the generic path (tags 0 and 1); 0 for what it cannot read.
+// of the generic path (tags 0 and 1); 0 for what it cannot read. Neither
+// field is validated against its enum (the relaxation table,
+// script/clustergen/relaxed.go): an EffectIdentifier the enum does not
+// define is handed over as received, an EffectVariant it does not define
+// becomes Default. Mirrors matter.js
+// packages/node/src/behaviors/identify/IdentifyServer.ts:134-139
+// (triggerEffect) and :162-166 (validate = false) at b25ed960.
 func triggerEffectOf(v any) (effect, variant uint8) {
 	switch x := v.(type) {
 	case identifydef.TriggerEffectRequest:
-		return uint8(x.EffectIdentifier), uint8(x.EffectVariant)
+		effect, variant = uint8(x.EffectIdentifier), uint8(x.EffectVariant)
 	case *identifydef.TriggerEffectRequest:
 		if x != nil {
-			return uint8(x.EffectIdentifier), uint8(x.EffectVariant)
+			effect, variant = uint8(x.EffectIdentifier), uint8(x.EffectVariant)
 		}
 	case map[uint8]any:
 		e, _ := coerceUint16(x[0])
 		w, _ := coerceUint16(x[1])
-		return uint8(e), uint8(w) //nolint:gosec // 8-bit enums
+		effect, variant = uint8(e), uint8(w) //nolint:gosec // 8-bit enums
 	}
-	return 0, 0
+	if !effectVariantDefined(variant) {
+		variant = uint8(identifydef.EffectVariantDefault)
+	}
+	return effect, variant
+}
+
+// effectVariantDefined reports whether EffectVariantEnum defines v.
+func effectVariantDefined(v uint8) bool {
+	values := identifydef.EffectVariantEnumDef.Values
+	for mi := range values {
+		if values[mi].Value == uint64(v) {
+			return true
+		}
+	}
+	return false
 }
 
 // identifyFieldIdentifyTime is the Identify command's IdentifyTime
