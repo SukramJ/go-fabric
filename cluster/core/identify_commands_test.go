@@ -422,7 +422,7 @@ func (r *effectRecorder) MatterTriggerEffect(_ context.Context, effect, variant 
 }
 
 // TestIdentifyTriggerEffectUndefinedValuesParityMatterJS ports
-// ProtocolServiceTest.ts:505-514 and :516-536 at b25ed960
+// ProtocolServiceTest.ts:505-514 and :516-538 at b25ed960
 // ("with cluster-specific handling of invalid requests"): TriggerEffect's
 // fields are not validated (IdentifyServer.ts:162-166, validate = false),
 // so an EffectIdentifier the enum does not define is answered SUCCESS and
