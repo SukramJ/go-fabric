@@ -19,7 +19,8 @@ import (
 )
 
 // TestParityMatterJS_LocalizationConfiguration: SupportedLocales defaults
-// to [ActiveLocale] (matter.js LocalizationConfigurationServer.ts:18-20);
+// to [ActiveLocale] (matter.js LocalizationConfigurationServer.ts:17-21
+// at b25ed960);
 // a written ActiveLocale outside it is CONSTRAINT_ERROR ("in
 // supportedLocales"; chip LocalizationConfigurationCluster.cpp:125-128).
 func TestParityMatterJS_LocalizationConfiguration(t *testing.T) {
@@ -76,9 +77,9 @@ func TestParityMatterJS_LocalizationConfiguration(t *testing.T) {
 }
 
 // TestParityMatterJS_TimeFormatLocalization: the server has CalendarFormat
-// (matter.js TimeFormatLocalizationServer.ts:16), SupportedCalendarTypes
-// defaults to [ActiveCalendarType] (:24-26), and a written
-// ActiveCalendarType outside it is CONSTRAINT_ERROR (chip
+// (matter.js TimeFormatLocalizationServer.ts:16 at b25ed960),
+// SupportedCalendarTypes defaults to [ActiveCalendarType] (:24-28), and a
+// written ActiveCalendarType outside it is CONSTRAINT_ERROR (chip
 // TimeFormatLocalizationCluster.cpp:138-141).
 func TestParityMatterJS_TimeFormatLocalization(t *testing.T) {
 	t.Parallel()
@@ -139,8 +140,10 @@ func TestParityMatterJS_TimeFormatLocalization(t *testing.T) {
 
 // TestParityMatterJS_UnitLocalization: TemperatureUnit defaults to Celsius
 // and SupportedTemperatureUnits to [Celsius, Fahrenheit] (matter.js
-// UnitLocalizationServer.ts:16-24); a written unit outside the supported
-// list is CONSTRAINT_ERROR (chip UnitLocalizationCluster.cpp:105-115).
+// UnitLocalizationServer.ts:17-23, :29-31 at b25ed960); a written unit
+// outside the supported list is CONSTRAINT_ERROR (the "in" constraint,
+// unit-localization.element.ts:24-27 at b25ed960; chip
+// UnitLocalizationCluster.cpp:105-115).
 func TestParityMatterJS_UnitLocalization(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

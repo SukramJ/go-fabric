@@ -11,17 +11,19 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
-	"github.com/SukramJ/go-fabric/im"
 )
 
 // UnitLocalizationConfig carries the construction parameters of a
 // UnitLocalization server.
 type UnitLocalizationConfig struct {
-	// TemperatureUnit is the unit the node starts with; nil is Celsius.
+	// TemperatureUnit is the unit the node starts with: the one the host
+	// persisted from an earlier write, say. nil is nothing configured:
+	// Celsius when SupportedTemperatureUnits holds it, else its first
+	// unit. A unit SupportedTemperatureUnits does not hold is refused.
 	TemperatureUnit *unitdef.TempUnitEnum
 	// SupportedTemperatureUnits lists the units a controller may choose
-	// (2 to 3 of them); empty is [Celsius, Fahrenheit]. It must hold
-	// TemperatureUnit.
+	// (2 to 3 of them, each once); empty (nil or zero length) is
+	// [Celsius, Fahrenheit].
 	SupportedTemperatureUnits []unitdef.TempUnitEnum
 	// OnWrite, when set, is handed a controller-written TemperatureUnit
 	// that passed the checks, before it is stored; the host persists it
@@ -41,40 +43,56 @@ type UnitLocalizationConfig struct {
 // TemperatureUnit feature.
 //
 // Mirrors matter.js packages/node/src/behaviors/unit-localization/
-// UnitLocalizationServer.ts: the behavior .with("TemperatureUnit") (:14);
-// initialize (:15-25) starts TemperatureUnit at Celsius when unset and
-// SupportedTemperatureUnits at [Celsius, Fahrenheit] when empty.
+// UnitLocalizationServer.ts at b25ed960: the behavior
+// .with("TemperatureUnit") (:16); initialize (:17-38) seeds
+// SupportedTemperatureUnits with [Celsius, Fahrenheit] when it is empty or
+// unset (:18-23), keeps a TemperatureUnit that is set and supported
+// (:24-27), and otherwise starts at Celsius when the list holds it, else
+// at the list's first unit (:29-31, :37). One rule departs, the same for
+// the three localization servers (decisions 289, 296): matter.js
+// replaces a set unit the list lacks, with a warning (:32-36); here a
+// configured TemperatureUnit is the host's explicit statement, and one
+// the list lacks is refused with [ErrLocalizationConfig] — this layer
+// holds no stored value of its own that could have gone stale
+// (notes/parity/by_design.md
+// BD-Matter-Localization-ConfiguredStartValueRefused).
 //
 // A written TemperatureUnit that SupportedTemperatureUnits does not hold
-// is CONSTRAINT_ERROR, as connectedhomeip answers it
-// (src/app/clusters/unit-localization-server/UnitLocalizationCluster.cpp
-// SetTemperatureUnit :105-115, at the harness pin
-// 6170af8461b10b1766044122ac83332c6d00ab20). matter.js does not check it:
-// the attribute's model states no "in" constraint.
+// is CONSTRAINT_ERROR: the model constraint is "in
+// supportedTemperatureUnits" (matter.js packages/model/src/standard/
+// elements/unit-localization.element.ts:24-27 at b25ed960), enforced by
+// matter.js's validator (packages/node/src/behavior/state/validation/
+// constraint.ts:157-168 at b25ed960) and by the generated runtime before
+// the sink sees the value (spec.Instance.ValidateWrite).
 func NewUnitLocalization(cfg UnitLocalizationConfig) (*spec.Server, error) {
-	unit := unitdef.TempUnitCelsius
-	if cfg.TemperatureUnit != nil {
-		unit = *cfg.TemperatureUnit
-	}
 	supported := slices.Clone(cfg.SupportedTemperatureUnits)
 	if len(supported) == 0 {
 		supported = []unitdef.TempUnitEnum{unitdef.TempUnitCelsius, unitdef.TempUnitFahrenheit}
 	}
 	// Each unit once: the model's text for the attribute, "Each entry in
 	// the list shall be unique" (matter.js unit-localization.resource.ts:43-45
-	// at db021da0); neither matter.js's constraint ("2 to 3",
-	// unit-localization.element.ts:30-31) nor connectedhomeip
+	// at b25ed960); neither matter.js's constraint ("2 to 3",
+	// unit-localization.element.ts:29-35 at b25ed960) nor connectedhomeip
 	// (UnitLocalizationCluster.cpp:52-66 at 6170af84, the size alone)
 	// checks it (review II, R2-P6-err-1268).
 	if sorted := slices.Sorted(slices.Values(supported)); len(slices.Compact(sorted)) != len(supported) {
 		return nil, fmt.Errorf("%w: UnitLocalization: SupportedTemperatureUnits %v lists a unit twice", ErrLocalizationConfig, supported)
 	}
-	if !slices.Contains(supported, unit) {
-		return nil, fmt.Errorf("%w: UnitLocalization: TemperatureUnit %d not in SupportedTemperatureUnits %v", ErrLocalizationConfig, unit, supported)
+	var unit unitdef.TempUnitEnum
+	switch {
+	case cfg.TemperatureUnit != nil:
+		unit = *cfg.TemperatureUnit
+		if !slices.Contains(supported, unit) {
+			return nil, fmt.Errorf("%w: UnitLocalization: TemperatureUnit %d not in SupportedTemperatureUnits %v", ErrLocalizationConfig, unit, supported)
+		}
+	case slices.Contains(supported, unitdef.TempUnitCelsius):
+		unit = unitdef.TempUnitCelsius
+	default:
+		unit = supported[0]
 	}
 	srv, err := spec.NewServer(unitdef.Definition, spec.Options{Features: uint32(unitdef.FeatureTemperatureUnit)}, spec.ServerConfig{
 		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
-		Sink:        unitSink{supported: supported, onWrite: cfg.OnWrite},
+		Sink:        unitSink{onWrite: cfg.OnWrite},
 		Initial: map[uint32]any{
 			unitdef.AttrTemperatureUnit:           unit,
 			unitdef.AttrSupportedTemperatureUnits: enumList[unitdef.TempUnitEnum](supported),
@@ -86,23 +104,19 @@ func NewUnitLocalization(cfg UnitLocalizationConfig) (*spec.Server, error) {
 	return srv, nil
 }
 
-// unitSink holds a written TemperatureUnit to the fixed
-// SupportedTemperatureUnits and hands it to the host.
+// unitSink hands a written TemperatureUnit to the host. Membership in
+// SupportedTemperatureUnits is the runtime's "in" constraint, refused
+// before the sink is called.
 type unitSink struct {
-	supported []unitdef.TempUnitEnum
-	onWrite   func(ctx context.Context, unit unitdef.TempUnitEnum) error
+	onWrite func(ctx context.Context, unit unitdef.TempUnitEnum) error
 }
 
 // MatterWriteAttribute implements [spec.Sink]; TemperatureUnit, stored as
 // a uint8, is the only writable attribute.
 func (s unitSink) MatterWriteAttribute(ctx context.Context, _ uint32, value any) error {
 	v, _ := value.(uint8)
-	unit := unitdef.TempUnitEnum(v)
-	if !slices.Contains(s.supported, unit) {
-		return spec.Errorf(im.StatusConstraintError, "UnitLocalization: TemperatureUnit %d is not in SupportedTemperatureUnits", v)
-	}
 	if s.onWrite != nil {
-		if err := s.onWrite(ctx, unit); err != nil {
+		if err := s.onWrite(ctx, unitdef.TempUnitEnum(v)); err != nil {
 			return fmt.Errorf("core: UnitLocalization: %w", err)
 		}
 	}
