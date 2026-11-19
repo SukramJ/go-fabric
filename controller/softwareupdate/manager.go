@@ -941,8 +941,9 @@ func (m *Manager) cleanupObsoleteUpdates(ctx context.Context) {
 // was not suppressed) ends with an [UpdateCheckFinished] event. A product
 // whose check failed is logged and passed over and the others are still
 // checked: the nodes returned are those of the products that succeeded,
-// and the error joins the failures (errors.Join; the event's Err is the
-// same error). It is nil only when every product's check succeeded, so a
+// and the error joins the failures, one [*ProductCheckError] per product
+// naming its nodes (errors.Join, [ProductCheckErrors]; the event's Err is
+// the same error). It is nil only when every product's check succeeded, so a
 // caller that treats any error as fatal discards the updates found
 // besides (review II, R2-P6-err-1912).
 func (m *Manager) QueryUpdates(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, error) {
@@ -1014,7 +1015,7 @@ func (m *Manager) queryUpdates(ctx context.Context, only *client.Node, includeSt
 		peers, err := m.checkProductForUpdates(ctx, g.vid, g.pid, g.version, g.targets, includeStored)
 		if err != nil {
 			m.log.Warn("ota.manager.check_failed", slog.Int("vendor_id", int(g.vid)), slog.Int("product_id", int(g.pid)), slog.Any("err", err))
-			failed = errors.Join(failed, err)
+			failed = errors.Join(failed, productCheckFailed(g.vid, g.pid, g.version, g.targets, err))
 			continue
 		}
 		m.mu.Lock()

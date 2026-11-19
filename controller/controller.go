@@ -1132,6 +1132,21 @@ type PairOptions struct {
 	Progress func(PairingStep)
 	// Edit adjusts the commissioner's options last (a seam).
 	Edit func(*commissioner.Options)
+	// CommissionTimeout, when positive, bounds the commissioning of a
+	// device once it is reached — from PASE to the node's start, for each
+	// device a search found and for one [PairOptions].Address or
+	// [Controller.PairDiscovered] names — on the controller's clock,
+	// independently of the search's bound: a ctx without a deadline keeps
+	// [DefaultPairTimeout] on the search and this on what follows it. A
+	// commissioning that outlasts it is given up as a caller's
+	// cancellation is — the fail-safe disarmed within
+	// commissioner.FailSafeMaxSendTime — and ends with an error that is
+	// context.DeadlineExceeded.
+	// Zero (or less) sets none, as matter.js's commissionNode sets no
+	// overall deadline (CommissioningController.ts:465-511 at db021da0);
+	// ctx, the commissioner's own budgets and the fail-safe still apply
+	// (go-fabric#554).
+	CommissionTimeout time.Duration
 
 	// onboardingCode is the code Pair was called with, set when
 	// Config.KeepOnboardingCodes is on.
@@ -1169,7 +1184,7 @@ const (
 // device ends after [DefaultPairTimeout], and a code no device answers
 // before it is [ErrNoDevice]; the commissioning of a found device is
 // bounded by ctx and the commissioner's own budgets, not by that
-// timeout. With [PairOptions].BLE the device is found over BLE and
+// timeout — [PairOptions].CommissionTimeout bounds that. With [PairOptions].BLE the device is found over BLE and
 // commissioned over BTP; with [PairOptions].Address it is dialled at that
 // address without discovery. Mirrors CommissioningController.commissionNode
 // (CommissioningController.ts:465-511 at db021da0), whose discovery takes
@@ -1320,15 +1335,38 @@ func (c *Controller) pair(ctx context.Context, opts PairOptions, prepare func() 
 		return req.search(ctx, st, opts)
 	}
 	commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
+	ctx, cancel := opts.commissionContext(ctx, c.clock)
+	defer cancel()
 	n, err := st.reg.ForDevice(ctx, *known, "")
 	if err != nil {
-		return nil, err
+		return nil, commissionErr(ctx, err)
 	}
 	o := c.pairOptions(req.passcode, nil, opts, opts.Progress)
 	if err := st.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, req.passcode)}); err != nil {
-		return n, err
+		return n, commissionErr(ctx, err)
 	}
 	return n, nil
+}
+
+// commissionContext is ctx bounded by [PairOptions].CommissionTimeout on
+// clk, or ctx itself when none is set.
+func (opts PairOptions) commissionContext(ctx context.Context, clk clock.Clock) (context.Context, context.CancelFunc) {
+	if opts.CommissionTimeout <= 0 {
+		return ctx, func() {}
+	}
+	return clock.WithTimeout(ctx, clk, opts.CommissionTimeout)
+}
+
+// commissionErr is err of a commissioning run under cctx, a
+// [PairOptions.commissionContext]: once cctx's deadline passed, an error
+// that is context.DeadlineExceeded — the code below reads the end from
+// contexts derived from cctx, whose Err is context.Canceled with the
+// deadline only as their cause.
+func commissionErr(cctx context.Context, err error) error {
+	if err == nil || errors.Is(err, context.DeadlineExceeded) || !errors.Is(context.Cause(cctx), context.DeadlineExceeded) {
+		return err
+	}
+	return fmt.Errorf("%w (PairOptions.CommissionTimeout): %w", context.DeadlineExceeded, err)
 }
 
 // keptCode is the code to keep for a commissioning with the options o:

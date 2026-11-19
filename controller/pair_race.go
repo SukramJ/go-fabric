@@ -88,10 +88,13 @@ func (c *Controller) pairDiscovered(ctx context.Context, st stack, pc PairingCod
 // BTP channel to the peripheral first (ble.Dial); the commissioner's
 // ClaimNodeIDAfterPASE is the race's gate (matter.js's
 // continueCommissioningAfterPase, CommissioningDiscovery.ts:66-74). The
-// attempt ends with Pair's ctx as well as with the race.
+// attempt ends with Pair's ctx as well as with the race, and after
+// [PairOptions].CommissionTimeout when one is set.
 func (c *Controller) pairAttempt(actx, pairCtx context.Context, reg *client.Registry, cand discovery.Candidate, win func() bool, bsc *ble.Scanner, passcode uint32, opts PairOptions, r *pairRace) (*client.Node, error) {
 	actx, stop := bothContexts(actx, pairCtx)
 	defer stop()
+	actx, cancel := opts.commissionContext(actx, c.clock)
+	defer cancel()
 	r.attemptStarted()
 	dev := cand.Device
 	var channel commissioner.Channel
@@ -125,7 +128,7 @@ func (c *Controller) pairAttempt(actx, pairCtx context.Context, reg *client.Regi
 		}
 		return nodeID, true
 	}
-	return n, reg.Commission(actx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)})
+	return n, commissionErr(actx, reg.Commission(actx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)}))
 }
 
 // serialProgress is progress called one report at a time; nil stays nil.

@@ -43,12 +43,12 @@ func TestHeldChangeAdvancesOncePerAttributeData(t *testing.T) {
 	} {
 		scope := writeScope{endpoints: []uint16{0}}
 		b.writeHolds.begin(scope)
-		first := b.writeHolds.beginAttributeData()
+		first := b.writeHolds.beginAttributeData(written)
 		if tc.inWrite {
 			b.writeHolds.holdPaths(ep, mgr, []im.ConcreteAttributePath{other})
 		}
 		b.writeHolds.noteAttributeData(first, ok)
-		b.writeHolds.beginAttributeData()
+		b.writeHolds.beginAttributeData(written)
 		if !tc.inWrite {
 			b.writeHolds.holdPaths(ep, mgr, []im.ConcreteAttributePath{other})
 		}
@@ -81,7 +81,7 @@ func TestHoldOutsideAnAttributeDataFollowsTheRecord(t *testing.T) {
 
 	// A unicast write numbers its attribute data.
 	b.writeHolds.begin(scope)
-	n := b.writeHolds.beginAttributeData()
+	n := b.writeHolds.beginAttributeData(written)
 	b.writeHolds.noteAttributeData(n, ok)
 	b.settleWrite(scope, recordOf(ok))
 
@@ -109,7 +109,7 @@ func TestPhasedClustersEndWithTheirEndpointsHold(t *testing.T) {
 		tbl.begin(scopes[(i+1)%2]) // the next write begins before this one ends
 		ep := uint16(i % 2)
 		path := attributeOf(ep, 0x0006, 0x0000)
-		phase := tbl.beginAttributeData()
+		phase := tbl.beginAttributeData(path)
 		tbl.noteAttributeData(phase, []im.WriteResult{{Path: path, Status: im.StatusSuccess}})
 		tbl.end(scopes[i%2], writeRecord{})
 	}
@@ -133,15 +133,93 @@ func TestQuieterHeldInTwoAttributeDataAdvancesOnce(t *testing.T) {
 	written := attributeOf(epID, r.path.Cluster, epmVoltage)
 	ok := []im.WriteResult{{Path: written, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: []uint32{written.Attribute}}}}
 	r.b.writeHolds.begin(scope)
-	first := r.b.writeHolds.beginAttributeData()
+	first := r.b.writeHolds.beginAttributeData(written)
 	r.src.setPower(10) // held in the attribute data that changed the cluster
 	r.b.writeHolds.noteAttributeData(first, ok)
-	second := r.b.writeHolds.beginAttributeData()
+	second := r.b.writeHolds.beginAttributeData(written)
 	r.src.setPower(20) // held again in one that did not
 	r.b.writeHolds.noteAttributeData(second, nil)
 	v0 := r.version()
 	r.b.settleWrite(scope, recordOf(ok))
 	if got := r.version() - v0; got != 1 {
 		t.Fatalf("the quieter change advanced the cluster %d times, want 1", got)
+	}
+}
+
+// TestConcurrentWritesStampTheirOwnAttributeData (review II, R2-P7-req-02):
+// the attribute data of two sessions' writes are open at once; a change
+// held on an endpoint is stamped with the one that names it, a write that
+// closes its attribute data leaves the other's open, and a change no open
+// attribute data can be told apart for is unattributed.
+func TestConcurrentWritesStampTheirOwnAttributeData(t *testing.T) {
+	t.Parallel()
+	var tbl writeHoldTable
+	stamp := func(ep uint16) uint64 {
+		tbl.mu.Lock()
+		defer tbl.mu.Unlock()
+		return tbl.stampFor(ep)
+	}
+	if got := stamp(0); got != 0 {
+		t.Fatalf("no attribute data open: stamp %d, want 0", got)
+	}
+	a := tbl.beginAttributeData(attributeOf(0, 0x0006, 0x0000))
+	if got := stamp(1); got != a {
+		t.Fatalf("one attribute data open: stamp %d, want its phase %d", got, a)
+	}
+	b := tbl.beginAttributeData(attributeOf(1, 0x0006, 0x0000))
+	if got := stamp(0); got != a {
+		t.Fatalf("endpoint 0 with A and B open: stamp %d, want A's %d", got, a)
+	}
+	if got := stamp(1); got != b {
+		t.Fatalf("endpoint 1 with A and B open: stamp %d, want B's %d", got, b)
+	}
+	if got := stamp(2); got != phaseUnattributed {
+		t.Fatalf("endpoint 2 with A and B open: stamp %d, want unattributed", got)
+	}
+	tbl.noteAttributeData(b, nil)
+	if got := stamp(0); got != a {
+		t.Fatalf("B closed: stamp %d, want A's %d still open", got, a)
+	}
+	c := tbl.beginAttributeData(attributeOf(0, 0x0008, 0x0000))
+	if got := stamp(0); got != phaseUnattributed {
+		t.Fatalf("A and C open on endpoint 0: stamp %d, want unattributed", got)
+	}
+	tbl.noteAttributeData(a, nil)
+	tbl.noteAttributeData(c, nil)
+	if got := stamp(0); got != 0 {
+		t.Fatalf("all closed: stamp %d, want 0", got)
+	}
+}
+
+// TestUnattributedHeldChangeAdvancesOnce (review II, R2-P7-req-02): a
+// change held while two writes' attribute data are open on its endpoint
+// advances its cluster once though the record changed the cluster — the
+// change may have followed the other write's advance, and a subscriber
+// filtering on that version would miss it.
+func TestUnattributedHeldChangeAdvancesOnce(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	ep := b.Topology().FindByID(0)
+	if ep == nil {
+		t.Fatal("no root endpoint")
+	}
+	const cluster = uint32(0x0028)
+	written := attributeOf(0, cluster, 0x0005)
+	other := attributeOf(0, cluster, 0x0010)
+	ok := []im.WriteResult{{Path: written, Status: im.StatusSuccess, Commit: &im.WriteCommit{Changed: []uint32{written.Attribute}}}}
+	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
+	scopeA, scopeB := writeScope{endpoints: []uint16{0}}, writeScope{endpoints: []uint16{0}}
+	b.writeHolds.begin(scopeA)
+	b.writeHolds.begin(scopeB)
+	pa := b.writeHolds.beginAttributeData(written)
+	pb := b.writeHolds.beginAttributeData(written)
+	b.writeHolds.holdPaths(ep, mgr, []im.ConcreteAttributePath{other})
+	b.writeHolds.noteAttributeData(pb, ok)
+	b.writeHolds.noteAttributeData(pa, ok)
+	b.settleWrite(scopeB, recordOf(ok))
+	before := ep.ClusterDataVersion(cluster)
+	b.settleWrite(scopeA, recordOf(ok))
+	if got := ep.ClusterDataVersion(cluster) - before; got != 1 {
+		t.Fatalf("the unattributed held change advanced the cluster %d times, want 1", got)
 	}
 }
