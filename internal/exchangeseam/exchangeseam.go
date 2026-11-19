@@ -27,7 +27,7 @@
 // creation, which processes what the initiator sends and is seen by peer
 // loss and close, and its completion when the Success went out (full
 // handshake) or arrived (resumption) — matter.js NodeSession.isEstablishing
-// and completeEstablishment (NodeSession.ts:205-251 at b25ed960). The
+// and completeEstablishment (NodeSession.ts:209-251 at b25ed960). The
 // establishing state is the handshake's affair, not a consumer's, so it is
 // not a field of exchange.SecureSessionConfig.
 package exchangeseam
