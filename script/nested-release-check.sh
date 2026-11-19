@@ -54,7 +54,7 @@ if [ "${1:-}" = "--tag" ]; then
 		echo "nested-release-check: --tag wants <dir>/vX.Y.Z, got '$tag'"
 		exit 2
 	fi
-	if ! printf '%s' "$version" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'; then
+	if ! grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$' <<<"$version"; then
 		echo "nested-release-check: tag '$tag': '$version' is not a Go module version"
 		exit 1
 	fi
