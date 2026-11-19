@@ -187,12 +187,9 @@ func TestCloseSessionMarksClosingBeforeItsCloseSession(t *testing.T) {
 		defer close(done)
 		m.CloseSession(context.Background(), establishing)
 	}()
-	select {
-	case <-conn.entered:
-	case <-time.After(5 * time.Second):
-		close(conn.release)
-		t.Fatal("CloseSession sent nothing")
-	}
+	// CloseSession's send reaches the conn; a hang is the test binary's
+	// timeout, not a wall-clock wait of its own.
+	<-conn.entered
 	// The CloseSession is on the wire and the session not yet closed.
 	established := establishing.completeEstablishment()
 	closing := establishing.IsClosing()
