@@ -29,7 +29,9 @@ every family group, the chip-tool suite, the Go-TH groups (`gocert-cadmin`,
 cases leg — and, beyond it, the nested modules' release shape (`make
 nested-release-check`: each nested module built against the go-fabric version
 its go.mod requires, its replace dropped; a module out of shape fails a nested
-release, `release/nested-*`, and is a warning on a root release). Its required
+release, `release/nested-*`, and is a warning on a root release; a sibling's
+require of the version the nested release pull request itself tags is built
+against that sibling's checked copy). Its required
 check `chip certification cases against the reference daemon` stays red until
 all of them have run and passed, so no release is tagged over a family only
 the nightly run would have shown; the virtual
