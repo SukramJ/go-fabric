@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -253,5 +255,134 @@ func TestBDXInitiatedExchangeWaitsAndRefuses(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the second Send still waits after the SendInit was acknowledged")
+	}
+}
+
+// TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd (review II, phase 7,
+// decision 283): a wait for an exchange's message that is given up ends
+// with mrp.ErrMaxRetransmissionsReached, not as a free slot, and a wait
+// whose exchange ends ends with errExchangeEnded — the slot freed in the
+// same instant included. matter.js's give-up rejects the ack wait and
+// leaves #sentMessageToAck set, so no further message goes out
+// (packages/protocol/src/protocol/MessageExchange.ts:973-978, :701-705 at
+// db021da0).
+func TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(1_700_000_000, 0)
+	dest := &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}
+	wait := func(tr *outboundReliableTracker, done chan struct{}) chan error {
+		out := make(chan error, 1)
+		blocked := make(chan struct{})
+		go func() {
+			out <- tr.waitExchangeFree(context.Background(), 7, 0x10, exchangeResponder, done, func() { close(blocked) })
+		}()
+		select {
+		case <-blocked:
+		case err := <-out:
+			t.Fatalf("the wait returned (%v) while the message waits for its acknowledgement", err)
+		}
+		return out
+	}
+	result := func(out chan error) error {
+		t.Helper()
+		select {
+		case err := <-out:
+			return err
+		case <-time.After(5 * time.Second):
+			t.Fatal("the wait did not end")
+			return nil
+		}
+	}
+
+	tr := newOutboundReliableTracker(nil, clock.System{})
+	if err := tr.trackExchangeMessage(1, 7, 0x10, false, []byte{1}, dest, now, 0); err != nil {
+		t.Fatal(err)
+	}
+	out := wait(tr, make(chan struct{}))
+	tr.mu.Lock()
+	for _, e := range tr.pending {
+		e.retries = mrp.MaxRetransmissions
+	}
+	tr.mu.Unlock()
+	tr.Tick(now.Add(time.Hour), func(net.Addr, []byte) error { return nil })
+	if err := result(out); !errors.Is(err, mrp.ErrMaxRetransmissionsReached) {
+		t.Fatalf("a wait whose message was given up: %v, want ErrMaxRetransmissionsReached", err)
+	}
+
+	tr = newOutboundReliableTracker(nil, clock.System{})
+	if err := tr.trackExchangeMessage(2, 7, 0x10, false, []byte{2}, dest, now, 0); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	out = wait(tr, done)
+	close(done)
+	if err := result(out); !errors.Is(err, errExchangeEnded) {
+		t.Fatalf("a wait whose exchange ended: %v, want errExchangeEnded", err)
+	}
+
+	// The slot freed and the exchange ended together — a session drop
+	// that ends its exchanges: the end wins.
+	tr = newOutboundReliableTracker(nil, clock.System{})
+	if err := tr.trackExchangeMessage(3, 7, 0x10, false, []byte{3}, dest, now, 0); err != nil {
+		t.Fatal(err)
+	}
+	done = make(chan struct{})
+	close(done)
+	tr.DropSession(7)
+	if err := tr.waitExchangeFree(context.Background(), 7, 0x10, exchangeResponder, done, nil); !errors.Is(err, errExchangeEnded) {
+		t.Fatalf("a wait on a free slot of an ended exchange: %v, want errExchangeEnded", err)
+	}
+}
+
+// TestBDXSendAfterAGiveUpSendsNothing (review II, phase 7, decision 283):
+// a Send that waits while the exchange's previous message is given up
+// returns an error and puts nothing on the wire.
+func TestBDXSendAfterAGiveUpSendsNothing(t *testing.T) {
+	t.Parallel()
+	dev, _, got := newReliableBDXHarness(t, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	s, err := dev.br.ConnectOtaProvider(ctx, resumeFabricIndex, resumeCtrlNode)
+	if err != nil {
+		t.Fatalf("CASE to the peer: %v", err)
+	}
+	ex, err := s.OpenExchange(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ex.Close() }()
+	if err := ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageSendInit), []byte{0x01}); err != nil {
+		t.Fatalf("SendInit: %v", err)
+	}
+	if m, ok := nextBDX(got, 5*time.Second); !ok || m.opcode != bdx.MessageSendInit {
+		t.Fatalf("the peer got %v (ok %t), want SendInit", m.opcode, ok)
+	}
+	second := make(chan error, 1)
+	go func() { second <- ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageBlockQuery), []byte{0x02}) }()
+	time.Sleep(200 * time.Millisecond)
+	tr := dev.br.outboundReliable
+	tr.mu.Lock()
+	for _, e := range tr.pending {
+		e.retries = mrp.MaxRetransmissions
+		e.nextSendAt = time.Time{}
+	}
+	tr.mu.Unlock()
+	dev.br.tickOutboundReliable(tr, time.Now())
+	select {
+	case err := <-second:
+		if err == nil {
+			t.Fatal("the Send waiting on the given-up SendInit returned nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the Send waiting on the given-up SendInit did not end")
+	}
+	for {
+		m, ok := nextBDX(got, 400*time.Millisecond)
+		if !ok {
+			break
+		}
+		if m.opcode != bdx.MessageSendInit {
+			t.Fatalf("after the give-up the device sent %v", m.opcode)
+		}
 	}
 }

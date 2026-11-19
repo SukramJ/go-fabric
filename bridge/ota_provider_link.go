@@ -673,16 +673,19 @@ func (e *initiatedSecureExchange) Reliable() bool {
 // acknowledgement owed on the exchange.
 //
 // A reliable send first waits until the exchange's previous message is
-// acknowledged — or given up, its session gone — or the exchange or ctx
-// ends: an exchange has one message in flight, and the newer one never
-// takes the older one's retransmissions (a ReceiveAccept lost before the
-// first Block of a sender-driven transfer is retransmitted). Mirrors
-// matter.js packages/protocol/src/protocol/MessageExchange.ts:786 and
-// :822-830 at db021da0 (send sets #sentMessageToAck and does not return
-// before its acknowledgement; a send while one is set throws, :701-705,
-// which the tracker's refusal keeps for a concurrent send —
-// [outboundReliableTracker.trackExchangeMessage]); review II, phase 7,
-// decision 276. While it waits, the responder counts as waiting for the
+// acknowledged: an exchange has one message in flight, and the newer one
+// never takes the older one's retransmissions (a ReceiveAccept lost before
+// the first Block of a sender-driven transfer is retransmitted). A give-up
+// of the previous message ends the send unsent with
+// [mrp.ErrMaxRetransmissionsReached] (or the ended exchange's error), and so
+// do the exchange's end and ctx's. Mirrors matter.js
+// packages/protocol/src/protocol/MessageExchange.ts:786 and :822-830 at
+// db021da0 (send sets #sentMessageToAck and does not return before its
+// acknowledgement; a send while one is set throws, :701-705, which the
+// tracker's refusal keeps for a concurrent send —
+// [outboundReliableTracker.trackExchangeMessage]; the give-up rejects the
+// ack wait and leaves #sentMessageToAck set, :973-978); review II, phase 7,
+// decisions 276, 283. While it waits, the responder counts as waiting for the
 // peer ([responderTurn]), so the session's next message — the
 // acknowledgement — is dispatched.
 func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, opcode uint8, payload []byte) error {

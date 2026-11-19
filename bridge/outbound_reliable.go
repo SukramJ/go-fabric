@@ -673,7 +673,12 @@ var errIncorrectAck = errors.New("bridge: incorrect ack received")
 // named slot does ([outboundReliableTracker.track]). On the unsecured
 // session it is the handshake the message names ([HandshakeKey]), whose
 // messages are tracked without that bound
-// ([outboundReliableTracker.trackUnsecured]).
+// ([outboundReliableTracker.trackUnsecured]). In ordered dispatch it holds
+// one there too — every reply answers a message that passed the receive
+// rules and so acknowledged the waiting one — and the rule is matter.js's
+// exactly; more than one only when two dispatches of a handshake overlap,
+// where matter.js, with one outstanding message per exchange, has no state
+// to compare with, and an acknowledgement of either is taken.
 func (b *Bridge) outstandingOn(hdr *message.Header, proto message.ProtocolHeader) []uint32 {
 	b.mu.RLock()
 	tracker := b.outboundReliable
@@ -725,20 +730,36 @@ func (t *outboundReliableTracker) pendingOnHandshake(hk HandshakeKey) []uint32 {
 
 // waitExchangeFree waits until the secure session's exchange holds no
 // message this node sent in role that waits for its acknowledgement: the
-// message was acknowledged, given up, or dropped with its session. It
-// returns early with ctx's error, or with errExchangeEnded when done
-// closes first. blocked, when set, is called once before the first wait —
+// message was acknowledged, or dropped with its session or by an
+// eviction. A message it waited on that was given up ends the wait with
+// [mrp.ErrMaxRetransmissionsReached] — [Tick] records the give-up in
+// abandoned in the lock section that drops the entry — and done closing
+// ends it with errExchangeEnded, before or after a wake; ctx ending, with
+// ctx's error. blocked, when set, is called once before the first wait —
 // never when the exchange is free at once.
 func (t *outboundReliableTracker) waitExchangeFree(ctx context.Context, sessionID, exchangeID uint16, role exchangeRole, done <-chan struct{}, blocked func()) error {
 	slot := secureSlot{sessionID, exchangeID, role}
 	told := false
+	var waited []outboundKey
 	for {
 		t.mu.Lock()
+		for _, k := range waited {
+			if _, given := t.abandoned[k]; given {
+				t.mu.Unlock()
+				return mrp.ErrMaxRetransmissionsReached
+			}
+		}
 		key, held := t.secureByExchange[slot]
 		if !held || t.pending[key] == nil {
 			t.mu.Unlock()
+			select {
+			case <-done:
+				return errExchangeEnded
+			default:
+			}
 			return nil
 		}
+		waited = append(waited, key)
 		if t.freed == nil {
 			t.freed = make(map[secureSlot]chan struct{})
 		}
