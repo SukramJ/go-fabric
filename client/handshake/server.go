@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/exchangeseam"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -434,36 +435,30 @@ func (c *CASEServer) handleSigma1(ctx context.Context, x *exchange.Exchange, fir
 	return c.full(ctx, x, responder, fabrics, sigma1, result)
 }
 
-// resume is CaseServer.#resume (CaseServer.ts:148-222) after the MIC
-// check: the session from the record (:172-188); Sigma2_Resume with a
-// fresh resumption id, our session id and parameters (:190-201), the
-// session closed when it cannot be sent (:202-206); the record's id
-// replaced (:213); the initiator's Success awaited (:216); the record
-// saved (:218-219). A Success that does not arrive closes the session:
-// matter.js keeps it registered at the pin (:211, before :216), a
-// divergence the report names (BD-Matter-CASEServer-CloseOnUnfinishedEstablishment).
+// resume is CaseServer.#resume after the MIC check (CaseServer.ts:150-220
+// at b25ed960): the session from the record, registered establishing
+// (:174-190); Sigma2_Resume with a fresh resumption id, our session id and
+// parameters (:192-202); the initiator's Success awaited and the session's
+// establishment completed then (:204-206) — a session closed during the
+// handshake is refused with errClosedBeforeEstablished (:367-376); any
+// failure in between closes the session without a CloseSession and ends
+// the handshake (:207-211); the record's id replaced and the record saved
+// after (:214-217).
 //
-// The session is registered in the manager before Sigma2_Resume goes
-// out; matter.js at the pin creates it before the send but adds it to the
-// manager only after it (:187 delayManagerRegistration, :211). The
-// initiator holds the session once Sigma2_Resume reached it and sends on
-// it at once, its Success first and then its first request, which this
-// manager reads on another goroutine while this one still returns from
-// the send. A request that met no session was dropped as one of an
-// unknown session; over UDP MRP sent it again, over TCP nothing does, and
-// the initiator's exchange waited out its response timeout (the camera's
-// first signal over its own CASE session after a restart). matter.js
-// after the pin registers the session before the send, in the
-// establishing state, and processes its messages in every state
-// (CaseServer.ts:177-206, NodeSession.ts:223-225 at c41eb7da);
-// BD-Matter-CASEServer-ResumedSessionBeforeSigma2Resume.
+// The session is registered before Sigma2_Resume goes out and, while it
+// establishes, processes what the initiator sends on it
+// (NodeSession.ts:205-231): the initiator holds the session once
+// Sigma2_Resume reached it and sends on it at once, its Success first and
+// then its first request, which this manager reads on another goroutine
+// while this one still returns from the send
+// (BD-Matter-CASEServer-ResumedSessionBeforeSigma2Resume).
 func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder *sigma.Responder, fabrics *responderFabrics, record *ResumptionRecord, sigma1 sigma.Sigma1, result sigma.Sigma1ProcessResult) error {
 	if !fabrics.found {
 		return fmt.Errorf("%w: resumption record of an unknown fabric", ErrUnexpectedData)
 	}
 	fabric := fabrics.chosen
 	keys := result.ResumeKeys
-	s, err := c.mgr.NewSecureSession(exchange.SecureSessionConfig{
+	s, err := c.newEstablishingSession(exchange.SecureSessionConfig{
 		ID:   responder.SessionID(),
 		Addr: x.Session().Addr(),
 		Channel: channel.Config{
@@ -493,18 +488,29 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 		s.Close()
 		return err
 	}
+	if err := completeEstablishmentOf(s); err != nil {
+		s.Close()
+		return err
+	}
 	rec := *record
 	rec.ResumptionID = append([]byte(nil), result.Sigma2Resume.ResumptionID...)
 	c.established(s, fabric, rec)
 	return nil
 }
 
-// full is CaseServer.#generateSigma2 (CaseServer.ts:224-347) around
-// secure/sigma's crypto: Sigma2 sent (:241-273), Sigma3 read and verified
-// (:276-309; a fabric id mismatch is UnexpectedData, :305-307, an
-// InvalidParam), the session registered (:311-328), Success sent (:332),
-// the record saved (:334-344). A Success that cannot be sent closes the
-// session: matter.js keeps it (:316-332), a divergence the report names.
+// full is CaseServer.#generateSigma2 (CaseServer.ts:222-360 at b25ed960)
+// around secure/sigma's crypto: Sigma2 sent, Sigma3 read and verified (a
+// fabric id mismatch is UnexpectedData, :303-305, an InvalidParam), the
+// session registered establishing (:307-327), Success sent with the
+// session established at its first transmission (:329-331, the send's
+// OnTransmitted), the record saved (:345-357). A Success whose first
+// transmission fails — or that went out while the session was already
+// closing — closes the session and ends the handshake (:333-336); one that
+// went out and then fails (no acknowledgement) keeps the established
+// session and the handshake completes, since the initiator may use the
+// session from that moment (:337-342). A session closed before its
+// establishment completed is refused with errClosedBeforeEstablished
+// (:344, :367-376) and not closed again: it is closing already.
 func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *sigma.Responder, fabrics *responderFabrics, sigma1 sigma.Sigma1, result sigma.Sigma1ProcessResult) error {
 	fabric := fabrics.chosen
 	if err := c.sendAnswer(ctx, x, sigma1.InitiatorRandom, mrp.SCOpcodeSigma2, result.Sigma2.Marshal()); err != nil {
@@ -520,7 +526,7 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 	keys, _ := responder.SessionKeys()
 	peerNodeID := responder.PeerNodeID()
 	cats := responder.PeerCATs()
-	s, err := c.mgr.NewSecureSession(exchange.SecureSessionConfig{
+	s, err := c.newEstablishingSession(exchange.SecureSessionConfig{
 		ID:   responder.SessionID(),
 		Addr: x.Session().Addr(),
 		Channel: channel.Config{
@@ -541,8 +547,20 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 	if err != nil {
 		return err
 	}
-	if err := c.sendStatus(ctx, x, mrp.SCStatusGeneralSuccess, mrp.SCStatusProtocolSessionEstablishmentSuccess); err != nil {
-		s.Close()
+	established := false
+	report := exchange.StatusReport{GeneralCode: mrp.SCStatusGeneralSuccess, ProtocolID: uint32(mrp.SecureChannelProtocolID), ProtocolCode: mrp.SCStatusProtocolSessionEstablishmentSuccess}
+	if err := x.Send(ctx, mrp.SCOpcodeStatusReport, report.Encode(), exchange.SendOptions{
+		ExpectedProcessingTime: ExpectedCryptoProcessingTime,
+		OnTransmitted:          func() { established = exchangeseam.CompleteSecureSessionEstablishment(s) },
+	}); err != nil {
+		if !established {
+			s.Close()
+			return err
+		}
+		c.log.Debug("matter.controller.case_server.success_failed_after_transmission",
+			slog.Int("session_id", int(s.ID())), slog.Any("err", err))
+	}
+	if err := completeEstablishmentOf(s); err != nil {
 		return err
 	}
 	c.established(s, fabric, ResumptionRecord{
@@ -552,6 +570,39 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 		SessionParameters:     s.Parameters(),
 		CaseAuthenticatedTags: cats,
 	})
+	return nil
+}
+
+// errClosedBeforeEstablished is a responder session closed during its
+// handshake — closed with its peer, its fabric's sessions or the manager —
+// which therefore never becomes established: matter.js's SessionClosedError
+// of completeEstablishmentOf (CaseServer.ts:367-376 at b25ed960). The
+// handshake ends without handing the session over or saving a record, and
+// Serve answers it with InvalidParam unless the exchange counts as closed
+// or a message is unacknowledged (:84-96).
+var errClosedBeforeEstablished = fmt.Errorf("%w before its establishment completed", exchange.ErrSessionClosed)
+
+// newEstablishingSession registers the responder session establishing
+// (CaseServer.ts:177-190, :314-327 at b25ed960, establishing: true).
+func (c *CASEServer) newEstablishingSession(cfg exchange.SecureSessionConfig) (*exchange.Session, error) {
+	registered, err := exchangeseam.NewEstablishingSecureSession(c.mgr, cfg)
+	if err != nil {
+		return nil, err
+	}
+	s, ok := registered.(*exchange.Session)
+	if !ok {
+		return nil, errors.New("handshake: establishing session of a foreign type")
+	}
+	return s, nil
+}
+
+// completeEstablishmentOf ends the establishment of s, refusing a session
+// that closed during its handshake. Mirrors matter.js CaseServer.ts:367-376
+// at b25ed960 (completeEstablishmentOf).
+func completeEstablishmentOf(s *exchange.Session) error {
+	if !exchangeseam.CompleteSecureSessionEstablishment(s) {
+		return fmt.Errorf("handshake: session %d: %w", s.ID(), errClosedBeforeEstablished)
+	}
 	return nil
 }
 
