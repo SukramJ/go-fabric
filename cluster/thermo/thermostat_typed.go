@@ -104,6 +104,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	s.mu.Lock()
 	before := s.eventStateLocked()
 	st := s.setpointState()
+	direct := directSetpointWrites(st, checked)
 	setpoints, err := st.applySet(checked)
 	if err != nil {
 		s.mu.Unlock()
@@ -170,16 +171,34 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	}
 	if setpoints {
-		s.clearActivePresetAfterSet(moved)
+		s.clearActivePresetAfterSet(direct)
 	}
 	return nil
 }
 
+// directSetpointWrites are the occupied and unoccupied setpoints a
+// SetAttributes sets to a value other than the stored one: the setpoints
+// whose $Changing matter.js runs with the application's value. A setpoint
+// only the reconcile moves is not among them.
+func directSetpointWrites(st setpointState, checked map[uint32]any) []uint32 {
+	var direct []uint32
+	for _, id := range []uint32{thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint, thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint} {
+		if n, ok := checked[id].(int16); ok && int(n) != st.value(id) {
+			direct = append(direct, id)
+		}
+	}
+	return direct
+}
+
 // clearActivePresetAfterSet ends the active preset in effect for each
-// occupied or unoccupied setpoint a SetAttributes moved, as a local
-// direct change does.
-func (s *ThermostatServer) clearActivePresetAfterSet(moved []uint32) {
-	for _, id := range moved {
+// occupied or unoccupied setpoint a SetAttributes wrote directly, as a
+// local direct change does; a setpoint that only moved to keep the limits
+// or the deadband keeps it. Mirrors matter.js
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:764-789 at
+// b25ed960 (#leavePresetOnSetpointWrite skips a value
+// #noteReconciledSetpoints recorded, :1447-1479).
+func (s *ThermostatServer) clearActivePresetAfterSet(direct []uint32) {
+	for _, id := range direct {
 		switch id {
 		case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint:
 			s.clearActivePresetOnDirectWrite(context.Background(), false)

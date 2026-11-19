@@ -460,9 +460,9 @@ func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte)
 
 // clearActivePresetOnDirectWrite clears the active preset after a direct
 // (not a command's) setpoint change of the setpoints in effect — matter.js
-// #assert(Un)occupied*SetpointChanging (ThermostatServer.ts:682-706,
-// :744-768 at db021da0): a setpoint someone set by hand is no longer the
-// preset's. It takes persist and s.mu, never s.op, so the inbound setters
+// #assert(Un)occupied*SetpointChanging (ThermostatServer.ts:1150-1166,
+// :1203-1220 at b25ed960) through #leavePresetOnSetpointWrite (:764-789):
+// a setpoint someone set by hand is no longer the preset's. It takes persist and s.mu, never s.op, so the inbound setters
 // may call it while a write waits on the Sink (issue #63); persist keeps
 // its save from overtaking a preset write's (R2-P6-store-1501).
 func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, unoccupied bool) {
