@@ -862,7 +862,12 @@ func (i *Instance) checkFieldConformance(where string, s *Struct, rv reflect.Val
 // (createStructValidator: each member's validator in turn, its error
 // rejected :422-426, then the choices :429-449) over conformance.ts:20-58
 // (createConformanceValidator: the member's conformance, its error
-// rejected :44-52, then its value :54-56) at b25ed960.
+// rejected :44-52, then its value :54-56) at b25ed960 — with one
+// difference: matter.js throws a choice error (:432-438, :441-448), so
+// the first failing choice group ends the struct's check even with a
+// collector, while a collecting scope here records every failing group,
+// by name. The status is the same: the choices come after every field in
+// both, and the first error decides.
 func (i *Instance) checkFields(where string, s *Struct, rv reflect.Value, scope nameScope, value func(f *Field) error) error {
 	loc := &confLocation{siblings: rv, fields: s, choices: map[string]*confChoice{}, scope: scope}
 	for fi := range s.Fields {
