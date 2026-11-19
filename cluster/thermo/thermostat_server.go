@@ -1360,7 +1360,7 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		// matter.js packages/node/src/behaviors/thermostat/
 		// ThermostatServer.ts:764-789 at b25ed960
 		// (#leavePresetOnSetpointWrite skips a value
-		// #noteReconciledSetpoints recorded, :1447-1479).
+		// #noteReconciledSetpoints recorded, :1447-1482).
 		return changed, nil
 	}
 	// The Sink hears the value the server will store: the written

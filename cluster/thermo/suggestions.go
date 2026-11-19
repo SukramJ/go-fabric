@@ -29,16 +29,16 @@ import (
 // Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts
 // at b25ed960 (#4993; class doc :196-213): the commands
 // (:613-660), the re-evaluation (#reevaluateSuggestions and
-// #determineCurrentSuggestion, :2368-2484), the timer (#restartSuggestionTimer,
+// #determineCurrentSuggestion, :2368-2477), the timer (#restartSuggestionTimer,
 // :2497-2529), the unique ids (#nextSuggestionUniqueId, :2532-2540), the
 // manual override (#trackOverrideOnPresetChange, :2324-2348) and the
 // suggestions of a removed preset (#reevaluateOnPresetsChange, :2556-2565).
 // Ours, with matter.js's protected defaults as the model: the host's own
 // not-following reasons arrive through SetAttributes (matter.js's
-// overridable suggestionNotFollowingReason, :747-754), the Matter time
+// overridable suggestionNotFollowingReason, :750-757), the Matter time
 // through [ThermostatServer.AttachMatterTime] (matter.js's
 // hasSynchronizedTime, :701-707). Not ported: matter.js's
-// selectThermostatSuggestion seam (:731-737; the earliest EffectiveTime,
+// selectThermostatSuggestion seam (:727-733; the earliest EffectiveTime,
 // which this server applies), and the retry back-off after a
 // re-evaluation that did not take effect (:75-78, :2512-2519), which is
 // transaction machinery with no counterpart here.
@@ -106,11 +106,11 @@ type suggestions struct {
 	// overriddenSet is false for none.
 	overridden    uint8
 	overriddenSet bool
-	// setpointWritten marks a SetAttributes that wrote a setpoint directly
-	// and scheduled the re-evaluation: matter.js's
-	// #setpointChangedInTransaction (:796-808 at b25ed960) for the one
-	// local change that, in Go, is a transaction. The next re-evaluation
-	// reads and clears it.
+	// setpointWritten marks a SetAttributes that wrote a setpoint of the
+	// current occupancy directly and scheduled the re-evaluation:
+	// matter.js's #setpointChangedInTransaction (:796-808 at b25ed960, the
+	// current occupancy's pair :803-808) for the one local change that, in
+	// Go, is a transaction. The next re-evaluation reads and clears it.
 	setpointWritten bool
 }
 
@@ -406,17 +406,17 @@ func (s *ThermostatServer) nextSuggestionIDLocked() uint8 {
 }
 
 // reevaluateSuggestions re-evaluates the current suggestion. Mirrors
-// matter.js ThermostatServer.ts:2368-2484 at b25ed960
+// matter.js ThermostatServer.ts:2368-2477 at b25ed960
 // (#reevaluateSuggestions, #determineCurrentSuggestion,
 // #setCurrentSuggestion): without a synchronised Matter time
 // CurrentThermostatSuggestion and the reason are null, the override stays
-// and the timer stops (:2421-2426, :2499-2501); otherwise the expired
+// and the timer stops (:2421-2426, :2499-2503); otherwise the expired
 // entries go, the current suggestion is the one with the earliest
 // EffectiveTime at or before now, the first in the list on a tie
-// (:731-737), and the thermostat follows it — activates its preset as
-// SetActivePresetRequest does and moves the setpoints (:2459) — unless a
+// (:727-733), and the thermostat follows it — activates its preset as
+// SetActivePresetRequest does and moves the setpoints (:2460) — unless a
 // reason applies: the host's own reasons or OngoingHold while a hold is
-// on (suggestionNotFollowingReason, :747-754), else the empty reason for
+// on (suggestionNotFollowingReason, :750-757), else the empty reason for
 // an overridden entry (:2449-2450), which also starts with a setpoint the
 // same SetAttributes wrote while the preset is not active (:2451-2454). A
 // reason keeps the active preset. Another entry or none becoming current

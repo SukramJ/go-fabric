@@ -611,7 +611,7 @@ func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) er
 // list does not exceed: a configuration that lowers a limit below what
 // clients already stored raises it, with a notice, and the stored entries
 // stay. Mirrors matter.js ThermostatServer.ts:393-399 at b25ed960
-// (#limitCoveringStored), applied to NumberOfPresets at :298-303.
+// (#limitCoveringStored), applied to NumberOfPresets at :299-304.
 func (s *ThermostatServer) limitCoveringStored(name string, limit uint8, required int, found string) uint8 {
 	if required <= int(limit) {
 		return limit
@@ -624,8 +624,8 @@ func (s *ThermostatServer) limitCoveringStored(name string, limit uint8, require
 }
 
 // seedPresets is matter.js initialize's preset part
-// (ThermostatServer.ts:293-316 at b25ed960) with the validation its commit
-// runs (persistedPresets$Changing with no old value, :1773-1791): the
+// (ThermostatServer.ts:294-319 at b25ed960) with the validation its commit
+// runs (persistedPresets$Changing with no old value, :1774-1791): the
 // stored presets when the PresetStore has them — NumberOfPresets raised to
 // cover them — else the configured ones — validated as a seed and
 // normalised — saved; then an ActivePresetHandle that matches no preset is

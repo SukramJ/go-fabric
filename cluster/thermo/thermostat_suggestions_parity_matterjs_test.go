@@ -8,7 +8,7 @@
 // MaxThermostatSuggestions and the preset activation.
 //
 // matter.js runs a MockServerNode with SuggestionsServer
-// (ThermostatSuggestionsTest.ts:41-115); the port runs the server on the
+// (ThermostatSuggestionsTest.ts:40-117); the port runs the server on the
 // fake clock (the Matter time attached as a node attaches its own), its
 // commands through MatterInvoke — a client's, matter.js's `command: true`
 // context — and the application's `set` through SetAttributes, which
@@ -48,7 +48,7 @@ import (
 
 // suggestClock is a fake clock and the Matter time read from it, which a
 // test may hold unsynchronised — matter.js's MockTime with ClockServer's
-// hasSynchronizedTime (ThermostatSuggestionsTest.ts:136-142).
+// hasSynchronizedTime (ThermostatSuggestionsTest.ts:139-146).
 type suggestClock struct {
 	*clocktest.Fake
 	mu       sync.Mutex
@@ -74,7 +74,7 @@ func (c *suggestClock) setSynced(synced bool) {
 	c.mu.Unlock()
 }
 
-// epoch is nowS() (ThermostatSuggestionsTest.ts:126-128).
+// epoch is nowS() (ThermostatSuggestionsTest.ts:135-137).
 func (c *suggestClock) epoch() uint32 { v, _ := c.matterTime(); return v }
 
 // newTSUGGEST builds a server of cfg and attaches the Matter time of its
@@ -169,7 +169,7 @@ func equalSuggestion(a, b thermo.Suggestion) bool {
 		a.EffectiveTime == b.EffectiveTime && a.ExpirationTime == b.ExpirationTime
 }
 
-// presetA, presetB and unknownPreset are ThermostatSuggestionsTest.ts:45-47.
+// presetA, presetB and unknownPreset are ThermostatSuggestionsTest.ts:44-46.
 var (
 	presetA       = filled(16, 1)
 	presetB       = filled(16, 2)
@@ -182,7 +182,7 @@ const (
 	demandResponseEvent = uint16(tdef.ThermostatSuggestionNotFollowingReasonDemandResponseEvent)
 )
 
-// suggestionPresets is ThermostatSuggestionsTest.ts:49-60: preset A
+// suggestionPresets is ThermostatSuggestionsTest.ts:48-59: preset A
 // matches the configured setpoints; activating preset B moves them.
 func suggestionPresets() []thermo.Preset {
 	return []thermo.Preset{
@@ -195,8 +195,8 @@ func suggestionPresets() []thermo.Preset {
 	}
 }
 
-// suggestionsConfig is ThermostatSuggestionsTest.ts:62-79 on
-// SuggestionsServer (:41, Heating, Cooling, AutoMode, Presets,
+// suggestionsConfig is ThermostatSuggestionsTest.ts:61-78 on
+// SuggestionsServer (:40, Heating, Cooling, AutoMode, Presets,
 // ThermostatSuggestions): thermostatConfig's CoolingAndHeating, Auto and
 // setpoints, the hold served and off, five presets of the Occupied and
 // the Unoccupied type, no active preset, presets A and B.
@@ -216,7 +216,7 @@ func suggestionsConfig(clk *suggestClock, edit ...func(*thermo.ThermostatConfig)
 	return cfg
 }
 
-// suggestCase is the online() context of ThermostatSuggestionsTest.ts:81-115.
+// suggestCase is the online() context of ThermostatSuggestionsTest.ts:80-117.
 type suggestCase struct {
 	t   *testing.T
 	clk *suggestClock

@@ -335,7 +335,7 @@ func TestPresetConfigurationRefused(t *testing.T) {
 // application's direct write of that setpoint ends it. Mirrors matter.js
 // packages/node/src/behaviors/thermostat/ThermostatServer.ts:764-789 at
 // b25ed960 (#leavePresetOnSetpointWrite skips the value
-// #noteReconciledSetpoints recorded, :1447-1479); #4993 changed it.
+// #noteReconciledSetpoints recorded, :1447-1482); #4993 changed it.
 func TestLimitWriteThatMovesTheSetpointInEffectKeepsThePreset(t *testing.T) {
 	t.Parallel()
 	srv := mustNew(t, thermostatConfig(5, []thermo.Preset{setpointPreset(1, 2200, 2700)}))

@@ -215,7 +215,7 @@ func (s *ThermostatServer) currentOccupancyWrittenLocked(direct []uint32) bool {
 // or the deadband keeps it. Mirrors matter.js
 // packages/node/src/behaviors/thermostat/ThermostatServer.ts:764-789 at
 // b25ed960 (#leavePresetOnSetpointWrite skips a value
-// #noteReconciledSetpoints recorded, :1447-1479).
+// #noteReconciledSetpoints recorded, :1447-1482).
 func (s *ThermostatServer) clearActivePresetAfterSet(direct []uint32) {
 	reevaluate := false
 	for _, id := range direct {
