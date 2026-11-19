@@ -132,7 +132,7 @@ type Manager struct {
 	// store failure leaves only that fabric absent.
 	owed map[uint8]bool
 	// owedRetryAt and owedBackoff pace reloadOwed on the receive path
-	// (owedDueLocked): a failing load is tried again owedBackoff later,
+	// (owedDue): a failing load is tried again owedBackoff later,
 	// on the send clock's monotonic reading; Load does not wait. Until
 	// allLoaded they pace the first load the same way (firstLoadErr).
 	owedRetryAt time.Duration
