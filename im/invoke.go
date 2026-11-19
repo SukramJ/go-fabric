@@ -508,13 +508,12 @@ type InvokeResponseEntry struct {
 }
 
 // HasCommandData reports whether any entry is a CommandDataIB (a command
-// that produced a response payload) rather than a CommandStatusIB. Per
-// Matter §8.8.3.2.1 a SuppressResponse invoke still ships a response when a
-// CommandDataIB is generated; when the response carries only status entries
-// the server sends nothing. Mirrors matter.js
-// packages/node/src/node/server/InteractionServer.ts:1168-1199 at db021da0
-// (`suppressedBuffer` is flushed on the first `cmd-response`; otherwise the
-// invoke returns without sending).
+// that produced a response payload) rather than a CommandStatusIB. It no
+// longer decides whether a SuppressResponse invoke is answered: since
+// matter.js 8addfb158 (#5011) such an invoke is never answered
+// (packages/node/src/node/server/InteractionServer.ts:1104-1109 at
+// b25ed960), and the bridge's dispatch layer follows that without
+// consulting the response's contents.
 func (ir InvokeResponse) HasCommandData() bool {
 	for i := range ir.Responses {
 		if !ir.Responses[i].IsStatus {
@@ -687,10 +686,11 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 
 	var ir InvokeResponse
 	// The InvokeResponseMessage.SuppressResponse field is deprecated and matter.js
-	// always emits it as false (packages/node/src/node/server/InteractionServer.ts:1111-1112
+	// always emits it as false (packages/node/src/node/server/InteractionServer.ts:1114 at b25ed960
 	// `emptyInvokeResponse.suppressResponse: false`). The controller's suppress-response
 	// intent governs whether the bridge sends the InvokeResponse at all (handled at the
-	// dispatch layer via [InvokeResponse.HasCommandData] per Matter §8.8.3.2.1), not the
+	// dispatch layer: a suppressed invoke is never answered, matter.js
+	// InteractionServer.ts:1104-1109 at b25ed960), not the
 	// value of this wire field — so it stays at its zero value here.
 	for _, inv := range req.Invokes {
 		// A wildcard-endpoint command runs on every endpoint that serves

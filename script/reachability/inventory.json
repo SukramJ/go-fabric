@@ -2167,7 +2167,7 @@
       "identifier": "TestChunkedWriteAcrossMessagesParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/interaction_protocol_parity_matterjs_test.go",
-      "line": 293
+      "line": 292
     },
     {
       "package": "bridge",
@@ -4883,7 +4883,7 @@
       "identifier": "TestInteractionProtocolBridgeParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/interaction_protocol_parity_matterjs_test.go",
-      "line": 181
+      "line": 189
     },
     {
       "package": "bridge",
@@ -39015,7 +39015,7 @@
       "identifier": "TestHandleInvokeRequest_ResponseSuppressResponseAlwaysFalse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_batch_test.go",
-      "line": 162
+      "line": 164
     },
     {
       "package": "im",
@@ -39323,7 +39323,7 @@
       "identifier": "TestInvokeResponse_HasCommandData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_batch_test.go",
-      "line": 137
+      "line": 139
     },
     {
       "package": "im",
