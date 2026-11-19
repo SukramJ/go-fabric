@@ -2152,7 +2152,7 @@
   },
   {
     "file": "controller/client/client_event_notification_parity_matterjs_test.go",
-    "line": 42,
+    "line": 43,
     "citation": "ClientEventNotificationTest.ts:264-287",
     "resolved": "packages/node/test/node/ClientEventNotificationTest.ts",
     "identifier": "switchPair",
@@ -2467,7 +2467,7 @@
   },
   {
     "file": "controller/client/registry.go",
-    "line": 406,
+    "line": 444,
     "citation": "CommissioningClient.ts:685-714",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#bindPeer",

@@ -76,11 +76,11 @@ func TestPeersLoadFailureParity(t *testing.T) {
 }
 
 // TestPeersLoadFailureByAddressParity ports PeersLoadFailureTest.ts:147-169
-// at b25ed960 (a37a502c3), "finds a peer that cannot load and the peers
+// at b25ed960, "finds a peer that cannot load and the peers
 // after it by address": peer1's stored commissionedAt is not a timestamp,
 // so it loads unavailable; its stored peer address still finds it
 // (ClientNode.peerAddress reads storage when the commissioning state did
-// not load, ClientNode.ts:387-421), and peer2 after it is found too.
+// not load, ClientNode.ts:388-421), and peer2 after it is found too.
 func TestPeersLoadFailureByAddressParity(t *testing.T) {
 	t.Parallel()
 	address1, address2 := scriptedAddr, handshake.PeerAddress{FabricIndex: scriptedAddr.FabricIndex, NodeID: 0x3333}

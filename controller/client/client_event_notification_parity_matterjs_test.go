@@ -274,7 +274,7 @@ func TestClientEventNotificationEventNumbersParity(t *testing.T) {
 		}
 	})
 
-	// ClientEventNotificationTest.ts:1004-1031 at b25ed960 (d7e3a454f): the
+	// ClientEventNotificationTest.ts:1004-1031 at b25ed960: the
 	// device drops the subscription, its sessions stay; the replacement asks
 	// above the stored number, so the two events are not delivered again.
 	t.Run("does not deliver events again when the device drops the subscription and the session stays", func(t *testing.T) {
@@ -296,8 +296,9 @@ func TestClientEventNotificationEventNumbersParity(t *testing.T) {
 			}
 		})
 		sessionIDs := func() []uint16 {
-			var ids []uint16
-			for _, s := range sp.pair.Device.Node().SessionDiagnostics().Sessions {
+			sessions := sp.pair.Device.Node().SessionDiagnostics().Sessions
+			ids := make([]uint16, 0, len(sessions))
+			for _, s := range sessions {
 				ids = append(ids, s.ID)
 			}
 			return ids

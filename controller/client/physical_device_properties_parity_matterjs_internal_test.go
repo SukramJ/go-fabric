@@ -2,13 +2,14 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/protocol/test/peer/PhysicalDevicePropertiesTest.ts
-// at 862ad75f, the ICD idle-synced ceiling cases at b25ed960 (a136e8385,
-// PhysicalDevicePropertiesTest.ts:240-332): the subscription interval bounds the controller derives from
+// at 862ad75f: the subscription interval bounds the controller derives from
 // a peer's physical properties (PhysicalDeviceProperties.subscriptionIntervalBoundsFor;
 // the client's intervalBounds over a Properties value). The Go subject of
 // this protocol test lives in controller/client, so it is ported here. A
 // matter.js call without properties is the zero Properties; the jitter is
-// math/rand's, as matter.js's crypto randomness.
+// math/rand's, as matter.js's crypto randomness. The ICD idle-synced
+// ceiling cases follow the test at b25ed960
+// (PhysicalDevicePropertiesTest.ts:240-332).
 package client
 
 import (

@@ -142,7 +142,7 @@ type Registry struct {
 	// storedAddress is the peer address stored for a node that failed to
 	// load, read from its record's peer address field alone — matter.js
 	// ClientNode.peerAddress, which reads storage when the commissioning
-	// state did not load (ClientNode.ts:387-421 at b25ed960). Only
+	// state did not load (ClientNode.ts:388-421 at b25ed960). Only
 	// GetByAddress reads it: such a node is not commissioned.
 	storedAddress map[*Node]PeerAddress
 	// removeFabric, when set, stands between a decommission and its
