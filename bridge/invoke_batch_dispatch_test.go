@@ -10,7 +10,7 @@
 //     CommandInvokeResponse.ts:68-99, :196-212 at db021da0
 //     (process/#processConcrete);
 //   - a SuppressResponse invoke sends nothing — mirrors matter.js
-//     InteractionServer.ts:1104-1109 at b25ed960 (handleInvokeRequest runs
+//     InteractionServer.ts:1104-1109 at b25ed960 (the suppressResponse branch runs
 //     the commands and returns); the case with a CommandDataIB is
 //     TestInteractionProtocolBridgeParityMatterJS.
 //

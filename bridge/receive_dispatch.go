@@ -854,7 +854,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	// and no InvokeResponse is sent — also when a command produced a
 	// CommandDataIB. Mirrors matter.js
 	// packages/node/src/node/server/InteractionServer.ts:1104-1109 at
-	// b25ed960 (handleInvokeRequest: `for await (const _chunk of
+	// b25ed960 (the `if (suppressResponse)` branch: `for await (const _chunk of
 	// results);` then return; #5011, 8addfb158, which removed the held
 	// response db021da0 flushed on the first CommandDataIB). matter.js
 	// decides here over the spec reading this module followed before
