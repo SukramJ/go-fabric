@@ -49,10 +49,14 @@ import (
 // threshold, and on a node of one fabric, nothing changes; a node whose
 // host wired no counter keeps the per-session bound alone. A session
 // without a fabric — a PASE session, one the session lookup cannot place
-// or a lookup without a [SessionFabricResolver] — is held to no share,
-// only to the per-session bound, and its claims count towards the
-// threshold (review II, TM R3.7, decision 245; R2-P7-req-05, decision
-// 275). The rule is
+// or a lookup without a [SessionFabricResolver] — is held to no share
+// and has no cap of its own: its claims count towards the threshold, and
+// it is bounded by [maxChunkWaitsPerSession] per session and by the
+// listener's dispatch slots (transport/udp/listener.go:50,
+// maxConcurrentDispatch). With a resolver, fabric 0 is the PASE sessions
+// (and a session already gone); without one every session is fabric 0,
+// and a share of one bucket over all of them could not work (review II,
+// TM R3.7, decision 245; R2-P7-req-05, decisions 275, 281). The rule is
 // this module's: matter.js bounds a session's outgoing exchanges only
 // (packages/protocol/src/protocol/ExchangeManager.ts:63 at db021da0);
 // connectedhomeip reserves read and subscription resources per fabric
@@ -155,8 +159,11 @@ func (c *chunkWaitClaims) share(ctx context.Context) int {
 // SetFabricCounter wires the count of the fabrics the node holds, which
 // sets each fabric's share of the chunk waits once they reach half the
 // dispatch budget (review II, TM R3.7, decision 245). It is asked only
-// then. Without it — nil clears it — the per-session bound is the only
-// one.
+// then — but then for every claim of a session with a fabric, under the
+// load the share exists for, so fn must be cheap: the node's counter keeps
+// the count and lists the store again only after a fabric was installed
+// or removed (review II, R2-P7-req-05, decisions 275, 280). Without it —
+// nil clears it — the per-session bound is the only one.
 func (b *Bridge) SetFabricCounter(fn func(context.Context) (int, error)) {
 	if fn == nil {
 		b.routing.chunkWaits.fabrics.Store(nil)

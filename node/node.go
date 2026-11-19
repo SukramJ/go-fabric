@@ -754,12 +754,21 @@ func (r *rotatingDeviceID) uniqueID(ctx context.Context) ([]byte, error) {
 // published — the only publish a freshly commissioned fabric gets
 // (main.go:263-289 at b4ea1f96^).
 func (n *Node) fabricInstalled(ctx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
+	n.invalidateFabricCount()
 	if err := n.caseIDs.load(ctx, n.st, fabricIndex); err != nil {
 		n.logger.Warn("case.identity.reload_failed", slog.Any("err", err))
 		return
 	}
 	if !n.announceInstalled(ctx, fabricIndex) {
 		n.logger.Warn("case.identity.announce_skipped", slog.Int("fabric_index", int(fabricIndex)))
+	}
+}
+
+// invalidateFabricCount drops the kept fabric count
+// ([fabricCountCache]): a fabric was installed or removed.
+func (n *Node) invalidateFabricCount() {
+	if n.window != nil {
+		n.window.fabrics.invalidate()
 	}
 }
 
@@ -807,6 +816,7 @@ func (n *Node) fabricLeaving(ctx context.Context, fabricIndex uint8) {
 // the terms-and-conditions acceptance and the node's own window once the
 // last fabric is gone. The Leave event went out in [Node.fabricLeaving].
 func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
+	n.invalidateFabricCount()
 	n.dropFabricState(ctx, fabricIndex)
 	compressedID, nodeID, hadIdentity := n.caseIDs.forget(fabricIndex)
 	// The client stacks' peers of the fabric, after its identity went: no
