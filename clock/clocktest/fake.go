@@ -335,9 +335,8 @@ func (f *Fake) Resolve(ctx context.Context, wait func() error) error {
 		// The step is measured on the advanced reading, not on Now: a
 		// StepWall offset would shorten it — forwards to nothing, so the
 		// work never resolved.
-		if _, ok := f.AdvanceToNext(); !ok {
-			continue // Yield paced the loop; nothing to advance
-		}
+		// Nothing armed: no move, and Yield paced the loop.
+		f.AdvanceToNext()
 	}
 }
 
