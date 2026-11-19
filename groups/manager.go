@@ -133,9 +133,14 @@ type Manager struct {
 	owed map[uint8]bool
 	// owedRetryAt and owedBackoff pace reloadOwed on the receive path
 	// (owedDueLocked): a failing load is tried again owedBackoff later,
-	// on the send clock's monotonic reading; Load does not wait.
+	// on the send clock's monotonic reading; Load does not wait. Until
+	// allLoaded they pace the first load the same way (firstLoadErr).
 	owedRetryAt time.Duration
 	owedBackoff time.Duration
+	// firstLoadErr is the error of the last failed first load (the
+	// store's ListFabrics), returned by the receive path without a store
+	// call until owedRetryAt; nil once one succeeded or none failed.
+	firstLoadErr error
 
 	// reception is matter.js MessagingState: the replay-protection
 	// window per operational key and source node, at most
@@ -502,6 +507,12 @@ func (m *Manager) loadAll(ctx context.Context, paced bool) error {
 		}
 		return nil
 	}
+	// The first load is paced the same way: after a failed ListFabrics
+	// the receive path returns that error, fail-closed, without a store
+	// call until the interval passed; [Manager.Load] does not wait.
+	if err := m.firstLoadPaced(paced); err != nil {
+		return err
+	}
 	m.storeMu.Lock()
 	defer m.storeMu.Unlock()
 	m.mu.RLock()
@@ -510,10 +521,23 @@ func (m *Manager) loadAll(ctx context.Context, paced bool) error {
 	if done {
 		return nil
 	}
+	if err := m.firstLoadPaced(paced); err != nil { // one failed meanwhile
+		return err
+	}
 	recs, err := m.st.ListFabrics(ctx)
 	if err != nil {
-		return fmt.Errorf("groups: list fabrics: %w", err)
+		err = fmt.Errorf("groups: list fabrics: %w", err)
+		m.noteOwedResult(err)
+		m.mu.Lock()
+		m.firstLoadErr = err
+		m.mu.Unlock()
+		return err
 	}
+	// The list succeeded: the pacing starts afresh for the owed reloads.
+	m.noteOwedResult(nil)
+	m.mu.Lock()
+	m.firstLoadErr = nil
+	m.mu.Unlock()
 	listed := make(map[uint8]bool, len(recs))
 	var failed []error
 	for i := range recs {
@@ -573,6 +597,22 @@ func (m *Manager) Load(ctx context.Context) error {
 	err := m.reloadOwed(ctx)
 	m.noteOwedResult(err)
 	m.notify()
+	return err
+}
+
+// firstLoadPaced returns the last first-load error while the receive path
+// (paced) is not due to try the store again; nil when it is, when none
+// failed, and for [Manager.Load] (paced false).
+func (m *Manager) firstLoadPaced(paced bool) error {
+	if !paced {
+		return nil
+	}
+	m.mu.RLock()
+	err, at := m.firstLoadErr, m.owedRetryAt
+	m.mu.RUnlock()
+	if err == nil || m.monotonic() >= at {
+		return nil
+	}
 	return err
 }
 

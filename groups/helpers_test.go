@@ -28,8 +28,9 @@ type memStore struct {
 	gcast   map[uint8]map[uint16]store.GroupcastGroup
 	failPut error
 	// failList makes ListFabrics fail; failGet makes GetFabric fail.
-	failList bool
-	failGet  error
+	failList  bool
+	listCalls int // ListFabrics calls
+	failGet   error
 	// failGetOf makes GetFabric fail for the fabrics it names.
 	failGetOf map[uint8]error
 	getCalls  int // GetFabric calls
@@ -69,6 +70,7 @@ func (s *memStore) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, 
 func (s *memStore) ListFabrics(context.Context) ([]store.FabricRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.listCalls++
 	if s.failList {
 		return nil, errors.New("memStore: list fabrics failed")
 	}
