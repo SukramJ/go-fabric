@@ -160,9 +160,11 @@ func (c *chunkWaitClaims) share(ctx context.Context) int {
 // sets each fabric's share of the chunk waits once they reach half the
 // dispatch budget (review II, TM R3.7, decision 245). It is asked only
 // then — but then for every claim of a session with a fabric, under the
-// load the share exists for, so fn must be cheap: the node's counter keeps
+// load the share exists for, so fn must be cheap. The node's counter keeps
 // the count and lists the store again only after a fabric was installed
-// or removed (review II, R2-P7-req-05, decisions 275, 280). Without it —
+// or removed, and keeps nothing while a fail-safe is armed, listing on
+// every call then; a host's own counter decides its own caching (review
+// II, R2-P7-req-05, decisions 275, 280). Without it —
 // nil clears it — the per-session bound is the only one.
 func (b *Bridge) SetFabricCounter(fn func(context.Context) (int, error)) {
 	if fn == nil {
