@@ -514,7 +514,8 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 	// but may still be stored: it is cleared as well, or the next
 	// construction loads the dropped fabric's Extension again (review II,
 	// R2-P7-acl-03). Only an entry memory held moves the DataVersion.
-	unread := a.extLoadErr[fabricIndex] != nil
+	loadErr := a.extLoadErr[fabricIndex]
+	unread := loadErr != nil
 	delete(a.extLoadErr, fabricIndex)
 	a.mu.Unlock()
 	if !had && !unread {
@@ -524,6 +525,15 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 		a.dataVersion.Bump()
 	}
 	if err := a.persistExtension(ctx, fabricIndex, nil); err != nil {
+		if unread {
+			// The setting is still stored and still unread: keep the
+			// record, so a later drop clears it again.
+			a.mu.Lock()
+			if _, ok := a.extLoadErr[fabricIndex]; !ok {
+				a.extLoadErr[fabricIndex] = loadErr
+			}
+			a.mu.Unlock()
+		}
 		return fmt.Errorf("core: AccessControl: clear the Extension of fabric %d: %w", fabricIndex, err)
 	}
 	return nil

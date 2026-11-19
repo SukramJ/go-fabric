@@ -50,8 +50,16 @@ func TestAuxiliaryEventOfAnotherFabricsChangeNamesNoForeignNode(t *testing.T) {
 type p7ExtStore struct {
 	settingsACLStore
 	getErr  error
+	setErr  error
 	listErr error
 	fabrics []mstore.FabricRecord
+}
+
+func (s *p7ExtStore) SetSetting(ctx context.Context, key, value string) error {
+	if s.setErr != nil {
+		return s.setErr
+	}
+	return s.settingsACLStore.SetSetting(ctx, key, value)
 }
 
 func (s *p7ExtStore) GetSetting(ctx context.Context, key string) (value string, ok bool, err error) {
@@ -94,6 +102,32 @@ func TestDropFabricClearsAnExtensionThatFailedToLoad(t *testing.T) {
 	}
 	if held := again.MatterHeldFabrics(); len(held) != 0 {
 		t.Errorf("held after restart: %v, want none", held)
+	}
+}
+
+// A drop whose clear of an unread Extension fails keeps the record that
+// the setting is unread, so the next drop clears it (review II,
+// R2-P7-acl-03, the Fable diff read of phase 7).
+func TestDropFabricRetriesAFailedClearOfAnUnreadExtension(t *testing.T) {
+	t.Parallel()
+	key := "access_control.extension.2"
+	st := &p7ExtStore{settingsACLStore: settingsACLStore{settings: map[string]string{key: hex.EncodeToString(encodeExtensionTLV(t))}}}
+	st.getErr = errors.New("busy")
+	ac, err := core.NewAccessControl(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.getErr = nil
+	st.setErr = errors.New("disk")
+	if err := ac.MatterDropFabric(context.Background(), 2); err == nil {
+		t.Fatal("MatterDropFabric(2) reported no error for a failed clear")
+	}
+	st.setErr = nil
+	if err := ac.MatterDropFabric(context.Background(), 2); err != nil {
+		t.Fatal(err)
+	}
+	if v := st.settings[key]; v != "" {
+		t.Errorf("after the second MatterDropFabric(2) the setting still holds %q", v)
 	}
 }
 
