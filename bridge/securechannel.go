@@ -645,8 +645,12 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 // session that is declined (ExchangeManager.ts:441-444), or an opening
 // message SecureChannel does not take
 // (packages/protocol/src/securechannel/SecureChannelProtocol.ts:152-153,
-// :43-50; ExchangeManager.ts:491-494) — no path sends a report;
-// connectedhomeip takes only Sigma1 unsolicited
+// :43-50; ExchangeManager.ts:491-494) — none hands it to CASE or builds a
+// report for it; only while the report is still unacknowledged does a
+// message that repeats the Sigma3's id without being flagged a duplicate
+// get that pending report again (MessageExchange.ts:512-519), the span in
+// which this node refuses it on receive and retransmits the report on its
+// own timer (decision 277); connectedhomeip takes only Sigma1 unsolicited
 // (src/protocols/secure_channel/CASEServer.cpp:54-55 at 6170af84) and
 // acknowledges the rest (src/messaging/ExchangeMgr.cpp:437).
 func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {

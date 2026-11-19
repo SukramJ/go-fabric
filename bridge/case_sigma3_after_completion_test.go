@@ -305,37 +305,51 @@ func TestSigma3AfterCompletionChangesNothingAboutTheSession(t *testing.T) {
 // MessageExchange.ts:501-511 and :522-534, ExchangeManager.ts:435-437 and
 // :491-494, packages/protocol/src/securechannel/
 // SecureChannelProtocol.ts:152-153 at db021da0); connectedhomeip takes only
-// Sigma1 unsolicited (src/protocols/secure_channel/CASEServer.cpp:54 at
+// Sigma1 unsolicited (src/protocols/secure_channel/CASEServer.cpp:54-55 at
 // 6170af84) and acknowledges the rest (src/messaging/ExchangeMgr.cpp:437).
 func TestSigma3OfACompletedHandshakeIsAcknowledgedOnly(t *testing.T) {
 	t.Parallel()
-	c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), true)
+	for _, tc := range []struct {
+		name        string
+		viaProvider bool
+	}{
+		{"through a provider, its record standing", true},
+		{"through the singleton handler, its record ended", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), tc.viaProvider)
 
-	err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter)
-	c.expectRefused(t, err, errIncorrectAck, 1, "the retransmission while the success report waits for its acknowledgement")
-	c.acknowledgeReport(t)
+			err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter)
+			c.expectRefused(t, err, errIncorrectAck, 1, "the retransmission while the success report waits for its acknowledgement")
+			c.acknowledgeReport(t)
+			if got := c.recordHeld(); got != tc.viaProvider {
+				t.Fatalf("after the report's acknowledgement the record is held: %v, want %v", got, tc.viaProvider)
+			}
 
-	pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
-	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, append([]byte(nil), c.sigma3[:len(c.sigma3)-1]...), nil); err != nil {
-		t.Fatal(err)
-	}
-	c.expectAcknowledgedOnly(t, pending, "other bytes over the completing route")
+			pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
+			if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, append([]byte(nil), c.sigma3[:len(c.sigma3)-1]...), nil); err != nil {
+				t.Fatal(err)
+			}
+			c.expectAcknowledgedOnly(t, pending, "other bytes over the completing route")
 
-	other := c.otherPeer(t)
-	if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
-		t.Fatal(err)
-	}
-	c.expectAcknowledgedOnly(t, pending, "the same bytes from another address")
+			other := c.otherPeer(t)
+			if err := other.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, nil); err != nil {
+				t.Fatal(err)
+			}
+			c.expectAcknowledgedOnly(t, pending, "the same bytes from another address")
 
-	if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
-		t.Fatal(err)
-	}
-	c.expectAcknowledgedOnly(t, pending, "the retransmission over the completing route")
-	if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
-		t.Fatal("a Sigma3 of the completed handshake ended its record")
-	}
-	if got := c.sessions.Load(); got != 1 {
-		t.Fatalf("the handshake installed %d sessions, want 1", got)
+			if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
+				t.Fatal(err)
+			}
+			c.expectAcknowledgedOnly(t, pending, "the retransmission over the completing route")
+			if got := c.recordHeld(); got != tc.viaProvider {
+				t.Fatalf("after the Sigma3s the record is held: %v, want %v", got, tc.viaProvider)
+			}
+			if got := c.sessions.Load(); got != 1 {
+				t.Fatalf("the handshake installed %d sessions, want 1", got)
+			}
+		})
 	}
 }
 
