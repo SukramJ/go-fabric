@@ -495,3 +495,9 @@ over `*.go`, tests included, each hit read by hand.
 | --- | --- | --- |
 | 271 | Where `nested-release-check` learns which versions a nested-release pull request releases (decision 266's tooling item) | **The head branch `release/nested-vX.Y.Z`** (decision 261's name), written down as the rule; a nested-release pull request on another branch stays strict |
 | 272 | Which modules count as released by such a pull request | **Those that already have a `<dir>/v*` tag**; a brand-new nested module stays strict until it is tagged by hand — red rather than silently green |
+
+## 2026-11-19, the phase-7 backlog: the resumption role
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 273 | With the role column (decision 270's backlog item) client-role resumption records have no bound, and a fabric's CA holder can drive client connections through peer-named targets (`AnnounceOtaProvider`, the camera requestor; Fable read) | **A bound of their own per fabric, 1024**, beside the responder's 16: each role evicts only its own records, the store stays bounded and a controller with many devices keeps its records. `caseInitiatorProvider` (`node/security.go`), whose targets are former subscribers, keeps saving in the responder role, under the 16 |
