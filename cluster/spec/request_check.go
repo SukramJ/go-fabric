@@ -42,8 +42,10 @@ func (i *Instance) CheckRequest(cmdID uint32, fields any, peers Peers) error {
 
 // requestErrors are the errors [Instance.CheckRequest] finds in the
 // request: with all, every one of every field, in the order matter.js
-// records them (ValueValidator.ts:375-509 at b25ed960, under a
-// ValidationLocation.errors collector); else the first alone.
+// records them (matter.js
+// packages/node/src/behavior/state/validation/ValueValidator.ts:375-509 at
+// b25ed960, under a ValidationLocation.errors collector); else the first
+// alone.
 func (i *Instance) requestErrors(cmdID uint32, fields any, peers Peers, all bool) []error {
 	cmd, rv, ok := i.requestOf(cmdID, fields)
 	if !ok {
@@ -168,7 +170,7 @@ func enumListAdmits(t Type, c Constraint, v uint64) bool {
 // hand-written definition states a Refusal for a command whose requests
 // the gate is to refuse.
 //
-// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:671-704
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:641-705
 // at b25ed960 (invokeCommand: the errors collected :675-689, then
 // onValidationError(errors[0]) :693-694, a thrown UnknownEnumValueError
 // :692, :695-696, else a warning :697-702).

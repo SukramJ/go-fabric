@@ -774,7 +774,8 @@ func (i *Instance) fieldValidator(where string, s *Struct, f *Field, enums bool)
 // at b25ed960): the member a value names — by its id, or by the range
 // that holds it — must be allowed by its conformance. A value the enum
 // does not define is the datatype check's to refuse, "the only check for
-// it" ([ErrUnknownEnumValue], [Instance.checkValueIn]; ValueValidator.ts:158-185
+// it" ([ErrUnknownEnumValue], [Instance.checkValueIn];
+// packages/node/src/behavior/state/validation/ValueValidator.ts:158-185
 // at b25ed960), so it passes here (conformance-compiler.ts:855-859).
 func (i *Instance) withEnumMembers(where string, f *Field, c *confCompiler, main fieldValidator) fieldValidator {
 	e := f.Type.Enum

@@ -13,7 +13,8 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// collectorRequest is the record of ValueValidatorTest.ts:51-80 at
+// collectorRequest is the record of
+// packages/node/test/behavior/state/validation/ValueValidatorTest.ts:51-80 at
 // b25ed960 ("with an error collector"): Num int8 "max 5", Mode enum8 of
 // A and B whose conformance names the feature F, Modes a list "max 1" of
 // that enum.
@@ -62,10 +63,12 @@ func errorClass(err error) string {
 }
 
 // TestValueValidatorErrorCollectorParityMatterJS ports
-// ValueValidatorTest.ts:51-99 at b25ed960 (describe "with an error
-// collector"): the request gate's collector records the errors of every
-// field, a field's conformance error and its value's alike
-// (location.ts:64-80, conformance.ts:44-56 at b25ed960), while the
+// packages/node/test/behavior/state/validation/ValueValidatorTest.ts:51-99 at
+// b25ed960 (describe "with an error collector"): the request gate's
+// collector records the errors of every field, a field's conformance
+// error and its value's alike
+// (packages/node/src/behavior/state/validation/location.ts:64-80,
+// conformance.ts:44-56 at b25ed960), while the
 // public check stops at the first, as the validator throws it without a
 // collector.
 func TestValueValidatorErrorCollectorParityMatterJS(t *testing.T) {
@@ -137,8 +140,8 @@ func gateCluster() *spec.Cluster {
 // value an enum does not define, wherever it sits among the errors, is
 // CONSTRAINT_ERROR and the handler does not run; else the errors are
 // logged and the handler runs. An enum without members accepts every
-// value (ValueValidator.ts:171-172), and a request without fields is
-// judged as {} (:624-625).
+// value (packages/node/src/behavior/state/validation/ValueValidator.ts:171-172),
+// and a request without fields is judged as {} (ProtocolService.ts:624-625).
 func TestRequestGateParityMatterJS(t *testing.T) {
 	t.Parallel()
 	valid := gateRequest{Flags: 1, Mode: 1, Gated: 0, Free: 0}
@@ -180,7 +183,8 @@ func TestRequestGateParityMatterJS(t *testing.T) {
 
 // TestEnumWithoutMembersAcceptsEveryValue: a written value of an enum
 // without members is held to its width only, as the request is
-// (ValueValidator.ts:171-172 at b25ed960, definesValues).
+// (packages/node/src/behavior/state/validation/ValueValidator.ts:171-172
+// at b25ed960, definesValues).
 func TestEnumWithoutMembersAcceptsEveryValue(t *testing.T) {
 	t.Parallel()
 	def := &spec.Cluster{

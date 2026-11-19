@@ -3427,7 +3427,7 @@
   },
   {
     "file": "node/protocol_service_parity_matterjs_test.go",
-    "line": 111,
+    "line": 118,
     "citation": "ProtocolServiceTest.ts:498-532",
     "resolved": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
     "identifier": "TestRequest",
@@ -3436,7 +3436,7 @@
   },
   {
     "file": "node/protocol_service_parity_matterjs_test.go",
-    "line": 189,
+    "line": 196,
     "citation": "ProtocolServiceTest.ts:500",
     "resolved": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
     "identifier": "TlvTestRequest",
@@ -3445,7 +3445,7 @@
   },
   {
     "file": "node/protocol_service_parity_matterjs_test.go",
-    "line": 398,
+    "line": 561,
     "citation": "ProtocolServiceTest.ts:379-414",
     "resolved": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
     "identifier": "skipCustomElements",
@@ -3491,7 +3491,7 @@
   },
   {
     "file": "script/clustergen/relaxed.go",
-    "line": 144,
+    "line": 174,
     "citation": "ThermostatServer.ts:1367-1375",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#validatePresetWriteRequest",
