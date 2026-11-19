@@ -1075,8 +1075,8 @@ func (c *Controller) Commissioner() *commissioner.Commissioner {
 	return st.com
 }
 
-// PairOptions configure [Controller.Pair]; the zero value pairs with the
-// defaults.
+// PairOptions configure [Controller.Pair] and [Controller.PairDiscovered];
+// the zero value pairs with the defaults.
 type PairOptions struct {
 	// AutoSubscribe, when non-nil, overrides the registry's default
 	// subscription of the new node (client.CommissionOptions.AutoSubscribe);
@@ -1180,10 +1180,104 @@ const (
 // before opts.Progress runs (an opts.Edit that replaces the commissioner's
 // Progress replaces that recording too), then the paired node, or — when
 // Pair returns an error — the failed pairing as an error, counted once as
-// pair.failures ([Config].Metrics).
+// pair.failures ([Config].Metrics). [Controller.PairDiscovered] runs the
+// same pipeline for a device a discovery found.
 func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*client.Node, error) {
+	return c.runPairing(ctx, opts, func() (pairRequest, error) {
+		pc, err := ParsePairingCode(code)
+		if err != nil {
+			return pairRequest{}, err
+		}
+		return pairRequest{
+			start: codeStart(pc), passcode: pc.Passcode, code: code,
+			reach: func(opts PairOptions) (*client.Device, error) {
+				if opts.BLE != nil && opts.Address != nil {
+					return nil, fmt.Errorf("%w: PairOptions.BLE and Address name two ways to reach the device", ErrConfiguration)
+				}
+				var known *client.Device
+				if opts.Address != nil {
+					d, err := DeviceAt(opts.Address)
+					if err != nil {
+						return nil, err
+					}
+					known = &d
+				}
+				if opts.BLE != nil && opts.WiFi == nil && opts.Thread == nil {
+					return nil, fmt.Errorf("%w: pairing over BLE needs PairOptions.WiFi or Thread: a device on BLE has no network yet", ErrConfiguration)
+				}
+				return known, nil
+			},
+			search: func(ctx context.Context, st stack, opts PairOptions) (*client.Node, error) {
+				identity := discovery.Identity{VendorID: pc.VendorID, ProductID: pc.ProductID}
+				// Without a deadline of the caller's the search alone is
+				// bounded: a deadline around the whole pairing would cut the
+				// commissioning of a device that was found — over BLE onto
+				// Thread the step-18 reconnect alone may take minutes.
+				var searchTimeout time.Duration
+				if _, ok := ctx.Deadline(); !ok {
+					searchTimeout = DefaultPairTimeout
+				}
+				return c.pairDiscovered(ctx, st, pc, identity, opts, searchTimeout)
+			},
+		}, nil
+	})
+}
+
+// PairDiscovered commissions dev, a commissionable device a discovery
+// found ([Controller.Discover], client.Registry.ForDevice's input), into
+// our fabric with passcode, the device's setup passcode: the pairing of
+// [Controller.Pair] with [PairOptions].Address, the device's own
+// addresses in place of that one. It is the same pipeline as Pair's:
+// "Discovery" 2.1 reported as skipped, the attestation policy of
+// [PairOptions].OnAttestationFailure (the zero value rejects), the
+// network and terms options, Edit, and the diagnostic trace — the
+// pairing's start ("Pairing started.", with dev's discriminator), each
+// failed step, then the paired node or the failed pairing, counted once
+// as pair.failures ([Config].Metrics). There is no onboarding code, so
+// [Config].KeepOnboardingCodes keeps none.
+//
+// dev names how the device is reached, so [PairOptions].BLE and
+// [PairOptions].Address are [ErrConfiguration], and so is a dev without
+// an address.
+func (c *Controller) PairDiscovered(ctx context.Context, dev client.Device, passcode uint32, opts PairOptions) (*client.Node, error) {
+	return c.runPairing(ctx, opts, func() (pairRequest, error) {
+		return pairRequest{
+			start: deviceStart(dev), passcode: passcode,
+			reach: func(opts PairOptions) (*client.Device, error) {
+				switch {
+				case opts.BLE != nil:
+					return nil, fmt.Errorf("%w: PairDiscovered reaches the discovered device at its addresses, not over PairOptions.BLE", ErrConfiguration)
+				case opts.Address != nil:
+					return nil, fmt.Errorf("%w: PairDiscovered reaches the discovered device at its addresses, not at PairOptions.Address", ErrConfiguration)
+				case len(dev.Addresses) == 0:
+					return nil, fmt.Errorf("%w: the discovered device has no address", ErrConfiguration)
+				}
+				return &dev, nil
+			},
+		}, nil
+	})
+}
+
+// pairRequest is what one pairing entry hands [Controller.runPairing]:
+// the trace's start detail, the passcode, the onboarding code ("" for
+// none), the entry's own option checks returning the device to commission
+// when it is known (nil to search), and the search (nil for an entry that
+// always knows its device).
+type pairRequest struct {
+	start    map[string]string
+	passcode uint32
+	code     string
+	reach    func(PairOptions) (*client.Device, error)
+	search   func(context.Context, stack, PairOptions) (*client.Node, error)
+}
+
+// runPairing is the one pipeline of [Controller.Pair] and
+// [Controller.PairDiscovered]: prepare's request, the trace around the
+// progress hook, the commissioning — of the known device, or the
+// request's search — and the trace's final record with pair.failures.
+func (c *Controller) runPairing(ctx context.Context, opts PairOptions, prepare func() (pairRequest, error)) (*client.Node, error) {
 	tr := &pairTrace{}
-	n, err := c.pair(ctx, code, opts, tr)
+	n, err := c.pair(ctx, opts, prepare, tr)
 	switch {
 	case err != nil:
 		c.recordPairFailed(tr, err)
@@ -1193,9 +1287,9 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 	return n, err
 }
 
-// pair is [Controller.Pair] without the trace's final record.
-func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr *pairTrace) (*client.Node, error) {
-	pc, err := ParsePairingCode(code)
+// pair is [Controller.runPairing] without the trace's final record.
+func (c *Controller) pair(ctx context.Context, opts PairOptions, prepare func() (pairRequest, error), tr *pairTrace) (*client.Node, error) {
+	req, err := prepare()
 	if err != nil {
 		return nil, err
 	}
@@ -1203,44 +1297,24 @@ func (c *Controller) pair(ctx context.Context, code string, opts PairOptions, tr
 	if !ok {
 		return nil, errClosed
 	}
-	opts.Progress = c.tracePairing(pc, tr, opts.Progress)
+	opts.Progress = c.traceSteps(req.start, tr, opts.Progress)
 	if c.keepCodes {
-		opts.onboardingCode = code
+		opts.onboardingCode = req.code
 	}
-	if opts.BLE != nil && opts.Address != nil {
-		return nil, fmt.Errorf("%w: PairOptions.BLE and Address name two ways to reach the device", ErrConfiguration)
+	known, err := req.reach(opts)
+	if err != nil {
+		return nil, err
 	}
-	var known *discovery.Device
-	if opts.Address != nil {
-		d, err := DeviceAt(opts.Address)
-		if err != nil {
-			return nil, err
-		}
-		known = &d
-	}
-	if opts.BLE != nil && opts.WiFi == nil && opts.Thread == nil {
-		return nil, fmt.Errorf("%w: pairing over BLE needs PairOptions.WiFi or Thread: a device on BLE has no network yet", ErrConfiguration)
-	}
-	passcode := pc.Passcode
-	identity := discovery.Identity{VendorID: pc.VendorID, ProductID: pc.ProductID}
 	if known == nil {
-		// Without a deadline of the caller's the search alone is bounded:
-		// a deadline around the whole pairing would cut the commissioning
-		// of a device that was found — over BLE onto Thread the step-18
-		// reconnect alone may take minutes.
-		var searchTimeout time.Duration
-		if _, ok := ctx.Deadline(); !ok {
-			searchTimeout = DefaultPairTimeout
-		}
-		return c.pairDiscovered(ctx, st, pc, identity, opts, searchTimeout)
+		return req.search(ctx, st, opts)
 	}
 	commissioner.ReportDiscovery(opts.Progress, PairingSkipped, nil)
 	n, err := st.reg.ForDevice(ctx, *known, "")
 	if err != nil {
 		return nil, err
 	}
-	o := c.pairOptions(passcode, nil, opts, opts.Progress)
-	if err := st.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, passcode)}); err != nil {
+	o := c.pairOptions(req.passcode, nil, opts, opts.Progress)
+	if err := st.reg.Commission(ctx, n, client.CommissionOptions{Options: o, AutoSubscribe: opts.AutoSubscribe, OnboardingCode: opts.keptCode(o, req.passcode)}); err != nil {
 		return n, err
 	}
 	return n, nil

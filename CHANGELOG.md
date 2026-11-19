@@ -12,6 +12,7 @@ pseudo-version of `main`.
 
 ### Added
 
+- `controller`: `Controller.PairDiscovered(ctx, dev, passcode, opts)` commissions a device a discovery found (`Controller.Discover`, a `client.Device`) by its setup passcode, for a host without an onboarding code. It runs `Pair`'s pipeline — the attestation policy of `PairOptions.OnAttestationFailure` (the zero value rejects), the progress reports with `Discovery` 2.1 skipped, the `DiagnosticEvents` entries and `pair.failures` — which a host going through `Registry().ForDevice` and `Commission` did not get. `PairOptions.BLE`, `PairOptions.Address` and a device without an address are `ErrConfiguration` (closes #553, owner decision 285).
 - `clock/clocktest`: `Fake.AdvanceToNext`, a step to the earliest armed deadline and no further — the step for a test that waits on timers, where a fixed step also fires whatever the woken work arms inside it while `Advance` still runs, depending on the scheduler (the cause of `controller/client`'s flaky `TestDefaultSubscription`). It reports the step, and false when nothing is armed.
 - `im/subscription`: `Subscription.RequeueAbortedAttributes` and `Subscription.RequeueAbortedEvents` owe an aborted report's paths and events to the next report again, as `RequeueAttributes` and `RequeueEvents` do, without counting a failed update — for a report whose wait the engine's stop, the subscription's close or the session's close ended, not the peer (review II, phase 7, R2-P7-req-06, owner decision 274).
 

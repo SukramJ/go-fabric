@@ -248,7 +248,7 @@ records nothing.
 | --- | --- | --- | --- |
 | `sessions.open` (`MetricSessionsOpen`) | gauge | a secure session of one of the controller's peers | taken from the peers' sessions when one is established or leaves its peer and when a closed peer leaves the set (its sessions go without a deletion event), and set to 0 at the end of `Controller.Close` (`controller/diagnostics.go`, `controller/metrics.go`) |
 | `mrp.retransmits` (`MetricMRPRetransmits`) | counter | a reliable message the controller's exchanges sent again | `client/exchange.Config.Retransmitted` |
-| `pair.failures` (`MetricPairFailures`) | counter | a failed pairing: a `Pair` that returned an error; a step that failed inside a pairing that went on is not counted | `Controller.Pair` |
+| `pair.failures` (`MetricPairFailures`) | counter | a failed pairing: a `Pair` or `PairDiscovered` that returned an error; a step that failed inside a pairing that went on is not counted | `Controller.Pair`, `Controller.PairDiscovered` |
 | `case.unresponsive` (`MetricCASEUnresponsive`) | counter | a CASE establishment unanswered past its MRP budget | the peer observer's `EstablishmentUnresponsive` |
 | `reachability.probes` (`MetricReachabilityProbes`) | counter | a reachability probe run, whatever its verdict | the peer observer's `ReachabilityVerified` |
 | `icd.checkins_missed` (`MetricICDCheckInsMissed`) | counter | an ICD Check-In expected from a registered LIT peer and not received | `client.ICDClient.OnCheckInMissed` |

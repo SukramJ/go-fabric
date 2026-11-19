@@ -28,7 +28,7 @@ the reference controller's `openStack` builds them:
 
 `Controller.Close` tears the stack down in reverse; the database stays
 the host's. Once `Close` has begun, the controller's methods answer
-closed: `Pair`, `Discover`, `VendorInfo` and `SetGroupKey` return an
+closed: `Pair`, `PairDiscovered`, `Discover`, `VendorInfo` and `SetGroupKey` return an
 error wrapping `ErrConfiguration`, the accessors (`Registry`, `Nodes`,
 `Peers`, `Commissioner`, …) their zero result; `Fabric`, `Clock`, `TCP`,
 `Addr` and `TCPAddr` keep their values, and a second `Close` waits for
@@ -288,6 +288,16 @@ the commissioner's own budgets and the context.
    CommissioningComplete. The record and settings are saved, and the node
    starts.
 
+`Controller.PairDiscovered(ctx, dev, passcode, controller.PairOptions{})`
+commissions a device a discovery found (`Controller.Discover`, a
+`client.Device`) with its setup passcode, for a host that has the device
+and the passcode but no onboarding code. It runs `Pair`'s pipeline from
+step 3: the same attestation policy (`OnAttestationFailure`, the zero value
+rejects), the same progress reports with `Discovery` 2.1 skipped, the same
+diagnostic trace and `pair.failures`. The device names how it is reached,
+so `PairOptions.BLE` and `PairOptions.Address` are `ErrConfiguration`, as
+is a device without an address.
+
 `CommissionOptions` decides the rest:
 
 - `NodeID`: 0 draws a random operational node id that no peer of the
@@ -319,7 +329,7 @@ or a given network only), `Reconnect` 18.1 (the operational CASE
 connection), `GeneralCommissioning.Complete` 20.1 and
 `OperationalCredentials.UpdateFabricLabel` 98.1. matter.js names no step
 for what comes before its flow; `Discovery` 2.1 (DNS-SD or BLE, skipped
-with `PairOptions.Address`) and `PASE` 2.2 are this module's names, and
+with `PairOptions.Address` and by `PairDiscovered`) and `PASE` 2.2 are this module's names, and
 they are reported first. `Subscribe` 21.1, also this module's, is
 reported last: the node's start, its initial read and default
 subscription. A failed step is the last report. The callback runs on `Pair`'s goroutine and must
