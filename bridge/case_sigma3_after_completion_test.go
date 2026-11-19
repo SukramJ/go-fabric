@@ -445,7 +445,7 @@ func TestSigma3AfterCompletionKeepsTheSuccessReportPending(t *testing.T) {
 					t.Fatalf("opcode %#x of %d bytes from another sender left the replies waiting for an acknowledgement going to %v, want the report to %s", tc.opcode, len(payload), got, want)
 				}
 			}
-			if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
+			if ok := c.r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
 				t.Fatal("the completed handshake's record did not outlive the messages from another sender")
 			}
 			err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter)
@@ -470,12 +470,12 @@ func TestSingletonCompletedRecordEndsWithItsHandler(t *testing.T) {
 	c := completeCASE(t, clocktest.New(time.Unix(1_700_000_000, 0)), false)
 	err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter)
 	c.expectRefused(t, err, errIncorrectAck, 1, "the retransmission over the completing route")
-	if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
+	if ok := c.r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
 		t.Fatal("the completed handshake's record did not outlive the refused retransmission")
 	}
 
 	c.r.b.AttachCaseHandler(nil)
-	if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); ok {
+	if ok := c.r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); ok {
 		t.Fatal("the completed handshake's record outlived the handler that completed it")
 	}
 	pending := pendingOnUnsecuredExchange(c.r.b, completedCaseExchange)
@@ -515,7 +515,7 @@ func TestSigma1ThatBeginsNothingKeepsACompletedHandshake(t *testing.T) {
 			other := c.otherPeer(t)
 			err := other.send(mrp.SCOpcodeSigma1, completedCaseExchange, []byte{0x15, 0x18}, nil)
 			c.expectRefused(t, err, errPreviousAckMissing, 1, "a Sigma1 that began nothing")
-			if _, ok := c.r.b.completedHandshake(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
+			if ok := c.r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: completedCaseInitiator, ExchangeID: completedCaseExchange}); !ok {
 				t.Fatal("a Sigma1 that began nothing ended the completed handshake's record")
 			}
 			if !c.successReportPending() {

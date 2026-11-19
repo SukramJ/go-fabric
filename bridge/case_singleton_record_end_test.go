@@ -71,7 +71,7 @@ func TestSingletonResumedHandshakeEndsWithItsAcknowledgement(t *testing.T) {
 	if established != 1 {
 		t.Fatalf("the resumption installed %d sessions, want 1", established)
 	}
-	if _, ok := r.b.completedHandshake(HandshakeKey{InitiatorNodeID: 0xD00D, ExchangeID: exchange}); !ok {
+	if ok := r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: 0xD00D, ExchangeID: exchange}); !ok {
 		t.Fatal("the handshake the resumption completed is not recorded as completed")
 	}
 	report := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, nil)
@@ -258,7 +258,7 @@ func TestSingletonCompletedRecordEndsAtItsAcknowledgement(t *testing.T) {
 	if err := p.send(mrp.StandaloneAckOpcode, exchange, nil, &c3); err != nil {
 		t.Fatal(err)
 	}
-	if _, held := r.b.completedHandshake(HandshakeKey{InitiatorNodeID: 0x7777, ExchangeID: exchange}); held {
+	if held := r.b.handshakeCompleted(HandshakeKey{InitiatorNodeID: 0x7777, ExchangeID: exchange}); held {
 		t.Fatal("the completed handshake's record outlived the acknowledgement of its success report")
 	}
 }

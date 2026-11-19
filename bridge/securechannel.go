@@ -680,7 +680,7 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// N4-rwsub-3). Nor does a Sigma3 that fails: an unacknowledged Sigma2
 	// goes on being retransmitted (F-db021da0-7, owner decision 173).
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
-	if _, ok := b.completedHandshake(key); ok {
+	if ok := b.handshakeCompleted(key); ok {
 		return b.dropHandshakeNotBegun(src, proto)
 	}
 	ch, provided, begun := b.resolveCaseContinuation(key)
@@ -2232,16 +2232,13 @@ type completedSigma3 struct {
 	bySingleton bool
 }
 
-// completedHandshake returns how the handshake key names was completed,
-// when its record says it was.
-func (b *Bridge) completedHandshake(key HandshakeKey) (*completedSigma3, bool) {
+// handshakeCompleted reports whether the record of the handshake key names
+// says it completed.
+func (b *Bridge) handshakeCompleted(key HandshakeKey) bool {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	rec, ok := b.sigma1Replied[key]
-	if !ok || rec.completed == nil {
-		return nil, false
-	}
-	return rec.completed, true
+	return ok && rec.completed != nil
 }
 
 // sigma3Step is the handler a Sigma3 is settled with
