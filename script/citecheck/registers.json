@@ -79,7 +79,7 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4468,
+    "line": 4470,
     "citation": "BleScanner.ts:46-52",
     "at": "862ad75f",
     "error": "ambiguous"

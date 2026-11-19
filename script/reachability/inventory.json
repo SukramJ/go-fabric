@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10032,
+  "entry_points": 10034,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27743,
+    "total_exported": 27745,
     "reachable": 20843,
-    "whitelisted": 6877,
+    "whitelisted": 6879,
     "unreachable": 23
   },
   "by_package": [
@@ -9231,6 +9231,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
       "line": 170
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestEstablishingSessionClosedDeliversNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/establishing_test.go",
+      "line": 107
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestEstablishingSessionHoldsUntilActivated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/establishing_test.go",
+      "line": 48
     },
     {
       "package": "client/exchange",
