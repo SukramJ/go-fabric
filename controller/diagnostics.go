@@ -256,23 +256,44 @@ func errText(err error) string {
 	return err.Error()
 }
 
-// tracePairing wraps a Pair's progress hook: the first started step
-// records "Pairing started.", a failed step a warning — one discovery
-// transport of a race may fail while another wins, so a failed step is
-// not yet a failed pairing ([Controller.Pair] records that) — and then
-// host runs.
+// tracePairing is [Controller.traceSteps] for a pairing by the code pc.
 func (c *Controller) tracePairing(pc PairingCode, tr *pairTrace, host func(PairingStep)) func(PairingStep) {
-	var started sync.Once
+	return c.traceSteps(codeStart(pc), tr, host)
+}
+
+// codeStart is the detail of "Pairing started." for a pairing by the code
+// pc: the code's kind and its discriminator.
+func codeStart(pc PairingCode) map[string]string {
 	kind := "qr"
 	if pc.Manual {
 		kind = "manual"
 	}
+	return map[string]string{"code_kind": kind, "discriminator": strconv.Itoa(int(pc.Discriminator))}
+}
+
+// deviceStart is the detail of "Pairing started." for
+// [Controller.PairDiscovered]: the device's long discriminator, and its
+// instance id when it has one.
+func deviceStart(d client.Device) map[string]string {
+	detail := map[string]string{"discriminator": strconv.Itoa(int(d.D))}
+	if d.InstanceID != "" {
+		detail["instance"] = d.InstanceID
+	}
+	return detail
+}
+
+// traceSteps wraps a pairing's progress hook: the first started step
+// records "Pairing started." with start as its detail, a failed step a
+// warning — one discovery transport of a race may fail while another
+// wins, so a failed step is not yet a failed pairing
+// ([Controller.runPairing] records that) — and then host runs.
+func (c *Controller) traceSteps(start map[string]string, tr *pairTrace, host func(PairingStep)) func(PairingStep) {
+	var started sync.Once
 	return func(st PairingStep) {
 		switch st.Phase {
 		case PairingStarted:
 			started.Do(func() {
-				c.record(diagevent.KindPairing, diagevent.SeverityInfo, "Pairing started.",
-					map[string]string{"code_kind": kind, "discriminator": strconv.Itoa(int(pc.Discriminator))})
+				c.record(diagevent.KindPairing, diagevent.SeverityInfo, "Pairing started.", start)
 			})
 		case PairingFailed:
 			tr.failed(st.Name)
@@ -286,7 +307,7 @@ func (c *Controller) tracePairing(pc PairingCode, tr *pairTrace, host func(Pairi
 	}
 }
 
-// recordPairFailed records a Pair that returned err: one pair.failures and
+// recordPairFailed records a pairing that returned err: one pair.failures and
 // an error naming the step that failed last, when one did.
 func (c *Controller) recordPairFailed(tr *pairTrace, err error) {
 	c.count(MetricPairFailures)
@@ -299,7 +320,7 @@ func (c *Controller) recordPairFailed(tr *pairTrace, err error) {
 	c.record(diagevent.KindPairing, diagevent.SeverityError, sentence(prefix, err), detail)
 }
 
-// recordPaired records a node Pair commissioned.
+// recordPaired records a node a pairing commissioned.
 func (c *Controller) recordPaired(n *client.Node) {
 	who, detail := nodeDetail(n, n.ID())
 	c.record(diagevent.KindPairing, diagevent.SeverityInfo, who+" was paired.", detail)

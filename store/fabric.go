@@ -165,8 +165,11 @@ func (p FabricPending) String() string {
 // db021da0): a persisted counter advances after each successful AddFabric so
 // a freshly-removed index is not immediately reused — Apple Home caches
 // fabric metadata by fabricIndex and may conflate old and new entries on
-// rapid re-use. Falls back to the lowest-free-slot scan when the
-// matter_metadata table is absent (pre-013 schema).
+// rapid re-use. Falls back to the lowest-free-slot scan when the counter
+// cannot be read. The matter_metadata table itself is required: the
+// transaction's first statement writes it to take the write lock, so a
+// database without it ([Apply] creates it) fails the call (review II,
+// R2-P7-sec-03).
 func (s *Store) AddFabric(ctx context.Context, rec FabricRecord) (uint8, error) {
 	if err := insertablePending(rec.Pending); err != nil {
 		return 0, err

@@ -43,11 +43,20 @@ import (
 //
 // Each fabric is held to a share as well: once the claims bridge-wide
 // reach [chunkWaitFabricThreshold] — half the listener's dispatch budget —
-// a fabric that holds more than the threshold divided by the fabrics the
-// node holds ([Bridge.SetFabricCounter]) is answered Busy for a further
-// claim, as the per-session bound answers. Below the threshold, and on a
-// node of one fabric, nothing changes; a node whose host wired no counter
-// keeps the per-session bound alone (review II, TM R3.7, decision 245). The rule is
+// a fabric that holds the threshold divided by the fabrics the node holds
+// ([Bridge.SetFabricCounter]) is answered Busy for a further claim, as the
+// per-session bound answers: a fabric holds at most its share. Below the
+// threshold, and on a node of one fabric, nothing changes; a node whose
+// host wired no counter keeps the per-session bound alone. A session
+// without a fabric — a PASE session, one the session lookup cannot place
+// or a lookup without a [SessionFabricResolver] — is held to no share
+// and has no cap of its own: its claims count towards the threshold, and
+// it is bounded by [maxChunkWaitsPerSession] per session and by the
+// listener's dispatch slots (transport/udp/listener.go:50,
+// maxConcurrentDispatch). With a resolver, fabric 0 is the PASE sessions
+// (and a session already gone); without one every session is fabric 0,
+// and a share of one bucket over all of them could not work (review II,
+// TM R3.7, decision 245; R2-P7-req-05, decisions 275, 281). The rule is
 // this module's: matter.js bounds a session's outgoing exchanges only
 // (packages/protocol/src/protocol/ExchangeManager.ts:63 at db021da0);
 // connectedhomeip reserves read and subscription resources per fabric
@@ -82,16 +91,17 @@ type chunkWaitClaims struct {
 }
 
 // claim takes one of sessionID's [maxChunkWaitsPerSession] claims for
-// fabric; false when the session holds them all, or when share is set and
-// the fabric already holds more than share. A true claim is given back
-// with [chunkWaitClaims.release].
+// fabric; false when the session holds them all, or when share is set,
+// the claims reach the threshold and the fabric already holds share
+// claims. Fabric 0 — no fabric — is held to no share. A true claim is
+// given back with [chunkWaitClaims.release].
 func (c *chunkWaitClaims) claim(sessionID uint16, fabric uint8, share int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.n[sessionID] >= maxChunkWaitsPerSession {
 		return false
 	}
-	if share > 0 && c.total >= chunkWaitFabricThreshold && c.byFabric[fabric] > share {
+	if share > 0 && fabric != 0 && c.total >= chunkWaitFabricThreshold && c.byFabric[fabric] >= share {
 		return false
 	}
 	if c.n == nil {
@@ -149,8 +159,13 @@ func (c *chunkWaitClaims) share(ctx context.Context) int {
 // SetFabricCounter wires the count of the fabrics the node holds, which
 // sets each fabric's share of the chunk waits once they reach half the
 // dispatch budget (review II, TM R3.7, decision 245). It is asked only
-// then. Without it — nil clears it — the per-session bound is the only
-// one.
+// then — but then for every claim of a session with a fabric, under the
+// load the share exists for, so fn must be cheap. The node's counter keeps
+// the count and lists the store again only after a fabric was installed
+// or removed, and keeps nothing while a fail-safe is armed, listing on
+// every call then; a host's own counter decides its own caching (review
+// II, R2-P7-req-05, decisions 275, 280). Without it —
+// nil clears it — the per-session bound is the only one.
 func (b *Bridge) SetFabricCounter(fn func(context.Context) (int, error)) {
 	if fn == nil {
 		b.routing.chunkWaits.fabrics.Store(nil)
@@ -161,8 +176,9 @@ func (b *Bridge) SetFabricCounter(fn func(context.Context) (int, error)) {
 
 // claimChunkWait takes one of sessionID's chunk wait claims when needed
 // is set. release gives it back and is a no-op when nothing was taken;
-// ok is false when the session holds every claim, or its fabric more than
-// its share ([chunkWaitFabricThreshold]).
+// ok is false when the session holds every claim, or its fabric its whole
+// share ([chunkWaitFabricThreshold]). A session without a fabric asks the
+// host's fabric count never: it is held to no share.
 func (b *Bridge) claimChunkWait(ctx context.Context, sessionID uint16, needed bool) (release func(), ok bool) {
 	if !needed {
 		return func() {}, true
@@ -175,7 +191,7 @@ func (b *Bridge) claimChunkWait(ctx context.Context, sessionID uint16, needed bo
 		fabric, _ = r.FabricFor(sessionID)
 	}
 	share := 0
-	if b.routing.chunkWaits.atThreshold() {
+	if fabric != 0 && b.routing.chunkWaits.atThreshold() {
 		share = b.routing.chunkWaits.share(ctx)
 	}
 	if !b.routing.chunkWaits.claim(sessionID, fabric, share) {
@@ -199,8 +215,9 @@ func (b *Bridge) endSessionChunkWaits(sessionID uint16) {
 // primingAbort registers the channel that ends subID's priming-report
 // chunk waits when the subscription closes, and closes it at once when
 // the subscription is already gone. The caller defers
-// [Bridge.forgetPrimingAbort].
-func (b *Bridge) primingAbort(subID uint32) <-chan struct{} {
+// [Bridge.forgetPrimingAbort] with the channel returned: it is the
+// table's stored value, bidirectional, so the forget's compare matches.
+func (b *Bridge) primingAbort(subID uint32) chan struct{} {
 	if subID == 0 {
 		return nil // no manager: nothing can close it
 	}
@@ -233,8 +250,10 @@ func (b *Bridge) closePrimingAbort(subID uint32) {
 // a report of a subscription a KeepSubscriptions=false request, a fabric's
 // removal or an emptied grant ended returns at once instead of waiting
 // out chunkStatusResponseTimeout (review II, R2-P6-fsm-0513). A
-// subscription has one report in flight, so the priming table holds it.
-// done stops it; the caller defers done.
+// subscription has one ongoing report in flight, so the priming table
+// holds it; the priming report's tail can overlap the first one, which is
+// why each forget removes only its own channel (R2-P7-req-01). done stops
+// it; the caller defers done.
 func (b *Bridge) reportAbort(ctx context.Context, subID uint32) (abort <-chan struct{}, done func()) {
 	ch := b.primingAbort(subID)
 	if ch == nil {
@@ -243,12 +262,19 @@ func (b *Bridge) reportAbort(ctx context.Context, subID uint32) (abort <-chan st
 	stop := context.AfterFunc(ctx, func() { b.closePrimingAbort(subID) })
 	return ch, func() {
 		stop()
-		b.forgetPrimingAbort(subID)
+		b.forgetPrimingAbort(subID, ch)
 	}
 }
 
-// forgetPrimingAbort drops subID's priming abort once its priming report
-// is done.
-func (b *Bridge) forgetPrimingAbort(subID uint32) {
-	b.routing.primingAborts.Delete(subID)
+// forgetPrimingAbort drops subID's abort ch once its report is done — only
+// while ch is still the registered one. The priming report's deferred
+// forget runs after EndPriming, so the first ongoing report may already
+// have registered its own channel; an unconditional delete would drop it
+// and leave that report's chunk wait to its timer when the subscription
+// closes (review II, phase 7, R2-P7-req-01).
+func (b *Bridge) forgetPrimingAbort(subID uint32, ch chan struct{}) {
+	if ch == nil {
+		return
+	}
+	b.routing.primingAborts.CompareAndDelete(subID, ch)
 }

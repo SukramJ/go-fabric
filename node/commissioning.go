@@ -84,10 +84,12 @@ type commissioningHost struct {
 
 	// ble is whether the node has a BLE radio (Network.GATT); clk paces
 	// the bound of leaving it. fabricCount counts the node's fabrics
-	// (set by wireCommissioningWindow).
+	// (set by wireCommissioningWindow): fabrics.count, the cached count
+	// it shares with the bridge and the window.
 	ble         bool
 	clk         clock.Clock
 	fabricCount func(context.Context) (int, error)
+	fabrics     *fabricCountCache
 
 	// announcedMu guards announcedDiscriminator and announcedMode.
 	announcedMu            sync.Mutex
@@ -111,10 +113,14 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 		}
 		return rec.VendorID
 	})
-	fabrics := func(ctx context.Context) (int, error) {
-		recs, err := st.ListFabrics(ctx)
-		return len(recs), err
+	h.fabrics = &fabricCountCache{
+		list: func(ctx context.Context) (int, error) {
+			recs, err := st.ListFabrics(ctx)
+			return len(recs), err
+		},
+		armed: h.root.GeneralCommissioning.FailSafeArmed,
 	}
+	fabrics := h.fabrics.count
 	admin.SetFabricCounter(fabrics)
 	window.SetFabricCounter(fabrics)
 	h.br.SetFabricCounter(fabrics)

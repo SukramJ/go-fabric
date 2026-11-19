@@ -15,8 +15,9 @@ import (
 // TestTrackOnExchangeRefusesWhileAMessageAwaitsItsAck (review II, hs 4b):
 // a second message of the same exchange and role is refused while the
 // first waits for its acknowledgement, and taken once it is acknowledged;
-// a message of the other role that shares the id keeps the shared slot's
-// rule and takes the place.
+// a message of the other role that shares the id is another exchange and
+// takes a slot of its own, the first keeping its retransmissions (review
+// II, phase 7, R2-P7-req-03).
 func TestTrackOnExchangeRefusesWhileAMessageAwaitsItsAck(t *testing.T) {
 	t.Parallel()
 	tr := newOutboundReliableTracker(nil, clock.System{})
@@ -40,7 +41,7 @@ func TestTrackOnExchangeRefusesWhileAMessageAwaitsItsAck(t *testing.T) {
 	if err := tr.TrackOnExchange(3, 7, 0x10, true, []byte{3}, dest, now); err != nil {
 		t.Fatalf("a message of the other role on the shared id: %v, want it taken", err)
 	}
-	if tr.Pending() != 1 {
-		t.Fatalf("pending = %d, want the other role's message alone", tr.Pending())
+	if tr.Pending() != 2 {
+		t.Fatalf("pending = %d, want both roles' messages: the exchanges are two", tr.Pending())
 	}
 }

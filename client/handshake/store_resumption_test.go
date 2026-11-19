@@ -47,13 +47,15 @@ func TestStoreResumptionOneRecordForBothRoles(t *testing.T) {
 		ResumptionID:          bytes.Repeat([]byte{0x01}, 16),
 		SessionParameters:     params,
 		CaseAuthenticatedTags: []uint32{0x00010001},
+		Initiator:             true,
 	}
 	if err := rs.SaveResumptionRecord(written); err != nil {
 		t.Fatal(err)
 	}
-	// The responder reads the client's record by id.
+	// The responder reads the client's record by id; the store holds its
+	// role, which keeps it out of the per-fabric cap (R2-P7-sec-01).
 	row, err := st.GetResumptionByID(context.Background(), written.ResumptionID)
-	if err != nil || row.FabricIndex != fi || row.PeerNodeID != 0xABCD || row.SessionParameters != params || !slices.Equal(row.CASEAuthTags, written.CaseAuthenticatedTags) {
+	if err != nil || row.FabricIndex != fi || row.PeerNodeID != 0xABCD || row.SessionParameters != params || !slices.Equal(row.CASEAuthTags, written.CaseAuthenticatedTags) || !row.Initiator {
 		t.Fatalf("store row %+v, %v", row, err)
 	}
 	for name, find := range map[string]func() (handshake.ResumptionRecord, bool){
@@ -62,7 +64,7 @@ func TestStoreResumptionOneRecordForBothRoles(t *testing.T) {
 	} {
 		got, ok := find()
 		if !ok || got.Peer != peer || !bytes.Equal(got.SharedSecret, written.SharedSecret) || !bytes.Equal(got.ResumptionID, written.ResumptionID) ||
-			got.SessionParameters != params || !slices.Equal(got.CaseAuthenticatedTags, written.CaseAuthenticatedTags) {
+			got.SessionParameters != params || !slices.Equal(got.CaseAuthenticatedTags, written.CaseAuthenticatedTags) || !got.Initiator {
 			t.Errorf("%s: %+v, %v", name, got, ok)
 		}
 	}
@@ -74,7 +76,7 @@ func TestStoreResumptionOneRecordForBothRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, ok := rs.FindResumptionRecord(peer)
-	if !ok || !bytes.Equal(got.ResumptionID, responder.ResumptionID) || got.SessionParameters != (sessionparams.Parameters{}) || got.CaseAuthenticatedTags != nil {
+	if !ok || !bytes.Equal(got.ResumptionID, responder.ResumptionID) || got.SessionParameters != (sessionparams.Parameters{}) || got.CaseAuthenticatedTags != nil || got.Initiator {
 		t.Fatalf("after the responder's save: %+v, %v", got, ok)
 	}
 	if ok, err := rs.DeleteResumptionRecord(peer); !ok || err != nil {

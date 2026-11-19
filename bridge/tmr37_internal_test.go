@@ -82,15 +82,19 @@ func TestTMR37(t *testing.T) {
 	b.AttachSessionLookup(lookup)
 	others, last := peers[:holders], peers[holders]
 
-	for _, p := range others {
-		for i := range maxChunkWaitsPerSession {
-			sendToBridge(t, b, p, wildcardRead(t, p, uint16(0x5000+i)))
-		}
-	}
+	// One session at a time: its reads, then their answers. A burst of
+	// every session's reads overflowed the bridge socket's receive buffer
+	// (in one run under Linux's default 212992 bytes, 762 of the 1024 dropped, by
+	// /proc/net/udp), and this peer never retransmits. Parked reads keep
+	// their claims (the chunk wait runs a minute), so the claims still
+	// climb to the threshold and the share still refuses the rest.
 	// One answer per read, told apart by exchange: a retransmitted first
 	// chunk names an exchange already seen.
 	var parked, busy int
 	for _, p := range others {
+		for i := range maxChunkWaitsPerSession {
+			sendToBridge(t, b, p, wildcardRead(t, p, uint16(0x5000+i)))
+		}
 		seen := map[uint16]bool{}
 		for len(seen) < maxChunkWaitsPerSession {
 			proto, body, answered := readOneIMDatagram(t, p.conn, p.sess, 10*time.Second)

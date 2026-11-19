@@ -480,3 +480,42 @@ go-fabric-ui's test `fabricui/error_branches_test.go:22` names
 value is what the opener returns); go-ha2fabric and go-fabric-server use
 none. Read with `git grep -w` of every deprecated identifier's last name
 over `*.go`, tests included, each hit read by hand.
+
+## 2026-11-19, phase 7
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 268 | Phase 7 (README: "repeat a full-cut run until one yields no new high or medium") under a token shortage | **Priorities 1–3 only, one pull request**: the CI flakes, the CASE initiator's window, a delta review of phase 6's fixes (`0ed3dbf3..26fe6211`, the security paths and the request path); no full-cut run 2, so phase 7 does not claim convergence — "two runs, the fixes of run 1 read in their delta". Priorities 4–7 (the `nested-release-check` sibling, the mutation survivors, the citation and by_design remnants, the full-cut run 2) stay in the plan and are caught up in small pull requests; the pin lift follows as its own pull request (decision 187) and does not wait for them |
+| 269 | The CASE initiator registers its session only after the responder's Success (`client/handshake/case.go:304` at `26fe6211`; matter.js `CaseClient.ts:336-369` has the same order) — a responder's first message is delayed meanwhile over UDP and lost over TCP | **Ahead of matter.js**, as the responder's `f2527f32`: the session is registered establishing before Sigma3, holds what arrives, is handed out only after the Success and closed on a failed or missing one; `BD-Matter-CASEClient-SessionBeforeSigma3` and a deterministic test (`0d5d1132`, rework `4f4bf9e5`) |
+| 270 | R2-P7-sec-01: the per-fabric resumption cap of 16 (decision 134) also evicts the records the CASE client writes | **Documentation now, the role column in the backlog**: `BD-Matter-ResumptionRecordsPerFabric` (`4f4bf9e5`) and `store/port.go` (`6843e1eb`) name the consequence for a controller; a role column with eviction of responder rows only is a small pull request of its own. The first choice — the cap bounds responder-role records only — cannot be done without a schema change: the store keeps one record per fabric and peer for both roles and carries no role (`store/resumption.go:29-42`), and it needs an exported field on `store.ResumptionRecord` |
+
+## 2026-11-19, the phase-7 backlog
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 271 | Where `nested-release-check` learns which versions a nested-release pull request releases (decision 266's tooling item) | **The head branch `release/nested-vX.Y.Z`** (decision 261's name), written down as the rule; a nested-release pull request on another branch stays strict |
+| 272 | Which modules count as released by such a pull request | **Those that already have a `<dir>/v*` tag**; a brand-new nested module stays strict until it is tagged by hand — red rather than silently green |
+
+## 2026-11-19, the phase-7 backlog: the resumption role
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 273 | With the role column (decision 270's backlog item) client-role resumption records have no bound, and a fabric's CA holder can drive client connections through peer-named targets (`AnnounceOtaProvider`, the camera requestor; Fable read) | **A bound of their own per fabric, 1024**, beside the responder's 16: each role evicts only its own records, the store stays bounded and a controller with many devices keeps its records. `caseInitiatorProvider` (`node/security.go`), whose targets are former subscribers, keeps saving in the responder role, under the 16 |
+
+## 2026-11-19, the phase-7 backlog: the request path, the group load, the receive rules
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 274 | R2-P7-req-06: an aborted report counts as a failed update for the flush's skip rule | **A new exported `im/subscription` method requeues without counting** (`RequeueAborted`-style, additive); the bridge uses it on the aborted path |
+| 275 | R2-P7-req-05: the chunk-wait fabric share admits share+1, pools unresolved/PASE sessions as fabric 0, asks the host's fabric count per claim | **Strict (`>=`, at most `share` claims), fabric 0 excluded from the share rule (only the global threshold applies), fabric count cached and refreshed on AddNOC/RemoveFabric** — revises decision 245's wording |
+| 276 | R2-P7-V3-bdx, R2-P7-V3-ack | **Mirror both** (receive refusal on BDX exchanges, "Incorrect ack received" `MessageExchange.ts:526-533`): one unit, Fable reads matter.js at the pin first, Opus implements, Fable reads the diff |
+| 277 | Decision 276's scope: matter.js applies both receive rules to unsecured exchanges too (Fable read); ours excludes session 0 (`bridge/receive.go:212`) | **Both rules for every exchange, session 0 included, as matter.js**; chip-tool run in the unit |
+| 278 | The secure ack is session-scoped (`bridge/outbound_reliable.go:775-777`): an ack on exchange X can clear exchange Y's entry, matter.js never does | **Fixed in the same unit: the ack is exchange-scoped, as matter.js** |
+| 279 | R2-P7-sec-04 fix: the first-load pacing also served the cached error to the four authenticated callers of `ensureAllLoaded` (Fable read) | **Only the unauthenticated datagram path (`groups/decode.go`) is paced**; authenticated callers try the store as before |
+| 280 | Decision 275 part 3: the bridge hears no AddNOC (`bridge/bridge.go:253-254`); where the fabric count is cached | **In node's counter** (`node/commissioning.go:114-120`), cleared on `fabricInstalled`/`fabricRemoved`; no new bridge API; `SetFabricCounter`'s doc says it is called per claim under load and must be cheap |
+| 280a | Coordinator, within 280: a failed AddNOC rolls its pending row back without a node hook (`cluster/core/operational_credentials.go:3157`) | **The node cache keeps nothing while a fail-safe is armed** (a pending row exists only then); no new hook in `cluster/core` |
+| 281 | Decision 275: the "global threshold" named for fabric 0 does not exist (the threshold only switches the share rule on) | **The per-session bound and the listener's dispatch slots suffice**: with a resolver fabric 0 is PASE sessions only, without one a share rule cannot work; stated in the package comment and `BD-Matter-ChunkWaitsSharedByFabric` |
+| 282 | Decision 277 leaves decision 173's guard and decision 70's branches partly unreachable over UDP (Fable read) | **Keep both** (matter.js keeps the same guard, `CaseServer.ts:82-86`, `PaseServer.ts:207-210`); rewrite the comments at `bridge/securechannel.go:1123-1131`, `:1556-1575` |
+| 283 | Fable A1: a give-up frees the BDX slot like an ack, the waiting send still goes out; matter.js sends nothing (`MessageExchange.ts:973-978`, `:701-705`) | **As matter.js**: after a wake `waitExchangeFree` returns `ErrMaxRetransmissionsReached` when the exchange was given up; doc + CHANGELOG corrected; test |
+| 284 | A provider's completed CASE record still answers a Sigma3 after the success report was acknowledged; its original case is covered by the receive rule + the report's retransmission | **Remove, in its own small PR after this one** (Fable read, chip-tool run) |
+| 285 | #553: a facade entry to commission a discovered device by its passcode (go-fabric-ui) | **`Controller.PairDiscovered(ctx, dev client.Device, passcode uint32, opts PairOptions)`**, sharing one internal pipeline with `Pair` (attestation, tracing, metrics, step reporting); additive; in PR #552 |

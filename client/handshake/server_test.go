@@ -39,6 +39,7 @@ type responderRig struct {
 	sessions   chan *exchange.Session
 
 	nodeMgr    *exchange.Manager
+	nodeRec    *recorder
 	nodeFabric handshake.Fabric
 	nodeStore  *handshake.MemoryResumptionStore
 	ca         *bridgetest.Commissioner
@@ -84,7 +85,7 @@ func newResponderRig(t *testing.T) *responderRig {
 	server.Register()
 	t.Cleanup(server.Close)
 	r.server = server
-	r.nodeMgr, _ = newManager(t)
+	r.nodeMgr, r.nodeRec = newManager(t)
 	// The node's own fabric index for the fabric need not be ours.
 	r.nodeFabric = fabricOf(t, c, testNodeID, 3)
 	return r
@@ -168,6 +169,20 @@ func TestCASEServerFullAndResumed(t *testing.T) {
 	if byID, ok := r.store.FindByResumptionID(rec.ResumptionID); !ok || byID.Peer != rec.Peer {
 		t.Fatalf("FindByResumptionID = %+v, %v", byID, ok)
 	}
+	// Each side saves its record in its own role (R2-P7-sec-01): the
+	// responder's is not the initiator's, the node's client's is.
+	if rec.Initiator || !nodeRec.Initiator {
+		t.Fatalf("roles after the full handshake: server Initiator %v, node %v; want false, true", rec.Initiator, nodeRec.Initiator)
+	}
+	// The resumption below copies each side's record; the role it saves is
+	// its own, not the copied record's — flip both to show it.
+	rec.Initiator, nodeRec.Initiator = true, false
+	if err := r.store.SaveResumptionRecord(rec); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.nodeStore.SaveResumptionRecord(nodeRec); err != nil {
+		t.Fatal(err)
+	}
 
 	client2, resumed, err := r.open(ctx, r.nodeFabric)
 	if err != nil {
@@ -183,6 +198,9 @@ func TestCASEServerFullAndResumed(t *testing.T) {
 	nodeMoved, _ := r.nodeStore.FindResumptionRecord(nodeRec.Peer)
 	if bytes.Equal(moved.ResumptionID, rec.ResumptionID) || !bytes.Equal(moved.ResumptionID, nodeMoved.ResumptionID) {
 		t.Fatal("the resumed handshake did not move both records to the new resumption id")
+	}
+	if moved.Initiator || !nodeMoved.Initiator {
+		t.Fatalf("roles after the resumption: server Initiator %v, node %v; want false, true", moved.Initiator, nodeMoved.Initiator)
 	}
 	if n := len(r.serverRec.unsecuredStatusReports()); n != 1 {
 		t.Fatalf("%d StatusReports sent, want the one Success of the full handshake", n)

@@ -200,6 +200,17 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		b.bindUnsecuredWindow(&hdr, proto.ExchangeID)
 	}
 
+	// A new message on an exchange whose earlier reliable message from this
+	// node still waits for its acknowledgement must acknowledge it, or it
+	// is refused here: not acknowledged, not processed, the exchange and
+	// the outstanding message left as they were
+	// ([Bridge.refuseUnacknowledging]).
+	if !duplicate {
+		if err := b.refuseUnacknowledging(src, &hdr, proto); err != nil {
+			return err
+		}
+	}
+
 	// Reliable inbound traffic: register an ACK obligation. The
 	// pump goroutine fires a StandaloneAck if no piggyback opportunity
 	// arises within the grace window; sendReply paths discharge the
@@ -230,8 +241,10 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		return nil
 	}
 
-	// Inbound piggyback ACK: clear any reliable outbound message we
-	// shipped whose MessageCounter matches AckCounter (Matter §4.12.3).
+	// Inbound piggyback ACK: clear the reliable outbound message of this
+	// exchange whose MessageCounter matches AckCounter (Matter §4.12.3) —
+	// of this exchange only, on a secure session as on the unsecured one
+	// ([outboundReliableTracker.AckOnExchange]).
 	// Applies to both IM and SC datagrams; the SC dispatch also
 	// runs an exchange-id-keyed Discharge for the legacy AckHandler
 	// (those two layers track different obligations). Successful
@@ -252,7 +265,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 			if outbound.AckUnsecured(hk, proto.AckCounter) {
 				b.unsecuredReplyAcknowledged(hk)
 			}
-		case outbound.Ack(hdr.SessionID, proto.AckCounter):
+		case outbound.AckOnExchange(hdr.SessionID, proto.ExchangeID, roleOf(!proto.Initiator), proto.AckCounter):
 			b.releaseReportCounter(hdr.SessionID, proto.AckCounter)
 		}
 	}
@@ -1370,4 +1383,56 @@ func (b *Bridge) replyDecodeError(src net.Addr, requestHdr *message.Header, prot
 	}
 	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	return decodeErr
+}
+
+// refuseUnacknowledging applies the two receive rules of an exchange that
+// holds a message from this node awaiting its acknowledgement
+// ([Bridge.outstandingOn]), for every exchange — a secure session's
+// interaction and BDX exchanges and the unsecured session's handshakes
+// alike (review II, phase 7, decisions 276, 277):
+//
+//   - a message that carries no acknowledgement is refused with
+//     [errPreviousAckMissing];
+//   - a message whose acknowledgement names another counter is refused
+//     with [errIncorrectAck], unless it is a standalone acknowledgement,
+//     which passes on and clears nothing ([outboundReliableTracker.AckOnExchange]).
+//
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:521-534
+// at db021da0 (onMessageReceived: with #sentMessageToAck set, no
+// ackedMessageId throws "Previous message ack is missing", :523-525;
+// another ackedMessageId throws "Incorrect ack received", :526-533, except
+// for a standalone ack, :528-529). The rules sit after the duplicate check
+// and before the acknowledgement is registered and the message delivered
+// (:553-562); the throw is caught and logged by ExchangeManager.ts:435-437
+// and :538-549, so a refused message is not acknowledged, not processed,
+// and its exchange and the outstanding message stay — the peer's
+// retransmissions of it are duplicates, acknowledged and never processed.
+// Called before [Bridge.owedInboundAck] and before the acknowledgement is
+// applied, so a refused message's acknowledgement clears nothing.
+func (b *Bridge) refuseUnacknowledging(src net.Addr, hdr *message.Header, proto message.ProtocolHeader) error {
+	expected := b.outstandingOn(hdr, proto)
+	if len(expected) == 0 {
+		return nil
+	}
+	attrs := []any{
+		slog.String("src", srcString(src)),
+		slog.Int("session_id", int(hdr.SessionID)),
+		slog.Int("exchange_id", int(proto.ExchangeID)),
+		slog.Uint64("counter", uint64(hdr.MessageCounter)),
+	}
+	switch {
+	case !proto.HasAck:
+		b.logger.Debug("matter.rx.previous_ack_missing", attrs...)
+		return fmt.Errorf("%w: session=%d exchange=%d", errPreviousAckMissing, hdr.SessionID, proto.ExchangeID)
+	case slices.Contains(expected, proto.AckCounter):
+		return nil
+	case proto.ProtocolID == mrp.SecureChannelProtocolID && proto.Opcode == mrp.StandaloneAckOpcode:
+		return nil
+	default:
+		attrs = append(attrs,
+			slog.Uint64("expected", uint64(expected[len(expected)-1])),
+			slog.Uint64("ack_counter", uint64(proto.AckCounter)))
+		b.logger.Debug("matter.rx.incorrect_ack", attrs...)
+		return fmt.Errorf("%w: session=%d exchange=%d expected=%d received=%d", errIncorrectAck, hdr.SessionID, proto.ExchangeID, expected[len(expected)-1], proto.AckCounter)
+	}
 }

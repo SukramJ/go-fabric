@@ -602,7 +602,9 @@ func (p *Prover) GeneratePake1() ([]byte, error) {
 	}
 	p.xMarshal = nistec.NewP256Point().Add(xG, w0M).Bytes()
 	p.state = proverStatePake1Generated
-	return p.xMarshal, nil
+	// X is the caller's copy: cB and the keys are checked and derived
+	// against the prover's own (review II, R2-P7-sec-06).
+	return append([]byte(nil), p.xMarshal...), nil
 }
 
 // ProcessPake2 consumes the verifier's Y + cB. Returns the prover's

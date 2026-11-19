@@ -494,10 +494,11 @@ func statusReportSuccessOr(payload []byte, failure error) error {
 // sendCASEError reports a failed handshake to the peer, best effort —
 // matter.js CaseClient.pair sends StatusReport(InvalidParam) unless the
 // failure was a transport one. The report is tracked like the rest. Nothing is
-// sent when sigma1Unacked: the Sigma1 still waited for its acknowledgement
-// when the failing reply arrived, and the handshake ends unreported
-// (review II, F-db021da0-7; [Bridge.endHandshakeUnreported] on the
-// responder side).
+// sent when sigma1Unacked: the Sigma1 still waits for its acknowledgement,
+// and the handshake ends unreported (review II, F-db021da0-7;
+// [Bridge.endHandshakeUnreported] on the responder side, which also says
+// where the guard is still reached since decision 277: a reply that does
+// not acknowledge the Sigma1 is refused on receive).
 func (b *Bridge) sendCASEError(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, ackCounter uint32, sigma1Unacked bool) {
 	if sigma1Unacked {
 		b.logger.Debug("matter.sc.handshake.failure_report_skipped",

@@ -103,7 +103,7 @@ func (m *Manager) MulticastAddressFor(ctx context.Context, fabricIndex uint8, gr
 // GroupcastServer #deriveMembership, which rebuilds the attribute from the
 // same three sources on every change of one of them.
 func (m *Manager) GroupcastMemberships(ctx context.Context) ([]GroupcastMembership, error) {
-	if err := m.ensureAllLoaded(ctx); err != nil {
+	if err := m.ensureAllLoaded(ctx, loadOnDemand); err != nil {
 		return nil, err
 	}
 	m.mu.RLock()
@@ -248,7 +248,7 @@ func (f *fabricGroups) hasEndpoints(groupID uint16) bool {
 // GroupcastServer #emitAuxAcl (core§11.27.10: sender-only memberships get
 // none); the entries carry AuxiliaryType Groupcast on the wire.
 func (m *Manager) AuxiliaryACL(ctx context.Context, fabricIndex uint8) ([]store.ACLEntry, error) {
-	if err := m.ensureAllLoaded(ctx); err != nil {
+	if err := m.ensureAllLoaded(ctx, loadOnDemand); err != nil {
 		return nil, err
 	}
 	m.mu.RLock()

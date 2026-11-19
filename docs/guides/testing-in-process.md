@@ -207,7 +207,9 @@ fake ESPHome proxy.
 that composes its controller with `controller.New` tests that composition
 instead: `Site.ControllerConfig(opts)` returns a `controller.Config` wired
 to the site — a host index with its socket on the site's network
-(`Listener`), the DNS-SD browser on the site's answers (`Names`), the
+(`Listener`; on a loopback site the address `New` binds itself, `Listen`
+`[::1]:0`, so that with incoming TCP it picks a port free for both), the
+DNS-SD browser on the site's answers (`Names`), the
 site's clock with the host's in-flight counters (`Clock`), the site's
 logger and a SQLite database of its own in the site's directory. The test
 edits the configuration as the program does, calls `controller.New` and

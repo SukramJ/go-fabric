@@ -197,8 +197,12 @@ type Sigma1ProcessResult struct {
 	// releases it ([ResumeClaim.Release]), so the record may resume again;
 	// a caller that installs one leaves the claim to the store's owner,
 	// who ends it with the record the resume replaces (review II,
-	// R2-P6-sec-3320, decision 243). nil on a full handshake and on a
-	// store that claims nothing.
+	// R2-P6-sec-3320, decision 243). When the caller's install fails
+	// (bridge's established-callback returns an error), the bridge
+	// releases nothing: the callback that failed releases the claim
+	// itself, as node's does, and a host with a claiming store of its
+	// own releases it in its callback, or the id stays claimed. nil on a
+	// full handshake and on a store that claims nothing.
 	Claim *ResumeClaim
 }
 

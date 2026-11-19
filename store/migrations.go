@@ -67,7 +67,10 @@ type Migration struct {
 //   - v11 — review II (decisions 148 and 134): matter_group_key_map's
 //     position, the order the GroupKeyMap was written in; matter_resumption's
 //     write_seq, the order the per-fabric cap evicts in.
-var migrationVersions = []string{"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"}
+//   - v12 — review II (R2-P7-sec-01, decision 270): matter_resumption's
+//     initiator, the role that wrote the record; the per-fabric cap counts
+//     the responder's records only.
+var migrationVersions = []string{"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12"}
 
 // Migrations returns the schema's steps in order. Applied to an empty
 // database one after the other, they produce the schema [Apply] produces —

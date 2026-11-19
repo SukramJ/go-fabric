@@ -749,12 +749,17 @@ ble-wifi-light-check: ## the examples/ble-wifi-light module: build (linux amd64,
 # requires — what a consumer's build resolves. Needs the tags (git fetch
 # --tags) and the module proxy. A release pull request runs it
 # (chiptool.yml, job nested-release), and so does the push of a nested
-# tag (release.yml). NESTED_MODULES narrows.
+# tag (release.yml). NESTED_MODULES narrows. NESTED_RELEASED names the
+# tags a nested release pull request makes at its merge
+# (NESTED_RELEASED="ble/bluez/v0.23.0 wifi/wpasupplicant/v0.23.0"): a
+# sibling's require of such a version builds against the sibling's checked
+# copy (owner decision 266; chiptool.yml derives them on the pull request).
 NESTED_MODULES ?= ble/bluez ble/esphome wifi/wpasupplicant examples/ble-wifi-light
+NESTED_RELEASED ?=
 
 .PHONY: nested-release-check
 nested-release-check: ## build each nested module against the go-fabric version it requires, its replace dropped (needs the tags and the module proxy)
-	script/nested-release-check.sh $(NESTED_MODULES)
+	script/nested-release-check.sh $(addprefix --released ,$(NESTED_RELEASED)) $(NESTED_MODULES)
 
 .PHONY: workflow-lint
 workflow-lint: ## actionlint and zizmor over .github/workflows (pinned: ACTIONLINT_VERSION, ZIZMOR_VERSION)

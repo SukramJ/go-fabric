@@ -168,16 +168,23 @@ func pendingCounterOfExchange(b *Bridge, sessionID, exchangeID uint16) (uint32, 
 	b.mu.RUnlock()
 	tracker.mu.Lock()
 	defer tracker.mu.Unlock()
-	key, ok := tracker.secureByExchange[secureSlot{sessionID, exchangeID}]
-	return key.counter, ok
+	for key, e := range tracker.pending {
+		if key.sessionID == sessionID && e.exchangeID == exchangeID {
+			return key.counter, true
+		}
+	}
+	return 0, false
 }
 
-// TestSubscribeResponseWaitsForThePrimingReportsAck (review II, hs 4b):
-// a peer whose StatusResponse does not acknowledge the priming report gets
-// no SubscribeResponse — a message of the exchange waits for its
-// acknowledgement, and a new one is refused, not sent in its place — and
-// the subscription is not established. Mirrors matter.js
-// packages/protocol/src/protocol/MessageExchange.ts:701-705 at db021da0.
+// TestSubscribeResponseWaitsForThePrimingReportsAck (review II, hs 4b;
+// phase 7, V3): a peer whose StatusResponse does not acknowledge the
+// priming report gets no SubscribeResponse and the subscription is not
+// established. A message that does not acknowledge the exchange's
+// outstanding reliable message is refused on receive, never processed
+// (matter.js packages/protocol/src/protocol/MessageExchange.ts:521-525 at
+// db021da0). The peer's answer here is such a message, so the priming
+// report's chunk wait runs out; were it processed, the reply would be
+// refused at the send (:701-705).
 func TestSubscribeResponseWaitsForThePrimingReportsAck(t *testing.T) {
 	t.Parallel()
 	const (
@@ -186,6 +193,7 @@ func TestSubscribeResponseWaitsForThePrimingReportsAck(t *testing.T) {
 	)
 	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
 	b.AttachAckTracker(mrp.NewAckTracker(time.Hour)) // attached after Start: no pump
+	b.chunkStatusResponseTimeoutOverride = 300 * time.Millisecond
 	mgr := subscription.NewManager(subscription.Config{}, nil, nil)
 	b.AttachSubscriptionManager(mgr)
 	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
@@ -221,11 +229,11 @@ func TestSubscribeResponseWaitsForThePrimingReportsAck(t *testing.T) {
 	answer := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
 		Opcode: im.OpcodeStatusResponse, ExchangeID: exchangeID, Initiator: true, NeedsAck: true,
 	}, status)
-	if err := b.dispatch(context.Background(), answer, peerAddr); err != nil {
-		t.Fatalf("dispatch of the StatusResponse: %v", err)
+	if err := b.dispatch(context.Background(), answer, peerAddr); !errors.Is(err, errPreviousAckMissing) {
+		t.Fatalf("dispatch of the StatusResponse = %v, want errPreviousAckMissing", err)
 	}
-	if err := <-done; !errors.Is(err, errExchangeAwaitsAck) {
-		t.Fatalf("dispatch of the SubscribeRequest = %v, want the refusal of the SubscribeResponse", err)
+	if err := <-done; err == nil {
+		t.Fatal("dispatch of the SubscribeRequest succeeded, want the priming report's wait to end without its answer")
 	}
 	for {
 		next, _, ok := readOneIMDatagram(t, peerConn, peerSess, 200*time.Millisecond)

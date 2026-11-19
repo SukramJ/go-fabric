@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"sync/atomic"
 	"testing"
 
@@ -20,7 +21,11 @@ import (
 // maxUnsecuredWindows — meets the completed handshake's adapter, whose
 // answer is the success report again, and installs no second session; it
 // is not taken for a Sigma3 of a handshake no Sigma1 began (review II,
-// R2-P3-dr-dev-02).
+// R2-P3-dr-dev-02). That is once the success report was acknowledged:
+// before, the Sigma3 acknowledges the Sigma2, not the report, and is
+// refused on receive with "Incorrect ack received" (review II, phase 7,
+// decision 277; matter.js packages/protocol/src/protocol/MessageExchange.ts:526-533
+// at db021da0).
 func TestSigma3OfACompletedHandshakeIsAnsweredSuccess(t *testing.T) {
 	t.Parallel()
 	r := newUnsecuredRig(t)
@@ -66,11 +71,17 @@ func TestSigma3OfACompletedHandshakeIsAnsweredSuccess(t *testing.T) {
 	if err := controller.send(mrp.SCOpcodeSigma3, caseExchange, sigma3, &counter); err != nil {
 		t.Fatal(err)
 	}
-	report, _, _ := controller.recv(mrp.SCOpcodeStatusReport, "the report on Sigma3")
+	report, reportCounter, _ := controller.recv(mrp.SCOpcodeStatusReport, "the report on Sigma3")
 	if general, _, _, ok := decodeStatusReport(report); !ok || general != mrp.SCStatusGeneralSuccess {
 		t.Fatalf("the report on Sigma3: general status %d, want SUCCESS", general)
 	}
 
+	if err := controller.send(mrp.SCOpcodeSigma3, caseExchange, sigma3, &counter); !errors.Is(err, errIncorrectAck) {
+		t.Fatalf("the Sigma3 again while the success report waits for its acknowledgement: dispatch %v, want errIncorrectAck", err)
+	}
+	if err := controller.send(mrp.StandaloneAckOpcode, caseExchange, nil, &reportCounter); err != nil {
+		t.Fatal(err)
+	}
 	if err := controller.send(mrp.SCOpcodeSigma3, caseExchange, sigma3, &counter); err != nil {
 		t.Fatal(err)
 	}

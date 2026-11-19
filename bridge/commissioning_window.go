@@ -393,7 +393,11 @@ func (w *CommissioningWindow) IsOwnWindow() bool {
 
 // SetFabricCounter wires (or clears, when nil) the fabric count
 // [CommissioningWindow.OpenOwnWindow] derives its default timeout from.
-// Without it the node counts as uncommissioned.
+// Without it the node counts as uncommissioned. The window asks it once
+// per OpenOwnWindow; the node wires the same counter into
+// [Bridge.SetFabricCounter], which asks it for every chunk wait claim
+// under load, so fn must be cheap — the node's keeps the count until a
+// fabric is installed or removed (review II, R2-P7-req-05, decision 280).
 func (w *CommissioningWindow) SetFabricCounter(fn func(context.Context) (int, error)) {
 	w.mu.Lock()
 	w.fabricCounter = fn

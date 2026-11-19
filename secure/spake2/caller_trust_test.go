@@ -46,6 +46,42 @@ func TestPake2OutputYIsTheCallersCopy(t *testing.T) {
 	}
 }
 
+// TestGeneratePake1XIsTheCallersCopy: the X GeneratePake1 returns is a
+// copy, as Pake2Output's Y is. A caller that changes it after sending it
+// changes nothing the prover checks cB against or derives its keys from,
+// so the handshake still completes (review II, R2-P7-sec-06).
+func TestGeneratePake1XIsTheCallersCopy(t *testing.T) {
+	t.Parallel()
+	salt := testSalt()
+	vc, err := NewVerifierContext(testPasscode, salt, testIterations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prover, err := NewProver(testPasscode, salt, testIterations, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pA, err := prover.GeneratePake1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier := NewVerifier(vc, nil, nil, nil)
+	pake2, err := verifier.ProcessPake1(append([]byte(nil), pA...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range pA {
+		pA[i] ^= 0xFF
+	}
+	cA, err := prover.ProcessPake2(pake2.Y, pake2.CB)
+	if err != nil {
+		t.Fatalf("ProcessPake2 after the caller changed its X: %v, want the verifier's genuine cB accepted", err)
+	}
+	if err := verifier.ProcessPake3(cA); err != nil {
+		t.Fatalf("ProcessPake3: %v", err)
+	}
+}
+
 // TestProcessPake1RefusesAVerifierContextThatDoesNotFit holds
 // R2-P6-api-0115 (b): a VerifierContext built by hand with a W0 that is
 // not a 32-byte scalar, or without L, is refused with an error instead of

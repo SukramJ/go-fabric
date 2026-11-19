@@ -96,7 +96,9 @@ type Subscription struct {
 	// they do not ask for (review II, F-db021da0-3).
 	owedPaths map[im.ConcreteAttributePath]struct{}
 	// failedUpdates counts the requeues of failed updates: a flush that
-	// waited for a report in flight sees whether it failed.
+	// waited for a report in flight sees whether it failed. An aborted
+	// report's requeue ([Subscription.RequeueAbortedAttributes],
+	// [Subscription.RequeueAbortedEvents]) does not count.
 	failedUpdates uint64
 	// The events the subscription owes are one number, not a queue: the
 	// lowest unreported event number (eventsMin, valid while
@@ -658,6 +660,10 @@ func (s *Subscription) eventUrgency(path im.ConcreteEventPath) (selected, urgent
 // urgent event (:396-398) and the send-interval timer (:480-484), not
 // there. It reported the retry once MinIntervalFloor had elapsed since the
 // failed report (review II, F-db021da0-3).
+//
+// It counts one failed update: a flush that waited for the report sends
+// nothing more ([Manager.FlushFabric]). A report that was aborted, not
+// failed, is owed again with [Subscription.RequeueAbortedEvents].
 func (s *Subscription) RequeueEvents(fromNumber uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -665,6 +671,27 @@ func (s *Subscription) RequeueEvents(fromNumber uint64) {
 		return
 	}
 	s.failedUpdates++
+	s.requeueEventsLocked(fromNumber)
+}
+
+// RequeueAbortedEvents is [Subscription.RequeueEvents] for a report that
+// was aborted, not failed — the engine's stop, the subscription's or the
+// session's close ended its wait, the peer did nothing wrong: the events
+// are owed again the same way, but no failed update is counted, so a
+// flush that waited for the report still sends what the subscription
+// owes (review II, R2-P7-req-06, decision 274).
+func (s *Subscription) RequeueAbortedEvents(fromNumber uint64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.requeueEventsLocked(fromNumber)
+}
+
+// requeueEventsLocked owes the events from fromNumber on again; s.mu is
+// held.
+func (s *Subscription) requeueEventsLocked(fromNumber uint64) {
 	if !s.eventsPending || fromNumber < s.eventsMin {
 		s.eventsMin = fromNumber
 	}
@@ -689,6 +716,10 @@ func (s *Subscription) failedUpdateCount() uint64 {
 // calls it when a report carrying them could not be sent. They do not ask
 // for a report — the next one another cause starts takes them
 // ([Subscription.RequeueEvents]; review II, F-db021da0-3).
+//
+// It counts one failed update: a flush that waited for the report sends
+// nothing more ([Manager.FlushFabric]). A report that was aborted, not
+// failed, is owed again with [Subscription.RequeueAbortedAttributes].
 func (s *Subscription) RequeueAttributes(paths []im.ConcreteAttributePath) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -696,6 +727,27 @@ func (s *Subscription) RequeueAttributes(paths []im.ConcreteAttributePath) {
 		return
 	}
 	s.failedUpdates++
+	s.requeueAttributesLocked(paths)
+}
+
+// RequeueAbortedAttributes is [Subscription.RequeueAttributes] for a
+// report that was aborted, not failed — the engine's stop, the
+// subscription's or the session's close ended its wait, the peer did
+// nothing wrong: the paths are owed again the same way, but no failed
+// update is counted, so a flush that waited for the report still sends
+// what the subscription owes (review II, R2-P7-req-06, decision 274).
+func (s *Subscription) RequeueAbortedAttributes(paths []im.ConcreteAttributePath) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.requeueAttributesLocked(paths)
+}
+
+// requeueAttributesLocked owes paths to the next report again; s.mu is
+// held.
+func (s *Subscription) requeueAttributesLocked(paths []im.ConcreteAttributePath) {
 	for _, p := range paths {
 		if s.owedPaths == nil {
 			s.owedPaths = make(map[im.ConcreteAttributePath]struct{})

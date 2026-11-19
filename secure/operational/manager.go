@@ -333,12 +333,13 @@ const SessionIdleTimeout = 5 * time.Minute
 //
 // The value must outlive every window in which the staked id can still
 // be claimed, because reclaiming one early would hand a live handshake
-// an id another session already owns. Two such windows exist: the
-// bridge's per-exchange CASE adapter TTL (60 s — past it the handshake
-// can never complete) and a commissioning window, whose PASE
-// placeholder is staked when the window opens and claimed only when
-// PASE completes, up to the spec maximum of 15 minutes later
-// (Matter §5.4.2.3).
+// an id another session already owns. Both stakes live in a per-exchange
+// handshake adapter: the CASE responder's, and the PASE responder's,
+// which node stakes when it builds the exchange's adapter
+// (buildPaseAdapter / buildPaseAdapterFromContext in node/security.go),
+// not when a commissioning window opens. Past the adapter TTL
+// (handshakeAdapterTTL, 60 s) the handshake can never complete, so the
+// 20 minutes leave a wide margin (review II, R2-P7-sec-05).
 const PlaceholderIDTTL = 20 * time.Minute
 
 // SessionIDSpace is the number of session ids the allocator can hand

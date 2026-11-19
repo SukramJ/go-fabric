@@ -131,11 +131,18 @@ type Manager struct {
 	// store is owed (reloadOwed): each is loaded again on its own, so a
 	// store failure leaves only that fabric absent.
 	owed map[uint8]bool
-	// owedRetryAt and owedBackoff pace reloadOwed on the receive path
-	// (owedDueLocked): a failing load is tried again owedBackoff later,
-	// on the send clock's monotonic reading; Load does not wait.
+	// owedRetryAt and owedBackoff pace reloadOwed on demand (owedDue):
+	// a failing load is tried again owedBackoff later, on the send
+	// clock's monotonic reading; Load does not wait. Until allLoaded
+	// they pace the first load of a group datagram the same way
+	// (firstLoadErr, loadForDatagram).
 	owedRetryAt time.Duration
 	owedBackoff time.Duration
+	// firstLoadErr is the error of the last failed first load (the
+	// store's ListFabrics, a caller's own context error excluded),
+	// returned to a group datagram without a store call until
+	// owedRetryAt; nil once one succeeded or none failed.
+	firstLoadErr error
 
 	// reception is matter.js MessagingState: the replay-protection
 	// window per operational key and source node, at most
@@ -474,33 +481,59 @@ func (m *Manager) rlockFabric(ctx context.Context, idx uint8) (*fabricGroups, er
 	return nil, fmt.Errorf("%w: %d", ErrNoFabric, idx)
 }
 
-// ensureAllLoaded loads every fabric the store knows the first time the
-// receive path needs them all. Mirrors GroupKeyManagementServer #online,
-// which restores the key sets, the key map and the group endpoint map of
-// every fabric at startup ("fd65e989: restore group endpoint mappings").
-func (m *Manager) ensureAllLoaded(ctx context.Context) error {
-	return m.loadAll(ctx, true)
+// loadMode is who asks [Manager.loadAll] for every fabric.
+type loadMode int
+
+const (
+	// loadForLoad is [Manager.Load]: the first load is tried at once and
+	// an owed reload is left to Load, which runs it itself, once.
+	loadForLoad loadMode = iota
+	// loadOnDemand is an authenticated caller (an attribute read, the ACL
+	// check, the auxiliary ACL sync, the membership list): the first load
+	// is tried at once, an owed reload at most once per interval.
+	loadOnDemand
+	// loadForDatagram is a group datagram, unauthenticated: the first
+	// load and an owed reload are each tried at most once per interval,
+	// so a group sender cannot drive a store read per datagram while the
+	// store fails (review II, R2-P7-sec-04, owner decision 279).
+	loadForDatagram
+)
+
+// ensureAllLoaded loads every fabric the store knows the first time a
+// caller needs them all; mode says who asks. Mirrors
+// GroupKeyManagementServer #online, which restores the key sets, the key
+// map and the group endpoint map of every fabric at startup ("fd65e989:
+// restore group endpoint mappings").
+func (m *Manager) ensureAllLoaded(ctx context.Context, mode loadMode) error {
+	return m.loadAll(ctx, mode)
 }
 
-// loadAll is ensureAllLoaded; paced false leaves an owed reload to the
-// caller ([Manager.Load] runs it itself, once).
-func (m *Manager) loadAll(ctx context.Context, paced bool) error {
+// loadAll is ensureAllLoaded.
+func (m *Manager) loadAll(ctx context.Context, mode loadMode) error {
 	m.mu.RLock()
 	done := m.allLoaded
 	m.mu.RUnlock()
-	if done && !paced {
+	if done && mode == loadForLoad {
 		return nil
 	}
 	if done {
 		// A fabric ForgetFabric left owed is tried on its own; its failure
 		// leaves it absent and does not fail the call for the others
-		// ([Manager.Load] returns it). The receive path tries at most once
-		// per interval, so a group sender cannot drive a store read per
+		// ([Manager.Load] returns it). It is tried at most once per
+		// interval, so a group sender cannot drive a store read per
 		// datagram while the store fails.
 		if m.owedDue() {
 			m.noteOwedResult(m.reloadOwed(ctx))
 		}
 		return nil
+	}
+	// A group datagram's first load is paced the same way: after a failed
+	// ListFabrics it gets that error, fail-closed, without a store call
+	// until the interval passed. An authenticated caller and
+	// [Manager.Load] try the store at once; their failure moves the
+	// datagrams' deadline too, their success ends the pacing.
+	if err := m.firstLoadPaced(mode); err != nil {
+		return err
 	}
 	m.storeMu.Lock()
 	defer m.storeMu.Unlock()
@@ -510,10 +543,34 @@ func (m *Manager) loadAll(ctx context.Context, paced bool) error {
 	if done {
 		return nil
 	}
+	if err := m.firstLoadPaced(mode); err != nil { // one failed meanwhile
+		return err
+	}
 	recs, err := m.st.ListFabrics(ctx)
 	if err != nil {
-		return fmt.Errorf("groups: list fabrics: %w", err)
+		err = fmt.Errorf("groups: list fabrics: %w", err)
+		if ctx.Err() != nil {
+			// The caller's own context ended: the store did not fail, and
+			// its error is not handed to the next datagram.
+			return err
+		}
+		// A datagram's attempt is always due (firstLoadPaced). An
+		// authenticated caller's or Load's is not paced, so it moves the
+		// backoff only when the datagrams' attempt was due — a burst of
+		// reads inside one interval is one step, not one per read.
+		if mode == loadForDatagram || m.firstLoadDue() {
+			m.noteOwedResult(err)
+		}
+		m.mu.Lock()
+		m.firstLoadErr = err
+		m.mu.Unlock()
+		return err
 	}
+	// The list succeeded: the pacing starts afresh for the owed reloads.
+	m.noteOwedResult(nil)
+	m.mu.Lock()
+	m.firstLoadErr = nil
+	m.mu.Unlock()
 	listed := make(map[uint8]bool, len(recs))
 	var failed []error
 	for i := range recs {
@@ -567,13 +624,34 @@ func (m *Manager) loadAll(ctx context.Context, paced bool) error {
 // Only Load announces the multicast memberships again; a receive-path
 // reload restores the keys, not the memberships.
 func (m *Manager) Load(ctx context.Context) error {
-	if err := m.loadAll(ctx, false); err != nil {
+	if err := m.loadAll(ctx, loadForLoad); err != nil {
 		return err
 	}
 	err := m.reloadOwed(ctx)
 	m.noteOwedResult(err)
 	m.notify()
 	return err
+}
+
+// firstLoadPaced returns the last first-load error while a group datagram
+// (loadForDatagram) is not due to try the store again; nil when it is,
+// when none failed, and for every other mode.
+func (m *Manager) firstLoadPaced(mode loadMode) error {
+	if mode != loadForDatagram || m.firstLoadDue() {
+		return nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.firstLoadErr
+}
+
+// firstLoadDue reports whether a group datagram's first load would try the
+// store now: none failed yet, or the interval passed.
+func (m *Manager) firstLoadDue() bool {
+	m.mu.RLock()
+	err, at := m.firstLoadErr, m.owedRetryAt
+	m.mu.RUnlock()
+	return err == nil || m.monotonic() >= at
 }
 
 // Pacing of an owed reload that keeps failing: the first retry after
@@ -583,8 +661,8 @@ const (
 	owedRetryMax   = time.Minute
 )
 
-// owedDue reports whether an owed reload is due on the receive path and,
-// when it is, claims the attempt: concurrent receives do not try it twice.
+// owedDue reports whether an owed reload is due on demand and, when it
+// is, claims the attempt: concurrent callers do not try it twice.
 func (m *Manager) owedDue() bool {
 	m.mu.RLock()
 	n := len(m.owed)
@@ -602,7 +680,7 @@ func (m *Manager) owedDue() bool {
 	return true
 }
 
-// noteOwedResult sets the next receive-path attempt after one ended with
+// noteOwedResult sets the next on-demand attempt after one ended with
 // err: none owed after a success, owedRetryFirst doubling up to
 // owedRetryMax after a failure.
 func (m *Manager) noteOwedResult(err error) {
@@ -798,9 +876,11 @@ func (m *Manager) park(idx uint8, f *fabricGroups, dropped map[string]map[uint64
 
 // restoreParked gives the fabric f just loaded the windows ForgetFabric
 // parked for its index: a key one of its key sets derives under the same
-// key set id gets them back — merged into a window set a decode in flight
-// across the forget may have created, the parked window winning per
-// source node; every other parked window is dropped.
+// key set id gets them back — merged into a window set created after the
+// forget, the parked window winning per source node; every other parked
+// window is dropped. A decode in flight across the forget no longer
+// creates one (it is dropped, review II, R2-P7-sec-02); the merge stays
+// for a window another fabric deriving the same key created.
 func (m *Manager) restoreParked(f *fabricGroups) {
 	m.receptionMu.Lock()
 	defer m.receptionMu.Unlock()
@@ -831,7 +911,7 @@ func (m *Manager) restoreParked(f *fabricGroups) {
 // Fabrics returns the index of every fabric the store knows, ascending,
 // loading each one's group state first.
 func (m *Manager) Fabrics(ctx context.Context) ([]uint8, error) {
-	if err := m.ensureAllLoaded(ctx); err != nil {
+	if err := m.ensureAllLoaded(ctx, loadOnDemand); err != nil {
 		return nil, err
 	}
 	m.mu.RLock()
@@ -1088,7 +1168,7 @@ type Membership struct {
 // group a Groupcast JoinGroup put on IanaAddr shares [IANAGroupcastAddress],
 // so callers deduplicate by address. Loads every fabric first.
 func (m *Manager) Memberships(ctx context.Context) ([]Membership, error) {
-	if err := m.ensureAllLoaded(ctx); err != nil {
+	if err := m.ensureAllLoaded(ctx, loadOnDemand); err != nil {
 		return nil, err
 	}
 	m.mu.RLock()

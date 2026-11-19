@@ -573,8 +573,8 @@ func (r siteResolver) ResolveOperational(ctx context.Context, compressedFabricID
 		}
 	}
 	for _, a := range r.s.controllerAdvertisers() {
-		if a.answersOperational(compressedFabricID, nodeID) {
-			return []*net.UDPAddr{a.addr}, nil
+		if addr := a.answersOperational(compressedFabricID, nodeID); addr != nil {
+			return []*net.UDPAddr{addr}, nil
 		}
 	}
 	// A device of the site, as its operational record names it: a node's

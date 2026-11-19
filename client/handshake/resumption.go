@@ -39,6 +39,13 @@ type ResumptionRecord struct {
 	// CaseServer.ts at db021da0; matter.js #4884); a resumed session
 	// carries them forward as its own.
 	CaseAuthenticatedTags []uint32
+	// Initiator is the role that saved the record: true when the CASE
+	// client ([CASE]) saved it, false when the responder ([CASEServer])
+	// did. Each sets it on its save, whatever role a resumed record came
+	// from. [StoreResumption] stores it as [store.ResumptionRecord]'s
+	// Initiator, which keeps the client's records out of the store's
+	// per-fabric cap (review II, R2-P7-sec-01, owner decision 270).
+	Initiator bool
 }
 
 // ResumptionStore keeps resumption records by peer.

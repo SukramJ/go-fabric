@@ -280,8 +280,12 @@ func (s *Site) listen(index int, g *inflight.Group) (*udp.Listener, error) {
 	if s.net != nil {
 		return s.net.listen(hostAddr(index), g)
 	}
-	return udp.New(udp.Config{LocalAddr: "[::1]:0"})
+	return udp.New(udp.Config{LocalAddr: loopbackListen})
 }
+
+// loopbackListen is a loopback host's listen address: [::1], an
+// ephemeral port.
+const loopbackListen = "[::1]:0"
 
 // Settle waits until the site is quiet for the settle period
 // ([Options].Settle): no datagram sent and none queued unread on the

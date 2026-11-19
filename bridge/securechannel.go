@@ -1121,14 +1121,26 @@ func (b *Bridge) handshakeReplyUnacknowledged(key HandshakeKey) bool {
 }
 
 // endHandshakeUnreported ends a failed handshake without its failure
-// StatusReport, because a message the handshake sent still waited for its
-// acknowledgement when the failing message arrived: nothing is sent, and
-// that message is not dropped — it goes on being retransmitted until the
-// peer acknowledges it or its retransmissions are spent
-// ([Bridge.sendHandshakeFailureReport]); the failing message's own
-// acknowledgement is left to the ACK pump. Review II, F-db021da0-7 and
-// owner decision 173: before, the unacknowledged messages were dropped and
-// the report sent as a reliable message.
+// StatusReport, because a message the handshake sent still waits for its
+// acknowledgement: nothing is sent, and that message is not dropped — it
+// goes on being retransmitted until the peer acknowledges it or its
+// retransmissions are spent ([Bridge.sendHandshakeFailureReport]); the
+// failing message's own acknowledgement is left to the ACK pump. Review II,
+// F-db021da0-7 and owner decision 173: before, the unacknowledged messages
+// were dropped and the report sent as a reliable message.
+//
+// Since review II, phase 7 (decision 277) a failing message that does not
+// acknowledge the waiting reply is refused on receive over UDP and never
+// reaches the handshake, and one that acknowledges it clears it first; the
+// guard ([Bridge.handshakeReplyUnacknowledged]) is reached over UDP only in
+// a residue — two waiting messages on one handshake, or two dispatches of
+// it that overlap — and never over TCP, where nothing is tracked
+// (bridge/reply.go:262-263). It is kept as the stated second line (owner
+// decision 282): matter.js keeps the same guard although its receive rules
+// shield it the same way (packages/protocol/src/session/case/CaseServer.ts:82-86,
+// packages/protocol/src/session/pase/PaseServer.ts:207-210 at db021da0),
+// where it is reached by a give-up: the send threw and #sentMessageToAck is
+// still set.
 func (b *Bridge) endHandshakeUnreported(key HandshakeKey, stage string) {
 	b.logger.Debug("matter.sc.handshake.failure_report_skipped",
 		slog.String("stage", stage),
@@ -1564,6 +1576,11 @@ func (b *Bridge) closeUnacknowledgedResume(sessionID uint16) {
 // handshake, which goes on and keeps its reply in retransmission (matter.js
 // packages/protocol/src/protocol/MessageExchange.ts:521-525 at db021da0;
 // connectedhomeip src/messaging/ExchangeContext.cpp:585-595 at 6170af84),
+// and since review II, phase 7 (decision 277) it does not here either: it
+// is refused on receive, so over UDP the guard is reached only in a residue
+// and over TCP never, nothing being tracked there (bridge/reply.go:262-263); it
+// stays as matter.js's own guard stays (CaseServer.ts:82-86,
+// PaseServer.ts:207-210; owner decision 282, [Bridge.endHandshakeUnreported]),
 // and matter.js goes on retransmitting a message whose send still waits for
 // its acknowledgement when its exchange is closed without a cause
 // (MessageExchange.ts:1165-1193, :937-943), and connectedhomeip leaves it in the retransmit table

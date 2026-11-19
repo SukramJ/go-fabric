@@ -981,17 +981,30 @@ func TestAccessControl_MatterReadFiltered_StoreError(t *testing.T) {
 	}
 }
 
-// TestAccessControl_MatterWrite_WrongType verifies that MatterWrite(ACL) with a
-// wrong value type returns an error.
+// TestAccessControl_MatterWrite_WrongType verifies that MatterWrite of the
+// Acl or Extension attribute with a value of the wrong Go type answers
+// INVALID_DATA_TYPE, and a write of a non-writable attribute
+// UNSUPPORTED_WRITE — the statuses the other security-path servers give
+// the same classes (review II, R2-P7-acl-04).
 func TestAccessControl_MatterWrite_WrongType(t *testing.T) {
 	t.Parallel()
 	ac, err := core.NewAccessControl(&fakeACLStore{})
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
-	err = ac.MatterWrite(context.Background(), 0x0000, "not a slice")
-	if spec.StatusOf(err) != im.StatusFailure {
-		t.Fatalf("MatterWrite(ACL, wrong type): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
+	for _, tc := range []struct {
+		name string
+		attr uint32
+		want im.StatusCode
+	}{
+		{"Acl", 0x0000, im.StatusInvalidDataType},
+		{"Extension", 0x0001, im.StatusInvalidDataType},
+		{"SubjectsPerAccessControlEntry", 0x0002, im.StatusUnsupportedWrite},
+	} {
+		err := ac.MatterWrite(context.Background(), tc.attr, "not a slice")
+		if got := spec.StatusOf(err); got != tc.want {
+			t.Errorf("MatterWrite(%s, wrong type): status %v (%v), want %v", tc.name, got, err, tc.want)
+		}
 	}
 }
 
@@ -1094,7 +1107,9 @@ func TestAccessControl_MatterWrite_ReplaceACLError(t *testing.T) {
 }
 
 // TestAccessControl_MatterWrite_UnknownAttr verifies that writing to an
-// attribute ID other than ACL (0x0000) returns an error.
+// attribute other than Acl or Extension answers UNSUPPORTED_WRITE, as
+// GroupKeyManagement answers a write of any attribute but GroupKeyMap
+// (review II, R2-P7-acl-04).
 func TestAccessControl_MatterWrite_UnknownAttr(t *testing.T) {
 	t.Parallel()
 	ac, err := core.NewAccessControl(&fakeACLStore{})
@@ -1102,8 +1117,8 @@ func TestAccessControl_MatterWrite_UnknownAttr(t *testing.T) {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
 	err = ac.MatterWrite(context.Background(), 0xDEAD, "any")
-	if spec.StatusOf(err) != im.StatusFailure {
-		t.Fatalf("MatterWrite(unknown attr): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusFailure)
+	if spec.StatusOf(err) != im.StatusUnsupportedWrite {
+		t.Fatalf("MatterWrite(unknown attr): status %v (%v), want %v", spec.StatusOf(err), err, im.StatusUnsupportedWrite)
 	}
 }
 

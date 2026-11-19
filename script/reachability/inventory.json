@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10029,
+  "entry_points": 10083,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27741,
-    "reachable": 20843,
-    "whitelisted": 6875,
+    "total_exported": 27779,
+    "reachable": 20846,
+    "whitelisted": 6910,
     "unreachable": 23
   },
   "by_package": [
@@ -519,7 +519,7 @@
       "package": "secure/operational",
       "identifier": "Entry.PeerMRPIntervals",
       "file": "secure/operational/manager.go",
-      "line": 459,
+      "line": 460,
       "kind": "method"
     },
     {
@@ -806,10 +806,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestAckClearsOnlyItsExchangesMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/receive_incorrect_ack_test.go",
+      "line": 111
+    },
+    {
+      "package": "bridge",
       "identifier": "TestAckOfAnUnsecuredMessageGoesToItsInitiator",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/unsecured_ack_route_test.go",
       "line": 22
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAckOnExchangeIsExchangeScoped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/receive_incorrect_ack_test.go",
+      "line": 158
     },
     {
       "package": "bridge",
@@ -915,6 +929,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
       "line": 703
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAcknowledgingMessagesUnderAHandshakeInProgressChangeNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_handshake_in_progress_test.go",
+      "line": 91
     },
     {
       "package": "bridge",
@@ -1054,7 +1075,7 @@
       "identifier": "TestAttachCaseHandlerEndsTheReplacedHandlersHandshakes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 623
+      "line": 672
     },
     {
       "package": "bridge",
@@ -1247,6 +1268,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestBDXBlockWaitsForTheAcceptsAck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_ack_wait_test.go",
+      "line": 123
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXInitiatedExchangeWaitsAndRefuses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_ack_wait_test.go",
+      "line": 232
+    },
+    {
+      "package": "bridge",
       "identifier": "TestBDXResponder_ExchangeNotifiesAtArrival",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
@@ -1272,6 +1307,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
       "line": 175
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXSendAfterAGiveUpBeforeTheExchangeEndsSendsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_ack_wait_test.go",
+      "line": 439
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXSendAfterAGiveUpSendsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_ack_wait_test.go",
+      "line": 379
     },
     {
       "package": "bridge",
@@ -2066,6 +2115,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestChunkWaitShareExcludesFabricZero",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/chunk_wait_share_test.go",
+      "line": 43
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkWaitShareIsStrict",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/chunk_wait_share_test.go",
+      "line": 26
+    },
+    {
+      "package": "bridge",
       "identifier": "TestChunkWaitsBoundTheBatchInvoke",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_wait_bound_test.go",
@@ -2126,6 +2189,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_chunked_bound_test.go",
       "line": 49
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestClaimChunkWaitAsksNoCountForFabricZero",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/chunk_wait_share_test.go",
+      "line": 67
     },
     {
       "package": "bridge",
@@ -4183,7 +4253,7 @@
       "identifier": "TestFailureReportOfAnotherInitiatorKeepsTheHold",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_claim_test.go",
-      "line": 172
+      "line": 187
     },
     {
       "package": "bridge",
@@ -4219,6 +4289,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_flag_reads_test.go",
       "line": 57
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestFlushAfterAnAbortedOngoingReportSends",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/flush_after_aborted_report_test.go",
+      "line": 35
     },
     {
       "package": "bridge",
@@ -4261,6 +4338,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/generated_payloads_test.go",
       "line": 19
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGivenUpInitiatedMessageLeavesTheRespondedExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/exchange_session_end_test.go",
+      "line": 308
     },
     {
       "package": "bridge",
@@ -4575,7 +4659,7 @@
       "identifier": "TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
-      "line": 191
+      "line": 194
     },
     {
       "package": "bridge",
@@ -4590,6 +4674,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
       "line": 571
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHandshakeMessageWithAnIncorrectAckIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/receive_incorrect_ack_test.go",
+      "line": 190
     },
     {
       "package": "bridge",
@@ -4736,7 +4827,7 @@
       "identifier": "TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
-      "line": 233
+      "line": 241
     },
     {
       "package": "bridge",
@@ -4988,7 +5079,7 @@
       "identifier": "TestMessagesUnderAHandshakeInProgressChangeNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_handshake_in_progress_test.go",
-      "line": 31
+      "line": 33
     },
     {
       "package": "bridge",
@@ -5408,7 +5499,7 @@
       "identifier": "TestPASEClaimHeldUntilItsTimeoutPasses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_claim_test.go",
-      "line": 245
+      "line": 260
     },
     {
       "package": "bridge",
@@ -5492,7 +5583,7 @@
       "identifier": "TestParityMatterJS_SuppressResponseSuppressesErrorStatuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/suppress_response_parity_matterjs_test.go",
-      "line": 68
+      "line": 69
     },
     {
       "package": "bridge",
@@ -5723,14 +5814,14 @@
       "identifier": "TestPaseClaimIsReadUnderTheLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_claim_test.go",
-      "line": 214
+      "line": 229
     },
     {
       "package": "bridge",
       "identifier": "TestPaseClaimRunsFromItsFirstRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_claim_test.go",
-      "line": 73
+      "line": 74
     },
     {
       "package": "bridge",
@@ -5927,6 +6018,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_path_node_parity_matterjs_test.go",
       "line": 59
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPrimingForgetKeepsTheFollowingReportsAbort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_stop_unanswered_chunk_test.go",
+      "line": 135
     },
     {
       "package": "bridge",
@@ -6493,7 +6591,7 @@
       "identifier": "TestRepeatedPBKDFParamRequestEndsThePairing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_claim_test.go",
-      "line": 108
+      "line": 113
     },
     {
       "package": "bridge",
@@ -6665,6 +6763,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRequestWithAnIncorrectAckIsNotProcessed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/receive_incorrect_ack_test.go",
+      "line": 31
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRequestWithoutAckOfAnOutstandingReplyIsNotProcessed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/receive_awaits_ack_test.go",
+      "line": 25
+    },
+    {
+      "package": "bridge",
       "identifier": "TestResetPaseFailures_KeepsUnsecuredWindows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_unsecured_dup_test.go",
@@ -6773,7 +6885,7 @@
       "identifier": "TestRespondedExchangeIsNeverStoredUnbound",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/exchange_session_end_test.go",
-      "line": 310
+      "line": 336
     },
     {
       "package": "bridge",
@@ -7053,7 +7165,7 @@
       "identifier": "TestSendRacingTheSessionCloseLeavesNoEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/exchange_session_end_test.go",
-      "line": 345
+      "line": 371
     },
     {
       "package": "bridge",
@@ -7221,7 +7333,7 @@
       "identifier": "TestSigma1AgainAfterCompletionBeginsAfresh",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 708
+      "line": 757
     },
     {
       "package": "bridge",
@@ -7249,7 +7361,7 @@
       "identifier": "TestSigma1OverARecordIsJudgedOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_handshake_in_progress_test.go",
-      "line": 89
+      "line": 134
     },
     {
       "package": "bridge",
@@ -7270,7 +7382,7 @@
       "identifier": "TestSigma1ThatBeginsNothingKeepsACompletedHandshake",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 431
+      "line": 479
     },
     {
       "package": "bridge",
@@ -7298,21 +7410,21 @@
       "identifier": "TestSigma3AfterCompletionChangesNothingAboutTheSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 217
+      "line": 253
     },
     {
       "package": "bridge",
       "identifier": "TestSigma3AfterCompletionKeepsTheSuccessReportPending",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 352
+      "line": 397
     },
     {
       "package": "bridge",
       "identifier": "TestSigma3OfACompletedHandshakeIsAnsweredSuccess",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_completed_test.go",
-      "line": 24
+      "line": 29
     },
     {
       "package": "bridge",
@@ -7326,14 +7438,14 @@
       "identifier": "TestSigma3RetransmissionIsAnsweredOnlyForItsBytesAndRoute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 271
+      "line": 309
     },
     {
       "package": "bridge",
       "identifier": "TestSigma3RetransmissionKeepsNoRecordAlive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 301
+      "line": 340
     },
     {
       "package": "bridge",
@@ -7368,7 +7480,7 @@
       "identifier": "TestSingletonCompletedHandshakesHoldNoWindows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 553
+      "line": 602
     },
     {
       "package": "bridge",
@@ -7382,14 +7494,14 @@
       "identifier": "TestSingletonCompletedRecordEndsWithItsHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 398
+      "line": 445
     },
     {
       "package": "bridge",
       "identifier": "TestSingletonCompletedRecordEndsWithItsSuccessReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 489
+      "line": 538
     },
     {
       "package": "bridge",
@@ -7795,7 +7907,7 @@
       "identifier": "TestSubscribeResponseWaitsForThePrimingReportsAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_route_release_test.go",
-      "line": 181
+      "line": 188
     },
     {
       "package": "bridge",
@@ -7949,14 +8061,14 @@
       "identifier": "TestSuppressResponseErrorPathsParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/suppress_response_parity_matterjs_test.go",
-      "line": 197
+      "line": 198
     },
     {
       "package": "bridge",
       "identifier": "TestSuppressedRequestAcknowledgedParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/suppress_response_parity_matterjs_test.go",
-      "line": 284
+      "line": 285
     },
     {
       "package": "bridge",
@@ -8110,7 +8222,7 @@
       "identifier": "TestTrackOnExchangeRefusesWhileAMessageAwaitsItsAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_track_exchange_test.go",
-      "line": 20
+      "line": 21
     },
     {
       "package": "bridge",
@@ -8131,7 +8243,7 @@
       "identifier": "TestTwentyAbandonedPaseClaimsLockPASEOut",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_claim_test.go",
-      "line": 150
+      "line": 165
     },
     {
       "package": "bridge",
@@ -8243,7 +8355,7 @@
       "identifier": "TestUnreportedRetransmissionEndsWithStop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
-      "line": 287
+      "line": 293
     },
     {
       "package": "bridge",
@@ -8335,6 +8447,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/decode_error_reply_test.go",
       "line": 47
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_ack_wait_test.go",
+      "line": 306
     },
     {
       "package": "bridge",
@@ -9234,6 +9353,20 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestEstablishingSessionClosedDeliversNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/establishing_test.go",
+      "line": 132
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestEstablishingSessionHoldsUntilActivated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/establishing_test.go",
+      "line": 48
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestExchangeCapEvictsLeastRecentlyActive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_test.go",
@@ -9594,7 +9727,7 @@
       "identifier": "TestPeerOpenedExchangeOnClosingSessionDeclined",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 274
+      "line": 281
     },
     {
       "package": "client/exchange",
@@ -9748,7 +9881,7 @@
       "identifier": "TestShutdownWaitsForTheHandlers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/handler_test.go",
-      "line": 307
+      "line": 321
     },
     {
       "package": "client/exchange",
@@ -10756,7 +10889,7 @@
       "identifier": "TestPeerConnectTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_connect_timeout_parity_matterjs_test.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "client/peer",
@@ -10963,6 +11096,13 @@
     },
     {
       "package": "client/peer",
+      "identifier": "TestSaveKeepsTheNewestDescriptor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/save_order_test.go",
+      "line": 35
+    },
+    {
+      "package": "client/peer",
       "identifier": "TestSemaphoreGrantedAndClear",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/transport_test.go",
@@ -11061,6 +11201,13 @@
     },
     {
       "package": "clock/clocktest",
+      "identifier": "Fake.AdvanceToNext",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "clock/clocktest/fake.go",
+      "line": 242
+    },
+    {
+      "package": "clock/clocktest",
       "identifier": "Fake.AfterFunc",
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "clock/clocktest/fake.go",
@@ -11120,7 +11267,7 @@
       "identifier": "Fake.Resolve",
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "clock/clocktest/fake.go",
-      "line": 278
+      "line": 318
     },
     {
       "package": "clock/clocktest",
@@ -11141,7 +11288,7 @@
       "identifier": "Fake.Yield",
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "clock/clocktest/fake.go",
-      "line": 265
+      "line": 305
     },
     {
       "package": "cluster",
@@ -12094,6 +12241,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/general_diagnostics.go",
       "line": 918
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestExtensionLoadFailureWarnsOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/access_control_load_warn_internal_test.go",
+      "line": 52
     },
     {
       "package": "cluster/core",
@@ -27843,14 +27997,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1151
+      "line": 1153
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1147
+      "line": 1149
     },
     {
       "package": "controller",
@@ -37430,6 +37584,13 @@
     },
     {
       "package": "fabrictest",
+      "identifier": "TestControllerConfigOnLoopbackLeavesThePortToNew",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "fabrictest/controller_config_loopback_internal_test.go",
+      "line": 25
+    },
+    {
+      "package": "fabrictest",
       "identifier": "TestControllerFailedStartReleasesItsAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/controller_internal_test.go",
@@ -37454,7 +37615,7 @@
       "identifier": "TestEventStatusError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "fabrictest/controller_advertiser_internal_test.go",
-      "line": 75
+      "line": 88
     },
     {
       "package": "fabrictest",
@@ -37563,6 +37724,13 @@
     },
     {
       "package": "groups",
+      "identifier": "TestDecodeInFlightAcrossForgetIsDropped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/decode_forget_inflight_test.go",
+      "line": 19
+    },
+    {
+      "package": "groups",
       "identifier": "TestDecodeNeverTriesAnUnmappedKeySet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groupcast_test.go",
@@ -37595,6 +37763,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/fabric_groups_manager_parity_matterjs_test.go",
       "line": 18
+    },
+    {
+      "package": "groups",
+      "identifier": "TestFirstLoadBackoffStepsOncePerInterval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/firstload_pacing_test.go",
+      "line": 205
+    },
+    {
+      "package": "groups",
+      "identifier": "TestFirstLoadDoesNotCacheACallersContextError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/firstload_pacing_test.go",
+      "line": 177
+    },
+    {
+      "package": "groups",
+      "identifier": "TestFirstLoadIsPacedOnTheReceivePath",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/firstload_pacing_test.go",
+      "line": 21
+    },
+    {
+      "package": "groups",
+      "identifier": "TestFirstLoadPacingIsTheDatagramsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/firstload_pacing_test.go",
+      "line": 106
     },
     {
       "package": "groups",
@@ -37797,7 +37993,7 @@
       "identifier": "TestLoadReadsAnOwedFabricOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/reception_forget_round4_test.go",
-      "line": 248
+      "line": 249
     },
     {
       "package": "groups",
@@ -37853,7 +38049,7 @@
       "identifier": "TestNewForgetStartsUnpaced",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/reception_forget_round4_test.go",
-      "line": 278
+      "line": 279
     },
     {
       "package": "groups",
@@ -37888,21 +38084,21 @@
       "identifier": "TestOwedReloadIsPacedOnTheReceivePath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/reception_forget_round4_test.go",
-      "line": 182
+      "line": 183
     },
     {
       "package": "groups",
       "identifier": "TestParkedWindowWinsOverAFreshOne",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/reception_forget_round4_test.go",
-      "line": 118
+      "line": 119
     },
     {
       "package": "groups",
       "identifier": "TestParkedWindowsOfARemovedFabricAreDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/reception_forget_round4_test.go",
-      "line": 155
+      "line": 156
     },
     {
       "package": "groups",
@@ -40083,6 +40279,13 @@
     },
     {
       "package": "im/subscription",
+      "identifier": "TestFlushAfterAnAbortedReportInFlightSends",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/failed_update_test.go",
+      "line": 82
+    },
+    {
+      "package": "im/subscription",
       "identifier": "TestGrantedMaxIntervalIsAtLeastTwoSeconds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/min_interval_parity_matterjs_test.go",
@@ -40703,6 +40906,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
       "line": 485
+    },
+    {
+      "package": "internal/exchangeseam",
+      "identifier": "ActivateSecureSession",
+      "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/exchangeseam/exchangeseam.go",
+      "line": 50
+    },
+    {
+      "package": "internal/exchangeseam",
+      "identifier": "NewEstablishingSecureSession",
+      "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/exchangeseam/exchangeseam.go",
+      "line": 43
     },
     {
       "package": "internal/paritytest",
@@ -42236,6 +42453,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/queued_callbacks_internal_test.go",
       "line": 44
+    },
+    {
+      "package": "node",
+      "identifier": "TestFabricCountCacheConcurrent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/fabric_count_internal_test.go",
+      "line": 112
+    },
+    {
+      "package": "node",
+      "identifier": "TestFabricCountCacheKeepsNothingUncertain",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/fabric_count_internal_test.go",
+      "line": 71
+    },
+    {
+      "package": "node",
+      "identifier": "TestFabricCountIsCachedUntilAFabricChanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/fabric_count_internal_test.go",
+      "line": 31
     },
     {
       "package": "node",
@@ -45298,6 +45536,13 @@
     },
     {
       "package": "secure/spake2",
+      "identifier": "TestGeneratePake1XIsTheCallersCopy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/spake2/caller_trust_test.go",
+      "line": 53
+    },
+    {
+      "package": "secure/spake2",
       "identifier": "TestGeneratePake1_CalledTwiceReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/spake2_test.go",
@@ -45476,7 +45721,7 @@
       "identifier": "TestProcessPake1RefusesAVerifierContextThatDoesNotFit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/spake2/caller_trust_test.go",
-      "line": 53
+      "line": 89
     },
     {
       "package": "secure/spake2",
@@ -45588,7 +45833,7 @@
       "identifier": "Eraser",
       "reason": "the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself",
       "file": "store/port.go",
-      "line": 332
+      "line": 337
     },
     {
       "package": "store",
