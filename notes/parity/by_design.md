@@ -7711,8 +7711,8 @@ retransmission timer and waits
 a plain `SendMessage`, reliable on a session that allows MRP
 (`src/protocols/secure_channel/PairingSession.h:157-190`,
 `src/messaging/ExchangeContext.cpp:111-114` at `6170af84`). When the
-references send none, and this module does, is the closed finding (closed 2026-11-17)
-F-db021da0-7. **What a flood costs:** retransmissions. Sixteen further
+references send none, and this module did, was the finding F-db021da0-7,
+closed 2026-11-17 (owner decision 173): the module sends none there either. **What a flood costs:** retransmissions. Sixteen further
 reliable messages on the unsecured session between a handshake's reply and
 its acknowledgement evict that reply; the handshake then fails only if the
 reply's datagram is lost as well, at the initiator's own timeout. **What a

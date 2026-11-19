@@ -458,14 +458,18 @@ func TestBDXSendAfterAGiveUpBeforeTheExchangeEndsSendsNothing(t *testing.T) {
 	}
 	// The tracker's give-up alone: its result is not handed to the bridge,
 	// so the exchange is not ended — the window between the two.
+	// The entry is due only for this test's tick: a pump tick on the real
+	// clock in between would give it up and end the exchange, closing the
+	// window.
 	tr := dev.br.outboundReliable
+	due := time.Now().Add(time.Hour)
 	tr.mu.Lock()
 	for _, e := range tr.pending {
 		e.retries = mrp.MaxRetransmissions
-		e.nextSendAt = time.Time{}
+		e.nextSendAt = due
 	}
 	tr.mu.Unlock()
-	tr.Tick(time.Now(), func(net.Addr, []byte) error { return nil })
+	tr.Tick(due, func(net.Addr, []byte) error { return nil })
 	if ex.(*initiatedSecureExchange).ended() {
 		t.Fatal("the exchange ended; the test needs the window before its end")
 	}
