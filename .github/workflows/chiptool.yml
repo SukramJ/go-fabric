@@ -190,7 +190,7 @@ jobs:
           # code, the Makefile, every embedded file, every workflow
           # (TestWorkflowCodeFilter holds this pattern).
           docs_only='^(docs/|notes/|mkdocs\.yml$|\.github/(dependabot\.yml|FUNDING\.yml|PULL_REQUEST_TEMPLATE\.md|SPONSORING\.md)$)|\.md$'
-          if [ -n "$changed" ] && echo "$changed" | grep -Evq "$docs_only"; then
+          if [ -n "$changed" ] && grep -Evq "$docs_only" <<<"$changed"; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "-> a path that is not documentation changed; the suite runs without a label"
           else
@@ -709,7 +709,7 @@ jobs:
             exit 1
           fi
           nested_gomod=false
-          if printf '%s\n' "$changed" | grep -qE '^.+/go\.mod$'; then nested_gomod=true; fi
+          if grep -qE '^.+/go\.mod$' <<<"$changed"; then nested_gomod=true; fi
           if [ "$rc" -eq 1 ] && [[ "$HEAD_REF" != release/nested-* ]] && [ "$nested_gomod" = false ]; then
             echo "::warning::a nested module is not in release shape (above); this root release does not tag it, but the next nested release must bump its require"
             exit 0

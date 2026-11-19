@@ -335,16 +335,31 @@ func aclExtensionSettingKey(fabric uint8) string {
 }
 
 // loadExtensions restores the persisted Extension entries, one per fabric
-// at most (the attribute's per-fabric constraint).
+// at most (the attribute's per-fabric constraint). The failures are logged
+// once, with their count and the first: a store failing at construction
+// fails every index, and the per-fabric record is extLoadErr (review II,
+// R2-P7-acl-05).
 func (a *AccessControl) loadExtensions(ctx context.Context) {
 	p, ok := a.store.(ACLExtensionPersistence)
 	if !ok {
 		return
 	}
+	var (
+		failed     int
+		firstIndex int
+		firstErr   error
+	)
 	for f := 1; f <= 254; f++ {
 		if err := a.loadExtension(ctx, p, uint8(f)); err != nil {
-			a.logger().Warn("matter.access_control.extension_load_failed", slog.Int("fabric_index", f), slog.Any("err", err))
+			if failed == 0 {
+				firstIndex, firstErr = f, err
+			}
+			failed++
 		}
+	}
+	if failed > 0 {
+		a.logger().Warn("matter.access_control.extension_load_failed",
+			slog.Int("count", failed), slog.Int("fabric_index", firstIndex), slog.Any("err", firstErr))
 	}
 }
 
@@ -495,13 +510,30 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 	if had {
 		delete(a.extensions, fabricIndex)
 	}
+	// A setting that could not be read at construction is not in memory
+	// but may still be stored: it is cleared as well, or the next
+	// construction loads the dropped fabric's Extension again (review II,
+	// R2-P7-acl-03). Only an entry memory held moves the DataVersion.
+	loadErr := a.extLoadErr[fabricIndex]
+	unread := loadErr != nil
 	delete(a.extLoadErr, fabricIndex)
 	a.mu.Unlock()
-	if !had {
+	if !had && !unread {
 		return nil
 	}
-	a.dataVersion.Bump()
+	if had {
+		a.dataVersion.Bump()
+	}
 	if err := a.persistExtension(ctx, fabricIndex, nil); err != nil {
+		if unread {
+			// The setting is still stored and still unread: keep the
+			// record, so a later drop clears it again.
+			a.mu.Lock()
+			if _, ok := a.extLoadErr[fabricIndex]; !ok {
+				a.extLoadErr[fabricIndex] = loadErr
+			}
+			a.mu.Unlock()
+		}
 		return fmt.Errorf("core: AccessControl: clear the Extension of fabric %d: %w", fabricIndex, err)
 	}
 	return nil
@@ -710,21 +742,22 @@ func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) 
 // holds — one removed while the write was on its way, whose removal's
 // clear has already run: without the check the write would store under a
 // removed index (review II, R2-P6-store-1010, N4-notesE-1). A pending row
-// counts as held. A store that cannot list fabrics, or whose listing
-// fails, refuses nothing. writeMu is held, as by MatterDropFabric.
+// counts as held. A store that cannot list fabrics refuses nothing; a
+// listing that fails refuses the write with FAILURE, as [fabricListed]
+// does (fail closed): the Extension's setting has no tie to the fabric row
+// that would refuse it instead (review II, R2-P7-acl-02). writeMu is held,
+// as by MatterDropFabric.
 func (a *AccessControl) fabricGone(ctx context.Context, fabric uint8, attr string) error {
 	lister, ok := a.store.(fabricLister)
 	if !ok {
 		return nil
 	}
-	recs, err := lister.ListFabrics(ctx)
+	listed, err := fabricListed(ctx, lister, fabric)
 	if err != nil {
-		return nil //nolint:nilerr // no listing, no refusal: the write's own store call decides
+		return storeFailureErr{err: fmt.Errorf("core: AccessControl: %s write for fabric %d: list fabrics: %w", attr, fabric, err)}
 	}
-	for i := range recs {
-		if recs[i].FabricIndex == fabric {
-			return nil
-		}
+	if listed {
+		return nil
 	}
 	return aclStatusError{im.StatusUnsupportedAccess, fmt.Sprintf("%s write for fabric %d, which no longer exists", attr, fabric)}
 }
@@ -786,7 +819,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 	if attrID == accessControlAttrACL {
 		entries, ok := value.([]AccessControlEntryStruct)
 		if !ok {
-			return false, fmt.Errorf("core: AccessControl.ACL write: value type %T not []AccessControlEntryStruct", value)
+			return false, fmt.Errorf("%w: ACL write: value type %T not []AccessControlEntryStruct", errAccessControlInvalidValue, value)
 		}
 		var entryFabric uint8
 		if len(entries) > 0 {
@@ -1036,7 +1069,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// Mirrors matter.js AccessControlServer.ts in-memory extension state.
 		entries, ok := value.([]AccessControlExtensionEntry)
 		if !ok {
-			return false, fmt.Errorf("core: AccessControl.Extension write: value type %T not []AccessControlExtensionEntry", value)
+			return false, fmt.Errorf("%w: Extension write: value type %T not []AccessControlExtensionEntry", errAccessControlInvalidValue, value)
 		}
 		fabric, err := a.writeFabric(ctx, "Extension", 0)
 		if err != nil {
@@ -1154,8 +1187,14 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		}
 		return true, nil
 	}
-	return false, fmt.Errorf("core: AccessControl attribute 0x%04X not writable", attrID)
+	return false, spec.Errorf(im.StatusUnsupportedWrite, "core: AccessControl attribute 0x%04X is read-only", attrID)
 }
+
+// errAccessControlInvalidValue is returned for an Acl or Extension write's
+// value of the wrong Go type: INVALID_DATA_TYPE ([invalidValueErr]; owner
+// decision 234), as the other security-path servers answer it (review II,
+// R2-P7-acl-04).
+var errAccessControlInvalidValue error = invalidValueErr{msg: "core: AccessControl invalid value"}
 
 // MatterInvoke — no commands; AccessControl in 1.5.1 is attribute-only.
 func (a *AccessControl) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {

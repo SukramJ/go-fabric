@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -69,23 +70,33 @@ func TestPeerConnectTimeout(t *testing.T) {
 
 	t.Run("remains unbounded when caller explicitly passes Forever", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		h, res := connectWith(ctx, t, ConnectOptions{ConnectionTimeout: -1})
-		// An hour, far past the 90 s default; the Sigma1 retransmissions
-		// are drained.
-		for range 60 {
-			h.clock.Advance(time.Minute)
-			h.udp.drain()
-		}
-		select {
-		case r := <-res:
-			t.Fatalf("Connect with Forever returned %v", r.err)
-		default:
-		}
-		// Only the caller's abort ends the wait.
-		cancel()
-		if r := waitResult(t, res); !errors.Is(r.err, context.Canceled) {
-			t.Fatalf("Connect after the abort = %v", r.err)
-		}
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			h, res := connectWith(ctx, t, ConnectOptions{ConnectionTimeout: -1})
+			// An hour, far past the 90 s default, deadline by deadline:
+			// each Sigma1 retransmission fires on its own, and the work it
+			// woke arms the next before the clock moves again (a minute's
+			// step fired whichever ones that work had armed in time). Once
+			// nothing is armed the rest of the hour passes.
+			hour := h.clock.Monotonic() + time.Hour
+			for h.clock.Monotonic() < hour {
+				synctest.Wait()
+				h.udp.drain()
+				if _, ok := h.clock.AdvanceToNext(); !ok {
+					h.clock.Advance(hour - h.clock.Monotonic())
+				}
+			}
+			synctest.Wait()
+			select {
+			case r := <-res:
+				t.Fatalf("Connect with Forever returned %v", r.err)
+			default:
+			}
+			// Only the caller's abort ends the wait.
+			cancel()
+			if r := waitResult(t, res); !errors.Is(r.err, context.Canceled) {
+				t.Fatalf("Connect after the abort = %v", r.err)
+			}
+		})
 	})
 }

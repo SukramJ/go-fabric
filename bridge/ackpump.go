@@ -675,8 +675,15 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 		}
 		if givenUp {
 			b.noteReportUndelivered(r.SessionID, r.Counter)
-			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
-			b.failRespondedExchange(r.SessionID, r.ExchangeID)
+			// Exchange ids are the initiator's: a message given up ends
+			// the exchange of its role only; one tracked without a role
+			// is looked for in both.
+			if r.Role != exchangeResponder {
+				b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
+			}
+			if r.Role != exchangeInitiator {
+				b.failRespondedExchange(r.SessionID, r.ExchangeID)
+			}
 			continue
 		}
 		// What is left is a failed send or an unsecured-session entry

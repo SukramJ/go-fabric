@@ -798,9 +798,11 @@ func (m *Manager) park(idx uint8, f *fabricGroups, dropped map[string]map[uint64
 
 // restoreParked gives the fabric f just loaded the windows ForgetFabric
 // parked for its index: a key one of its key sets derives under the same
-// key set id gets them back — merged into a window set a decode in flight
-// across the forget may have created, the parked window winning per
-// source node; every other parked window is dropped.
+// key set id gets them back — merged into a window set created after the
+// forget, the parked window winning per source node; every other parked
+// window is dropped. A decode in flight across the forget no longer
+// creates one (it is dropped, review II, R2-P7-sec-02); the merge stays
+// for a window another fabric deriving the same key created.
 func (m *Manager) restoreParked(f *fabricGroups) {
 	m.receptionMu.Lock()
 	defer m.receptionMu.Unlock()

@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -61,7 +62,7 @@ type outboundReliableTracker struct {
 	// entry in pending, the one tracked least recently first;
 	// [secureExchangeLimit] bounds it. secureByExchange is each such
 	// exchange's one entry ([outboundReliableTracker.track]).
-	secureOrder      map[uint16][]uint16
+	secureOrder      map[uint16][]secureSlot
 	secureByExchange map[secureSlot]outboundKey
 	// abandoned remembers, for a secure session, the messages [Tick] gave
 	// up on, each until the instant it may be forgotten: a caller that
@@ -105,11 +106,16 @@ type outboundReliableTracker struct {
 }
 
 // secureSlot names one exchange of a secure session in the retransmit
-// table. The exchange id alone, without the role: an exchange this node
-// opened and one the peer opened that share an id share the slot.
+// table: its id and this node's role in it, since exchange ids are the
+// initiator's — an exchange this node opened and one the peer opened that
+// share an id are two exchanges with a slot each (review II, phase 7,
+// R2-P7-req-03). Messages tracked without a role
+// ([outboundReliableTracker.TrackWithMargin]) share the unnamed slot of
+// their id.
 type secureSlot struct {
 	sessionID  uint16
 	exchangeID uint16
+	role       exchangeRole
 }
 
 // outboundEntry captures one in-flight reliable datagram and the
@@ -135,8 +141,14 @@ type outboundEntry struct {
 	// unsecured-session entry is dropped [unsecuredEntryLifetime] after it.
 	trackedAt time.Time
 	// role is this node's role in the exchange, when the tracker call
-	// named it ([outboundReliableTracker.TrackOnExchange]).
+	// named it ([outboundReliableTracker.TrackOnExchange],
+	// [outboundReliableTracker.trackExchangeMessage]).
 	role exchangeRole
+	// oneAtATime marks a message tracked through
+	// [outboundReliableTracker.TrackOnExchange]: its exchange takes no
+	// further message until it is acknowledged, and the receive path
+	// refuses a message that does not acknowledge it ([Bridge.awaitsAckOn]).
+	oneAtATime bool
 	// margin joins the base interval of every (re)transmission, so the
 	// backoff amplifies it: the exchange's additional MRP delay (matter.js
 	// MRP.ts retransmissionIntervalOf, `additionalDelay`). Zero for every
@@ -168,7 +180,7 @@ func newOutboundReliableTracker(baseIntervalFor func(sessionID uint16, now time.
 		clock:            clock.Or(clk),
 		pending:          make(map[outboundKey]*outboundEntry),
 		abandoned:        make(map[outboundKey]time.Time),
-		secureOrder:      make(map[uint16][]uint16),
+		secureOrder:      make(map[uint16][]secureSlot),
 		secureByExchange: make(map[secureSlot]outboundKey),
 		baseIntervalFor:  baseIntervalFor,
 	}
@@ -270,14 +282,29 @@ func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID ui
 // packages/protocol/src/protocol/MessageExchange.ts:701-705 at db021da0
 // (a send while #sentMessageToAck is set throws "has not been acked yet,
 // cannot send a new message"; review II, hs 4b). An exchange of the other
-// role that shares the id keeps the shared slot's rule
-// ([secureExchangeLimit]): its message gives up its place.
+// role that shares the id is another exchange, with its own slot
+// ([secureSlot]).
 func (t *outboundReliableTracker) TrackOnExchange(counter uint32, sessionID, exchangeID uint16, initiator bool, datagram []byte, dest net.Addr, now time.Time) error {
-	role := exchangeResponder
+	role := roleOf(initiator)
+	return t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, 0, nil, role, true)
+}
+
+// trackExchangeMessage is [outboundReliableTracker.TrackWithMargin] for a
+// message of a secure session's exchange in which this node is the
+// initiator (initiator) or the responder — a BDX exchange's: the role
+// keeps it out of the other role's slot of the same id, and its give-up
+// is reported with it, so only the exchange it belongs to ends. A newer
+// message of the exchange still takes its place.
+func (t *outboundReliableTracker) trackExchangeMessage(counter uint32, sessionID, exchangeID uint16, initiator bool, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) {
+	_ = t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil, roleOf(initiator), false)
+}
+
+// roleOf is this node's exchange role: the initiator, or the responder.
+func roleOf(initiator bool) exchangeRole {
 	if initiator {
-		role = exchangeInitiator
+		return exchangeInitiator
 	}
-	return t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, 0, nil, role)
+	return exchangeResponder
 }
 
 // exchangeRole is this node's role in the exchange of a tracked secure
@@ -301,7 +328,7 @@ var errExchangeAwaitsAck = errors.New("bridge: outbound retransmit: the exchange
 // retransmissionIntervalOf's additionalDelay (MRP.ts, `baseInterval =
 // (isPeerActive ? activeInterval : idleInterval) + additionalDelay`).
 func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) {
-	_ = t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil, exchangeRoleUnnamed)
+	_ = t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil, exchangeRoleUnnamed, false)
 }
 
 // trackUnsecured tracks a reliable message on session 0: a responder's
@@ -322,7 +349,7 @@ func (t *outboundReliableTracker) trackUnsecured(counter uint32, key HandshakeKe
 // entry's give-up, and the bridge closes it
 // ([Bridge.closeUnacknowledgedResume]). Zero is none.
 func (t *outboundReliableTracker) trackUnsecuredInstalled(counter uint32, key HandshakeKey, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming, installed uint16) {
-	_ = t.track(counter, 0, key.ExchangeID, key.InitiatorNodeID, datagram, dest, now, 0, peer, exchangeRoleUnnamed)
+	_ = t.track(counter, 0, key.ExchangeID, key.InitiatorNodeID, datagram, dest, now, 0, peer, exchangeRoleUnnamed, false)
 	if installed == 0 {
 		return
 	}
@@ -428,9 +455,10 @@ const unsecuredEntryLifetime = 60 * time.Second
 // and matter.js refuses the new message (MessageExchange.ts:701-705 at
 // db021da0). The bridge's interaction replies and reports are tracked
 // through [outboundReliableTracker.TrackOnExchange], which refuses as
-// matter.js does (hs 4b); a message tracked through [Track] — a BDX
-// transfer's, a test's — and one of the other role on a shared id still
-// take the older message's place, which then loses its retransmissions.
+// matter.js does (hs 4b); a message tracked through [Track] or
+// [outboundReliableTracker.trackExchangeMessage] — a BDX transfer's, a
+// test's — still takes the older message's place of its slot, which then
+// loses its retransmissions.
 //
 // The number is matter.js's: at most 30 non-closed exchanges per secure
 // session, the least recently active closed beyond it
@@ -467,9 +495,9 @@ func (t *outboundReliableTracker) evictSecureLocked(key outboundKey, superseded 
 // placeSecureLocked makes room for the entry key of exchangeID on a secure
 // session ([secureExchangeLimit]) and records it; it returns the entries
 // that lost their place. Caller holds t.mu, and key is not in pending.
-func (t *outboundReliableTracker) placeSecureLocked(key outboundKey, exchangeID uint16) []secureEviction {
+func (t *outboundReliableTracker) placeSecureLocked(key outboundKey, exchangeID uint16, role exchangeRole) []secureEviction {
 	var out []secureEviction
-	slot := secureSlot{key.sessionID, exchangeID}
+	slot := secureSlot{key.sessionID, exchangeID, role}
 	if prev, ok := t.secureByExchange[slot]; ok {
 		if ev, ok := t.evictSecureLocked(prev, true); ok {
 			out = append(out, ev)
@@ -477,7 +505,7 @@ func (t *outboundReliableTracker) placeSecureLocked(key outboundKey, exchangeID 
 	}
 	for len(t.secureOrder[key.sessionID]) >= secureExchangeLimit {
 		first := t.secureOrder[key.sessionID][0]
-		prev, ok := t.secureByExchange[secureSlot{key.sessionID, first}]
+		prev, ok := t.secureByExchange[first]
 		if !ok {
 			// Not reachable: every exchange in the order has its entry.
 			t.secureOrder[key.sessionID] = t.secureOrder[key.sessionID][1:]
@@ -487,7 +515,7 @@ func (t *outboundReliableTracker) placeSecureLocked(key outboundKey, exchangeID 
 			out = append(out, ev)
 		}
 	}
-	t.secureOrder[key.sessionID] = append(t.secureOrder[key.sessionID], exchangeID)
+	t.secureOrder[key.sessionID] = append(t.secureOrder[key.sessionID], slot)
 	t.secureByExchange[slot] = key
 	return out
 }
@@ -502,7 +530,7 @@ func (t *outboundReliableTracker) reportSecureEvictions(evs []secureEviction) {
 	}
 }
 
-func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, initiator uint64, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming, role exchangeRole) error {
+func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, initiator uint64, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming, role exchangeRole, oneAtATime bool) error {
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
@@ -516,9 +544,9 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 		secureGone []secureEviction
 	)
 	t.mu.Lock()
-	if sessionID != 0 && role != exchangeRoleUnnamed {
-		if prev, ok := t.secureByExchange[secureSlot{sessionID, exchangeID}]; ok && prev != key {
-			if e := t.pending[prev]; e != nil && e.role == role {
+	if sessionID != 0 && oneAtATime {
+		if prev, ok := t.secureByExchange[secureSlot{sessionID, exchangeID, role}]; ok && prev != key {
+			if e := t.pending[prev]; e != nil {
 				t.mu.Unlock()
 				return errExchangeAwaitsAck
 			}
@@ -528,7 +556,7 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	t.dropLocked(key)
 	delete(t.abandoned, key)
 	if sessionID != 0 {
-		secureGone = t.placeSecureLocked(key, exchangeID)
+		secureGone = t.placeSecureLocked(key, exchangeID, role)
 	}
 	if sessionID == 0 {
 		if len(t.unsecured) >= unsecuredEntryLimit {
@@ -553,6 +581,7 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 		peer:       peer,
 		sentWall:   t.clock.Now(),
 		role:       role,
+		oneAtATime: oneAtATime,
 	}
 	t.mu.Unlock()
 	if oldest != nil && t.evicted != nil {
@@ -580,13 +609,13 @@ func (t *outboundReliableTracker) dropLocked(key outboundKey) {
 		}
 		return
 	}
-	slot := secureSlot{key.sessionID, e.exchangeID}
+	slot := secureSlot{key.sessionID, e.exchangeID, e.role}
 	if t.secureByExchange[slot] != key {
 		return
 	}
 	delete(t.secureByExchange, slot)
 	order := t.secureOrder[key.sessionID]
-	if i := slices.Index(order, e.exchangeID); i >= 0 {
+	if i := slices.Index(order, slot); i >= 0 {
 		order = slices.Delete(order, i, i+1)
 	}
 	if len(order) == 0 {
@@ -607,6 +636,38 @@ func (t *outboundReliableTracker) holdsUnsecuredExchange(hk HandshakeKey) bool {
 		}
 	}
 	return false
+}
+
+// errPreviousAckMissing is the receive path's refusal of a message that
+// does not acknowledge this node's outstanding message of its exchange
+// ([Bridge.awaitsAckOn]).
+var errPreviousAckMissing = errors.New("bridge: previous message ack is missing")
+
+// awaitsAckOn reports whether this node's earlier message of the exchange
+// proto names, on the secure session sessionID, still waits for its
+// acknowledgement. The node's role is the other one of the sender's.
+func (b *Bridge) awaitsAckOn(sessionID uint16, proto message.ProtocolHeader) bool {
+	b.mu.RLock()
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	return tracker.holdsSecureExchange(sessionID, proto.ExchangeID, roleOf(!proto.Initiator))
+}
+
+// holdsSecureExchange reports whether a message this node sent in role on
+// the secure session's exchange still waits for its acknowledgement — one
+// tracked through [outboundReliableTracker.TrackOnExchange].
+func (t *outboundReliableTracker) holdsSecureExchange(sessionID, exchangeID uint16, role exchangeRole) bool {
+	if t == nil || sessionID == 0 || role == exchangeRoleUnnamed {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	key, ok := t.secureByExchange[secureSlot{sessionID, exchangeID, role}]
+	if !ok {
+		return false
+	}
+	e := t.pending[key]
+	return e != nil && e.oneAtATime
 }
 
 // Untrack drops a message Track registered whose send then failed: there is
@@ -802,7 +863,11 @@ type outboundTickResult struct {
 	// handshake: with ExchangeID it names the handshake ([HandshakeKey]).
 	Initiator uint64
 	Counter   uint32
-	Err       error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
+	// Role is this node's role in a secure entry's exchange, when its
+	// tracker call named it: a give-up ends only the exchange of that role
+	// (review II, phase 7, R2-P7-req-04).
+	Role exchangeRole
+	Err  error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
 	// Installed is, for an unsecured entry given up or expired, the secure
 	// session its handshake installed before the peer acknowledged it
 	// ([outboundReliableTracker.trackUnsecuredInstalled]); zero for none.
@@ -859,7 +924,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 			if key.sessionID != 0 {
 				t.abandoned[key] = now.Add(now.Sub(p.trackedAt))
 			}
-			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached, Installed: p.installed})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Initiator: p.initiator, Counter: key.counter, Role: p.role, Err: mrp.ErrMaxRetransmissionsReached, Installed: p.installed})
 			continue
 		}
 		p.retries++

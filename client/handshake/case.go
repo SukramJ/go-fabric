@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
+	"github.com/SukramJ/go-fabric/internal/exchangeseam"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -291,17 +292,29 @@ func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, sessionID 
 	if err != nil {
 		return nil, ResumptionRecord{}, err
 	}
-	if err := c.x.Send(ctx, mrp.SCOpcodeSigma3, sigma3, exchange.SendOptions{ExpectedProcessingTime: c.ept()}); err != nil {
-		return nil, ResumptionRecord{}, err
-	}
-	if _, err := nextMessage(ctx, c.x, mrp.SCOpcodeStatusReport, c.ept()); err != nil {
-		return nil, ResumptionRecord{}, err
-	}
+	// The keys are final once Sigma2 is processed
+	// (secure/sigma/initiator.go processSigma2 ends in the finished state).
 	res, _ := init.Result()
 	// The peer's CATs from its NOC are the session's (CaseClient.ts:285,
 	// :355 at db021da0); a configured set is not applied (:396-404).
 	cats := res.PeerCATs
-	s, err := c.mgr.NewSecureSession(exchange.SecureSessionConfig{
+	// The session is registered before Sigma3 goes out, establishing: a
+	// responder can send on its session as soon as its Success is out
+	// (matter.js registers it before sending the Success, CaseServer.ts:316,
+	// :332 at db021da0; connectedhomeip activates right after,
+	// CASESession.cpp:2138, :2150 at 6170af84), and this manager reads
+	// that message on its listener goroutine while this one still waits
+	// for the Success — registered after the Success, as matter.js does
+	// (CaseClient.ts:336-369 at db021da0), the message met no session and
+	// was dropped, for good over TCP. Until the Success activates it the
+	// session delivers nothing it receives (it holds it) and is not listed
+	// among the peer's sessions; a Sigma3 that cannot be sent, a failure
+	// StatusReport and a Success that does not arrive close it, and the
+	// caller never sees it. connectedhomeip activates on the Success too
+	// (CASESession.cpp:2315-2339 → PairingSession.cpp:42-66 at 6170af84)
+	// and drops what arrives before (SessionManager.cpp:1007-1012).
+	// BD-Matter-CASEClient-SessionBeforeSigma3, owner decision 269.
+	registered, err := exchangeseam.NewEstablishingSecureSession(c.mgr, exchange.SecureSessionConfig{
 		ID:   sessionID,
 		Addr: c.us.Addr(),
 		Channel: channel.Config{
@@ -321,6 +334,19 @@ func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, sessionID 
 	if err != nil {
 		return nil, ResumptionRecord{}, err
 	}
+	s, ok := registered.(*exchange.Session)
+	if !ok {
+		return nil, ResumptionRecord{}, errors.New("handshake: establishing session of a foreign type")
+	}
+	if err := c.x.Send(ctx, mrp.SCOpcodeSigma3, sigma3, exchange.SendOptions{ExpectedProcessingTime: c.ept()}); err != nil {
+		s.Close()
+		return nil, ResumptionRecord{}, err
+	}
+	if _, err := nextMessage(ctx, c.x, mrp.SCOpcodeStatusReport, c.ept()); err != nil {
+		s.Close()
+		return nil, ResumptionRecord{}, err
+	}
+	exchangeseam.ActivateSecureSession(s)
 	return s, ResumptionRecord{
 		Peer:                  PeerAddress{FabricIndex: c.fabric.Identity.FabricIndex, NodeID: c.peer},
 		SharedSecret:          res.SharedSecret,

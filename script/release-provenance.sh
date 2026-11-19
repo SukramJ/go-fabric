@@ -37,6 +37,13 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 # ci.yml: the `name:` of a job sits at four spaces under `jobs:` (the
 # shape script/requiredchecks reads, TestProvenanceRequiredCI holds this
 # reader to it).
+#
+# Every membership test in this script reads a here-string, never a pipe
+# into `grep -q`: grep -q exits at its first match, bash's printf writes a
+# multi-line value one line per write(2), and a write after grep has gone
+# is SIGPIPE — under pipefail the pipeline's status is 141, so a context
+# that matched counted as absent, once in a few hundred runs (review II
+# phase 7, fl-ci; TestNoQuietGrepAfterPipeUnderPipefail).
 required_ci() {
 	local required="$root/script/requiredchecks/required.txt" ci="$root/.github/workflows/ci.yml"
 	[ -r "$required" ] && [ -r "$ci" ] || { echo "release-provenance: cannot read $required or $ci" >&2; return 2; }
@@ -45,7 +52,7 @@ required_ci() {
 	local ctx found=0
 	while IFS= read -r ctx || [ -n "$ctx" ]; do
 		[ -n "$ctx" ] || continue
-		if printf '%s\n' "$names" | grep -Fxq -- "$ctx"; then
+		if grep -Fxq -- "$ctx" <<<"$names"; then
 			printf '%s\n' "$ctx"
 			found=1
 		fi
@@ -74,7 +81,7 @@ required=$(required_ci) || exit 2
 outside=""
 while IFS= read -r ctx || [ -n "$ctx" ]; do
 	[ -n "$ctx" ] || continue
-	printf '%s\n' "$required" | grep -Fxq -- "$ctx" || outside="$outside${outside:+, }$ctx"
+	grep -Fxq -- "$ctx" <<<"$required" || outside="$outside${outside:+, }$ctx"
 done <"$root/script/requiredchecks/required.txt"
 [ -z "$outside" ] || echo "release-provenance: required checks outside ci.yml, not checked on the tag here: $outside"
 
@@ -142,9 +149,10 @@ for id in $ids; do
 		echo "release-provenance: ci run $id has $jtotal jobs; this check reads one page of 100"
 		exit 2
 	fi
+	jlines=$(printf '%s\n' "$jobs" | sed 1d)
 	missing=""
 	while IFS= read -r ctx; do
-		if ! printf '%s\n' "$jobs" | sed 1d | grep -Fxq -- "$(printf 'success\t%s' "$ctx")"; then
+		if ! grep -Fxq -- "$(printf 'success\t%s' "$ctx")" <<<"$jlines"; then
 			missing="$missing${missing:+, }$ctx"
 		fi
 	done <<<"$required"

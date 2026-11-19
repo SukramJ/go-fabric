@@ -10,9 +10,33 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `clock/clocktest`: `Fake.AdvanceToNext`, a step to the earliest armed deadline and no further — the step for a test that waits on timers, where a fixed step also fires whatever the woken work arms inside it while `Advance` still runs, depending on the scheduler (the cause of `controller/client`'s flaky `TestDefaultSubscription`). It reports the step, and false when nothing is armed.
+
+### Security
+
+Findings of review II, phase 7.
+
+- `cluster/core`: AccessControl's AuxiliaryAccessUpdated of a fabric names no node of another fabric's request — a change of fabric B signalled under fabric A's request while a Groupcast batch was open named A's administrator; a write of Acl or Extension while the store's fabric listing fails is refused with FAILURE instead of stored; `MatterDropFabric` clears a fabric's stored Extension also when it could not be read at construction, so the next start no longer loads it again (review II, R2-P7-acl-01, -02, -03).
+- `groups`: a group message whose fabric was forgotten or reloaded while it was decrypted is dropped instead of being taken into a fresh replay window (review II, R2-P7-sec-02).
+### Fixed
+
+- `client/handshake`: the CASE initiator registers its session before it sends Sigma3 and holds what arrives on it until the responder's Success, then delivers it in order; it registered the session only after the Success, and a message the responder sent on the new session right after its Success was dropped as one of an unknown session — for good over TCP or when sent without an acknowledgement asked. A Sigma3 that cannot be sent, a failure StatusReport or a Success that does not arrive closes the session; `exchange.Manager.SessionsFor` does not list it before the Success. Ahead of matter.js (`BD-Matter-CASEClient-SessionBeforeSigma3`, owner decision 269).
+
 ### Changed
 
+- `cluster/core`: AccessControl answers a host's `MatterWrite` of Acl or Extension with a value of the wrong Go type INVALID_DATA_TYPE, and a write of any other attribute UNSUPPORTED_WRITE (both FAILURE before), as the other security-path servers do; a settings store that fails at construction logs one `matter.access_control.extension_load_failed` with the count instead of one per fabric index (review II, R2-P7-acl-04, -05).
+- `secure/spake2`: `Prover.GeneratePake1` returns a copy of X, as `Verifier.ProcessPake1` returns one of Y (review II, R2-P7-sec-06).
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.23.0` (before `v0.22.1`) and are tagged `ble/bluez/v0.23.0`, `ble/esphome/v0.23.0` and `wifi/wpasupplicant/v0.23.0` at this commit — `ble/bluez` with its move onto `contract.GATTPeripheral` (see `[0.23.0]`); `examples/ble-wifi-light` requires the three at `v0.23.0` (owner decisions 261, 266).
+
+### Fixed
+
+- `clock/clocktest`: `Fake.Resolve` measures each step on the advanced reading; after a forward `Fake.StepWall` it measured on the wall reading, every step came out zero, and a wait on a timer never resolved.
+- `bridge`: a message on a secure session's exchange that does not acknowledge the node's earlier reliable message of that exchange, still unacknowledged, is refused on receive — neither processed nor acknowledged (`matter.rx.previous_ack_missing`), as matter.js refuses it (`MessageExchange.ts:521-525` at `db021da0`). Before, a Write or Invoke sent that way — a timed one after a TimedRequest whose StatusResponse the peer had acknowledged only by a standalone ack that was lost — took effect and only its response was refused (review II, phase 7, V3).
+- `bridge`: the end of a priming report no longer drops the abort of the ongoing report that follows it at once, so the subscription's close ends that report's wait for its chunk's answer instead of the chunk timeout (review II, phase 7, R2-P7-req-01).
+- `bridge`: an exchange this node opened and one its peer opened that share an exchange id are kept apart in the retransmission table: a message of one no longer takes the place of the other's unacknowledged message — which lost its retransmissions — and a message given up ends only the BDX exchange it belongs to, not the other role's of the same id (review II, phase 7, R2-P7-req-03, R2-P7-req-04).
+- `fabrictest`: on a loopback site `Site.ControllerConfig` hands `controller.New` the address to bind (`Listen` `[::1]:0`) instead of a socket of its own (`Listener` nil). With incoming TCP, `New` then picks a port free for both UDP and TCP and binds again while it is taken for TCP, as a program's controller does; a socket bound by the site left the TCP twin of its ephemeral port to chance, and a TCP socket elsewhere on the machine holding the number failed `New` with `EADDRINUSE` (`controller/camera` `TestServiceOnTheFabric` in CI). The site answers for such a controller at `[::1]` and the port its records publish. On the in-memory network nothing changes.
 
 ## [0.23.0] — 2026-11-18
 

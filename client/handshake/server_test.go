@@ -39,6 +39,7 @@ type responderRig struct {
 	sessions   chan *exchange.Session
 
 	nodeMgr    *exchange.Manager
+	nodeRec    *recorder
 	nodeFabric handshake.Fabric
 	nodeStore  *handshake.MemoryResumptionStore
 	ca         *bridgetest.Commissioner
@@ -84,7 +85,7 @@ func newResponderRig(t *testing.T) *responderRig {
 	server.Register()
 	t.Cleanup(server.Close)
 	r.server = server
-	r.nodeMgr, _ = newManager(t)
+	r.nodeMgr, r.nodeRec = newManager(t)
 	// The node's own fabric index for the fabric need not be ours.
 	r.nodeFabric = fabricOf(t, c, testNodeID, 3)
 	return r

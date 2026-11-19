@@ -152,7 +152,7 @@ hci_down() {
 	for i in 1 2 3 4 5; do
 		sudo hciconfig "$1" down >>"$LOG_DIR/hciconfig.log" 2>&1
 		sleep 0.5
-		hciconfig "$1" 2>/dev/null | grep -q DOWN && return 0
+		grep -q DOWN <<<"$(hciconfig "$1" 2>/dev/null)" && return 0
 	done
 	hciconfig "$1" >>"$LOG_DIR/hciconfig.log" 2>&1
 	return 1

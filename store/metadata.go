@@ -37,10 +37,10 @@ func getNextFabricIndexFromMetadata(ctx context.Context, tx *sql.Tx) (uint8, err
 // matter_metadata. The table row must already exist (inserted by
 // migration 013).
 //
-// If the matter_metadata table is absent (pre-013 schema) the update
-// is silently skipped — the scan-based fallback in nextFreeFabricIndex
-// then takes over on the next call. This ensures backwards compatibility
-// with databases that have not been migrated yet.
+// A failing update is skipped: the fabric insert stands, and the next
+// AddFabric skips occupied slots from whatever the counter holds. (The
+// table itself cannot be absent here: AddFabric's first statement writes
+// it, review II, R2-P7-sec-03.)
 func bumpNextFabricIndex(ctx context.Context, tx *sql.Tx, occupied []uint8) error {
 	// Build lookup set of occupied indices.
 	occupiedSet := make(map[uint8]struct{}, len(occupied))
@@ -82,9 +82,8 @@ func bumpNextFabricIndex(ctx context.Context, tx *sql.Tx, occupied []uint8) erro
 		 ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
 		metadataKeyNextFabricIndex, int64(next),
 	); err != nil {
-		// If the table does not exist (pre-013 schema) treat as
-		// non-fatal so old databases still work.
-		return nil //nolint:nilerr // intentional: pre-013 compat
+		// Best-effort, as AddFabric's caller of it states.
+		return nil //nolint:nilerr // intentional: the counter is advisory
 	}
 	return nil
 }

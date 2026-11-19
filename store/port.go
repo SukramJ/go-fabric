@@ -222,7 +222,13 @@ type Resumption interface {
 	// SharedSecret that is not 32. A fabric keeps at most
 	// 16 records: the write of one more peer's
 	// evicts the fabric's record written least recently (a rewrite counts
-	// as a write), and never another fabric's.
+	// as a write), and never another fabric's. The cap counts the records
+	// of both roles: a record carries no role, so those a CASE initiator
+	// writes (a controller's, a node's client) share it with the
+	// responder's, and beyond 16 peers on one fabric a reconnect to a peer
+	// whose record was evicted runs a full CASE handshake — slower, not
+	// failing (BD-Matter-ResumptionRecordsPerFabric; a role column is the
+	// planned follow-up).
 	UpsertResumption(ctx context.Context, rec ResumptionRecord) error
 	// GetResumptionByID and GetResumptionByPeer return
 	// [ErrResumptionNotFound] on a miss.

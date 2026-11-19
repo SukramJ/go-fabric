@@ -261,6 +261,75 @@ func resolveSleep(t *testing.T, f *clocktest.Fake, d time.Duration) (bool, error
 	return full, err
 }
 
+// TestAdvanceToNextStopsAtTheEarliestDeadline: AdvanceToNext fires the
+// earliest instant — a timer a callback arms for that instant included —
+// and leaves a timer armed for later, even one the callback arms inside
+// what a fixed step would have covered.
+func TestAdvanceToNextStopsAtTheEarliestDeadline(t *testing.T) {
+	t.Parallel()
+	f := clocktest.New(epoch)
+	if step, ok := f.AdvanceToNext(); ok || step != 0 || !f.Now().Equal(epoch) {
+		t.Fatalf("AdvanceToNext with nothing armed = %v %v, now +%v; want 0 false and no move", step, ok, f.Now().Sub(epoch))
+	}
+	var (
+		mu    sync.Mutex
+		order []string
+	)
+	record := func(name string) func() {
+		return func() {
+			mu.Lock()
+			defer mu.Unlock()
+			order = append(order, name)
+		}
+	}
+	f.AfterFunc(15*time.Second, func() {
+		record("wait")()
+		f.AfterFunc(0, record("same instant"))
+		f.AfterFunc(39*time.Millisecond, record("retransmission"))
+	})
+	f.AfterFunc(time.Minute, record("minute"))
+
+	if step, ok := f.AdvanceToNext(); !ok || step != 15*time.Second {
+		t.Fatalf("AdvanceToNext = %v %v, want 15s true", step, ok)
+	}
+	if want := []string{"wait", "same instant"}; !slices.Equal(order, want) {
+		t.Fatalf("fired %v, want %v", order, want)
+	}
+	if got := f.Armed(); !slices.Equal(got, []time.Duration{39 * time.Millisecond, 45 * time.Second}) {
+		t.Fatalf("Armed = %v, want [39ms 45s]", got)
+	}
+	if step, ok := f.AdvanceToNext(); !ok || step != 39*time.Millisecond || order[len(order)-1] != "retransmission" {
+		t.Fatalf("second AdvanceToNext = %v %v, fired %v", step, ok, order)
+	}
+	// An overdue deadline is a step of zero.
+	f.Set(f.Now().Add(2 * time.Minute))
+	if step, ok := f.AdvanceToNext(); !ok || step != 0 || order[len(order)-1] != "minute" {
+		t.Fatalf("overdue AdvanceToNext = %v %v, fired %v", step, ok, order)
+	}
+}
+
+// TestResolveAfterStepWall: Resolve measures its steps on the advanced
+// reading; a forward StepWall before it once made every step zero, and a
+// wait on a timer never resolved.
+func TestResolveAfterStepWall(t *testing.T) {
+	t.Parallel()
+	f := clocktest.New(epoch)
+	f.StepWall(time.Hour)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // names a hang
+	defer cancel()
+	full := false
+	err := f.Resolve(ctx, func() error {
+		full = clock.Sleep(f, 90*time.Second, nil)
+		return nil
+	})
+	if err != nil || !full {
+		t.Fatalf("Resolve after StepWall = %v, slept fully %v", err, full)
+	}
+	if got := f.Monotonic(); got != 90*time.Second {
+		t.Fatalf("Resolve moved %v, want 90s", got)
+	}
+}
+
 func TestResolveReturnsWaitsErrorAndHonoursContext(t *testing.T) {
 	t.Parallel()
 	f := clocktest.New(epoch)
@@ -337,5 +406,14 @@ func TestSystemIsTheStandardLibrary(t *testing.T) {
 	}
 	if clock.Since(f, epoch.Add(-time.Second)) != time.Second || clock.Until(f, epoch.Add(time.Second)) != time.Second {
 		t.Fatal("Since/Until do not read the clock")
+	}
+}
+
+// Next reports false when nothing is armed.
+func TestNextWithNothingArmed(t *testing.T) {
+	t.Parallel()
+	f := clocktest.New(epoch)
+	if at, ok := f.Next(); ok || !at.IsZero() {
+		t.Fatalf("Next = %v %v on a fake with nothing armed, want zero false", at, ok)
 	}
 }

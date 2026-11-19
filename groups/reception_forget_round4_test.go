@@ -110,8 +110,9 @@ func TestParkedWindowsSurviveASecondForget(t *testing.T) {
 	}
 }
 
-// TestParkedWindowWinsOverAFreshOne: a decode in flight across the forget
-// may create a fresh window for the key before the reload; the parked
+// TestParkedWindowWinsOverAFreshOne: when a window for the key was
+// created after the forget and before the reload (a decode in flight no
+// longer creates one, TestDecodeInFlightAcrossForgetIsDropped), the parked
 // window of a source wins over it (a replay the fresh one took stays
 // refused afterwards), and a fresh source the parked set lacks keeps its
 // window.

@@ -124,3 +124,34 @@ func TestSubscriptionCloseEndsAnOngoingReportWait(t *testing.T) {
 		t.Fatal("the reporter still waits on an unanswered chunk 5 s after its subscription closed")
 	}
 }
+
+// TestPrimingForgetKeepsTheFollowingReportsAbort (review II, phase 7,
+// R2-P7-req-01): the priming report and the first ongoing report share
+// the abort table, and EndPriming runs before the priming handler's
+// deferred forget. An ongoing report that registers its abort in that
+// window keeps it: the priming report's forget removes only the channel
+// it registered, so the subscription's close still ends the ongoing
+// report's chunk wait.
+func TestPrimingForgetKeepsTheFollowingReportsAbort(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
+	const subID uint32 = 7
+	priming := b.primingAbort(subID)
+	reportCh, done := b.reportAbort(context.Background(), subID)
+	defer done()
+	b.forgetPrimingAbort(subID, priming)
+	b.closePrimingAbort(subID)
+	select {
+	case <-reportCh:
+	default:
+		t.Fatal("the subscription's close did not end the ongoing report's abort: the priming report's forget removed it")
+	}
+	// The ongoing report's done after the close leaves a later
+	// registration alone too.
+	later := b.primingAbort(subID)
+	done()
+	if v, ok := b.routing.primingAborts.Load(subID); !ok || v.(chan struct{}) != later {
+		t.Fatal("an ended report's done removed a later report's abort")
+	}
+	b.forgetPrimingAbort(subID, later)
+}

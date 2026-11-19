@@ -92,7 +92,7 @@ func (s *Site) answer(questions []dns.Question) []dns.RR {
 	for _, a := range s.controllerAdvertisers() {
 		services := a.Active()
 		for i := range services {
-			rrs, names := serviceRecords(&services[i], "fabrictest-c"+strconv.Itoa(a.index)+".local.", a.addr.IP)
+			rrs, names := serviceRecords(&services[i], "fabrictest-c"+strconv.Itoa(a.index)+".local.", a.ip())
 			for _, name := range names {
 				if asked[name] {
 					out = append(out, rrs...)

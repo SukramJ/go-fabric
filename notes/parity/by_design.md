@@ -225,6 +225,7 @@ pin lift confirms by re-reading the row, [`pin-lifts.md`](./pin-lifts.md)).
 | BD-Matter-Transition-StepErrorEndsAsCancel | `Transitions.ts:594-600` at `db021da0`: a step error → `this.stop()`, and `stop` reports nothing (`:263-284`) (presence) | `packages/node/src/behavior/Transitions.ts` | `"\"Aborting transition due to unhandled error during step management:\","` | the rule connectedhomeip quotes and implements, "When it changes to 0." (`src/app/clusters/level-control/LevelControlCluster.cpp:688-691`, `:706` at `6170af84`); applying it to a step error is this module's (review II, R2-P6-err-1415, owner decision 209) | no |
 | BD-Matter-Example-SkipForwardSaturates | `MediaPlaybackServer.ts:14` at `db021da0`: matter.js has no server logic (absence: the class line) | `packages/node/src/behaviors/media-playback/MediaPlaybackServer.ts` | `"export class MediaPlaybackServer extends MediaPlaybackBehavior {}"` | this module's own rule for the reference daemon (review II, R2-P6-wire-2654, owner decision 207); connectedhomeip's tv-app example wraps (`examples/tv-app/tv-common/clusters/media-playback/MediaPlaybackManager.cpp:249-250` at `6170af84`) | no |
 | BD-Matter-Commissioner-FailSafeKeptThroughConsent | `ControllerCommissioningFlow.ts:293` at `db021da0`: the BLE re-arm period is the constant `BTP_IDLE_ALIVE_INTERVAL = Seconds(25)`, the period of the timer `:922-926`, which runs on BLE only (`:920`) (presence); the flow has no joint-fabric trust-verification stage (absence: no `jcm`/`JointFabric` under `packages/protocol/src/peer/`, re-checked by that grep) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts`<br>`packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"const BTP_IDLE_ALIVE_INTERVAL = Seconds(25);"`<br>`"if (this.interaction.channelType === ChannelType.BLE) {"` | connectedhomeip for the consent wait (`src/controller/jcm/DeviceCommissioner.cpp:430-441`, `:63-73` at `6170af84`); the period min(25 s, half the fail-safe) and the re-arm off BLE while Consent waits are this module's own (review II, R2-P6-fsm-1860, owner decision 215) | no |
+| BD-Matter-CASEClient-SessionBeforeSigma3 | `CaseClient.ts:336-369` at `db021da0`: the initiator awaits the responder's Success (`:336`) before it creates the session (`:343-358`, `delayManagerRegistration` at `:356`) and adds it to the manager (`:369`) (presence) | `packages/protocol/src/session/case/CaseClient.ts` | `"            await abort.attempt(messenger.waitForSuccess({ description: \"Sigma3-Success\" }));"` | this module's own rule (owner decision 269): registered before Sigma3, what arrives held until the Success. connectedhomeip serves the initiator's session from the Success as well — `OnSuccessStatusReport` ends in `Finish()` (`src/protocols/secure_channel/CASESession.cpp:2315-2339` at `6170af84`), which activates it (`src/protocols/secure_channel/PairingSession.cpp:42-66`) — and drops a message on a session not yet active (`src/transport/SessionManager.cpp:1007-1012`) | no |
 
 ---
 
@@ -3387,6 +3388,44 @@ and `c41eb7da` also closes a resumed session whose Success does not
 arrive (`CaseServer.ts:205-211`), which ends the resume half of
 `BD-Matter-CASEServer-CloseOnUnfinishedEstablishment`. Pinned by
 `TestCASEServerRegistersTheResumedSessionBeforeSigma2Resume`.
+
+### BD-Matter-CASEClient-SessionBeforeSigma3 — the CASE initiator registers its session before Sigma3 and holds it until the Success
+
+matter.js `CaseClient.ts` at `db021da0` sends Sigma3 and awaits the
+responder's Success (`:335-336`), then creates the session with
+`delayManagerRegistration` (`:343-358`, `:356`) and adds it to the
+manager (`:369`); a message for the session before then is dropped as one
+of an unknown session (`ExchangeManager.ts:331-341`). connectedhomeip
+activates the initiator's session when the Success arrives
+(`src/protocols/secure_channel/CASESession.cpp:2315-2339` at `6170af84`,
+`OnSuccessStatusReport` ending in `Finish()`; the activation is
+`PairingSession.cpp:42-66`) and drops a message on a session not yet active
+(`src/transport/SessionManager.cpp:1007-1012`); neither holds one.
+`handshake.CASE`'s full handshake (`client/handshake/case.go`) registers
+the session before Sigma3 goes out, establishing (through
+`internal/exchangeseam`): what decrypts on it is held, in order and at
+most 16 distinct messages — one beyond that is dropped undecrypted, so its
+retransmission is taken; a retransmission of a held message takes no
+place — and `exchange.Manager.SessionsFor` does not list it,
+until the Success activates it; then the held messages are delivered
+before any that follows, and the caller gets the session. A Sigma3 that
+cannot be sent, a failure StatusReport and a Success that does not arrive
+(timeout, cancellation) close it. Reasoning: a responder can send on the session as soon as its Success is out
+— matter.js's has it in the manager before it sends the Success
+(`CaseServer.ts:316`, `:332`, `NodeSession.ts:153-155`), connectedhomeip's
+activates right after sending it (`CASESession.cpp:2138`, `:2150`) — and the
+manager reads that message on its listener goroutine while the handshake's
+goroutine still waits for the Success; registered after it,
+the message met no session and was dropped — for good over TCP or for a
+message sent without an acknowledgement asked. The keys are final once
+Sigma2 is processed, so only the responder the handshake authenticated
+can send on the session early. The resumption branch is unchanged: its
+session is registered before our Success goes out. The row closes when
+matter.js's initiator registers the session before Sigma3. Pinned by
+`TestCASEInitiatorReceivesTheResponderMessageBeforeSuccess` and
+`TestCASEInitiatorClosesTheEstablishingSessionWithoutSuccess`, and in
+`client/exchange` by `TestEstablishingSessionHoldsUntilActivated` and
+`TestEstablishingSessionClosedDeliversNothing`.
 
 ### BD-Matter-CASEServer-NoReportOnShutdown — a handshake the responder's Close cut short reports nothing
 
@@ -9261,7 +9300,7 @@ matter.js awaits the socket's write callback for a send with no timeout (`packag
 
 ### BD-Matter-ResumptionRecordsPerFabric — the store keeps at most 16 CASE resumption records per fabric
 
-The store keeps at most 16 CASE resumption records per fabric and, when one more peer's record is written, evicts the fabric's record the store wrote longest ago — by its own write sequence (`write_seq`, schema v11), not the clock; a rewrite counts as a write (`store/resumption.go` UpsertResumption, `store/memstore`; host backends are held to it by storetest `resumption/cap-per-fabric`). It follows neither reference: matter.js keeps one resumption record per peer without a cap (`packages/protocol/src/session/SessionManager.ts:261-262`, `:912-913` at `db021da0`); connectedhomeip caps the node at `CHIP_CONFIG_CASE_SESSION_RESUME_CACHE_SIZE` = 3 × `CHIP_CONFIG_MAX_FABRICS` records in one index (`DefaultSessionResumptionStorage.h:38-42`) and, when it is full, drops the entry at its head — the peer first saved longest ago of any fabric; a re-save keeps the entry's place (`DefaultSessionResumptionStorage.cpp:55-90`, `:95-99` at `6170af84`; `src/lib/core/CHIPConfig.h:1336-1343`). Per fabric, because a fabric's administrator mints the node ids its peers authenticate with and must not grow or evict another fabric's records. Review II, R2-P6-bound-0106, owner decision 134. Register row above; the row closes when matter.js bounds its resumption records.
+The store keeps at most 16 CASE resumption records per fabric and, when one more peer's record is written, evicts the fabric's record the store wrote longest ago — by its own write sequence (`write_seq`, schema v11), not the clock; a rewrite counts as a write (`store/resumption.go` UpsertResumption, `store/memstore`; host backends are held to it by storetest `resumption/cap-per-fabric`). It follows neither reference: matter.js keeps one resumption record per peer without a cap (`packages/protocol/src/session/SessionManager.ts:261-262`, `:912-913` at `db021da0`); connectedhomeip caps the node at `CHIP_CONFIG_CASE_SESSION_RESUME_CACHE_SIZE` = 3 × `CHIP_CONFIG_MAX_FABRICS` records in one index (`DefaultSessionResumptionStorage.h:38-42`) and, when it is full, drops the entry at its head — the peer first saved longest ago of any fabric; a re-save keeps the entry's place (`DefaultSessionResumptionStorage.cpp:55-90`, `:95-99` at `6170af84`; `src/lib/core/CHIPConfig.h:1336-1343`). Per fabric, because a fabric's administrator mints the node ids its peers authenticate with and must not grow or evict another fabric's records. Review II, R2-P6-bound-0106, owner decision 134. The cap counts every record of the fabric, whichever role wrote it: the store keeps one record per peer for both roles and does not carry the role (`store/resumption.go` ResumptionRecord), so the records a controller or a node's client writes as CASE initiator (`client/handshake.StoreResumption`) share the 16 with the responder's. A controller with more than 16 peers on one fabric therefore resumes only with the 16 written most recently; a reconnect to any other runs a full CASE handshake — a cost in time and computation, not in function (review II, R2-P7-sec-01, owner decision 270). The planned follow-up is a role column (a schema migration and an exported field on `store.ResumptionRecord`) with the cap counting only the responder's records. Register row above; the row closes when matter.js bounds its resumption records.
 
 ### BD-Matter-CASEServer-ResumptionRecordSingleUse — the device's resumption record is consumed when a resume is accepted
 

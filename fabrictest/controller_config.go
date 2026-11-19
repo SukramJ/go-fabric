@@ -6,17 +6,22 @@ package fabrictest
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"path/filepath"
 	"strconv"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/attestation"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // ControllerConfig is a controller.Config wired to the site, for a
 // program's own controller.New to run on it: a host index with its UDP
-// socket on the site's network (Listener), the DNS-SD browser on the
+// socket on the site's network (Listener) — on a loopback site the
+// address New binds itself (Listen [::1]:0), so that with incoming TCP it
+// picks a port free for both, as a program's controller does — the
+// DNS-SD browser on the
 // site's answers (Names), the site's clock carrying the host's in-flight
 // counters (Clock), the site's logger, and a SQLite database of its own in
 // the site's directory (DB, closed with the site). opts gives the vendor
@@ -39,13 +44,26 @@ func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 	s.tb.Helper()
 	index := s.index()
 	g := s.newGroup("controller " + strconv.Itoa(index))
-	l, err := s.listen(index, g)
-	if err != nil {
-		s.tb.Fatalf("fabrictest: controller %d: listen: %v", index, err)
+	// On loopback New binds the socket itself: with incoming TCP it binds
+	// the UDP and TCP pair and binds again while the port is taken for
+	// TCP, which it does only for a port it chose (controller/tcp.go
+	// bindTransports). A socket bound here left the TCP twin of its
+	// ephemeral port to chance — a TCP socket elsewhere on the machine
+	// holding the number failed New with EADDRINUSE.
+	var l *udp.Listener
+	var addr *net.UDPAddr
+	if s.net != nil {
+		var err error
+		if l, err = s.listen(index, g); err != nil {
+			s.tb.Fatalf("fabrictest: controller %d: listen: %v", index, err)
+		}
+		addr = l.LocalAddr()
 	}
 	db, err := controller.OpenDB(filepath.Join(s.dir, "controller"+strconv.Itoa(index)+".db"))
 	if err != nil {
-		_ = l.Close()
+		if l != nil {
+			_ = l.Close()
+		}
 		s.tb.Fatalf("fabrictest: controller %d: %v", index, err)
 	}
 	s.onClose(func() { s.logTeardown(fmt.Sprintf("controller %d: close the store", index), db.Close()) })
@@ -63,12 +81,15 @@ func (s *Site) ControllerConfig(opts ControllerOptions) controller.Config {
 	}
 	cfg := controller.Config{
 		DB: db, Attestation: trust, VendorID: opts.VendorID, Label: label, Logger: log,
-		Advertiser: s.controllerAdvertiser(index, l.LocalAddr()),
+		Advertiser: s.controllerAdvertiser(index, addr),
 		Clock:      s.hostClock(g), Listener: l, Networks: opts.Networks, OwnNetworkProfile: opts.OwnNetworkProfile,
 		TCP: opts.TCP, Sessions: opts.Sessions, TransportPreference: opts.TransportPreference,
 		Names: func(log *slog.Logger) (*discovery.Names, error) {
 			return discovery.NewNames(newQueryConn(s), log), nil
 		},
+	}
+	if l == nil {
+		cfg.Listen = loopbackListen
 	}
 	if opts.OTA != nil {
 		ota := *opts.OTA

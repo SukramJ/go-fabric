@@ -392,7 +392,15 @@ func protectedHeaderEnd(buf []byte) int {
 // completeMessage fills in the subject of a message whose candidate
 // passed [Manager.mappingAllows] and runs the reception window; an error
 // when the key's reception state holds no window for the sender and has
-// no room for one ([Manager.receptionWindow]).
+// no room for one ([Manager.receptionWindow]), and [errFabricChanged]
+// when the candidate's fabric is no longer the one installed.
+//
+// The installed-fabric check, the window and its Accept share one m.mu
+// read lock: ForgetFabric deletes the fabric under the write lock, so a
+// decode either takes its counter before the delete — into the window
+// ForgetFabric then parks — or sees the fabric gone and is dropped
+// (review II, R2-P7-sec-02). Lock order m.mu → receptionMu; no path takes
+// m.mu while holding receptionMu.
 func (m *Manager) completeMessage(msg *Message, c candidate) error {
 	msg.FabricIndex = c.fabric.index
 	msg.GroupID = msg.Header.DestGroupID
@@ -401,13 +409,19 @@ func (m *Manager) completeMessage(msg *Message, c candidate) error {
 	msg.HasValidMapping = true
 
 	m.mu.RLock()
+	if m.fabrics[c.fabric.index] != c.fabric {
+		m.mu.RUnlock()
+		return fmt.Errorf("%w: fabric %d, group %#04x", errFabricChanged, msg.FabricIndex, msg.GroupID)
+	}
 	msg.LocalNodeID = c.fabric.nodeID
 	if e, ok := c.fabric.table[msg.GroupID]; ok {
 		msg.Endpoints = slices.Clone(e.Endpoints)
 	}
-	m.mu.RUnlock()
-
 	w, ok := m.receptionWindow(c.epoch.key, msg.SourceNodeID)
+	if ok {
+		msg.Duplicate = !w.Accept(msg.Header.MessageCounter)
+	}
+	m.mu.RUnlock()
 	if !ok {
 		if m.firstRefusal(c.epoch.key) {
 			m.logger.Warn("groups.reception.full",
@@ -418,9 +432,16 @@ func (m *Manager) completeMessage(msg *Message, c candidate) error {
 		}
 		return fmt.Errorf("%w: source node %#016x, group %#04x", errReceptionFull, msg.SourceNodeID, msg.GroupID)
 	}
-	msg.Duplicate = !w.Accept(msg.Header.MessageCounter)
 	return nil
 }
+
+// errFabricChanged drops a message whose candidate's fabric was forgotten
+// or reloaded while the message was being decrypted: the reception window
+// is taken only for the fabric state the candidate came from, so a forget
+// in between neither hands the message a fresh, unprimed window nor takes
+// a counter the parked window misses (review II, R2-P7-sec-02). The
+// sender's next message decodes against the state now installed.
+var errFabricChanged = errors.New("groups: the candidate's fabric changed during the decode")
 
 // maxGroupSendersPerKey bounds the source node ids an operational key
 // holds reception state for. Because a sender beyond it is refused for as

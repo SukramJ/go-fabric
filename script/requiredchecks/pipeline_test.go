@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -247,6 +248,102 @@ func TestLintToolPinsMatch(t *testing.T) {
 		}
 		if mk[0][1] != wf[0][1] {
 			t.Errorf("%s: the Makefile pins %s, ci.yml %s", name, mk[0][1], wf[0][1])
+		}
+	}
+}
+
+// quietGrepAfterPipe is a pipe (not `||`) into a grep whose flags make it
+// exit at its first match: -q, --quiet or --silent.
+var quietGrepAfterPipe = regexp.MustCompile(`(^|[^|])\|\s*grep\s(\s*-[^\s|;&]*)*?\s*(-[A-Za-z]*q[A-Za-z]*|--quiet|--silent)(\s|$)`)
+
+// quietGrepPipes returns the lines of src, from line first on, where a
+// pipe feeds a quiet grep; comment lines are skipped.
+func quietGrepPipes(src string, first int) []int {
+	var out []int
+	for i, l := range strings.Split(src, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(l), "#") {
+			continue
+		}
+		if quietGrepAfterPipe.MatchString(l) {
+			out = append(out, first+i)
+		}
+	}
+	return out
+}
+
+// TestNoQuietGrepAfterPipeUnderPipefail: no script that sets pipefail —
+// a tracked *.sh of the repository or a workflow's run script — pipes
+// into `grep -q`. grep -q exits at its first match; bash's printf and echo
+// write a multi-line value one line per write(2) (strace, bash 5.2), so a
+// line written after grep has gone is SIGPIPE, the writer's status is 141
+// and pipefail turns the match into a miss. release-provenance.sh dropped
+// "bench (smoke)" from its required checks this way in ci run 44447266854
+// (TestProvenanceRequiredCI, review II phase 7, fl-ci); a here-string
+// (`grep -q … <<<"$v"`) has no writer to lose.
+func TestNoQuietGrepAfterPipeUnderPipefail(t *testing.T) {
+	var bad []string
+	err := filepath.WalkDir(repoRoot, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", "node_modules", "worktrees":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(path) != ".sh" {
+			return nil
+		}
+		raw, err := os.ReadFile(path) //nolint:gosec // a file of the repository
+		if err != nil {
+			return err
+		}
+		if !strings.Contains(string(raw), "pipefail") {
+			return nil
+		}
+		for _, n := range quietGrepPipes(string(raw), 1) {
+			bad = append(bad, path+":"+strconv.Itoa(n))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for file, src := range workflowFiles(t) {
+		for _, rs := range runScripts(file, src) {
+			if !strings.Contains(rs.text, "pipefail") {
+				continue
+			}
+			for _, n := range quietGrepPipes(rs.text, rs.line+1) {
+				bad = append(bad, ".github/workflows/"+file+":"+strconv.Itoa(n))
+			}
+		}
+	}
+	sort.Strings(bad)
+	for _, b := range bad {
+		t.Errorf("%s: a pipe into a quiet grep under pipefail; the writer's SIGPIPE turns a match into a miss — read a here-string instead", b)
+	}
+}
+
+func TestQuietGrepAfterPipe(t *testing.T) {
+	for _, tc := range []struct {
+		line string
+		want bool
+	}{
+		{`if printf '%s\n' "$names" | grep -Fxq -- "$ctx"; then`, true},
+		{`echo "$changed" | grep -Evq "$docs_only"`, true},
+		{`printf '%s\n' "$changed" | grep -qE '^.+/go\.mod$'`, true},
+		{`x | grep --quiet y`, true},
+		{`x | grep -E -q y`, true},
+		{`if grep -Fxq -- "$ctx" <<<"$names"; then`, false},
+		{`a || grep -q b c`, false},
+		{`x | grep -v y | wc -l`, false},
+		{`x | grep -c y`, false},
+	} {
+		if got := len(quietGrepPipes(tc.line, 1)) > 0; got != tc.want {
+			t.Errorf("%q: got %v, want %v", tc.line, got, tc.want)
 		}
 	}
 }

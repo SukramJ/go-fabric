@@ -57,8 +57,13 @@ func TestReportStatusResponseAckedAtOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	reportCounter, ok := pendingCounterOfExchange(b, sessionID, proto.ExchangeID)
+	if !ok {
+		t.Fatal("the report does not wait for its acknowledgement")
+	}
 	datagram := encryptIMFromPeer(t, peerSess, sessionID, message.ProtocolHeader{
 		Opcode: im.OpcodeStatusResponse, ExchangeID: proto.ExchangeID, Initiator: false, NeedsAck: true,
+		HasAck: true, AckCounter: reportCounter,
 	}, body)
 	if err := b.dispatch(context.Background(), datagram, peerAddr); err != nil {
 		t.Fatalf("dispatch: %v", err)

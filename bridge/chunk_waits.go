@@ -199,8 +199,9 @@ func (b *Bridge) endSessionChunkWaits(sessionID uint16) {
 // primingAbort registers the channel that ends subID's priming-report
 // chunk waits when the subscription closes, and closes it at once when
 // the subscription is already gone. The caller defers
-// [Bridge.forgetPrimingAbort].
-func (b *Bridge) primingAbort(subID uint32) <-chan struct{} {
+// [Bridge.forgetPrimingAbort] with the channel returned: it is the
+// table's stored value, bidirectional, so the forget's compare matches.
+func (b *Bridge) primingAbort(subID uint32) chan struct{} {
 	if subID == 0 {
 		return nil // no manager: nothing can close it
 	}
@@ -233,8 +234,10 @@ func (b *Bridge) closePrimingAbort(subID uint32) {
 // a report of a subscription a KeepSubscriptions=false request, a fabric's
 // removal or an emptied grant ended returns at once instead of waiting
 // out chunkStatusResponseTimeout (review II, R2-P6-fsm-0513). A
-// subscription has one report in flight, so the priming table holds it.
-// done stops it; the caller defers done.
+// subscription has one ongoing report in flight, so the priming table
+// holds it; the priming report's tail can overlap the first one, which is
+// why each forget removes only its own channel (R2-P7-req-01). done stops
+// it; the caller defers done.
 func (b *Bridge) reportAbort(ctx context.Context, subID uint32) (abort <-chan struct{}, done func()) {
 	ch := b.primingAbort(subID)
 	if ch == nil {
@@ -243,12 +246,19 @@ func (b *Bridge) reportAbort(ctx context.Context, subID uint32) (abort <-chan st
 	stop := context.AfterFunc(ctx, func() { b.closePrimingAbort(subID) })
 	return ch, func() {
 		stop()
-		b.forgetPrimingAbort(subID)
+		b.forgetPrimingAbort(subID, ch)
 	}
 }
 
-// forgetPrimingAbort drops subID's priming abort once its priming report
-// is done.
-func (b *Bridge) forgetPrimingAbort(subID uint32) {
-	b.routing.primingAborts.Delete(subID)
+// forgetPrimingAbort drops subID's abort ch once its report is done — only
+// while ch is still the registered one. The priming report's deferred
+// forget runs after EndPriming, so the first ongoing report may already
+// have registered its own channel; an unconditional delete would drop it
+// and leave that report's chunk wait to its timer when the subscription
+// closes (review II, phase 7, R2-P7-req-01).
+func (b *Bridge) forgetPrimingAbort(subID uint32, ch chan struct{}) {
+	if ch == nil {
+		return
+	}
+	b.routing.primingAborts.CompareAndDelete(subID, ch)
 }
