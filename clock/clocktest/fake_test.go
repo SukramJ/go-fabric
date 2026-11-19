@@ -408,3 +408,12 @@ func TestSystemIsTheStandardLibrary(t *testing.T) {
 		t.Fatal("Since/Until do not read the clock")
 	}
 }
+
+// Next reports false when nothing is armed.
+func TestNextWithNothingArmed(t *testing.T) {
+	t.Parallel()
+	f := clocktest.New(epoch)
+	if at, ok := f.Next(); ok || !at.IsZero() {
+		t.Fatalf("Next = %v %v on a fake with nothing armed, want zero false", at, ok)
+	}
+}
