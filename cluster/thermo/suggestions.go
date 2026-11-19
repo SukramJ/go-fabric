@@ -446,53 +446,7 @@ func (s *ThermostatServer) reevaluateSuggestions(ctx context.Context) {
 		return
 	}
 	removed, _ := s.removeExpiredLocked(now)
-	var current *Suggestion
-	var wake uint32
-	soonest := func(t uint32) {
-		if t > now && (wake == 0 || t < wake) {
-			wake = t
-		}
-	}
-	for i := range s.suggest.list {
-		sg := &s.suggest.list[i]
-		if sg.EffectiveTime <= now {
-			if current == nil || sg.EffectiveTime < current.EffectiveTime {
-				current = sg
-			}
-		}
-		soonest(sg.EffectiveTime)
-		soonest(sg.ExpirationTime)
-	}
-	var follow []byte
-	var reason *uint16
-	if current != nil {
-		id := current.UniqueId
-		presetActive := s.activePresetHandle != nil && bytes.Equal(s.activePresetHandle, current.PresetHandle)
-		bits := s.suggest.hostReason
-		if s.hold == holdOn {
-			bits |= uint16(tdef.ThermostatSuggestionNotFollowingReasonOngoingHold)
-		}
-		var none uint16
-		switch {
-		case bits != 0:
-			reason = &bits
-		case s.suggest.overriddenSet && s.suggest.overridden == id:
-			reason = &none
-		case !presetActive && written:
-			s.suggest.overridden, s.suggest.overriddenSet = id, true
-			reason = &none
-		}
-		s.suggest.current, s.suggest.has = id, true
-		if s.suggest.overriddenSet && s.suggest.overridden != id {
-			s.suggest.overriddenSet = false
-		}
-		if reason == nil && !presetActive {
-			follow = bytes.Clone(current.PresetHandle)
-		}
-	} else {
-		s.suggest.has = false
-		s.suggest.overriddenSet = false
-	}
+	follow, reason, wake := s.determineCurrentLocked(now, written)
 	currentChanged := hadBefore != s.suggest.has || (s.suggest.has && before != s.suggest.current)
 	reasonChanged := !equalReason(s.suggest.reason, reason)
 	s.suggest.reason = reason
@@ -506,6 +460,60 @@ func (s *ThermostatServer) reevaluateSuggestions(ctx context.Context) {
 				slog.String("preset_handle", handleKey(follow)), slog.String("reason", err.Error()))
 		}
 	}
+}
+
+// determineCurrentLocked chooses the current suggestion among the entries
+// in effect at now, sets it and the override, and returns the preset to
+// follow (nil: none), the reason not to follow (nil: null) and the
+// earliest EffectiveTime or ExpirationTime still ahead (0: none). written
+// is suggest.setpointWritten. Mirrors matter.js ThermostatServer.ts:2434-2477
+// at b25ed960 (#determineCurrentSuggestion, #setCurrentSuggestion), the
+// timer's times :2505-2510 (#restartSuggestionTimer). The caller holds
+// s.mu.
+func (s *ThermostatServer) determineCurrentLocked(now uint32, written bool) (follow []byte, reason *uint16, wake uint32) {
+	var current *Suggestion
+	soonest := func(t uint32) {
+		if t > now && (wake == 0 || t < wake) {
+			wake = t
+		}
+	}
+	for i := range s.suggest.list {
+		sg := &s.suggest.list[i]
+		if sg.EffectiveTime <= now && (current == nil || sg.EffectiveTime < current.EffectiveTime) {
+			current = sg
+		}
+		soonest(sg.EffectiveTime)
+		soonest(sg.ExpirationTime)
+	}
+	if current == nil {
+		s.suggest.has = false
+		s.suggest.overriddenSet = false
+		return nil, nil, wake
+	}
+	id := current.UniqueId
+	presetActive := s.activePresetHandle != nil && bytes.Equal(s.activePresetHandle, current.PresetHandle)
+	bits := s.suggest.hostReason
+	if s.hold == holdOn {
+		bits |= uint16(tdef.ThermostatSuggestionNotFollowingReasonOngoingHold)
+	}
+	var none uint16
+	switch {
+	case bits != 0:
+		reason = &bits
+	case s.suggest.overriddenSet && s.suggest.overridden == id:
+		reason = &none
+	case !presetActive && written:
+		s.suggest.overridden, s.suggest.overriddenSet = id, true
+		reason = &none
+	}
+	s.suggest.current, s.suggest.has = id, true
+	if s.suggest.overriddenSet && s.suggest.overridden != id {
+		s.suggest.overriddenSet = false
+	}
+	if reason == nil && !presetActive {
+		follow = bytes.Clone(current.PresetHandle)
+	}
+	return follow, reason, wake
 }
 
 // notifySuggestionChanges reports the suggestion attributes a

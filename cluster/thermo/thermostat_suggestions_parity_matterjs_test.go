@@ -356,8 +356,9 @@ func (c *suggestCase) wantHeating(want int16) {
 
 func (c *suggestCase) wantIDs(want ...uint8) {
 	c.t.Helper()
-	var got []uint8
-	for _, sg := range readSuggestions(c.t, c.srv) {
+	list := readSuggestions(c.t, c.srv)
+	got := make([]uint8, 0, len(list))
+	for _, sg := range list {
 		got = append(got, sg.UniqueId)
 	}
 	if !slices.Equal(got, want) {
