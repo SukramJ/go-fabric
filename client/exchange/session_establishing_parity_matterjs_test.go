@@ -322,12 +322,14 @@ func TestSessionViews(t *testing.T) {
 		served := make(chan uint16, 1)
 		m.SetProtocolHandler(im.InteractionModelProtocolID, func(_ *Exchange, first *Message) { served <- first.ExchangeID })
 		p.send(t, establishing.ID(), message.ProtocolHeader{Initiator: true, ExchangeID: 0x0333, ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeStatusResponse}, []byte{0x15, 0x18})
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
 		select {
 		case id := <-served:
 			if id != 0x0333 {
 				t.Fatalf("served exchange %#x", id)
 			}
-		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
 			t.Fatal("a message on the establishing session was not served")
 		}
 		if !establishing.establishing.Load() {

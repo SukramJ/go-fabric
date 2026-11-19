@@ -659,12 +659,14 @@ func TestMessageExchangeOnTransmitted(t *testing.T) {
 		go func() {
 			done <- x.send(context.Background(), 1, nil, SendOptions{}, func() { transmittedAt <- len(e.conn.datagrams()) })
 		}()
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
 		select {
 		case n := <-transmittedAt:
 			if n != 1 {
 				t.Fatalf("ran after %d datagrams, want 1", n)
 			}
-		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
 			t.Fatal("did not run after the first transmission")
 		}
 		if !x.HasUnackedMessage() {

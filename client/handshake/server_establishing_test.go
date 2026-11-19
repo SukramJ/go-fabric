@@ -128,12 +128,11 @@ func TestCASEServerResponderSessionEstablishing(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("no Success attempted")
 		}
-		deadline := time.Now().Add(20 * time.Second)
-		for len(r.serverMgr.SessionsFor(nodeAddr)) != 0 {
-			if time.Now().After(deadline) {
-				t.Fatal("the session whose Success never went out is still registered")
-			}
-			time.Sleep(10 * time.Millisecond)
+		// Close waits for the handshake in flight, which ended at the
+		// refused Success.
+		r.server.Close()
+		if got := r.serverMgr.SessionsFor(nodeAddr); len(got) != 0 {
+			t.Fatalf("the session whose Success never went out is still registered: %v", got)
 		}
 		if len(r.sessions) != 0 {
 			t.Fatal("the session was handed over")
@@ -157,25 +156,33 @@ func TestCASEServerResponderSessionEstablishing(t *testing.T) {
 		}
 		first := r.accepted(t)
 		before, _ := r.store.FindResumptionRecord(handshake.PeerAddress{FabricIndex: 1, NodeID: testNodeID})
+		reported := make(chan struct{}, 8)
 		r.serverRec.setHook(func(d []byte) {
-			if opcode, _, ok := unsecuredMessage(d); ok && opcode == mrp.SCOpcodeSigma2Resume {
+			opcode, payload, ok := unsecuredMessage(d)
+			if !ok {
+				return
+			}
+			switch opcode {
+			case mrp.SCOpcodeSigma2Resume:
 				for _, s := range r.serverMgr.SessionsFor(nodeAddr) {
 					s.Close()
+				}
+			case mrp.SCOpcodeStatusReport:
+				if sr, ok := exchange.DecodeStatusReport(payload); ok && sr.GeneralCode == mrp.SCStatusGeneralFailure {
+					reported <- struct{}{}
 				}
 			}
 		})
 		if _, resumed, err := r.open(ctx, r.nodeFabric); err != nil || !resumed {
 			t.Fatalf("resumed CASE: resumed %v, %v", resumed, err)
 		}
-		invalidParam := func() bool {
-			return statusCount(r.serverRec.unsecuredStatusReports(), mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolInvalidParameter) == 1
+		select {
+		case <-reported:
+		case <-ctx.Done():
+			t.Fatalf("no failure reported; reports %+v", r.serverRec.unsecuredStatusReports())
 		}
-		deadline := time.Now().Add(20 * time.Second)
-		for !invalidParam() {
-			if time.Now().After(deadline) {
-				t.Fatalf("no InvalidParam; reports %+v", r.serverRec.unsecuredStatusReports())
-			}
-			time.Sleep(10 * time.Millisecond)
+		if n := statusCount(r.serverRec.unsecuredStatusReports(), mrp.SCStatusGeneralFailure, mrp.SCStatusProtocolInvalidParameter); n != 1 {
+			t.Fatalf("%d InvalidParam reports; reports %+v", n, r.serverRec.unsecuredStatusReports())
 		}
 		if len(r.sessions) != 0 {
 			t.Fatal("the session closed during its establishment was handed over")

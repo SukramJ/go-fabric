@@ -9433,7 +9433,7 @@
       "identifier": "TestFabricSessionsForPeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/session_establishing_parity_matterjs_test.go",
-      "line": 379
+      "line": 381
     },
     {
       "package": "client/exchange",
