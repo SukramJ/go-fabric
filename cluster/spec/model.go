@@ -365,7 +365,7 @@ type RequestCheck struct {
 	// (db021da0's skipCommandValidation is gone at b25ed960) and no
 	// generated definition states it; a command with its own refusal
 	// states a Refusal. A host-written definition that sets it keeps its
-	// behaviour until the field is removed.
+	// behaviour until the field is removed. Removable in v0.26.0.
 	Unchecked bool
 	// Refusal is the status a request the definition refuses answers in
 	// place of the schema's own — every error of its request, the

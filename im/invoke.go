@@ -514,6 +514,11 @@ type InvokeResponseEntry struct {
 // (packages/node/src/node/server/InteractionServer.ts:1104-1109 at
 // b25ed960), and the bridge's dispatch layer follows that without
 // consulting the response's contents.
+//
+// Deprecated: nothing in the module calls it, and the rule it once encoded
+// (a SuppressResponse invoke is answered when it produced command data) is
+// no longer matter.js's. There is no replacement; range over
+// [InvokeResponse.Responses] and test IsStatus. Removable in v0.26.0.
 func (ir InvokeResponse) HasCommandData() bool {
 	for i := range ir.Responses {
 		if !ir.Responses[i].IsStatus {
