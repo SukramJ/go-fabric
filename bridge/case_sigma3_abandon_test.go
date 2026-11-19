@@ -24,7 +24,7 @@ func TestSigma3TheHandlerDidNotTakeKeepsTheTrackedReport(t *testing.T) {
 	b := newStartedBridge(t)
 	b.AttachAckTracker(mrp.NewAckTracker(50 * time.Millisecond))
 	a := NewCaseAdapter(sigma.NewResponder(nil, nil, 0x2000))
-	a.established, a.sigma3Accepted, a.sigma3Digest = true, true, sha256.Sum256([]byte("the completing Sigma3"))
+	a.established = true
 	b.AttachCaseHandlerProvider(func(HandshakeKey) CaseHandler { return a })
 	const exchange = uint16(9)
 	key := scKey(exchange)

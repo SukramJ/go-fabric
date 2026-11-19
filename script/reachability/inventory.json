@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10083,
+  "entry_points": 10081,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27779,
+    "total_exported": 27777,
     "reachable": 20846,
-    "whitelisted": 6910,
+    "whitelisted": 6908,
     "unreachable": 23
   },
   "by_package": [
@@ -1075,7 +1075,7 @@
       "identifier": "TestAttachCaseHandlerEndsTheReplacedHandlersHandshakes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 672
+      "line": 699
     },
     {
       "package": "bridge",
@@ -1733,14 +1733,14 @@
       "identifier": "TestCaseAdapter_SecondResumeWithFreshSessionIDFiresOnEstablished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_adapter_gate_test.go",
-      "line": 202
+      "line": 210
     },
     {
       "package": "bridge",
       "identifier": "TestCaseAdapter_SecondResumeWithSameSessionIDDoesNotRefire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_adapter_gate_test.go",
-      "line": 240
+      "line": 248
     },
     {
       "package": "bridge",
@@ -2448,13 +2448,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_commissioning_complete_test.go",
       "line": 101
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestCompletedRecordHoldsWhileItsReportIsSentAgain",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/case_record_race_test.go",
-      "line": 18
     },
     {
       "package": "bridge",
@@ -7333,7 +7326,7 @@
       "identifier": "TestSigma1AgainAfterCompletionBeginsAfresh",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 757
+      "line": 784
     },
     {
       "package": "bridge",
@@ -7354,7 +7347,7 @@
       "identifier": "TestSigma1JudgedAcrossAHandlerSwapLeavesNoHandshake",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_record_race_test.go",
-      "line": 52
+      "line": 19
     },
     {
       "package": "bridge",
@@ -7382,7 +7375,7 @@
       "identifier": "TestSigma1ThatBeginsNothingKeepsACompletedHandshake",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 479
+      "line": 502
     },
     {
       "package": "bridge",
@@ -7417,14 +7410,14 @@
       "identifier": "TestSigma3AfterCompletionKeepsTheSuccessReportPending",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 397
+      "line": 420
     },
     {
       "package": "bridge",
-      "identifier": "TestSigma3OfACompletedHandshakeIsAnsweredSuccess",
+      "identifier": "TestSigma3OfACompletedHandshakeIsAcknowledgedOnly",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/case_sigma3_completed_test.go",
-      "line": 29
+      "file": "bridge/case_sigma3_after_completion_test.go",
+      "line": 310
     },
     {
       "package": "bridge",
@@ -7435,17 +7428,10 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestSigma3RetransmissionIsAnsweredOnlyForItsBytesAndRoute",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 309
-    },
-    {
-      "package": "bridge",
       "identifier": "TestSigma3RetransmissionKeepsNoRecordAlive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 340
+      "line": 361
     },
     {
       "package": "bridge",
@@ -7480,7 +7466,7 @@
       "identifier": "TestSingletonCompletedHandshakesHoldNoWindows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 602
+      "line": 629
     },
     {
       "package": "bridge",
@@ -7494,14 +7480,14 @@
       "identifier": "TestSingletonCompletedRecordEndsWithItsHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 445
+      "line": 468
     },
     {
       "package": "bridge",
       "identifier": "TestSingletonCompletedRecordEndsWithItsSuccessReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
-      "line": 538
+      "line": 565
     },
     {
       "package": "bridge",

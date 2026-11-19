@@ -173,6 +173,14 @@ func TestCaseAdapter_Sigma1ReplayDoesNotReopenTheEstablishedGate(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("calls after the handshake = %d, want 1", calls)
 	}
+	// The establishing Sigma3 again is not answered (review II, phase 7,
+	// decision 286).
+	if op, reply, err := a.ProcessSigma3(sigma3Bytes); err != nil || op != 0 || reply != nil {
+		t.Fatalf("the establishing Sigma3 again: op=%#x reply=%x err=%v, want no answer", op, reply, err)
+	}
+	if calls != 1 {
+		t.Fatalf("calls after the establishing Sigma3 again = %d, want 1", calls)
+	}
 
 	// MRP retransmit of Sigma1 (our Sigma2 ack was in flight), then of Sigma3.
 	op2, sigma2Again, err := a.ProcessSigma1(sigma1Bytes)
