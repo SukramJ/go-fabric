@@ -512,7 +512,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1204,
+    "line": 1237,
     "citation": "packages/types/src/protocol/definitions/general.ts:33",
     "resolved": "packages/types/src/protocol/definitions/general.ts",
     "at": "db021da0",
@@ -522,7 +522,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1392,
+    "line": 1425,
     "citation": "ExchangeManager.ts:556-579",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "MessageExchangeContext",
@@ -531,7 +531,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1395,
+    "line": 1428,
     "citation": "SessionManager.ts:636-638",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "asOf",
@@ -540,7 +540,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1435,
+    "line": 1472,
     "citation": "SessionManager.ts:636-638",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "handlePeerLoss",
@@ -567,7 +567,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 261,
+    "line": 272,
     "citation": "NodeSession.ts:408-413",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "peerAddress",
@@ -576,7 +576,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 377,
+    "line": 388,
     "citation": "NodeSession.ts:320-322",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "isPeerLost",
@@ -585,7 +585,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 415,
+    "line": 426,
     "citation": "NodeSession.ts:311-314",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerLoss",
@@ -621,7 +621,7 @@
   },
   {
     "file": "client/handshake/server_test.go",
-    "line": 212,
+    "line": 213,
     "citation": "CaseServer.ts:309",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "InvalidParam",
@@ -630,7 +630,7 @@
   },
   {
     "file": "client/handshake/server_test.go",
-    "line": 383,
+    "line": 384,
     "citation": "SessionManager.ts:205",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "at": "db021da0",

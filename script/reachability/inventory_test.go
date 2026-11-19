@@ -98,10 +98,12 @@ const reachabilityUnreachedRatchet = 23
 // "generated: referenced from Definition and the generated test", written by
 // script/clustergen), 55 written by hand, 20 identifiers of the mock/fake
 // pattern (clock/clocktest.Fake and its methods, endpoint/endpointtest.FakeStore
-// and its methods, among others).
+// and its methods, among others). By hand 57 since review II, phase 7
+// (decision 269): internal/exchangeseam's NewEstablishingSecureSession and
+// ActivateSecureSession, installed at init and called by client/handshake.
 var reachabilityWhitelistRatchet = map[string]int{
 	whitelistClassGenerated:         1101,
-	whitelistClassHand:              55,
+	whitelistClassHand:              57,
 	string(autoWhitelistMockPrefix): 20,
 }
 

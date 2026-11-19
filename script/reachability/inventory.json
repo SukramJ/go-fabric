@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10030,
+  "entry_points": 10032,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27741,
+    "total_exported": 27743,
     "reachable": 20843,
-    "whitelisted": 6875,
+    "whitelisted": 6877,
     "unreachable": 23
   },
   "by_package": [
@@ -40703,6 +40703,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
       "line": 485
+    },
+    {
+      "package": "internal/exchangeseam",
+      "identifier": "ActivateSecureSession",
+      "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/exchangeseam/exchangeseam.go",
+      "line": 50
+    },
+    {
+      "package": "internal/exchangeseam",
+      "identifier": "NewEstablishingSecureSession",
+      "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/exchangeseam/exchangeseam.go",
+      "line": 43
     },
     {
       "package": "internal/paritytest",
