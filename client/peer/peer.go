@@ -39,11 +39,14 @@ type Peer struct {
 	cancel  context.CancelFunc
 	workers sync.WaitGroup
 
-	// mu guards closed, desc, saving, sessions and workers.
-	mu                    sync.Mutex
-	desc                  Descriptor
-	sessions              []*exchange.Session
+	// mu guards closed, desc, saving, resave, sessions and workers.
+	mu       sync.Mutex
+	desc     Descriptor
+	sessions []*exchange.Session
+	// saving is set while the peer's one save worker runs; resave records
+	// a change made after that worker took its copy (changedLocked).
 	saving                bool
+	resave                bool
 	closed                bool
 	connecting            *connection
 	connectionInitiatedAt time.Time
@@ -361,26 +364,38 @@ func (p *Peer) mergeKnown(d Descriptor) {
 }
 
 // changedLocked records a descriptor change: one save runs for every
-// burst of changes made before it starts — matter.js's #isSaving guard
-// around #save (Peer.ts:99-106, :575-579).
+// burst of changes made before it takes its copy — matter.js's #isSaving
+// guard (packages/protocol/src/peer/Peer.ts:99-106 at db021da0: a change
+// while #isSaving is set starts no save) around #save (:576-580: it clears
+// #isSaving, then awaits #updated.emit). A change made after the copy is
+// saved again by the same worker, not by a second one. This module's
+// reasoning, not a matter.js statement: two goroutines could reach the
+// store in either order and the older copy overwrite the newer (review II
+// phase 7 backlog, TestSaveKeepsTheNewestDescriptor).
 func (p *Peer) changedLocked() {
-	if p.saving || p.closed {
+	if p.closed {
+		return
+	}
+	if p.saving {
+		p.resave = true
 		return
 	}
 	p.saving = true
 	p.workers.Add(1)
 	go func() {
 		defer p.workers.Done()
-		p.save()
+		for p.save() {
+		}
 	}()
 }
 
-// save stores the descriptor and reports the update; a store error is
-// logged at error level, as matter.js logs a failed worker
-// (general/src/util/Multiplex.ts:41-47).
-func (p *Peer) save() {
+// save stores one copy of the descriptor and reports the update; a store
+// error is logged at error level, as matter.js logs a failed worker
+// (general/src/util/Multiplex.ts:41-47). It reports whether a change made
+// after the copy asks for another save; otherwise the worker ends.
+func (p *Peer) save() (again bool) {
 	p.mu.Lock()
-	p.saving = false
+	p.resave = false
 	d := p.desc.clone()
 	p.mu.Unlock()
 	if st := p.set.ctx.Store; st != nil {
@@ -396,6 +411,11 @@ func (p *Peer) save() {
 			o.Updated()
 		}
 	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	again = p.resave
+	p.saving = again
+	return again
 }
 
 // addSession takes a session of the peer: the operational address follows

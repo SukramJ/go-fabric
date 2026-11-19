@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"fmt"
 	"testing"
 	"time"
 
@@ -19,8 +20,9 @@ import (
 // the Sigma3 of a CASE handshake, a Sigma1 under its initiator node id and
 // exchange that begins nothing — one that does not decode, or a well-formed
 // one whose destination id names no fabric of the node — or a
-// Sigma2_Resume under them, from another sender, is acknowledged and not
-// answered: the handshake's record stays,
+// Sigma2_Resume under them, from another sender, does not acknowledge the
+// Sigma2 and is refused on receive, not acknowledged and not answered
+// (review II, phase 7, decision 277): the handshake's record stays,
 // its Sigma2 stays in retransmission to the controller, and the
 // controller's Sigma3 completes the handshake — through a
 // PerExchangeCaseProvider and through the singleton handler alike (review
@@ -52,14 +54,10 @@ func TestMessagesUnderAHandshakeInProgressChangeNothing(t *testing.T) {
 			if tc.foreign {
 				payload = foreignSigma1(t)
 			}
-			if err := other.send(tc.opcode, completedCaseExchange, payload, nil); err != nil {
-				t.Fatal(err)
-			}
+			err := other.send(tc.opcode, completedCaseExchange, payload, nil)
+			c.expectRefused(t, err, errPreviousAckMissing, 1, "a message from another sender")
 			if got := pendingDestsOnUnsecuredExchange(c.r.b, completedCaseExchange); len(got) != 1 || got[0] != want {
 				t.Fatalf("after opcode %#x from another sender the replies waiting for an acknowledgement go to %v, want the Sigma2 to %s", tc.opcode, got, want)
-			}
-			if !c.r.b.ackTracker.Owes(0, completedCaseExchange, false) {
-				t.Fatal("no acknowledgement owed for the message from another sender — a reply carried it")
 			}
 			if !c.recordHeld() {
 				t.Fatal("the message from another sender ended the handshake's record")
@@ -78,6 +76,53 @@ func TestMessagesUnderAHandshakeInProgressChangeNothing(t *testing.T) {
 				expectNoHandshakeState(t, c.r.b, "after the success report was acknowledged")
 			}
 		})
+	}
+}
+
+// TestAcknowledgingMessagesUnderAHandshakeInProgressChangeNothing: the
+// messages of TestMessagesUnderAHandshakeInProgressChangeNothing from
+// another sender, when they pass the receive rules — one that acknowledges
+// the Sigma2 (session-0 counters travel in the clear), or one that arrives
+// after the controller's standalone acknowledgement of it — reach the
+// router and are acknowledged and not answered (owner decision 70): the
+// handshake's record stays, and the controller's Sigma3 completes the
+// handshake, through a PerExchangeCaseProvider and through the singleton
+// handler alike (review II, phase 7, Fable's read A3).
+func TestAcknowledgingMessagesUnderAHandshakeInProgressChangeNothing(t *testing.T) {
+	t.Parallel()
+	for _, viaProvider := range []bool{true, false} {
+		for _, opcode := range []uint8{mrp.SCOpcodeSigma1, mrp.SCOpcodeSigma2Resume} {
+			for _, afterAck := range []bool{false, true} {
+				name := fmt.Sprintf("provider=%t opcode=%#x after-standalone-ack=%t", viaProvider, opcode, afterAck)
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+					c := beginCASE(t, newUnsecuredRig(t), clocktest.New(time.Unix(1_700_000_000, 0)), viaProvider)
+					other := c.otherPeer(t)
+					var ack *uint32
+					if afterAck {
+						if err := c.controller.send(mrp.StandaloneAckOpcode, completedCaseExchange, nil, &c.sigma2Counter); err != nil {
+							t.Fatal(err)
+						}
+					} else {
+						ack = &c.sigma2Counter
+					}
+					if err := other.send(opcode, completedCaseExchange, []byte{0x15, 0x18}, ack); err != nil {
+						t.Fatalf("a message that passes the receive rules: %v", err)
+					}
+					c.expectNoReply(t, 0, "a message from another sender")
+					if !c.recordHeld() {
+						t.Fatal("the message from another sender ended the handshake's record")
+					}
+					if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
+						t.Fatal(err)
+					}
+					c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the controller's Sigma3")
+					if got := c.sessions.Load(); got != 1 {
+						t.Fatalf("%d sessions installed, want 1", got)
+					}
+				})
+			}
+		}
 	}
 }
 

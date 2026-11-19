@@ -111,7 +111,7 @@ cleanup() {
 trap cleanup EXIT
 
 version_of() { # package directory under node_modules
-	sed -n 's/^  "version": "\(.*\)",$/\1/p' "$PKG/node_modules/$1/package.json" 2>/dev/null | head -1
+	sed -n 's/^  "version": "\(.*\)",$/\1/p' "$PKG/node_modules/$1/package.json" 2>/dev/null | sed -n 1p
 }
 
 verdict() { # class what
@@ -132,7 +132,7 @@ verdict() { # class what
 			echo "- matter.js: \`$(version_of @matter/main || true)\` (@matter/nodejs-ble \`$(version_of @matter/nodejs-ble || true)\`, bleno \`$(version_of @stoprocent/bleno || true)\`, noble \`$(version_of @stoprocent/noble || true)\`)"
 			echo "- Node.js: \`$(node --version 2>/dev/null || echo unknown)\`"
 			echo "- BlueZ: \`$(bluetoothctl --version 2>/dev/null || echo unknown)\`"
-			echo "- btvirt: \`$(btvirt --version 2>/dev/null | head -1 || echo unknown)\`"
+			echo "- btvirt: \`$(btvirt --version 2>/dev/null | sed -n 1p || echo unknown)\`"
 			echo "- kernel: \`$(uname -r)\`"
 		} >>"$SUMMARY"
 	fi
@@ -171,7 +171,7 @@ start_peripheral() {
 	peripheral_pid=$!
 	MANUAL=
 	for _ in $(seq 1 150); do
-		MANUAL=$(sed -n 's/^ble-virtual-peripheral: ready manual=\([0-9]*\) .*/\1/p' "$out" | head -1)
+		MANUAL=$(sed -n 's/^ble-virtual-peripheral: ready manual=\([0-9]*\) .*/\1/p' "$out" | sed -n 1p)
 		[ -n "$MANUAL" ] && break
 		alive "$peripheral_pid" || break
 		sleep 0.2
@@ -407,8 +407,8 @@ start_example() {
 	example_pid=$!
 	EXAMPLE_QR= EXAMPLE_MANUAL=
 	for _ in $(seq 1 150); do
-		EXAMPLE_QR=$(sed -n 's/^QR code: \(MT:[^ ]*\)$/\1/p' "$out" | head -1)
-		EXAMPLE_MANUAL=$(sed -n 's/^Manual code: \([0-9]*\)$/\1/p' "$out" | head -1)
+		EXAMPLE_QR=$(sed -n 's/^QR code: \(MT:[^ ]*\)$/\1/p' "$out" | sed -n 1p)
+		EXAMPLE_MANUAL=$(sed -n 's/^Manual code: \([0-9]*\)$/\1/p' "$out" | sed -n 1p)
 		[ -n "$EXAMPLE_QR" ] && [ -n "$EXAMPLE_MANUAL" ] && grep -q 'matter.ble.serving' "$out" && break
 		alive "$example_pid" || break
 		sleep 0.2

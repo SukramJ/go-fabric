@@ -1146,16 +1146,25 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 	target.abort = ctx.Done()
 	_, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
 	if err != nil {
+		aborted := errors.Is(err, errChunkWaitAborted)
 		if len(events) > 0 {
-			sub.RequeueEvents(events[0].Number)
+			if aborted {
+				sub.RequeueAbortedEvents(events[0].Number)
+			} else {
+				sub.RequeueEvents(events[0].Number)
+			}
 		}
 		if len(paths) > 0 {
-			sub.RequeueAttributes(paths)
+			if aborted {
+				sub.RequeueAbortedAttributes(paths)
+			} else {
+				sub.RequeueAttributes(paths)
+			}
 		}
-		if errors.Is(err, errChunkWaitAborted) {
+		if aborted {
 			// ctx ended the flush (Stop's budget, a removal's ctx): the
 			// peer did nothing wrong, as for the ongoing reporters (review
-			// II, R2-P2-rr-dev-05).
+			// II, R2-P2-rr-dev-05) — owed again uncounted (R2-P7-req-06).
 			return
 		}
 		b.noteSubscriptionSendError(sub.ID, "flush", err)
@@ -1314,6 +1323,18 @@ func (o *owedReport) requeue(sub *subscription.Subscription) {
 	sub.RequeueAttributes(o.paths)
 }
 
+// requeueAborted owes what the report carried again, as
+// [owedReport.requeue], for a report that was aborted — the engine's
+// stop, the subscription's close, the session's close ended its wait —
+// not failed: no failed update is counted on sub, so a flush that waited
+// for the report still sends (review II, R2-P7-req-06, decision 274).
+func (o *owedReport) requeueAborted(sub *subscription.Subscription) {
+	if o.hasEvents {
+		sub.RequeueAbortedEvents(o.eventsFrom)
+	}
+	sub.RequeueAbortedAttributes(o.paths)
+}
+
 // deliverOngoingReport sends report, an ongoing report of sub that owes
 // owed, on a fresh exchange and returns once the update is settled, so a
 // subscription has one report in flight: the engine starts no report of
@@ -1357,7 +1378,7 @@ func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target sub
 	if err != nil {
 		switch {
 		case errors.Is(err, errChunkWaitAborted):
-			owed.requeue(sub) // the engine stopped; the peer did nothing wrong
+			owed.requeueAborted(sub) // the engine stopped; the peer did nothing wrong
 		case errors.Is(err, errChunkRejected):
 			// An error status to a chunk ends the subscription as one to
 			// the last message does.
@@ -1386,7 +1407,7 @@ func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target sub
 	}
 	switch {
 	case aborted:
-		owed.requeue(sub)
+		owed.requeueAborted(sub)
 	case answered && answer.undecodable:
 		// No status of the peer's, so no refusal: a failed update, its
 		// data owed again (owner decision 176; [errChunkAnswerUndecodable]).

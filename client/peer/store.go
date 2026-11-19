@@ -12,8 +12,8 @@ import (
 
 // Store keeps peer descriptors across restarts. A peer saves its
 // descriptor whenever it changes — matter.js emits Peer.updated
-// (Peer.ts:99-106, :575-579) for the node layer to persist; here the peer
-// calls the store itself. A store error is logged, never fatal, as
+// (Peer.ts:99-106, :576-580 at db021da0) for the node layer to persist;
+// here the peer calls the store itself. A store error is logged, never fatal, as
 // matter.js logs a rejected save worker (general/src/util/Multiplex.ts:41-47).
 type Store interface {
 	// LoadPeers returns the descriptors stored for a fabric.

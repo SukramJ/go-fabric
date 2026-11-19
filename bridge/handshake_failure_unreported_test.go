@@ -182,7 +182,10 @@ func caseRefusedAtSigma3(t *testing.T, r *unsecuredRig, x uint16, acked bool) {
 // that fails on a message arriving while the handshake's previous reply
 // still waits for its acknowledgement ends without a failure StatusReport,
 // and that reply goes on being retransmitted until the peer acknowledges
-// it (owner decision 173); once that reply is acknowledged, the same
+// it (owner decision 173). The cases call the handlers below the receive
+// rule: since review II, phase 7 (decision 277) such a message is refused
+// on receive over UDP, and the guard is the second line for the residue
+// (owner decision 282, [Bridge.endHandshakeUnreported]). Once that reply is acknowledged, the same
 // failure is reported, reliably (review II, F-db021da0-7; the register row
 // in notes/parity/matter_behaviour_findings.md). Before, the reply was
 // dropped and the report sent reliably in both cases. One case per role and per
@@ -226,9 +229,14 @@ func TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged(t *testing.T) {
 
 // TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged: a
 // handshake this node opened gets a Sigma2 that does not decode and does
-// not acknowledge the Sigma1. It ends without a StatusReport, and the
-// Sigma1 goes on being retransmitted until it is acknowledged (review II,
-// F-db021da0-7, owner decision 173). The acknowledged case is
+// not acknowledge the Sigma1. The message is refused on receive — not
+// acknowledged, never reaching the handshake — so no StatusReport is sent,
+// the handshake goes on waiting, and the Sigma1 goes on being
+// retransmitted until it is acknowledged (review II, F-db021da0-7, owner
+// decision 173; phase 7, decision 277). matter.js throws "Previous message
+// ack is missing" for such a message
+// (packages/protocol/src/protocol/MessageExchange.ts:521-525 at db021da0).
+// The acknowledged case is
 // TestInitiatedHandshakeKeepsItsFailureReportTracked.
 func TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged(t *testing.T) {
 	t.Parallel()
@@ -267,16 +275,14 @@ func TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged(t *testi
 	}
 	datagram := append(hdr.Marshal(), proto.Marshal()...)
 	datagram = append(datagram, 0xFF)
-	if err := r.b.dispatch(ctx, datagram, r.peer.LocalAddr()); err != nil {
-		t.Fatalf("dispatch(Sigma2): %v", err)
+	if err := r.b.dispatch(ctx, datagram, r.peer.LocalAddr()); !errors.Is(err, errPreviousAckMissing) {
+		t.Fatalf("dispatch(Sigma2): %v, want errPreviousAckMissing", err)
 	}
+	// The refusal is synchronous: the Sigma2 never reached the handshake.
 	select {
 	case err := <-done:
-		if err == nil {
-			t.Fatal("the handshake accepted a Sigma2 that does not decode")
-		}
-	case <-ctx.Done():
-		t.Fatal("the handshake did not end")
+		t.Fatalf("the handshake ended (%v) on a Sigma2 refused on receive", err)
+	default:
 	}
 	r.wantUnreportedRetransmitting(t, HandshakeKey{InitiatorNodeID: sigma1Hdr.SourceNodeID, ExchangeID: sigma1.ExchangeID}, mrp.SCOpcodeSigma1)
 }

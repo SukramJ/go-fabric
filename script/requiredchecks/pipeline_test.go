@@ -256,31 +256,38 @@ func TestLintToolPinsMatch(t *testing.T) {
 // exit at its first match: -q, --quiet or --silent.
 var quietGrepAfterPipe = regexp.MustCompile(`(^|[^|])\|\s*grep\s(\s*-[^\s|;&]*)*?\s*(-[A-Za-z]*q[A-Za-z]*|--quiet|--silent)(\s|$)`)
 
+// headAfterPipe is a pipe (not `||`) into head, which exits once it has
+// printed its lines, whatever its flags.
+var headAfterPipe = regexp.MustCompile(`(^|[^|])\|\s*head(\s|$|\))`)
+
 // quietGrepPipes returns the lines of src, from line first on, where a
 // pipe feeds a quiet grep; comment lines are skipped.
-func quietGrepPipes(src string, first int) []int {
+func quietGrepPipes(src string, first int) []int { return pipeSites(quietGrepAfterPipe, src, first) }
+
+// headPipes returns the lines of src, from line first on, where a pipe
+// feeds head; comment lines are skipped.
+func headPipes(src string, first int) []int { return pipeSites(headAfterPipe, src, first) }
+
+// pipeSites returns the lines of src, from line first on, that re
+// matches; comment lines are skipped.
+func pipeSites(re *regexp.Regexp, src string, first int) []int {
 	var out []int
 	for i, l := range strings.Split(src, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(l), "#") {
 			continue
 		}
-		if quietGrepAfterPipe.MatchString(l) {
+		if re.MatchString(l) {
 			out = append(out, first+i)
 		}
 	}
 	return out
 }
 
-// TestNoQuietGrepAfterPipeUnderPipefail: no script that sets pipefail —
-// a tracked *.sh of the repository or a workflow's run script — pipes
-// into `grep -q`. grep -q exits at its first match; bash's printf and echo
-// write a multi-line value one line per write(2) (strace, bash 5.2), so a
-// line written after grep has gone is SIGPIPE, the writer's status is 141
-// and pipefail turns the match into a miss. release-provenance.sh dropped
-// "bench (smoke)" from its required checks this way in ci run 44447266854
-// (TestProvenanceRequiredCI, review II phase 7, fl-ci); a here-string
-// (`grep -q … <<<"$v"`) has no writer to lose.
-func TestNoQuietGrepAfterPipeUnderPipefail(t *testing.T) {
+// pipefailSites returns every site, as path:line, that sites finds in a
+// script that sets pipefail: a tracked *.sh of the repository or a
+// workflow's run script.
+func pipefailSites(t *testing.T, sites func(src string, first int) []int) []string {
+	t.Helper()
 	var bad []string
 	err := filepath.WalkDir(repoRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -303,7 +310,7 @@ func TestNoQuietGrepAfterPipeUnderPipefail(t *testing.T) {
 		if !strings.Contains(string(raw), "pipefail") {
 			return nil
 		}
-		for _, n := range quietGrepPipes(string(raw), 1) {
+		for _, n := range sites(string(raw), 1) {
 			bad = append(bad, path+":"+strconv.Itoa(n))
 		}
 		return nil
@@ -316,14 +323,59 @@ func TestNoQuietGrepAfterPipeUnderPipefail(t *testing.T) {
 			if !strings.Contains(rs.text, "pipefail") {
 				continue
 			}
-			for _, n := range quietGrepPipes(rs.text, rs.line+1) {
+			for _, n := range sites(rs.text, rs.line+1) {
 				bad = append(bad, ".github/workflows/"+file+":"+strconv.Itoa(n))
 			}
 		}
 	}
 	sort.Strings(bad)
-	for _, b := range bad {
+	return bad
+}
+
+// TestNoQuietGrepAfterPipeUnderPipefail: no script that sets pipefail —
+// a tracked *.sh of the repository or a workflow's run script — pipes
+// into `grep -q`. grep -q exits at its first match; bash's printf and echo
+// write a multi-line value one line per write(2) (strace, bash 5.2), so a
+// line written after grep has gone is SIGPIPE, the writer's status is 141
+// and pipefail turns the match into a miss. release-provenance.sh dropped
+// "bench (smoke)" from its required checks this way in ci run 44447266854
+// (TestProvenanceRequiredCI, review II phase 7, fl-ci); a here-string
+// (`grep -q … <<<"$v"`) has no writer to lose.
+func TestNoQuietGrepAfterPipeUnderPipefail(t *testing.T) {
+	for _, b := range pipefailSites(t, quietGrepPipes) {
 		t.Errorf("%s: a pipe into a quiet grep under pipefail; the writer's SIGPIPE turns a match into a miss — read a here-string instead", b)
+	}
+}
+
+// TestNoHeadAfterPipeUnderPipefail: the same race with head. head exits
+// once it has printed its lines; a writer with more to write gets
+// SIGPIPE, its status is 141, and pipefail fails the pipeline although
+// the line was read — a step under `set -e` ends, and a `|| fallback`
+// appends its fallback to the value. `sed -n 1p` reads its whole input
+// and has no writer to lose (review II phase 7 backlog).
+func TestNoHeadAfterPipeUnderPipefail(t *testing.T) {
+	for _, b := range pipefailSites(t, headPipes) {
+		t.Errorf("%s: a pipe into head under pipefail; the writer's SIGPIPE fails the pipeline — pipe into `sed -n 1p` instead", b)
+	}
+}
+
+func TestHeadAfterPipe(t *testing.T) {
+	for _, tc := range []struct {
+		line string
+		want bool
+	}{
+		{`PIN=$(sed -n 's/x/y/p' f | head -1)`, true},
+		{`x | head -n1`, true},
+		{`x |head`, true},
+		{`$(x | head)`, true},
+		{`x | sed -n 1p`, false},
+		{`a || head -1 f`, false},
+		{`head -1 f`, false},
+		{`x | header`, false},
+	} {
+		if got := len(headPipes(tc.line, 1)) > 0; got != tc.want {
+			t.Errorf("%q: got %v, want %v", tc.line, got, tc.want)
+		}
 	}
 }
 

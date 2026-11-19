@@ -70,7 +70,7 @@ func TestSetForGetAndUnknownFabric(t *testing.T) {
 // TestAddKnownPeerMergeAndCoalescedSave: the merge table of
 // PeerSet.ts:315-337 — operational address and CATs replace, discovery
 // data fills what the peer lacks, reported parameters only when unknown
-// — and one save per burst of changes (Peer.ts:99-106).
+// — and one save per burst of changes (packages/protocol/src/peer/Peer.ts:99-106 at db021da0).
 func TestAddKnownPeerMergeAndCoalescedSave(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {

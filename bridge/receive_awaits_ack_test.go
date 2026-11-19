@@ -32,7 +32,7 @@ func TestRequestWithoutAckOfAnOutstandingReplyIsNotProcessed(t *testing.T) {
 	if got := p.status(); got != im.StatusSuccess {
 		t.Fatalf("TimedRequest: %v", got)
 	}
-	if !b.outboundReliable.holdsSecureExchange(paseTestSessionID, x, exchangeResponder) {
+	if !holdsExchange(b, x) {
 		t.Fatal("the TimedRequest's StatusResponse is not awaiting its acknowledgement; the test needs it to")
 	}
 	// The timed Write, without a piggybacked acknowledgement of that
@@ -53,7 +53,7 @@ func TestRequestWithoutAckOfAnOutstandingReplyIsNotProcessed(t *testing.T) {
 	}
 	// The StatusResponse still waits for its acknowledgement: the refused
 	// message did not displace it.
-	if !b.outboundReliable.holdsSecureExchange(paseTestSessionID, x, exchangeResponder) {
+	if !holdsExchange(b, x) {
 		t.Error("the refused message cleared the outstanding StatusResponse")
 	}
 
@@ -76,4 +76,11 @@ func TestRequestWithoutAckOfAnOutstandingReplyIsNotProcessed(t *testing.T) {
 	if n := srv.writes(); n != 1 {
 		t.Fatalf("%d writes after the acknowledging Write, want 1", n)
 	}
+}
+
+// holdsExchange reports whether the bridge's message on the PASE test
+// session's exchange x, as its responder, waits for its acknowledgement.
+func holdsExchange(b *Bridge, x uint16) bool {
+	_, ok := b.outboundReliable.pendingOnExchange(paseTestSessionID, x, exchangeResponder)
+	return ok
 }
