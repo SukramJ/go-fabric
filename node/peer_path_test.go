@@ -156,18 +156,22 @@ func TestPeerPathEstablishesTCPBesideAUDPSession(t *testing.T) {
 }
 
 // TestPeerPathWithoutTCPRefusesTheSignal: the camera dials no TCP; a
-// signal is refused with camera.ErrNoLargeMessageTransport and nothing
-// reaches the requestor (case c).
+// signal is refused with camera.ErrNoLargeMessageTransport before a client
+// stack is built — no connection process waits out its timeout — and
+// nothing reaches the requestor (case c; docs/adr/0032, decision 5).
 func TestPeerPathWithoutTCPRefusesTheSignal(t *testing.T) {
 	ctx := parityCtx(t)
 	cp := newCameraPeers(ctx, t, nil, bothTCPRoles)
 	cp.requestorOpens(ctx, t, exchange.TransportUDP)
 	err := cp.site.Run(ctx, func(ctx context.Context) error { return cp.prov.Answer(ctx, 1, "v=0 answer") })
-	if !errors.Is(err, camera.ErrNoLargeMessageTransport) {
-		t.Fatalf("Answer without TCP: %v, want ErrNoLargeMessageTransport", err)
+	if !errors.Is(err, camera.ErrNoLargeMessageTransport) || !errors.Is(err, peer.ErrNoTCP) {
+		t.Fatalf("Answer without TCP: %v, want ErrNoLargeMessageTransport for peer.ErrNoTCP", err)
 	}
 	if got := cp.answers(); len(got) != 0 {
 		t.Fatalf("the requestor received %q", got)
+	}
+	if node.PeerPathClientBuilt(cp.cam.Node()) {
+		t.Error("the camera built a client stack for a signal it cannot send")
 	}
 }
 
