@@ -794,7 +794,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 	if attrID == accessControlAttrACL {
 		entries, ok := value.([]AccessControlEntryStruct)
 		if !ok {
-			return false, fmt.Errorf("core: AccessControl.ACL write: value type %T not []AccessControlEntryStruct", value)
+			return false, fmt.Errorf("%w: ACL write: value type %T not []AccessControlEntryStruct", errAccessControlInvalidValue, value)
 		}
 		var entryFabric uint8
 		if len(entries) > 0 {
@@ -1044,7 +1044,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		// Mirrors matter.js AccessControlServer.ts in-memory extension state.
 		entries, ok := value.([]AccessControlExtensionEntry)
 		if !ok {
-			return false, fmt.Errorf("core: AccessControl.Extension write: value type %T not []AccessControlExtensionEntry", value)
+			return false, fmt.Errorf("%w: Extension write: value type %T not []AccessControlExtensionEntry", errAccessControlInvalidValue, value)
 		}
 		fabric, err := a.writeFabric(ctx, "Extension", 0)
 		if err != nil {
@@ -1162,8 +1162,14 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		}
 		return true, nil
 	}
-	return false, fmt.Errorf("core: AccessControl attribute 0x%04X not writable", attrID)
+	return false, spec.Errorf(im.StatusUnsupportedWrite, "core: AccessControl attribute 0x%04X is read-only", attrID)
 }
+
+// errAccessControlInvalidValue is returned for an Acl or Extension write's
+// value of the wrong Go type: INVALID_DATA_TYPE ([invalidValueErr]; owner
+// decision 234), as the other security-path servers answer it (review II,
+// R2-P7-acl-04).
+var errAccessControlInvalidValue error = invalidValueErr{msg: "core: AccessControl invalid value"}
 
 // MatterInvoke — no commands; AccessControl in 1.5.1 is attribute-only.
 func (a *AccessControl) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
