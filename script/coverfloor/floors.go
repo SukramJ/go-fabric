@@ -61,7 +61,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarmbase", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/appliance", min: 98},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 96},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 95}, // pin lift b25ed960 P1-B: the model gate refuses an undefined enum before the servers' own checks
 	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/energy", min: 93},
@@ -90,7 +90,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/camera", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/tls", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/sensing", min: 93},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/jointfabric", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/jointfabric", min: 85}, // pin lift b25ed960 P1-B: the model gate refuses an undefined security policy before validSecurityPolicy
 	{
 		pkg: "github.com/SukramJ/go-fabric/cluster/transition",
 		min: 93,
