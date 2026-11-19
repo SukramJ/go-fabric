@@ -52,7 +52,7 @@ red-then-green test confirmed.
 | R2-P7-sec-01 | low, unverified | open → backlog (decision 270 rev.); documented `4f4bf9e5` (`BD-Matter-ResumptionRecordsPerFabric`), `6843e1eb` (`store/port.go`) | the per-fabric resumption cap of 16 (`store/resumption.go:90-98`, evict `:155-161`) also bounds the records the CASE client writes, since a record carries no role; beyond 16 peers on one fabric a reconnect takes a full handshake |
 | R2-P7-sec-02 | low | fixed `8c88f72d` | `groups/decode.go:206-262`: a decode whose candidates were taken before `ForgetFabric` completed against a fresh window; `completeMessage` now checks the fabric under `m.mu` and drops on a change |
 | R2-P7-sec-03 | note | fixed `126db996` | `store/fabric.go:166-170`: `AddFabric`'s doc promised a fallback for a missing `matter_metadata` table that the write-lock-first statement (`:186-188`) made dead; the doc names the table as required |
-| R2-P7-sec-04 | note, unverified | open → backlog | `groups/manager.go:487-516`: while the first load of the group fabrics fails, every group datagram costs one store listing; only an owed reload is paced |
+| R2-P7-sec-04 | note, unverified | fixed on `review2/p7c` (decision 279): the first load is paced for group datagrams; a caller's ctx error is not cached | `groups/manager.go:487-516`: while the first load of the group fabrics fails, every group datagram costs one store listing; only an owed reload is paced |
 | R2-P7-sec-05 | note | fixed `9fcf8354` | `secure/operational/manager.go:334-341`: `PlaceholderIDTTL`'s reasoning named a PASE stake held for the window; the stake is per exchange, bounded by the adapter's minute (`node/security.go:1375`) |
 | R2-P7-sec-06 | note | fixed `20d1d838` | `secure/spake2/spake2.go:603-605`: `GeneratePake1` returned the prover's own X slice, read again at `:681` and `:777`; it returns a copy |
 | R2-P7-acl-01 | low | fixed `7e7f25f7` | `cluster/core/access_control_auxiliary.go:63-67`: under an open batch the deferred context of another fabric's request named that request's node in this fabric's `AuxiliaryAccessUpdated`; only a request of the changed fabric is recorded |
@@ -61,13 +61,13 @@ red-then-green test confirmed.
 | R2-P7-acl-04 | note | fixed `8c436ee7` | `cluster/core/access_control.go:789`, `:1039`, `:1157`: a wrong Go type answered FAILURE; it answers INVALID_DATA_TYPE, a non-writable attribute UNSUPPORTED_WRITE |
 | R2-P7-acl-05 | note | fixed `607ed085` | `cluster/core/access_control.go:344-347`: a failing settings read logged one warning per index (254); one warning with the count |
 | R2-P7-acl-06 | note, unverified | no change: no guess is gained, Pake1 and Pake3 meet the lockout (`bridge/securechannel.go:551`) | `bridge/securechannel.go:958-992`: the PBKDFParamRequest whose expired claim engages the lockout is still answered |
-| R2-P7-acl-07 | note | not a finding in the shipped wiring (verify V2); the `Claim` doc sentence → backlog | `bridge/handlers.go:942-984`: the handler does not release a resume claim when `onEstablished` fails; node's callback releases it itself (`node/security.go:1223-1227`), a host's own claiming store would not be told to |
+| R2-P7-acl-07 | note | not a finding in the shipped wiring (verify V2); the `Claim` doc sentence written on `review2/p7c` | `bridge/handlers.go:942-984`: the handler does not release a resume claim when `onEstablished` fails; node's callback releases it itself (`node/security.go:1223-1227`), a host's own claiming store would not be told to |
 | R2-P7-req-01 | low (medium as reported; low by the verify) | fixed `4245fdef` | `bridge/subscribe.go:2220-2221`, `bridge/chunk_waits.go:252-254`: the priming report's deferred forget deleted the abort channel of the first ongoing report; the forget is a compare-and-delete of its own channel |
 | R2-P7-req-02 | low, unverified | open → backlog | `bridge/write_hold.go:394-424`: the write-hold phase is one value per table, so concurrent writes of two sessions stamp each other's phase |
 | R2-P7-req-03 | low | fixed `83c75408` | `bridge/outbound_reliable.go:102-106`: the secure retransmission slot was keyed without the exchange's role, so one role's message superseded the other's on a shared id; the slot carries the role |
 | R2-P7-req-04 | low | fixed `83c75408` | `bridge/ackpump.go:676-680`: a given-up retransmission ended the exchange of the other role on the same id; the tick result carries the role |
-| R2-P7-req-05 | low, unverified | open → backlog (owner question) | `bridge/chunk_waits.go:94`, `:177-183`: the per-fabric chunk-wait share admits one claim beyond the share, and pools every unresolved session under fabric 0 |
-| R2-P7-req-06 | low, unverified | open → backlog (needs an exported `im/subscription` method, owner) | `im/subscription/subscription.go:667`, `:698`: an aborted report counts as a failed update for the flush's skip rule |
+| R2-P7-req-05 | low, unverified | fixed on `review2/p7c` (decisions 275, 280, 280a, 281) | `bridge/chunk_waits.go:94`, `:177-183`: the per-fabric chunk-wait share admits one claim beyond the share, and pools every unresolved session under fabric 0 |
+| R2-P7-req-06 | low, unverified | fixed on `review2/p7c` (decision 274: `RequeueAbortedEvents`, `RequeueAbortedAttributes`) | `im/subscription/subscription.go:667`, `:698`: an aborted report counts as a failed update for the flush's skip rule |
 | R2-P7-req-07 | note | fixed `10c25bd3` (with V3) | `bridge/reply.go:337-343`: a reply was refused at the send while the exchange's earlier message was unacknowledged; the request is now refused on receive |
 | R2-P7-req-08 | note, unverified | no change: inferred only, a central that waits for the response is unaffected | `transport/btp/accept.go:155-157`: a C1 write blocks its caller while the subscribe span runs |
 | R2-P7-req-09 | note, unverified | no change: owner's intent (one budget for both roles) | `bridge/bdx_responder.go:52-77`: responder-side BDX exchanges count against the session's budget that the node's own initiated ones share |
@@ -78,8 +78,8 @@ red-then-green test confirmed.
 | ID | sev | disposition | claim |
 | --- | --- | --- | --- |
 | R2-P7-V3 | parity gap | fixed `10c25bd3` for the exchanges tracked one at a time (IM replies and reports) | `bridge/receive.go:240-257`: a message without the ack of this node's outstanding reliable message was processed and its reply then refused; matter.js refuses it on receive (`MessageExchange.ts:521-525` at `db021da0`, verify V3) — refused on receive now, neither acknowledged nor processed |
-| R2-P7-V3-bdx | parity gap | open → backlog | the receive refusal of V3 does not cover BDX exchanges |
-| R2-P7-V3-ack | parity gap | open → backlog | matter.js's "Incorrect ack received" (`MessageExchange.ts:526-533`) is not mirrored: a message whose ack names another counter is not refused |
+| R2-P7-V3-bdx | parity gap | fixed on `review2/p7c` (decisions 276, 277, 283): BDX waits for the ack before its next send | the receive refusal of V3 does not cover BDX exchanges |
+| R2-P7-V3-ack | parity gap | fixed on `review2/p7c` (decisions 276–278, 282): mirrored on every exchange incl. session 0; the ack is exchange-scoped | matter.js's "Incorrect ack received" (`MessageExchange.ts:526-533`) is not mirrored: a message whose ack names another counter is not refused |
 | R2-P7-case-init | low (medium over TCP) | fixed `0d5d1132`, `04c8057e`, `ab0ecacc`, `4f4bf9e5`; artefacts `073923e5`, `94b45496` — decision 269, `BD-Matter-CASEClient-SessionBeforeSigma3` | `client/handshake/case.go:304`: the initiator registered its session only after the responder's Success, so a responder's first message was delayed over UDP and lost over TCP (matter.js `CaseClient.ts:336-369` has the same order); the session is registered establishing before Sigma3, holds what arrives and is handed out after the Success |
 | R2-P7-hs-rework | low–medium | fixed `4f4bf9e5` | at the unit branch (`client/exchange/manager.go:881-917`, `session.go:619-622`): a message dropped at the hold cap of 16 had its counter recorded, so its retransmission was acknowledged and never served; the cap is tested before the decryption, a duplicate is dropped, not held |
 
@@ -138,3 +138,21 @@ Priorities 4 to 6 and the full-cut run 2 stay as the plan states them (owner,
   `TestControllerServesTheCameraRequestor` remains (the test passes; not
   traced). The hand-over's "mode B, 35 s CASE timeout" is wrong (row
   R2-P7-fl-cam-1).
+
+## Backlog round `review2/p7c` (2026-11-19)
+
+Closed: sec-04, acl-07, req-05, req-06, V3-bdx, V3-ack (rows above); the
+`client/peer` flake `TestOperationalHostLearned` (two save goroutines could
+store an older descriptor last; one save worker per peer); `| head` under
+`pipefail` at `script/ble-virtual-test.sh` (five sites, guard
+`TestNoHeadAfterPipeUnderPipefail`; `ci.yml:281` runs without `pipefail`);
+`transport/tcp/session_traffic_test.go:42`, `:110` checked, no defect. From
+fl-ci, measured over 907 pull-request runs of `chiptool.yml`: #115 and #534
+skipped the chip-tool suites though code changed (SIGPIPE inferred as the
+trigger, not shown in the logs); main's scheduled runs after both were green.
+New open row: R2-P7-V3-giveup (`notes/parity/matter_behaviour_findings.md`).
+Next: decision 284 (a provider's completed CASE record no longer answers a
+Sigma3 after the report's acknowledgement) in its own pull request; req-02,
+the `node` race flake `TestPeerPathWithoutTCPRefusesTheSignal` (times out
+under `-race` at a9658f58 too, not traced), the citation remnants and the
+full-cut run 2 stay in the backlog.
