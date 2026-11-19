@@ -386,3 +386,59 @@ func TestBDXSendAfterAGiveUpSendsNothing(t *testing.T) {
 		}
 	}
 }
+
+// TestBDXSendAfterAGiveUpBeforeTheExchangeEndsSendsNothing (review II,
+// phase 7, decision 283; Fable's read R2-1): a Send that begins after the
+// tracker gave up the exchange's last message and before the exchange is
+// ended — there is nothing to wait on — returns
+// mrp.ErrMaxRetransmissionsReached and puts nothing on the wire, as
+// matter.js's exchange, whose #sentMessageToAck stays set after the
+// give-up, throws on a further send
+// (packages/protocol/src/protocol/MessageExchange.ts:973-978, :701-705 at
+// db021da0).
+func TestBDXSendAfterAGiveUpBeforeTheExchangeEndsSendsNothing(t *testing.T) {
+	t.Parallel()
+	dev, _, got := newReliableBDXHarness(t, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	s, err := dev.br.ConnectOtaProvider(ctx, resumeFabricIndex, resumeCtrlNode)
+	if err != nil {
+		t.Fatalf("CASE to the peer: %v", err)
+	}
+	ex, err := s.OpenExchange(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ex.Close() }()
+	if err := ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageSendInit), []byte{0x01}); err != nil {
+		t.Fatalf("SendInit: %v", err)
+	}
+	if m, ok := nextBDX(got, 5*time.Second); !ok || m.opcode != bdx.MessageSendInit {
+		t.Fatalf("the peer got %v (ok %t), want SendInit", m.opcode, ok)
+	}
+	// The tracker's give-up alone: its result is not handed to the bridge,
+	// so the exchange is not ended — the window between the two.
+	tr := dev.br.outboundReliable
+	tr.mu.Lock()
+	for _, e := range tr.pending {
+		e.retries = mrp.MaxRetransmissions
+		e.nextSendAt = time.Time{}
+	}
+	tr.mu.Unlock()
+	tr.Tick(time.Now(), func(net.Addr, []byte) error { return nil })
+	if ex.(*initiatedSecureExchange).ended() {
+		t.Fatal("the exchange ended; the test needs the window before its end")
+	}
+	if err := ex.Send(ctx, bdx.ProtocolID, uint8(bdx.MessageBlockQuery), []byte{0x02}); !errors.Is(err, mrp.ErrMaxRetransmissionsReached) {
+		t.Fatalf("a Send after the give-up: %v, want ErrMaxRetransmissionsReached", err)
+	}
+	for {
+		m, ok := nextBDX(got, 400*time.Millisecond)
+		if !ok {
+			break
+		}
+		if m.opcode != bdx.MessageSendInit {
+			t.Fatalf("after the give-up the device sent %v", m.opcode)
+		}
+	}
+}

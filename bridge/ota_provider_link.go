@@ -394,6 +394,11 @@ type initiatedSecureExchange struct {
 	// cause is why the exchange ended when it did not end by Close: the
 	// reliable tracker gave up on a message it sent (fail).
 	cause atomic.Pointer[error]
+	// lastTracked is the message counter of the exchange's last reliable
+	// message plus one, zero before the first: a send after that message was
+	// given up ends unsent, also before the exchange is ended
+	// ([initiatedSecureExchange.Send]).
+	lastTracked atomic.Uint64
 	// peerMargin (nanoseconds) is the additional MRP delay of every
 	// message this exchange sends ([initiatedSecureExchange.SetPeerAdditionalMrpDelay]).
 	peerMargin atomic.Int64
@@ -705,6 +710,15 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 		tracker = nil
 	}
 	if tracker != nil {
+		// A give-up of the exchange's last message ends every later send,
+		// also one that begins between the tracker's drop and the
+		// exchange's end, where there is nothing left to wait on.
+		if last := e.lastTracked.Load(); last != 0 && tracker.Abandoned(e.sessionID, uint32(last-1)) {
+			if e.ended() {
+				return e.closedErr()
+			}
+			return mrp.ErrMaxRetransmissionsReached
+		}
 		// The counter is taken after the wait: the encryption below
 		// allocates it.
 		if err := tracker.waitExchangeFree(ctx, e.sessionID, e.exchangeID, roleOf(!e.responder), e.done, e.turn.waiting); err != nil {
@@ -755,6 +769,7 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 			// wait: this message is not sent.
 			return err
 		}
+		e.lastTracked.Store(uint64(hdr.MessageCounter) + 1)
 		// The session may have closed since the check above, its entries
 		// dropped by the purge before this one was tracked: the entry is
 		// taken back and the exchange ends, so none of a closed session
