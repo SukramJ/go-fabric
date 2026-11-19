@@ -238,6 +238,9 @@ func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
 			fromFlooder++
 		}
 	}
+	// Read while the handler still blocks: once block is closed the drain
+	// takes the queued ones and pending falls.
+	pending := o.pending
 	o.mu.Unlock()
 	close(block)
 	if fromPeer != peerSends {
@@ -246,9 +249,6 @@ func TestOrderedBacklogLeavesRoomForAnotherSource(t *testing.T) {
 	if fromPeer+fromFlooder != maxOrderedBacklog {
 		t.Fatalf("backlog %d, want %d", fromPeer+fromFlooder, maxOrderedBacklog)
 	}
-	o.mu.Lock()
-	pending := o.pending
-	o.mu.Unlock()
 	if pending != maxOrderedBacklog+1 { // the queued ones and the one running
 		t.Fatalf("pending %d after displacements, want %d", pending, maxOrderedBacklog+1)
 	}
