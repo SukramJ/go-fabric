@@ -207,8 +207,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS matter_acl_position
 -- (store.ResumptionRecord.SessionParameters); 0 is absent, and a record
 -- the responder wrote carries none. One record per peer serves both roles;
 -- initiator (migration v12) is the role that wrote it last, 1 for the
--- node's own CASE client, and the per-fabric cap of write_seq (v11)
--- counts and evicts only the responder's rows (initiator = 0).
+-- CASE client of client/handshake, 0 for a responder and every writer that
+-- does not set it; each role has a per-fabric cap of its own by write_seq
+-- (v11) — 16 rows of initiator 0, 1024 of initiator 1 — and a write evicts
+-- only rows of its own role.
 --
 -- case_authenticated_tags carries the CATs from the initiator's NOC
 -- subject as JSON (e.g. [1099511627777]); NULL and '[]' both mean

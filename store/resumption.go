@@ -31,14 +31,13 @@ import (
 // is optional: zero is absent, and a record a responder wrote carries
 // none.
 //
-// Initiator records which role wrote the record last: true for the node's
-// own CASE client — the initiator, which chooses the peers it connects to —
-// false for the CASE responder, whose records a foreign peer can make the
-// node write. Only the responder's records count against and are evicted by
-// the per-fabric cap ([Resumption].UpsertResumption). A rewrite by the
-// other role takes that role. False is the zero value, so a writer that
-// does not set it — and every record stored before schema v12, whose role
-// was not recorded — stays under the cap.
+// Initiator records which role wrote the record last: true when the CASE
+// client of client/handshake saved it, false for a CASE responder and for
+// every writer that does not set it. Each role has a per-fabric cap of its
+// own and evicts only its own records ([Resumption].UpsertResumption): 16
+// records with Initiator false, 1024 with Initiator true. A rewrite by the
+// other role takes that role. A record stored before schema v12 did not
+// record its role and counts as Initiator false.
 //
 // matter.js ref: packages/protocol/src/session/case/
 type ResumptionRecord struct {
@@ -96,19 +95,30 @@ func (s *Store) scanResumption(r scanRow) (ResumptionRecord, error) {
 // and every read.
 const resumptionSecretSize = 32
 
-// resumptionRecordsPerFabric is how many of the CASE responder's
-// resumption records the store keeps for one fabric ([Resumption]):
-// UpsertResumption of one more peer's record evicts the fabric's
-// responder record written least recently. The cap is per fabric, so a
-// fabric's administrator, who mints the node ids its peers authenticate
-// with, cannot grow the table for every fabric or evict another fabric's
-// records. It bounds the responder's records only — those a foreign peer
-// can make the node write; the records the node's own CASE client writes
-// ([ResumptionRecord].Initiator) are of peers the node chose and are
-// neither counted nor evicted. store/memstore keeps the same number, and
-// storetest's resumption/cap-per-fabric and
-// resumption/cap-counts-responders-only hold both to it.
+// resumptionRecordsPerFabric is how many resumption records with
+// Initiator false the store keeps for one fabric ([Resumption]):
+// UpsertResumption of one more peer's record evicts the fabric's such
+// record written least recently. The cap is per fabric, so a fabric's
+// administrator, who mints the node ids its peers authenticate with,
+// cannot grow the table for every fabric or evict another fabric's
+// records. It bounds the records with Initiator false only; the records
+// the CASE client of client/handshake writes ([ResumptionRecord].Initiator)
+// are neither counted nor evicted by it, so the sentence above holds for
+// the responder's records, and resumptionClientRecordsPerFabric bounds the
+// client's. store/memstore keeps the same numbers, and storetest's
+// resumption/cap-per-fabric, resumption/cap-counts-responders-only and
+// resumption/cap-per-role hold both to them.
 const resumptionRecordsPerFabric = 16
+
+// resumptionClientRecordsPerFabric is how many resumption records with
+// Initiator true the store keeps for one fabric (owner decision 273): the
+// write of one more evicts the fabric's client record written least
+// recently, never a responder's. The client's records are of a
+// controller's peers and of the targets the node's client stack connects
+// to, among them targets a peer names (node/peer_path.go: the provider of
+// an AnnounceOTAProvider, a camera's WebRTC requestor); this bound keeps
+// the administrator who mints the node ids from growing them without end.
+const resumptionClientRecordsPerFabric = 1024
 
 // ErrResumptionNotFound is returned when a lookup misses.
 var ErrResumptionNotFound = errors.New("store: resumption record not found")
@@ -117,10 +127,12 @@ var ErrResumptionNotFound = errors.New("store: resumption record not found")
 // peer_node_id) in one transaction: the old row deleted, the new one
 // inserted with a write sequence one above the table's highest (write_seq,
 // the store's own count — not the clock, which may step back), and then the
-// fabric's responder rows (initiator 0) beyond resumptionRecordsPerFabric
-// deleted, the lowest write sequence first; a row the client wrote
-// (initiator 1) is never deleted by the cap. The row just written holds the
-// highest, so it is never the one evicted. CASEAuthTags is
+// fabric's rows of the written record's role beyond that role's cap
+// deleted — resumptionRecordsPerFabric for initiator 0,
+// resumptionClientRecordsPerFabric for initiator 1 — the lowest write
+// sequence first; a write never deletes a row of the other role. The row
+// just written holds the highest, so it is never the one evicted.
+// CASEAuthTags is
 // serialised as JSON; nil and empty slice both persist as '[]'.
 func (s *Store) UpsertResumption(ctx context.Context, rec ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
@@ -167,11 +179,15 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M
 	); err != nil {
 		return fmt.Errorf("store: upsert resumption: %w", err)
 	}
+	limit := resumptionRecordsPerFabric
+	if rec.Initiator {
+		limit = resumptionClientRecordsPerFabric
+	}
 	if _, err := tx.ExecContext(ctx, `
-DELETE FROM matter_resumption WHERE fabric_index = ? AND initiator = 0 AND peer_node_id NOT IN (
-    SELECT peer_node_id FROM matter_resumption WHERE fabric_index = ? AND initiator = 0
+DELETE FROM matter_resumption WHERE fabric_index = ? AND initiator = ? AND peer_node_id NOT IN (
+    SELECT peer_node_id FROM matter_resumption WHERE fabric_index = ? AND initiator = ?
     ORDER BY write_seq DESC LIMIT ?)`,
-		rec.FabricIndex, rec.FabricIndex, resumptionRecordsPerFabric); err != nil {
+		rec.FabricIndex, rec.Initiator, rec.FabricIndex, rec.Initiator, limit); err != nil {
 		return fmt.Errorf("store: upsert resumption: evict: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

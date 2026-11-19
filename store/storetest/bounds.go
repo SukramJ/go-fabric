@@ -16,6 +16,10 @@ import (
 // (store/port.go, Resumption): the number every backend keeps.
 const resumptionCap = 16
 
+// resumptionClientCap is the port's per-fabric cap on the records the CASE
+// client writes (ResumptionRecord.Initiator; owner decision 273).
+const resumptionClientCap = 1024
+
 // resumptionRecordID is a resumption id distinct for each (fabric, peer).
 func resumptionRecordID(f uint8, peer uint64) store.ResumptionRecord {
 	rec := resumptionRec(f, peer, 0)
@@ -133,6 +137,59 @@ func resumptionCapRespondersOnly(ctx context.Context, t *testing.T, p store.Port
 	}
 	if initiator, held := role(clients + responders - 1); !held || !initiator {
 		t.Errorf("peer %d after the client's rewrite: held %v, Initiator %v; want held, true", clients+responders-1, held, initiator)
+	}
+}
+
+// resumptionCapPerRole (owner decision 273): the records the CASE client
+// wrote (ResumptionRecord.Initiator) have a per-fabric bound of their own,
+// resumptionClientCap, the least recently written evicted first; each role
+// evicts only its own records — a client write never evicts a responder's
+// record, a responder write never a client's.
+func resumptionCapPerRole(ctx context.Context, t *testing.T, p store.Port) {
+	const over, responderBase = 6, 1 << 12
+	f := addFabric(ctx, t, p, 1)
+	client := func(peer uint64) store.ResumptionRecord {
+		rec := resumptionRecordID(f, peer)
+		rec.Initiator = true
+		return rec
+	}
+	held := func(peer uint64) bool {
+		_, err := p.GetResumptionByPeer(ctx, f, peer)
+		if err != nil && !errors.Is(err, store.ErrResumptionNotFound) {
+			t.Fatalf("GetResumptionByPeer(%d): %v", peer, err)
+		}
+		return err == nil
+	}
+	for i := range uint64(resumptionCap) {
+		must(t, p.UpsertResumption(ctx, resumptionRecordID(f, responderBase+i)))
+	}
+	for peer := range uint64(resumptionClientCap + over) {
+		must(t, p.UpsertResumption(ctx, client(peer)))
+	}
+	for peer := range uint64(resumptionClientCap + over) {
+		if want := peer >= over; held(peer) != want {
+			t.Fatalf("the client's record of peer %d after %d client writes: held %v, want %v", peer, resumptionClientCap+over, !want, want)
+		}
+	}
+	for i := range uint64(resumptionCap) {
+		if !held(responderBase + i) {
+			t.Fatalf("a client write evicted the responder's record of peer %d", responderBase+i)
+		}
+	}
+	// A full responder set rewritten by new peers: the responder's records
+	// turn over, the client's stay.
+	for i := range uint64(resumptionCap) {
+		must(t, p.UpsertResumption(ctx, resumptionRecordID(f, responderBase+resumptionCap+i)))
+	}
+	for i := range uint64(resumptionCap) {
+		if held(responderBase + i) {
+			t.Errorf("the responder's record of peer %d survived %d newer ones", responderBase+i, resumptionCap)
+		}
+	}
+	for peer := uint64(over); peer < resumptionClientCap+over; peer++ {
+		if !held(peer) {
+			t.Fatalf("a responder write evicted the client's record of peer %d", peer)
+		}
 	}
 }
 

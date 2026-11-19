@@ -221,13 +221,13 @@ type Resumption interface {
 	// UpsertResumption refuses a ResumptionID that is not 16 bytes and a
 	// SharedSecret that is not 32. It stores the record's role
 	// (ResumptionRecord.Initiator; a rewrite takes the role of the write).
-	// A fabric keeps at most 16 of the CASE responder's records (Initiator
-	// false): the write of one more evicts the fabric's responder record
-	// written least recently (a rewrite counts as a write), and never
-	// another fabric's. The records a CASE initiator writes (a
-	// controller's, a node's client) are of peers the node chose; they are
-	// neither counted nor evicted
-	// (BD-Matter-ResumptionRecordsPerFabric).
+	// A fabric keeps at most 16 records with Initiator false (a CASE
+	// responder's, and every writer's that does not set it) and 1024 with
+	// Initiator true (the CASE client of client/handshake: a controller's,
+	// the node's client stack's): the write of one more evicts the
+	// fabric's record of the same role written least recently (a rewrite
+	// counts as a write), never one of the other role and never another
+	// fabric's (BD-Matter-ResumptionRecordsPerFabric).
 	UpsertResumption(ctx context.Context, rec ResumptionRecord) error
 	// GetResumptionByID and GetResumptionByPeer return
 	// [ErrResumptionNotFound] on a miss.
