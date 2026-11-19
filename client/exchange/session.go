@@ -413,10 +413,10 @@ func (s *Session) Closing() <-chan struct{} { return s.closing }
 // IsClosing reports whether the session has begun to close: closed, lost,
 // or wound down at counter rollover until its last exchange ends. A
 // closing session takes no new exchange. Mirrors matter.js
-// Session.isClosing (packages/protocol/src/session/Session.ts:190-191 at
-// db021da0, closing or deferredClose), which ExchangeManager.ts:441-444
+// Session.isClosing (packages/protocol/src/session/Session.ts:190-192 at
+// b25ed960, closing or deferredClose), which ExchangeManager.ts:441-444
 // consults to decline an exchange the peer opens and Peer.ts:572-573 and
-// :587-590 to choose a session.
+// :587-590 to choose a session (those three at db021da0).
 func (s *Session) IsClosing() bool {
 	select {
 	case <-s.closing:

@@ -76,10 +76,13 @@ type CASEServerConfig struct {
 	// record is saved. Nil neither resumes nor saves.
 	Resumption ResumptionStore
 	// OnSession is called with every session the responder established
-	// and its fabric index — matter.js `this.#sessions.sessions.add`
-	// (CaseServer.ts:211, and createSecureSession's registration at
-	// :316-328), which a peer set observes to adopt the session. Nil
-	// ignores it.
+	// and its fabric index, once its establishment completed — matter.js's
+	// session joins SessionManager.sessions on its established event
+	// (SessionManager.ts:1274-1280 at b25ed960; CaseServer no longer adds
+	// it), the establishment completed at CaseServer.ts:206 (resumed) or
+	// :331 (full) — which a peer set observes to adopt the session. It is
+	// called after the Success's send returned, where matter.js adds at
+	// the Success's first transmission. Nil ignores it.
 	OnSession func(s *exchange.Session, fabricIndex uint8)
 	// Logger receives the diagnostics; nil is slog.Default().
 	Logger *slog.Logger
@@ -256,10 +259,10 @@ func (c *CASEServer) Close() {
 // Sigma1. It is the responder's exchange.ProtocolHandler. Mirrors matter.js
 // CaseServer.onNewExchange (CaseServer.ts:61-100): the handshake; on an
 // error a StatusReport unless the exchange counts as closed or a message
-// we sent is unacknowledged (:82-86) — NoSharedTrustRoots when no fabric
-// matched (:88-90), nothing when the peer reported the failure itself or
-// stopped answering (:91-92), InvalidParam otherwise (:93); and in every
-// case the unsecured session closes (:95-99). A handshake the server's
+// we sent is unacknowledged (:84-88) — NoSharedTrustRoots when no fabric
+// matched (:90-92), nothing when the peer reported the failure itself or
+// stopped answering (:93-94), InvalidParam otherwise (:95); and in every
+// case the unsecured session closes (:97-100). A handshake the server's
 // Close cut short reports nothing.
 func (c *CASEServer) Serve(x *exchange.Exchange, first *exchange.Message) {
 	defer x.Session().Close()
@@ -298,7 +301,7 @@ func (c *CASEServer) Serve(x *exchange.Exchange, first *exchange.Message) {
 	}
 }
 
-// causedByPeerStatusOrUnresponsive is CaseServer.ts:92's
+// causedByPeerStatusOrUnresponsive is CaseServer.ts:94's (at b25ed960)
 // causedBy(error, ChannelStatusResponseError, PeerUnresponsiveError): the
 // peer's own StatusReport, or a peer that did not answer
 // (PeerMessageMissingError extends PeerUnresponsiveError).
@@ -447,7 +450,7 @@ func (c *CASEServer) handleSigma1(ctx context.Context, x *exchange.Exchange, fir
 //
 // The session is registered before Sigma2_Resume goes out and, while it
 // establishes, processes what the initiator sends on it
-// (NodeSession.ts:205-231): the initiator holds the session once
+// (NodeSession.ts:223-225 at b25ed960): the initiator holds the session once
 // Sigma2_Resume reached it and sends on it at once, its Success first and
 // then its first request, which this manager reads on another goroutine
 // while this one still returns from the send
@@ -503,7 +506,8 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 // fabric id mismatch is UnexpectedData, :303-305, an InvalidParam), the
 // session registered establishing (:307-327), Success sent with the
 // session established at its first transmission (:329-331, the send's
-// onTransmitted through exchangeseam.SendNotifyingTransmission), the record saved (:345-357). A Success whose first
+// onTransmitted through exchangeseam.SendNotifyingTransmission), the
+// record built (:347-354) and saved (:357). A Success whose first
 // transmission fails — or that went out while the session was already
 // closing — closes the session and ends the handshake (:333-336); one that
 // went out and then fails (no acknowledgement) keeps the established
@@ -606,7 +610,7 @@ func completeEstablishmentOf(s *exchange.Session) error {
 }
 
 // established hands the session over and saves its record — the save of
-// CaseServer.ts:218-219 and :343-344, a failure only logged as the CASE
+// CaseServer.ts:217 and :357 at b25ed960, a failure only logged as the CASE
 // client logs it (CaseClient.ts:369-381).
 func (c *CASEServer) established(s *exchange.Session, fabric Fabric, rec ResumptionRecord) {
 	c.log.Info("matter.controller.case_server.session",

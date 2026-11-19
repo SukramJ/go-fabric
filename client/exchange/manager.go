@@ -160,8 +160,8 @@ type Manager struct {
 	// next one's registration position ([Session].position). Written
 	// under mu with the session table, read without it by an exchange
 	// taking its peer-loss cutoff. Mirrors matter.js
-	// SessionManager.ts:1260-1298 at b25ed960 (RegisteredSessions: #count,
-	// positionOf, isRegisteredBefore).
+	// SessionManager.ts:1256-1299 at b25ed960 (RegisteredSessions: #count
+	// declared at :1259, positionOf, isRegisteredBefore).
 	registrations atomic.Uint64
 	// inboundOrder is the inbound unsecured sessions, oldest first
 	// ([maxInboundUnsecuredSessions]); ackWaits the messages sent on them
@@ -506,7 +506,7 @@ const maxHeldWhileEstablishing = 16
 //     [Session.completeEstablishment]: its messages are processed, and
 //     [Manager.SessionsFor] — routing, peer loss and close — sees it; only
 //     the per-peer cap neither counts nor evicts it until it is
-//     established. Mirrors matter.js NodeSession.ts:205-251 at b25ed960
+//     established. Mirrors matter.js NodeSession.ts:209-251 at b25ed960
 //     (isEstablishing, its state table, completeEstablishment) and
 //     SessionManager.ts:1266-1284 (RegisteredSessions.add: an establishing
 //     session joins the established view only once established).
@@ -1497,7 +1497,7 @@ func (m *Manager) reportPeerLost(s *Session, cause error) {
 }
 
 // exchangePeerLost is the peer loss an exchange observed. Mirrors matter.js
-// ExchangeManager.ts:622-651 at b25ed960 (#messageExchangeContextFor,
+// ExchangeManager.ts:622-657 at b25ed960 (#messageExchangeContextFor,
 // peerLost): ignored off a secure session; a session without a peer
 // address (PASE, or no node id) alone is lost, sparing the exchange;
 // otherwise every session of the peer registered before the exchange was
