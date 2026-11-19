@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10091,
+  "entry_points": 10096,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27787,
+    "total_exported": 27788,
     "reachable": 20850,
-    "whitelisted": 6914,
+    "whitelisted": 6915,
     "unreachable": 23
   },
   "by_package": [
@@ -15628,7 +15628,7 @@
       "identifier": "Bind",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 383
+      "line": 384
     },
     {
       "package": "cluster/spec",
@@ -15649,35 +15649,35 @@
       "identifier": "DecodeList",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 293
+      "line": 294
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeListIn",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 297
+      "line": 298
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeNullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 359
+      "line": 360
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeOptional",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 323
+      "line": 324
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeStruct",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 282
+      "line": 283
     },
     {
       "package": "cluster/spec",
@@ -15733,7 +15733,7 @@
       "identifier": "List",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 454
+      "line": 455
     },
     {
       "package": "cluster/spec",
@@ -15754,14 +15754,14 @@
       "identifier": "NullOf",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 351
+      "line": 352
     },
     {
       "package": "cluster/spec",
       "identifier": "Nullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 338
+      "line": 339
     },
     {
       "package": "cluster/spec",
@@ -15789,49 +15789,56 @@
       "identifier": "Put",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 467
+      "line": 468
     },
     {
       "package": "cluster/spec",
       "identifier": "PutInt",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 476
+      "line": 477
     },
     {
       "package": "cluster/spec",
       "identifier": "PutList",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 499
+      "line": 500
     },
     {
       "package": "cluster/spec",
       "identifier": "PutNullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 511
+      "line": 512
     },
     {
       "package": "cluster/spec",
       "identifier": "PutOptional",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 523
+      "line": 524
     },
     {
       "package": "cluster/spec",
       "identifier": "PutStruct",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 495
+      "line": 496
     },
     {
       "package": "cluster/spec",
       "identifier": "PutUint",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 472
+      "line": 473
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "RequestErrorsForTests",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/export_test.go",
+      "line": 16
     },
     {
       "package": "cluster/spec",
@@ -16048,7 +16055,7 @@
       "identifier": "ValueOf",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 355
+      "line": 356
     },
     {
       "package": "cluster/spec/accesscontrol",
@@ -27556,21 +27563,21 @@
       "identifier": "Preset",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
-      "line": 35
+      "line": 34
     },
     {
       "package": "cluster/thermo",
       "identifier": "PresetStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
-      "line": 64
+      "line": 63
     },
     {
       "package": "cluster/thermo",
       "identifier": "PresetType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
-      "line": 38
+      "line": 37
     },
     {
       "package": "cluster/thermo",
@@ -27626,7 +27633,7 @@
       "identifier": "Suggestion",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/suggestions.go",
-      "line": 53
+      "line": 51
     },
     {
       "package": "cluster/thermo",
