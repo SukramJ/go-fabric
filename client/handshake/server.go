@@ -32,7 +32,7 @@ type FabricResolver interface {
 	FabricForDestination(destinationID [32]byte, initiatorRandom [sigma.RandomSize]byte) (Fabric, bool)
 	// FabricByIndex returns the fabric of a resumption record — matter.js
 	// keeps the fabric in the record (SessionManager.ts:837-839,
-	// CaseServer.ts:153).
+	// CaseServer.ts:155 at b25ed960).
 	FabricByIndex(fabricIndex uint8) (Fabric, bool)
 }
 
@@ -91,7 +91,7 @@ type CASEServerConfig struct {
 // CASEServer is the controller's CASE responder: a peer that opens CASE to
 // us — a node re-establishing its subscriptions after a restart — is
 // answered as a device answers a controller. It is the port of matter.js
-// packages/protocol/src/session/case/CaseServer.ts:49-347 at db021da0
+// packages/protocol/src/session/case/CaseServer.ts:50-360 at b25ed960
 // over secure/sigma's Responder, which holds the cryptography; this type
 // holds the exchange loop, the status reports, the session and the
 // record.
@@ -257,7 +257,7 @@ func (c *CASEServer) Close() {
 
 // Serve answers the CASE handshake the peer opened on x with first, its
 // Sigma1. It is the responder's exchange.ProtocolHandler. Mirrors matter.js
-// CaseServer.onNewExchange (CaseServer.ts:61-100): the handshake; on an
+// CaseServer.onNewExchange (CaseServer.ts:62-102 at b25ed960): the handshake; on an
 // error a StatusReport unless the exchange counts as closed or a message
 // we sent is unacknowledged (:84-88) — NoSharedTrustRoots when no fabric
 // matched (:90-92), nothing when the peer reported the failure itself or
@@ -337,7 +337,7 @@ func (r *responderFabrics) ResolveSigma1Destination(destinationID [32]byte, init
 }
 
 // ResolveFabricIndex implements sigma.FabricIndexResolver for the resume
-// path: the record's fabric (CaseServer.ts:153).
+// path: the record's fabric (CaseServer.ts:155 at b25ed960).
 func (r *responderFabrics) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, bool) {
 	f, ok := r.fabrics.FabricByIndex(fabricIndex)
 	if !ok || f.Identity == nil || f.Verifier == nil {
@@ -348,7 +348,7 @@ func (r *responderFabrics) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identit
 }
 
 // recordLookup serves sigma's resume probe the one record the Sigma1's
-// resumption id named (CaseServer.ts:113-116).
+// resumption id named (CaseServer.ts:115-118 at b25ed960).
 type recordLookup struct {
 	rec *ResumptionRecord
 }
@@ -367,7 +367,7 @@ func (l recordLookup) GetByID(id []byte) (*sigma.ResumptionRecord, error) {
 	}, nil
 }
 
-// handleSigma1 is CaseServer.#handleSigma1 (CaseServer.ts:102-146).
+// handleSigma1 is CaseServer.#handleSigma1 (CaseServer.ts:104-148 at b25ed960).
 func (c *CASEServer) handleSigma1(ctx context.Context, x *exchange.Exchange, first *exchange.Message) error {
 	// readSigma1 (CaseMessenger.ts:22-25): a malformed Sigma1 is data the
 	// peer sent (SecureChannelMessenger.ts:117-139).
@@ -504,7 +504,7 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 // full is CaseServer.#generateSigma2 (CaseServer.ts:222-360 at b25ed960)
 // around secure/sigma's crypto: Sigma2 sent, Sigma3 read and verified (a
 // fabric id mismatch is UnexpectedData, :303-305, an InvalidParam), the
-// session registered establishing (:307-327), Success sent with the
+// session registered establishing (:309-327), Success sent with the
 // session established at its first transmission (:329-331, the send's
 // onTransmitted through exchangeseam.SendNotifyingTransmission), the
 // record built (:347-354) and saved (:357). A Success whose first
