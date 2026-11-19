@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,7 +114,8 @@ func TestPairDiscoveredPairs(t *testing.T) {
 
 // TestPairDiscoveredConflictingOptions: the discovered device names how
 // it is reached, so PairOptions.BLE and Address are ErrConfiguration, and
-// so is a device without an address; each is a failed pairing in the
+// so are a device without an address, an address without a port and a
+// passcode the setup codes refuse; each is a failed pairing in the
 // trace and in pair.failures, and nothing is commissioned.
 func TestPairDiscoveredConflictingOptions(t *testing.T) {
 	t.Parallel()
@@ -120,17 +123,20 @@ func TestPairDiscoveredConflictingOptions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	cases := []struct {
-		name string
-		dev  client.Device
-		opts controller.PairOptions
+		name     string
+		dev      client.Device
+		opts     controller.PairOptions
+		passcode uint32
 	}{
-		{"BLE", found, controller.PairOptions{BLE: bletest.NewCentral()}},
-		{"Address", found, controller.PairOptions{Address: &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}}},
-		{"no address", client.Device{D: found.D, InstanceID: found.InstanceID}, controller.PairOptions{}},
+		{"BLE", found, controller.PairOptions{BLE: bletest.NewCentral()}, dev.Passcode()},
+		{"Address", found, controller.PairOptions{Address: &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}}, dev.Passcode()},
+		{"no address", client.Device{D: found.D, InstanceID: found.InstanceID}, controller.PairOptions{}, dev.Passcode()},
+		{"address without port", client.Device{D: found.D, InstanceID: found.InstanceID, Addresses: []discovery.Address{{IP: netip.IPv6Loopback()}}}, controller.PairOptions{}, dev.Passcode()},
+		{"invalid passcode", found, controller.PairOptions{}, 12345678},
 	}
 	for _, tc := range cases {
 		err := site.Run(ctx, func(ctx context.Context) error {
-			_, err := c.PairDiscovered(ctx, tc.dev, dev.Passcode(), tc.opts)
+			_, err := c.PairDiscovered(ctx, tc.dev, tc.passcode, tc.opts)
 			return err
 		})
 		if !errors.Is(err, controller.ErrConfiguration) {
@@ -142,5 +148,14 @@ func TestPairDiscoveredConflictingOptions(t *testing.T) {
 	}
 	if len(c.Nodes()) != 0 {
 		t.Fatalf("%d nodes after refused pairings", len(c.Nodes()))
+	}
+	failed := 0
+	for _, e := range c.DiagnosticEvents() {
+		if e.Kind == diagevent.KindPairing && e.Severity == diagevent.SeverityError && strings.HasPrefix(e.Message, "Pairing failed") {
+			failed++
+		}
+	}
+	if failed != len(cases) {
+		t.Fatalf("%d failed pairings in the trace, want %d", failed, len(cases))
 	}
 }

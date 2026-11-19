@@ -38,6 +38,7 @@ import (
 	"log/slog"
 	"math"
 	"net"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -62,6 +63,7 @@ import (
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/thread/brdiscovery"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -1237,8 +1239,9 @@ func (c *Controller) Pair(ctx context.Context, code string, opts PairOptions) (*
 // [Config].KeepOnboardingCodes keeps none.
 //
 // dev names how the device is reached, so [PairOptions].BLE and
-// [PairOptions].Address are [ErrConfiguration], and so is a dev without
-// an address.
+// [PairOptions].Address are [ErrConfiguration], and so are a dev without
+// an address, an address without IP or port, and a passcode the setup
+// codes refuse ([setup.IsValidPasscode]), as [Pair] refuses it in the code.
 func (c *Controller) PairDiscovered(ctx context.Context, dev client.Device, passcode uint32, opts PairOptions) (*client.Node, error) {
 	return c.runPairing(ctx, opts, func() (pairRequest, error) {
 		return pairRequest{
@@ -1251,6 +1254,14 @@ func (c *Controller) PairDiscovered(ctx context.Context, dev client.Device, pass
 					return nil, fmt.Errorf("%w: PairDiscovered reaches the discovered device at its addresses, not at PairOptions.Address", ErrConfiguration)
 				case len(dev.Addresses) == 0:
 					return nil, fmt.Errorf("%w: the discovered device has no address", ErrConfiguration)
+				case !setup.IsValidPasscode(passcode):
+					// The value stays out of the error: the passcode is the secret.
+					return nil, fmt.Errorf("%w: invalid passcode", ErrConfiguration)
+				}
+				for _, a := range dev.Addresses {
+					if !a.IP.IsValid() || a.Port == 0 {
+						return nil, fmt.Errorf("%w: the discovered device's address %v has no IP or no port", ErrConfiguration, netip.AddrPortFrom(a.IP, a.Port))
+					}
 				}
 				return &dev, nil
 			},
