@@ -212,7 +212,7 @@ func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error)
 		return nil, ErrNotGroupMessage
 	}
 	sessionID := binary.LittleEndian.Uint16(datagram[1:3])
-	if err := m.ensureAllLoaded(ctx); err != nil {
+	if err := m.ensureAllLoaded(ctx, loadForDatagram); err != nil {
 		return nil, err
 	}
 

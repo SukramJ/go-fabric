@@ -67,10 +67,13 @@ func (s *memStore) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, 
 	return r, nil
 }
 
-func (s *memStore) ListFabrics(context.Context) ([]store.FabricRecord, error) {
+func (s *memStore) ListFabrics(ctx context.Context) ([]store.FabricRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.listCalls++
+	if err := ctx.Err(); err != nil { // a store that honours its caller's context
+		return nil, err
+	}
 	if s.failList {
 		return nil, errors.New("memStore: list fabrics failed")
 	}

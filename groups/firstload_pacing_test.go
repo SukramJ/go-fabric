@@ -5,6 +5,7 @@ package groups
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -94,5 +95,105 @@ func TestFirstLoadIsPacedOnTheReceivePath(t *testing.T) {
 	}
 	if got := lists() - before; got != 0 {
 		t.Fatalf("%d ListFabrics calls once loaded, want 0", got)
+	}
+}
+
+// TestFirstLoadPacingIsTheDatagramsOnly: an authenticated caller tries
+// the store at once while the group datagrams are paced — each of its
+// failures is a store call, and after the store recovered inside the
+// interval it loads at once, where a datagram is still refused without a
+// store call (owner decision 279).
+func TestFirstLoadPacingIsTheDatagramsOnly(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	m, st := newTestManager(t)
+	m.SetClock(clocktest.New(time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)))
+	st.mu.Lock()
+	st.failList = true
+	st.mu.Unlock()
+	op1, sid1 := opKeyOf(t, 0xA1)
+	counter := uint32(0)
+	lists := func() int {
+		st.mu.Lock()
+		defer st.mu.Unlock()
+		return st.listCalls
+	}
+	datagram := func() error {
+		counter++
+		_, err := m.Decode(ctx, sealGroup(t, op1, sid1, 0x0101, 7, counter, true, imPayload([]byte("x"))))
+		return err
+	}
+	if err := datagram(); err == nil {
+		t.Fatal("a group datagram decoded while the first load fails")
+	}
+	before := lists()
+	for range 3 {
+		if _, err := m.Fabrics(ctx); err == nil {
+			t.Fatal("Fabrics while the store fails: nil error")
+		}
+		if _, err := m.GroupcastMemberships(ctx); err == nil {
+			t.Fatal("GroupcastMemberships while the store fails: nil error")
+		}
+	}
+	if got := lists() - before; got != 6 {
+		t.Fatalf("6 authenticated calls while the store fails made %d ListFabrics calls, want 6", got)
+	}
+	before = lists()
+	for range 10 {
+		if err := datagram(); err == nil {
+			t.Fatal("a group datagram decoded while the first load fails")
+		}
+	}
+	if got := lists() - before; got != 0 {
+		t.Fatalf("10 datagrams after the authenticated failures made %d ListFabrics calls, want 0", got)
+	}
+
+	st.mu.Lock()
+	st.failList = false
+	st.mu.Unlock()
+	before = lists()
+	if err := datagram(); err == nil {
+		t.Fatal("a group datagram decoded inside the interval before any load succeeded")
+	}
+	if got := lists() - before; got != 0 {
+		t.Fatalf("a datagram inside the interval made %d ListFabrics calls, want 0", got)
+	}
+	got, err := m.Fabrics(ctx)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("Fabrics after the store recovered inside the interval: %v, %v; want [1]", got, err)
+	}
+	if got := lists() - before; got != 1 {
+		t.Fatalf("the recovered authenticated load made %d ListFabrics calls, want 1", got)
+	}
+	if err := datagram(); err != nil {
+		t.Fatalf("a group datagram once an authenticated caller loaded: %v", err)
+	}
+}
+
+// TestFirstLoadDoesNotCacheACallersContextError: a first load that fails
+// because its caller's context ended neither moves the pacing nor hands
+// that context's error to the next group datagram, which tries the store
+// itself.
+func TestFirstLoadDoesNotCacheACallersContextError(t *testing.T) {
+	t.Parallel()
+	m, st := newTestManager(t)
+	m.SetClock(clocktest.New(time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC)))
+	op1, sid1 := opKeyOf(t, 0xA1)
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := m.Decode(cancelled, sealGroup(t, op1, sid1, 0x0101, 7, 1, true, imPayload([]byte("x")))); !errors.Is(err, context.Canceled) {
+		t.Fatalf("a datagram under a cancelled context: %v, want context.Canceled", err)
+	}
+	st.mu.Lock()
+	before := st.listCalls
+	st.mu.Unlock()
+	if _, err := m.Decode(context.Background(), sealGroup(t, op1, sid1, 0x0101, 7, 2, true, imPayload([]byte("x")))); err != nil {
+		t.Fatalf("a datagram under a live context after another's cancelled load: %v", err)
+	}
+	st.mu.Lock()
+	got := st.listCalls - before
+	st.mu.Unlock()
+	if got != 1 {
+		t.Fatalf("the live datagram made %d ListFabrics calls, want 1", got)
 	}
 }
