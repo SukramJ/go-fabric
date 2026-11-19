@@ -563,6 +563,9 @@ func (c *CASEServer) established(s *exchange.Session, fabric Fabric, rec Resumpt
 		slog.Int("session_id", int(s.ID())), slog.Bool("resumed", s.Resumed()),
 		slog.Int("fabric_index", int(fabric.Identity.FabricIndex)), slog.Uint64("node_id", s.PeerNodeID()))
 	if c.cfg.Resumption != nil {
+		// Saved in the responder's role, also when resumed from a record
+		// the client saved (R2-P7-sec-01).
+		rec.Initiator = false
 		if err := c.cfg.Resumption.SaveResumptionRecord(rec); err != nil {
 			c.log.Warn("matter.controller.case_server.resumption_save_failed", slog.Any("err", err))
 		}

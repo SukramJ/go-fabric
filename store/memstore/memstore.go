@@ -757,8 +757,9 @@ func (s *Store) ListGroupcastGroups(_ context.Context, fabricIndex uint8) ([]sto
 
 // UpsertResumption implements [store.Resumption]. A resumption id is unique
 // across the table, as SQLite's index on it makes it; a fabric keeps at
-// most resumptionRecordsPerFabric records, the least recently
-// written evicted first.
+// most resumptionRecordsPerFabric records with Initiator false and
+// resumptionClientRecordsPerFabric with Initiator true, each role's least
+// recently written evicted first by a write of that role only.
 func (s *Store) UpsertResumption(_ context.Context, rec store.ResumptionRecord) error {
 	if len(rec.ResumptionID) != 16 {
 		return fmt.Errorf("memstore: resumption_id length=%d (want 16)", len(rec.ResumptionID))
@@ -784,24 +785,33 @@ func (s *Store) UpsertResumption(_ context.Context, rec store.ResumptionRecord) 
 	s.resumption[key] = rec
 	s.resumptionSeq++
 	s.resumptionWritten[key] = s.resumptionSeq
-	s.evictResumptions(rec.FabricIndex)
+	s.evictResumptions(rec.FabricIndex, rec.Initiator)
 	return nil
 }
 
-// resumptionRecordsPerFabric is the port's per-fabric cap on resumption
-// records (store/port.go, Resumption); storetest's resumption/cap-per-fabric
-// holds it to the SQLite store's.
-const resumptionRecordsPerFabric = 16
+// resumptionRecordsPerFabric and resumptionClientRecordsPerFabric are the
+// port's per-fabric caps on the resumption records with Initiator false and
+// true (store/port.go, Resumption); storetest's resumption/cap-per-fabric,
+// resumption/cap-counts-responders-only and resumption/cap-per-role hold
+// them to the SQLite store's.
+const (
+	resumptionRecordsPerFabric       = 16
+	resumptionClientRecordsPerFabric = 1024
+)
 
-// evictResumptions deletes the fabric's records beyond
-// resumptionRecordsPerFabric, the least recently written first, as
-// SQLite's UpsertResumption does; the caller holds mu.
-func (s *Store) evictResumptions(fabricIndex uint8) {
+// evictResumptions deletes the fabric's records of the role initiator
+// beyond that role's cap, the least recently written first, as SQLite's
+// UpsertResumption does; the caller holds mu.
+func (s *Store) evictResumptions(fabricIndex uint8, initiator bool) {
+	limit := resumptionRecordsPerFabric
+	if initiator {
+		limit = resumptionClientRecordsPerFabric
+	}
 	for {
 		n := 0
 		var oldest resumptionKey
 		for k := range s.resumption {
-			if k.fabric != fabricIndex {
+			if k.fabric != fabricIndex || s.resumption[k].Initiator != initiator {
 				continue
 			}
 			n++
@@ -809,7 +819,7 @@ func (s *Store) evictResumptions(fabricIndex uint8) {
 				oldest = k
 			}
 		}
-		if n <= resumptionRecordsPerFabric {
+		if n <= limit {
 			return
 		}
 		delete(s.resumption, oldest)

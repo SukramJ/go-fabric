@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10054,
+  "entry_points": 10055,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -45672,7 +45672,7 @@
       "identifier": "Eraser",
       "reason": "the method set store.Port embeds; node and controller call Erase through Port, so no call edge names the interface itself",
       "file": "store/port.go",
-      "line": 338
+      "line": 337
     },
     {
       "package": "store",

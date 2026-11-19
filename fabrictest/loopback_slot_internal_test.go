@@ -45,8 +45,10 @@ func TestLoopbackSlotRunsOneTreeAtATime(t *testing.T) {
 		waiting[o.name] = done
 		go func() {
 			holdLoopbackSlot(o)
-			close(done)
+			// Released before done closes: the check after the loop
+			// reads the slot once every done is closed.
 			o.end()
+			close(done)
 		}()
 	}
 	for name, done := range waiting {

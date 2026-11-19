@@ -138,6 +138,9 @@ func CASE(ctx context.Context, mgr *exchange.Manager, addr *net.UDPAddr, fabric 
 	}
 	x.Close()
 	if opts.Resumption != nil {
+		// Saved in the client's role, also when resumed from a record the
+		// responder saved (R2-P7-sec-01).
+		rec.Initiator = true
 		if err := opts.Resumption.SaveResumptionRecord(rec); err != nil {
 			log.Warn("matter.controller.case.resumption_save_failed", slog.Any("err", err))
 		}

@@ -771,6 +771,18 @@ func caseInitiatorProvider(st store.Resumption, sessions *operational.Manager, i
 				if onOpened != nil {
 					onOpened(entry.SessionID)
 				}
+				// This handshake is an initiator's, yet the record is
+				// saved without the role (Initiator false) on purpose: the
+				// node reaches it only to re-establish former subscriptions
+				// (bridge.reestablishPeer), whose targets are peers that
+				// connected to the node, so the record counts against the
+				// responder's cap of 16 per fabric, as theirs would. A
+				// host's call of the deprecated Bridge.ConnectPeer or
+				// Bridge.ConnectOtaProvider reaches it too and is counted
+				// the same way. Setting Initiator
+				// would move it under the client's cap of 1024, which any
+				// subscriber could then fill (review II, Fable read of
+				// R2-P7-sec-01; BD-Matter-ResumptionRecordsPerFabric).
 				rec := store.ResumptionRecord{
 					FabricIndex: fabricIndex, PeerNodeID: res.PeerNodeID, ResumptionID: res.ResumptionID,
 					SharedSecret: res.SharedSecret, CASEAuthTags: res.PeerCATs,
