@@ -54,7 +54,7 @@ type p7ExtStore struct {
 	fabrics []mstore.FabricRecord
 }
 
-func (s *p7ExtStore) GetSetting(ctx context.Context, key string) (string, bool, error) {
+func (s *p7ExtStore) GetSetting(ctx context.Context, key string) (value string, ok bool, err error) {
 	if s.getErr != nil {
 		return "", false, s.getErr
 	}
