@@ -182,7 +182,10 @@ func caseRefusedAtSigma3(t *testing.T, r *unsecuredRig, x uint16, acked bool) {
 // that fails on a message arriving while the handshake's previous reply
 // still waits for its acknowledgement ends without a failure StatusReport,
 // and that reply goes on being retransmitted until the peer acknowledges
-// it (owner decision 173); once that reply is acknowledged, the same
+// it (owner decision 173). The cases call the handlers below the receive
+// rule: since review II, phase 7 (decision 277) such a message is refused
+// on receive over UDP, and the guard is the second line for the residue
+// (owner decision 282, [Bridge.endHandshakeUnreported]). Once that reply is acknowledged, the same
 // failure is reported, reliably (review II, F-db021da0-7; the register row
 // in notes/parity/matter_behaviour_findings.md). Before, the reply was
 // dropped and the report sent reliably in both cases. One case per role and per
