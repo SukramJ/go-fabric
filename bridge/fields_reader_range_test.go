@@ -51,7 +51,6 @@ func TestCommandFieldDecoders_RejectOverWideIntegers(t *testing.T) {
 		{"MoveToLevel.OptionsOverride", 3, 0x100, viaDefinition(0x0008, 0x00)},
 		{"ArmFailSafe.ExpiryLengthSeconds", 0, 0x10000, viaFieldsReader(0x0030, 0x00)},
 		{"SetRegulatoryConfig.NewRegulatoryConfig", 0, 0x100, viaFieldsReader(0x0030, 0x02)},
-		{"CertificateChainRequest.CertificateType", 0, 0x100, viaFieldsReader(0x003E, 0x02)},
 		{"AddNOC.AdminVendorID", 4, 0x10000, viaFieldsReader(0x003E, 0x06)},
 		{"RemoveFabric.FabricIndex", 0, 0x100, viaFieldsReader(0x003E, 0x0A)},
 	}
@@ -70,6 +69,33 @@ func TestCommandFieldDecoders_RejectOverWideIntegers(t *testing.T) {
 				t.Errorf("err = %v; want an error carrying StatusConstraintError", err)
 			}
 		})
+	}
+}
+
+// TestCertificateChainRequest_UndefinedTypeIsInvalidCommand pins
+// CertificateChainRequest's CertificateType 0x100 to INVALID_COMMAND, not
+// CONSTRAINT_ERROR: the field's TLV is an enum over a 32-bit integer, so
+// the value decodes (packages/types/src/tlv/TlvOfModel.ts:221-224 at
+// b25ed960); the command is model-validated, so the TLV check is skipped
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:317, :359,
+// :485-487 at b25ed960); the model rejects the undefined member
+// (packages/node/src/behavior/state/validation/ValueValidator.ts:176-181
+// at b25ed960) and the server's onValidationError answers INVALID_COMMAND
+// (packages/node/src/behaviors/operational-credentials/
+// OperationalCredentialsServer.ts:636-638 at b25ed960, through
+// packages/node/src/node/integration/ProtocolService.ts:693-694).
+func TestCertificateChainRequest_UndefinedTypeIsInvalidCommand(t *testing.T) {
+	t.Parallel()
+	dec := buildDecoderAfterStructOpen(func(enc *tlv.Encoder) {
+		enc.PutUint(tlv.ContextTag(0), 0x100)
+	})
+	err := viaFieldsReader(0x003E, 0x02)(dec)
+	if err == nil {
+		t.Fatal("CertificateType 0x100 accepted; want an INVALID_COMMAND reject")
+	}
+	var sce im.StatusCodeError
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusInvalidCommand {
+		t.Errorf("err = %v; want an error carrying StatusInvalidCommand", err)
 	}
 }
 
