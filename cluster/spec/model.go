@@ -182,8 +182,10 @@ type Field struct {
 	// its constraint, nor an enum to its values. matter.js relaxes a field
 	// by extending its server's schema (constraint "none",
 	// packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-75
-	// at b25ed960); empty for a field held to the model. Written by
-	// script/clustergen from its relaxation table (relaxed.go).
+	// at b25ed960); empty for a field held to the model. On a list's
+	// [Type.Entry] it relaxes each entry, the list's own constraint
+	// staying the model's. Written by script/clustergen from its
+	// relaxation table (relaxed.go).
 	Relaxed string
 }
 

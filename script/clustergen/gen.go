@@ -1182,6 +1182,13 @@ func baseDec(t typeInfo, v *value) string {
 		return "spec.DecodeStruct[" + t.goType + "]"
 	case kindList:
 		entry := decExpr(t.elem)
+		if t.elem.relaxed != "" {
+			// The server judges each entry (relaxed.go,
+			// relaxRequestListEntry); the decoder holds its width only.
+			unbounded := *t.elem
+			unbounded.v = nil
+			entry = decExpr(&unbounded)
+		}
 		if lo, hi, ok := lengthBounds(c); ok {
 			return fmt.Sprintf("spec.DecodeListIn(%s, %d, %d)", entry, lo, hi)
 		}

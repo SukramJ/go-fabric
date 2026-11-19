@@ -810,6 +810,9 @@ func TestChipAvStreamCommands(t *testing.T) { //nolint:gocognit,funlen,maintidx 
 		_, st := invokeStream(a, csdef.CmdVideoStreamAllocate, videoAllocate())
 		wantCode(t, "allocate", st, im.StatusSuccess)
 		wantCode(t, "with a stream", set(csdef.StreamUsageLiveView), im.StatusInvalidInState)
+		// The allocated-streams check comes before the unknown usage
+		// (CameraAVStreamManagementCluster.cpp:2577-2578, :2583-2585).
+		wantCode(t, "with a stream, unknown 0xFF", set(0xFF), im.StatusInvalidInState)
 		_, st = invokeStream(a, csdef.CmdVideoStreamDeallocate, csdef.VideoStreamDeallocateRequest{VideoStreamId: 1})
 		wantCode(t, "deallocate", st, im.StatusSuccess)
 		if len(a.VideoStreams()) != 0 {

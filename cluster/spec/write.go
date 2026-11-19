@@ -450,8 +450,11 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 	if c.Entry != nil {
 		entry = *c.Entry
 	}
+	// A relaxed entry ([Field.Relaxed]) is held to its type's width: the
+	// server judges its value, an enum's member among them.
+	et, entry := held(t.Entry.Type, entry, t.Entry.Relaxed)
 	for n := range rv.Len() {
-		_, err := i.checkValueIn(fmt.Sprintf("%s[%d]", name, n), t.Entry.Type, t.Entry.Quality.Nullable, entry, entryValue(rv.Index(n).Interface()), nil, scope)
+		_, err := i.checkValueIn(fmt.Sprintf("%s[%d]", name, n), et, t.Entry.Quality.Nullable, entry, entryValue(rv.Index(n).Interface()), nil, scope)
 		if err := scope.reject(err); err != nil {
 			return err
 		}

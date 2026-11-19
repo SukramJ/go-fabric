@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
@@ -284,5 +285,33 @@ func TestRelaxedAttributeIsHeldToItsWidth(t *testing.T) {
 	}
 	if _, err := inst.ValidateWrite(lwc.AttrNumberOfRinses, uint64(256), nil); spec.StatusOf(err) != im.StatusConstraintError {
 		t.Errorf("NumberOfRinses 256: %v, want CONSTRAINT_ERROR", err)
+	}
+}
+
+// TestRelaxedListEntryIsHeldToItsWidth: the entries of a request list the
+// relaxation table relaxes are held to their type's width only — a
+// StreamUsage the enum does not define reaches the server, which answers
+// it after its own state check (CameraAvStreamManagement
+// SetStreamPriorities, BD-chip-CameraAvStreamManagement-RulesInServer).
+func TestRelaxedListEntryIsHeldToItsWidth(t *testing.T) {
+	t.Parallel()
+	cmd := csdef.Definition.Command(csdef.CmdSetStreamPriorities, spec.Request)
+	if cmd == nil || len(cmd.Fields) != 1 || cmd.Fields[0].Type.Entry == nil || cmd.Fields[0].Type.Entry.Relaxed == "" {
+		t.Fatal("SetStreamPriorities.StreamPriorities carries no relaxed entry")
+	}
+	inst, err := spec.New(csdef.Definition, spec.Options{Features: uint32(csdef.FeatureVideo)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := csdef.SetStreamPrioritiesRequest{StreamPriorities: []csdef.StreamUsageEnum{csdef.StreamUsageLiveView, 0xFF}}
+	if err := inst.CheckRequest(csdef.CmdSetStreamPriorities, req, nil); err != nil {
+		t.Errorf("StreamPriorities [LiveView, 0xFF]: %v, want it to reach the server", err)
+	}
+	fields, err := decodeRequest(t, csdef.Definition.ID, csdef.CmdSetStreamPriorities, req)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got := fields.(csdef.SetStreamPrioritiesRequest).StreamPriorities; len(got) != 2 || got[1] != 0xFF {
+		t.Errorf("decoded %v", got)
 	}
 }

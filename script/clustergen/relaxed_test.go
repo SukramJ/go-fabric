@@ -51,6 +51,7 @@ func TestRelaxationNamingNothingFailsTheGeneration(t *testing.T) {
 		{kind: relaxStructField, key: "OnOff.NoSuchStruct.Field", ref: "x"},
 		{kind: relaxAttribute, key: "OnOff.NoSuchAttribute", ref: "x"},
 		{kind: relaxRefusal, key: "OnOff.NoSuchCommand", refusal: statusInvalidCommand, ref: "x"},
+		{kind: relaxRequestListEntry, key: "OnOff.OnWithTimedOff.OnOffControl", ref: "x"},
 	} {
 		serverRelaxations = []struct {
 			server  string

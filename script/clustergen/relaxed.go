@@ -33,6 +33,11 @@ const (
 	// relaxRefusal: a request of the command the definition refuses
 	// answers refusal in place of the schema's status ("Cluster.Command").
 	relaxRefusal
+	// relaxRequestListEntry: the entries of a request field's list
+	// ("Cluster.Command.Field"): each entry's value — an enum's member
+	// among them — is the server's to judge (validate = false on the
+	// entry); the list's own constraint stays the model's.
+	relaxRequestListEntry
 )
 
 // relaxation is one entry of the table.
@@ -167,6 +172,16 @@ var serverRelaxations = []struct {
 		// 1 to 10 itself (CONSTRAINT_ERROR, :556-569).
 		{kind: relaxStructField, key: "PushAvStreamTransport.TransportTriggerOptionsStruct.MotionSensitivity", ref: "connectedhomeip src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:571-577 at 6170af84 (owner decision 69, BD-chip-PushAvStreamTransport-RulesInServer)"},
 	}},
+	{"cluster/camera AvStream", []relaxation{
+		// matter.js has no SetStreamPriorities handler; its generic gate
+		// would answer a StreamUsage the enum does not define with
+		// CONSTRAINT_ERROR. chip's handler answers INVALID_IN_STATE while a
+		// stream is allocated, then INVALID_COMMAND for an unknown usage
+		// (:2577-2578, :2583-2585), which its test expects
+		// (TestCameraAVStreamManagementCluster.cpp:1460-1465). The server's
+		// check is cluster/camera/avstream.go's setStreamPriorities.
+		{kind: relaxRequestListEntry, key: "CameraAvStreamManagement.SetStreamPriorities.StreamPriorities", ref: "connectedhomeip src/app/clusters/camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp:2577-2585 at 6170af84 (BD-chip-CameraAvStreamManagement-RulesInServer)"},
+	}},
 	{"cluster/thermo ThermostatServer", []relaxation{
 		// A value written inside an atomic write goes to the pending state,
 		// which matter.js does not validate against the model at the write;
@@ -238,6 +253,10 @@ func (g *generator) relax() error {
 			}
 		case relaxRefusal:
 			refusals[e.key] = e
+		case relaxRequestListEntry:
+			if !g.relaxListEntry(e) {
+				return fmt.Errorf("relaxation %s names no request list field", e.key)
+			}
 		default:
 			return fmt.Errorf("relaxation %s has no kind", e.key)
 		}
@@ -278,6 +297,23 @@ func (g *generator) relaxField(e relaxation, request bool) bool {
 	}
 	for _, di := range g.dataList {
 		mark(di.dt.Name, di.fields)
+	}
+	return found
+}
+
+// relaxListEntry marks the entry of the request list field e names;
+// false when the cluster has no such list field.
+func (g *generator) relaxListEntry(e relaxation) bool {
+	found := false
+	for _, p := range g.payloads {
+		if p.command == nil || p.response != nil {
+			continue
+		}
+		for _, f := range p.fields {
+			if g.c.Name+"."+p.what+"."+f.name == e.key && f.t.kind == kindList && f.t.elem != nil {
+				f.t.elem.relaxed, found = e.ref, true
+			}
+		}
 	}
 	return found
 }
