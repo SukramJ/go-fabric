@@ -43,11 +43,16 @@ import (
 //
 // Each fabric is held to a share as well: once the claims bridge-wide
 // reach [chunkWaitFabricThreshold] — half the listener's dispatch budget —
-// a fabric that holds more than the threshold divided by the fabrics the
-// node holds ([Bridge.SetFabricCounter]) is answered Busy for a further
-// claim, as the per-session bound answers. Below the threshold, and on a
-// node of one fabric, nothing changes; a node whose host wired no counter
-// keeps the per-session bound alone (review II, TM R3.7, decision 245). The rule is
+// a fabric that holds the threshold divided by the fabrics the node holds
+// ([Bridge.SetFabricCounter]) is answered Busy for a further claim, as the
+// per-session bound answers: a fabric holds at most its share. Below the
+// threshold, and on a node of one fabric, nothing changes; a node whose
+// host wired no counter keeps the per-session bound alone. A session
+// without a fabric — a PASE session, one the session lookup cannot place
+// or a lookup without a [SessionFabricResolver] — is held to no share,
+// only to the per-session bound, and its claims count towards the
+// threshold (review II, TM R3.7, decision 245; R2-P7-req-05, decision
+// 275). The rule is
 // this module's: matter.js bounds a session's outgoing exchanges only
 // (packages/protocol/src/protocol/ExchangeManager.ts:63 at db021da0);
 // connectedhomeip reserves read and subscription resources per fabric
@@ -82,16 +87,17 @@ type chunkWaitClaims struct {
 }
 
 // claim takes one of sessionID's [maxChunkWaitsPerSession] claims for
-// fabric; false when the session holds them all, or when share is set and
-// the fabric already holds more than share. A true claim is given back
-// with [chunkWaitClaims.release].
+// fabric; false when the session holds them all, or when share is set,
+// the claims reach the threshold and the fabric already holds share
+// claims. Fabric 0 — no fabric — is held to no share. A true claim is
+// given back with [chunkWaitClaims.release].
 func (c *chunkWaitClaims) claim(sessionID uint16, fabric uint8, share int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.n[sessionID] >= maxChunkWaitsPerSession {
 		return false
 	}
-	if share > 0 && c.total >= chunkWaitFabricThreshold && c.byFabric[fabric] > share {
+	if share > 0 && fabric != 0 && c.total >= chunkWaitFabricThreshold && c.byFabric[fabric] >= share {
 		return false
 	}
 	if c.n == nil {
@@ -161,8 +167,9 @@ func (b *Bridge) SetFabricCounter(fn func(context.Context) (int, error)) {
 
 // claimChunkWait takes one of sessionID's chunk wait claims when needed
 // is set. release gives it back and is a no-op when nothing was taken;
-// ok is false when the session holds every claim, or its fabric more than
-// its share ([chunkWaitFabricThreshold]).
+// ok is false when the session holds every claim, or its fabric its whole
+// share ([chunkWaitFabricThreshold]). A session without a fabric asks the
+// host's fabric count never: it is held to no share.
 func (b *Bridge) claimChunkWait(ctx context.Context, sessionID uint16, needed bool) (release func(), ok bool) {
 	if !needed {
 		return func() {}, true
@@ -175,7 +182,7 @@ func (b *Bridge) claimChunkWait(ctx context.Context, sessionID uint16, needed bo
 		fabric, _ = r.FabricFor(sessionID)
 	}
 	share := 0
-	if b.routing.chunkWaits.atThreshold() {
+	if fabric != 0 && b.routing.chunkWaits.atThreshold() {
 		share = b.routing.chunkWaits.share(ctx)
 	}
 	if !b.routing.chunkWaits.claim(sessionID, fabric, share) {
