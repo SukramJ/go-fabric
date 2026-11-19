@@ -365,11 +365,13 @@ func (p *Peer) mergeKnown(d Descriptor) {
 
 // changedLocked records a descriptor change: one save runs for every
 // burst of changes made before it takes its copy — matter.js's #isSaving
-// guard around #save (Peer.ts:99-106, :575-579). A change made after the
-// copy is saved again by the same worker, not by a second one: matter.js's
-// single thread orders its saves, while two goroutines could reach the
-// store in either order and the older copy overwrite the newer (review
-// II phase 7 backlog, TestSaveKeepsTheNewestDescriptor).
+// guard (packages/protocol/src/peer/Peer.ts:99-106 at db021da0: a change
+// while #isSaving is set starts no save) around #save (:576-580: it clears
+// #isSaving, then awaits #updated.emit). A change made after the copy is
+// saved again by the same worker, not by a second one. This module's
+// reasoning, not a matter.js statement: two goroutines could reach the
+// store in either order and the older copy overwrite the newer (review II
+// phase 7 backlog, TestSaveKeepsTheNewestDescriptor).
 func (p *Peer) changedLocked() {
 	if p.closed {
 		return
