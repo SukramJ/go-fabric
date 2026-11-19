@@ -295,7 +295,7 @@ func (r *Registry) restore(id string) (n *Node, addr *PeerAddress, err error) {
 
 // storedPeerAddress is the peer address field of a stored record decoded
 // on its own, nil when it is absent or does not decode. Mirrors matter.js
-// packages/node/src/node/ClientNode.ts:407-418 at b25ed960
+// packages/node/src/node/ClientNode.ts:408-418 at b25ed960
 // (ClientNode.peerAddress): with the commissioning state not loaded, the
 // address is read from storage, whatever else the state holds.
 func storedPeerAddress(values map[uint32][]byte) *PeerAddress {

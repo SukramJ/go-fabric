@@ -120,7 +120,10 @@ func TestPeersLoadFailureByAddressParity(t *testing.T) {
 	if got, err := sr.reg.ForAddress(address2, ""); err != nil || got != healthy {
 		t.Fatalf("ForAddress(address2): %v, %v; want the healthy node", got, err)
 	}
-	// Peers.commissioned lists the healthy node alone (PeersLoadFailureTest.ts:125).
+	// Peers.commissioned lists the healthy node alone, as the first case
+	// asserts for an orphaned fabric (PeersLoadFailureTest.ts:123-125 at
+	// b25ed960); the case ported here asserts nothing about it, so for the
+	// commissionedAt corruption the assertion is Go's own.
 	if c := sr.reg.Commissioned(); len(c) != 1 || c[0] != healthy {
 		t.Fatalf("commissioned %v, want the healthy node alone", c)
 	}

@@ -274,9 +274,10 @@ func TestClientEventNotificationEventNumbersParity(t *testing.T) {
 		}
 	})
 
-	// ClientEventNotificationTest.ts:1004-1031 at b25ed960: the
-	// device drops the subscription, its sessions stay; the replacement asks
-	// above the stored number, so the two events are not delivered again.
+	// ClientEventNotificationTest.ts:1004-1032 at b25ed960: the
+	// device drops the subscription, its sessions stay, and the two events
+	// are not delivered again. That the replacement asks above the stored
+	// event number is the Go client's mechanism; matter.js's is not read.
 	t.Run("does not deliver events again when the device drops the subscription and the session stays", func(t *testing.T) {
 		t.Parallel()
 		sp := newSwitchPair(t, false)

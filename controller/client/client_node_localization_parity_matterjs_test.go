@@ -55,10 +55,10 @@ func TestClientNodeTemperatureUnitWithoutSupportedListParity(t *testing.T) {
 
 // TestClientNodeSendsConstraintBreakingWriteParity ports the cases of the
 // describe "sends a write that breaks a model constraint to the device"
-// (ClientNodeTest.ts:1466-1555 at b25ed960) whose subject is the device's
+// (ClientNodeTest.ts:1465-1558 at b25ed960) whose subject is the device's
 // answer. matter.js's device carries a ContactSensor whose
 // BooleanStateConfiguration has SensitivityLevel with three levels, at
-// level 0 (:1467-1480), the Go device the same ContactSensor, bridged as
+// level 0 (:1466-1480), the Go device the same ContactSensor, bridged as
 // the pair's light is (newClientPair). The image keeps its value by
 // construction (no write-through); it is checked as matter.js checks the
 // cache.

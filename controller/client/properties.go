@@ -331,7 +331,7 @@ const (
 // 1 s for a Thread node before Matter 1.3 without a Generic Switch, else 0
 // (:116-128); the device ceiling by the node's kind (:130-137); an ICD's
 // IdleModeDuration is the default ceiling only when it is at least that
-// device ceiling (:138-140, doc :67-71) — a shorter one gets the device
+// device ceiling (:138-140, doc :68-72) — a shorter one gets the device
 // ceiling with its jitter; an ICD's or the caller's ceiling is kept, at least
 // the floor (:151-157); a default one gets up to max(10 %, 10 s) of jitter,
 // whole seconds (:158-170); at most 65535 s (:171).
