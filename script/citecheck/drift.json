@@ -603,7 +603,7 @@
   },
   {
     "file": "client/handshake/resumption.go",
-    "line": 58,
+    "line": 65,
     "citation": "session/SessionManager.ts:468-480",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "deleteResumptionRecord",
@@ -612,7 +612,7 @@
   },
   {
     "file": "client/handshake/resumption.go",
-    "line": 59,
+    "line": 66,
     "citation": "PeerConnection.ts:681-685",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "NoSharedTrustRoots",
@@ -621,7 +621,7 @@
   },
   {
     "file": "client/handshake/server_test.go",
-    "line": 213,
+    "line": 230,
     "citation": "CaseServer.ts:309",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "InvalidParam",
@@ -630,7 +630,7 @@
   },
   {
     "file": "client/handshake/server_test.go",
-    "line": 384,
+    "line": 401,
     "citation": "SessionManager.ts:205",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "at": "db021da0",
@@ -2355,7 +2355,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 1169,
+    "line": 1181,
     "citation": "packages/protocol/src/session/case/CaseServer.ts:219",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "at": "db021da0",
