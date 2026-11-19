@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -214,21 +215,19 @@ func TestNetworkLossAndDelay(t *testing.T) {
 		t.Fatalf("read with delay and duplicates: %v", err)
 	}
 	site.Net().Set(fabrictest.NetOptions{})
-	dropped := 0
+	// The filter runs for concurrent sends at once, outside the network's
+	// lock (net.go, Network.send): the one drop is claimed atomically.
+	var dropped atomic.Int32
 	site.Net().Filter(func(d fabrictest.Datagram) bool {
-		if dropped == 0 && d.To.String() == p.Device.Addr().String() {
-			dropped++
-			return false
-		}
-		return true
+		return d.To.String() != p.Device.Addr().String() || !dropped.CompareAndSwap(0, 1)
 	})
 	sentBefore := site.Net().Sent()
 	if _, err := fabrictest.Read(ctx, p, label); err != nil {
 		t.Fatalf("read with one datagram dropped: %v", err)
 	}
 	site.Net().Filter(nil)
-	if dropped != 1 || site.Net().Sent()-sentBefore < 3 {
-		t.Fatalf("dropped %d, sent %d", dropped, site.Net().Sent()-sentBefore)
+	if got := dropped.Load(); got != 1 || site.Net().Sent()-sentBefore < 3 {
+		t.Fatalf("dropped %d, sent %d", got, site.Net().Sent()-sentBefore)
 	}
 }
 
