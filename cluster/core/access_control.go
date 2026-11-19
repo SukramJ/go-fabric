@@ -495,12 +495,19 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 	if had {
 		delete(a.extensions, fabricIndex)
 	}
+	// A setting that could not be read at construction is not in memory
+	// but may still be stored: it is cleared as well, or the next
+	// construction loads the dropped fabric's Extension again (review II,
+	// R2-P7-acl-03). Only an entry memory held moves the DataVersion.
+	unread := a.extLoadErr[fabricIndex] != nil
 	delete(a.extLoadErr, fabricIndex)
 	a.mu.Unlock()
-	if !had {
+	if !had && !unread {
 		return nil
 	}
-	a.dataVersion.Bump()
+	if had {
+		a.dataVersion.Bump()
+	}
 	if err := a.persistExtension(ctx, fabricIndex, nil); err != nil {
 		return fmt.Errorf("core: AccessControl: clear the Extension of fabric %d: %w", fabricIndex, err)
 	}
@@ -710,21 +717,22 @@ func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) 
 // holds — one removed while the write was on its way, whose removal's
 // clear has already run: without the check the write would store under a
 // removed index (review II, R2-P6-store-1010, N4-notesE-1). A pending row
-// counts as held. A store that cannot list fabrics, or whose listing
-// fails, refuses nothing. writeMu is held, as by MatterDropFabric.
+// counts as held. A store that cannot list fabrics refuses nothing; a
+// listing that fails refuses the write with FAILURE, as [fabricListed]
+// does (fail closed): the Extension's setting has no tie to the fabric row
+// that would refuse it instead (review II, R2-P7-acl-02). writeMu is held,
+// as by MatterDropFabric.
 func (a *AccessControl) fabricGone(ctx context.Context, fabric uint8, attr string) error {
 	lister, ok := a.store.(fabricLister)
 	if !ok {
 		return nil
 	}
-	recs, err := lister.ListFabrics(ctx)
+	listed, err := fabricListed(ctx, lister, fabric)
 	if err != nil {
-		return nil //nolint:nilerr // no listing, no refusal: the write's own store call decides
+		return storeFailureErr{err: fmt.Errorf("core: AccessControl: %s write for fabric %d: list fabrics: %w", attr, fabric, err)}
 	}
-	for i := range recs {
-		if recs[i].FabricIndex == fabric {
-			return nil
-		}
+	if listed {
+		return nil
 	}
 	return aclStatusError{im.StatusUnsupportedAccess, fmt.Sprintf("%s write for fabric %d, which no longer exists", attr, fabric)}
 }

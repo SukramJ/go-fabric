@@ -59,8 +59,12 @@ func (a *AccessControl) registerAuxiliaryProvider(ctx context.Context, src Auxil
 		// Only a change a request made names a node: a change without one
 		// — GroupKeyManagement's retry of a stale group state, a forget —
 		// neither records a context nor displaces the one a request
-		// recorded (review II, R2-P6-err-1701 R3-1).
-		if _, _, request := im.LookupFabricFilter(changeCtx); batched && request {
+		// recorded (review II, R2-P6-err-1701 R3-1). Nor does a request of
+		// another fabric: GroupKeyManagement reloads every stale fabric
+		// under the context of the command that runs the reload, and that
+		// command's node is no administrator of the changed fabric (review
+		// II, R2-P7-acl-01).
+		if _, f, request := im.LookupFabricFilter(changeCtx); batched && request && f == fabric {
 			if a.auxDeferred == nil {
 				a.auxDeferred = make(map[uint8]context.Context)
 			}
