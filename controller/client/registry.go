@@ -131,20 +131,20 @@ type Registry struct {
 	op sync.Mutex
 
 	// mu guards bound, closed, nextID, nodes and storedAddress.
-	mu    sync.Mutex
-	nodes []*Node
+	mu     sync.Mutex
+	nodes  []*Node
+	bound  map[*Node]func()
+	ops    map[*Node]*fabricOp
+	leaves map[*Node]*leaveLatch
+	nextID int
+	timer  exchange.Timer
+	closed bool
 	// storedAddress is the peer address stored for a node that failed to
 	// load, read from its record's peer address field alone — matter.js
 	// ClientNode.peerAddress, which reads storage when the commissioning
 	// state did not load (ClientNode.ts:387-421 at b25ed960). Only
 	// GetByAddress reads it: such a node is not commissioned.
 	storedAddress map[*Node]PeerAddress
-	bound         map[*Node]func()
-	ops           map[*Node]*fabricOp
-	leaves        map[*Node]*leaveLatch
-	nextID        int
-	timer         exchange.Timer
-	closed        bool
 	// removeFabric, when set, stands between a decommission and its
 	// RemoveFabric invoke: the test seam of matter.js's patchRemoveFabric
 	// (DecommissionTest.ts:48-58 at b25ed960), set only by
