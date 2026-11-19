@@ -70,11 +70,11 @@ func resumptionCapPerFabric(ctx context.Context, t *testing.T, p store.Port) {
 	}
 }
 
-// resumptionCapRespondersOnly (R2-P7-sec-01, decision 270): the cap bounds
-// the records the CASE responder wrote — those a foreign peer can make the
-// node write — and leaves the records the node's own CASE client wrote
-// (ResumptionRecord.Initiator) neither counted nor evicted. The role reads
-// back by peer and by id, and a rewrite by the other role takes its role.
+// resumptionCapRespondersOnly (R2-P7-sec-01, decision 270): the cap of 16
+// bounds the records with Initiator false only; it neither counts nor
+// evicts the records the CASE client wrote (ResumptionRecord.Initiator),
+// which resumptionCapPerRole's bound covers. The role reads back by peer
+// and by id, and a rewrite by the other role takes its role.
 func resumptionCapRespondersOnly(ctx context.Context, t *testing.T, p store.Port) {
 	const clients, responders = 40, 20
 	f := addFabric(ctx, t, p, 1)
