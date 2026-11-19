@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/internal/deepcopy"
@@ -586,12 +587,28 @@ func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) er
 	return nil
 }
 
+// limitCoveringStored is the value for a limit attribute that the stored
+// list does not exceed: a configuration that lowers a limit below what
+// clients already stored raises it, with a notice, and the stored entries
+// stay. Mirrors matter.js ThermostatServer.ts:393-399 at b25ed960
+// (#limitCoveringStored), applied to NumberOfPresets at :298-303.
+func (s *ThermostatServer) limitCoveringStored(name string, limit uint8, required int, found string) uint8 {
+	if required <= int(limit) {
+		return limit
+	}
+	raised := uint8(min(required, math.MaxUint8)) //nolint:gosec // clamped to a uint8
+	s.logger().Info("matter.thermostat.limit_raised",
+		slog.String("attribute", name), slog.Int("configured", int(limit)), slog.String("found", found), slog.Int("raised_to", int(raised)))
+	return raised
+}
+
 // seedPresets is matter.js initialize's preset part
-// (ThermostatServer.ts:134-152) with the validation its commit runs
-// (persistedPresets$Changing with no old value, :1300-1320): the stored
-// presets when the PresetStore has them, else the configured ones —
-// validated as a seed and normalised — saved; then an ActivePresetHandle
-// that matches no preset is cleared with a warning.
+// (ThermostatServer.ts:293-316 at b25ed960) with the validation its commit
+// runs (persistedPresets$Changing with no old value, :1773-1791): the
+// stored presets when the PresetStore has them — NumberOfPresets raised to
+// cover them — else the configured ones — validated as a seed and
+// normalised — saved; then an ActivePresetHandle that matches no preset is
+// cleared with a warning.
 func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 	ctx := context.Background()
 	if v, err := s.inst.CheckValue(tdef.AttrNumberOfPresets, cfg.NumberOfPresets, nil); err != nil {
@@ -618,6 +635,7 @@ func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 				return fmt.Errorf("%w: %w", ErrPresets, err)
 			}
 			active, loaded = bytes.Clone(h), true
+			s.numberOfPresets = s.limitCoveringStored("NumberOfPresets", s.numberOfPresets, len(presets), fmt.Sprintf("%d presets are stored", len(presets)))
 		}
 	}
 	if !loaded {
