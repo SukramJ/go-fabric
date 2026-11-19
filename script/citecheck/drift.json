@@ -593,7 +593,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1296,
+    "line": 1313,
     "citation": "packages/types/src/protocol/definitions/general.ts:33",
     "resolved": "packages/types/src/protocol/definitions/general.ts",
     "at": "b25ed960",
