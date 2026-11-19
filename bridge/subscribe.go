@@ -2218,7 +2218,7 @@ func (b *Bridge) subscribeWith(
 	// the subscription too — a KeepSubscriptions=false request that
 	// replaces it, its session's close.
 	abort := b.primingAbort(subID)
-	defer b.forgetPrimingAbort(subID)
+	defer b.forgetPrimingAbort(subID, abort)
 	leaveSessionOrder(ctx)
 	if err := b.streamPrimingChunks(ctx, abort, src, requestHdr, proto, subID, chunker); err != nil {
 		b.abandonPrimingSubscription(subID)
