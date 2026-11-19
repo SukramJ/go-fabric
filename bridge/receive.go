@@ -1430,8 +1430,8 @@ func (b *Bridge) refuseUnacknowledging(src net.Addr, hdr *message.Header, proto 
 		return nil
 	default:
 		attrs = append(attrs,
-			slog.Uint64("expected_ack", uint64(expected[len(expected)-1])),
-			slog.Uint64("received_ack", uint64(proto.AckCounter)))
+			slog.Uint64("expected", uint64(expected[len(expected)-1])),
+			slog.Uint64("ack_counter", uint64(proto.AckCounter)))
 		b.logger.Debug("matter.rx.incorrect_ack", attrs...)
 		return fmt.Errorf("%w: session=%d exchange=%d expected=%d received=%d", errIncorrectAck, hdr.SessionID, proto.ExchangeID, expected[len(expected)-1], proto.AckCounter)
 	}
