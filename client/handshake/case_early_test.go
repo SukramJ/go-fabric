@@ -96,9 +96,11 @@ func TestCASEInitiatorReceivesTheResponderMessageBeforeSuccess(t *testing.T) {
 						t.Errorf("early send: %v", err)
 					}
 				}()
+				wait, stop := context.WithTimeout(ctx, 5*time.Second)
+				defer stop()
 				select {
 				case <-earlyOnSec:
-				case <-time.After(5 * time.Second):
+				case <-wait.Done():
 					t.Error("the responder's early message did not reach the socket")
 				}
 			})
@@ -113,12 +115,14 @@ func TestCASEInitiatorReceivesTheResponderMessageBeforeSuccess(t *testing.T) {
 		t.Fatal("resumed, want a full handshake")
 	}
 	r.accepted(t)
+	wait, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
 	select {
 	case activated := <-served:
 		if !activated {
 			t.Fatal("the responder's message was served on a session still establishing")
 		}
-	case <-time.After(5 * time.Second):
+	case <-wait.Done():
 		t.Fatalf("the responder's message on session %d, sent before its Success, never reached the initiator's handler", client.ID())
 	}
 }
