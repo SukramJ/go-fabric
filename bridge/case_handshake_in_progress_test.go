@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"fmt"
 	"testing"
 	"time"
 
@@ -75,6 +76,53 @@ func TestMessagesUnderAHandshakeInProgressChangeNothing(t *testing.T) {
 				expectNoHandshakeState(t, c.r.b, "after the success report was acknowledged")
 			}
 		})
+	}
+}
+
+// TestAcknowledgingMessagesUnderAHandshakeInProgressChangeNothing: the
+// messages of TestMessagesUnderAHandshakeInProgressChangeNothing from
+// another sender, when they pass the receive rules — one that acknowledges
+// the Sigma2 (session-0 counters travel in the clear), or one that arrives
+// after the controller's standalone acknowledgement of it — reach the
+// router and are acknowledged and not answered (owner decision 70): the
+// handshake's record stays, and the controller's Sigma3 completes the
+// handshake, through a PerExchangeCaseProvider and through the singleton
+// handler alike (review II, phase 7, Fable's read A3).
+func TestAcknowledgingMessagesUnderAHandshakeInProgressChangeNothing(t *testing.T) {
+	t.Parallel()
+	for _, viaProvider := range []bool{true, false} {
+		for _, opcode := range []uint8{mrp.SCOpcodeSigma1, mrp.SCOpcodeSigma2Resume} {
+			for _, afterAck := range []bool{false, true} {
+				name := fmt.Sprintf("provider=%t opcode=%#x after-standalone-ack=%t", viaProvider, opcode, afterAck)
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+					c := beginCASE(t, newUnsecuredRig(t), clocktest.New(time.Unix(1_700_000_000, 0)), viaProvider)
+					other := c.otherPeer(t)
+					var ack *uint32
+					if afterAck {
+						if err := c.controller.send(mrp.StandaloneAckOpcode, completedCaseExchange, nil, &c.sigma2Counter); err != nil {
+							t.Fatal(err)
+						}
+					} else {
+						ack = &c.sigma2Counter
+					}
+					if err := other.send(opcode, completedCaseExchange, []byte{0x15, 0x18}, ack); err != nil {
+						t.Fatalf("a message that passes the receive rules: %v", err)
+					}
+					c.expectNoReply(t, 0, "a message from another sender")
+					if !c.recordHeld() {
+						t.Fatal("the message from another sender ended the handshake's record")
+					}
+					if err := c.controller.send(mrp.SCOpcodeSigma3, completedCaseExchange, c.sigma3, &c.sigma2Counter); err != nil {
+						t.Fatal(err)
+					}
+					c.expectReport(t, c.controller, mrp.SCStatusGeneralSuccess, "the controller's Sigma3")
+					if got := c.sessions.Load(); got != 1 {
+						t.Fatalf("%d sessions installed, want 1", got)
+					}
+				})
+			}
+		}
 	}
 }
 
