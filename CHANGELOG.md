@@ -23,7 +23,7 @@ pseudo-version of `main`.
 
 - `github.com/SukramJ/go-fabric/im.InvokeResponse.HasCommandData`: nothing calls it, and the rule it encoded (a SuppressResponse invoke is answered when it produced command data) is no longer matter.js's. No replacement; range over `InvokeResponse.Responses` and test `IsStatus`. Removable in `v0.26.0` (decision 313).
 - `github.com/SukramJ/go-fabric/cluster/spec.RequestCheck.Unchecked`: matter.js no longer skips a cluster's request validation and no generated definition states it; a command with its own refusal states `RequestCheck.Refusal`. The gate still honours it for a host-written definition. Removable in `v0.26.0` (coordinator decision C-6).
-- `github.com/SukramJ/go-fabric/client/exchange.Manager.HandlePeerLoss`: two sessions may share a creation time; use `Manager.HandlePeerLossBefore`, which cuts by registration order (pin lift b25ed960, P1-A). No use in openccu-loom (bef849d2), go-ha2fabric (ec7deea), go-fabric-ui (792d15b) or go-fabric-server (d61a545).
+- `github.com/SukramJ/go-fabric/client/exchange.Manager.HandlePeerLoss`: two sessions may share a creation time; use `Manager.HandlePeerLossBefore`, which cuts by registration order; the old method behaves as before. Removable in `v0.26.0` (pin lift b25ed960, P1-A). No use in openccu-loom (bef849d2), go-ha2fabric (ec7deea), go-fabric-ui (792d15b) or go-fabric-server (d61a545).
 
 ### Security
 

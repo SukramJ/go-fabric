@@ -1554,6 +1554,7 @@ func (m *Manager) SessionsFor(peer PeerAddress) []*Session {
 //
 // Deprecated: two sessions may have the same creation time; use
 // [Manager.HandlePeerLossBefore], which cuts by registration order.
+// Removable in v0.26.0.
 // Mirrors matter.js SessionManager.ts:722-735 at b25ed960 (handlePeerShutdown
 // with a Timestamp, which matter.js deprecates) and :832-834, and the
 // equally deprecated PeerLossContext.asOf

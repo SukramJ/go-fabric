@@ -50,10 +50,10 @@ func TestThermostatRequestCheckParityMatterJS(t *testing.T) {
 			// ThermostatServer.MatterInvoke runs the host's handler
 			// (spec.HostHandlers.Invoke) and its own logic without the
 			// request gate (spec.Instance.admitRequest), so the handler
-			// answers mode 3 with INVALID_COMMAND. Open for a decision (pin
-			// lift b25ed960, P1-B): the gate on the self-held servers'
-			// own invoke path.
-			t.Skip("ThermostatServer.MatterInvoke holds no request gate; open decision, pin lift b25ed960 P1-B")
+			// answers mode 3 with INVALID_COMMAND. Owner decision 319: one
+			// central request gate where the bridge decodes by definition,
+			// unit P2-request-gate (finding F-b25ed960-29).
+			t.Skip("ThermostatServer.MatterInvoke holds no request gate; decision 319, P2-request-gate, F-b25ed960-29")
 			if got := raiseLowerOnCoolingThermostat(t, tdef.SetpointRaiseLowerModeEnum(3)); got != im.StatusConstraintError {
 				t.Errorf("status %v, want CONSTRAINT_ERROR", got)
 			}
