@@ -32,6 +32,7 @@ Findings of review II, phase 7.
 - `clock/clocktest`: `Fake.Resolve` measures each step on the advanced reading; after a forward `Fake.StepWall` it measured on the wall reading, every step came out zero, and a wait on a timer never resolved.
 - `bridge`: a message on a secure session's exchange that does not acknowledge the node's earlier reliable message of that exchange, still unacknowledged, is refused on receive — neither processed nor acknowledged (`matter.rx.previous_ack_missing`), as matter.js refuses it (`MessageExchange.ts:521-525` at `db021da0`). Before, a Write or Invoke sent that way — a timed one after a TimedRequest whose StatusResponse the peer had acknowledged only by a standalone ack that was lost — took effect and only its response was refused (review II, phase 7, V3).
 - `bridge`: the end of a priming report no longer drops the abort of the ongoing report that follows it at once, so the subscription's close ends that report's wait for its chunk's answer instead of the chunk timeout (review II, phase 7, R2-P7-req-01).
+- `bridge`: an exchange this node opened and one its peer opened that share an exchange id are kept apart in the retransmission table: a message of one no longer takes the place of the other's unacknowledged message — which lost its retransmissions — and a message given up ends only the BDX exchange it belongs to, not the other role's of the same id (review II, phase 7, R2-P7-req-03, R2-P7-req-04).
 
 ## [0.23.0] — 2026-11-18
 

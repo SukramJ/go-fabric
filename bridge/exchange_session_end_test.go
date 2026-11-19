@@ -301,6 +301,28 @@ func TestRespondedExchangeEndsWhenItsMessageIsGivenUp(t *testing.T) {
 	r.responderEnded(t)
 }
 
+// TestGivenUpInitiatedMessageLeavesTheRespondedExchange (review II,
+// phase 7, R2-P7-req-04): exchange ids are the initiator's, so a message
+// of an exchange this node opened that shares its id with the peer's BDX
+// exchange is given up without ending the peer's exchange.
+func TestGivenUpInitiatedMessageLeavesTheRespondedExchange(t *testing.T) {
+	r := newExchangeSessionRig(t)
+	now := time.Now()
+	tr := newOutboundReliableTracker(nil, nil)
+	tr.trackExchangeMessage(7, r.sid, r.peerXID, true, []byte{0x00}, r.peer.addr, now, 0)
+	tr.mu.Lock()
+	for _, e := range tr.pending {
+		e.retries = mrp.MaxRetransmissions
+	}
+	tr.mu.Unlock()
+	r.dev.br.tickOutboundReliable(tr, now.Add(time.Hour))
+	select {
+	case err := <-r.responder.ended:
+		t.Fatalf("the peer's exchange ended (%v) with a message of this node's exchange of the same id", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
 // TestRespondedExchangeIsNeverStoredUnbound: a peer's first BDX message on a
 // session id the lookup does not hold at the delivery's first look opens no
 // exchange, even when a later look — the peer's resolution — finds a

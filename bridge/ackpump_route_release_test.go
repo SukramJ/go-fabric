@@ -168,8 +168,12 @@ func pendingCounterOfExchange(b *Bridge, sessionID, exchangeID uint16) (uint32, 
 	b.mu.RUnlock()
 	tracker.mu.Lock()
 	defer tracker.mu.Unlock()
-	key, ok := tracker.secureByExchange[secureSlot{sessionID, exchangeID}]
-	return key.counter, ok
+	for key, e := range tracker.pending {
+		if key.sessionID == sessionID && e.exchangeID == exchangeID {
+			return key.counter, true
+		}
+	}
+	return 0, false
 }
 
 // TestSubscribeResponseWaitsForThePrimingReportsAck (review II, hs 4b;
