@@ -59,7 +59,10 @@ import (
 // Pin lift b25ed960 (P0) plans the 20 new upstream test files a unit of the
 // lift owns as a whole (eleven outside packages/node/test/node, nine in it),
 // each entry naming its unit; the other eight new files are excluded: 22.
-const testparityPlannedRatchet = 22
+// Pin lift b25ed960 wave P1 decides two of them in part: ThermostatSuggestionsTest.ts
+// (61 of 91 cases, P1-E) and SessionViewsTest.ts (the controller's seven rows,
+// P1-A): 20.
+const testparityPlannedRatchet = 20
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -169,9 +172,17 @@ const testparityPlannedRatchet = 22
 // ControlSequenceOfOperation cases have no unit yet, findings F-b25ed960-22),
 // and 16 ported files become partial by their new cases or by a case upstream
 // renamed with the opposite outcome: 146 ported, 1218 missing.
+// Pin lift b25ed960 wave P1 (units P1-A … P1-F) ports 61 missing cases net:
+// six files become ported (ValueValidatorTest.ts of node, the two Presets
+// files, ClientStartUpTest.ts, PeersLoadFailureTest.ts,
+// PhysicalDevicePropertiesTest.ts), the two planned files it takes in part
+// add 23 missing cases (ThermostatSuggestionsTest.ts's 13 that wait for
+// decisions 316-318, SessionViewsTest.ts's 10 device-side rows), and the
+// localization files keep five stored-value cases (a port on node) and three
+// TimeFormat starts (decision 315) missing: 152 ported, 1157 missing.
 const (
-	testparityPortedRatchet  = 146
-	testparityMissingRatchet = 1218
+	testparityPortedRatchet  = 152
+	testparityMissingRatchet = 1157
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -237,7 +248,16 @@ const (
 // the mDNS pre-filter and always-emitted keys (BD-Matter-MdnsRelevancePreFilter,
 // BD-mDNS-SAT-AlwaysEmitted) — and removes the two ValueValidatorTest.ts and
 // one ClientNodeTest.ts rows whose cases are gone upstream: 714.
-const testparityLeftRatchet = 714
+// Pin lift b25ed960 wave P1 leaves 31 cases, each with class and reason:
+// ThermostatSuggestionsTest.ts's eight transaction cases (js-runtime-only)
+// and nine by design (BD-Matter-Thermostat-Suggestions-Seams, the
+// whole-second timer by coordinator decision C-10), ThermostatBehaviorTest.ts's
+// six ControlSequenceOfOperation cases (BD-Matter-Thermostat-ControlSequenceFromFeatures,
+// C-3), three configured localization start values refused
+// (BD-Matter-Localization-ConfiguredStartValueRefused), four JavaScript
+// getter and log cases of the localization tests and PresetsConfigurationTest.ts's
+// pre-accessor key (js-runtime-only), moved from missing: 745.
+const testparityLeftRatchet = 745
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by
