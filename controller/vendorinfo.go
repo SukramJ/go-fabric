@@ -14,7 +14,7 @@ import (
 
 // DCLConfig configures the controller's ledger services — matter.js
 // DclBehavior's state (packages/node/src/behavior/system/dcl/DclBehavior.ts:180-206
-// at db021da0): the production ledger's URL and the offline switch, which
+// at b25ed960): the production ledger's URL and the offline switch, which
 // keeps every service off the network.
 type DCLConfig struct {
 	// ProductionURL is the production ledger; "" is dcl.ProductionURL

@@ -5,7 +5,7 @@ package jcm_test
 
 // A port of matter.js
 // packages/node/test/behaviors/operational-credentials/VendorIdVerificationTest.ts
-// at db021da0 (matter.js #4880), by meaning: verification fails for
+// at b25ed960 (matter.js #4880), by meaning: verification fails for
 // certificates the peer sent that do not decode — a repeated or missing
 // subject attribute of the NOC, a repeated one of the RCAC or the VVSC —
 // and for a VVSC that fails its profile (VendorIdVerification.ts:217-256,

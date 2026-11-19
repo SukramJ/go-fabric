@@ -52,7 +52,7 @@ type Properties struct {
 
 // Medium is the part of the properties a peer's network profile is
 // selected by (client/peer.NetworkProfiles.ForPeer, NetworkProfile.ts:184-221
-// at db021da0).
+// at b25ed960).
 func (p Properties) Medium() peer.Medium {
 	m := peer.Medium{
 		SupportsThread: p.SupportsThread, SupportsWifi: p.SupportsWifi, SupportsEthernet: p.SupportsEthernet,

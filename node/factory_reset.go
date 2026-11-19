@@ -172,7 +172,7 @@ func (n *Node) pinFreshUniqueID(ctx context.Context, st store.Settings) error {
 // numbers as a fresh install. Mirrors matter.js
 // packages/node/src/storage/server/ServerNodeStore.ts erase (:137-142),
 // which erases the endpoint stores, and ServerEndpointStores.ts erase
-// (:63-80 at db021da0): storage.clearAll(), a fresh holder map, #nextNumber = 1.
+// (:63-80 at b25ed960): storage.clearAll(), a fresh holder map, #nextNumber = 1.
 func eraseEndpointRecords(ctx context.Context, s endpoint.Store) error {
 	if err := s.EraseEndpoints(ctx); err != nil {
 		return fmt.Errorf("node: factory reset: erase endpoints: %w", err)

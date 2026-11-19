@@ -243,7 +243,7 @@ func (f *outboundFlow) sendBlockEOF(ctx context.Context, b Block) error {
 // (src/protocols/bdx/TransferFacilitator.cpp:61 at 6170af84, where
 // HandleMessageReceived runs in OnMessageReceived) and the end matter.js's
 // processTransfer reaches once finalizeTransfer read that ack
-// (flow/Flow.ts:139-141, flow/OutboundFlow.ts:115-118 at db021da0). The
+// (flow/Flow.ts:139-141, flow/OutboundFlow.ts:115-118 at b25ed960). The
 // transition needs no I/O, so it is complete before the receive path
 // decodes the peer's next datagram: an OTA requestor's ApplyUpdateRequest,
 // sent after its BlockAckEof, finds the update waiting for its apply. Any

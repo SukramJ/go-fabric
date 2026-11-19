@@ -43,8 +43,8 @@ const (
 
 // controllerRoleCases are matter.js's certification cases with its
 // controller as the DUT (support/chip-testing/test/cert at the snapshot's
-// pin, checkMatterJSCertCases; their files are the same at db021da0 as at
-// 862ad75f, where the lines below were read) that the
+// pin, checkMatterJSCertCases; the lines below were read at 862ad75f and
+// hold at b25ed960) that the
 // Go controller does not run as the DUT, each with its class and reason;
 // the DD onboarding-payload cases, TC-ICDM-6.1, TC-ICDB-1.3 run since phase
 // 29b-1 (gocert_dddut_test.go, gocert_icd_test.go), TC-BR-4 since 29b-2
@@ -77,11 +77,11 @@ func pythonDriven(script string) gap {
 // requestorServed is the row of a WEBRTCR case now that the controller
 // serves the WebRtcTransportRequestor (phase 37, controller.Config.Camera):
 // matter.js runs these with chip's camera-app as TH_SERVER and the DUT as
-// the requestor (support/chip-testing/test/cert/tc-webrtcr-support.ts:142-148
-// at db021da0) through the prompt-driven Python runner; that runner is the
+// the requestor (support/chip-testing/test/cert/tc-webrtcr-support.ts:139-145
+// at b25ed960) through the prompt-driven Python runner; that runner is the
 // harness's follow-up, so the gap is the harness's (class (c)).
 func requestorServed(script string) gap {
-	return gap{class: classHarness, reason: "controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:142-148, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (" + script + ")"}
+	return gap{class: classHarness, reason: "controller role, served since phase 37 (controller.Config.Camera): matter.js drives chip's python script with chip-camera-app as TH_SERVER and the DUT as requestor (tc-webrtcr-support.ts:139-145, prompt-driven-python-test.ts:41) — the prompt-driven runner is a follow-up (" + script + ")"}
 }
 
 // gap is one case of a family that is not run, with its class and reason.
@@ -456,8 +456,8 @@ var chipFamilies = []family{
 		// TC-CADMIN-1.6 and 1.16 open Basic windows of
 		// PIXIT.CADMIN.CwDuration seconds. The runner passes 3, as matter.js's
 		// YAML runner does (packages/testing/src/chip/config.ts:102, :130 at
-		// db021da0) for a test node whose minimum window timeout it lowers to
-		// one second (support/chip-testing/src/NodeTestInstance.ts:105); the
+		// b25ed960) for a test node whose minimum window timeout it lowers to
+		// one second (support/chip-testing/src/NodeTestInstance.ts:106); the
 		// daemon keeps the specification's 180 s minimum
 		// (bridge/commissioning_window.go), so these two run with the cases'
 		// own default, 180 (Test_TC_CADMIN_1_6.yaml, Test_TC_CADMIN_1_16.yaml
@@ -1141,7 +1141,7 @@ var chipFamilies = []family{
 	{
 		name: "PAVST", deviceType: dtCamera, variant: variantCamera,
 		exclude: map[string]gap{
-			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at db021da0 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
+			"2.15": {classNotSupported, "TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at b25ed960 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND", false},
 			"2.8":  {classHarness, "TC-PAVST-2.8 step 4 has TH2, a second controller on a fresh fabric commissioned on-network, send FindTransport — a Large Message (\"L\") command, push-av-stream-transport.element.ts:130 at db021da0 — with MRP_PAYLOAD and expects NOT_FOUND (TC_PAVST_2_8.py:179-189, TC_PAVSTTestBase.py:352-368, matter_testing.py:3105 at 6170af84); the module answers INVALID_TRANSPORT_TYPE (0xD1) on a UDP session, as matter.js does (CommandInvokeResponse.ts:281-285). chip's engine carries the same gate (InteractionModelEngine.cpp:1875-1884), inert for its code-driven clusters because its generator drops kLargeMessage (sdk_generator.py:62; PushAvStreamTransport Metadata.h:79-81): chip's camera-app answers NOT_FOUND there (PushAVStreamTransportLogic.cpp:1576-1585) only because that gate is inert. Kept by owner decision 183, notes/parity/by_design.md BD-chip-LargeMessageGateEnforced", false},
 		},
 		// Measured in run 44018148063 (certification families,

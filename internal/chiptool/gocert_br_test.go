@@ -31,9 +31,9 @@ import (
 // support/chip-testing/src/BridgeTestInstance.ts). The DUT is commissioned
 // with its default subscription, as matter.js's cert controller commissions
 // with its sustained wildcard subscription (InProcessControllerAdapter.ts:
-// 2919-2956), and every "the DUT took in" claim reads the controller's own
+// 3131-3168), and every "the DUT took in" claim reads the controller's own
 // image of the node — client.Node.Endpoints and Cluster.Value, matter.js's
-// clientEndpoints and clientAttribute (:1770-1805) — taken before any read,
+// clientEndpoints and clientAttribute (:1799-1834) — taken before any read,
 // because a read feeds that image too (TC-BR-4.test.ts:214-220).
 //
 // matter.js names the TH's endpoints by chip's bridge-app numbers
@@ -45,8 +45,8 @@ import (
 // among them.
 //
 // matter.js also checks the TH's log for each read's AttributePathIB and
-// the On command's CommandDataIB (expectAttributePathIB, tc-support.ts:973;
-// expectCommandInvoke :1213; LOG_TIMEOUT 15 s :64); the daemon logs both at
+// the On command's CommandDataIB (expectAttributePathIB, tc-support.ts:996;
+// expectCommandInvoke :1236; LOG_TIMEOUT 15 s :65); the daemon logs both at
 // debug level (bridge's matter.rx.im.read_path and matter.rx.im.invoke), so
 // the same checks run on its log.
 
@@ -61,7 +61,7 @@ const (
 	brNoticeWait = 20 * time.Second
 	// brPoll is the poll of the DUT's image while it waits (POLL_MS, :111).
 	brPoll = 100 * time.Millisecond
-	// brLogTimeout is LOG_TIMEOUT (tc-support.ts:64).
+	// brLogTimeout is LOG_TIMEOUT (tc-support.ts:65).
 	brLogTimeout = 15 * time.Second
 	// brOneDegree is one warming (ONE_DEGREE, :102).
 	brOneDegree = 100
@@ -196,7 +196,7 @@ func (r *brRun) discover(th *goTH) error {
 // --- the DUT's image (clientEndpoints / clientAttribute) --------------------
 
 // heldEndpoints are the endpoint numbers the DUT holds for the TH
-// (clientEndpoints, InProcessControllerAdapter.ts:1770-1789).
+// (clientEndpoints, InProcessControllerAdapter.ts:1799-1818).
 func heldEndpoints(n *client.Node) []uint16 {
 	eps := n.Endpoints()
 	out := make([]uint16, 0, len(eps))
@@ -299,7 +299,7 @@ type brRead struct{ r *client.Report }
 
 // readEveryEndpoint is readEveryEndpoint (:173-194): one read of
 // cluster/attribute with a wildcard endpoint, and the TH's log of the
-// AttributePathIB it received (expectAttributePathIB, tc-support.ts:973),
+// AttributePathIB it received (expectAttributePathIB, tc-support.ts:996),
 // the daemon's matter.rx.im.read_path at debug level.
 func (r *brRun) readEveryEndpoint(th *goTH, what string, cluster, attr uint32) (brRead, error) {
 	from := mark(th)
@@ -753,7 +753,7 @@ func (r *brRun) step3d(th *goTH) error {
 
 // step3e: the TH removes LIGHT_1; it leaves the DUT's image on the
 // subscription alone — the root's parts list no longer names it, so the
-// image erases it (ClientStructure.ts:1076-1145; controller/client
+// image erases it (ClientStructure.ts:1076-1145 at db021da0; controller/client
 // structure.go synchronizePartsList) —, and the root and the aggregator no longer name
 // it (:858-897).
 func (r *brRun) step3e(th *goTH) error {

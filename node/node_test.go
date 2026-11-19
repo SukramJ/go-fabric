@@ -522,7 +522,7 @@ func TestConfigValidate(t *testing.T) {
 // TestEmptyNodeLabelIsTheProductName: a node configured without a
 // NodeLabel starts and serves its ProductName as the NodeLabel. Mirrors
 // matter.js packages/node/src/behaviors/basic-information/
-// BasicInformationServer.ts:68 at db021da0 — setDefault("nodeLabel",
+// BasicInformationServer.ts:68 at b25ed960 — setDefault("nodeLabel",
 // state.productName).
 func TestEmptyNodeLabelIsTheProductName(t *testing.T) {
 	t.Parallel()
@@ -736,7 +736,7 @@ func TestAggregatorConcurrentAdds(t *testing.T) {
 
 // TestStartFailureLeavesTheNodeStartable: a Start that fails — its UDP
 // port held by another socket — leaves the node startable, as matter.js's
-// Node.start does (packages/node/src/node/Node.ts:113-128 at db021da0:
+// Node.start does (packages/node/src/node/Node.ts:113-128 at b25ed960:
 // the target state back to "offline", the error rethrown): the store New
 // opened stays usable, the Aggregator takes a device, and once the port
 // is free the second Start succeeds; an explicit Stop then makes a later

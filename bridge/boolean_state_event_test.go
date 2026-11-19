@@ -146,7 +146,7 @@ func (*fakeOccupancy) MatterMeasurementClass() contract.MeasurementClass {
 
 // TestOccupancyChangedEvent ports matter.js
 // packages/node/test/behaviors/occupancy-sensing/OccupancySensingServerTest.ts:33-54
-// at db021da0 on the measurement-projected server: with the OccupancyEvent
+// at b25ed960 on the measurement-projected server: with the OccupancyEvent
 // feature an Occupancy change emits OccupancyChanged (event 0x00) carrying
 // the new bitmap; a notification that does not change it emits nothing;
 // a selection without the feature emits nothing.

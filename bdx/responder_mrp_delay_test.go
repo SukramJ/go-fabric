@@ -33,7 +33,7 @@ func (p *delayPipe) got() *time.Duration {
 
 // The responder sets the scope's additionalMrpDelay, else its own default,
 // as the exchange's peerAdditionalMrpDelay before it answers the Init
-// (matter.js BdxProtocol.ts:139-142 at db021da0); without either the
+// (matter.js BdxProtocol.ts:139-142 at b25ed960); without either the
 // exchange keeps its own.
 func TestResponder_SetsTheExchangeMrpDelay(t *testing.T) {
 	t.Parallel()

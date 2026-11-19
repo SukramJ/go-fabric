@@ -86,7 +86,7 @@ type Options struct {
 	CAT []uint32
 	// DeviceCAT are the CASE Authenticated Tags the commissioner puts into
 	// the device's NOC (matter.js CaseSessionCatsTest.ts "with CATs in the
-	// device NOC" at db021da0); nil for none, the usual device.
+	// device NOC" at b25ed960); nil for none, the usual device.
 	DeviceCAT []uint32
 	// AdminSubject has no effect: AddNOC's CaseAdminSubject is
 	// ControllerNodeID, the fabric's root node id, as matter.js's

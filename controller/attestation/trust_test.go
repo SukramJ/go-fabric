@@ -42,7 +42,7 @@ func TestTrustModes(t *testing.T) {
 		t.Fatal("Development misses the test roots")
 	}
 	// The test CD signer is built in and trusted while test certificates
-	// are (CdSigners.ts:76-83 at db021da0), so no store lists it.
+	// are (CdSigners.ts:76-83 at b25ed960), so no store lists it.
 	if s, ok := attestation.KnownCDSigner(secattestation.TestCMSSignerSKID); !ok || !s.IsTestSigner {
 		t.Fatal("the test CD signer is not built in")
 	}

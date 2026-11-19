@@ -10,7 +10,7 @@ import (
 
 // ErrInvalidVVSC is a Vendor ID Verification Signer Certificate that
 // fails its profile — matter.js's CertificateError of
-// packages/protocol/src/certificate/kinds/Vvsc.ts at db021da0.
+// packages/protocol/src/certificate/kinds/Vvsc.ts at b25ed960.
 var ErrInvalidVVSC = errors.New("mattercert: VVSC profile violated")
 
 // DecodeVVSC decodes a VVSC from its Matter TLV form and checks its
@@ -43,7 +43,7 @@ func DecodeVVSC(raw []byte) (*Certificate, error) {
 // so a decoded certificate changed afterwards is checked as changed, as
 // Vvsc.verify reads its cert. The chain of a VVSC is not verified, as
 // matter.js does not ("TODO Verify the VVSC chain", Vvsc.ts:43). Mirrors
-// matter.js Vvsc.ts at db021da0 (matter.js #4880).
+// matter.js Vvsc.ts at b25ed960 (matter.js #4880).
 func ValidateVVSC(c *Certificate) error {
 	if c == nil {
 		return fmt.Errorf("%w: nil certificate", ErrInvalidVVSC)
@@ -89,7 +89,7 @@ func ValidateVVSC(c *Certificate) error {
 // P-256) signed the VVSC c — the one step of the VVSC path the verifier of
 // a VID Verification Statement takes against a trust anchor of the vendor
 // (Matter Core §6.4.10.1, the text matter.js quotes at
-// VendorIdVerification.ts:233-240 at db021da0, where the path check is
+// VendorIdVerification.ts:233-240 at b25ed960, where the path check is
 // still a TODO). The signature covers the X.509 DER TBSCertificate, as
 // for every operational certificate (matter.js Certificate.verify).
 func VerifyVVSCIssuedBy(c *Certificate, issuerPublicKey []byte) error {

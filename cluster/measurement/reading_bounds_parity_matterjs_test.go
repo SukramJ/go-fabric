@@ -24,7 +24,7 @@ func (floatReading) MatterMeasurementClass() contract.MeasurementClass {
 // reading outside the advertised range reads as its bound, so MeasuredValue
 // meets its "minMeasuredValue to maxMeasuredValue" constraint
 // (pressure-measurement.element.ts:24-25, concentration-measurement.element.ts:32-33
-// at db021da0; W3-club1-08).
+// at b25ed960; W3-club1-08).
 func TestReadingBoundsParity(t *testing.T) {
 	t.Parallel()
 	servers := map[string]func(contract.FloatMeasurementSource) interface{ MatterRead(uint32) (any, bool) }{

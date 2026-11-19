@@ -21,7 +21,7 @@ import (
 // declare them; the type's own list does not name them.
 //
 // Mirrors matter.js packages/model/src/standard/elements/base.element.ts:46-47
-// at db021da0 (`Requirement({ name: "FixedLabel", id: 0x40, conformance:
+// at b25ed960 (`Requirement({ name: "FixedLabel", id: 0x40, conformance:
 // "O", element: "serverCluster" })`, UserLabel likewise): the Base
 // requirements apply to every endpoint that lists a device type
 // (ModelLookups.baseDeviceTypes; schema.BaseDeviceTypes). Read from the
@@ -69,7 +69,7 @@ func withBaseOptional(t *Type, s *settings) *Type {
 // ConditionBridgedPowerSourceInfo is the Base device type's condition a
 // bridged device states when it carries power-source information
 // (matter.js packages/model/src/standard/elements/base.element.ts:40 at
-// db021da0, `Condition({ name: "BridgedPowerSourceInfo" })`). The kit
+// b25ed960, `Condition({ name: "BridgedPowerSourceInfo" })`). The kit
 // states it for a device whose declarations mount PowerSource through the
 // BridgedNode rule ([withBridgedPowerSource]).
 const ConditionBridgedPowerSourceInfo = "BridgedPowerSourceInfo"
@@ -83,11 +83,11 @@ const ConditionBridgedPowerSourceInfo = "BridgedPowerSourceInfo"
 // them; the type's own list does not name them. Under the condition both
 // are mandatory: a trailing "D" announces a future deprecation and the
 // terms before it decide (matter.js packages/model/src/aspects/Conformance.ts:937-940
-// at db021da0), so the device-type validator demands
+// at b25ed960), so the device-type validator demands
 // PowerSourceConfiguration wherever the condition holds.
 //
 // Mirrors matter.js packages/model/src/standard/elements/bridged-node.element.ts:22-23
-// at db021da0. Read from the generated BridgedNode type, not hand-coded.
+// at b25ed960. Read from the generated BridgedNode type, not hand-coded.
 var bridgedPowerSourceServers = sync.OnceValue(func() []ClusterRequirement {
 	var out []ClusterRequirement
 	for _, r := range typeBridgedNode.Servers {

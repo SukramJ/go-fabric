@@ -78,7 +78,7 @@ type structure struct {
 	// recordedFabricFiltered is the fabric filter the cache records, nil
 	// before one is recorded — ClientNodeStore.cacheFabricFiltered
 	// (packages/node/src/storage/client/ClientNodeStore.ts:80-97 at
-	// db021da0); [structure.cacheFabricFiltered] reads it.
+	// b25ed960); [structure.cacheFabricFiltered] reads it.
 	recordedFabricFiltered *bool
 	// epoch is the epoch an interaction starting now belongs to
 	// (ClientStructure.ts:128, :335-341).

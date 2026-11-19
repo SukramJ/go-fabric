@@ -53,7 +53,7 @@ type EventData struct {
 	// carried no timestamp, or carried a delta and the event before it has
 	// no absolute time on the same clock. Mirrors matter.js
 	// ReadResult.EventValue.resolvedTimestamp (ReadResult.ts:78-88 at
-	// db021da0).
+	// b25ed960).
 	ResolvedTimestamp *uint64
 	// The four timestamps as the event carried them, nil when absent.
 	EpochTimestamp       *uint64
@@ -401,7 +401,7 @@ func (a *assembler) emitEvents(rd *im.ReportData) {
 		ev := &rd.EventReports[i]
 		// An entry with neither data nor a status (Received nil) is
 		// skipped without touching the chain, as matter.js yields nothing
-		// for it (InputChunk.ts:341-351 at db021da0); its missing path
+		// for it (InputChunk.ts:341-351 at b25ed960); its missing path
 		// drops it below.
 		var resolved *uint64
 		if !ev.IsStatus && ev.Received != nil {
@@ -468,7 +468,7 @@ const (
 // before it in the same message and starts each message with an absolute
 // timestamp, so a chain never spans messages." Mirrors matter.js
 // EventTimestampChain (packages/protocol/src/action/client/InputChunk.ts:360-405
-// at db021da0, matter.js #4832); the sum wraps where matter.js's Number
+// at b25ed960, matter.js #4832); the sum wraps where matter.js's Number
 // arithmetic loses precision, both far beyond any real clock.
 type eventTimestampChain struct {
 	clock eventClock // 0: no prior absolute time

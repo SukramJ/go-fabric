@@ -2,7 +2,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 124,
+    "line": 134,
     "citation": "camera-controller.ts:133",
     "at": "0bd06f2",
     "error": "file not found"
@@ -10,7 +10,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 137,
+    "line": 147,
     "citation": "NetworkClient.ts:35",
     "at": "0bd06f22",
     "error": "file not found"
@@ -18,7 +18,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 138,
+    "line": 148,
     "citation": "ClientEventEmitter.ts:45-74",
     "at": "0bd06f22",
     "error": "file not found"
@@ -26,7 +26,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 139,
+    "line": 149,
     "citation": "LogDestination.ts:77-91",
     "at": "0bd06f22",
     "error": "file not found"
@@ -34,7 +34,7 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 144,
+    "line": 154,
     "citation": "PeerSet.ts:218",
     "at": "0bd06f2",
     "error": "file not found"
@@ -42,44 +42,44 @@
   {
     "file": "notes/parity/by_design.md",
     "tree": "matterjs-server",
-    "line": 144,
+    "line": 154,
     "citation": "SessionManager.ts:376",
     "at": "0bd06f2",
     "error": "file not found"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1053,
+    "line": 1064,
     "citation": "packages/protocol/src/interaction/SubscriptionHandler.ts:284",
     "error": "file not found"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1081,
+    "line": 1092,
     "citation": "element.ts:568-573",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1082,
+    "line": 1093,
     "citation": "element.ts:568-573",
     "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1259,
+    "line": 1270,
     "citation": "aggregator.ts:62",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 2788,
+    "line": 2799,
     "citation": "endpoints/bridged-node.ts:39-73",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4475,
+    "line": 4533,
     "citation": "BleScanner.ts:46-52",
     "at": "862ad75f",
     "error": "ambiguous"
@@ -100,14 +100,8 @@
   },
   {
     "file": "notes/parity/matter_behaviour_findings.md",
-    "line": 491,
+    "line": 523,
     "citation": "ValueValidatorTest.ts:478-480",
     "error": "ambiguous"
-  },
-  {
-    "file": "notes/parity/pin-lifts.md",
-    "line": 83,
-    "citation": "PeerExchangeProvider.ts:19-159",
-    "error": "line beyond end of file"
   }
 ]

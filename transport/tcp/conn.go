@@ -123,7 +123,7 @@ func newConn(nc net.Conn, maxPayloadSize int, incoming bool, logger *slog.Logger
 // Send frames msg with its 4-byte little-endian length and writes it.
 // Returns [ErrMessageTooLarge] above [Conn.MaxMessageSize] and
 // [ErrConnClosed] after the connection closed. Mirrors matter.js
-// TcpChannel.ts:110-126 send at db021da0.
+// TcpChannel.ts:110-126 send at b25ed960.
 //
 // The write is bounded by an absolute deadline: a frame not handed to the
 // socket within 30 s of the Send (a peer that stopped reading, its receive

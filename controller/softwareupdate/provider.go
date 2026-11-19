@@ -74,7 +74,8 @@ func peerOf(p mattercore.OTAPeer) Peer { return Peer{FabricIndex: p.FabricIndex,
 type providerPorts struct{ m *Manager }
 
 // QueryImage implements mattercore.OTAImageSource: checkUpdateAvailable
-// (OtaSoftwareUpdateProviderServer.ts:519-528) over [Manager.UpdateExistsFor].
+// (OtaSoftwareUpdateProviderServer.ts:519-528 at db021da0) over
+// [Manager.UpdateExistsFor].
 func (s providerPorts) QueryImage(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest) (mattercore.OTAImage, bool, error) {
 	d, ok := s.m.UpdateExistsFor(ctx, peerOf(p), req)
 	if !ok {

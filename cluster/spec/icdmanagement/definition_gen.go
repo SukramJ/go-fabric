@@ -238,7 +238,7 @@ func (v *RegisterClientRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(0, "CheckInNodeId", true, &v.CheckInNodeId, spec.DecodeUint[uint64](64)),
 		spec.Bind(1, "MonitoredSubject", true, &v.MonitoredSubject, spec.DecodeUint[uint64](64)),
 		spec.Bind(2, "Key", true, &v.Key, spec.DecodeBytesIn(16, 16)),
-		// VerificationKey: the constraint "16" is the server's to judge (matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at db021da0).
+		// VerificationKey: the constraint "16" is the server's to judge (matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at b25ed960).
 		spec.Bind(3, "VerificationKey", false, &v.VerificationKey, spec.DecodeOptional(spec.DecodeBytes)),
 		spec.Bind(4, "ClientType", true, &v.ClientType, spec.DecodeUint[ClientTypeEnum](8)),
 	)
@@ -316,7 +316,7 @@ func (v UnregisterClientRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 func (v *UnregisterClientRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "UnregisterClient",
 		spec.Bind(0, "CheckInNodeId", true, &v.CheckInNodeId, spec.DecodeUint[uint64](64)),
-		// VerificationKey: the constraint "16" is the server's to judge (matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at db021da0).
+		// VerificationKey: the constraint "16" is the server's to judge (matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at b25ed960).
 		spec.Bind(1, "VerificationKey", false, &v.VerificationKey, spec.DecodeOptional(spec.DecodeBytes)),
 	)
 }
@@ -516,7 +516,7 @@ var Definition = &spec.Cluster{
 				{ID: 0, Name: "CheckInNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 1, Name: "MonitoredSubject", Type: spec.Type{Name: "subject-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 2, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
-				{ID: 3, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at db021da0"},
+				{ID: 3, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at b25ed960"},
 				{ID: 4, Name: "ClientType", Type: spec.Type{Name: "ClientTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: ClientTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 			},
 			Decode: decodeRegisterClientRequest,
@@ -537,7 +537,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Fabric: "F"},
 			Fields: []spec.Field{
 				{ID: 0, Name: "CheckInNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at db021da0"},
+				{ID: 1, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at b25ed960"},
 			},
 			Decode: decodeUnregisterClientRequest,
 		},

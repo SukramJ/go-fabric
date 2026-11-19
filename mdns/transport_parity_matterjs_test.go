@@ -50,7 +50,7 @@ func (h logRecorder) at(level slog.Level) []string {
 }
 
 // TestMdnsServerTransportNotices ports the remaining cases of matter.js
-// packages/protocol/test/mdns/MdnsServerTransportTest.ts at db021da0 by
+// packages/protocol/test/mdns/MdnsServerTransportTest.ts at b25ed960 by
 // meaning, on the fake wire: the once-per-outage notice of a missed
 // multicast — Info here, matter.js's logger.notice — the deferred answer of
 // the one-second rule, the per-datagram reach of a split message, a send

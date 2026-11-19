@@ -1,0 +1,11 @@
+# Rows of the Ahead-of-matter.js register (notes/parity/by_design.md) that
+# matter.js caught up with at a pin lift, open until the pin-lift unit that
+# reconciles the two implementations closes them. One line per row:
+#   <entry> <pin sha> <unit>
+# For a listed row script/aheadcheck requires the marker to be gone at the
+# pin; a line whose sha is not the current pin's is a finding, so a row may
+# not ride across another lift. The closing unit removes its line together
+# with the row.
+BD-chip-Thermostat-Suggestions b25ed960 P1-E
+BD-chip-Commissioner-CsrNonceEchoed b25ed960 P2-D
+BD-chip-EnergyReporting-FakeReadings b25ed960 P3-E

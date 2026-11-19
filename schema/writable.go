@@ -5,12 +5,12 @@ package schema
 
 // The read-only-attribute write gate. matter.js gives every attribute its
 // limits from the model's effective access and quality
-// (packages/protocol/src/action/server/AccessControl.ts:523 at db021da0):
+// (packages/protocol/src/action/server/AccessControl.ts:523 at b25ed960):
 //
 //	writable: access.writable && !fixed,
 //
 // where access.writable is an rw other than "R"
-// (packages/model/src/aspects/Access.ts:44-46 at db021da0: "RW" and the
+// (packages/model/src/aspects/Access.ts:44-46 at b25ed960: "RW" and the
 // optional-write "R[W]" are writable, "R" and no rw are not). A remote write
 // to an attribute that is not writable is answered before any behaviour
 // runs, before the write privilege and before the DataVersion
@@ -42,7 +42,7 @@ package schema
 // them once for every cluster, each "R V"
 // (packages/model/src/standard/elements/generated-command-list.element.ts:14,
 // accepted-command-list.element.ts:14, attribute-list.element.ts:13,
-// feature-map.element.ts:13, cluster-revision.element.ts:13 at db021da0) but
+// feature-map.element.ts:13, cluster-revision.element.ts:13 at b25ed960) but
 // the deprecated EventList, which states no access
 // (event-list.element.ts:12) and is therefore not writable either
 // (Access.ts:44-46, `!!this.rw`).

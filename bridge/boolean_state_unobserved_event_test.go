@@ -57,7 +57,7 @@ func (s *observedContact) set(value, observed bool) {
 // included — emits the event. matter.js emits StateChange on
 // stateValue$Changed, a change of a value the application set
 // (packages/node/src/behaviors/boolean-state/BooleanStateServer.ts:20-28 at
-// db021da0); an unobserved source sets none. The same rule as
+// b25ed960); an unobserved source sets none. The same rule as
 // OccupancyChanged's (TestOccupancyChangedEventFollowsObservedReadings).
 func TestBooleanStateChangeEventFollowsObservedReadings(t *testing.T) {
 	t.Parallel()

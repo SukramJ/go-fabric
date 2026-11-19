@@ -24,8 +24,8 @@ import (
 // commands the TS's DUT sends and reads what it reads, and the daemon
 // answers as the TS's TH device does.
 //
-// These ports were read at the snapshot pin db021da0, not at
-// [goCertReadAt]: every TS line cited below is that commit's.
+// These ports were read at [goCertReadAt], the snapshot pin b25ed960:
+// every TS line cited below is that commit's.
 //
 // What the TS checks on the TH's side — its log showing the command's
 // exact payload (tc-support.ts sendCommand, expectCommandPayload) or the
@@ -246,8 +246,8 @@ func caseCC54() goCertCase {
 // the TS's TH light is the one at COLOR_CONTROL_ENDPOINT
 // (tc-cc-support.ts:35-36), whose ColorControl declares every feature —
 // HueSaturation, EnhancedHue, ColorLoop, XY and ColorTemperature in
-// matter.js's all-clusters TH (support/chip-testing/src/AllClustersTestInstance.ts:465-471
-// at db021da0), FeatureMap 0x1F in chip's (all-clusters-app.matter:8886 at
+// matter.js's all-clusters TH (support/chip-testing/src/AllClustersTestInstance.ts:467-473
+// at b25ed960), FeatureMap 0x1F in chip's (all-clusters-app.matter:8886 at
 // 6170af84) — the light every other CC port lands on.
 func caseCC64() goCertCase {
 	c := &ccClient{}
@@ -366,7 +366,7 @@ func caseCC94() goCertCase {
 			{n: "2d", line: 64, title: "read ColorLoopStartEnhancedHue", pics: "CC.C.A4005", run: c.reads(ccColorLoopStartEnhancedHue)},
 			{n: "2e", line: 70, title: "EnhancedCurrentHue every 5 s over 30 s", pics: "CC.C.A4000", run: func(th *goTH) error {
 				// :73-81: the read-th read at start + read*5 s
-				// (sleepUntil, tc-support.ts:2854-2858).
+				// (sleepUntil, tc-support.ts:2877-2881).
 				start := time.Now()
 				var got []string
 				for read := 1; read <= hueReads; read++ {

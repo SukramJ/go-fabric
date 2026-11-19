@@ -253,8 +253,8 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 	// controller's IM StatusResponse answers a report we initiated. The
 	// pump stamps the flag verbatim, and a StandaloneAck that does not
 	// invert the peer's flag is discarded as unsolicited (chip
-	// src/messaging/ExchangeContext.cpp:384, matter.js
-	// packages/protocol/src/protocol/ExchangeManager.ts:324), leaving
+	// src/messaging/ExchangeContext.cpp:384; matter.js states the role rule
+	// at packages/protocol/src/protocol/MessageExchange.ts:218-233), leaving
 	// the peer to retransmit until its cap fires.
 	tracker.Owe(hdr.MessageCounter, hdr.SessionID, proto.ExchangeID, !proto.Initiator, b.clk().Now())
 	b.routing.ackRouteMu.Unlock()

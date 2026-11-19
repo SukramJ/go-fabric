@@ -14,7 +14,7 @@ import (
 )
 
 // The DER reading of a CRL as matter.js does it: its DerCodec
-// (packages/general/src/codec/DerCodec.ts at db021da0) and
+// (packages/general/src/codec/DerCodec.ts at b25ed960) and
 // DclCertificateService.parseCrl (DclCertificateService.ts:1900-2113).
 // crypto/x509's ParseRevocationList reads differently — it neither reports
 // an unknown critical extension nor an Issuing Distribution Point URI —

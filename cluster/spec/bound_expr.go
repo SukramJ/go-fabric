@@ -79,7 +79,7 @@ func parseBoundNode(raw json.RawMessage) *boundExpr {
 // evalBound computes an expression against the sibling attributes; ok is
 // false when it has no number — an operand that does not resolve, a
 // function without a numeric argument, an opaque node. Mirrors matter.js
-// packages/model/src/aspects/Constraint.ts:969-1096 at db021da0
+// packages/model/src/aspects/Constraint.ts:969-1096 at b25ed960
 // (evaluate): "+", "-" and "*" of two numbers, "/" of two numbers, "^" as
 // -(|a|^b) for a negative base, maxOf / minOf over the numeric arguments
 // only (Constraint.ts:14-36, Functions.extreme), a reference resolved by

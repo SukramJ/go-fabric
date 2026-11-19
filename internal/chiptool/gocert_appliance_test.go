@@ -22,12 +22,13 @@ import (
 
 // The appliance cases: matter.js's TS files whose DUT is a ModeSelect,
 // Thermostat, WindowCovering or DoorLock client, read mirrored onto the
-// reference daemon's servers. Their line citations were read at the
-// snapshot's pin, db021da0 (not at goCertReadAt).
+// reference daemon's servers. Their line citations were read at
+// [goCertReadAt], the snapshot's pin b25ed960 — TC-DRLK-3.2's at its own
+// readAt, db021da0.
 //
 // Each TS step sends one command through tc-support.ts sendCommand
-// (:1802-1815): the invoke must succeed, a response that carries a Status
-// field must carry 0 (invokeWithResponseChecks :1610-1661), and the TH's
+// (:1825-1838): the invoke must succeed, a response that carries a Status
+// field must carry 0 (invokeWithResponseChecks :1633-1684), and the TH's
 // log must show the request's payload (expectCommandPayload). The port
 // holds the first two; the third is the TH device's own log of what it
 // received, which the mirrored direction has no equivalent of — the Go TH
@@ -45,7 +46,7 @@ func init() {
 
 // commandSucceeds invokes a command and, where the response carries a
 // Status field, holds it to 0 — invokeWithResponseChecks
-// (tc-support.ts:1640-1659), which finds the field by name; statusTag is
+// (tc-support.ts:1663-1682), which finds the field by name; statusTag is
 // its context tag in the generated response type, -1 for a response
 // without one. A command whose model is timed goes as a timed invoke with
 // a 2 s timeout (TC-DRLK-3.2.test.ts:59, :69).
@@ -332,6 +333,10 @@ func caseDRLK32() goCertCase {
 	}
 	return goCertCase{
 		tc: "TC-DRLK-3.2", line: 80, pics: []string{"DRLK.C"}, at: "DRLK.S",
+		// At b25ed960 steps 7-9 gate on DRLK.C.F0a and steps 10-12 on DRLK.C.F0b
+		// instead of F04 (TC-DRLK-3.2.test.ts:126, :136-171), which the port does
+		// not mirror yet; the daemon declares F04, F0a and F0b 0, so they skip either way.
+		readAt: "db021da0",
 		steps: []goStep{
 			{n: "0", line: 81, title: "commission TH to DUT", run: func(th *goTH) error {
 				var err error

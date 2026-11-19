@@ -41,7 +41,7 @@ var ErrUnbalanced = errors.New("spec: TLV container not closed")
 // ErrArrayElementTag is returned for an array that holds an element with a
 // tag: the elements of a TLV array are anonymous. Both references refuse
 // such an array when they read it — matter.js packages/types/src/tlv/
-// TlvArray.ts:77-78 at db021da0 ("Array element tags should be
+// TlvArray.ts:77-78 at b25ed960 ("Array element tags should be
 // anonymous."), connectedhomeip src/lib/core/TLVReader.cpp:873-875 at
 // 6170af84 (CHIP_ERROR_INVALID_TLV_TAG).
 var ErrArrayElementTag = errors.New("spec: TLV array element with a tag")
@@ -98,7 +98,7 @@ func ReadElement(dec *tlv.Decoder) (Node, error) {
 // a structure belongs, a TLV list where an array belongs. A write path
 // tells it apart from a value of the right type that fails its constraint
 // with errors.Is: matter.js throws UnexpectedDataError for it, not a
-// status error (TlvNumber.ts:124-131, TlvObject.ts:205-207 at db021da0).
+// status error (TlvNumber.ts:124-131, TlvObject.ts:205-207 at b25ed960).
 var ErrWrongType = errors.New("spec: value of another type than its field's")
 
 // FieldError rejects a payload with an IM status. The payload's container
@@ -298,7 +298,7 @@ func DecodeListIn[T any](entry Decoder[T], lo, hi int) Decoder[[]T] {
 	return func(n Node) ([]T, error) {
 		// A list is a TLV array: a TLV list (0x17) is another type, as
 		// matter.js's TlvArray refuses every type but an array
-		// (packages/types/src/tlv/TlvArray.ts:73-74 at db021da0).
+		// (packages/types/src/tlv/TlvArray.ts:73-74 at b25ed960).
 		if n.El.Type != tlv.TypeArray {
 			return nil, wrongType("value is not a list (type 0x%02X)", n.El.Type)
 		}
@@ -396,7 +396,7 @@ func Bind[T any](id uint32, name string, mandatory bool, dst *T, d Decoder[T]) F
 // mandatory field that is absent rejected. A field whose tag occurs twice
 // is decoded twice and the last one wins, as matter.js's TlvObject decodes
 // it (a repeat throws only with preserveDataOrdering,
-// packages/types/src/tlv/TlvObject.ts:229-232 at db021da0; review II,
+// packages/types/src/tlv/TlvObject.ts:229-232 at b25ed960; review II,
 // R2-P6-wire-1313).
 func DecodeFields(n Node, what string, fields ...FieldSpec) error {
 	if n.El.Type != tlv.TypeStructure {

@@ -21,7 +21,7 @@ import (
 // attribute as it was, where it used to be masked into another valid
 // value; a value of another type is INVALID_ACTION — matter.js
 // packages/types/src/tlv/TlvNumber.ts:145-156 and
-// packages/types/src/common/ValidationError.ts:35-38 at db021da0
+// packages/types/src/common/ValidationError.ts:35-38 at b25ed960
 // (W3-clucore-04).
 func TestParityMatterJS_IdentifyTimeBounds(t *testing.T) {
 	t.Parallel()

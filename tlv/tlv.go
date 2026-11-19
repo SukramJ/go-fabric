@@ -206,7 +206,7 @@ var (
 	// nullable-uint8 sentinel. Encode null via [Encoder.PutNull] instead.
 	//
 	// Mirrors matter.js packages/types/src/tlv/TlvNullable.ts:37-44 at
-	// db021da0 — NullableSchema shrinks the max of UInt8 from 0xFF to
+	// b25ed960 — NullableSchema shrinks the max of UInt8 from 0xFF to
 	// 0xFE so that 0xFF is reserved as the null-sentinel wire value.
 	ErrUint8NullableSentinel = errors.New("tlv: uint8 nullable sentinel value")
 

@@ -124,7 +124,7 @@ func (f Field) Typed() bool { return f.f != nil }
 // be there, except in a command's fields ([CommandField]), where a
 // mandatory member left out takes the specification's fallback as
 // matter.js's MandatoryDefaultValue computes it
-// (packages/model/src/logic/SelectDefaultValue.ts:79-138 at db021da0): null
+// (packages/model/src/logic/SelectDefaultValue.ts:79-138 at b25ed960): null
 // when nullable, 0 for a number or bitmap, false, "", empty bytes, an empty
 // list, a struct of its members' fallbacks; an enum has none and stays
 // required — so {"level": 128, "transitionTime": 10} is a
@@ -232,7 +232,7 @@ func hasMember(m map[string]any, f *spec.Field) bool {
 
 // mandatoryFallback is the value a mandatory member left out of a
 // command's fields takes, in the form spec.EncodeJSON reads — matter.js
-// MandatoryDefaultValue (SelectDefaultValue.ts:79-138 at db021da0): the
+// MandatoryDefaultValue (SelectDefaultValue.ts:79-138 at b25ed960): the
 // stated default when there is one, else null when nullable, 0 for a
 // number or bitmap, false for a boolean, "" for a string, empty bytes, an
 // empty list, a struct of its mandatory members' fallbacks; false for an

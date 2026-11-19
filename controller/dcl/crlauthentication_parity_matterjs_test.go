@@ -386,7 +386,7 @@ func dclCrlServe(t *testing.T, f *fakeDCL, issuerSKID []byte, points []dclCrlPoi
 	for _, tr := range trusted {
 		// AddCertificate refuses a CD signer the CSA did not issue, so such
 		// an entry arrives unverified, as matter.js seeds it
-		// (DclCrlAuthenticationTest.ts at db021da0, the cdSigners seed).
+		// (DclCrlAuthenticationTest.ts at b25ed960, the cdSigners seed).
 		if tr.kind == KindCDSigner {
 			c, err := parseTrustStoreCertificate(tr.der, KindCDSigner)
 			if err != nil {

@@ -29,7 +29,7 @@ var (
 )
 
 // ReadRequest is a read through the node — matter.js ClientRead
-// (packages/protocol/src/action/client/ClientRead.ts:15 at db021da0): the
+// (packages/protocol/src/action/client/ClientRead.ts:15 at b25ed960): the
 // paths and filters it sends ([ReadPaths], embedded as ReadRequest, its
 // fields promoted) and IncludeKnownVersions.
 type ReadRequest struct {
@@ -42,7 +42,7 @@ type ReadRequest struct {
 // SubscribeRequest is a subscription through the node — matter.js
 // ClientSubscribe with ClientNodeInteraction's includeKnownVersions
 // (packages/node/src/node/client/ClientNodeInteraction.ts:111-124 at
-// db021da0): what it sends ([SubscribePaths], embedded, its fields
+// b25ed960): what it sends ([SubscribePaths], embedded, its fields
 // promoted) and IncludeKnownVersions.
 type SubscribeRequest struct {
 	interaction.SubscribeRequest
@@ -257,7 +257,9 @@ func (n *Node) observeRequest(r SubscribePaths) {
 // Write writes to the peer — ClientNodeInteraction.write
 // (ClientNodeInteraction.ts:175-186). The image changes when the peer
 // reports the new value, not through the write (matter.js's RemoteWriter
-// sets the cache and compensates a refusal).
+// settles the values the peer accepts in the cache, and a declined
+// attribute rolls the transaction back, RemoteWriteParticipant.ts:59-110;
+// BD-Matter-ClientNode-WriteNotThroughCache).
 func (n *Node) Write(ctx context.Context, writes []WriteRequest, opts WriteOptions) (WriteStatuses, error) {
 	ia, err := n.interaction()
 	if err != nil {

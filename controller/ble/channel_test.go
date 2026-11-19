@@ -278,7 +278,7 @@ func (c *answeringConnCentral) Connect(context.Context, ble.Peripheral) (ble.Con
 
 // TestCloseDetachesTheC2Handler: data on C2 after Close reaches no
 // session — matter.js's close detaches the handler
-// (packages/nodejs-ble/src/NobleBleChannel.ts:1010 at db021da0).
+// (packages/nodejs-ble/src/NobleBleChannel.ts:1010 at b25ed960).
 func TestCloseDetachesTheC2Handler(t *testing.T) {
 	conn := &answering{silent: silent{gone: make(chan struct{})}}
 	rec := &recorder{}
@@ -302,7 +302,7 @@ func TestCloseDetachesTheC2Handler(t *testing.T) {
 // ends the channel at once, while the C2 unsubscribe still waits on the
 // dead link — matter.js's disconnect callback starts the unsubscribe and
 // the disconnect without awaiting them
-// (packages/nodejs-ble/src/NobleBleChannel.ts:788-805 at db021da0), so
+// (packages/nodejs-ble/src/NobleBleChannel.ts:788-805 at b25ed960), so
 // the channel reports its loss and a send in that window reads as
 // channel loss, not as a bare BTP flow error (review II, R2-P1-sec-05).
 func TestSessionCloseEndsTheChannelBeforeTheGATTRelease(t *testing.T) {

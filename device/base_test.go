@@ -103,7 +103,7 @@ func TestBaseOptionalConformsAndRefuses(t *testing.T) {
 // under the condition BridgedPowerSourceInfo are PowerSourceConfiguration
 // (`BridgedPowerSourceInfo, D`) and PowerSource (`BridgedPowerSourceInfo`) —
 // matter.js packages/model/src/standard/elements/bridged-node.element.ts:22-23
-// at db021da0 — read from the generated type with their definitions, and
+// at b25ed960 — read from the generated type with their definitions, and
 // the condition is the Base device type's (base.element.ts:40).
 func TestBridgedPowerSourceServers(t *testing.T) {
 	t.Parallel()

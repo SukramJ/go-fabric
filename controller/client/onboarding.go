@@ -36,7 +36,7 @@ const (
 
 // The commissionable advertisement's commissioning mode — matter.js
 // CommissioningMode (packages/protocol/src/advertisement/CommissioningMode.ts:7-11
-// at db021da0). Basic is the device's own passcode and discriminator.
+// at b25ed960). Basic is the device's own passcode and discriminator.
 // Enhanced is a window an administrator opened: its passcode and its
 // discriminator are the window's and gone when it closes. A record whose
 // mode is neither saw no such advertisement — a node paired by address

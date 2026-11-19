@@ -361,7 +361,7 @@ type Config struct {
 	// BLE is the host's Bluetooth LE peripheral, on which the bridge
 	// serves BTP and advertises a commissioning window between
 	// [Bridge.StartBLE] and [Bridge.StopBLE] — matter.js `network.ble`
-	// (NetworkServer.ts:28-34 at db021da0) with the platform's peripheral
+	// (NetworkServer.ts:28-34 at b25ed960) with the platform's peripheral
 	// installed. nil is no BLE: the bridge never touches a radio.
 	//
 	// Deprecated: set GATT, whose service registration [Bridge.StartBLE]
@@ -466,7 +466,7 @@ type Bridge struct {
 	// operational `_matter._tcp` service [Bridge.AnnounceFabric] published
 	// for it, so the broadcast events reach the session's fabric only
 	// (matter.js packages/protocol/src/advertisement/Advertiser.ts:69-75 at
-	// db021da0, advertisementForFabric). Guarded by mu.
+	// b25ed960, advertisementForFabric). Guarded by mu.
 	operationalByFabric map[uint8]string
 
 	// rootClusters carry the cluster servers the daemon attached to
@@ -2813,7 +2813,7 @@ func (b *Bridge) LocalAddr() string {
 // assigns an ephemeral port, and advertising the 5540 default instead
 // points every commissioner's SRV lookup at a port nothing listens on.
 // Mirrors matter.js packages/node/src/behavior/system/network/
-// ServerNetworkRuntime.ts:243 at db021da0 (`addTransports` writes the
+// ServerNetworkRuntime.ts:243 at b25ed960 (`addTransports` writes the
 // bound `ipv6Interface.port` into `network.operationalPort`) which
 // ServerNetworkRuntime.ts:90 then reads when it constructs the
 // MdnsAdvertiser.
@@ -3055,7 +3055,7 @@ func (b *Bridge) forgetOperationalInstance(fabricIndex uint8, instance string) {
 // and the event does nothing — matter.js
 // packages/protocol/src/protocol/DeviceAdvertiser.ts:164-179 at db021da0
 // returns when the session has no fabric, and
-// packages/protocol/src/advertisement/Advertiser.ts:69-75 at db021da0
+// packages/protocol/src/advertisement/Advertiser.ts:69-75 at b25ed960
 // (advertisementForFabric) finds no advertisement for a fabric that has
 // none.
 func (b *Bridge) operationalInstanceFor(fabricIndex uint8) (string, bool) {
@@ -3099,7 +3099,7 @@ type CommissioningAdvertisement struct {
 	// src/setup_payload/AdditionalDataPayloadGenerator.cpp:81 at
 	// 6170af84; matter.js advertises no RI key,
 	// packages/protocol/src/advertisement/mdns/CommissionableMdnsAdvertisement.ts:85-92
-	// at db021da0) — 36 uppercase-hex characters when present, empty to
+	// at b25ed960) — 36 uppercase-hex characters when present, empty to
 	// suppress the `RI` TXT key. Callers compute it via
 	// [mdns.GenerateRotatingID] from a persisted UniqueID + LifetimeCounter
 	// pair; the bridge merely forwards the precomputed value into the mDNS

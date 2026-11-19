@@ -76,7 +76,7 @@ type SubscribeRequest struct {
 	// the error logged; a sustained subscription logs it, warning once,
 	// and keeps running. Mirrors matter.js's subscribe, whose updated
 	// rejection fails the establishment (ClientSubscribeTest.ts:1276-1332
-	// at db021da0), and
+	// at b25ed960), and
 	// SustainedSubscription.#deliver
 	// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-352).
 	Updated func(r *Report) error

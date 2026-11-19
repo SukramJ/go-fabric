@@ -252,7 +252,7 @@ func derSigValue(t *testing.T, r, s *big.Int) []byte {
 // The signature's r and s are read as matter.js reads them: the
 // INTEGER's content bytes, 32 of them, 33 with a leading zero, fewer
 // padded to 32 (EcdsaSignature.ts:28-29, DerCodec.ts:303-318 at
-// db021da0) — so a negative INTEGER is its two's-complement bytes, not
+// b25ed960) — so a negative INTEGER is its two's-complement bytes, not
 // its magnitude (review II, R2-P1-sec-01).
 func TestDecodeDERReadsSignatureIntegersAsTheirBytes(t *testing.T) {
 	t.Parallel()
@@ -390,7 +390,7 @@ func TestDecodeDERSkipsForeignExtensionsAndReadsEveryKeyPurpose(t *testing.T) {
 // derDN refuses a Matter id that is not hex, skips an attribute it cannot
 // read or does not know, and reads a domainComponent and a
 // PrintableString under their tags — parseSubjectOrIssuer
-// (Certificate.ts:302-382 at db021da0).
+// (Certificate.ts:302-382 at b25ed960).
 func TestDERDistinguishedNameEdges(t *testing.T) {
 	t.Parallel()
 	attr := func(oid asn1.ObjectIdentifier, tag int, value string) []byte {
@@ -474,7 +474,7 @@ func TestDERDistinguishedNameEdges(t *testing.T) {
 		t.Fatalf("Order = %v, want %v", dn.Order, want)
 	}
 	// matter-firmware-signing-id is read from DER and counts as an RDN
-	// (asn.ts:98-99; OperationalCertificateVerifyTest.ts:864-879 at db021da0).
+	// (asn.ts:98-99; OperationalCertificateVerifyTest.ts:864-879 at b25ed960).
 	fw, err := derDN(name(attr(oidMatterNodeID, asn1.TagUTF8String, "0000000000000001"), attr(oidMatterFirmwareSigningID, asn1.TagUTF8String, "FFFFFFFFFFFFFFFF")))
 	if err != nil || !fw.HasFirmwareSigningID || fw.MatterFirmwareSigningID != 0xFFFF_FFFF_FFFF_FFFF || !slices.Equal(fw.Order, []uint8{dnTagMatterNodeID, dnTagMatterFirmwareSignID}) {
 		t.Fatalf("derDN(firmware signing id) = %+v, %v", fw, err)

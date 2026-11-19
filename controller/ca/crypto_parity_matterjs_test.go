@@ -11,7 +11,7 @@ import (
 )
 
 // TestCompressedFabricIDHkdfParityMatterJS mirrors
-// packages/general/test/crypto/StandardCryptoTest.ts:92-100 at db021da0
+// packages/general/test/crypto/StandardCryptoTest.ts:92-100 at b25ed960
 // ("performs correct HKDF computation"): HKDF-SHA256 over a root public
 // key without its 0x04 prefix, salt the fabric id 1 as eight big-endian
 // bytes, info "CompressedFabric", eight bytes — the compressed fabric id.

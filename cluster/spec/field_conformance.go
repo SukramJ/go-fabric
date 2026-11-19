@@ -19,7 +19,8 @@ import (
 // answered CONSTRAINT_ERROR: matter.js's ConformanceError,
 // EnumValueConformanceError and UnknownEnumValueError all carry
 // Status.ConstraintError (packages/protocol/src/action/errors.ts:99-123 at
-// db021da0).
+// db021da0; UnknownEnumValueError is
+// packages/protocol/src/action/errors.ts:99-103 at b25ed960).
 var (
 	// ErrConformance: a field the conformance requires is absent, one it
 	// does not allow is present, or a choice group holds too few or too
@@ -36,7 +37,7 @@ var (
 
 // The node codes of matter.js's conformance compiler
 // (packages/node/src/behavior/state/validation/conformance-util.ts:21-39
-// at db021da0).
+// at b25ed960).
 type confCode uint8
 
 const (
@@ -233,7 +234,7 @@ type confCompiler struct {
 	nameRef func(name string) confNode
 	// unreadable records a static comparison with an operand that is not
 	// a value ("LT > 4"), which matter.js's compiler refuses to compile
-	// (conformance-util.ts:183-196 at db021da0, performComparison's
+	// (conformance-util.ts:183-196 at b25ed960, performComparison's
 	// assertValue throws SchemaImplementationError); the field
 	// conformance reads it as nonconformant, a bit's is left unjudged
 	// ([Instance.checkBitConformance]).

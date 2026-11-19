@@ -15,7 +15,7 @@ import (
 // The composite device types (brief 27-B §4) pass the node's strict
 // device-type validation with their components as parts — matter.js
 // counts a simple component on an endpoint below the composite
-// (DeviceTypeConformance.ts:596-613 at db021da0) — and fail it without
+// (DeviceTypeConformance.ts:596-613 at b25ed960) — and fail it without
 // them (StandardDeviceTypeCorpusTest.ts:328-358, "component endpoints are
 // the developer's to add").
 func TestCompositeDeviceTypesValidate(t *testing.T) {

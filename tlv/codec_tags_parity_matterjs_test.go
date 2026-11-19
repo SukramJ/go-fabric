@@ -10,7 +10,7 @@ import (
 )
 
 // TestTlvCodecTagsParityMatterJS mirrors
-// packages/types/test/tlv/TlvCodecTest.ts:23-75 at db021da0: the tag
+// packages/types/test/tlv/TlvCodecTest.ts:23-75 at b25ed960: the tag
 // encodings of Core Appendix A.12 (vendor 0xFFF1, profile 0xDEED) read and
 // written, a structure member under a 4-octet fully qualified tag, and an
 // implicit-profile tag — 2 or 4 octets, alone or inside a structure —

@@ -50,7 +50,7 @@ var (
 	// ErrStatement is a VID Verification Statement that does not hold: not
 	// version 1 of its 85-byte form, no VVSC to check it with, a signer
 	// key identifier other than the VVSC's, or a VVSC that fails its
-	// profile (matter.js VendorIdVerification.ts:230-293 at db021da0).
+	// profile (matter.js VendorIdVerification.ts:230-293 at b25ed960).
 	ErrStatement = errors.New("jcm: VID Verification Statement does not verify")
 )
 
@@ -184,7 +184,7 @@ func Verify(ctx context.Context, info *Info, clientChallenge, attestationChallen
 
 // verifyStatement is step 12a, the VID Verification Statement path: the
 // statement is version 1 of its 85-byte form; the administrator's VVSC
-// holds the VVSC profile (mattercert.DecodeVVSC, Vvsc.ts at db021da0); its
+// holds the VVSC profile (mattercert.DecodeVVSC, Vvsc.ts at b25ed960); its
 // SubjectKeyID is the statement's signer key identifier; its key signed
 // statement_version || vendor_fabric_binding_message || signer_skid; and
 // a trust anchor of the vendor — lookup for the vendor id and the VVSC's
@@ -289,7 +289,7 @@ func verifyRaw(pub *ecdsa.PublicKey, msg, sig []byte) bool {
 // (VendorIdVerificationClient.cpp:28-49). mattercert's NOC check requires
 // serverAuth since the db021da0 lift, as matter.js's VendorIdVerification
 // verifies through Noc.verify (VendorIdVerification.ts:228, Noc.ts:148-154
-// at db021da0, which notes chip's clientAuth there).
+// at b25ed960, which notes chip's clientAuth there).
 func verifyChain(noc, icac, rootPublicKey []byte) error {
 	v, err := mattercert.NewVerifier(rootPublicKey, nil)
 	if err != nil {

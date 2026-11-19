@@ -104,7 +104,7 @@ func (r *icdRig) attemptsNow() int {
 // schedule, not at once each time: the schedule lives across
 // establishments and starts over only after a subscription that lasted
 // its current interval. matter.js starts a new schedule per establishment
-// loop (SustainedSubscription.ts:203 at db021da0); the rule is this
+// loop (SustainedSubscription.ts:203 at b25ed960); the rule is this
 // module's (review II, R2-P6-fsm-2110).
 func TestSustainedRetryScheduleSpansEstablishments(t *testing.T) {
 	t.Parallel()

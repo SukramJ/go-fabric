@@ -23,7 +23,7 @@ import (
 
 // The TCP cases: matter.js's TC-SC-8.x run the device as the DUT and a
 // helper controller as the TH over TCP (support/chip-testing/test/cert/
-// tc-sc-8-support.ts:36-54 at db021da0, TCP_ROLES), the direction of the
+// tc-sc-8-support.ts:36-54 at b25ed960, TCP_ROLES), the direction of the
 // Go-TH leg: the reference daemon is the DUT — its --tcp default "true"
 // accepts TCP on the Matter port (examples/reference-bridge/main.go,
 // tcp.go), so no daemonArgs —, the Go controller the TH, built with

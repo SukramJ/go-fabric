@@ -330,7 +330,7 @@ func (n *Name) off(o *nameObserver) {
 // at the first "=", a key without "=" having an empty value, and the first
 // occurrence of a key winning whatever its case. Mirrors matter.js
 // packages/general/src/net/dns-sd/DnssdName.ts:76-107 (the entries) and
-// DnssdParameters.ts:27-34 (first wins, the key folded) at db021da0
+// DnssdParameters.ts:27-34 (first wins, the key folded) at b25ed960
 // (review II, R2-P6-doc-2906).
 func (n *Name) parameters() Parameters {
 	if n.params != nil {

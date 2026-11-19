@@ -21,7 +21,7 @@ var ErrSemaphoreClosed = errors.New("peer: semaphore closed")
 // Semaphore limits concurrent work by slots: a caller obtains a [Slot],
 // works, and closes it. A delay is a cooldown between consecutive grants;
 // a timeout releases a slot its holder forgot. It is matter.js's
-// Semaphore (packages/general/src/util/Semaphore.ts:38-256 at db021da0),
+// Semaphore (packages/general/src/util/Semaphore.ts:38-256 at b25ed960),
 // the throttle of a network profile. It is safe for concurrent use.
 type Semaphore struct {
 	clock       clock.Clock

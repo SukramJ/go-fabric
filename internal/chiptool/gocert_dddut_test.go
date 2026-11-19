@@ -24,7 +24,7 @@ import (
 // module's controller is the DUT commissioner, the reference daemon the
 // all-clusters TH whose QR and manual codes the TS reads (here the
 // daemon's banner, built by secure/setup from its --passcode and
-// --discriminator). The helpers mirror tc-dd-support.ts at db021da0:
+// --discriminator). The helpers mirror tc-dd-support.ts at b25ed960:
 //
 //   - a refusal counts only as a refusal of the payload itself
 //     (CommissioningRefusals.requireRefusal :787, isPayloadRefusal :1027):
@@ -93,9 +93,9 @@ func (d *dutRun) setup(th *goTH) error {
 
 // pair is the DUT's commission(target): with the registry's default
 // subscription, as matter.js's adapter commissions with autoSubscribe
-// (InProcessControllerAdapter.ts:2919-2930), and test devices' attestation
+// (InProcessControllerAdapter.ts:3131-3142), and test devices' attestation
 // accepted, as its judgeAttestation does without an attestation option
-// (:2973-2975).
+// (:3185-3187).
 func (d *dutRun) pair(ctx context.Context, code string) (*client.Node, error) {
 	return d.ctrl.Pair(ctx, code, gocontroller.PairOptions{OnAttestationFailure: attestation.Accept()})
 }
@@ -805,10 +805,10 @@ func caseDD314() goCertCase {
 			// Pair takes the code as one string and reads one without the MT:
 			// prefix as a manual code, its other characters dropped
 			// (controller.ParsePairingCode) — as matter.js's own commission
-			// does with a pairingCode string (CommissioningClient.ts:1358-1359,
+			// does with a pairingCode string (CommissioningClient.ts:1468-1469,
 			// ManualPairingCodeCodec.decode); its cert adapter hands the
 			// payload to the QR decoder instead, as the target names it a QR
-			// code (InProcessControllerAdapter.ts:1210-1219). Refused before
+			// code (InProcessControllerAdapter.ts:1232-1241). Refused before
 			// the network either way, which is what the step asks; the
 			// evidence names the reason.
 			{n: "6.b", line: 211, title: "the DUT refuses it", run: func(th *goTH) error {

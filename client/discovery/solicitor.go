@@ -374,7 +374,7 @@ func (s *Solicitor) emit() {
 // left out so the responder refreshes it before it expires (RFC 6762
 // §7.1); without the cache-flush bit, which means nothing outside a
 // response (RFC 6762 §18.12). Mirrors matter.js
-// packages/general/src/net/dns-sd/DnssdSolicitor.ts:271-292 at db021da0
+// packages/general/src/net/dns-sd/DnssdSolicitor.ts:271-292 at b25ed960
 // (knownAnswersOf).
 func knownAnswersOf(nm *Name, now time.Time) []mdns.DNSRecord {
 	out := make([]mdns.DNSRecord, 0, nm.records.len())

@@ -33,7 +33,7 @@ import (
 // otbrThreadVersion is the Thread version reported when the border
 // router's own diagnostics record carries none: 5, Thread 1.4, the
 // version the device type asks a border router to be built on (matter.js
-// packages/node/src/devices/thread-border-router.ts:55-56 at db021da0).
+// packages/node/src/devices/thread-border-router.ts:55-56 at b25ed960).
 const otbrThreadVersion = 5
 
 // otbrRefreshInterval is how often the daemon reads the border router

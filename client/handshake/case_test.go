@@ -38,7 +38,7 @@ func commissionedFabric(t *testing.T) (*net.UDPAddr, handshake.Fabric) {
 
 // commissionedFabricWithDeviceCATs commissions a node whose NOC carries
 // deviceCATs — matter.js CaseSessionCatsTest.ts commissionedPair's
-// deviceCats at db021da0.
+// deviceCats at b25ed960.
 func commissionedFabricWithDeviceCATs(t *testing.T, deviceCATs []uint32) (*net.UDPAddr, handshake.Fabric) {
 	t.Helper()
 	n, addr := startNode(t)

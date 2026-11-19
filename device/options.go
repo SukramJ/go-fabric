@@ -369,7 +369,7 @@ func mountServer(srv contract.ClusterServer) Declaration {
 // hosting it does not come up, as matter.js fails an endpoint's
 // initialization with the ClusterImplementationError of
 // ValidatedElements (packages/node/src/behavior/cluster/
-// ValidatedElements.ts:190-222 at db021da0; ValidatedElementsTest.ts:655-668
+// ValidatedElements.ts:190-222 at b25ed960; ValidatedElementsTest.ts:655-668
 // "fails endpoint initialization for a hosted cluster with an illegal ID").
 func checkServedIDs(srv contract.ClusterServer) error {
 	var errs []error

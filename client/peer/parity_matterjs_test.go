@@ -19,7 +19,7 @@ type (
 )
 
 // TestParityTimingDefaults: every default of matter.js
-// packages/protocol/src/peer/PeerTimingParameters.ts:186-211 at db021da0.
+// packages/protocol/src/peer/PeerTimingParameters.ts:186-211 at b25ed960.
 func TestParityTimingDefaults(t *testing.T) {
 	t.Parallel()
 	d := DefaultTiming()

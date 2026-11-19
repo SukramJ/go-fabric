@@ -4,13 +4,13 @@
 package discovery
 
 // A port of matter.js packages/protocol/test/mdns/
-// CommissionableMdnsScannerWindowChangeTest.ts at db021da0 by meaning: a
+// CommissionableMdnsScannerWindowChangeTest.ts at b25ed960 by meaning: a
 // device ends one commissioning window and opens the next with the same
 // discriminator about 30 ms apart, while the controller has the previous
 // window cached. matter.js drives its own responder over a simulated
 // network; the port injects the packets that responder sends — the window's
 // records in one announcement, the goodbyes of a withdrawal (InterfaceResponder.ts
-// #goodbyesFor at db021da0: the host addresses only when no other window
+// #goodbyesFor at b25ed960: the host addresses only when no other window
 // publishes them, the cache-flush bit only on a unique type whose set is
 // left empty) — into the cache's fake connection, and answers its address
 // queries as the device would.

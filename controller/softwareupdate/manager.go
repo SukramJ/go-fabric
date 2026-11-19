@@ -45,7 +45,8 @@ const ProgressTimeout = 15 * time.Minute
 const queueCheckInterval = 5 * time.Minute
 
 // maxApplyDelay is the longest delay an apply is allowed with, a day
-// (OtaSoftwareUpdateProviderServer.ts:467-473, MAX_DELAYED_ACTION_TIME).
+// (OtaSoftwareUpdateProviderServer.ts:39, MAX_DELAYED_ACTION_TIME = 86_400
+// seconds, clamped at :346-351).
 const maxApplyDelay = 24 * time.Hour
 
 // ErrNotApplicable is a node that is not currently applicable for OTA
@@ -203,11 +204,11 @@ type Config struct {
 	BDXAdditionalMrpDelay *time.Duration
 	// ApplyDelay is how long an allowed apply waits, rounded up to whole
 	// seconds and at most a day (the provider's State.applyDelay,
-	// OtaSoftwareUpdateProviderServer.ts:652-660, default 0).
+	// OtaSoftwareUpdateProviderServer.ts:427-435, default 0).
 	ApplyDelay time.Duration
 	// RequestConsent asks the user for an update a requestor that cannot
 	// consent needs consent for (requestUserConsentForUpdate,
-	// OtaSoftwareUpdateProviderServer.ts:507-515); nil answers Unknown,
+	// OtaSoftwareUpdateProviderServer.ts:382-393); nil answers Unknown,
 	// which declines.
 	RequestConsent func(ctx context.Context, p Peer, req QueryImageRequest, d AvailableDetails) (ConsentState, time.Duration)
 

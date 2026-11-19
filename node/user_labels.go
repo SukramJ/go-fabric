@@ -70,7 +70,7 @@ func (u *userLabelSync) release(keys []string) {
 // the node has not met before from the store and saves its later changes,
 // under the endpoint's stable key — before the bridge serves the
 // topology. LabelList is nonvolatile (quality N, matter.js
-// packages/model/src/standard/elements/user-label.element.ts:21-22 at db021da0),
+// packages/model/src/standard/elements/user-label.element.ts:21-22 at b25ed960),
 // as the root's list is (buildLabels). A server met again in a reassembly
 // keeps its subscription; one that left the topology is released. An
 // endpoint without a stable key keeps its list in memory only. A store

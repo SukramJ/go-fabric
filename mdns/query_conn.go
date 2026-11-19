@@ -219,7 +219,7 @@ func unpackReadable(msg []byte) (m *dns.Msg, ok bool) {
 
 // MaxMessageSize is the largest mDNS message the module writes: an IPv6
 // minimum MTU of 1280 bytes less the IPv6 and UDP headers. Mirrors
-// matter.js packages/general/src/codec/DnsCodec.ts:26 at db021da0
+// matter.js packages/general/src/codec/DnsCodec.ts:26 at b25ed960
 // (MAX_MDNS_MESSAGE_SIZE).
 const MaxMessageSize = 1232
 
@@ -362,7 +362,7 @@ func rrOf(r DNSRecord) dns.RR {
 		// An empty TXT record is a single zero-length string (RFC 6763
 		// §6.1), and an entry is at most 255 bytes, a longer one cut there.
 		// Mirrors matter.js packages/general/src/codec/DnsCodec.ts:477-497
-		// at db021da0 (encodeTxtRecord).
+		// at b25ed960 (encodeTxtRecord).
 		txt := make([]string, 0, max(len(r.TXT), 1))
 		for _, e := range r.TXT {
 			txt = append(txt, escapeText(e[:min(len(e), 255)]))

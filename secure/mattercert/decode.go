@@ -42,7 +42,7 @@ const (
 	// as UTF8String — domainComponent (16) as IA5String — and tags 129-143
 	// carry the attributes 1-15 as PrintableString. Mirrors matter.js
 	// packages/protocol/src/certificate/kinds/definitions/operational.ts:71-112
-	// at db021da0 (TlvGenericMatterSubjectOrIssuerTaggedList).
+	// at b25ed960 (TlvGenericMatterSubjectOrIssuerTaggedList).
 	dnTagStandardFirst  uint8 = 1
 	dnTagStandardLast   uint8 = 16
 	dnTagPrintableFirst uint8 = 129
@@ -192,13 +192,13 @@ type DistinguishedName struct {
 	// (matter-vvs-id, DN tag 23): the subject of a VVSC carries exactly
 	// one, a NOC, ICAC or RCAC none. Mirrors matter.js
 	// packages/protocol/src/certificate/kinds/definitions/operational.ts:64
-	// at db021da0 (the TLV field) and definitions/asn.ts:113-114 (the OID
+	// at b25ed960 (the TLV field) and definitions/asn.ts:113-114 (the OID
 	// 1.3.6.1.4.1.37244.1.7).
 	MatterVVSID uint64
 	HasVVSID    bool
 	// MatterFirmwareSigningID is the 64-bit matter-firmware-signing-id (DN
 	// tag 18, OID 1.3.6.1.4.1.37244.1.2 — matter.js definitions/asn.ts:98-99
-	// at db021da0), an optional attribute of an operational certificate
+	// at b25ed960), an optional attribute of an operational certificate
 	// that counts as an RDN like the others.
 	MatterFirmwareSigningID uint64
 	HasFirmwareSigningID    bool
@@ -216,7 +216,7 @@ type DistinguishedName struct {
 // the TLV carried it: Tag is the context tag (1-16 a UTF8String, 129-143 a
 // PrintableString), Value the string. Mirrors matter.js
 // packages/protocol/src/certificate/kinds/definitions/operational.ts:71-112
-// at db021da0.
+// at b25ed960.
 type DNAttribute struct {
 	Tag   uint8
 	Value string
@@ -332,7 +332,7 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			// re-encodes the Subject so) is malformed. Mirrors chip
 			// CHIPCert.cpp:782 ChipDN::DecodeFromTLV (kTLVType_List,
 			// CHIP_ERROR_WRONG_TLV_TYPE) at 6170af84 and matter.js
-			// DistinguishedName.ts:636-638 at db021da0 (the DN schema is
+			// DistinguishedName.ts:636-638 at b25ed960 (the DN schema is
 			// TlvDistinguishedName, operational.ts:111, a
 			// DistinguishedNameSchema with its own codec,
 			// DistinguishedName.ts:613-666; another type is
@@ -346,7 +346,7 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 		cert.Issuer = dn
 	case tagNotBefore, tagNotAfter:
 		// notBefore/notAfter are TlvUInt32 (operational.ts:138-139 at
-		// db021da0), and matter.js's Schema.decode validates the bounds.
+		// b25ed960), and matter.js's Schema.decode validates the bounds.
 		v, err := uintField(el, 32, "validity time")
 		if err != nil {
 			return err
@@ -362,7 +362,7 @@ func assignField(cert *Certificate, el tlv.Element, d *tlv.Decoder) error {
 			// re-encodes the Subject so) is malformed. Mirrors chip
 			// CHIPCert.cpp:782 ChipDN::DecodeFromTLV (kTLVType_List,
 			// CHIP_ERROR_WRONG_TLV_TYPE) at 6170af84 and matter.js
-			// DistinguishedName.ts:636-638 at db021da0 (the DN schema is
+			// DistinguishedName.ts:636-638 at b25ed960 (the DN schema is
 			// TlvDistinguishedName, operational.ts:111, a
 			// DistinguishedNameSchema with its own codec,
 			// DistinguishedName.ts:613-666; another type is
@@ -643,7 +643,7 @@ func validateMandatory(c *Certificate) error {
 // keyIDSize is the length of the subject and authority key identifiers:
 // 160 bits, as matter.js's certificate schema bounds them
 // (packages/protocol/src/certificate/kinds/definitions/operational.ts:47-48
-// at db021da0).
+// at b25ed960).
 const keyIDSize = 20
 
 // Extension TLV tags inside the [tagExtensions] List per Matter
@@ -792,7 +792,7 @@ func decodeBasicConstraints(d *tlv.Decoder, ext *CertificateExtensions) error {
 			}
 			ext.BasicConstraintsIsCA = el.Type == tlv.TypeBoolTrue
 		case extBCInnerTagPathLen:
-			// pathLen is TlvUInt8 (operational.ts:42 at db021da0): a wider
+			// pathLen is TlvUInt8 (operational.ts:42 at b25ed960): a wider
 			// value is refused, not cut to its low byte.
 			v, err := uintField(el, 8, "basic-constraints: pathLen")
 			if err != nil {
@@ -825,7 +825,7 @@ func decodeUint8Array(d *tlv.Decoder) ([]uint8, error) {
 		}
 		// An array's entries are anonymous; one with a tag is refused, as
 		// matter.js refuses it ("Array element tags should be anonymous",
-		// packages/types/src/tlv/TlvArray.ts:78 at db021da0).
+		// packages/types/src/tlv/TlvArray.ts:78 at b25ed960).
 		if el.Tag.Kind != tlv.TagKindAnonymous {
 			return nil, fmt.Errorf("%w: extended-key-usage entry with a tag", ErrMalformed)
 		}

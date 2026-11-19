@@ -7,7 +7,7 @@ package node_test
 // packages/node/test/behaviors/user-label/UserLabelServerTest.ts at
 // db021da0 (TestUserLabelServerParity) and
 // packages/node/test/behaviors/fixed-label/FixedLabelServerTest.ts at
-// db021da0 (TestFixedLabelServerParity). Both drive a commissioned
+// b25ed960 (TestFixedLabelServerParity). Both drive a commissioned
 // device's OnOffLight over the wire — REPLACE_ALL, REPLACE_ALL followed by
 // ADD, hand-made TLV — so they live here and not beside the servers in
 // cluster/core: the list-append and BUSY rules are the Interaction Model's
@@ -251,7 +251,7 @@ var (
 )
 
 // TestUserLabelServerParity ports UserLabelServerTest.ts at db021da0: the
-// UserLabel server (UserLabelServer.ts at db021da0) behind a commissioned
+// UserLabel server (UserLabelServer.ts at b25ed960) behind a commissioned
 // device, written as a controller writes it.
 func TestUserLabelServerParity(t *testing.T) { //nolint:tparallel // each subtest commissions a device on the shared test site; parallel subtests would wait for a site slot this test holds
 	t.Parallel()
@@ -429,11 +429,11 @@ func TestUserLabelServerParity(t *testing.T) { //nolint:tparallel // each subtes
 	}
 }
 
-// fixed is FIXED (FixedLabelServerTest.ts:18-21 at db021da0).
+// fixed is FIXED (FixedLabelServerTest.ts:18-21 at b25ed960).
 var fixed = []fixedlabeldef.LabelStruct{{Label: "room", Value: "bedroom 2"}, {Label: "orientation", Value: "up"}}
 
 // fixedLabelPair is addCommissionedPair with lightWithFixedLabels(FIXED)
-// (FixedLabelServerTest.ts:23-29 at db021da0).
+// (FixedLabelServerTest.ts:23-29 at b25ed960).
 func fixedLabelPair(t *testing.T) *labelPair {
 	t.Helper()
 	return newLabelPair(t, fixedLabelDecl(fixed))
@@ -448,9 +448,9 @@ func (lp *labelPair) fixedStored() []fixedlabeldef.LabelStruct {
 	return lp.light.FixedLabel().Get().LabelList
 }
 
-// TestFixedLabelServerParity ports FixedLabelServerTest.ts at db021da0: the
+// TestFixedLabelServerParity ports FixedLabelServerTest.ts at b25ed960: the
 // FixedLabel server, which has no logic of its own (FixedLabelServer.ts:14
-// at db021da0), behind a commissioned device.
+// at b25ed960), behind a commissioned device.
 func TestFixedLabelServerParity(t *testing.T) { //nolint:tparallel // each subtest commissions a device on the shared test site; parallel subtests would wait for a site slot this test holds
 	t.Parallel()
 

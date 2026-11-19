@@ -17,7 +17,7 @@ import (
 
 // broadcastEvent is what started a broadcast run, matter.js
 // Advertiser.BroadcastEvent (packages/protocol/src/advertisement/
-// Advertiser.ts:93 at db021da0).
+// Advertiser.ts:93 at b25ed960).
 type broadcastEvent int
 
 const (
@@ -45,7 +45,7 @@ type broadcastSchedule struct {
 
 // defaultBroadcastSchedule is matter.js MdnsAdvertiser.DefaultBroadcastSchedule
 // (packages/protocol/src/advertisement/mdns/MdnsAdvertiser.ts:213-232 at
-// db021da0): 1 s, doubling, at most 90 s apart, 25 % jitter, for the
+// b25ed960): 1 s, doubling, at most 90 s apart, 25 % jitter, for the
 // maximum commissioning timeout of two days
 // (packages/types/src/commissioning/CommissioningConstants.ts:11). Its
 // broadcastAfterConnection is Instant: an operational connection ends the
@@ -71,7 +71,7 @@ func scheduleFor(event broadcastEvent) broadcastSchedule {
 }
 
 // retrySchedule yields the intervals of a schedule, matter.js RetrySchedule
-// (packages/general/src/net/RetrySchedule.ts:28-60 at db021da0).
+// (packages/general/src/net/RetrySchedule.ts:28-60 at b25ed960).
 type retrySchedule struct {
 	cfg      broadcastSchedule
 	count    int
@@ -132,7 +132,7 @@ type broadcastRun struct {
 
 // startLocked begins a broadcast run of e for event, unless one runs:
 // matter.js Advertisement.start (packages/protocol/src/advertisement/
-// Advertisement.ts:78-91 at db021da0) does not reset a running schedule.
+// Advertisement.ts:78-91 at b25ed960) does not reset a running schedule.
 // The first broadcast goes out now. Caller holds r.mu.
 func (r *Responder) startLocked(e *entry, event broadcastEvent) {
 	if r.closed || e.run != nil {
@@ -182,7 +182,7 @@ func (r *Responder) stopLocked(e *entry) {
 }
 
 // broadcastLocked announces e's service on every listed interface
-// (MdnsServer.broadcast, MdnsServer.ts:208-219 at db021da0), with the
+// (MdnsServer.broadcast, MdnsServer.ts:208-219 at b25ed960), with the
 // other announcements of the same turn. Caller holds r.mu.
 func (r *Responder) broadcastLocked(e *entry) { r.announceLocked([]string{e.key}, false) }
 
@@ -192,7 +192,7 @@ func (r *Responder) broadcastAllLocked() { r.announceLocked(nil, true) }
 
 // pendingAnnouncement collects the announcements requested before it goes
 // out (MdnsServer.ts PendingAnnouncement, #announce and
-// #startAnnouncement, :221-246 at db021da0).
+// #startAnnouncement, :221-246 at b25ed960).
 type pendingAnnouncement struct {
 	services map[string]bool
 	all      bool
@@ -204,7 +204,7 @@ type pendingAnnouncement struct {
 // announcements of services published together — the commissionable and
 // the operational record of a starting node — share one message per
 // interface with each shared record once (MdnsServer.ts:209-214 at
-// db021da0). An announcement is never held by the one-second rule.
+// b25ed960). An announcement is never held by the one-second rule.
 // Caller holds r.mu.
 func (r *Responder) announceLocked(keys []string, all bool) {
 	p := r.pending

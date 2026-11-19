@@ -225,7 +225,7 @@ func base38Encode(b []byte) string {
 // versionFlag is 0 here (vendor + product not embedded); [ManualCodeLong]
 // writes the 21-digit form that carries them. A trivial passcode is
 // refused, as matter.js's encoder refuses it (ManualPairingCodeSchema.validate,
-// PairingCodeSchema.ts:429-430 at db021da0).
+// PairingCodeSchema.ts:429-430 at b25ed960).
 func ManualCode(discriminator uint16, passcode uint32) (string, error) {
 	return manualCode(discriminator, passcode, nil, true)
 }
@@ -234,7 +234,7 @@ func ManualCode(discriminator uint16, passcode uint32) (string, error) {
 // the vendor and product id after the 10 digits of the short form and
 // sets the VID_PID_PRESENT bit of the first digit. Mirrors matter.js
 // ManualPairingCodeSchema.encodeInternal (PairingCodeSchema.ts:440-454 at
-// db021da0): the first digit is (discriminator >> 10) | 1 << 2, the vendor
+// b25ed960): the first digit is (discriminator >> 10) | 1 << 2, the vendor
 // and product id are five digits each, and the Verhoeff check digit
 // closes the code.
 func ManualCodeLong(discriminator uint16, passcode uint32, vendorID, productID uint16) (string, error) {
@@ -354,7 +354,7 @@ const passcodeRule = "zero, above 99999998 or one of the disallowed values"
 // text is logged and travels into a controller's diagnostics, and a
 // passcode on the disallowed list is still the passcode of a device that
 // ships with it. matter.js prints the value
-// (packages/types/src/schema/PairingCodeSchema.ts:183 at db021da0,
+// (packages/types/src/schema/PairingCodeSchema.ts:183 at b25ed960,
 // `Invalid passcode ${passcode}`); the departure is this text only.
 var errInvalidPasscode = errors.New("setup: invalid passcode: " + passcodeRule)
 

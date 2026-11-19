@@ -16,7 +16,7 @@ import (
 )
 
 // The cases of matter.js packages/node/test/behaviors/general-diagnostics/
-// GeneralDiagnosticsServerTest.ts at db021da0 (#4881), ported by meaning on
+// GeneralDiagnosticsServerTest.ts at b25ed960 (#4881), ported by meaning on
 // the server: matter.js's createDevice configures deviceTestEnableKey and a
 // TriggerServer that supports one trigger, here EnableTestEventTriggers
 // with a handler that supports one.

@@ -59,8 +59,8 @@ var serverRelaxations = []struct {
 		// rejected with ConstraintError before the handler runs": an
 		// Administrator's key is ignored, a Manage caller's mismatch is
 		// FAILURE (review 2026-11 W3-clusec-06).
-		{kind: relaxRequestField, key: "IcdManagement.RegisterClient.VerificationKey", ref: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at db021da0"},
-		{kind: relaxRequestField, key: "IcdManagement.UnregisterClient.VerificationKey", ref: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at db021da0"},
+		{kind: relaxRequestField, key: "IcdManagement.RegisterClient.VerificationKey", ref: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at b25ed960"},
+		{kind: relaxRequestField, key: "IcdManagement.UnregisterClient.VerificationKey", ref: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at b25ed960"},
 	}},
 	{"cluster/core OperationalCredentials", []relaxation{
 		// "relax constraints on AttestationNonce and CsrNonce … so the

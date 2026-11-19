@@ -220,7 +220,7 @@ func TestParityMatterJS_DescriptorServer_RemovesPartsAutomatically(t *testing.T)
 //
 // Mirrors matter.js packages/node/test/behaviors/descriptor/
 // DescriptorServerTest.ts:146-158 (case "fully populates device types") at
-// db021da0: [{deviceType:268 (0x010C), revision:5}], the revision of the
+// b25ed960: [{deviceType:268 (0x010C), revision:5}], the revision of the
 // device type itself, which the Go side reads from the snapshot
 // (schema.DeviceTypeRevision) rather than hand-coding.
 func TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes(t *testing.T) {
@@ -249,7 +249,7 @@ func TestParityMatterJS_DescriptorServer_FullyPopulatesDeviceTypes(t *testing.T)
 		t.Errorf("deviceType = 0x%04X, want 0x010C", list[0].DeviceType)
 	}
 	if list[0].Revision != 5 {
-		t.Errorf("revision = %d, want 5 (DescriptorServerTest.ts:158 at db021da0)", list[0].Revision)
+		t.Errorf("revision = %d, want 5 (DescriptorServerTest.ts:158 at b25ed960)", list[0].Revision)
 	}
 }
 

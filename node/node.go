@@ -174,7 +174,7 @@ type Node struct {
 	// were active.
 	reopenChecked func(armed bool, sessions int)
 	// commissioned is matter.js's CommissioningServer state.commissioned
-	// (CommissioningServer.ts:148-165 at db021da0): true from a start
+	// (CommissioningServer.ts:148-165 at b25ed960): true from a start
 	// with stored fabrics and from a committed CommissioningComplete, false
 	// once the last fabric of a commissioned node is removed. A fabric
 	// that only a fail-safe added leaves it false, so the fail-safe's
@@ -828,7 +828,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
 	// The removed fabric's fabric-sensitive events leave the log
-	// (FabricScopedDataHandler.ts:114-170 at db021da0).
+	// (FabricScopedDataHandler.ts:114-170 at b25ed960).
 	if log := n.br.EventLog(); log != nil {
 		log.DropFabric(fabricIndex)
 	}
@@ -1285,7 +1285,7 @@ func (n *Node) notifyFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // The node counts as started once Start completed. A Start that fails
 // leaves the node startable, as matter.js's Node.start does — it sets the
 // target state back to "offline" and rethrows (Node.ts:124-126 at
-// db021da0): the node is not started, a later Start runs the whole start
+// b25ed960): the node is not started, a later Start runs the whole start
 // path again, and what New opened (the store file of Store.Path) stays
 // open until Stop.
 // Every step that can fail — the DataModelTest check, the PartsList
@@ -1450,7 +1450,7 @@ func (n *Node) startLocked(ctx context.Context) error {
 	// would invite a stranger onto a bridge its owners still administer.
 	// A store that cannot list its fabrics fails closed the same way.
 	// With Commissioning.WindowOnDemand the host opens it
-	// (CommissioningServer.ts:266-273 at db021da0, `enabled: false`).
+	// (CommissioningServer.ts:266-273 at b25ed960, `enabled: false`).
 	switch {
 	case err != nil:
 	case stored == 0 && n.window.onDemand:

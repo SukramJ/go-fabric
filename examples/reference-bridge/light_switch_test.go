@@ -18,7 +18,7 @@ import (
 // pipe's SendOnOffToBindings is refused without the flag, for another
 // endpoint and for a command that is neither on nor off, and sends to no
 // one while the Binding attribute is empty
-// (LightSwitchTestInstance.ts:181-210 at db021da0).
+// (LightSwitchTestInstance.ts:181-210 at b25ed960).
 func TestLightSwitchFlag(t *testing.T) {
 	plain := newFleet()
 	if err := plain.applyPipeCommand(pipeCommand{Name: "SendOnOffToBindings", Command: "on"}); err == nil {

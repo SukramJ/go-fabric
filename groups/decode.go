@@ -149,7 +149,7 @@ type Message struct {
 	// id a path of the message that names a node is compared with
 	// (matter.js DataResponse.nodeId, the node's id on the session's
 	// fabric, packages/protocol/src/action/server/DataResponse.ts:57-62 at
-	// db021da0).
+	// b25ed960).
 	LocalNodeID uint64
 	// KeySetID is the key set that authenticated the message.
 	KeySetID uint16
@@ -285,7 +285,7 @@ func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error)
 // another key set with identical material is allowed too. Mirrors
 // matter.js Groups.mappingAllows and KeySets.containsOperationalKey
 // (packages/protocol/src/groups/Groups.ts:78-81,
-// packages/protocol/src/groups/KeySets.ts:44-49 at db021da0).
+// packages/protocol/src/groups/KeySets.ts:44-49 at b25ed960).
 func (m *Manager) mappingAllows(c candidate, groupID uint16) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

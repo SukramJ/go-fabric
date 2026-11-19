@@ -312,7 +312,7 @@ func presentValues(cv SceneClusterValues) map[uint32]uint64 {
 // (OnOffServer, LevelControlServer and ColorControlServer). A scene-able
 // server without one — a host's own — is driven through its commands:
 // OnOff On/Off, LevelControl MoveToLevel with ExecuteIfOff (matter.js
-// LevelControlServer.ts:757 at db021da0, moveToLevelLogic with
+// LevelControlServer.ts:757 at b25ed960, moveToLevelLogic with
 // executeIfOff), ColorControl MoveToColorTemperature or
 // MoveToHueAndSaturation for the stored color mode. transitionMs is the
 // scene's transition in milliseconds; the commands take tenths of a second.

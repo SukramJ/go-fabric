@@ -21,7 +21,7 @@ import (
 // TestTagListOverTheWire: a bridged plug built with device.Options.Tags
 // serves its Descriptor TagList as a list of semtag structs (matter.js
 // packages/model/src/standard/elements/descriptor.element.ts:48-51 at
-// db021da0: list, entry semtag), and a
+// b25ed960: list, entry semtag), and a
 // controller's read stores the entries in its image — not the TLV null the
 // bridge's value writer sent for the plain []Semtag slice before the
 // general Encodable-slice rule (G-N4, issue #388). The FixedLabel

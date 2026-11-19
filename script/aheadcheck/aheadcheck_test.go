@@ -179,6 +179,86 @@ func TestAheadcheckAllowance(t *testing.T) {
 	}
 }
 
+// fixtureRootCaught lays the fixture register out with caught-up.txt.
+func fixtureRootCaught(t *testing.T, caught string) string {
+	t.Helper()
+	root := fixtureRoot(t, "BD-Fixture-Todo\n")
+	writeFile(t, filepath.Join(root, caughtUpPath), caught)
+	return root
+}
+
+// TestAheadcheckCaughtUp: a row in caught-up.txt passes while its marker is
+// gone at the pin the line names, and is a finding when the marker still
+// holds, when the line names another pin, or when it names no row.
+func TestAheadcheckCaughtUp(t *testing.T) {
+	repo := newFixtureRepo(t)
+
+	// Listed, the marker gone at the pin: the run passes and says so.
+	root := fixtureRootCaught(t, "# fixture\nBD-Fixture-Absence "+repo.second[:8]+" P9-Z # closes later\n")
+	code, lines := runFixture(t, root, repo.dir, repo.second, repo.second)
+	if code != 0 || len(lines) != 2 {
+		t.Fatalf("listed, marker gone = %d %q, want 0, the note and the summary", code, lines)
+	}
+	for _, want := range []string{"BD-Fixture-Absence", "caught up at " + repo.second[:8], "reconciled by P9-Z"} {
+		if !strings.Contains(lines[0], want) {
+			t.Errorf("note %q does not name %q", lines[0], want)
+		}
+	}
+	if !strings.Contains(lines[1], "1 in caught-up.txt") || !strings.Contains(lines[1], "every other row's marker holds") {
+		t.Errorf("summary %q does not count the caught-up row", lines[1])
+	}
+	// The ref is not read for a listed row: at the third commit only the
+	// two other rows report "caught up?".
+	code, lines = runFixture(t, root, repo.dir, repo.second, repo.third)
+	if code != 1 || len(lines) != 3 || !strings.Contains(lines[0], "reconciled by P9-Z") ||
+		!strings.Contains(lines[1], "BD-Fixture-TwoFiles") || !strings.Contains(lines[2], "BD-Fixture-Class") {
+		t.Errorf("listed, ref at the third commit = %d %q, want the note and the two other rows' findings", code, lines)
+	}
+
+	// Listed, the marker still holds at the pin.
+	root = fixtureRootCaught(t, "BD-Fixture-Absence "+repo.first+" P9-Z\n")
+	code, lines = runFixture(t, root, repo.dir, repo.first, repo.first)
+	if code != 1 || len(lines) != 1 || !strings.Contains(lines[0], "BD-Fixture-Absence") ||
+		!strings.Contains(lines[0], "the marker still holds at the pin ("+repo.first[:8]+") — remove its line") {
+		t.Errorf("listed, marker present = %d %q, want the still-holds finding", code, lines)
+	}
+
+	// A line naming no row.
+	root = fixtureRootCaught(t, "BD-Fixture-Gone "+repo.first[:8]+" P9-Z\n")
+	code, lines = runFixture(t, root, repo.dir, repo.first, repo.first)
+	if code != 1 || len(lines) != 1 || !strings.Contains(lines[0], "caught-up.txt names BD-Fixture-Gone, which is no row") {
+		t.Errorf("stale line = %d %q, want the stale-line finding", code, lines)
+	}
+
+	// The line names another pin than the current one, the marker gone at
+	// the current pin: the row rode across a lift.
+	root = fixtureRootCaught(t, "BD-Fixture-Absence "+repo.first[:8]+" P9-Z\n")
+	code, lines = runFixture(t, root, repo.dir, repo.second, repo.second)
+	if code != 1 || len(lines) != 1 || !strings.Contains(lines[0], "BD-Fixture-Absence") ||
+		!strings.Contains(lines[0], "caught up at "+repo.first[:8]+", but the pin is "+repo.second[:8]) {
+		t.Errorf("sha off the pin = %d %q, want the pin finding", code, lines)
+	}
+
+	// A listed row without a marker.
+	root = fixtureRootCaught(t, "BD-Fixture-Todo "+repo.first[:8]+" P9-Z\n")
+	code, lines = runFixture(t, root, repo.dir, repo.first, repo.first)
+	if code != 1 || len(lines) != 1 || !strings.Contains(lines[0], "BD-Fixture-Todo") || !strings.Contains(lines[0], "has no marker but is in caught-up.txt") {
+		t.Errorf("unmarked row listed = %d %q", code, lines)
+	}
+
+	// A malformed line, or a row listed twice: the check cannot run.
+	for name, content := range map[string]string{
+		"two fields": "BD-Fixture-Absence P9-Z\n",
+		"short sha":  "BD-Fixture-Absence abc P9-Z\n",
+		"upper sha":  "BD-Fixture-Absence ABCDEF12 P9-Z\n",
+		"twice":      "BD-Fixture-Absence " + repo.first[:8] + " P9-Z\nBD-Fixture-Absence " + repo.first[:8] + " P9-Y\n",
+	} {
+		if code, _ := runFixture(t, fixtureRootCaught(t, content), repo.dir, repo.first, repo.first); code != 2 {
+			t.Errorf("%s: exit %d, want 2", name, code)
+		}
+	}
+}
+
 func TestAheadcheckCannotRun(t *testing.T) {
 	repo := newFixtureRepo(t)
 	root := fixtureRoot(t, "BD-Fixture-Todo\n")
@@ -233,7 +313,7 @@ func TestParseRegisterRefuses(t *testing.T) {
 			t.Errorf("%s: rows %+v, err %v; want one row with the problem %q", name, rows, err, c.problem)
 			continue
 		}
-		if f := check(rows, nil, nil, revision{}, revision{}); len(f) != 1 || !strings.Contains(f[0], c.problem) {
+		if f, _ := check(rows, nil, nil, nil, revision{}, revision{}); len(f) != 1 || !strings.Contains(f[0], c.problem) {
 			t.Errorf("%s: findings %q, want the problem reported", name, f)
 		}
 	}
@@ -285,7 +365,7 @@ func TestAheadcheckRegisterParses(t *testing.T) {
 			unmarked = append(unmarked, r)
 		}
 	}
-	if f := check(unmarked, allow, nil, revision{}, revision{}); len(f) > 0 {
+	if f, _ := check(unmarked, allow, nil, nil, revision{}, revision{}); len(f) > 0 {
 		t.Errorf("the register against todo-marker.txt:\n%s", strings.Join(f, "\n"))
 	}
 	for _, r := range marked {
@@ -298,6 +378,31 @@ func TestAheadcheckRegisterParses(t *testing.T) {
 	}
 	if len(marked) == 0 {
 		t.Error("no register row has a marker")
+	}
+	// caught-up.txt names marked rows only, each at the current pin; that
+	// their markers are gone there is read by the next test.
+	caught, err := readCaughtUp(filepath.Join(root, caughtUpPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin, err := readPin(parity.SchemaJSON())
+	if err != nil {
+		t.Fatal(err)
+	}
+	byEntry := map[string]row{}
+	for _, r := range rows {
+		byEntry[r.entry] = r
+	}
+	for name, c := range caught {
+		r, ok := byEntry[name]
+		switch {
+		case !ok:
+			t.Errorf("caught-up.txt names %s, which is no row of the register", name)
+		case r.noMarker:
+			t.Errorf("caught-up.txt names %s, which has no marker", name)
+		case !strings.HasPrefix(pin, c.pin):
+			t.Errorf("caught-up.txt lists %s at %s, the pin is %s", name, c.pin, pin)
+		}
 	}
 }
 
@@ -354,7 +459,7 @@ func TestClassMarkerWrongAtThePin(t *testing.T) {
 		return "", errNoFile
 	}
 	pin := revision{name: "the pin", sha: "p"}
-	f := check(rows, nil, show, pin, revision{name: "ref", sha: "r"})
+	f, _ := check(rows, nil, nil, show, pin, revision{name: "ref", sha: "r"})
 	if len(f) != 3 || !strings.Contains(f[0], "no class None in a.ts") || !strings.Contains(f[1], "gone.ts does not exist") ||
 		!strings.Contains(f[2], "neither a Go-quoted string") {
 		t.Errorf("findings %q", f)
@@ -372,7 +477,7 @@ func TestReadFailureIsExitTwo(t *testing.T) {
 	}
 	show := func(_, _ string) (string, error) { return "", errors.New("fatal: unable to fetch blob") }
 	var out, errOut strings.Builder
-	if code := report(&out, &errOut, rows, nil, show, revision{name: "the pin", sha: "p"}, revision{name: "ref", sha: "r"}); code != 2 {
+	if code := report(&out, &errOut, rows, nil, nil, show, revision{name: "the pin", sha: "p"}, revision{name: "ref", sha: "r"}); code != 2 {
 		t.Errorf("exit %d, want 2; out %q", code, out.String())
 	}
 	if !strings.Contains(errOut.String(), "unable to fetch blob") || out.Len() != 0 {

@@ -167,7 +167,7 @@ var errNonContextMember = errors.New("im: structure member without a context tag
 // the switch's default arm ([skipField]) — and a member with any other tag
 // refuses the structure. matter.js TlvObject refuses a non-context tag and
 // skips an unknown context tag as a whole element
-// (packages/types/src/tlv/TlvObject.ts:212-219 at db021da0); a nested
+// (packages/types/src/tlv/TlvObject.ts:212-219 at b25ed960); a nested
 // container read field by field as the enclosing structure's used to end
 // that structure early (review II, R2-P6-wire-0504). The refusal is a plain
 // error: the request is answered FAILURE.
@@ -181,7 +181,7 @@ func contextMember(el tlv.Element) error {
 // taggedArrayElement reports an element of an array that carries a tag.
 // Array elements are anonymous: matter.js refuses a tagged one as it
 // refuses a value that is not an array, both as UnexpectedDataError
-// (packages/types/src/tlv/TlvArray.ts:73-78 at db021da0), and
+// (packages/types/src/tlv/TlvArray.ts:73-78 at b25ed960), and
 // connectedhomeip's reader as CHIP_ERROR_INVALID_TLV_TAG
 // (src/lib/core/TLVReader.cpp:873-875 at 6170af84). Every array reader of
 // a message refuses it with its malformed error (review II,

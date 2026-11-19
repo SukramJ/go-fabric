@@ -98,7 +98,7 @@ type Manager struct {
 	// fired by [Manager.CloseAllGraceful]: matter.js kicks off the
 	// advertiser shutdown before removing sessions precisely to prevent
 	// re-announces during teardown (packages/node/src/behavior/system/
-	// network/ServerNetworkRuntime.ts:450-453 at db021da0).
+	// network/ServerNetworkRuntime.ts:450-453 at b25ed960).
 	onReannounce func(fabricIndex uint8)
 
 	// reapExempt, when non-nil, is asked by the idle reaper for every
@@ -706,9 +706,11 @@ func randomInitialSessionID() uint16 {
 // keeps every session it established until it holds more than
 // [MaxSessionsPerPeer], at which point the least recently active ones
 // are force-closed (no CloseSession on the wire). Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:201-205
-// (MAX_SESSIONS_PER_PEER) and :690-725 (#evictExcessSessionsFor) at
-// db021da0.
+// packages/protocol/src/session/SessionManager.ts:204-206
+// (MAX_SESSIONS_PER_PEER) and :779-808 (#evictExcessSessionsFor), except
+// that matter.js runs the check once a session is established
+// (#sessionEstablished, :764-768) and counts established sessions only
+// (:785-796) — pin-lift unit P2-B.
 func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint64, keys sigma.SessionKeys) (*Entry, error) {
 	sess, err := channel.New(channel.Config{
 		EncryptKey:  keys.R2IKey[:], // bridge → peer
@@ -1418,7 +1420,7 @@ func (m *Manager) finishClose(entry *Entry) {
 // daemon shutdown never blocks on the network. The reannounce trigger
 // deliberately does not fire — the caller is shutting the bridge down
 // and matter.js likewise kicks off the advertiser shutdown before removing
-// sessions "to prevent re-announces when removing sessions" (at db021da0,
+// sessions "to prevent re-announces when removing sessions" (at b25ed960,
 // packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:450-453).
 //
 // The CloseSession per session departs from matter.js at db021da0, whose
@@ -1637,8 +1639,8 @@ func (m *Manager) closePeerLost(fabricIndex uint8, peerNodeID uint64, keep func(
 // time. A new CASE does not close the peer's previous sessions, so a
 // peer that reconnects repeatedly accumulates them; the cap is per
 // peer rather than global so one noisy peer cannot evict another's.
-// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:201-205
-// at db021da0, MAX_SESSIONS_PER_PEER.
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:204-206,
+// MAX_SESSIONS_PER_PEER.
 const MaxSessionsPerPeer = 5
 
 // evictExcessPeerSessionsLocked removes the least recently active
@@ -1652,14 +1654,13 @@ const MaxSessionsPerPeer = 5
 // placeholders (Session==nil) are mid-handshake and left alone, and
 // added itself is excluded so a burst of new sessions cannot evict the
 // one that prompted the check. Mirrors matter.js
-// packages/protocol/src/session/SessionManager.ts:691-725 at db021da0,
-// #evictExcessSessionsFor (:697) and #leastRecentlyUsedSession (:553-562).
+// packages/protocol/src/session/SessionManager.ts:779-808,
+// #evictExcessSessionsFor, and #leastRecentlyUsedSession (:600-608).
 //
 // Only a session the peer established runs the check: one we initiated
 // evicts nothing, since the peer loss our own traffic reports sweeps
-// those. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:312-318
-// at db021da0 (the sessions-added observer runs the check only when
-// !session.isInitiator).
+// those. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:764-768
+// (#sessionEstablished runs the check only for a responder session).
 func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
 	if added.isPase || added.isInitiator {
 		return nil

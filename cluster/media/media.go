@@ -11,7 +11,7 @@
 // matter.js has no logic for thirteen of them: each server is the
 // generated behaviour, `export class MediaPlaybackServer extends
 // MediaPlaybackBehavior {}` (packages/node/src/behaviors/media-playback/
-// MediaPlaybackServer.ts:14 at db021da0) and its siblings; LowPower's
+// MediaPlaybackServer.ts:14 at b25ed960) and its siblings; LowPower's
 // `sleep()` emits the `enterLowPowerMode` observable
 // (packages/node/src/behaviors/low-power/LowPowerServer.ts:16-18). A
 // matter.js application implements the commands in a subclass and changes
@@ -145,7 +145,7 @@ type handlers map[uint32]spec.CommandHandler
 
 // newServer is [spec.NewServer]; a mandatory command left without a
 // handler — the port does not implement it — is [ErrNotImplemented]
-// (ValidatedElements.ts:357-371 at db021da0).
+// (ValidatedElements.ts:357-371 at b25ed960).
 func newServer(def *spec.Cluster, opts spec.Options, cfg spec.ServerConfig) (*spec.Server, error) {
 	srv, err := spec.NewServer(def, opts, cfg)
 	if errors.Is(err, spec.ErrMissingHandler) {

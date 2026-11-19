@@ -43,7 +43,7 @@ func heldFabrics[T any](entries []T, fabric func(T) uint8) []uint8 {
 // as a requestor's EndSession command ends it — and leaves
 // CurrentSessions whatever the port answers; the error is the port's.
 // matter.js strips the fabric's CurrentSessions entries on its deletion
-// (FabricScopedDataHandler.ts:41-73 at db021da0); the camera's stack is
+// (FabricScopedDataHandler.ts:41-73 at b25ed960); the camera's stack is
 // told, so it stops streaming to the removed fabric's peer.
 func (p *Provider) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
 	p.op.Lock()
@@ -79,7 +79,7 @@ func (p *Provider) MatterHeldFabrics() []uint8 {
 // MatterDropFabric implements [contract.FabricScopedState]: the removed
 // fabric's sessions leave CurrentSessions, as matter.js strips them
 // (FabricScopedDataHandler.ts:41-73, on fabrics.events.deleting at
-// node/server/ServerEnvironment.ts:188-196, db021da0), and the port's End
+// node/server/ServerEnvironment.ts:188-196, b25ed960), and the port's End
 // is told of each with UnknownReason, after it left, as of a peer's End,
 // so the host tears the stream down.
 func (r *Requestor) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
@@ -116,7 +116,7 @@ func (r *Requestor) MatterHeldFabrics() []uint8 {
 // leaves CurrentConnections whatever the port answers, its expiry timer
 // with it; the error is the port's. matter.js strips the fabric's
 // CurrentConnections entries on its deletion
-// (FabricScopedDataHandler.ts:41-73 at db021da0); the port is told, so
+// (FabricScopedDataHandler.ts:41-73 at b25ed960); the port is told, so
 // the camera stops uploading for the removed fabric.
 func (p *PushTransport) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
 	p.op.Lock()

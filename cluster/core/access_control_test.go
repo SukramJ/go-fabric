@@ -402,7 +402,7 @@ func TestAccessControl_CASESubjectOperationalNodeIdUpperBound(t *testing.T) {
 // subject that is a CASE Auth Tag (upper 32 bits == 0xFFFF_FFFD) with a
 // version number of 0 (the low 16 bits) is rejected with a constraint error.
 // A non-zero CAT version is accepted. Mirrors matter.js
-// packages/node/src/behaviors/access-control/AccessControlServer.ts:205-212 at db021da0
+// packages/node/src/behaviors/access-control/AccessControlServer.ts:205-212 at b25ed960
 // (CaseAuthenticatedTag.getVersion(cat) === 0 → ConstraintError) and
 // packages/types/src/datatype/CaseAuthenticatedTag.ts:76 (getVersion). Matter §6.6.2.1.2.
 func TestAccessControl_CASESubjectCATVersionZeroRejected(t *testing.T) {
@@ -467,7 +467,7 @@ func TestAccessControl_CASESubjectCATVersionZeroRejected(t *testing.T) {
 // 0x0000..0x7FFF; a manufacturer-specific cluster needs a non-zero vendor
 // prefix + type suffix 0xFC00..0xFFFE; a DeviceType needs a type suffix
 // 0x0000..0xBFFF. Mirrors matter.js
-// packages/node/src/behaviors/access-control/AccessControlServer.ts:254-265 at db021da0
+// packages/node/src/behaviors/access-control/AccessControlServer.ts:254-265 at b25ed960
 // (ClusterId.isValid / DeviceTypeId.isValid). Matter §7.10 / §7.19.2.29.
 func TestAccessControl_TargetClusterAndDeviceTypeValidity(t *testing.T) {
 	t.Parallel()

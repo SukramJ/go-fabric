@@ -20,7 +20,7 @@ import (
 
 // The node's UTC as a served time source, and the time client after
 // connectedhomeip. matter.js's TimeSynchronizationServer is the generated
-// behaviour with no logic (TimeSynchronizationServer.ts:14 at db021da0).
+// behaviour with no logic (TimeSynchronizationServer.ts:14 at b25ed960).
 //
 // connectedhomeip's server takes its time from the platform first, then
 // from the trusted time source's node, then from the default NTP server,

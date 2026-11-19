@@ -126,7 +126,7 @@ func TestMoverGetsOneGoToPerCommand(t *testing.T) {
 
 // TestMoverStopSetsTargetToCurrent: StopMotion calls Stop, and the target
 // follows the current position (matter.js handleStopMovement,
-// WindowCoveringServer.ts:491-493 at db021da0).
+// WindowCoveringServer.ts:491-493 at b25ed960).
 func TestMoverStopSetsTargetToCurrent(t *testing.T) {
 	t.Parallel()
 	m := &recordingMover{}

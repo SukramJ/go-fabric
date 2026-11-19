@@ -32,15 +32,15 @@ import (
 // (examples/reference-bridge/media.go), which every daemon of the leg
 // carries (TestGoCertificationCases requires the flag, bridge_test.go
 // startBridgeWith adds it). The TS line citations in this file were read
-// at the snapshot's pin, db021da0 (parity/schema.json matter.sourceCommit),
-// not at [goCertReadAt].
+// at [goCertReadAt], the snapshot's pin b25ed960 (parity/schema.json
+// matter.sourceCommit).
 //
 // Every step is sendsTvCommand (tc-tv-client-support.ts:47-57) or, for
-// LOWPOWER, sendCommand (tc-support.ts:1802-1815): the DUT invokes the
+// LOWPOWER, sendCommand (tc-support.ts:1825-1838): the DUT invokes the
 // command with the TS's arguments, the invoke must succeed and a response
 // that carries a Status must carry 0 (invokeWithResponseChecks
-// tc-support.ts:1610-1662), and the TH's log must show the request with
-// exactly that payload (expectCommandPayload :1698-1738). Read mirrored,
+// tc-support.ts:1633-1685), and the TH's log must show the request with
+// exactly that payload (expectCommandPayload :1721-1761). Read mirrored,
 // the TH is the daemon, whose log the Go TH does not read for a payload:
 // the Go TH sends the same command and holds the same response checks,
 // and the TH-log payload check becomes the daemon's — for a command whose
@@ -73,7 +73,7 @@ func init() {
 // --- The media case -----------------------------------------------------------
 
 // mediaCommand is one command a step sends: statusField holds a
-// response's Status (tag 0) to 0 (tc-support.ts :1647-1659).
+// response's Status (tag 0) to 0 (tc-support.ts :1670-1682).
 type mediaCommand struct {
 	cluster, cmd uint32
 	name         string

@@ -6,7 +6,7 @@ package chipdm
 import "testing"
 
 // TestConformanceTextParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:18-100 at db021da0
+// packages/model/test/aspects/ConformanceTest.ts:18-100 at b25ed960
 // (TEST_DEFINITIONS and TEST_DEFINITIONS2, "parses" and "serializes"):
 // every conformance text matter.js parses, parsed by the module's
 // conformance parser (the one the CHIP data model cross-check reads chip's
@@ -49,7 +49,7 @@ func TestConformanceTextParityMatterJS(t *testing.T) {
 }
 
 // TestConformanceInvalidParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:106-155 at db021da0: a
+// packages/model/test/aspects/ConformanceTest.ts:106-155 at b25ed960: a
 // text that is not conformance, a range-form choice, mixed choice
 // modifiers and partial optionality are refused.
 func TestConformanceInvalidParityMatterJS(t *testing.T) {
@@ -62,7 +62,7 @@ func TestConformanceInvalidParityMatterJS(t *testing.T) {
 }
 
 // TestConformanceRevisionParityMatterJS mirrors
-// packages/model/test/aspects/ConformanceTest.ts:676-698 at db021da0:
+// packages/model/test/aspects/ConformanceTest.ts:676-698 at b25ed960:
 // "Rev >= vN" is one revision node, "[Rev >= vN]" an optional group of it,
 // "Rev >= vN, [Rev >= vM]" a list, each serialized with its "v".
 func TestConformanceRevisionParityMatterJS(t *testing.T) {
@@ -107,7 +107,7 @@ func TestConformancePrecedenceParityMatterJS(t *testing.T) {
 }
 
 // TestConformanceSecondOrIsRefused: matter.js reads the first " or " as "|"
-// (Conformance.ts:554 at db021da0) and that one only; the module's parser
+// (Conformance.ts:554 at b25ed960) and that one only; the module's parser
 // does the same, and a second "or" is an error instead of a name that makes
 // the text an otherwise list (R2-P6-test-2851, a module rule).
 func TestConformanceSecondOrIsRefused(t *testing.T) {

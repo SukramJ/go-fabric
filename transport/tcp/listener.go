@@ -119,7 +119,7 @@ type Config struct {
 	PreferIPv4 bool
 	// MaxPayloadSize is the largest message a connection sends or
 	// receives, the length prefix not counted (MAX_TCP_MESSAGE_SIZE,
-	// TcpChannel.ts:37-41 at db021da0). Zero means [DefaultMaxPayloadSize].
+	// TcpChannel.ts:37-41 at b25ed960). Zero means [DefaultMaxPayloadSize].
 	MaxPayloadSize int
 	// Logger receives the listener's log lines. nil means slog.Default.
 	Logger *slog.Logger

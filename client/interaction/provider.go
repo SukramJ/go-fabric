@@ -24,8 +24,9 @@ const (
 )
 
 // ErrNoSession is a provider without a session to run the exchange on —
-// matter.js's "No existing session available for probe"
-// (PeerExchangeProvider.ts:118-121) and a closed dedicated session.
+// matter.js's SessionClosedError "No existing session to <address>"
+// (PeerExchangeProvider.ts:118), kept under this name — and a closed
+// dedicated session.
 var ErrNoSession = errors.New("interaction: no session")
 
 // ExchangeOptions configures [Provider.InitiateExchange] — the part of
@@ -182,10 +183,10 @@ func (p *sessionProvider) Session() *exchange.Session   { return p.s }
 func (p *sessionProvider) Manager() *exchange.Manager   { return p.mgr }
 
 // PeerProvider is the provider over peer p — matter.js
-// PeerExchangeProvider (packages/protocol/src/peer/PeerExchangeProvider.ts:19-159):
+// PeerExchangeProvider (packages/protocol/src/peer/PeerExchangeProvider.ts:20-157):
 // each exchange runs on the peer's newest session, connecting first
-// unless RequireExistingSession is set (:73-150), reachability is the
-// peer's (:69-71).
+// unless RequireExistingSession is set (:74-144), reachability is the
+// peer's (:70-72).
 func PeerProvider(p *peer.Peer) Provider { return &peerProvider{p: p} }
 
 // ForPeer returns the interaction over peer p.
@@ -267,7 +268,7 @@ func (p *peerProvider) MaximumPeerResponseTime(ept time.Duration, includeSending
 		return exchange.ReliableMaxPeerResponseTime(ept)
 	}
 	// Our own retransmissions carry the manager's local pad — matter.js
-	// PeerExchangeProvider.ts:150-158 (W4-ctlim-07).
+	// PeerExchangeProvider.ts:146-156 (W4-ctlim-07).
 	mgr := p.p.Exchanges()
 	local := exchange.IntervalsOf(mgr.LocalParameters())
 	pad := mgr.LocalPad()

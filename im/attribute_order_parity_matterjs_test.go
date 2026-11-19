@@ -83,7 +83,7 @@ func TestCompareAttributeIDsFollowsTheSnapshotOrder(t *testing.T) {
 // that the cluster's model does not list. matter.js lists the members a
 // server's schema adds to a cluster's model before the model's own
 // (findAllMembers visits the extending schema before its base,
-// packages/model/src/logic/Scope.ts:287-333 at db021da0), in the order
+// packages/model/src/logic/Scope.ts:287-333 at b25ed960), in the order
 // the extension defines them; that order is not known here, so such
 // attributes come first in ascending id order — this module's rule. A
 // cluster the snapshot does not define has the global attributes as its

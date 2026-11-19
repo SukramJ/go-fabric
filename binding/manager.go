@@ -68,7 +68,7 @@ type Resolution struct {
 	Interaction *interaction.Interaction
 	// Endpoint is the target endpoint: the bound node's (KindClient), ours
 	// (KindServer), or — as matter.js materialises a group's endpoint under
-	// the source endpoint's number (BindingManager.ts:455 at db021da0) — the source
+	// the source endpoint's number (BindingManager.ts:455 at b25ed960) — the source
 	// endpoint (KindGroup).
 	Endpoint uint16
 	// Group sends to the bound group (KindGroup).

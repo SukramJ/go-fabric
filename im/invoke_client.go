@@ -19,7 +19,7 @@ import (
 // MarshalInvokeRequestTLV encodes req as an InvokeRequestMessage, each
 // command's fields through fieldsWriter, in matter.js TlvInvokeRequest's
 // field order (packages/types/src/protocol/messages/TlvInvokeRequest.ts:17-31
-// at db021da0): the DelayReportData (tag 3) when req carries one, both its
+// at b25ed960): the DelayReportData (tag 3) when req carries one, both its
 // fields written (TlvDelayReportData.ts, TlvField with a decode fallback
 // only), then req's InteractionModelRevision — this module's
 // [MatterInteractionModelRevision] when 0. fieldsWriter is required: it
@@ -183,7 +183,7 @@ func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (I
 
 // readCommandStatusIB reads a CommandStatusIB after its opener. Its path
 // and its status are mandatory (matter.js TlvCommandStatus.ts:16-17 at
-// db021da0, both TlvField).
+// b25ed960, both TlvField).
 func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 	sawPath, sawStatus := false, false
 	for {
@@ -243,7 +243,7 @@ func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 }
 
 // readStatusIBFields reads a StatusIB's fields after its opener. Status
-// is mandatory (matter.js TlvStatus.ts:15 at db021da0), as
+// is mandatory (matter.js TlvStatus.ts:15 at b25ed960), as
 // [UnmarshalStatusIBTLV] holds it: a block without it is refused, not
 // read as Success; a member it does not know is skipped whole (review
 // II, R2-P1-req2-09).

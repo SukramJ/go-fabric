@@ -81,7 +81,7 @@ const yearSeconds int64 = 365 * 24 * 60 * 60
 
 // matterDate is the certificate time of t moved by years. Mirrors matter.js
 // packages/protocol/src/certificate/kinds/definitions/asn.ts:18-22
-// (jsToMatterDate) at db021da0: Unix seconds, floored, minus the Matter
+// (jsToMatterDate) at b25ed960: Unix seconds, floored, minus the Matter
 // epoch offset, plus the years; the X.520 non-well-defined date (a zero
 // time here) encodes as 0. A result outside the 32-bit field is an error.
 func matterDate(t time.Time, years int64) (uint32, error) {

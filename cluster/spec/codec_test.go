@@ -245,7 +245,7 @@ func TestDecodeRequest(t *testing.T) {
 // TestReadContainerRefusesATaggedArrayElement: an array's elements are
 // anonymous; one with a tag refuses the tree, at any depth, after the
 // container was read through to its end — as matter.js's array schema
-// (packages/types/src/tlv/TlvArray.ts:77-78 at db021da0) and
+// (packages/types/src/tlv/TlvArray.ts:77-78 at b25ed960) and
 // connectedhomeip's reader (src/lib/core/TLVReader.cpp:873-875 at
 // 6170af84) refuse it.
 func TestReadContainerRefusesATaggedArrayElement(t *testing.T) {

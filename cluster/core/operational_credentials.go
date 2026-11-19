@@ -2091,7 +2091,7 @@ func (o *OperationalCredentials) failSafeKeyPair() (priv *ecdsa.PrivateKey, draw
 // buildPKCS10CSR creates the DER-encoded PKCS#10 certification request
 // with `priv` as the subject key — [mattercert.CreateCSR], the request
 // matter.js's Certificate.createCertificateSigningRequest builds
-// (Certificate.ts:259-272 at db021da0): the placeholder subject `O=CSR`,
+// (Certificate.ts:259-272 at b25ed960): the placeholder subject `O=CSR`,
 // which the CA replaces with the operational subject DN when issuing the
 // NOC, signed ECDSA-SHA256 per Matter §6.4.1.2.
 func buildPKCS10CSR(priv *ecdsa.PrivateKey) ([]byte, error) {
@@ -2555,7 +2555,7 @@ func fabricInstalled(fabrics []store.FabricRecord, fabricID uint64, rootPub []by
 // nocVerifier is the verifier of a NOC chain under the trust root: built
 // from the root certificate when it is held, so a root-signed NOC's
 // authorityKeyIdentifier is checked against the root's
-// subjectKeyIdentifier (matter.js Noc.ts:174-188 at db021da0); from the
+// subjectKeyIdentifier (matter.js Noc.ts:174-188 at b25ed960); from the
 // root's public key alone for a legacy fabric row without the certificate.
 func nocVerifier(rcac, rootPublicKey []byte) (*mattercert.Verifier, error) {
 	if len(rcac) > 0 {
@@ -3105,7 +3105,7 @@ func (o *OperationalCredentials) SetCurrentFabric(idx uint8) {
 // removeFabricRow is RemoveFabric's store removal, serialised with the
 // NOC commands, the commit and the rollback (nocMu): a removal never lands
 // between a command's writes. A deletion is final, whoever holds the
-// fail-safe (matter.js CommissioningServer.ts:119-121 at db021da0): the
+// fail-safe (matter.js CommissioningServer.ts:119-121 at b25ed960): the
 // fail-safe context goes with it only when its fabric is the removed one —
 // another fabric's removal leaves an armed fail-safe and its pending row
 // alone (review II, R2-P2-comm-01 = R2-P2-fabric-01).

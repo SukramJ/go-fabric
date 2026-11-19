@@ -192,7 +192,7 @@ func (unobservedReadings) HasEnergy() bool                                { retu
 // element: an attribute reads null only when the element gives it quality
 // X. A non-nullable attribute reads its default instead — matter.js's
 // default of a non-nullable member is never null (packages/model/src/
-// logic/SelectDefaultValue.ts:155-157 at db021da0, null only
+// logic/SelectDefaultValue.ts:155-157 at b25ed960, null only
 // `if (member.nullable)`).
 func TestUnobservedReadsAreNullOnlyWhereTheDefinitionAllows(t *testing.T) {
 	t.Parallel()

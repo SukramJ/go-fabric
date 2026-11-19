@@ -1099,7 +1099,7 @@ func RandomDiscriminator() (uint16, error) {
 // from the §5.1.1.1.1 valid-passcode set: a candidate that fails
 // [setup.IsValidPasscode] — 0, the all-same-digit values 11111111..99999999,
 // 12345678 and 87654321, matter.js packages/types/src/schema/
-// PairingCodeSchema.ts:160-162 INVALID_PASSCODES at db021da0 — is
+// PairingCodeSchema.ts:160-162 INVALID_PASSCODES at b25ed960 — is
 // re-rolled, as matter.js PaseClient.generateRandomPasscode does
 // (packages/protocol/src/session/pase/PaseClient.ts:55-67). The rule is
 // that one function; this one only draws.

@@ -16,7 +16,7 @@ import (
 
 // TestQuieterAttributeReportsThroughItsThrottleParityMatterJS: PowerSource's
 // BatPercentRemaining is quieter with a ten-second interval
-// (PowerSourceServer.ts:25-34 at db021da0, the definition's QuietInterval).
+// (PowerSourceServer.ts:25-34 at b25ed960, the definition's QuietInterval).
 // Its first change is reported at once; three more inside the interval
 // reach the change listeners at once and the wire once, when the interval
 // has passed. Each stored change advances the DataVersion at the change —

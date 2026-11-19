@@ -12,7 +12,7 @@ import (
 )
 
 // TestEcdsaSignatureDERParityMatterJS mirrors
-// packages/general/test/crypto/EcdsaSignatureTest.ts:27-38 at db021da0
+// packages/general/test/crypto/EcdsaSignatureTest.ts:27-38 at b25ed960
 // ("round-trips through DER encoding", "rejects malformed DER input"): a
 // certificate's DER ECDSA-Sig-Value reads back as the 64-byte r ‖ s it
 // encodes (derECDSASignature), and bytes that are no DER signature are
@@ -45,7 +45,7 @@ func TestEcdsaSignatureDERParityMatterJS(t *testing.T) {
 }
 
 // TestX509ExtensionsParityMatterJS mirrors
-// packages/general/test/crypto/X509Test.ts:11-31 at db021da0: extended
+// packages/general/test/crypto/X509Test.ts:11-31 at b25ed960: extended
 // key usage encodes the known values and refuses an unsupported one, and
 // basic constraints and key usage encode (the X.509 extensions a Matter
 // certificate's DER form carries, tbs_der.go).

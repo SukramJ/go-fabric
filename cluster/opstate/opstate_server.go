@@ -199,7 +199,7 @@ const (
 // as an empty string, and refused for any other id at construction with
 // [spec.ErrInvalidValue] — the OperationalStateLabel conformance
 // "OperationalStateID >= 128 & OperationalStateID <= 191" (matter.js
-// operational-state.element.ts:94-97 at db021da0), where it was dropped
+// operational-state.element.ts:94-97 at b25ed960), where it was dropped
 // silently (R2-P6-par-1567).
 type StateEntry struct {
 	ID    State
@@ -987,7 +987,7 @@ func equalPhase(a, b *uint8) bool {
 // reported as matter.js reports its "Q"
 // quality: at once from or to null, otherwise at most once a second, with
 // the latest value (see [cluster.Quieter]; the throttle is the
-// QuietEvent's `online` view only, Events.ts:269-296 at db021da0). The server applies matter.js's
+// QuietEvent's `online` view only, Events.ts:269-296 at b25ed960). The server applies matter.js's
 // throttle, not the specification's fuller list of when a countdown change
 // is reportable — matter.js's RvcOperationalStateServer notes the same
 // gap.

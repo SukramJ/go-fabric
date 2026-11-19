@@ -48,7 +48,7 @@ func TestFanControlServerParityMatterJS(t *testing.T) {
 	t.Run("has not-off-only commands by default", func(t *testing.T) {
 		t.Parallel()
 		purifier, err := godevice.NewAirPurifier(godevice.Options{StableKey: endpoint.StringKey("purifier"), Name: "purifier"},
-			// The test's fanModeSequence (FanControlTest.ts:28 at db021da0),
+			// The test's fanModeSequence (FanControlTest.ts:28 at b25ed960),
 			// which device.New requires (decision 17).
 			onoffdef.Declare{}, fandef.Declare{Initial: fandef.Patch{FanModeSequence: new(fandef.FanModeSequenceOffLowMedHigh)}})
 		if err != nil {

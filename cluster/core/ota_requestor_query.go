@@ -142,7 +142,7 @@ func (r *OTASoftwareUpdateRequestor) performUpdateQuery(ctx context.Context) {
 // ends — a panic included, which would otherwise leave the flag set and
 // every later timer skipping. Mirrors `try { await this.#queryForUpdate() }
 // finally { this.internal.queryRunning = false }`
-// (OtaSoftwareUpdateRequestorServer.ts:576-581 at db021da0). It returns
+// (OtaSoftwareUpdateRequestorServer.ts:576-581 at b25ed960). It returns
 // the update the query prepared, if any.
 func (r *OTASoftwareUpdateRequestor) runUpdateQuery(ctx context.Context) (pending *pendingApply) {
 	defer func() {

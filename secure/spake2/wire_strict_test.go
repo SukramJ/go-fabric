@@ -83,14 +83,14 @@ func encodeWire(t *testing.T, asList bool, members ...wireMember) []byte {
 // numbered like a field or not, before or after the declared members, at
 // the top level or inside the nested PBKDFParameters — is refused, as
 // matter.js's TlvObject decode throws for it
-// (packages/types/src/tlv/TlvObject.ts:212-214 at db021da0; an implicit
+// (packages/types/src/tlv/TlvObject.ts:212-214 at b25ed960; an implicit
 // tag matter.js's codec already throws for, TlvCodec.ts:169-171), while inside
 // a skipped unknown member the tag forms are not looked at
 // (packages/types/src/tlv/TlvAny.ts:87-90; an implicit-profile tag is
 // refused by the tlv decoder wherever it stands) (R2-P5 Fable F1). A
 // PBKDFParamRequest needs all four of its mandatory members — matter.js's
 // TlvPbkdfParamRequest declares tags 1-4 TlvFields
-// (packages/protocol/src/session/pase/PaseMessages.ts:70-73 at db021da0) —
+// (packages/protocol/src/session/pase/PaseMessages.ts:70-73 at b25ed960) —
 // so one without PasscodeID or HasPBKDFParameters is refused.
 func TestPASEDecodersAreStrictAboutShape(t *testing.T) {
 	t.Parallel()
@@ -253,7 +253,7 @@ func TestPBKDFParamResponseFieldsAreTyped(t *testing.T) {
 
 // TestPASEDecodersSkipUnknownMembersWholeAndKeepTheLast holds the member
 // walk of every PASE decoder against matter.js's TlvObject decode
-// (packages/types/src/tlv/TlvObject.ts at db021da0): a context-tagged
+// (packages/types/src/tlv/TlvObject.ts at b25ed960): a context-tagged
 // member the message does not declare is skipped whole, containers included
 // (:216-219), so the members of an unknown structure never count as the
 // message's own fields and its end never ends the message; a declared

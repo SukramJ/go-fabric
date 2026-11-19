@@ -42,7 +42,7 @@ func TestEncodeFrameLittleEndianLength(t *testing.T) {
 }
 
 func TestEncodeFrameRejectsAboveMaxMessageSize(t *testing.T) {
-	// The limit excludes the length prefix (TcpChannel.ts:116 at db021da0).
+	// The limit excludes the length prefix (TcpChannel.ts:116 at b25ed960).
 	if _, err := encodeFrame(make([]byte, 16), 16); err != nil {
 		t.Fatalf("16 bytes at max payload 16 must fit: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestAssemblerOversizedAnnouncedLengthCloses(t *testing.T) {
 
 func TestAssemblerNoReceiveBufferCap(t *testing.T) {
 	// Since the db021da0 lift the buffered bytes have no cap of their own
-	// (TcpChannel.ts:204 at db021da0): a chunk of many complete frames is
+	// (TcpChannel.ts:204 at b25ed960): a chunk of many complete frames is
 	// taken whole, an incomplete one is bounded by the header check.
 	a := newAssembler(16)
 	chunk := bytes.Repeat(frameOf(make([]byte, 16)), 8) // 160 bytes, ten times the limit

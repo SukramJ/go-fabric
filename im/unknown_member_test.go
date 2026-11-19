@@ -18,7 +18,7 @@ const unknownTag = 0x1D
 // whose context tag it does not know as one whole element — a container
 // there that holds a look-alike of a real field changes nothing, as
 // matter.js TlvObject skips an unknown context tag whole
-// (packages/types/src/tlv/TlvObject.ts:215-219 at db021da0). Before, the
+// (packages/types/src/tlv/TlvObject.ts:215-219 at b25ed960). Before, the
 // container's members were read as the enclosing structure's: an invoke
 // ran another command, a read flipped FabricFiltered, a TimedRequest
 // lost its Timeout.

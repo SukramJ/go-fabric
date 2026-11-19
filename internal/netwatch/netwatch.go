@@ -4,7 +4,7 @@
 // Package netwatch notices changes of the host's network interfaces by
 // comparing a snapshot of them at an interval — matter.js
 // Network.interfacesChanged (packages/general/src/net/Network.ts:142-215 at
-// db021da0). The mDNS responder and the GeneralDiagnostics server each run
+// b25ed960). The mDNS responder and the GeneralDiagnostics server each run
 // one while somebody depends on the interfaces: the responder while
 // services are published, GeneralDiagnostics while its attribute changes
 // are observed.
@@ -22,7 +22,7 @@ import (
 // DefaultInterval is how often a running [Watcher] compares the interfaces:
 // half the 120 s TTL of the mDNS address records, so peers hold an old
 // address for at most this interval plus one TTL — matter.js
-// INTERFACE_CHECK_INTERVAL (Network.ts:91-95 at db021da0).
+// INTERFACE_CHECK_INTERVAL (Network.ts:91-95 at b25ed960).
 const DefaultInterval = 60 * time.Second
 
 // Watcher compares snapshots of the interfaces every interval while it
@@ -90,7 +90,7 @@ func (w *Watcher) SetInterval(d time.Duration) {
 
 // Start begins the observation, unless it runs: it records the current
 // snapshot and, unless the interval is disabled, compares again after each
-// interval (Network.ts:163-171 at db021da0).
+// interval (Network.ts:163-171 at b25ed960).
 func (w *Watcher) Start() {
 	w.mu.Lock()
 	if w.running {
@@ -118,7 +118,7 @@ func (w *Watcher) Start() {
 }
 
 // Stop ends the observation and forgets the snapshot, so a later Start
-// records afresh (Network.ts:163-171 at db021da0).
+// records afresh (Network.ts:163-171 at b25ed960).
 func (w *Watcher) Stop() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -144,7 +144,7 @@ func (w *Watcher) Running() bool {
 // Check compares the interfaces now and, while the Watcher runs, reports
 // the changed names to changed and returns them — matter.js
 // Network.checkInterfaces, for a host that learns of a change before the
-// next periodic check (Network.ts:174-186 at db021da0). A stopped Watcher
+// next periodic check (Network.ts:174-186 at b25ed960). A stopped Watcher
 // compares nothing.
 func (w *Watcher) Check() []string {
 	w.checkMu.Lock()
@@ -211,7 +211,7 @@ func (w *Watcher) tick(gen, tickGen uint64) {
 
 // Diff returns the sorted names whose description differs between prev and
 // next, those present in only one of them included (Network.ts:208-210 at
-// db021da0).
+// b25ed960).
 func Diff(prev, next map[string]string) []string {
 	var names []string
 	for name, d := range prev {
@@ -231,7 +231,7 @@ func Diff(prev, next map[string]string) []string {
 // Describe is an interface's description for the comparison: its MAC and
 // its addresses, each address family sorted and without duplicates, so
 // neither the order nor a repeat of an address counts as a change —
-// matter.js describeDetails (Network.ts:251-254 at db021da0).
+// matter.js describeDetails (Network.ts:251-254 at b25ed960).
 func Describe(mac string, families ...[]string) string {
 	parts := make([]string, 0, 1+len(families))
 	parts = append(parts, mac)

@@ -287,7 +287,7 @@ func TestPqcAttestationCertificatesParsing(t *testing.T) {
 	})
 }
 
-// PqcAnnexHCertificates.ts:526-611 at db021da0, verbatim (Matter 1.6 Annex
+// PqcAnnexHCertificates.ts:526-611 at b25ed960, verbatim (Matter 1.6 Annex
 // H: an ML-DSA-44 PAI signed by the ML-DSA-44 PAA).
 const pqcPaiMlDsa44ByPaaMlDsa44 = `-----BEGIN CERTIFICATE-----
 MIIPpDCCBhqgAwIBAgICIEQwCwYJYIZIAWUDBAMRMBYxFDASBgorBgEEAYKifAIB

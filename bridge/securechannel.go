@@ -917,8 +917,10 @@ const pasePairingTimeout = 60 * time.Second
 // the doubling backoff runs into.
 //
 // matter.js and chip both end the refusal with the commissioning window:
-// matter.js throws MaximumPasePairingErrorsReachedError and lets the
-// PaseServer die with the window (PaseServer.ts:106-110), chip calls
+// matter.js counts failed attempts per window and, at
+// MAX_FAILED_COMMISSIONING_ATTEMPTS = 20, closes the window
+// (DeviceCommissioner.ts:44, :181-198), with no timer keeping PASE refused
+// afterwards; chip calls
 // CommissioningWindowManager::Cleanup once mFailedCommissioningAttempts
 // reaches kMaxFailedCommissioningAttempts
 // (CommissioningWindowManager.cpp:160-192). Neither can lock pairing out
@@ -1177,10 +1179,17 @@ func (b *Bridge) releasePaseInFlight(key HandshakeKey) {
 // reaches [paseMaxErrors], closes the open commissioning window and
 // engages a timed PASE lockout. Mirrors matter.js PaseServer.ts:95-110
 // (count → MaximumPasePairingErrorsReachedError) + DeviceCommissioner.ts:78-82
-// at db021da0 (tooManyPaseErrors → endCommissioning). The window closes
+// at db021da0 (tooManyPaseErrors → endCommissioning). At b25ed960 that
+// mechanism is gone: matter.js counts failed attempts per window — a PASE
+// pairing that fails before its session is established (pairingFailed,
+// wired at DeviceCommissioner.ts:251) and a fail-safe that ends without
+// commissioning (:160-174) — and closes the window at
+// MAX_FAILED_COMMISSIONING_ATTEMPTS = 20 (:44, :198); the fail-safe half is
+// pin-lift unit P3-C, the timed lockout stays ahead of matter.js
+// (BD-Matter-PASE-TimedLockout). The window closes
 // as the end of commissioning closes it ([CommissioningWindow.EndCommissioning]),
-// not as RevokeCommissioning does: matter.js's endCommissioning →
-// #closeWindow (DeviceCommissioner.ts:319-324, :283-299) stops the timer,
+// not as RevokeCommissioning does: matter.js's
+// #closeWindow (DeviceCommissioner.ts:318-334) stops the timer,
 // removes the PASE commissioner and leaves commissioning mode, and touches
 // neither the fail-safe nor a PASE session — a commissioning already past
 // PASE keeps its fail-safe and its pending fabric. Called from the
@@ -2700,7 +2709,7 @@ type serviceRetransmitter interface {
 // waits for it before the advertiser closes. No-op once the bridge
 // stopped — matter.js shuts the advertiser down before removing
 // sessions to prevent exactly this re-announce
-// (ServerNetworkRuntime.ts:450-453 at db021da0).
+// (ServerNetworkRuntime.ts:450-453 at b25ed960).
 func (b *Bridge) triggerSessionReannounce(fabricIndex uint8) {
 	if fabricIndex == 0 {
 		return

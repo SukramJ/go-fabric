@@ -255,7 +255,7 @@ func negotiateReceiver(ctx context.Context, f *inboundFlow, modes []DriverMode, 
 	// (R2-P2-alloc-06; review II, R2-P6-bound-1908; an Ahead-of-matter.js
 	// row: matter.js's receiver-and-responder collects the accept
 	// parameters with no length, bdx-session-initiator.ts:105-111 at
-	// db021da0).
+	// b25ed960).
 	if length != nil {
 		f.setDataLength(*length)
 	}

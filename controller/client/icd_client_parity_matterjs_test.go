@@ -738,7 +738,7 @@ func TestIcdClientParity(t *testing.T) {
 			}
 		})
 		t.Run("exposes nextExpectedCheckin on the wall clock once no subscription is held", func(t *testing.T) {
-			// IcdClientTest.ts:2281-2293 at db021da0: a step of the wall clock
+			// IcdClientTest.ts:2281-2293 at b25ed960: a step of the wall clock
 			// alone leaves the deadline at least the idle mode duration ahead
 			// of the stepped now — the wakefulness runs on the monotonic
 			// reading, nextExpectedCheckin converts (IcdClient.ts:83-87).

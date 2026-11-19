@@ -114,7 +114,7 @@ func TestPqcAttestationCertificatesDeviceCertification(t *testing.T) {
 
 // TestPqcAttestationCertificatesDeviceCertificationProduct ports "refuses
 // a chain it cannot serve without segmented responses"
-// (PqcAttestationCertificatesTest.ts:509-529 at db021da0) with the product
+// (PqcAttestationCertificatesTest.ts:509-529 at b25ed960) with the product
 // description: matter.js's DeviceCertification checks the servable size
 // first (#assertServable, DeviceCertification.ts:75-78) and the product
 // after, so an oversized ML-DSA chain is refused for its size whatever

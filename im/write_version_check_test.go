@@ -76,7 +76,7 @@ func TestWriteTransactionRelease(t *testing.T) {
 
 // TestWriteRequestSuppressResponseType: a SuppressResponse that is not a
 // boolean fails the decode, and the request is answered
-// (SuppressResponseTest.ts:399-403 at db021da0, UNREADABLE_SUPPRESS_RESPONSE).
+// (SuppressResponseTest.ts:399-403 at b25ed960, UNREADABLE_SUPPRESS_RESPONSE).
 func TestWriteRequestSuppressResponseType(t *testing.T) {
 	t.Parallel()
 	enc := tlv.NewEncoder()
@@ -93,7 +93,7 @@ func TestWriteRequestSuppressResponseType(t *testing.T) {
 }
 
 // TestWriteRequestDecodeRefusals: the WriteRequest decoder refuses what
-// TlvWriteRequest.ts:16-24 at db021da0 does not describe — a top level that
+// TlvWriteRequest.ts:16-24 at b25ed960 does not describe — a top level that
 // is no struct, a WriteRequests that is no array, an AttributeDataIB that
 // is no struct, a message cut short — and skips a field it does not know.
 func TestWriteRequestDecodeRefusals(t *testing.T) {

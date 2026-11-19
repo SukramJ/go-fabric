@@ -18,7 +18,7 @@ import (
 // nothing published yet and the records go out right after it. Mirrors
 // matter.js
 // examples/device-onoff-advanced/src/cluster/DummyWifiNetworkCommissioningServer.ts:132-133
-// at db021da0 ("Announce operational in IP network",
+// at b25ed960 ("Announce operational in IP network",
 // `this.env.get(DeviceAdvertiser).restartAdvertisement()` after its
 // connect).
 func (n *Node) wifiConnected(ctx context.Context) {

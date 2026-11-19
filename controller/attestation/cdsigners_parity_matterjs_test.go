@@ -4,7 +4,7 @@
 package attestation
 
 // A port of matter.js packages/protocol/test/certificate/CdSignersTest.ts
-// at db021da0 on the CSA CD certificates connectedhomeip ships in
+// at b25ed960 on the CSA CD certificates connectedhomeip ships in
 // credentials/development/cd-certs at 6170af84 (matter.js copies them into
 // CsaCdCertificates.ts).
 

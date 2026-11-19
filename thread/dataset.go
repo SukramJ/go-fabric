@@ -163,7 +163,7 @@ func (ds *OperationalDataset) encodeWithReplay() ([]byte, error) {
 // replay state, so it encodes canonically.
 //
 // Mirrors matter.js packages/protocol/src/thread/OperationalDataset.ts:100-102
-// (OperationalDataset.redact) at db021da0 for PSKc and NetworkKey: the
+// (OperationalDataset.redact) at b25ed960 for PSKc and NetworkKey: the
 // spread copy there is not in the ORIGINAL_TLVS WeakMap. It departs from
 // it for Raw: the copy there keeps raw (:41), the source bytes and the
 // network key and PSKc with them, under a doc that calls the result safe

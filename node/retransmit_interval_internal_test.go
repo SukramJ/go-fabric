@@ -20,7 +20,7 @@ import (
 // outbound tracker sizes every retransmission of a secure session from
 // it (bridge.SessionRetransmitIntervalResolver); before the node wired it,
 // each one ran on the 500 ms idle default. Mirrors matter.js
-// MessageChannel.ts:268-275 and MRP.ts:181 at db021da0.
+// MessageChannel.ts:268-275 and MRP.ts:181 at b25ed960.
 func TestRetransmitIntervalFollowsThePeer(t *testing.T) {
 	t.Parallel()
 	cfg := mdnsTestConfig(t)

@@ -366,7 +366,7 @@ func caseSC48() goCertCase {
 				return commission(th, devs[0])
 			}},
 			{n: "2", line: 137, title: "Commission TH2 to DUT's Fabric", run: func(th *goTH) error {
-				// identityFor(1) (cert-dsl.ts:304-325): the next device's
+				// identityFor(1) (cert-dsl.ts:310-331): the next device's
 				// discriminator.
 				b := startBridgeWith(th.t, th.bin, th.flags, bridgeOptions{listen: ":0", extraArgs: []string{"--discriminator", strconv.FormatUint(uint64(th.dut.info.discriminator)+1, 10)}})
 				th.extra = append(th.extra, b)

@@ -27,7 +27,7 @@ func IsFabricScopedInvoke(clusterID, commandID uint32) bool {
 // IsFabricScopedWrite reports whether the (cluster, attribute) pair is a
 // writable attribute whose effective access is fabric-scoped ("F") or
 // fabric-sensitive ("S") — matter.js's limits.fabricScoped
-// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0:
+// (packages/protocol/src/action/server/AccessControl.ts:524 at b25ed960:
 // `access.fabric === Access.Fabric.Scoped || access.fabric ===
 // Access.Fabric.Sensitive`) on an attribute with limits.writable. A write to
 // one on a session with no accessing fabric answers UNSUPPORTED_ACCESS
@@ -43,7 +43,7 @@ func IsFabricScopedWrite(clusterID, attributeID uint32) bool {
 // IsFabricScopedRead reports whether the (cluster, attribute) pair is a
 // readable attribute whose effective access is fabric-scoped ("F") or
 // fabric-sensitive ("S") — matter.js's limits.fabricScoped
-// (packages/protocol/src/action/server/AccessControl.ts:524 at db021da0) on
+// (packages/protocol/src/action/server/AccessControl.ts:524 at b25ed960) on
 // an attribute with limits.readable: what a request reads of it depends on
 // the accessing fabric (packages/node/src/behavior/state/managed/values/
 // ListManager.ts:609-616 at db021da0, createProxy). It is the presence of a

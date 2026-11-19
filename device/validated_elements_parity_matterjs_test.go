@@ -21,7 +21,7 @@ func (l *illegalIDServer) MatterAttributes() []uint32 { return l.attrs }
 
 // TestValidatedElementsHostedParityMatterJS ports matter.js
 // packages/node/test/behavior/cluster/ValidatedElementsTest.ts:655-668 at
-// db021da0, "fails endpoint initialization for a hosted cluster with an
+// b25ed960, "fails endpoint initialization for a hosted cluster with an
 // illegal ID": a device whose host server serves the attribute 0xFFF15000
 // — suffix 0x5000, above the 0x4FFF an attribute suffix may take — is not
 // built, and the error names the id; the same server with a legal

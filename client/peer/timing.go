@@ -8,7 +8,7 @@ import "time"
 // Timing are the parameters that pace the connection process and the
 // address monitor of a peer — matter.js PeerTimingParameters
 // (packages/protocol/src/peer/PeerTimingParameters.ts:21-135 at
-// db021da0). A zero field is unset: [DefaultTiming] or the base of [Merge]
+// b25ed960). A zero field is unset: [DefaultTiming] or the base of [Merge]
 // supplies it. So is a negative one, but for ProvenAddressRetention: no
 // other parameter gives a negative value a meaning, and a negative pause
 // would make the connection process retry at once — after a peer's

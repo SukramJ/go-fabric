@@ -278,7 +278,7 @@ type ChangeReportingWriter interface {
 // conformant events it supports, so nothing else reaches a subscriber
 // there
 // (packages/node/src/behavior/internal/ClusterDerivation.ts:174-200 at
-// db021da0, createDerivedEvents).
+// b25ed960, createDerivedEvents).
 type ClusterEventLister interface {
 	// MatterEvents returns the cluster event IDs the server may
 	// surface via subscribed event reports.

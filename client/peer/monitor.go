@@ -27,7 +27,7 @@ const (
 	// (a subscription timed out, say): the probe cooldown is reset, the
 	// current address is probed, then the other discovered ones. matter.js
 	// probes the current address only (PeerAddressMonitor.ts:105-106 at
-	// db021da0); walking the alternates is this module's
+	// b25ed960); walking the alternates is this module's
 	// (BD-Matter-SuspectProbeWalksAlternates).
 	ReasonSessionSuspect
 )
@@ -203,7 +203,7 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 	}
 	if s.Transport() == exchange.TransportTCP {
 		// A TCP session is evicted when its connection drops: probing is
-		// moot (PeerAddressMonitor.ts:137-141 at db021da0).
+		// moot (PeerAddressMonitor.ts:137-141 at b25ed960).
 		return true
 	}
 	current := addressOf(s.Addr()).AddrPort()
@@ -276,7 +276,7 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 // Both reasons walk the alternates, the proven host's addresses first,
 // as the connection tries them (orderForPeer). matter.js walks them on
 // an address change only; a session-suspect probe stays on the current
-// address (PeerAddressMonitor.ts:219-221 at db021da0). Here a suspect
+// address (PeerAddressMonitor.ts:219-221 at b25ed960). Here a suspect
 // session is migrated to an alternate that answers before it is given
 // up: the reconnect that follows HandlePeerLoss costs a Thread node a
 // minute or more (issue 478), a probe one small exchange per address.

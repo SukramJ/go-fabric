@@ -12,7 +12,7 @@
 // matter.js strips every attribute whose access is fabric-scoped (F) or
 // fabric-sensitive (S) by schema, whatever the server's logic
 // (packages/node/src/behavior/cluster/FabricScopedDataHandler.ts:41-73 at
-// db021da0; AttributeModel.fabricScoped). A Go server keeps such state in
+// b25ed960; AttributeModel.fabricScoped). A Go server keeps such state in
 // its own fields, so the node reaches it only through the contract
 // (node/fabric_state.go); a server without it keeps a removed fabric's
 // entries and hands them to the next fabric with the same index.

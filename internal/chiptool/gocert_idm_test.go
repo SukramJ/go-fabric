@@ -252,6 +252,10 @@ func caseIDM21() goCertCase {
 	nEP := 0
 	return goCertCase{
 		tc: "TC-IDM-2.1", line: 168, pics: []string{"MCORE.IDM.C.ReadRequest"},
+		// At b25ed960 step 21 fails a TH without a cluster >= 0x10000, the
+		// non-chip acceptance removed because matter.js's all-clusters app serves
+		// Unit Testing (TC-IDM-2.1.test.ts:52-54, :794-810); the daemon serves no such cluster yet.
+		readAt: "db021da0",
 		steps: []goStep{
 			{n: "1", line: 169, title: "read one attribute on a given cluster and endpoint", run: func(th *goTH) error {
 				var err error
@@ -360,7 +364,7 @@ func caseIDM21() goCertCase {
 					}
 				}
 				return goSkip("(b) not supported: the reference composition serves no manufacturer-specific cluster "+
-					"(none >= 0x10000 among %d attributes), as matter.js accepts for its own all-clusters app (TC-IDM-2.1.test.ts:798-807)", len(as))
+					"(none >= 0x10000 among %d attributes), as matter.js accepts for its own all-clusters app at db021da0 (TC-IDM-2.1.test.ts:798-807)", len(as))
 			}},
 		},
 	}
@@ -387,10 +391,14 @@ func caseIDM31() goCertCase {
 			return nil
 		}
 	}
-	unitTesting := "the reference daemon has no UnitTesting cluster, as matter.js's all-clusters app has none (unitTestingNotApplicable, test/cert/unit-testing-cluster.ts:16-20)"
+	unitTesting := "the reference daemon has no UnitTesting cluster, as matter.js's all-clusters app has none at db021da0 (unitTestingNotApplicable, test/cert/unit-testing-cluster.ts:16-20)"
 	labels := listOf(userlabel.LabelStruct{Label: "room", Value: "kitchen"}, userlabel.LabelStruct{Label: "floor", Value: "1"})
 	return goCertCase{
 		tc: "TC-IDM-3.1", line: 209, pics: []string{"MCORE.IDM.C.WriteRequest"},
+		// At b25ed960 matter.js's all-clusters app serves UnitTesting
+		// (AllClustersTestInstance.ts:1198) and steps 7, 8, 9 and 13 lost their
+		// unitTestingNotApplicable; the pin's version needs the daemon to serve UnitTesting (0xFFF1FC05).
+		readAt: "db021da0",
 		steps: []goStep{
 			{n: "1", line: 210, title: "modify one attribute on a given cluster and endpoint", at: "LVL.S", need: "LVL.S.A0011", run: func(th *goTH) error {
 				var err error
@@ -616,12 +624,16 @@ func (th *goTH) subscribeAndModify(n *client.Node, p im.ConcreteAttributePath, v
 // every change of the subscribed attribute.
 func caseIDM41() goCertCase {
 	var n *client.Node
-	unitTesting := "the reference daemon has no UnitTesting cluster, as matter.js's all-clusters app has none (unitTestingNotApplicable, test/cert/unit-testing-cluster.ts:16-20)"
+	unitTesting := "the reference daemon has no UnitTesting cluster, as matter.js's all-clusters app has none at db021da0 (unitTestingNotApplicable, test/cert/unit-testing-cluster.ts:16-20)"
 	modify := func(cluster, attr uint32, values []spec.Encodable, want []string) func(th *goTH) error {
 		return func(th *goTH) error { return th.subscribeAndModify(n, attrPath(th.ep, cluster, attr), values, want) }
 	}
 	return goCertCase{
 		tc: "TC-IDM-4.1", line: 88, pics: []string{"MCORE.IDM.C.SubscribeRequest"},
+		// At b25ed960 matter.js's all-clusters app serves UnitTesting
+		// (AllClustersTestInstance.ts:1198) and step 7 lost its
+		// unitTestingNotApplicable; the pin's version needs the daemon to serve UnitTesting (0xFFF1FC05).
+		readAt: "db021da0",
 		steps: []goStep{
 			{n: "1", line: 93, title: "subscription request for an attribute", pics: "MCORE.IDM.C.SubscribeRequest", at: "OO.S", run: func(th *goTH) error {
 				var err error

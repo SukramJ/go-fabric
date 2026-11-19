@@ -70,7 +70,7 @@ var (
 	oidMatterCASEAuthTag = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 6}
 	oidMatterVVSID       = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 7}
 	// oidMatterFirmwareSigningID is matter-firmware-signing-id (matter.js
-	// definitions/asn.ts:98-99 at db021da0).
+	// definitions/asn.ts:98-99 at b25ed960).
 	oidMatterFirmwareSigningID = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 1, 2}
 	// oidDomainComponent is domainComponent (0.9.2342.19200300.100.1.25),
 	// an IA5String — matter.js X520.DomainComponent.
@@ -128,7 +128,7 @@ type rdnAttribute struct {
 // localityName, stateOrProvinceName, organizationName,
 // organizationalUnitName, title, name, givenName, initials,
 // generationQualifier, dnQualifier, pseudonym. Mirrors matter.js
-// packages/general/src/crypto/X520.ts:46-75 at db021da0.
+// packages/general/src/crypto/X520.ts:46-75 at b25ed960.
 var x520AttributeTypes = [...]int{3, 4, 5, 6, 7, 8, 10, 11, 12, 41, 42, 43, 44, 46, 65}
 
 // standardDNAttribute maps a standard X.520 DN TLV tag to its OID and its
@@ -136,7 +136,7 @@ var x520AttributeTypes = [...]int{3, 4, 5, 6, 7, 8, 10, 11, 12, 41, 42, 43, 44, 
 // as IA5String, 129-143 are the attributes 1-15 as PrintableString; ok is
 // false for any other tag. Mirrors matter.js
 // packages/protocol/src/certificate/kinds/DistinguishedName.ts:489-583 at
-// db021da0 (distinguishedNameToAsn1 and rdnToAsn1 with the X520 encoders,
+// b25ed960 (distinguishedNameToAsn1 and rdnToAsn1 with the X520 encoders,
 // packages/general/src/crypto/X520.ts:28-79).
 func standardDNAttribute(tag uint8) (oid asn1.ObjectIdentifier, asn1Tag int, ok bool) {
 	switch {

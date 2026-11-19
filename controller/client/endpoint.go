@@ -14,7 +14,7 @@ import (
 
 // UnknownDeviceType is the device type of an endpoint whose Descriptor has
 // not named one — matter.js EndpointType.UNKNOWN_DEVICE_TYPE, DeviceTypeId(-1)
-// (node/src/endpoint/type/EndpointType.ts:43 at db021da0).
+// (node/src/endpoint/type/EndpointType.ts:43 at b25ed960).
 const UnknownDeviceType uint32 = math.MaxUint32
 
 // rootNodeDeviceType is the RootNode device type the image's endpoint 0

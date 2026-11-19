@@ -32,7 +32,7 @@ const (
 	kindDAC
 	// kindCDSigner is a CD signer certificate (cdsigners.go), which
 	// CdSigners.verifyCertificate parses with all of
-	// Certificate.REQUIRED_EXTENSIONS (CdSigners.ts:104-105 at db021da0).
+	// Certificate.REQUIRED_EXTENSIONS (CdSigners.ts:104-105 at b25ed960).
 	kindCDSigner
 )
 
@@ -62,7 +62,7 @@ func profileErrorf(format string, args ...any) error {
 }
 
 // The interpreted extensions, by name as MatterCertificate.ExtensionName
-// spells them (Certificate.ts:465-484 at db021da0).
+// spells them (Certificate.ts:465-484 at b25ed960).
 const (
 	extBasicConstraints = "basicConstraints"
 	extKeyUsage         = "keyUsage"
@@ -95,8 +95,8 @@ type extensionEncoding struct {
 }
 
 // certEncoding is MatterCertificate.Encoding (kinds/definitions/base.ts:
-// 88-104 at db021da0) with the basic constraints values
-// (Certificate.ts:496-513 at db021da0).
+// 88-104 at b25ed960) with the basic constraints values
+// (Certificate.ts:496-513 at b25ed960).
 type certEncoding struct {
 	// version is the X.509 version field; 2 means v3, an absent field 0.
 	version *big.Int
@@ -114,7 +114,7 @@ type certEncoding struct {
 	isCA    bool
 	pathLen *big.Int
 	// skid and akid are the key identifiers as matter.js reads them
-	// (Certificate.ts:573-585 at db021da0), nil when it reads none; the
+	// (Certificate.ts:573-585 at b25ed960), nil when it reads none; the
 	// encoding reader keeps them because crypto/x509 reads no extension of
 	// a v1 or v2 certificate.
 	skid, akid []byte
@@ -152,7 +152,7 @@ func (e *certEncoding) critical(name string) bool {
 func (e *certEncoding) isV3() bool { return e.version != nil && e.version.Cmp(big.NewInt(2)) == 0 }
 
 // readEncoding reads a certificate's encoding — the version
-// parseAsn1Certificate reads (Certificate.ts:667-706 at db021da0) and parseExtensions
+// parseAsn1Certificate reads (Certificate.ts:667-706 at b25ed960) and parseExtensions
 // (:431-596 at db021da0): an extension it does not interpret is skipped
 // whatever its encoding, an interpreted one needs its value OCTET STRING,
 // a critical flag or cA is a one-byte BOOLEAN, a pathLen an INTEGER with
@@ -181,7 +181,7 @@ func readEncoding(der []byte) (certEncoding, error) {
 		idx++
 	}
 	// Serial, signature algorithm, issuer, validity, subject, public key,
-	// then the extensions [3] (Certificate.ts:708-792 at db021da0).
+	// then the extensions [3] (Certificate.ts:708-792 at b25ed960).
 	idx += 6
 	if idx >= len(tbs) || tbs[idx].tag != 0xa3 || len(tbs[idx].elements) == 0 {
 		return certEncoding{}, errors.New("attestation: missing required extensions in certificate")
@@ -195,7 +195,7 @@ func readEncoding(der []byte) (certEncoding, error) {
 }
 
 // readExtension is one pass of parseExtensions' loop (Certificate.ts:
-// 450-586 at db021da0).
+// 450-586 at b25ed960).
 func (e *certEncoding) readExtension(ext derNode) error {
 	if len(ext.elements) < 2 {
 		return nil
@@ -259,7 +259,7 @@ func (e *certEncoding) readExtension(ext derNode) error {
 	return nil
 }
 
-// derBoolean is Certificate.ts:390-397 at db021da0: exactly one content
+// derBoolean is Certificate.ts:390-397 at b25ed960: exactly one content
 // byte, any non-zero value true.
 func derBoolean(n derNode, field string) (bool, error) {
 	if len(n.bytes) != 1 {
@@ -268,7 +268,7 @@ func derBoolean(n derNode, field string) (bool, error) {
 	return n.bytes[0] != 0, nil
 }
 
-// derUnsignedInteger is Certificate.ts:399-406 at db021da0: the content
+// derUnsignedInteger is Certificate.ts:399-406 at b25ed960: the content
 // bytes as an unsigned big-endian number; none is an error.
 func derUnsignedInteger(n derNode, field string) (*big.Int, error) {
 	if len(n.bytes) == 0 {
@@ -277,7 +277,7 @@ func derUnsignedInteger(n derNode, field string) (*big.Int, error) {
 	return new(big.Int).SetBytes(n.bytes), nil
 }
 
-// keyUsageBits is Certificate.ts:408-423 at db021da0: bit n as X.509
+// keyUsageBits is Certificate.ts:408-423 at b25ed960: bit n as X.509
 // numbers it (0 is digitalSignature, 8 decipherOnly), a set bit beyond 15
 // as bit 16.
 func keyUsageBits(bitString []byte) uint32 {
@@ -295,7 +295,7 @@ func keyUsageBits(bitString []byte) uint32 {
 
 // requiredExtensions lists the extensions each kind requires. They are
 // Certificate.REQUIRED_PAA_EXTENSIONS and REQUIRED_EXTENSIONS
-// (Certificate.ts:385-388 at db021da0), except that a DAC and a PAI
+// (Certificate.ts:385-388 at b25ed960), except that a DAC and a PAI
 // leave basic constraints out, whose absence is a profile violation
 // (DAC_PAI_REQUIRED_EXTENSIONS, AttestationCertificates.ts:65-73 at
 // db021da0).
@@ -313,7 +313,7 @@ func requiredExtensions(kind certKind, acceptProfileViolation bool) []string {
 }
 
 // checkRequiredExtensions is the required extensions check that closes
-// parseExtensions (Certificate.ts:431-596 at db021da0): an extension is
+// parseExtensions (Certificate.ts:431-596 at b25ed960): an extension is
 // missing unless the DER carries it and its value reads — a key usage
 // BIT STRING with content, a key identifier.
 func checkRequiredExtensions(kind certKind, acceptProfileViolation bool, enc *certEncoding) error {

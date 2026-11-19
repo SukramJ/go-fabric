@@ -234,6 +234,8 @@ matter.js function it mirrors in a comment + the contract it enforces.
    source.** Likely paths:
    - schema constant / cluster revision / attribute id →
      `../matter.js/packages/model/src/standard/elements/<name>.element.ts`
+     (where a cluster and a device type share a name, the files are
+     `<name>-cluster.element.ts` and `<name>-device.element.ts`)
    - cluster behavior (defaults, mandatory attributes, conformance
      checks) → `../matter.js/packages/node/src/behaviors/<name>/`
    - device type (DeviceTypeList revision, mandatory cluster set) →

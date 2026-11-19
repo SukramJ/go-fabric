@@ -8,7 +8,7 @@ import "testing"
 // TestBoundExpressionParity: a bound the generator keeps as an expression
 // tree is computed against the sibling attributes, one row per kind of
 // expression the snapshot states (W3-clugen-01). The vectors follow
-// matter.js packages/model/test/aspects/ConstraintTest.ts at db021da0
+// matter.js packages/model/test/aspects/ConstraintTest.ts at b25ed960
 // ("2^10", "min maxOf(holdTimeMin, 10)", "0 to segmentDuration / 2",
 // "max (2^62) - 1") over Constraint.ts:969-1096 (evaluate): a name that
 // does not resolve leaves the bound without a number, which admits.

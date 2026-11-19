@@ -13,7 +13,7 @@ import (
 // IA5String for domainComponent (16), a PrintableString for 129-143, in
 // arrival order among the Matter attributes — matter.js
 // packages/protocol/src/certificate/kinds/DistinguishedName.ts:489-583 and
-// packages/general/src/crypto/X520.ts:28-79 at db021da0.
+// packages/general/src/crypto/X520.ts:28-79 at b25ed960.
 func TestBuildDNStandardAttributes(t *testing.T) {
 	dn := DistinguishedName{
 		MatterRCACID: 0xCACACACA00000001, HasRCACID: true,

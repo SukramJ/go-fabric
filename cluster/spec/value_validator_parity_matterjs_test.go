@@ -275,12 +275,12 @@ func TestValueValidatorParityMatterJS(t *testing.T) {
 		_, err := ints.ValidateWrite(0, "nope", nil)
 		wantConstraint(t, err)
 	})
-	t.Run("still rejects a value-range constraint on a client peer write", func(t *testing.T) { // :482-484
+	t.Run("still rejects an integer outside its wire type on a client peer write", func(t *testing.T) { // :482-484
 		t.Parallel()
 		_, err := ints.ValidateWrite(0, uint64(0x1ff), nil)
 		wantConstraint(t, err)
 	})
-	t.Run("still rejects a schema-constraint violation on a client peer write", func(t *testing.T) { // :486-488
+	t.Run("rejects a schema-constraint violation on a server write", func(t *testing.T) { // :486-488
 		t.Parallel()
 		_, err := ints.ValidateWrite(1, uint64(20), nil)
 		wantConstraint(t, err, `"0 to 10"`)

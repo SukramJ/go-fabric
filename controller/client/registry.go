@@ -141,7 +141,7 @@ type Registry struct {
 	closed bool
 	// removeFabric, when set, stands between a decommission and its
 	// RemoveFabric invoke: the test seam of matter.js's patchRemoveFabric
-	// (DecommissionTest.ts:48-58 at db021da0), set only by
+	// (DecommissionTest.ts:48-58 at b25ed960), set only by
 	// export_test.go's PatchRemoveFabric. Nil invokes directly.
 	removeFabric func(fabricIndex uint8, invoke func(fabricIndex uint8) (Result, error)) (Result, error)
 
@@ -187,7 +187,7 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 	r.ctx, r.cancel = context.WithCancel(context.Background())
 	r.icdTables = map[uint8]*icd.PeerTable{}
 	// Check-Ins arrive unsecured on the exchange manager
-	// (SecureChannelProtocol.ts:149-180).
+	// (SecureChannelProtocol.ts:135-166).
 	cfg.Exchanges.SetCheckInReceiver(r.receiveCheckIn)
 	ids, err := r.store.NodeIDs()
 	if err != nil {
@@ -359,7 +359,7 @@ func (r *Registry) ownNodeID(fabricIndex uint8) (uint64, bool) {
 
 // receiveCheckIn trial-decrypts a Check-In against every fabric with ICD
 // peers and reports whether one matched. Mirrors matter.js
-// SecureChannelProtocol.ts:164-180 (#handleIcdCheckIn).
+// SecureChannelProtocol.ts:150-166 (#handleIcdCheckIn).
 func (r *Registry) receiveCheckIn(payload []byte) bool {
 	r.icdMu.Lock()
 	tables := make([]*icd.PeerTable, 0, len(r.icdTables))
@@ -415,7 +415,7 @@ func (r *Registry) bindPeer(n *Node, p *peer.Peer) {
 	// The peer's medium selects its network profile: matter.js sets the
 	// peer's physicalProperties from the client node at startup
 	// (packages/node/src/behavior/system/network/NetworkClient.ts:71 at
-	// db021da0).
+	// b25ed960).
 	p.SetMedium(func() peer.Medium { return n.Properties().Medium() })
 	follow := func() {
 		d := p.Descriptor()
@@ -681,7 +681,9 @@ func (r *Registry) Get(id string) *Node {
 }
 
 // GetByAddress is the commissioned node with peer address addr, nil when
-// there is none (Peers.ts:412-427).
+// there is none (Peers.ts:425-441). matter.js finds a peer that failed to
+// load there too, by its ClientNode.peerAddress; this lookup does not
+// (pin-lift unit P1-D).
 func (r *Registry) GetByAddress(addr PeerAddress) *Node {
 	for _, n := range r.Nodes() {
 		if a, ok := n.PeerAddress(); ok && a == addr {

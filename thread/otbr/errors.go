@@ -7,7 +7,7 @@ import "fmt"
 
 // Code classifies an [Error], matter.js's OtbrRestErrorCode
 // (packages/thread-br-client/src/otbr-rest/OtbrRestError.ts:9-15 at
-// db021da0).
+// b25ed960).
 type Code string
 
 // The error codes.

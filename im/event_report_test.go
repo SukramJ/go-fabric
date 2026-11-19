@@ -493,7 +493,7 @@ func TestEventReport_Marshal_DataIB_NullPayload_OmitsData(t *testing.T) {
 // ---- EventReport.marshal: IsUrgent stripped from EventDataIB path (Fix G) ----
 
 // TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath mirrors matter.js
-// packages/protocol/src/interaction/AttributeDataEncoder.ts:137 at db021da0
+// packages/protocol/src/interaction/AttributeDataEncoder.ts:137 at b25ed960
 // (#3988, Matter §8.9.3.4): an EventDataIB path MUST NOT carry
 // tagEventPathIsUrgent (context tag 4) even when Path.IsUrgent=true on the
 // EventReport. IsUrgent is a SubscribeRequest path qualifier; it is deleted
@@ -559,7 +559,7 @@ func TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath(t *testing.T) {
 			break
 		}
 		if inner.Tag.Kind == tlv.TagKindContext && inner.Tag.Number == uint32(tagEventPathIsUrgent) {
-			t.Errorf("EventDataIB path carries tagEventPathIsUrgent (tag 4); must be stripped per matter.js AttributeDataEncoder.ts:137 at db021da0")
+			t.Errorf("EventDataIB path carries tagEventPathIsUrgent (tag 4); must be stripped per matter.js AttributeDataEncoder.ts:137 at b25ed960")
 		}
 	}
 }

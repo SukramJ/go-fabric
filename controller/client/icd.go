@@ -598,7 +598,7 @@ func (c *ICDClient) flushAnnouncements() {
 // stored registration (IcdClient.ts:444-456). The caller holds commitMu.
 // The registration in memory takes reg either way; a store error is logged
 // and returned — a commit that fails in its second phase, whose state
-// stays committed in memory (IcdClientTest.ts:806-824 at db021da0).
+// stays committed in memory (IcdClientTest.ts:806-824 at b25ed960).
 func (c *ICDClient) persist(reg *ICDRegistration) error {
 	var before bool
 	c.mu.Lock()

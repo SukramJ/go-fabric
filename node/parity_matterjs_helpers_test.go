@@ -280,7 +280,7 @@ func encodeInvoke(t *testing.T, req im.InvokeRequest) []byte {
 }
 
 // rawInvoke sends req over p — matter.js invokeCmdRaw
-// (CommandInvokeResponseTest.ts:830-865), on the wire — and returns the
+// (CommandInvokeResponseTest.ts:828-863), on the wire — and returns the
 // InvokeResponse or the status of a StatusResponse in its place.
 func rawInvoke(t *testing.T, p *fabrictest.Pair, req im.InvokeRequest) rawAnswer[im.InvokeResponse] {
 	t.Helper()

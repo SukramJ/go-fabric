@@ -453,7 +453,7 @@ func TestIssue507_SessionEndsAnchor(t *testing.T) {
 // TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt: a Busy answered from
 // an address no session proved to be the node's — another SRV target's,
 // here the router's — is waited out by the attempt that received it, as
-// matter.js waits it (PeerConnection.ts:700-701 at db021da0), and holds no
+// matter.js waits it (PeerConnection.ts:700-701 at b25ed960), and holds no
 // Sigma1 to the node's proven addresses; a Busy at the proven address
 // still holds the peer (review II, R2-P1-net-05).
 func TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt(t *testing.T) {

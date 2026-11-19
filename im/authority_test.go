@@ -102,7 +102,7 @@ func TestAuthorityAtParityMatterJS(t *testing.T) {
 	// Fabric 0 without PASE is no grant: the implicit Administer is keyed
 	// on the auth mode alone (matter.js
 	// packages/protocol/src/interaction/FabricAccessControl.ts:189-191 at
-	// db021da0), as on the read, subscribe and dispatcher gates.
+	// b25ed960), as on the read, subscribe and dispatcher gates.
 	noFabric := WithFabricFilter(context.Background(), false, 0)
 	if got := probeInvoke(noFabric, &authorityProbe{}); got != StatusUnsupportedAccess {
 		t.Errorf("fabric 0 without PASE and without an ACL source: %v, want a denial", got)

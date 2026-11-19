@@ -1924,7 +1924,7 @@ func TestGroupcastTestingEventsParityMatterJS(t *testing.T) {
 	// The group's own address only when the group table holds endpoints
 	// for it — the address the node joined; a sender-only PerGroup group
 	// was never joined, so its message most likely arrived on the IANA
-	// address. Mirrors matter.js GroupcastServer.ts:514-519 at db021da0
+	// address. Mirrors matter.js GroupcastServer.ts:514-519 at b25ed960
 	// (#arrivalAddress, `!groups.endpoints.has(groupId)`).
 	t.Run("a sender-only group's message arrives on the IANA address", func(t *testing.T) {
 		t.Parallel()
@@ -1947,7 +1947,7 @@ func TestGroupcastTestingEventsParityMatterJS(t *testing.T) {
 }
 
 // gcSealGroup is groupDatagram of matter.js packages/protocol/test/session/
-// group-datagrams.ts:37-89 at db021da0 for fabric's key epochKey: a
+// group-datagrams.ts:37-89 at b25ed960 for fabric's key epochKey: a
 // privacy group message to groupID from source with counter, an initiator
 // payload header (exchange 0x1234, protocol 1, opcode 8) and no payload,
 // as GroupcastServerTest.ts:2073-2108 encodes it.

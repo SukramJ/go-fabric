@@ -18,8 +18,10 @@ import (
 
 // cache is one cluster's values and DataVersion — matter.js DatasourceCache
 // (packages/node/src/storage/client/DatasourceCache.ts at 0ceb202d) without
-// the local-write compensation (writes go to the peer, not through the
-// cache). Its fields are guarded by the node's lock.
+// a write path. matter.js settles the values the peer accepted in the cache
+// (RemoteWriteParticipant.ts:59-96); here writes go to the peer, not through
+// the cache (BD-Matter-ClientNode-WriteNotThroughCache). Its fields are
+// guarded by the node's lock.
 type cache struct {
 	p       *persister
 	ep      uint16

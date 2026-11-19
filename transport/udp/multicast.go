@@ -42,7 +42,7 @@ var multicastInterfaces = func() []net.Interface {
 // MockUdpSocket hands the membership to the host's MockNetwork. A datagram
 // to a group goes to the network's router for every host that takes its
 // destination: MockUdpSocket.send
-// (packages/general/src/net/mock/MockUdpSocket.ts:87-97 at db021da0) with
+// (packages/general/src/net/mock/MockUdpSocket.ts:87-97 at b25ed960) with
 // MockNetwork.shouldReceive (MockNetwork.ts:67-69).
 type multicastMember interface {
 	JoinGroup(group net.IP) error

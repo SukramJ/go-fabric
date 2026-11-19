@@ -93,7 +93,7 @@ type ConnectOptions struct {
 	// Network names the network profile whose throttle the connection
 	// process takes a slot of — its connect sub-profile when it has one —
 	// for a process this call starts; "" is the peer's medium profile
-	// (matter.js PeerConnection.ts:112-120 at db021da0, options.network).
+	// (matter.js PeerConnection.ts:112-120 at b25ed960, options.network).
 	// "icdLit" is the unthrottled profile a sustained subscription to a
 	// LIT ICD peer connects on, so its subscribe lands inside the peer's
 	// brief active window (SustainedSubscription.ts:133-149). A name no
@@ -149,7 +149,7 @@ type attempt struct {
 
 // connection is one run of the connection process of a peer — matter.js
 // PeerConnection (packages/protocol/src/peer/PeerConnection.ts:95-775 at
-// db021da0): an attempt per address and transport variant, over UDP or
+// b25ed960): an attempt per address and transport variant, over UDP or
 // TCP. Its state (:131-179) is guarded by mu.
 type connection struct {
 	p           *Peer
@@ -636,7 +636,7 @@ func (c *connection) shiftLocked(discovered []discovery.Address) target {
 //
 // Ahead of matter.js and chip: compareDesirability ranks an address by
 // class, health and DNS priority and knows no host
-// (ServerAddressSet.ts:165-184 at db021da0); chip's lookup scores an
+// (ServerAddressSet.ts:165-184 at b25ed960); chip's lookup scores an
 // address by class alone, every IPv6 link-local first, and keeps the
 // DNS-SD interface only for link-local (src/lib/dnssd/IPAddressSorter.cpp:44-50,
 // src/lib/address_resolve/AddressResolve_DefaultImpl.cpp:130-141 at
@@ -877,7 +877,7 @@ func (c *connection) fallbackSuperseded() bool {
 //
 // Nor is a retained fallback (retainLocked) before its bound. matter.js
 // retires a superseded fallback after addressChangeStabilizationDelay
-// (PeerConnection.ts:277-322 at db021da0); this module keeps it: another
+// (PeerConnection.ts:277-322 at b25ed960); this module keeps it: another
 // target's SRV answering for the node's instance is not evidence that the
 // node's address is stale (issue 507: a border router's SRV to its own
 // host), and the stagger still starts the discovered targets beside it,
@@ -913,7 +913,7 @@ func (c *connection) fallbackSupersededLocked() bool {
 // (unicastDestination, HintAddresses),
 // since any host on the link can send the record that names it (review
 // II, R2-P3-ctl-lan-09). matter.js takes a discovered address as it
-// stands (IpService.ts:392-407 at db021da0, unicastDestination's doc).
+// stands (IpService.ts:392-407 at b25ed960, unicastDestination's doc).
 func (c *connection) addAddressLocked(a discovery.Address) {
 	if !unicastDestination(a.IP) {
 		return
@@ -952,7 +952,7 @@ func (c *connection) addAddressLocked(a discovery.Address) {
 
 // maybeAttemptFallbackLocked queues the descriptor's operational address
 // when nothing else is attempted, pending or discovered
-// (PeerConnection.ts:362-382 at db021da0).
+// (PeerConnection.ts:362-382 at b25ed960).
 //
 // Ahead of matter.js (BD-Matter-ProvenOperationalHost), it is queued too
 // when the peer's proven host is known but no discovered address carries
@@ -1044,7 +1044,7 @@ func (c *connection) withdrawnLocked(a discovery.Address) {
 //
 // Ahead of matter.js, whose deleteAddress keeps the operational address
 // only while no other attempt remains (PeerConnection.ts:419-441 at
-// db021da0), and of BD-Matter-ProvenOperationalHost, which ranks the
+// b25ed960), and of BD-Matter-ProvenOperationalHost, which ranks the
 // proven host first only while discovery carries it: another responder's
 // cache-flush SRV for the node's instance removes the node's own records
 // for as long as it answers (issue 507: a border router answering a Thread
@@ -1169,7 +1169,7 @@ func (c *connection) anchorLocked() bool {
 // beside the anchor this way yet. The anchor is a guess from the last
 // session, as matter.js treats its fallback — it resets the stagger when
 // it retires the fallback (lastAttemptAt = undefined,
-// PeerConnection.ts:300-303 at db021da0) — so a genuinely new address the
+// PeerConnection.ts:300-303 at b25ed960) — so a genuinely new address the
 // discovery offers does not wait DelayBeforeNextAddress behind it; the
 // addresses after it do. With a proven host the stagger stays: the other
 // targets are foreign ones.
@@ -1339,7 +1339,7 @@ func (c *connection) kickLocked(origin kickOrigin) {
 
 // connect attempts the address until the attempt is aborted, the Sigma1
 // messages of every try on the address's one [initialContactSchedule]
-// (PeerConnection.ts:471-497 at db021da0).
+// (PeerConnection.ts:471-497 at b25ed960).
 func (c *connection) connect(att *attempt) {
 	p := c.p
 	schedule := newInitialContactSchedule(c.timing, func() {
@@ -1507,7 +1507,7 @@ func (c *connection) adopt(s *exchange.Session) {
 // afterFailure ends the attempt a with its handshake's err: an
 // unacknowledged Sigma1 is the schedule moving on, not a failure, and
 // retries at once without the error handling (nil); anything else is
-// returned for it (PeerConnection.ts:639-653 at db021da0).
+// returned for it (PeerConnection.ts:639-653 at b25ed960).
 func (c *connection) afterFailure(att *attempt, a *contactAttempt, err error) error {
 	log := c.p.log.With(slog.String("address", att.addr.String()))
 	switch a.fail(err) {
@@ -1528,7 +1528,7 @@ func (c *connection) afterFailure(att *attempt, a *contactAttempt, err error) er
 
 // isDelayedFallback reports whether an attempt at att starts at the
 // maximum retry delay: the fallback address once it is not the first
-// address tried (PeerConnection.ts:499-512 at db021da0).
+// address tried (PeerConnection.ts:499-512 at b25ed960).
 func (c *connection) isDelayedFallback(att *attempt) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1560,7 +1560,7 @@ func (c *connection) attemptAddress(ctx context.Context, att *attempt) (*net.UDP
 }
 
 // onKickLocked is the kick handler of one attempt (PeerConnection.ts:579-605
-// at db021da0): it restarts the attempt's exchange when the schedule's
+// at b25ed960): it restarts the attempt's exchange when the schedule's
 // attempt has no blocker — Sigma1 retransmitted enough across the
 // schedule's attempts, the peer not answered yet, a restart saving
 // enough — and the last restart of the process is older than the origin's
@@ -1591,7 +1591,7 @@ func (c *connection) onKickLocked(origin kickOrigin, att *attempt, a *contactAtt
 // handler, shared by every attempt of the process: true, and the restart
 // recorded, when no restart happened yet or the last one is at least the
 // origin's cooldown old, on the connection's timing. Mirrors matter.js
-// packages/protocol/src/peer/PeerConnection.ts:588-597 at db021da0.
+// packages/protocol/src/peer/PeerConnection.ts:588-597 at b25ed960.
 func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 	threshold := c.timing.KickRestartCooldown.Connect
 	if origin == kickDiscover {

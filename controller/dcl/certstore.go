@@ -145,7 +145,7 @@ type CertificateStore struct {
 
 	// verifyCDSigner is attestation.VerifyCDSignerCertificate; a test
 	// stands in a CSA-issued signer the CSA CD root cannot sign here, as
-	// matter.js's DclCertificateServiceTest.ts:1758-1777 at db021da0 stands
+	// matter.js's DclCertificateServiceTest.ts:1758-1777 at b25ed960 stands
 	// in the crypto.
 	verifyCDSigner func(der, skid []byte) (*ecdsa.PublicKey, error)
 }
@@ -338,12 +338,12 @@ func (s *CertificateStore) PAA(skid []byte) (attestation.PAA, bool) {
 var considerAll = true
 
 // ErrCertificateNotFound is matter.js's MatterDclError "Certificate not
-// found" (DclCertificateService.ts:612-618 at db021da0): no certificate
+// found" (DclCertificateService.ts:612-618 at b25ed960): no certificate
 // with that key identifier, or one the trust policy filters out.
 var ErrCertificateNotFound = errors.New("dcl: certificate not found")
 
 // GetCertificateOptions is DclCertificateService.GetCertificateOptions
-// (DclCertificateService.ts:2123-2129 at db021da0).
+// (DclCertificateService.ts:2123-2129 at b25ed960).
 type GetCertificateOptions struct {
 	// ConsiderTestCertificates also returns test PAAs; nil is
 	// [CertificateStore.AcceptsTestCertificates].
@@ -427,7 +427,7 @@ func (s *CertificateStore) CertificateDER(ctx context.Context, skid string, o Ge
 }
 
 // GetOrFetchCertificateOptions is getOrFetchCertificate's options
-// (DclCertificateService.ts:757 at db021da0).
+// (DclCertificateService.ts:757 at b25ed960).
 type GetOrFetchCertificateOptions struct {
 	GetCertificateOptions
 	// IsProduction asks the production ledger, false the test ledger; nil
@@ -553,7 +553,7 @@ func (s *CertificateStore) clientFor(isProduction bool) *Client {
 }
 
 // CDSigner implements attestation.PAAStore — lookupCdSigner
-// (dcl/DclCertificateService.ts:901-970 at db021da0): a key identifier of
+// (dcl/DclCertificateService.ts:901-970 at b25ed960): a key identifier of
 // 20 bytes, then a built-in CSA signing key (the Matter test CD signer is
 // left to the validator, which applies its test policy), then a stored
 // CD signer certificate that attestation.VerifyCDSignerCertificate
@@ -612,11 +612,11 @@ func (s *CertificateStore) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 }
 
 // cdSignerKeyIDLength is CertificationDeclaration.SIGNER_SUBJECT_KEY_ID_LENGTH
-// (kinds/CertificationDeclaration.ts:261-266 at db021da0).
+// (kinds/CertificationDeclaration.ts:261-266 at b25ed960).
 const cdSignerKeyIDLength = 20
 
 // putCDSigner is #putCertificate for a verified CD signer
-// (dcl/DclCertificateService.ts:862-884 at db021da0): stored as a
+// (dcl/DclCertificateService.ts:862-884 at b25ed960): stored as a
 // production CD signer, replacing what is stored under its key identifier.
 func (s *CertificateStore) putCDSigner(ctx context.Context, id string, der []byte) {
 	c, err := parseTrustStoreCertificate(der, KindCDSigner)
@@ -632,7 +632,7 @@ func (s *CertificateStore) putCDSigner(ctx context.Context, id string, der []byt
 }
 
 // AddCertificate puts a PAA or CD signer into the trust store — matter.js
-// addCertificate (dcl/DclCertificateService.ts:822-859 at db021da0). It
+// addCertificate (dcl/DclCertificateService.ts:822-859 at b25ed960). It
 // reports false when a certificate with the same key identifier is stored
 // already (the store is then unchanged). A CD signer is the Matter test CD
 // signer's certificate or one attestation.VerifyCDSignerCertificate
@@ -890,7 +890,7 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		existing, ok := s.index[refID]
 		s.mu.Unlock()
 		// A stored test certificate the production ledger lists is upgraded
-		// (DclCertificateService.ts:1186-1192 at db021da0) by the production
+		// (DclCertificateService.ts:1186-1192 at b25ed960) by the production
 		// ledger's own record: it is fetched
 		// and stored below, its DER replacing the test source's, and the
 		// entry stays a test certificate when that fetch fails. matter.js

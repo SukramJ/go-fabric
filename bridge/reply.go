@@ -485,7 +485,7 @@ func (b *Bridge) chunkLimitsFor(dst net.Addr, sessionID uint16) chunkLimits {
 }
 
 // maxUDPMessageSize is matter.js MAX_UDP_MESSAGE_SIZE, 1280 - 48
-// (packages/general/src/net/udp/UdpSocket.ts:12 at db021da0): the floor
+// (packages/general/src/net/udp/UdpSocket.ts:12 at b25ed960): the floor
 // of a peer's TCP message limit.
 const maxUDPMessageSize = 1280 - 48
 
@@ -533,7 +533,7 @@ func (b *Bridge) connMessageLimit(route net.Addr, sessionID uint16) (int, bool) 
 // [tcp.ErrMessageTooLarge] — the sender splits by the limit, it is never
 // cut. matter.js MessageChannel.send throws MessageTooLargeError for an
 // encoded message above maxPayloadSize on a TCP channel, before the write
-// (packages/protocol/src/protocol/MessageChannel.ts:104-112 at db021da0).
+// (packages/protocol/src/protocol/MessageChannel.ts:104-112 at b25ed960).
 func (b *Bridge) sendRouted(listener *udp.Listener, dst net.Addr, sessionID uint16, datagram []byte) error {
 	if r, ok := dst.(*connRoute); ok && r != nil && connNetwork(r.conn) == "tcp" {
 		if limit, ok := b.connMessageLimit(dst, sessionID); ok && len(datagram) > limit {

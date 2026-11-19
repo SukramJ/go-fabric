@@ -143,7 +143,7 @@ func (f *inboundFlow) fail(ctx context.Context, err error) error {
 func (f *inboundFlow) run(ctx context.Context, modes []DriverMode, opts ReceiveOptions) (Result, error) {
 	// buildInitMessage, receiver branch (bdx-session-initiator.ts:155-178).
 	// At most a 16-bit block size: a TCP exchange may carry more than the
-	// field holds (bdx-session-initiator.ts:155 at db021da0, matter.js
+	// field holds (bdx-session-initiator.ts:155 at b25ed960, matter.js
 	// #4793).
 	maxBlockSize := min(f.m.MaxPayloadSize()-blockCounterOverhead, 0xFFFF)
 	if opts.MaxBlockSize != 0 && maxBlockSize > int(opts.MaxBlockSize) {
@@ -288,7 +288,7 @@ func (f *inboundFlow) followingNext(ctx context.Context) (bool, error) {
 // goes to the sink, and BlockEof ends the transfer — refused when a definite
 // length was not met exactly. A block that would pass a definite length is
 // refused before it reaches the sink: matter.js enqueues it and refuses
-// the transfer only at BlockEof (InboundFlow.ts:78-94 at db021da0), so a
+// the transfer only at BlockEof (InboundFlow.ts:78-94 at b25ed960), so a
 // sender that never sends BlockEof could fill the sink past the length it
 // announced (review II, R2-P2-alloc-06; ahead of matter.js).
 func (f *inboundFlow) write(data []byte, t MessageType) (bool, error) {

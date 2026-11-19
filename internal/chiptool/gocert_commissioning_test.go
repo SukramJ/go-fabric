@@ -39,8 +39,8 @@ import (
 // daemon is the DUT, the Go controllers play the TS file's controllers),
 // and TC-DD-1.9, 2.2 and 3.5 in matter.js's own direction (the Go
 // controller is the DUT commissioner, the daemon the TH). Every TS line
-// cited here was read at matter.js db021da0, the snapshot's pin — not at
-// goCertReadAt: the CADMIN cases moved into tc-cadmin-support.ts and
+// cited here was read at [goCertReadAt], the snapshot's pin b25ed960: the
+// CADMIN cases' steps are defined in tc-cadmin-support.ts and
 // tc-cadmin-window-support.ts there, and each step names that file.
 //
 // matter.js proves a step on the TH by the TH's log lines; the daemon's
@@ -57,14 +57,14 @@ func init() {
 	}
 }
 
-// The support files the CADMIN cases' steps are defined in at db021da0;
+// The support files the CADMIN cases' steps are defined in at b25ed960;
 // cadminSupport serves TC-CADMIN-1.17 in gocert_app_test.go too.
 const (
 	cadminSupport       = "tc-cadmin-support.ts"
 	cadminWindowSupport = "tc-cadmin-window-support.ts"
 )
 
-// The budgets and constants of the CADMIN support files at db021da0.
+// The budgets and constants of the CADMIN support files at b25ed960.
 const (
 	cwDuration          = 180 * time.Second           // CW_DURATION_SECONDS, tc-cadmin-support.ts:82
 	cwClockAllowance    = 1800 * time.Millisecond     // CW_CLOCK_ALLOWANCE :88, 1 % of the window
@@ -75,7 +75,7 @@ const (
 	noActionWindow      = 5 * time.Second             // NO_ACTION_WINDOW :81
 	revokeAnswerTimeout = 30 * time.Second            // REVOKE_ANSWER_TIMEOUT :84
 	advertisementWait   = 10 * time.Second            // ADVERTISEMENT_TIMEOUT :87
-	certLogTimeout      = 15 * time.Second            // LOG_TIMEOUT, tc-support.ts:64
+	certLogTimeout      = 15 * time.Second            // LOG_TIMEOUT, tc-support.ts:65
 	noRecordProbe       = 10 * time.Second            // noRecordOrNoPase's probe, tc-cadmin-support.ts:294
 	cadminVendorID      = 0xfff1                      // checkCommissioned :424
 	expectedCR2Index    = 2                           // EXPECTED_CR2_FABRIC_INDEX :645
@@ -1280,7 +1280,7 @@ func caseDGWIFI32() goCertCase {
 				if _, err := th.invoke(node, cmdPath(0, wifinetworkdiagnostics.ClusterID, wifinetworkdiagnostics.CmdResetCounts), nil, false, client.InvokeOptions{}); err != nil {
 					return err
 				}
-				// sendCommand's expectCommandPayload (tc-support.ts:1802-1816):
+				// sendCommand's expectCommandPayload (tc-support.ts:1825-1839):
 				// the TH received the command, with no fields.
 				line, err := awaitTHLine(th, from, certLogTimeout, "msg=matter.rx.im.invoke ", `req_paths="ep=0 cl=0x0036 cmd=0x0"`)
 				if err != nil {
@@ -1511,7 +1511,7 @@ func vendorProduct(d *client.Device) (vid, pid int) {
 
 // --- TC-DD-3.5 ----------------------------------------------------------------
 
-// ddStage is one STAGES entry of TC-DD-3.5 (TC-DD-3.5.test.ts:37-76): the
+// ddStage is one STAGES entry of TC-DD-3.5 (TC-DD-3.5.test.ts:37-77): the
 // daemon's line for a commissioning stage, in the order § 5.5 runs them.
 var ddStages = map[string][]string{
 	// "Received pairing request": the PBKDFParamRequest the daemon took.
@@ -1525,18 +1525,18 @@ var ddStages = map[string][]string{
 	"trustedRoot": {"msg=matter.opcreds.cmd_ok command_name=AddTrustedRootCertificate "},
 	"adminAcl":    {"msg=matter.opcreds.cmd_ok command_name=AddNOC "},
 	// The CASE session the Sigma3 established (node/security.go
-	// case.session_established).
+	// case.session_established), logged as the session is installed.
 	"case":                  {"msg=case.session_established ", " fabric_index="},
 	"commissioningComplete": {logCommissioned},
 	// The daemon clears its PASE sessions after an OK CommissioningComplete
 	// and logs their ids as it does (bridge/pase_close.go
 	// closePASESessionsOnCommissioningComplete, matter.session.pase_close):
 	// what matter.js's "Session ended" and chip's "Released - Type:1 LSID"
-	// say (TC-DD-3.5.test.ts:71-74).
+	// say (TC-DD-3.5.test.ts:72-75).
 	"paseClosed": {"msg=matter.session.pase_close ", " reason=commissioning_complete "},
 }
 
-// caseDD35 is TC-DD-3.5 (TC-DD-3.5.test.ts:152-279), the Go controller as
+// caseDD35 is TC-DD-3.5 (TC-DD-3.5.test.ts:153-280), the Go controller as
 // the DUT commissioner: each commissioning stage is a daemon log line
 // after the stage the previous step found.
 func caseDD35() goCertCase {
@@ -1561,15 +1561,15 @@ func caseDD35() goCertCase {
 			return nil
 		}
 	}
-	onEthernet := "The TH is already on the operational network over Ethernet, so the Commissioner neither needs to configure network credentials nor to tell it to connect (TC-DD-3.5.test.ts:146-149)"
+	onEthernet := "The TH is already on the operational network over Ethernet, so the Commissioner neither needs to configure network credentials nor to tell it to connect (TC-DD-3.5.test.ts:147-150)"
 	return goCertCase{
-		tc: "TC-DD-3.5", line: 152, role: roleDUT, pics: []string{"MCORE.ROLE.COMMISSIONER"},
+		tc: "TC-DD-3.5", line: 153, role: roleDUT, pics: []string{"MCORE.ROLE.COMMISSIONER"},
 		finalize: d.finalize,
 		steps: []goStep{
-			{n: "1", line: 153, title: "Commissioner has regulatory and fabric information and accurate date, time and timezone", run: func(*goTH) error {
-				return goSkip("the date, time and timezone on the DUT need a person in front of the DUT; no adapter reads them (TC-DD-3.5.test.ts:157-162)")
+			{n: "1", line: 154, title: "Commissioner has regulatory and fabric information and accurate date, time and timezone", run: func(*goTH) error {
+				return goSkip("the date, time and timezone on the DUT need a person in front of the DUT; no adapter reads them (TC-DD-3.5.test.ts:158-163)")
 			}},
-			{n: "2", line: 166, title: "Commissioner and Commissionee discover each other and connect", run: func(th *goTH) error {
+			{n: "2", line: 167, title: "Commissioner and Commissionee discover each other and connect", run: func(th *goTH) error {
 				if err := d.setup(th); err != nil {
 					return err
 				}
@@ -1582,10 +1582,10 @@ func caseDD35() goCertCase {
 				}
 				return stage("discovered", "the DUT connected to the TH")(th)
 			}},
-			{n: "3", line: 178, title: "Establish encryption keys with PASE", run: stage("pase", "the TH established PASE")},
-			{n: "4", line: 184, title: "Commissioner re-arms the Fail-safe timer", run: stage("failSafe", "the TH armed the fail-safe for the DUT")},
-			{n: "5", line: 191, title: "Commissioner configures regulatory information", run: func(th *goTH) error {
-				// notApplicableAtRun regulatoryNotRequired (:111-124): no
+			{n: "3", line: 179, title: "Establish encryption keys with PASE", run: stage("pase", "the TH established PASE")},
+			{n: "4", line: 185, title: "Commissioner re-arms the Fail-safe timer", run: stage("failSafe", "the TH armed the fail-safe for the DUT")},
+			{n: "5", line: 192, title: "Commissioner configures regulatory information", run: func(th *goTH) error {
+				// notApplicableAtRun regulatoryNotRequired (:112-125): no
 				// NetworkCommissioning instance with Wi-Fi or Thread.
 				r, err := th.read(d.node, im.ConcreteAttributePath{Cluster: networkcommissioning.ClusterID, Attribute: spec.AttrFeatureMap, HasCluster: true, HasAttribute: true})
 				if err != nil {
@@ -1605,12 +1605,12 @@ func caseDD35() goCertCase {
 				}
 				return stage("regulatory", "the TH set the regulatory configuration")(th)
 			}},
-			{n: "6", line: 200, title: "Commissioner requests the operational CSR", run: stage("csr", "the TH answered the CSRRequest")},
-			{n: "7", line: 206, title: "Commissioner configures operational credentials", run: stage("trustedRoot", "the TH installed the trusted root certificate")},
-			{n: "8", line: 212, title: "Commissioner configures itself as administrator in ACL", run: stage("adminAcl", "the TH created the administrator ACL entry")},
-			{n: "9", line: 218, title: "Commissioner configures operational network on TH", na: onEthernet},
-			{n: "10", line: 222, title: "Commissioner instructs Commissionee to connect to operational network", na: onEthernet},
-			{n: "12", line: 228, title: "Commissioner starts discovery of TH using Operational Discovery", run: func(th *goTH) error {
+			{n: "6", line: 201, title: "Commissioner requests the operational CSR", run: stage("csr", "the TH answered the CSRRequest")},
+			{n: "7", line: 207, title: "Commissioner configures operational credentials", run: stage("trustedRoot", "the TH installed the trusted root certificate")},
+			{n: "8", line: 213, title: "Commissioner configures itself as administrator in ACL", run: stage("adminAcl", "the TH created the administrator ACL entry")},
+			{n: "9", line: 219, title: "Commissioner configures operational network on TH", na: onEthernet},
+			{n: "10", line: 223, title: "Commissioner instructs Commissionee to connect to operational network", na: onEthernet},
+			{n: "12", line: 229, title: "Commissioner starts discovery of TH using Operational Discovery", run: func(th *goTH) error {
 				if d.node == nil {
 					return errors.New("the DUT holds no node; step 2 must run first")
 				}
@@ -1622,8 +1622,11 @@ func caseDD35() goCertCase {
 				th.note("the TH advertises %s, the operational instance the DUT's discovery looks for", instance)
 				return nil
 			}},
-			{n: "13", line: 244, title: "Commissioner opens a CASE session with TH", run: stage("case", "the TH established CASE")},
-			{n: "14", line: 250, title: "Commissioner sends CommissioningComplete", run: func(th *goTH) error {
+			// matter.js matches /SecureSession +Created secure CASE session/ on its TH
+			// (TC-DD-3.5.test.ts:63-67), logged when the session is created
+			// (NodeSession.ts:157-158); case.session_established is the same event.
+			{n: "13", line: 245, title: "Commissioner opens a CASE session with TH", run: stage("case", "the TH established CASE")},
+			{n: "14", line: 251, title: "Commissioner sends CommissioningComplete", run: func(th *goTH) error {
 				if err := stage("commissioningComplete", "the TH received CommissioningComplete")(th); err != nil {
 					return err
 				}
@@ -1632,7 +1635,7 @@ func caseDD35() goCertCase {
 				}
 				return nil
 			}},
-			{n: "15", line: 271, title: "Commissioning channel between the Commissioner and Commissionee is terminated", run: stage("paseClosed", "the TH closed the PASE session")},
+			{n: "15", line: 272, title: "Commissioning channel between the Commissioner and Commissionee is terminated", run: stage("paseClosed", "the TH closed the PASE session")},
 		},
 	}
 }

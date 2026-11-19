@@ -30,7 +30,7 @@ var (
 
 	// ErrRetransmissionLimit is matter.js RetransmissionLimitReachedError
 	// (packages/protocol/src/protocol/errors.ts:17, deprecated there and thrown by no exchange at
-	// db021da0). It is kept so the handshakes' "do not report an error to
+	// b25ed960). It is kept so the handshakes' "do not report an error to
 	// a peer we cannot reach" rule names the same three classes matter.js
 	// names (PaseClient.ts:101, CaseClient.ts:89).
 	ErrRetransmissionLimit = errors.New("exchange: retransmission limit reached")
@@ -59,7 +59,7 @@ var (
 	// ends every exchange on it. Not transient: the caller splits the
 	// message by [Session.MaxPayloadSize]. Mirrors matter.js
 	// MessageTooLargeError (packages/protocol/src/protocol/errors.ts:32-38
-	// at db021da0), thrown by MessageChannel.ts:106-112.
+	// at b25ed960), thrown by MessageChannel.ts:106-112.
 	ErrMessageTooLarge = errors.New("exchange: message exceeds the TCP limit")
 
 	// ErrNoSessionID is returned when every session id is taken and no
@@ -144,7 +144,7 @@ type StatusReport struct {
 
 // DecodeStatusReport splits a StatusReport body. Mirrors matter.js
 // packages/protocol/src/protocol/ProtocolStatusMessage.ts:50-66
-// (decodeInternal) at db021da0, which SecureChannelStatusMessageSchema.ts:14
+// (decodeInternal) at b25ed960, which SecureChannelStatusMessageSchema.ts:14
 // instantiates for the Secure Channel; ProtocolID carries the vendor id
 // in its upper 16 bits as on the wire. ok is false for a body shorter
 // than 8 bytes.

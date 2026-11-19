@@ -51,7 +51,7 @@ var lightClusterCounts = map[uint32]int{3: 7, 4: 6, 6: 10, 29: 9, 98: 7}
 
 // goRootExtra is what the Go root serves beyond the mock's counts:
 // BasicInformation.SerialNumber and Reachable (both default ProductLabel to
-// the ProductName, BasicInformationServer.ts:67 at db021da0).
+// the ProductName, BasicInformationServer.ts:67 at b25ed960).
 const goRootExtra = 2
 
 func TestAttributeReadResponseParity(t *testing.T) {

@@ -17,7 +17,7 @@ const clusterThermostat = 0x0201
 // attributes the reference thermostat serves (issue #273, brief CO):
 // chip-tool reads the hold, its duration and ThermostatRunningState —
 // the duration null, as matter.js sets temperatureSetpointHoldDuration
-// (ThermostatServer.ts:365-369 at db021da0) —
+// (ThermostatServer.ts:867-871 at b25ed960) —
 // writes the hold on and reads it back, and writes it off again so the
 // legs after this one see the daemon as it started.
 func testThermostatHold(t *testing.T, f *fixture) {

@@ -35421,6 +35421,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 64",
                   "max": 64
@@ -35476,6 +35477,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 254",
                   "max": 254
@@ -37373,6 +37375,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -37503,6 +37506,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -47153,6 +47157,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "97",
                   "value": 97
@@ -48009,6 +48014,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -49816,6 +49822,7 @@
               "quality": {
                 "nullable": true
               },
+              "isSecret": true,
               "constraint": {
                 "text": "16",
                 "value": 16
@@ -49858,6 +49865,7 @@
               "quality": {
                 "nullable": true
               },
+              "isSecret": true,
               "constraint": {
                 "text": "16",
                 "value": 16
@@ -49900,6 +49908,7 @@
               "quality": {
                 "nullable": true
               },
+              "isSecret": true,
               "constraint": {
                 "text": "16",
                 "value": 16
@@ -50860,6 +50869,7 @@
                 "access": {
                   "fabric": "F"
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -50880,6 +50890,7 @@
                 "access": {
                   "fabric": "F"
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -50995,6 +51006,7 @@
                 "access": {
                   "fabric": "F"
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -51270,6 +51282,7 @@
               "quality": {
                 "nonvolatile": true
               },
+              "isSecret": true,
               "constraint": {
                 "text": "16",
                 "value": 16
@@ -65814,6 +65827,7 @@
                 "access": {
                   "fabric": "F"
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -66083,6 +66097,7 @@
                 "access": {
                   "fabric": "F"
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -83027,6 +83042,7 @@
             "quality": {
               "nullable": true
             },
+            "isSecret": true,
             "constraint": {
               "text": "16",
               "value": 16
@@ -83257,7 +83273,8 @@
                       }
                     }
                   }
-                }
+                },
+                "isSecret": true
               }
             ]
           }
@@ -83308,7 +83325,8 @@
                       }
                     }
                   }
-                }
+                },
+                "isSecret": true
               }
             ]
           }
@@ -83396,7 +83414,8 @@
                       }
                     }
                   }
-                }
+                },
+                "isSecret": true
               }
             ]
           }
@@ -85146,6 +85165,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "desc",
                   "desc": true
@@ -85639,7 +85659,8 @@
                       }
                     }
                   }
-                }
+                },
+                "isSecret": true
               }
             ]
           }
@@ -85679,6 +85700,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "32",
                   "value": 32
@@ -85731,6 +85753,7 @@
                     "param": "ALBU"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "16",
                   "value": 16
@@ -119397,6 +119420,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 64",
                   "max": 64
@@ -119719,6 +119743,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 254",
                   "max": 254
@@ -119761,6 +119786,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 254",
                   "max": 254
@@ -119817,6 +119843,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 254",
                   "max": 254
@@ -120035,6 +120062,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 254",
                   "max": 254
@@ -120157,6 +120185,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 254",
                   "max": 254
@@ -128374,6 +128403,7 @@
                 "access": {
                   "fabric": "F"
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "desc",
                   "desc": true
@@ -128441,6 +128471,7 @@
                 "access": {
                   "fabric": "F"
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "min 8",
                   "min": 8
@@ -128963,6 +128994,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 6",
                   "max": 6
@@ -128980,6 +129012,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 6",
                   "max": 6
@@ -129045,6 +129078,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 6",
                   "max": 6
@@ -129135,6 +129169,7 @@
                     "type": "O"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "max 6",
                   "max": 6
@@ -143838,6 +143873,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "97",
                   "value": 97
@@ -146605,6 +146641,7 @@
               "quality": {
                 "nullable": true
               },
+              "isSecret": true,
               "constraint": {
                 "text": "16",
                 "value": 16
@@ -146641,6 +146678,7 @@
               "quality": {
                 "nullable": true
               },
+              "isSecret": true,
               "constraint": {
                 "text": "16",
                 "value": 16
@@ -146677,6 +146715,7 @@
               "quality": {
                 "nullable": true
               },
+              "isSecret": true,
               "constraint": {
                 "text": "16",
                 "value": 16
@@ -147227,6 +147266,7 @@
                     "type": "M"
                   }
                 },
+                "isSecret": true,
                 "constraint": {
                   "text": "97",
                   "value": 97
@@ -151784,6 +151824,7 @@
                   "type": "O"
                 }
               },
+              "isSecret": true,
               "constraint": {
                 "text": "max 512",
                 "max": 512

@@ -761,7 +761,7 @@ func (s *Server) resetLocked() {
 // long-press and multi-press timers, so none fires an event or a position
 // write after the bridge let the server go. The server stays usable; the
 // next input arms them again. Mirrors matter.js
-// packages/node/src/behaviors/switch/SwitchServer.ts:379-384 at db021da0
+// packages/node/src/behaviors/switch/SwitchServer.ts:379-384 at b25ed960
 // ([Symbol.asyncDispose] stops the three timers and nothing else).
 func (s *Server) MatterQuiesce() {
 	s.mu.Lock()

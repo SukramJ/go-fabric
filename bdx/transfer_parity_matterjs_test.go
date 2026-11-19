@@ -3,7 +3,7 @@
 
 package bdx_test
 
-// A port of matter.js packages/protocol/test/bdx/BdxTest.ts at db021da0:
+// A port of matter.js packages/protocol/test/bdx/BdxTest.ts at b25ed960:
 // whole transfers between an initiator (Send / Receive, matter.js
 // BdxClient.asSender / asReceiver) and a [bdx.Responder] serving the "ota"
 // scope (BdxProtocol.onNewExchange), every message both sides sent

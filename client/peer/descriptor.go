@@ -14,7 +14,7 @@ import (
 
 // Descriptor is what is known about a peer — a node on one of our
 // fabrics — and what a [Store] keeps of it. It is matter.js PeerDescriptor
-// (packages/protocol/src/peer/PeerDescriptor.ts:39-75 at db021da0).
+// (packages/protocol/src/peer/PeerDescriptor.ts:39-75 at b25ed960).
 type Descriptor struct {
 	// Address is the peer's logical address: our fabric index and its node
 	// id (:40-43).
@@ -37,7 +37,7 @@ type Descriptor struct {
 	// session's address when the peer was last reached
 	// ([discovery.Address.Host]), empty when unknown. matter.js persists
 	// the operational address and not the host it belonged to
-	// (PeerDescriptor.ts:48 at db021da0); the host is this module's, ahead
+	// (PeerDescriptor.ts:48 at b25ed960); the host is this module's, ahead
 	// of matter.js: while discovery still advertises it, its addresses are
 	// tried first on reconnect (issue 478, a border router answering a
 	// node's instance with an SRV to its own host).

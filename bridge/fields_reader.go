@@ -121,7 +121,7 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 		// the definition defines, each the element the check judged. A
 		// member the definition does not know — skipped whole by its
 		// decoder, as matter.js skips an unknown field
-		// (packages/types/src/tlv/TlvObject.ts:215-217 at db021da0) — never
+		// (packages/types/src/tlv/TlvObject.ts:215-217 at b25ed960) — never
 		// reaches a reader that would descend into it and read its inner
 		// tags as the command's own (R2-P6-wire-0440).
 		n = definedFields(n, cmd)

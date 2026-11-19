@@ -51,7 +51,7 @@ const ThermostatFeatureTEVT = uint32(tdef.FeatureEvents)
 
 // servedEvents are the TEVT events the selection emits. Each is
 // provisional ("P, TEVT…", thermostat-cluster.element.ts:287-333 at
-// db021da0), which the definition reads as optional, so the server names
+// b25ed960), which the definition reads as optional, so the server names
 // them: every event whose feature condition the selection meets.
 func servedEvents(features uint32) []uint32 {
 	if features&ThermostatFeatureTEVT == 0 {

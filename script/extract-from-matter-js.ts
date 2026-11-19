@@ -432,6 +432,13 @@ function valueOut(m: any, role: "element" | "member" = "element"): any {
     if (role === "member" && access?.fabric !== undefined) o.access = { fabric: access.fabric };
     const quality = qualityOut(m.effectiveQuality);
     if (quality !== undefined) o.quality = quality;
+    // isSecret is matter.js's own mark for a key, passcode or network
+    // credential whose value its logs redact — not a Matter quality
+    // (packages/model/src/elements/ValueElement.ts:53). It is read through
+    // ValueModel.effectiveIsSecret (packages/model/src/models/ValueModel.ts:82),
+    // the base chain SecretRedaction reads, and carried only when true, so
+    // the snapshot grows only where matter.js marks a secret.
+    if (m.effectiveIsSecret === true) o.isSecret = true;
     const constraint = constraintOut(m.effectiveConstraint);
     if (constraint !== undefined) o.constraint = constraint;
     const def = effectiveDefault(m);
@@ -490,6 +497,9 @@ function datatypeOut(d: any): any {
     const o: any = { name: d.name, ...typeOut(d) };
     const conformance = conformanceOut(d.effectiveConformance);
     if (conformance !== undefined) o.conformance = conformance;
+    // A datatype may carry the mark too (ValueElement.ts:53 is on every
+    // value element); as for a value, only when true.
+    if (d.effectiveIsSecret === true) o.isSecret = true;
     const constraint = constraintOut(d.effectiveConstraint);
     if (constraint !== undefined) o.constraint = constraint;
     o.fields = fieldsOut(d);

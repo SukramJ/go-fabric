@@ -233,7 +233,7 @@ func (h *closeWindowAfterPASE) progress(s commissioner.Step) {
 }
 
 // TestNodeBLEWindowCloseKeepsTheLink: the window's end stops only the
-// advertisement (matter.js BleAdvertisement.ts:69-71 at db021da0); the
+// advertisement (matter.js BleAdvertisement.ts:69-71 at b25ed960); the
 // GATT service and the central stay, so a commissioning over BLE whose
 // window closed after PASE completes over the same link, and only its
 // commit takes the node off the radio (ServerNetworkRuntime.ts:294-308,
@@ -295,7 +295,7 @@ func TestNodeBLEReopenedWindowAdvertisesAgain(t *testing.T) {
 // fails after the window closed rolls its fabric back; the node stays
 // uncommissioned with the window closed, the service registered and
 // nothing advertised over BLE — matter.js reopens nothing for a fabric only
-// the fail-safe added (CommissioningServer.ts:118-165 at db021da0) — until
+// the fail-safe added (CommissioningServer.ts:118-165 at b25ed960) — until
 // a window opens.
 func TestNodeBLEFailSafeExpiryAfterWindowClose(t *testing.T) {
 	site, dev, c := bleSite(t, joinWiFi{fail: true})
@@ -323,7 +323,7 @@ func TestNodeBLEFailSafeExpiryAfterWindowClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The rollback decommissions nothing (CommissioningServer.ts:148-152 at
-	// db021da0): no reopen follows once the node is idle. Time moves well
+	// b25ed960): no reopen follows once the node is idle. Time moves well
 	// past the node's idle poll before the state is read.
 	if err := site.Eventually(bleCtx(t), "no session left", func() bool {
 		return len(dev.Node().SessionDiagnostics().Sessions) == 0

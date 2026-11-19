@@ -33,14 +33,14 @@ import (
 // host name's records, which no service holds any more (publication.go).
 
 // changeRepeatInterval is RFC 6762 §8.3's second announcement of a change,
-// matter.js CHANGE_REPEAT_INTERVAL (MdnsServer.ts:32-33 at db021da0).
+// matter.js CHANGE_REPEAT_INTERVAL (MdnsServer.ts:32-33 at b25ed960).
 const changeRepeatInterval = time.Second
 
 // SetInterfaceCheckInterval sets how often the responder compares the
 // host's interfaces while services are published; zero or negative
 // disables the periodic comparison ([Responder.CheckInterfaces] still
 // runs one). The default is 60 s, matter.js INTERFACE_CHECK_INTERVAL
-// (Network.ts:91-95 at db021da0).
+// (Network.ts:91-95 at b25ed960).
 func (r *Responder) SetInterfaceCheckInterval(d time.Duration) {
 	r.watch.SetInterval(d)
 }
@@ -48,7 +48,7 @@ func (r *Responder) SetInterfaceCheckInterval(d time.Duration) {
 // CheckInterfaces compares the host's interfaces now and publishes the
 // changes as the periodic check does — for a host that learns of a change
 // before the next check (matter.js Network.checkInterfaces,
-// Network.ts:174-186 at db021da0). It does nothing while no service is
+// Network.ts:174-186 at b25ed960). It does nothing while no service is
 // published.
 func (r *Responder) CheckInterfaces() {
 	r.watch.Check()
@@ -98,7 +98,7 @@ func (r *Responder) interfaceSnapshot() map[string]string {
 // interfacesChanged takes the host-name verdict again, then publishes on
 // the interfaces that changed — on every interface when the host name
 // moved — and arms the repeat (MdnsServer.ts #publishChange, :321-339 at
-// db021da0: previousHostname, #updateHost, "all" when the name changed).
+// b25ed960: previousHostname, #updateHost, "all" when the name changed).
 func (r *Responder) interfacesChanged(names []string) {
 	kept, retaken := r.retakeHostName()
 	r.mu.Lock()
@@ -140,7 +140,7 @@ func (r *Responder) armChangeRepeatLocked() {
 	r.stopChangeRepeatTimerLocked()
 	// The timer's generation: a repeat that fired before the re-arm and
 	// waits for r.mu is stale and must neither publish early nor drop the
-	// new timer (MdnsServer.ts:337 stop().start() at db021da0).
+	// new timer (MdnsServer.ts:337 stop().start() at b25ed960).
 	gen := r.changeRepeatGen
 	r.changeRepeat = r.clock.Load().AfterFunc(changeRepeatInterval, func() { r.repeatChange(gen) })
 }
@@ -201,7 +201,7 @@ func (r *Responder) moveHostLocked(kept string) bool {
 }
 
 // repeatChange publishes once more on the interfaces of the changes since
-// the last repeat (MdnsServer.ts #repeatChange, :341-349 at db021da0).
+// the last repeat (MdnsServer.ts #repeatChange, :341-349 at b25ed960).
 func (r *Responder) repeatChange(gen uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -222,7 +222,7 @@ func (r *Responder) repeatChange(gen uint64) {
 
 // publishOnListedLocked publishes every service on each listed interface
 // in only, on every one when only is nil (MdnsServer.ts
-// #publishOnListedInterfaces, :254-284 at db021da0). Caller holds r.mu.
+// #publishOnListedInterfaces, :254-284 at b25ed960). Caller holds r.mu.
 func (r *Responder) publishOnListedLocked(only map[int]bool) {
 	for _, l := range r.listLocked() {
 		if only == nil || only[l.index] {
@@ -232,7 +232,7 @@ func (r *Responder) publishOnListedLocked(only map[int]bool) {
 }
 
 // stopChangeRepeatLocked drops a waiting repeat (MdnsServer.ts:299-302 at
-// db021da0). Caller holds r.mu.
+// b25ed960). Caller holds r.mu.
 func (r *Responder) stopChangeRepeatLocked() {
 	r.stopChangeRepeatTimerLocked()
 	r.repeatOn, r.repeatAll = nil, false

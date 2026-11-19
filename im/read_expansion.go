@@ -360,7 +360,7 @@ func compareReadResultPaths(a, b ReadResult) int {
 // ascending by id among its kind. matter.js lists the members a server's
 // schema adds to a cluster's model before the model's own (findAllMembers
 // visits the extending schema before its base,
-// packages/model/src/logic/Scope.ts:287-333 at db021da0), in the order the
+// packages/model/src/logic/Scope.ts:287-333 at b25ed960), in the order the
 // extension defines them; that order is not known here, so ascending id
 // among them is this module's rule.
 func CompareAttributeIDs(cluster, a, b uint32) int {

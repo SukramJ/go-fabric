@@ -13,7 +13,7 @@ import (
 )
 
 // TestKnownAnswersParityMatterJS mirrors
-// packages/general/test/net/dns-sd/DnssdNamesTest.ts:1577-1637 at db021da0
+// packages/general/test/net/dns-sd/DnssdNamesTest.ts:1577-1637 at b25ed960
 // (describe "known answers"): a query's known answers carry their remaining
 // TTL, a partial second of it rounded up, and a record past half its TTL is
 // left out so the responder refreshes it.

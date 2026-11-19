@@ -45,7 +45,7 @@ func MatchDataVersionFilter(filters []DataVersionFilter, endpoint uint16, cluste
 // array that is not an anonymous structure. Both references refuse the
 // request for it: matter.js decodes either array as a TlvArray, which
 // throws on a tagged element (packages/types/src/tlv/TlvArray.ts:77-78 at
-// db021da0) and on one that is not a structure
+// b25ed960) and on one that is not a structure
 // (packages/types/src/tlv/TlvObject.ts:205-207); connectedhomeip's
 // ReadHandler returns CHIP_ERROR_INVALID_TLV_TAG for a tagged one
 // (src/app/ReadHandler.cpp:543-545, :597-599 at 6170af84) and fails a

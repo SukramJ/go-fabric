@@ -204,7 +204,7 @@ const settingPrefix = "jointfabric.datastore:"
 // node holds. The rules are connectedhomeip's JointFabricDatastore.cpp and
 // joint-fabric-datastore-server.cpp at 6170af84; matter.js's
 // JointFabricDatastoreServer is the generated behaviour
-// (JointFabricDatastoreServer.ts:14 at db021da0).
+// (JointFabricDatastoreServer.ts:14 at b25ed960).
 //
 // The datastore is the anchor fabric's alone (owner decision 129, ahead
 // of connectedhomeip, whose joint-fabric-datastore-server.cpp asks no

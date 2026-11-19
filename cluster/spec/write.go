@@ -107,7 +107,7 @@ func hostStatus(err error) (contract.StatusError, bool) {
 // names ("minMeasuredValue to maxMeasuredValue", "max numberOfPositions -
 // 1"); nil resolves none. A bound computed from a name that does not
 // resolve admits every value, as matter.js's does (Constraint.ts:193-205
-// at db021da0); one computed from literals alone ("max 2^62 - 1") always
+// at b25ed960); one computed from literals alone ("max 2^62 - 1") always
 // holds.
 type Peers func(attrID uint32) (any, bool)
 
@@ -279,9 +279,9 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 	case t.Kind == KindBitmap && nullable && n>>(bitWidth(t.Bits)-1) != 0:
 		// A nullable bitmap reserves its most-significant bit for null
 		// (Core § 7.19.1.2). Mirrors matter.js
-		// packages/types/src/tlv/TlvNullable.ts:53-56 at db021da0, which
+		// packages/types/src/tlv/TlvNullable.ts:53-56 at b25ed960, which
 		// wraps a nullable BitmapWrapper in withReservedMsb, and
-		// packages/types/src/tlv/TlvNumber.ts:327-330 at db021da0, whose
+		// packages/types/src/tlv/TlvNumber.ts:327-330 at b25ed960, whose
 		// withReservedMsb bounds the value by half the base type's maximum.
 		return nil, fmt.Sprintf("0x%X sets the most-significant bit a nullable bitmap reserves", n)
 	case t.Kind == KindBitmap && t.Bitmap != nil && n&^t.Bitmap.Defined() != 0:

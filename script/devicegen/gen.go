@@ -97,7 +97,7 @@ type typeModel struct {
 // cluster requirement but the Descriptor (VideoDoorbell, FloodlightCamera;
 // matter.js generates their files with no behaviours of their own,
 // packages/node/src/devices/video-doorbell.ts:28-33,
-// packages/node/src/devices/floodlight-camera.ts:31-36 at db021da0).
+// packages/node/src/devices/floodlight-camera.ts:31-36 at b25ed960).
 // matter.js places a component on an endpoint below the composite (DeviceTypeConformance.ts:596-613: only a
 // utility device type counts on the composing endpoint itself), and its
 // StandardDeviceTypeCorpusTest pins the missing components as "component
@@ -372,7 +372,7 @@ func (g *generator) ingestElement(dt *deviceType, cr *clusterReq, n *requirement
 	if c := n.Constraint; c != nil {
 		// Mirrors matter.js ClusterRequirements.ingestElement
 		// (support/codegen/src/endpoints/ClusterRequirements.ts:169-187 at
-		// db021da0; Fable, verify-6b-B R2-P6-par-2708): only a numeric
+		// b25ed960; Fable, verify-6b-B R2-P6-par-2708): only a numeric
 		// value is taken, and min / max are tried when the value gives
 		// none — MeterReferencePoint's TariffUnit "kWh | kVAh" is such a
 		// non-numeric value at the pin. Other forms are refused here

@@ -186,7 +186,7 @@ func (s *commandLevel) MatterInvoke(_ context.Context, cmd uint32, fields any) (
 // the scene's transition in tenths, as the OnOff and ColorControl
 // fallbacks drive theirs through their commands. Mirrors matter.js
 // packages/node/src/behaviors/level-control/LevelControlServer.ts:757 at
-// db021da0 (#applySceneValues recalls the level through moveToLevelLogic
+// b25ed960 (#applySceneValues recalls the level through moveToLevelLogic
 // with executeIfOff and the scene's transition in tenths).
 func TestScenesRecallDrivesAForeignLevelControlThroughMoveToLevel(t *testing.T) {
 	t.Parallel()

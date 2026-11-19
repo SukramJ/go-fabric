@@ -14,7 +14,7 @@ import (
 // broadcast events resolve a session's fabric through: AnnounceFabric
 // records each fabric's operational instance, WithdrawFabric forgets it,
 // index 0 and an unknown index find nothing (matter.js
-// packages/protocol/src/advertisement/Advertiser.ts:69-75 at db021da0,
+// packages/protocol/src/advertisement/Advertiser.ts:69-75 at b25ed960,
 // advertisementForFabric), and the withdraw of a replaced identity does
 // not drop the identity announced after it.
 func TestOperationalInstanceFor_TracksEachFabricsService(t *testing.T) {

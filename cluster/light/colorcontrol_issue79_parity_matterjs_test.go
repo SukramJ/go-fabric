@@ -54,7 +54,7 @@ func (d *hsDevice) writes() []light.Color {
 // TestIssue79_MoveToColorOnAnHSDevice: a MoveToColor on a light whose
 // device takes hue and saturation — the mode switch converts the
 // attributes without writing (matter.js switchColorMode changes state
-// only, ColorControlServer.ts:1454-1540 at db021da0), the device's echo in
+// only, ColorControlServer.ts:1454-1540 at b25ed960), the device's echo in
 // its own colour space is the confirmation of the x/y write, and the
 // target lands.
 func TestIssue79_MoveToColorOnAnHSDevice(t *testing.T) {
