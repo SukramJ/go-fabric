@@ -148,7 +148,7 @@
   },
   {
     "file": "bridge/case_sigma3_after_completion_test.go",
-    "line": 266,
+    "line": 304,
     "citation": "packages/protocol/src/protocol/MessageExchange.ts:501-511",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "at": "db021da0",
