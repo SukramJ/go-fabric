@@ -10868,14 +10868,14 @@
       "identifier": "TestPeerAddressMonitorBackoff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 209
+      "line": 210
     },
     {
       "package": "client/peer",
       "identifier": "TestPeerAddressMonitorCoalescing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/peer_address_monitor_parity_matterjs_test.go",
-      "line": 192
+      "line": 193
     },
     {
       "package": "client/peer",
