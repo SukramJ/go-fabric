@@ -689,11 +689,12 @@ func (m *Manager) forget(s *Session) {
 // counted for the per-peer cap, not handed over, its record not saved.
 // The mark is taken under s.mu, the lock that completion checks and flips
 // under. Mirrors matter.js packages/protocol/src/session/Session.ts:311
-// before :319 at b25ed960 (initiateClose: closing, then the close), whose
-// close alone emits the graceful close that sends CloseSession
-// (NodeSession.ts:490-492), with completeEstablishment declining from :311
-// on (NodeSession.ts:245-247). [Manager.Initiate] refuses only a closed
-// session, so the CloseSession's own exchange still opens.
+// before :319 at b25ed960 (initiateClose: closing, then the close). Only
+// the close emits the graceful close that sends CloseSession
+// (NodeSession.ts:490-492 at b25ed960). From :311 on the establishment
+// is declined (NodeSession.ts:245-247 at b25ed960). [Manager.Initiate]
+// refuses only a closed session, so the CloseSession's own exchange
+// still opens.
 func (m *Manager) CloseSession(ctx context.Context, s *Session) {
 	s.mu.Lock()
 	if s.closed {
