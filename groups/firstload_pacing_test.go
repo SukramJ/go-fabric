@@ -197,3 +197,40 @@ func TestFirstLoadDoesNotCacheACallersContextError(t *testing.T) {
 		t.Fatalf("the live datagram made %d ListFabrics calls, want 1", got)
 	}
 }
+
+// TestFirstLoadBackoffStepsOncePerInterval: authenticated failures inside
+// one interval refresh the error but step the backoff once — a burst of
+// reads does not drive the datagrams' retry to the maximum (review II,
+// Fable round 2, note 2a).
+func TestFirstLoadBackoffStepsOncePerInterval(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	m, st := newTestManager(t)
+	fake := clocktest.New(time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC))
+	m.SetClock(fake)
+	st.mu.Lock()
+	st.failList = true
+	st.mu.Unlock()
+	backoff := func() time.Duration {
+		m.mu.RLock()
+		defer m.mu.RUnlock()
+		return m.owedBackoff
+	}
+	for range 6 {
+		if _, err := m.Fabrics(ctx); err == nil {
+			t.Fatal("Fabrics while the store fails: nil error")
+		}
+	}
+	if got := backoff(); got != owedRetryFirst {
+		t.Fatalf("backoff after 6 authenticated failures inside one interval: %v, want %v", got, owedRetryFirst)
+	}
+	fake.Advance(owedRetryFirst)
+	for range 3 {
+		if _, err := m.Fabrics(ctx); err == nil {
+			t.Fatal("Fabrics while the store fails: nil error")
+		}
+	}
+	if got := backoff(); got != 2*owedRetryFirst {
+		t.Fatalf("backoff after the interval passed and 3 more failures: %v, want %v", got, 2*owedRetryFirst)
+	}
+}

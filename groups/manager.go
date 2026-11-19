@@ -554,7 +554,13 @@ func (m *Manager) loadAll(ctx context.Context, mode loadMode) error {
 			// its error is not handed to the next datagram.
 			return err
 		}
-		m.noteOwedResult(err)
+		// A datagram's attempt is always due (firstLoadPaced). An
+		// authenticated caller's or Load's is not paced, so it moves the
+		// backoff only when the datagrams' attempt was due — a burst of
+		// reads inside one interval is one step, not one per read.
+		if mode == loadForDatagram || m.firstLoadDue() {
+			m.noteOwedResult(err)
+		}
 		m.mu.Lock()
 		m.firstLoadErr = err
 		m.mu.Unlock()
@@ -631,16 +637,21 @@ func (m *Manager) Load(ctx context.Context) error {
 // (loadForDatagram) is not due to try the store again; nil when it is,
 // when none failed, and for every other mode.
 func (m *Manager) firstLoadPaced(mode loadMode) error {
-	if mode != loadForDatagram {
+	if mode != loadForDatagram || m.firstLoadDue() {
 		return nil
 	}
 	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.firstLoadErr
+}
+
+// firstLoadDue reports whether a group datagram's first load would try the
+// store now: none failed yet, or the interval passed.
+func (m *Manager) firstLoadDue() bool {
+	m.mu.RLock()
 	err, at := m.firstLoadErr, m.owedRetryAt
 	m.mu.RUnlock()
-	if err == nil || m.monotonic() >= at {
-		return nil
-	}
-	return err
+	return err == nil || m.monotonic() >= at
 }
 
 // Pacing of an owed reload that keeps failing: the first retry after
@@ -650,8 +661,8 @@ const (
 	owedRetryMax   = time.Minute
 )
 
-// owedDue reports whether an owed reload is due on the receive path and,
-// when it is, claims the attempt: concurrent receives do not try it twice.
+// owedDue reports whether an owed reload is due on demand and, when it
+// is, claims the attempt: concurrent callers do not try it twice.
 func (m *Manager) owedDue() bool {
 	m.mu.RLock()
 	n := len(m.owed)
@@ -669,7 +680,7 @@ func (m *Manager) owedDue() bool {
 	return true
 }
 
-// noteOwedResult sets the next receive-path attempt after one ended with
+// noteOwedResult sets the next on-demand attempt after one ended with
 // err: none owed after a success, owedRetryFirst doubling up to
 // owedRetryMax after a failure.
 func (m *Manager) noteOwedResult(err error) {
