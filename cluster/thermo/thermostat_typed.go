@@ -159,7 +159,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	}
 	s.setOptionalLocked(checked, note)
 	reevaluate := s.setSuggestionReasonLocked(checked) || slices.Contains(changed, thermoAttrTemperatureSetpointHold)
-	if reevaluate && len(direct) > 0 && s.features&ThermostatFeatureTSUGGEST != 0 {
+	if reevaluate && s.features&ThermostatFeatureTSUGGEST != 0 && s.currentOccupancyWrittenLocked(direct) {
 		// The re-evaluation this change schedules belongs to the same
 		// change as the setpoint written here (suggest.setpointWritten).
 		s.suggest.setpointWritten = true
@@ -193,6 +193,20 @@ func directSetpointWrites(st setpointState, checked map[uint32]any) []uint32 {
 		}
 	}
 	return direct
+}
+
+// currentOccupancyWrittenLocked reports whether direct holds a setpoint of
+// the occupancy in effect: the occupied pair when occupied, the unoccupied
+// pair otherwise. Mirrors matter.js
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:803-808 at
+// b25ed960 (#setpointChangedInTransaction looks only at the two setpoints
+// of the current occupancy). The caller holds s.mu.
+func (s *ThermostatServer) currentOccupancyWrittenLocked(direct []uint32) bool {
+	heat, cool := thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint
+	if !s.occupiedLocked() {
+		heat, cool = thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint
+	}
+	return slices.Contains(direct, heat) || slices.Contains(direct, cool)
 }
 
 // clearActivePresetAfterSet ends the active preset in effect for each

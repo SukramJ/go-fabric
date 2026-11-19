@@ -151,6 +151,44 @@ func TestSuggestionUniqueIDs(t *testing.T) {
 	}
 }
 
+// TestSetpointOfTheOtherOccupancyIsNoOverride pins that only a setpoint of
+// the occupancy in effect, written in the change that ends the hold, makes
+// the current suggestion an override — matter.js ThermostatServer.ts:803-808
+// at b25ed960 (#setpointChangedInTransaction): with the thermostat occupied,
+// an UnoccupiedHeatingSetpoint written as the hold ends is followed past,
+// and an OccupiedHeatingSetpoint is the override.
+func TestSetpointOfTheOtherOccupancyIsNoOverride(t *testing.T) {
+	t.Parallel()
+	withOccupancy := func(cfg *thermo.ThermostatConfig) {
+		cfg.Features |= thermo.ThermostatFeatureOCC
+		heat, cool := int16(1800), int16(2800)
+		cfg.InitialUnoccupiedHeatingSetpoint, cfg.InitialUnoccupiedCoolingSetpoint = &heat, &cool
+		occupied := true
+		cfg.Occupied = &occupied
+	}
+	holdOffAnd := func(attr uint32) map[uint32]any {
+		return map[uint32]any{
+			tdef.AttrTemperatureSetpointHold: uint8(tdef.TemperatureSetpointHoldSetpointHoldOff),
+			attr:                             int16(1900),
+		}
+	}
+
+	c := onlineSuggestions(t, withOccupancy)
+	c.hold(true)
+	c.mustAdd(presetB, nil, 0)
+	c.wantActive(nil)
+	c.set(holdOffAnd(tdef.AttrUnoccupiedHeatingSetpoint))
+	c.wantReason(nil)
+	c.wantActive(presetB)
+
+	c = onlineSuggestions(t, withOccupancy)
+	c.hold(true)
+	c.mustAdd(presetB, nil, 0)
+	c.set(holdOffAnd(tdef.AttrOccupiedHeatingSetpoint))
+	c.wantReason(reasonOf(0))
+	c.wantActive(nil)
+}
+
 // TestDeviceReasonsKeepTheThermostatOffTheSuggestion pins the device's own
 // reasons (the reference delegate's SetThermostatSuggestionNotFollowingReason,
 // thermostat-suggestions-delegate-impl.cpp:91-103 at 6170af84) and the hold
