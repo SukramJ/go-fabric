@@ -29,6 +29,17 @@ const (
 )
 
 func TestDoorLockServerParity(t *testing.T) {
+	// :315-338 at b25ed960: ClearCredential's onValidationError
+	// (DoorLockServer.ts:1512) answers a CredentialType the enum does not
+	// define, nested in the Credential struct, with INVALID_COMMAND.
+	t.Run("answers ClearCredential with a CredentialType the enum does not define with INVALID_COMMAND", func(t *testing.T) {
+		f := createLock(t, nil)
+		req := lockdef.ClearCredentialRequest{Credential: spec.ValueOf(lockdef.CredentialStruct{CredentialType: lockdef.CredentialTypeEnum(9), CredentialIndex: 1})}
+		if se := f.refused(lockdef.CmdClearCredential, req); se.Status != im.StatusInvalidCommand {
+			t.Errorf("interaction status 0x%02X, want INVALID_COMMAND", se.Status)
+		}
+	})
+
 	t.Run("refuses SetCredential naming an OperationType its constraint omits", func(t *testing.T) {
 		f := createLock(t, nil)
 		// The request creates its own user, so it does not depend on a

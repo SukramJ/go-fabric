@@ -56,3 +56,37 @@ func TestRefusedRequestNeverReachesTheHostHandler(t *testing.T) {
 		t.Errorf("a request that fits: %v, %d handler calls", st, calls)
 	}
 }
+
+// TestRefusedRequestOfTheFiveNewRefusalCommandsNeverReachesTheHostHandler:
+// at b25ed960 GetWeekDaySchedule, GetYearDaySchedule, GetHolidaySchedule,
+// ClearCredential and GetCredentialStatus answer a validation error with
+// INVALID_COMMAND too (DoorLockServer.ts:1509-1513), where db021da0 left
+// them unchecked: a CredentialType the enum does not define and a request
+// without fields (validated as {}, ProtocolService.ts:624-625) are refused
+// before the host's handler runs.
+func TestRefusedRequestOfTheFiveNewRefusalCommandsNeverReachesTheHostHandler(t *testing.T) {
+	srv, _ := newLocal(t, nil)
+	calls := 0
+	host := func(context.Context, any) (any, error) { calls++; return nil, nil }
+	for _, cmd := range []uint32{lockdef.CmdClearCredential, lockdef.CmdGetCredentialStatus, lockdef.CmdGetWeekDaySchedule} {
+		if err := srv.Handle(cmd, host); err != nil {
+			t.Fatal(err)
+		}
+	}
+	undefined := lockdef.CredentialStruct{CredentialType: lockdef.CredentialTypeEnum(9), CredentialIndex: 1}
+	for name, c := range map[string]struct {
+		cmd uint32
+		req any
+	}{
+		"ClearCredential CredentialType 9":     {lockdef.CmdClearCredential, lockdef.ClearCredentialRequest{Credential: spec.ValueOf(undefined)}},
+		"GetCredentialStatus CredentialType 9": {lockdef.CmdGetCredentialStatus, lockdef.GetCredentialStatusRequest{Credential: undefined}},
+		"GetWeekDaySchedule without fields":    {lockdef.CmdGetWeekDaySchedule, nil},
+	} {
+		if _, st := invokeStatus(t, srv, withPairFabric(), c.cmd, c.req); st != im.StatusInvalidCommand {
+			t.Errorf("%s: %v, want INVALID_COMMAND", name, st)
+		}
+	}
+	if calls != 0 {
+		t.Errorf("the host's handler ran %d times for a refused request", calls)
+	}
+}
