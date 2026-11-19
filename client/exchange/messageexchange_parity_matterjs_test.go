@@ -646,7 +646,8 @@ func TestMessageExchangeAckWaitAbort(t *testing.T) {
 }
 
 // TestMessageExchangeOnTransmitted ports describe "onTransmitted"
-// (MessageExchangeTest.ts:1005-1070 at b25ed960): SendOptions.OnTransmitted.
+// (MessageExchangeTest.ts:1005-1070 at b25ed960): Exchange.send's onTransmitted
+// (exchangeseam.SendNotifyingTransmission).
 func TestMessageExchangeOnTransmitted(t *testing.T) {
 	t.Parallel()
 	t.Run("runs once, after the first transmission and before the ack, not for retransmissions or acks", func(t *testing.T) {
@@ -654,7 +655,10 @@ func TestMessageExchangeOnTransmitted(t *testing.T) {
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		transmittedAt := make(chan int, 4)
-		done := sendAsync(x, 1, nil, SendOptions{OnTransmitted: func() { transmittedAt <- len(e.conn.datagrams()) }})
+		done := make(chan error, 1)
+		go func() {
+			done <- x.send(context.Background(), 1, nil, SendOptions{}, func() { transmittedAt <- len(e.conn.datagrams()) })
+		}()
 		select {
 		case n := <-transmittedAt:
 			if n != 1 {
@@ -694,7 +698,7 @@ func TestMessageExchangeOnTransmitted(t *testing.T) {
 		s, _ := newSecurePair(t, m, 0x0391, false)
 		x, _ := m.Initiate(s, mrp.SecureChannelProtocolID, Options{})
 		var transmittedAt []int
-		if err := x.Send(context.Background(), 1, nil, SendOptions{OnTransmitted: func() { transmittedAt = append(transmittedAt, conn.count()) }}); err != nil {
+		if err := x.send(context.Background(), 1, nil, SendOptions{}, func() { transmittedAt = append(transmittedAt, conn.count()) }); err != nil {
 			t.Fatal(err)
 		}
 		if s.UsesMRP() {
@@ -711,10 +715,7 @@ func TestMessageExchangeOnTransmitted(t *testing.T) {
 		abort := make(chan struct{})
 		close(abort)
 		var transmittedAt []int
-		if err := x.Send(context.Background(), 1, nil, SendOptions{
-			AckWaitAbort:  abort,
-			OnTransmitted: func() { transmittedAt = append(transmittedAt, len(e.conn.datagrams())) },
-		}); err != nil {
+		if err := x.send(context.Background(), 1, nil, SendOptions{AckWaitAbort: abort}, func() { transmittedAt = append(transmittedAt, len(e.conn.datagrams())) }); err != nil {
 			t.Fatal(err)
 		}
 		if !slices.Equal(transmittedAt, []int{1}) {
@@ -729,7 +730,7 @@ func TestMessageExchangeOnTransmitted(t *testing.T) {
 		e.conn.mu.Unlock()
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		transmitted := 0
-		if err := x.Send(context.Background(), 1, nil, SendOptions{OnTransmitted: func() { transmitted++ }}); !errors.Is(err, ErrNetwork) {
+		if err := x.send(context.Background(), 1, nil, SendOptions{}, func() { transmitted++ }); !errors.Is(err, ErrNetwork) {
 			t.Fatalf("Send = %v, want ErrNetwork", err)
 		}
 		if transmitted != 0 {

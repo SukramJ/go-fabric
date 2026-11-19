@@ -32,6 +32,8 @@
 // not a field of exchange.SecureSessionConfig.
 package exchangeseam
 
+import "context"
+
 // NotifyActivity records traffic on sess (an *exchange.Session, threaded
 // through as any because this package must not import client/exchange):
 // received true is a message from the peer, which also moves the stamp the
@@ -56,6 +58,16 @@ var NewEstablishingSecureSession func(m, cfg any) (any, error)
 // client/exchange's init.
 // fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
 var ActivateSecureSession func(sess any)
+
+// SendNotifyingTransmission is exchange.Exchange.Send on x (an
+// *exchange.Exchange) with opts (an exchange.SendOptions) that also runs
+// onTransmitted once, when the first transmission of the message went
+// out, before the wait for its acknowledgement — matter.js
+// ExchangeSendOptions.onTransmitted (MessageExchange.ts:132-137 at
+// b25ed960); the CASE responder's Success completes its session's
+// establishment with it. Set by client/exchange's init.
+// fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
+var SendNotifyingTransmission func(ctx context.Context, x any, opcode uint8, payload []byte, opts any, onTransmitted func()) error
 
 // CompleteSecureSessionEstablishment ends the establishment of sess (a
 // CASE responder's *exchange.Session from NewEstablishingSecureSession)

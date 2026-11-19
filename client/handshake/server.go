@@ -503,7 +503,7 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 // fabric id mismatch is UnexpectedData, :303-305, an InvalidParam), the
 // session registered establishing (:307-327), Success sent with the
 // session established at its first transmission (:329-331, the send's
-// OnTransmitted), the record saved (:345-357). A Success whose first
+// onTransmitted through exchangeseam.SendNotifyingTransmission), the record saved (:345-357). A Success whose first
 // transmission fails — or that went out while the session was already
 // closing — closes the session and ends the handshake (:333-336); one that
 // went out and then fails (no acknowledgement) keeps the established
@@ -549,10 +549,9 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 	}
 	established := false
 	report := exchange.StatusReport{GeneralCode: mrp.SCStatusGeneralSuccess, ProtocolID: uint32(mrp.SecureChannelProtocolID), ProtocolCode: mrp.SCStatusProtocolSessionEstablishmentSuccess}
-	if err := x.Send(ctx, mrp.SCOpcodeStatusReport, report.Encode(), exchange.SendOptions{
-		ExpectedProcessingTime: ExpectedCryptoProcessingTime,
-		OnTransmitted:          func() { established = exchangeseam.CompleteSecureSessionEstablishment(s) },
-	}); err != nil {
+	if err := exchangeseam.SendNotifyingTransmission(ctx, x, mrp.SCOpcodeStatusReport, report.Encode(),
+		exchange.SendOptions{ExpectedProcessingTime: ExpectedCryptoProcessingTime},
+		func() { established = exchangeseam.CompleteSecureSessionEstablishment(s) }); err != nil {
 		if !established {
 			s.Close()
 			return err

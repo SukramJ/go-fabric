@@ -146,16 +146,6 @@ type SendOptions struct {
 	// matter.js's abort — still stops the transmission. Mirrors matter.js
 	// ExchangeSendOptions.ackWaitAbort (MessageExchange.ts:125-130).
 	AckWaitAbort <-chan struct{}
-	// OnTransmitted, when set, runs once, on the caller's goroutine, when
-	// the first transmission of the message went out and before Send
-	// waits for its acknowledgement — also on a channel without MRP and
-	// when AckWaitAbort closed before the send. It does not run when the
-	// first transmission fails or is not made (ctx done before it), and
-	// never for a retransmission. Mirrors matter.js
-	// ExchangeSendOptions.onTransmitted (MessageExchange.ts:132-137 at
-	// b25ed960, called at :830-833 after the first channel.send); the CASE
-	// responder's Success completes its session's establishment with it.
-	OnTransmitted func()
 }
 
 // ReceiveOptions configures [Exchange.Next] — matter.js
@@ -491,6 +481,21 @@ func (x *Exchange) notifySentLocked() {
 // acknowledgement stops the retransmissions and leaves the message
 // unacknowledged (:813-843). Both return ctx's error.
 func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts SendOptions) error {
+	return x.send(ctx, opcode, payload, opts, nil)
+}
+
+// send is [Exchange.Send]; onTransmitted, when set, runs once, on the
+// caller's goroutine, when the first transmission of the message went out
+// and before send waits for its acknowledgement — also on a channel
+// without MRP and when AckWaitAbort closed before the send. It does not
+// run when the first transmission fails or is not made (ctx done before
+// it), and never for a retransmission. Mirrors matter.js
+// ExchangeSendOptions.onTransmitted (MessageExchange.ts:132-137 at
+// b25ed960, called at :830-833 after the first channel.send); the CASE
+// responder's Success completes its session's establishment with it,
+// through internal/exchangeseam (a func field would make SendOptions
+// incomparable, an API break).
+func (x *Exchange) send(ctx context.Context, opcode uint8, payload []byte, opts SendOptions, onTransmitted func()) error {
 	x.mu.Lock()
 	x.releaseHeldLocked()
 	if x.closed {
@@ -512,8 +517,8 @@ func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts 
 		p = nil
 	}
 	x.mu.Unlock()
-	if err == nil && opts.OnTransmitted != nil {
-		opts.OnTransmitted()
+	if err == nil && onTransmitted != nil {
+		onTransmitted()
 	}
 	if err == nil && p != nil {
 		release := x.m.holdAckWait(x, p)

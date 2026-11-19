@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10095,
+  "entry_points": 10096,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27787,
-    "reachable": 20850,
-    "whitelisted": 6914,
+    "total_exported": 27795,
+    "reachable": 20851,
+    "whitelisted": 6921,
     "unreachable": 23
   },
   "by_package": [
@@ -407,7 +407,7 @@
       "package": "client/exchange",
       "identifier": "Manager.LocalFixedMrpBackoff",
       "file": "client/exchange/manager.go",
-      "line": 240,
+      "line": 249,
       "kind": "method"
     },
     {
@@ -9384,21 +9384,21 @@
       "identifier": "TestExchangeManagerInboundSecureMessages",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchangemanager_parity_matterjs_test.go",
-      "line": 92
+      "line": 115
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeManagerInboundUnsecuredSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchangemanager_parity_matterjs_test.go",
-      "line": 125
+      "line": 148
     },
     {
       "package": "client/exchange",
       "identifier": "TestExchangeManagerPeerLoss",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchangemanager_parity_matterjs_test.go",
-      "line": 41
+      "line": 43
     },
     {
       "package": "client/exchange",
@@ -9427,6 +9427,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_table_test.go",
       "line": 22
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestFabricSessionsForPeer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/session_establishing_parity_matterjs_test.go",
+      "line": 379
     },
     {
       "package": "client/exchange",
@@ -9545,28 +9552,28 @@
       "identifier": "TestMessageExchangeAckWaitAbort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 543
+      "line": 545
     },
     {
       "package": "client/exchange",
       "identifier": "TestMessageExchangeActivityTracking",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 429
+      "line": 431
     },
     {
       "package": "client/exchange",
       "identifier": "TestMessageExchangeBDXRetransmissionIntervalCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 411
+      "line": 413
     },
     {
       "package": "client/exchange",
       "identifier": "TestMessageExchangeCloseNotification",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 457
+      "line": 459
     },
     {
       "package": "client/exchange",
@@ -9580,21 +9587,21 @@
       "identifier": "TestMessageExchangeCrossProtocolStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 485
+      "line": 487
     },
     {
       "package": "client/exchange",
       "identifier": "TestMessageExchangeHasUnackedMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 238
+      "line": 240
     },
     {
       "package": "client/exchange",
       "identifier": "TestMessageExchangeLivenessKickOnDuplicate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 319
+      "line": 321
     },
     {
       "package": "client/exchange",
@@ -9602,6 +9609,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/margins_parity_matterjs_test.go",
       "line": 144
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestMessageExchangeOnTransmitted",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/messageexchange_parity_matterjs_test.go",
+      "line": 651
     },
     {
       "package": "client/exchange",
@@ -9615,14 +9629,14 @@
       "identifier": "TestMessageExchangePeerLossDeclaration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 159
+      "line": 161
     },
     {
       "package": "client/exchange",
       "identifier": "TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messageexchange_parity_matterjs_test.go",
-      "line": 352
+      "line": 354
     },
     {
       "package": "client/exchange",
@@ -9864,10 +9878,31 @@
     },
     {
       "package": "client/exchange",
+      "identifier": "TestSessionManagerEstablishing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/session_establishing_parity_matterjs_test.go",
+      "line": 79
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSessionManagerPeerLossByRegistrationOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/session_establishing_parity_matterjs_test.go",
+      "line": 198
+    },
+    {
+      "package": "client/exchange",
       "identifier": "TestSessionParametersMaxTCPMessageSizeParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/messagechannel_tcp_parity_matterjs_test.go",
       "line": 140
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestSessionViews",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/session_establishing_parity_matterjs_test.go",
+      "line": 303
     },
     {
       "package": "client/exchange",
@@ -12905,7 +12940,7 @@
       "identifier": "TestParityMatterJS_LocalizationConfiguration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/localization_test.go",
-      "line": 26
+      "line": 25
     },
     {
       "package": "cluster/core",
@@ -12989,14 +13024,14 @@
       "identifier": "TestParityMatterJS_TimeFormatLocalization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/localization_test.go",
-      "line": 84
+      "line": 83
     },
     {
       "package": "cluster/core",
       "identifier": "TestParityMatterJS_UnitLocalization",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/localization_test.go",
-      "line": 147
+      "line": 144
     },
     {
       "package": "cluster/core",
@@ -40940,14 +40975,28 @@
       "identifier": "ActivateSecureSession",
       "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
       "file": "internal/exchangeseam/exchangeseam.go",
-      "line": 50
+      "line": 60
+    },
+    {
+      "package": "internal/exchangeseam",
+      "identifier": "CompleteSecureSessionEstablishment",
+      "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/exchangeseam/exchangeseam.go",
+      "line": 77
     },
     {
       "package": "internal/exchangeseam",
       "identifier": "NewEstablishingSecureSession",
       "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
       "file": "internal/exchangeseam/exchangeseam.go",
-      "line": 43
+      "line": 53
+    },
+    {
+      "package": "internal/exchangeseam",
+      "identifier": "SendNotifyingTransmission",
+      "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/exchangeseam/exchangeseam.go",
+      "line": 70
     },
     {
       "package": "internal/paritytest",
