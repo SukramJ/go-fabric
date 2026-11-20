@@ -72,9 +72,9 @@ func (b *Bridge) SessionSuperseded(olderID, newerID uint16) {
 	b.subUpdateMu.Unlock()
 	if moved > 0 && b.logger != nil {
 		b.logger.Debug("matter.subscribe.session_superseded",
-			slog.Int("from_session", int(olderID)),
-			slog.Int("to_session", int(newerID)),
-			slog.Int("subscriptions", moved))
+			slog.Int("from_session_id", int(olderID)),
+			slog.Int("to_session_id", int(newerID)),
+			slog.Int("subscription_count", moved))
 	}
 }
 
@@ -108,8 +108,8 @@ func (b *Bridge) supersedingSubjectMatches(m *subscription.Manager, olderID, new
 		if info.SessionID == olderID && (info.FabricIndex != fabricIndex || info.PeerNodeID != nodeID) {
 			if b.logger != nil {
 				b.logger.Warn("matter.subscribe.session_superseded.subject_mismatch",
-					slog.Int("from_session", int(olderID)),
-					slog.Int("to_session", int(newerID)),
+					slog.Int("from_session_id", int(olderID)),
+					slog.Int("to_session_id", int(newerID)),
 					slog.Int("subscription_id", int(info.ID)))
 			}
 			return false

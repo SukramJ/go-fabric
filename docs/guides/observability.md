@@ -82,6 +82,9 @@ wherever it is logged. Each row below names a value's type and meaning:
 | `session_id` | slog.Int | a secure session's local id |
 | `exchange_id` | slog.Int | an exchange id |
 | `subscription_id` | slog.Uint64 (slog.Int where the id is held as an int) | a subscription id |
+| `from_session_id` | slog.Int | the local id of a superseded session whose subscriptions moved |
+| `to_session_id` | slog.Int | the local id of the newer session the subscriptions moved to |
+| `subscription_count` | slog.Int | how many subscriptions an operation touched |
 | `group_id` | slog.Int | a group id |
 | `peer` | slog.String | the network address of the node at the other end — of a session, an exchange, a handshake, a commissioning attempt |
 | `src` | slog.String | the source address of one received datagram — what the socket saw, which a peer's later datagrams may not share |

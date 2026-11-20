@@ -703,9 +703,9 @@ func (m *Manager) MoveSession(olderID, newerID uint16) []uint32 {
 		changed(newerID)
 	}
 	m.logger.Debug("im.subscription.session_moved",
-		slog.Int("from_session", int(olderID)),
-		slog.Int("to_session", int(newerID)),
-		slog.Int("subscriptions", len(moved)))
+		slog.Int("from_session_id", int(olderID)),
+		slog.Int("to_session_id", int(newerID)),
+		slog.Int("subscription_count", len(moved)))
 	return moved
 }
 
