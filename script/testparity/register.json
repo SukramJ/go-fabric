@@ -7956,7 +7956,7 @@
         "controller/attestation:TestCertificatesFallbackVendorIDProductID",
         "controller/attestation:TestCertificatesParseMatterFallbackVidPid",
         "controller/attestation:TestCertificatesPaaFromAsn1",
-        "controller/commissioner:TestCertificatesGetPublicKeyFromCsr",
+        "controller/attestation:TestCertificatesGetPublicKeyFromCsr",
         "secure/mattercert:TestBuildDNStandardAttributes",
         "controller/attestation:TestCertificatesPQCSizeLimit",
         "secure/mattercert:TestCertificatesRecodeParityMatterJS",

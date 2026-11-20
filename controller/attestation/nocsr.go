@@ -155,14 +155,14 @@ func publicKeyFromCSR(der []byte) ([]byte, error) {
 		return nil, fmt.Errorf("CSR: %w", err)
 	}
 	if req.Version != 0 {
-		return nil, fmt.Errorf("unsupported CSR version %d", req.Version)
+		return nil, fmt.Errorf("attestation: unsupported CSR version %d", req.Version)
 	}
 	key, ok := req.PublicKey.(*ecdsa.PublicKey)
 	if !ok || key.Curve != elliptic.P256() {
-		return nil, errors.New("unsupported public key in CSR")
+		return nil, errors.New("attestation: unsupported public key in CSR")
 	}
 	if req.SignatureAlgorithm != x509.ECDSAWithSHA256 {
-		return nil, errors.New("unsupported signature algorithm in CSR")
+		return nil, errors.New("attestation: unsupported signature algorithm in CSR")
 	}
 	if err := req.CheckSignature(); err != nil {
 		return nil, fmt.Errorf("CSR signature: %w", err)
