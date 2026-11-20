@@ -191,8 +191,9 @@ const citecheckDriftRatchet = 433
 // b25ed960, #5012) re-read and relabelled 37 more in the request-check
 // files it rewrote (2728 at db021da0 remain). Wave P2b relabelled 10
 // more at b25ed960 in the files its units touched (E, A, B); P2b-L2 one
-// more (client/exchange/manager.go).
-const citecheckOffPinRatchet = 2796
+// more (client/exchange/manager.go). The P2b register commit relabelled
+// one more (controller/commissioner/fabric.go's MaxLabelLength).
+const citecheckOffPinRatchet = 2795
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

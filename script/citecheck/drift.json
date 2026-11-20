@@ -423,7 +423,7 @@
   },
   {
     "file": "client/exchange/errors.go",
-    "line": 127,
+    "line": 128,
     "citation": "NodeSession.ts:305-309",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
