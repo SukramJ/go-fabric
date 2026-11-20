@@ -860,7 +860,7 @@
   },
   {
     "file": "client/interaction/invoke_batcher_parity_matterjs_test.go",
-    "line": 384,
+    "line": 387,
     "citation": "ClientInteraction.ts:186",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "isBatchable",
@@ -923,7 +923,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 163,
+    "line": 178,
     "citation": "ExchangeManager.ts:533-545",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "localAdditionalMrpDelay",
@@ -932,7 +932,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 283,
+    "line": 298,
     "citation": "ClientInteraction.ts:1112",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "verifyReachability",
@@ -1043,7 +1043,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 318,
+    "line": 324,
     "citation": "InteractionMessenger.ts:1129",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ackWaitAbort",
@@ -1052,7 +1052,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 355,
+    "line": 361,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
