@@ -112,6 +112,61 @@ func TestServerSubscriptionSessionSupersessionOverTheWire(t *testing.T) {
 		waitOnReported(ctx, t, site, p, pl, ep, reports)
 	})
 
+	// packages/node/test/node/ServerSubscriptionSessionTest.ts:176, by
+	// meaning: the controller reconnects twice, and each time the device
+	// moves the subscription onto the session established, leaving none on
+	// the former ones; their close does not end it, and the subscriber
+	// still gets its reports. Whether the new session is resumed or a full
+	// CASE session is the controller's choice here; the move does not
+	// depend on it. "Announced once" — SessionsBehavior's subscriptionAdded
+	// not raised again by a move — has no counterpart: the node announces
+	// a move as a change of both sessions' subscriptions.
+	t.Run("moves to each resumed session once the controller confirms it, announced once", func(t *testing.T) {
+		t.Parallel()
+		site, p, pl, ep := pairWithPlug(t, fabrictest.Options{})
+		ctx := testContext(t)
+		reports := make(chan *interaction.Report, 64)
+		sub, err := fabrictest.Subscribe(ctx, p, interaction.SubscribeRequest{
+			Attributes: []im.ConcreteAttributePath{onOffPath(ep)}, MinIntervalFloor: interaction.Interval(time.Second), MaxIntervalCeiling: interaction.Interval(time.Hour),
+			Updated: func(r *interaction.Report) error { reports <- r; return nil },
+		})
+		if err != nil {
+			t.Fatalf("Subscribe: %v", err)
+		}
+		t.Cleanup(sub.Close)
+		former, ok := subscriptionSession(t, p, sub.ID())
+		if !ok {
+			t.Fatal("the subscription is on no device session")
+		}
+		holders := []uint16{former}
+		for range 2 {
+			dropSessionsOnController(p)
+			if _, err := fabrictest.Read(ctx, p, onOffPath(ep)); err != nil {
+				t.Fatalf("read on a new session: %v", err)
+			}
+			now := fabrictestseam.Peer(p).NewestSession().PeerSessionID()
+			on, ok := subscriptionSession(t, p, sub.ID())
+			if !ok || on != now {
+				t.Fatalf("the subscription is on session %d (%v); want the newest, %d", on, ok, now)
+			}
+			for sid, subs := range deviceSessions(t, p) {
+				if sid != now && len(subs) != 0 {
+					t.Fatalf("session %d still holds %v after the move", sid, subs)
+				}
+			}
+			holders = append(holders, now)
+		}
+		for _, sid := range holders[:2] {
+			if err := p.Device.Act(func(n *node.Node) error { return n.Sessions().Close(sid) }); err != nil {
+				t.Fatalf("close session %d: %v", sid, err)
+			}
+		}
+		if _, ok := subscriptionSession(t, p, sub.ID()); !ok {
+			t.Fatal("the subscription ended with its former sessions")
+		}
+		waitOnReported(ctx, t, site, p, pl, ep, reports)
+	})
+
 	// packages/node/test/node/server/ServerSubscriptionTest.ts:1882 — there
 	// with sessions of other CATs in between, which do not supersede; here
 	// the controller's sessions all carry its CATs, so the subscription
