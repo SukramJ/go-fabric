@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"unicode/utf16"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -269,9 +268,11 @@ func (s *Groups) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	return nil, im.UnsupportedCommandf("core: Groups command 0x%02X not supported", cmdID)
 }
 
-// nameLength is the length matter.js checks GroupName against: a JS string
-// length, i.e. UTF-16 code units.
-func nameLength(name string) int { return len(utf16.Encode([]rune(name))) }
+// nameLength is the length matter.js checks GroupName against: its UTF-8
+// bytes. Mirrors matter.js packages/node/src/behaviors/groups/GroupsServer.ts:101
+// at b25ed960 (`Bytes.utf8Length(groupName) > 16`, #4995; a JS string
+// length, UTF-16 code units, before).
+func nameLength(name string) int { return spec.StringLength(name) }
 
 // addGroup mirrors GroupsServer.addGroup: GroupId 0 and a name longer than
 // 16 answer ConstraintError in the response (the server relaxes the model

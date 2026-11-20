@@ -953,13 +953,21 @@ func (b *BasicInformation) SetNodeLabel(ctx context.Context, label string) error
 // RestoreNodeLabel is the boot-time restore of a persisted NodeLabel (a
 // controller's or the host's earlier write, node.New reads it back before
 // the node serves), as [BasicInformation.RestoreConfigurationVersion]
-// restores its value. Held to the attribute's constraint as the Matter
-// write path is ([BasicInformation.checkLabelWrite], CONSTRAINT_ERROR).
+// restores its value. A label longer than its 32 bytes in UTF-8 — one
+// stored while the bound counted UTF-16 code units — is first cut to them
+// between two runes, with a warning, and the cut label is stored with the
+// next write of NodeLabel or Location ([BasicInformation.SetOnPersistentWrite]
+// stores both); until then each restore cuts it again. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:124-163 at
+// b25ed960 (shortenStoredStrings at load, #4995). Held to the
+// attribute's constraint as the Matter write path is
+// ([BasicInformation.checkLabelWrite], CONSTRAINT_ERROR).
 // Does NOT fire the persistence hook — restores must not echo
 // back into the store — and neither advances the DataVersion nor reports
 // a change: nothing has been served yet. A run-time rename is
 // [BasicInformation.SetNodeLabel].
 func (b *BasicInformation) RestoreNodeLabel(s string) error {
+	s = b.shortenStored(basicInfoAttrNodeLabel, s)
 	if err := b.checkLabelWrite(basicInfoAttrNodeLabel, s); err != nil {
 		return err
 	}
@@ -969,6 +977,27 @@ func (b *BasicInformation) RestoreNodeLabel(s string) error {
 	b.nodeLabel = s
 	b.mu.Unlock()
 	return nil
+}
+
+// shortenStored cuts a stored string attribute's value to its numeric
+// maximum in UTF-8 bytes, between two runes, and warns when it cut — as
+// matter.js's datasource does with a stored value at load
+// (Datasource.ts:149-165 at b25ed960; a bound that is not a numeric
+// maximum leaves the value, :150-153). NodeLabel and Location are not
+// secret in the model, so the warning shows both values, as matter.js's
+// does for a value outside a secret container.
+func (b *BasicInformation) shortenStored(attrID uint32, s string) string {
+	a := bidef.Definition.Attribute(attrID)
+	if a == nil || !a.Constraint.Max.IsInt() {
+		return s
+	}
+	limit := int(a.Constraint.Max.Int)
+	cut := truncateUTF8(s, limit)
+	if cut != s {
+		b.logger().Warn("core: BasicInformation: shortened the stored value to its bound in UTF-8 bytes",
+			slog.String("name", a.Name), slog.Int("max_bytes", limit), slog.String("stored", s), slog.String("value", cut))
+	}
+	return cut
 }
 
 // OtaNodeInformation is what the OTA Software Update Requestor reads from
@@ -1027,6 +1056,7 @@ func (b *BasicInformation) SetSoftwareVersion(version uint32, versionString stri
 // Matter write path is ([BasicInformation.checkLabelWrite]); does NOT fire the persistence hook, advance the DataVersion or report a
 // change.
 func (b *BasicInformation) RestoreLocation(s string) error {
+	s = b.shortenStored(basicInfoAttrLocation, s)
 	if err := b.checkLabelWrite(basicInfoAttrLocation, s); err != nil {
 		return err
 	}
