@@ -140,17 +140,30 @@ func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Tim
 		return nil
 	}
 	return func() {
-		report := Report{Paths: work.paths, Events: work.events, KeepAlive: work.keepAlive}
-		if send(ctx, sub, report) != NothingForSubscriber {
-			return
-		}
-		if work.keepAlive && (len(work.paths) > 0 || len(work.events) > 0) {
-			if send(ctx, sub, Report{KeepAlive: true}) != NothingForSubscriber {
+		for {
+			sendDue(ctx, sub, work, send)
+			// A report that failed on a session the subscription left
+			// meanwhile is resent at once on the new one (matter.js
+			// ServerSubscription.ts:569-577, :612-624 at b25ed960).
+			if work, due = sub.takeLeftSessionResend(work, m.cfg.Clock.Now(), m.eventSourceOf()); !due {
 				return
 			}
 		}
-		sub.revokeReport(work)
 	}
+}
+
+// sendDue sends the report of one pass, work, through send.
+func sendDue(ctx context.Context, sub *Subscription, work dueWork, send ReportSender) {
+	report := Report{Paths: work.paths, Events: work.events, KeepAlive: work.keepAlive}
+	if send(ctx, sub, report) != NothingForSubscriber {
+		return
+	}
+	if work.keepAlive && (len(work.paths) > 0 || len(work.events) > 0) {
+		if send(ctx, sub, Report{KeepAlive: true}) != NothingForSubscriber {
+			return
+		}
+	}
+	sub.revokeReport(work)
 }
 
 // Tick is the test surface for [Manager.tick]: it waits for the reports

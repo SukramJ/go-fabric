@@ -817,7 +817,7 @@ func runRestartEndToEnd(t *testing.T, withMRP bool) {
 		t.Fatalf("a re-established subscription must not send a SubscribeResponse (got %#x)", id)
 	default:
 	}
-	if got, err := run2.subs.Get(subID); err != nil || got.SessionID == 0 {
+	if got, err := run2.subs.Get(subID); err != nil || got.CurrentSessionID() == 0 {
 		t.Fatalf("subscription %#x not live in the new manager: %v", subID, err)
 	}
 	if got := st.ids(); !slices.Equal(got, []uint32{subID}) {

@@ -218,7 +218,7 @@ type armerCalls struct {
 func (a *armerCalls) context(clk *Config) peer.RebootArmerContext {
 	return peer.RebootArmerContext{
 		Clock: clk.Clock, Logger: slog.New(slog.DiscardHandler),
-		ClosePeerSessionsBefore: func(exchange.PeerAddress, time.Time) {},
+		ClosePeerSessionsRegisteredBefore: func(exchange.PeerAddress, peer.ArmerSession) {},
 		PeerLost: func(p exchange.PeerAddress) {
 			if p == testPeer {
 				a.mu.Lock()

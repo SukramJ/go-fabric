@@ -5,6 +5,7 @@ package peer
 
 import (
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -32,7 +33,10 @@ func RebootReturnTimeout(applyDelay time.Duration) time.Duration {
 	return min(max(applyDelay, 0), rebootMaxApplyDelay) + rebootExpectedReturn
 }
 
-// ArmerSession is a secure session as the reboot armer sees it.
+// ArmerSession is a secure session as the reboot armer sees it. The armer
+// compares sessions with ==, so an implementation is a comparable value
+// that is equal for the same session wherever it is handed over — a
+// pointer, or a struct of the session's pointer.
 type ArmerSession interface {
 	// Peer is the session's peer.
 	Peer() exchange.PeerAddress
@@ -48,8 +52,28 @@ type RebootArmerContext struct {
 	// Clock runs the deadlines; nil is the system clock.
 	Clock clock.Clock
 	// ClosePeerSessionsBefore closes the peer's sessions created before t,
-	// the dead pre-reboot ones (SessionManager.handlePeerShutdown).
+	// the dead pre-reboot ones (SessionManager.handlePeerShutdown with a
+	// Timestamp). Used only while ClosePeerSessionsRegisteredBefore is nil.
+	//
+	// Deprecated: two sessions may have the same creation time, and the
+	// older one then survives the return; set
+	// ClosePeerSessionsRegisteredBefore, which cuts by registration order,
+	// as matter.js deprecates the Timestamp form (SessionManager.ts:719-721
+	// at b25ed960). Removable in v0.26.0.
 	ClosePeerSessionsBefore func(peer exchange.PeerAddress, t time.Time)
+	// ClosePeerSessionsRegisteredBefore closes the peer's sessions that
+	// registered before keep — the dead pre-reboot ones — and keeps keep
+	// and every session registered after it, whatever their creation
+	// times (SessionManager.handlePeerShutdown with a session,
+	// exchange.Manager.HandlePeerLossBefore).
+	ClosePeerSessionsRegisteredBefore func(peer exchange.PeerAddress, keep ArmerSession)
+	// SessionsRegisteredSince returns the open sessions with the peer of s
+	// that registered at or after it, s among them, also those whose
+	// handshake still runs; none for a session that never registered
+	// (SessionManager.sessionsRegisteredSince,
+	// exchange.Manager.SessionsRegisteredSince). Nil: only the sessions
+	// handed to SessionAdded count as the return's.
+	SessionsRegisteredSince func(s ArmerSession) []ArmerSession
 	// PeerLost gives every session of the peer up as unresponsive
 	// (SessionManager.handlePeerLoss).
 	PeerLost func(peer exchange.PeerAddress)
@@ -61,12 +85,23 @@ type RebootArmerContext struct {
 }
 
 type armState struct {
-	returned    bool
-	sessions    []ArmerSession // opened since the return, the announcing one first
-	reported    bool
-	graceTimer  clock.Timer
-	returnTimer clock.Timer
-	gen         uint64
+	returned bool
+	// sessions are the return's: the announcing one first, those
+	// registered since it when it was handed over, and those established
+	// after it.
+	sessions []ArmerSession
+	// announcing is the session that announced the return; a session
+	// registered after it is the return's whenever it reports.
+	announcing ArmerSession
+	reported   bool
+	// reportedBeforeReturn are the sessions that carried a report before
+	// the return: a returning device may send its priming report before
+	// its announcing session is established (RebootResubscribeArmer.ts:33-37
+	// at b25ed960).
+	reportedBeforeReturn []ArmerSession
+	graceTimer           clock.Timer
+	returnTimer          clock.Timer
+	gen                  uint64
 }
 
 // RebootResubscribeArmer re-subscribes a peer that restarts after an OTA
@@ -139,10 +174,14 @@ func stopTimers(st *armState) {
 	}
 }
 
-// SessionAdded is a new session with a peer: the first one an armed peer
-// opens announces its return, so its older sessions close and the grace
-// window starts; a later one joins the return's evidence; one we opened
-// announces nothing (RebootResubscribeArmer.ts:117-150).
+// SessionAdded is a newly established session with a peer: the first one
+// an armed peer opens announces its return, so the sessions registered
+// before it close and the grace window starts; it and the sessions
+// registered since it are the return's, and the return counts as
+// reported when one of them carried a report before it; a later one joins
+// the return's evidence; one we opened announces nothing. Mirrors matter.js
+// packages/protocol/src/peer/RebootResubscribeArmer.ts:127-131 at b25ed960
+// (#onSessionRegistered) and :133-164 (#onSessionAdded).
 func (a *RebootResubscribeArmer) SessionAdded(s ArmerSession) {
 	peer := s.Peer()
 	a.mu.Lock()
@@ -166,30 +205,79 @@ func (a *RebootResubscribeArmer) SessionAdded(s ArmerSession) {
 		st.returnTimer.Stop()
 		st.returnTimer = nil
 	}
-	st.returned, st.sessions, st.reported = true, []ArmerSession{s}, false
+	// The sessions registered since s run a handshake with the returned
+	// device, or are ours to it: read outside the lock, as no context
+	// function runs under it.
+	a.mu.Unlock()
+	var since []ArmerSession
+	if fn := a.ctx.SessionsRegisteredSince; fn != nil {
+		since = fn(s)
+	}
+	a.mu.Lock()
+	if a.armed[peer] != st || st.returned {
+		// Re-armed, disarmed or returned meanwhile.
+		a.mu.Unlock()
+		return
+	}
+	sessions := []ArmerSession{s}
+	for _, x := range since {
+		if !slices.Contains(sessions, x) {
+			sessions = append(sessions, x)
+		}
+	}
+	reported := slices.ContainsFunc(sessions, func(x ArmerSession) bool { return slices.Contains(st.reportedBeforeReturn, x) })
+	st.returned, st.sessions, st.announcing, st.reported, st.reportedBeforeReturn = true, sessions, s, reported, nil
 	gen := st.gen
 	st.graceTimer = a.clock.AfterFunc(RebootResubscribeGrace, func() { a.graceExpired(peer, gen) })
 	a.mu.Unlock()
-	if fn := a.ctx.ClosePeerSessionsBefore; fn != nil {
-		fn(peer, s.CreatedAt())
+	switch {
+	case a.ctx.ClosePeerSessionsRegisteredBefore != nil:
+		a.ctx.ClosePeerSessionsRegisteredBefore(peer, s)
+	case a.ctx.ClosePeerSessionsBefore != nil:
+		a.ctx.ClosePeerSessionsBefore(peer, s.CreatedAt())
 	}
 }
 
-// ReportStarted is a report over a session: one over a post-return
-// session keeps the subscriptions (RebootResubscribeArmer.ts:165-172).
+// ReportStarted is a report over a session: one over a session of the
+// return keeps the subscriptions; one before the return is remembered, and
+// counts once its session turns out to be the return's. A session
+// registered after the announcing one is the return's as matter.js adds
+// it on registration (#onSessionRegistered), read here from
+// SessionsRegisteredSince when it reports. Mirrors matter.js
+// packages/protocol/src/peer/RebootResubscribeArmer.ts:179-193 at b25ed960
+// (#onReportStarted).
 func (a *RebootResubscribeArmer) ReportStarted(s ArmerSession) {
+	peer := s.Peer()
 	a.mu.Lock()
-	defer a.mu.Unlock()
-	st := a.armed[s.Peer()]
-	if st == nil || !st.returned {
+	st := a.armed[peer]
+	if st == nil {
+		a.mu.Unlock()
 		return
 	}
-	for _, x := range st.sessions {
-		if x == s {
-			st.reported = true
-			return
+	if !st.returned {
+		if !slices.Contains(st.reportedBeforeReturn, s) {
+			st.reportedBeforeReturn = append(st.reportedBeforeReturn, s)
 		}
+		a.mu.Unlock()
+		return
 	}
+	if slices.Contains(st.sessions, s) {
+		st.reported = true
+		a.mu.Unlock()
+		return
+	}
+	announcing := st.announcing
+	a.mu.Unlock()
+	fn := a.ctx.SessionsRegisteredSince
+	if fn == nil || !slices.Contains(fn(announcing), s) {
+		return
+	}
+	a.mu.Lock()
+	if a.armed[peer] == st {
+		st.sessions = append(st.sessions, s)
+		st.reported = true
+	}
+	a.mu.Unlock()
 }
 
 // graceExpired closes the subscriptions of a peer no post-return report

@@ -162,23 +162,36 @@ func (c *Controller) otaNodeDeleted(p softwareupdate.Peer) {
 }
 
 // armerContext is the reboot armer's view of the stack — matter.js's
-// SessionManager and ClientSubscriptions (RebootResubscribeArmer.ts:58-75
-// at db021da0).
+// SessionManager and ClientSubscriptions (RebootResubscribeArmer.ts:72-78
+// at b25ed960).
 func (c *Controller) armerContext() peer.RebootArmerContext {
 	return peer.RebootArmerContext{
 		Clock: c.clock, Logger: c.log,
-		ClosePeerSessionsBefore: func(p exchange.PeerAddress, t time.Time) {
-			peers := c.live.peers.Load()
-			if peers == nil {
+		// The sessions registered before the returning one are given up,
+		// as handlePeerShutdown with that session does
+		// (RebootResubscribeArmer.ts:156-159, SessionManager.ts:722-735 at
+		// b25ed960) — whatever their creation times.
+		ClosePeerSessionsRegisteredBefore: func(p exchange.PeerAddress, keep peer.ArmerSession) {
+			mgr := c.live.mgr.Load()
+			as, ok := keep.(armerSession)
+			if mgr == nil || !ok {
 				return
 			}
-			if pp := peers.Get(p); pp != nil {
-				for _, s := range pp.Sessions() {
-					if s.CreatedAt().Before(t) {
-						s.Close()
-					}
-				}
+			mgr.HandlePeerLossBefore(p, client.ErrPeerShutdown, as.s)
+		},
+		// The return's sessions: the returning one and every one
+		// registered since (RebootResubscribeArmer.ts:149 at b25ed960).
+		SessionsRegisteredSince: func(s peer.ArmerSession) []peer.ArmerSession {
+			mgr := c.live.mgr.Load()
+			as, ok := s.(armerSession)
+			if mgr == nil || !ok {
+				return nil
 			}
+			var out []peer.ArmerSession
+			for _, x := range mgr.SessionsRegisteredSince(as.s) {
+				out = append(out, armerSession{s: x, c: c})
+			}
+			return out
 		},
 		// The armer's timers run on the clock's goroutines, which Close does
 		// not wait for: each reads the component it reaches from live and
@@ -212,18 +225,18 @@ type armerObserver struct {
 }
 
 // sessionAdded feeds a peer's new session to the armer
-// (RebootResubscribeArmer.ts:117-150 at db021da0).
+// (RebootResubscribeArmer.ts:133-164 at b25ed960).
 func (c *Controller) sessionAdded(p *peer.Peer, s *exchange.Session) {
 	if c.armer != nil && s.IsSecure() {
-		c.armer.SessionAdded(armerSession{s: s, initiator: c.initiated(s)})
+		c.armer.SessionAdded(armerSession{s: s, c: c})
 	}
 }
 
 // reportStarted feeds a report's session to the armer
-// (RebootResubscribeArmer.ts:68, :165-172).
+// (RebootResubscribeArmer.ts:77, :179-193 at b25ed960).
 func (c *Controller) reportStarted(s *exchange.Session) {
 	if c.armer != nil {
-		as := armerSession{s: s, initiator: c.initiated(s)}
+		as := armerSession{s: s, c: c}
 		if o := c.armerObs.Load(); o != nil && o.ReportStarted != nil {
 			o.ReportStarted(as)
 		}
@@ -235,15 +248,18 @@ func (c *Controller) reportStarted(s *exchange.Session) {
 var errRebootReturnTimeout = errors.New("controller: no session after the expected reboot")
 
 // armerSession is an exchange session as the armer sees it.
+// armerSession is a session as the armer sees it: equal for the same
+// session wherever it is handed over (peer.ArmerSession), so its role is
+// read, not stored.
 type armerSession struct {
-	s         *exchange.Session
-	initiator bool
+	s *exchange.Session
+	c *Controller
 }
 
 func (a armerSession) Peer() exchange.PeerAddress {
 	return exchange.PeerAddress{FabricIndex: a.s.FabricIndex(), NodeID: a.s.PeerNodeID()}
 }
-func (a armerSession) Initiator() bool      { return a.initiator }
+func (a armerSession) Initiator() bool      { return a.c.initiated(a.s) }
 func (a armerSession) CreatedAt() time.Time { return a.s.CreatedAt() }
 
 // otaHooks feeds every node's hooks to the update manager before the

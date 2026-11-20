@@ -44,8 +44,15 @@ type Subscription struct {
 	// PeerNodeID is the commissioner node that owns the subscription.
 	PeerNodeID uint64
 	// SessionID is the operational session id this subscription
-	// belongs to. Manager.OnSessionClosed tears down every
-	// subscription with a matching SessionID.
+	// reports on. [Manager.CloseSession] tears down every subscription
+	// with a matching SessionID. It changes when a newer session of the
+	// subscriber supersedes it ([Manager.MoveSession]); it is written
+	// under the manager's and the subscription's lock.
+	//
+	// Deprecated: Read [Subscription.CurrentSessionID]: since the session
+	// can change while the subscription lives, a direct read races with
+	// [Manager.MoveSession]. The field stays for the deprecation window,
+	// removable in v0.26.0.
 	SessionID uint16
 
 	// MinIntervalFloor / MaxIntervalCeiling come from the request
@@ -134,6 +141,28 @@ type Subscription struct {
 	// ([legacyHooks.sender]) reads it.
 	sentNothing bool
 	closed      bool
+	// leftSessionRequeue is set when the data of a report sent on a session
+	// the subscription has left since ([Manager.MoveSession]) is owed again
+	// uncounted ([Subscription.RequeueAbortedAttributes],
+	// [Subscription.RequeueAbortedEvents]): the engine resends at once on
+	// the new session ([Subscription.takeLeftSessionResend]).
+	leftSessionRequeue bool
+	// keepAliveOwed: the report that failed on the session the
+	// subscription left was the send interval's, so its resend goes out
+	// even when it carries nothing. Cleared by the next report that
+	// carries the keep-alive.
+	keepAliveOwed bool
+}
+
+// CurrentSessionID returns the id of the operational session the
+// subscription reports on. It changes when a newer session of the
+// subscriber supersedes that session ([Manager.MoveSession]). Mirrors
+// matter.js packages/node/src/node/server/ServerSubscription.ts:214-219 at
+// b25ed960 (the session getter).
+func (s *Subscription) CurrentSessionID() uint16 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.SessionID
 }
 
 // NothingSent tells the engine that the report it is handing to the
@@ -462,6 +491,9 @@ type dueWork struct {
 	// stamped is the time of the last report this pass set, prev the one
 	// it replaced ([Subscription.revokeReport]).
 	stamped, prev time.Time
+	// sentOn is the session the subscription reported on when the pass
+	// took its data: the session the report goes out on.
+	sentOn uint16
 }
 
 // drainDue decides whether a report of the subscription is due at now and
@@ -503,11 +535,20 @@ func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (wor
 	if s.closed {
 		return dueWork{}, false
 	}
+	return s.drainLocked(now, src, flush, false)
+}
+
+// drainLocked is [Subscription.drainDue] under s.mu. resend is the pass
+// that resends at once what a report on a session the subscription left
+// owed ([Subscription.takeLeftSessionResend]): it takes the owed data
+// whatever MinIntervalFloor, unless a deferral holds it, and carries the
+// keep-alive the failed report owed.
+func (s *Subscription) drainLocked(now time.Time, src EventSource, flush, resend bool) (work dueWork, due bool) {
 	takeData := flush
 	if !flush {
-		work.keepAlive = s.lastReport.IsZero() || now.Sub(s.lastReport) >= s.sendIntervalLocked()
+		work.keepAlive = s.keepAliveOwed || s.lastReport.IsZero() || now.Sub(s.lastReport) >= s.sendIntervalLocked()
 		asked := len(s.pendingDirty) > 0 || (s.eventsPending && s.eventsUrgent)
-		floorOver := s.lastReport.IsZero() || now.Sub(s.lastReport) >= time.Duration(s.MinIntervalFloor)*time.Second
+		floorOver := resend || s.lastReport.IsZero() || now.Sub(s.lastReport) >= time.Duration(s.MinIntervalFloor)*time.Second
 		held := now.Before(s.deferredUntil)
 		takeData = !held && (work.keepAlive || (asked && floorOver))
 	}
@@ -526,9 +567,65 @@ func (s *Subscription) drainDue(now time.Time, src EventSource, flush bool) (wor
 	if len(work.events) == 0 && len(work.paths) == 0 && !work.keepAlive {
 		return dueWork{}, false
 	}
+	if work.keepAlive {
+		s.keepAliveOwed = false
+	}
+	// A requeue counts as the left session's only for the report in
+	// flight (takeLeftSessionResend): one this pass starts.
+	s.leftSessionRequeue = false
+	work.sentOn = s.SessionID
 	work.stamped, work.prev = now, s.lastReport
 	s.lastReport = now
 	return work, true
+}
+
+// takeLeftSessionResend decides, after the report work was sent, whether
+// it failed on a session the subscription has left since — its data owed
+// again uncounted while the subscription reports on another session — and
+// takes the report that resends it at once on the new one. A report that
+// carried the keep-alive owes it to the resend. The resend is held by a
+// deferral as any report is: then the owed data asks for the report the
+// deferral's end lets through.
+//
+// Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts
+// :569-577 at b25ed960 (sentOn !== this.session: #requeueUpdate,
+// #keepAliveOwed ||= !onlyWithData, #sendNextUpdateImmediately, no error
+// count) and :612-624 (the loop sends the next update at once unless
+// #deferredUntil holds it, onlyWithData = !#keepAliveOwed).
+func (s *Subscription) takeLeftSessionResend(sent dueWork, now time.Time, src EventSource) (dueWork, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	left := s.leftSessionRequeue
+	s.leftSessionRequeue = false
+	if !left || s.closed || s.SessionID == sent.sentOn {
+		return dueWork{}, false
+	}
+	if sent.keepAlive {
+		s.keepAliveOwed = true
+	}
+	// What the failed report carried asks for a report now, not only for
+	// the next one another cause starts.
+	for p := range s.owedPaths {
+		if s.pendingDirty == nil {
+			s.pendingDirty = make(map[im.ConcreteAttributePath]struct{}, len(s.owedPaths))
+		}
+		s.pendingDirty[p] = struct{}{}
+	}
+	s.owedPaths = nil
+	if s.eventsPending {
+		s.eventsUrgent = true
+	}
+	return s.drainLocked(now, src, false, true)
+}
+
+// moveTo re-points the subscription at sessionID; the manager holds its
+// own lock. A failure on the session it left says nothing about the new
+// one: the requeue flag of a report sent before the move stays, the
+// keep-alive owed by it too.
+func (s *Subscription) moveTo(sessionID uint16) {
+	s.mu.Lock()
+	s.SessionID = sessionID
+	s.mu.Unlock()
 }
 
 // takeDirtyLocked hands out the dirty attribute paths in the priming
@@ -686,6 +783,7 @@ func (s *Subscription) RequeueAbortedEvents(fromNumber uint64) {
 	if s.closed {
 		return
 	}
+	s.leftSessionRequeue = true
 	s.requeueEventsLocked(fromNumber)
 }
 
@@ -742,6 +840,7 @@ func (s *Subscription) RequeueAbortedAttributes(paths []im.ConcreteAttributePath
 	if s.closed {
 		return
 	}
+	s.leftSessionRequeue = true
 	s.requeueAttributesLocked(paths)
 }
 

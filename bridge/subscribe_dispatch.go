@@ -491,6 +491,9 @@ func (b *Bridge) registerSubscriptionAt(
 		initialReport.HasSubscription = true
 		initialReport.SubscriptionID = subID
 		b.captureSubTarget(subID, src, requestHdr, proto, req.FabricFiltered)
+		// A newer session that superseded the request's while the route
+		// was captured has the subscription already ([Bridge.SessionSuperseded]).
+		b.followMovedSession(m, subID)
 		b.releaseTargetOfClosed(m, subID)
 	}
 	return subID, nil
