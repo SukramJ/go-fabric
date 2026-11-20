@@ -478,14 +478,15 @@ func (z *Zones) assertFocusSupported(zone TwoDZone) error {
 
 // createTwoDCartesianZone carries out CreateTwoDCartesianZone. Mirrors
 // matter.js ZoneManagementServer.ts:80-107 at b25ed960
-// (createTwoDCartesianZone): the zone's constraints (the interaction
-// layer's, ZoneManagementServerTest.ts:756-768), a Focus zone only with
-// FOCUSZONES, RESOURCE_EXHAUSTED once MaxUserDefinedZones user-defined
-// zones or MaxZones zones exist, the vertex checks, then the next zone ID
+// (createTwoDCartesianZone): a Focus zone only with FOCUSZONES,
+// RESOURCE_EXHAUSTED once MaxUserDefinedZones user-defined zones or
+// MaxZones zones exist, the vertex checks, then the next zone ID
 // ([nextZoneID]). The port stores the zone under that ID before the
 // server keeps it: a refusal of the port leaves Zones and the last ID as
 // they were, as matter.js discards the state of a command an override
-// refuses after super (:61-63).
+// refuses after super (:61-63). The zone's constraints come first; matter.js
+// checks them in the interaction layer, before the command
+// (ZoneManagementServerTest.ts:756-768 at b25ed960).
 func (z *Zones) createTwoDCartesianZone(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.CreateTwoDCartesianZoneRequest](fields, "CreateTwoDCartesianZone")
 	if err != nil {
