@@ -59,6 +59,9 @@ type Manager struct {
 	// onPaseSessionClose fires after onSessionClose for a session
 	// established via PASE (SetOnPaseSessionClose).
 	onPaseSessionClose func(sessionID uint16)
+	// onSessionSuperseded fires once per older session a newly
+	// established one supersedes (SetOnSessionSuperseded).
+	onSessionSuperseded func(olderID, newerID uint16)
 
 	// onGracefulClose, when non-nil, fires once per session BEFORE its
 	// key material is zeroised on every locally-initiated ("graceful")
@@ -272,6 +275,103 @@ func (m *Manager) SetOnPaseSessionClose(fn func(sessionID uint16)) {
 	m.mu.Lock()
 	m.onPaseSessionClose = fn
 	m.mu.Unlock()
+}
+
+// SetOnSessionSuperseded registers a callback invoked once per older
+// session a newly established CASE session supersedes, with the older and
+// the newer session's ids, outside the manager's lock. It fires when the
+// newer session is established — at its install for one installed
+// established, at the end of its handshake for a responder session
+// installed establishing — and before the sessions that establishment
+// evicts from the per-peer cap are closed, so a subscription moved by the
+// callback has left a session before the eviction closes it. Supersession
+// closes nothing: the older session stays open until it is evicted, its
+// peer is lost or it is closed.
+//
+// A newer session supersedes an older one when both are CASE sessions on
+// the same fabric with the same peer node id and the same set of CASE
+// Authenticated Tags (order and repetition free), whoever initiated
+// either; an older session still establishing, or no longer in the table
+// (closed), is not superseded. Older sessions are reported in the order
+// they were created.
+//
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:750-769
+// at b25ed960 (#sessionEstablished: supersession first and synchronous,
+// then the per-peer eviction) and :1233-1250 (supersedes, hasEqualCats),
+// chip src/transport/SecureSessionTable.h:100-120 at 6170af84
+// (NewerSessionAvailable). Passing nil clears any prior hook.
+func (m *Manager) SetOnSessionSuperseded(fn func(olderID, newerID uint16)) {
+	m.mu.Lock()
+	m.onSessionSuperseded = fn
+	m.mu.Unlock()
+}
+
+// supersededByLocked returns the established sessions newer supersedes,
+// oldest first. Caller MUST hold m.mu and MUST call it only once newer is
+// installed and established. Mirrors matter.js
+// packages/protocol/src/session/SessionManager.ts:757-763 at b25ed960
+// (the loop over the established sessions) and :1242-1250 (supersedes).
+// Unlike matter.js the PASE check covers older too: this table does not
+// guarantee a PASE session's unspecified peer node id, which matter.js
+// relies on for older (:1239-1241).
+func (m *Manager) supersededByLocked(newer *Entry) []*Entry {
+	if newer.isPase || newer.establishing || newer.Session == nil {
+		return nil
+	}
+	fabricIndex, peerNodeID := newer.FabricIndex(), newer.Session.PeerNodeID()
+	cats := newer.Session.PeerCATs()
+	var older []*Entry
+	for _, e := range m.sessions {
+		if e == newer || e.Session == nil || e.establishing || e.isPase {
+			continue
+		}
+		if e.FabricIndex() != fabricIndex || e.Session.PeerNodeID() != peerNodeID || !equalCATSets(cats, e.Session.PeerCATs()) {
+			continue
+		}
+		older = append(older, e)
+	}
+	sort.Slice(older, func(i, j int) bool {
+		a, b := older[i], older[j]
+		if a.createdAtMono != b.createdAtMono {
+			return a.createdAtMono < b.createdAtMono
+		}
+		return a.SessionID < b.SessionID
+	})
+	return older
+}
+
+// equalCATSets reports whether a and b hold the same tags as sets.
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:1246-1250
+// at b25ed960 (hasEqualCats).
+func equalCATSets(a, b []uint32) bool {
+	for _, x := range a {
+		if !slices.Contains(b, x) {
+			return false
+		}
+	}
+	for _, x := range b {
+		if !slices.Contains(a, x) {
+			return false
+		}
+	}
+	return true
+}
+
+// fireOnSessionSuperseded dispatches the supersession hook for every
+// entry of older, superseded by newer. Caller MUST hold no manager locks.
+func (m *Manager) fireOnSessionSuperseded(older []*Entry, newer *Entry) {
+	if len(older) == 0 {
+		return
+	}
+	m.mu.RLock()
+	hook := m.onSessionSuperseded
+	m.mu.RUnlock()
+	if hook == nil {
+		return
+	}
+	for _, e := range older {
+		hook(e.SessionID, newer.SessionID)
+	}
 }
 
 // fireOnSessionClose dispatches the close hooks for every entry in
@@ -766,11 +866,16 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		clock:                m.clk(),
 	}
 	m.sessions[id] = entry
+	superseded := m.supersededByLocked(entry)
 	excess := m.evictExcessPeerSessionsLocked(entry)
 	m.mu.Unlock()
-	// Force close, no CloseSession: matter.js SessionManager.ts:721-723
-	// at db021da0 skips the graceful path for the cap because the
-	// eviction target is typically the peer it can no longer reach.
+	// Supersession before the eviction closes anything: matter.js
+	// SessionManager.ts:750-769 at b25ed960 (#sessionEstablished).
+	m.fireOnSessionSuperseded(superseded, entry)
+	// Force close, no CloseSession: matter.js SessionManager.ts:779-808
+	// at b25ed960 (#evictExcessSessionsFor, a forced close) skips the
+	// graceful path for the cap because the eviction target is typically
+	// the peer it can no longer reach.
 	closeStaleEntries(excess)
 	m.fireOnSessionClose(excess)
 	return entry, nil
@@ -1119,14 +1224,20 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 	// installed established, at [Manager.completeEstablishment] for an
 	// establishing one (matter.js SessionManager.ts:757-769 at b25ed960,
 	// #sessionEstablished on the established set's added event, :336).
-	var excess []*Entry
+	var superseded, excess []*Entry
 	if !entry.establishing {
+		superseded = m.supersededByLocked(entry)
 		excess = m.evictExcessPeerSessionsLocked(entry)
 	}
 	m.mu.Unlock()
 	m.notifyGracefulClose(occupied, time.Time{})
 	closeStaleEntries(occupied)
 	m.fireOnSessionClose(occupied)
+	// Supersession after the occupant's close — which closes what is
+	// keyed to this id — and before the eviction closes the sessions the
+	// moved subscriptions leave (matter.js SessionManager.ts:750-769 at
+	// b25ed960, #sessionEstablished).
+	m.fireOnSessionSuperseded(superseded, entry)
 	// The per-peer cap force-closes without CloseSession — see
 	// OpenFromSigma for the matter.js provenance.
 	closeStaleEntries(excess)
@@ -1461,8 +1572,12 @@ func (m *Manager) completeEstablishment(e *Entry) bool {
 		return false
 	}
 	e.establishing = false
+	superseded := m.supersededByLocked(e)
 	excess := m.evictExcessPeerSessionsLocked(e)
 	m.mu.Unlock()
+	// Supersession before the eviction closes anything (matter.js
+	// SessionManager.ts:750-769 at b25ed960, #sessionEstablished).
+	m.fireOnSessionSuperseded(superseded, e)
 	closeStaleEntries(excess)
 	m.fireOnSessionClose(excess)
 	return true
