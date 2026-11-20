@@ -522,7 +522,7 @@ func (f *flow) invokeWith(ctx context.Context, cluster, command uint32, fields s
 // force-closed (establishOverChannel) refuses a new exchange with
 // exchange.ErrSessionClosed alone, and the flow reads the cause as a
 // commissioning-channel drop (isChannelDrop). Mirrors matter.js
-// packages/protocol/src/peer/ControllerCommissioner.ts:508-518 at
+// packages/protocol/src/peer/ControllerCommissioner.ts:523-558 at
 // b25ed960 (#closeOnBleLoss: the PASE session force-closed with a
 // BleChannelClosedError, "ControllerCommissioningFlow treats the
 // resulting BleDisconnectedError as a commissioning-channel drop").

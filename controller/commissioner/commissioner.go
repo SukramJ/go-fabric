@@ -457,20 +457,20 @@ func (c *Commissioner) closePASE(s *exchange.Session, ch Channel, cause error) {
 // (discovery.AttemptAnswered, owner decision 55).
 //
 // The channel's loss ends the PASE session for its whole lifetime.
-// Mirrors matter.js packages/protocol/src/peer/ControllerCommissioner.ts:470-546
-// at b25ed960 (#establishPaseOverChannel, #closeOnBleLoss; #4908, #4922):
+// Mirrors matter.js packages/protocol/src/peer/ControllerCommissioner.ts:426-558
+// at b25ed960 (#establishEphemeralNodeSession, #closeOnBleLoss; #4908, #4922):
 //   - while PASE runs, a lost channel ends the handshake at once rather
-//     than after its response timeout (:470-471): here the channel's
+//     than after its response timeout (:482-483): here the channel's
 //     manager is closed, which ends every exchange on it — handshake.PASE
 //     keeps its unsecured session to itself, and nothing else runs over a
 //     lost channel — and the attempt fails with the channel's close as its
 //     cause;
 //   - a channel that closed before PASE returned — also while the session
 //     was created — fails the attempt with that cause instead of handing
-//     on a session on a dead channel (:502-508), the session force-closed;
+//     on a session on a dead channel (:514-520), the session force-closed;
 //   - afterwards the session is force-closed with the channel's
 //     ClosedCause when the channel goes (Ble.ts:17-22), until it closes
-//     (:519-546), so its exchanges end at once.
+//     (:523-558), so its exchanges end at once.
 //
 // matter.js's other half — a BLE close as an address-local failure among
 // a device's candidates (CommissioningConnection.ts) — has no counterpart:
@@ -496,7 +496,7 @@ func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, tim
 	close(paired)
 	<-watched
 	// Kept after the last wait: a session whose channel closed is not
-	// handed on (:502-508).
+	// handed on (:514-520).
 	select {
 	case <-ch.Closed():
 		if s != nil {
