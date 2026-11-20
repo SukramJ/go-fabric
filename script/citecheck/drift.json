@@ -165,6 +165,16 @@
     "occurrences": 2
   },
   {
+    "file": "bridge/case_resume_second_sigma1_test.go",
+    "line": 73,
+    "citation": "SecureChannelMessenger.ts:94-98",
+    "resolved": "packages/protocol/src/securechannel/SecureChannelMessenger.ts",
+    "at": "b25ed960",
+    "identifier": "waitForSuccess",
+    "nearest": 146,
+    "occurrences": 1
+  },
+  {
     "file": "bridge/case_sigma3_after_completion_test.go",
     "line": 305,
     "citation": "packages/protocol/src/protocol/MessageExchange.ts:501-511",
@@ -2872,7 +2882,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 1151,
+    "line": 1143,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",

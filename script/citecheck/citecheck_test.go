@@ -184,7 +184,7 @@ const citecheckDriftRatchet = 431
 // with the same rule; their ratchet did not move. P1-B (pin lift
 // b25ed960, #5012) re-read and relabelled 37 more in the request-check
 // files it rewrote (2728 at db021da0 remain).
-const citecheckOffPinRatchet = 2827
+const citecheckOffPinRatchet = 2810
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
