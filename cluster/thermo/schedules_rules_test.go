@@ -52,10 +52,10 @@ func TestScheduleWriteRules(t *testing.T) {
 	})
 
 	t.Run("the count limits come after every schedule's own rules", func(t *testing.T) {
-		// TS:2793-2806 after the loop: the third schedule's unknown handle
+		// TS:2793-2806 after the loop: the third schedule's unknown preset
 		// answers, not the second schedule's count.
 		srv := newSchedulesServer(t, schedulesConfig(1, nil))
-		wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{newSchedule(), newSchedule(), newSchedule(scHandle([]byte{0xee}))}), im.StatusNotFound, "")
+		wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{newSchedule(), newSchedule(), newSchedule(scPreset(filled(16, 0xee)))}), im.StatusConstraintError, "names no preset")
 	})
 
 	t.Run("the handle rules come before the schedule type", func(t *testing.T) {

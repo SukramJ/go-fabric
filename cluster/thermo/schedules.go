@@ -50,8 +50,7 @@ type ScheduleType = tdef.ScheduleTypeStruct
 // with the error's status when it carries one (an [im.StatusCodeError]),
 // FAILURE otherwise, and nothing is stored. Both run in the server's
 // command queue with no lock the inbound setters take: the port may
-// confirm through [ThermostatServer.SetSchedules] (the handles the commit
-// issued count as the change's own) and
+// confirm through [ThermostatServer.SetSchedules] (the host's replace) and
 // [ThermostatServer.SetActiveScheduleHandle]. A nil port keeps the
 // schedules in memory.
 type SchedulePort = tdef.SchedulePort
@@ -86,10 +85,11 @@ func scheduleWithHandle(list []Schedule, h []byte) (Schedule, bool) {
 // seedSchedules takes the MSCH configuration as matter.js's initialize
 // does (ThermostatServer.ts:321-366 at b25ed960): the schedule types
 // (#assertScheduleTypes) and counts (each checked against its attribute),
-// the configured schedules held to the write rules against themselves
-// (:322-334) and normalised — a handle issued where null, a null BuiltIn
-// false — the active handle (one that names no schedule is cleared with a
-// warning, :353-366), and the port.
+// the configured schedules held to the content rules (:322-334, the
+// host's list as in [ThermostatServer.SetSchedules]) and normalised — a
+// handle issued where null, a null BuiltIn false — the active handle
+// (one that names no schedule is cleared with a warning, :353-366), and
+// the port.
 func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 	if _, err := s.inst.CheckValue(tdef.AttrScheduleTypes, spec.List[ScheduleType](cfg.ScheduleTypes), nil); err != nil {
 		return fmt.Errorf("%w: ScheduleTypes: %w", ErrSchedules, err)
@@ -119,7 +119,7 @@ func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 	if err != nil {
 		return fmt.Errorf("%w: configured schedules are invalid: %w", ErrSchedules, err)
 	}
-	if err := issueScheduleHandles(schedules, nil); err != nil {
+	if err := issueScheduleHandles(schedules); err != nil {
 		return fmt.Errorf("%w: %w", ErrSchedules, err)
 	}
 	s.schedules = schedules
@@ -155,32 +155,39 @@ func assertScheduleTypes(types []ScheduleType) error {
 	return nil
 }
 
-// validateHostSchedules holds the device's schedules to the Schedules
+// validateHostSchedules holds the host's schedules to the Schedules
 // attribute's schema — its literal bounds; "max numberOfSchedules" is the
 // write rules' count, which answers RESOURCE_EXHAUSTED after every
 // schedule's own rules, as on the wire (MatterWriteChanged) — and to the
-// write rules against stored, with the stored presets, and returns them
+// content rules against stored, with the stored presets, and returns them
 // normalised. The caller holds s.mu or owns s.
 func (s *ThermostatServer) validateHostSchedules(stored, list []Schedule) ([]Schedule, error) {
 	if _, err := s.inst.CheckValue(tdef.AttrSchedules, spec.List[Schedule](list), nil); err != nil {
 		return nil, spec.Errorf(im.StatusConstraintError, "thermo: Schedules: %w", err)
 	}
-	return s.scheduleRules(s.presets).validateSchedules(stored, list)
+	rules := s.scheduleRules(s.presets)
+	rules.host = true
+	return rules.validateSchedules(stored, list)
 }
 
-// SetSchedules is a local write of the Schedules attribute — matter.js
-// `state.schedules = …` with a local actor, which stores at once
-// (ThermostatServer.ts:3272-3287 at b25ed960) through
-// persistedSchedules$Changing (:2603-2630): the schedules pass the rules a
-// controller's do against the stored ones (a handle the device has not
-// issued is NOT_FOUND, the type and counts, names, presets and
-// transitions), new schedules get a handle, a null BuiltIn takes the
-// stored schedule's or false, and a built-in or the active schedule
-// cannot be removed; the list is stored and reported through the change
-// notifier, without the port. A [SchedulePort] confirming a commit may
-// pass the handles that commit issued. The error is the refusal, with its
-// IM status (UNSUPPORTED_ATTRIBUTE without MSCH); schedules is not
-// modified.
+// SetSchedules is the host's authoritative replace of the schedules — the
+// device's own programs, the host being their source of truth (owner
+// decision O-8, by_design BD-Thermostat-HostSchedules). The list is held
+// to the content rules matter.js's write holds a controller to
+// (#validateScheduleWriteRequest, #validateScheduleTransitions,
+// ThermostatServer.ts:2693-3003 at b25ed960: the schedule types and
+// counts, names, presets, transitions, limits and deadband, each handle
+// once) and normalised (:3028-3048: a null handle gets one, a null BuiltIn
+// takes the stored schedule's or false). matter.js's lifecycle rules of a
+// Matter write do not apply: a handle the device never issued is a new
+// schedule, a schedule may arrive built in or change its BuiltIn, and a
+// built-in schedule may be dropped. An active schedule the list drops is
+// cleared, as a start clears an active handle that names no schedule
+// (:353-366): the host's list says the program is gone, and the
+// ActiveScheduleHandle never names a missing schedule. The list is stored
+// and reported through the change notifier, without the port. The error
+// is the refusal, with its IM status (UNSUPPORTED_ATTRIBUTE without MSCH);
+// schedules is not modified.
 func (s *ThermostatServer) SetSchedules(schedules []Schedule) error {
 	if s.features&ThermostatFeatureMSCH == 0 {
 		return spec.Errorf(im.StatusUnsupportedAttribute, "thermo: Schedules needs the MatterScheduleConfiguration feature")
@@ -191,20 +198,24 @@ func (s *ThermostatServer) SetSchedules(schedules []Schedule) error {
 	s.mu.Lock()
 	list, err := s.validateHostSchedules(s.schedules, schedules)
 	if err == nil {
-		err = validateScheduleCommit(s.schedules, list, s.activeScheduleHandle)
-	}
-	if err == nil {
-		err = issueScheduleHandles(list, nil)
+		err = issueScheduleHandles(list)
 	}
 	if err != nil {
 		s.mu.Unlock()
 		return err
 	}
-	changed := !schedulesTLVEqual(s.schedules, list)
+	var changed []uint32
+	if !schedulesTLVEqual(s.schedules, list) {
+		changed = append(changed, tdef.AttrSchedules)
+	}
 	s.schedules = list
+	if s.activeScheduleHandle != nil && !scheduleHandleIn(list, s.activeScheduleHandle) {
+		s.activeScheduleHandle = nil
+		changed = append(changed, tdef.AttrActiveScheduleHandle)
+	}
 	s.mu.Unlock()
-	if changed {
-		s.changes.NotifyFrom(contract.OriginHostSet, tdef.AttrSchedules)
+	if len(changed) > 0 {
+		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	}
 	return nil
 }

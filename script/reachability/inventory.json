@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10183,
+  "entry_points": 10184,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -27746,7 +27746,7 @@
       "identifier": "SchedulePort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 57
+      "line": 56
     },
     {
       "package": "cluster/thermo",
@@ -27774,7 +27774,7 @@
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 344
+      "line": 345
     },
     {
       "package": "cluster/thermo",

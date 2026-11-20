@@ -225,9 +225,10 @@ type ThermostatConfig struct {
 	// supports, the number of schedules and of transitions across them it
 	// holds, and the transitions a day may carry. ScheduleTypes name Auto,
 	// Heat or Cool, each once, each supporting presets or setpoints.
-	// Schedules are the device's own week programs, held to the write rules
-	// a controller's are — a null handle gets one, a null BuiltIn is false
-	// (set BuiltIn for a program a controller may not remove) — and
+	// Schedules are the device's own week programs, held to the content
+	// rules a controller's write is — a null handle gets one, a null
+	// BuiltIn is false (set BuiltIn for a program a controller may not
+	// remove) — and
 	// ActiveScheduleHandle the one it follows (nil for none; one that names
 	// no schedule is cleared with a warning). The
 	// device's later changes come back through [ThermostatServer.SetSchedules]
@@ -449,10 +450,6 @@ type ThermostatServer struct {
 	schedules                   []Schedule
 	activeScheduleHandle        []byte
 	schedulePort                SchedulePort
-	// issuedScheduleHandles are the handles the commit in flight issued,
-	// while its SchedulePort runs (commitSchedules): the change's own,
-	// which the port may confirm through SetSchedules.
-	issuedScheduleHandles map[string]bool
 
 	// suggest is the TSUGGEST state (suggestions.go).
 	suggest suggestions

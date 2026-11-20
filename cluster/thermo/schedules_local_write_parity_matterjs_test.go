@@ -26,7 +26,14 @@
 // handle from, and stays writable", "refuses a schedule an observer marks
 // built-in after the thermostat issued its handle", "validates a change
 // an observer makes after the thermostat normalized"), a seam the Go
-// server does not have. Planned: "keeps the generated handle across a
+// server does not have. A divergence (by_design BD-Thermostat-HostSchedules,
+// owner decision O-8): SetSchedules is the host's authoritative replace,
+// held to matter.js's content rules but not to the lifecycle rules of a
+// Matter write — "rejects a schedule citing an unknown handle and keeps
+// the stored schedules", "refuses to remove the active schedule" (the
+// replace clears it) and "refuses to remove a schedule the application
+// marked built-in" are not ported; schedules_host_test.go holds the Go
+// behaviour. Planned: "keeps the generated handle across a
 // restart" — the Go server keeps the schedules in memory or behind the
 // host's SchedulePort; persisting them is a unit of its own.
 package thermo_test
@@ -134,17 +141,6 @@ func TestParityMatterJS_SchedulesLocalWriteTest(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects a schedule citing an unknown handle and keeps the stored schedules", func(t *testing.T) {
-		t.Parallel()
-		srv := thermostat(t, 5)
-		storesOne(t, srv, newSchedule())
-		stored := srv.Schedules()
-		wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{newSchedule(scHandle([]byte{1, 2, 3, 4}))}), im.StatusNotFound, "")
-		if got := srv.Schedules(); len(got) != 1 || !bytes.Equal(got[0].ScheduleHandle.Value, stored[0].ScheduleHandle.Value) {
-			t.Errorf("stored %+v, want %+v", got, stored)
-		}
-	})
-
 	t.Run("rejects more schedules than the thermostat supports", func(t *testing.T) {
 		t.Parallel()
 		srv := thermostat(t, 2)
@@ -153,8 +149,13 @@ func TestParityMatterJS_SchedulesLocalWriteTest(t *testing.T) {
 
 	t.Run("checks every schedule's own rules before the schedule count limits", func(t *testing.T) {
 		t.Parallel()
+		// matter.js's second schedule carries a handle the device never
+		// issued (NOT_FOUND); the host's replace is not held to that
+		// lifecycle rule (BD-Thermostat-HostSchedules), so the port names a
+		// content rule of the second schedule instead: a preset no preset
+		// carries. Its refusal still answers before the count.
 		srv := thermostat(t, 1)
-		refused(t, srv, srv.SetSchedules([]thermo.Schedule{newSchedule(), newSchedule(scHandle([]byte{0xee}))}), im.StatusNotFound)
+		refused(t, srv, srv.SetSchedules([]thermo.Schedule{newSchedule(), newSchedule(scPreset(filled(16, 0xee)))}), im.StatusConstraintError)
 	})
 
 	t.Run("rejects more schedules than a systemMode scenario supports", func(t *testing.T) {
@@ -380,29 +381,6 @@ func TestParityMatterJS_SchedulesLocalWriteTest(t *testing.T) {
 		cfg.ActiveScheduleHandle = filled(16, 7)
 		if h := newSchedulesServer(t, cfg).ActiveScheduleHandle(); !bytes.Equal(h, filled(16, 7)) {
 			t.Errorf("ActiveScheduleHandle %x, want the configured schedule's", h)
-		}
-	})
-
-	t.Run("refuses to remove the active schedule", func(t *testing.T) {
-		t.Parallel()
-		srv := thermostat(t, 5)
-		handle := storesOne(t, srv, newSchedule()).ScheduleHandle.Value
-		if err := srv.SetActiveScheduleHandle(handle); err != nil {
-			t.Fatal(err)
-		}
-		wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{}), im.StatusInvalidInState, "while it is the active schedule")
-		if got := srv.Schedules(); len(got) != 1 {
-			t.Errorf("stored schedules %+v, want the active one", got)
-		}
-	})
-
-	t.Run("refuses to remove a schedule the application marked built-in", func(t *testing.T) {
-		t.Parallel()
-		srv := thermostat(t, 5, newSchedule(scHandle(filled(16, 7)), scBuiltIn(true)))
-		wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{}), im.StatusConstraintError, "built-in schedule")
-		stored := srv.Schedules()
-		if len(stored) != 1 || !bytes.Equal(stored[0].ScheduleHandle.Value, filled(16, 7)) || stored[0].BuiltIn.Null || !stored[0].BuiltIn.Value {
-			t.Errorf("stored schedules %+v, want the built-in one", stored)
 		}
 	})
 

@@ -18,15 +18,17 @@ import (
 )
 
 // TestSchedulesFromTheDevice: the device's schedules — configured or
-// stored by SetSchedules — pass the write rules a controller's do, as
-// matter.js holds configured schedules (ThermostatServer.ts:322-334 at
-// b25ed960) and a local write (:2603-2630): a null handle gets one, a
-// null BuiltIn takes the stored schedule's or false (:3028-3048); a
-// repeated handle, a handle the device never issued and a configuration
-// without a schedule type are refused; an active handle that names no
-// schedule is cleared at construction and refused by its setter; and the
-// active or a built-in schedule cannot be removed. The setters do not
-// call the port and report as the host's change.
+// stored by SetSchedules — are the host's authoritative replace (owner
+// decision O-8, BD-Thermostat-HostSchedules): held to matter.js's content
+// rules (ThermostatServer.ts:2693-3003 at b25ed960) and normalised — a
+// null handle gets one, a null BuiltIn takes the stored schedule's or
+// false (:3028-3048) — while matter.js's lifecycle rules of a Matter write
+// do not apply: a handle the device never issued is a new schedule, a
+// schedule may arrive built in, a built-in schedule may be dropped, and a
+// dropped active schedule is cleared (as the start clears a dangling
+// handle, :353-366). A repeated handle and a configuration without a
+// schedule type are refused; the setters do not call the port and report
+// as the host's change.
 func TestSchedulesFromTheDevice(t *testing.T) {
 	t.Parallel()
 	noHandle := builtInSchedule(0x01)
@@ -37,8 +39,8 @@ func TestSchedulesFromTheDevice(t *testing.T) {
 	}
 	newBuiltIn := builtInSchedule(0x01)
 	newBuiltIn.ScheduleHandle = spec.NullOf[[]byte]()
-	if _, err := thermo.New(mschConfig(withSchedules(newBuiltIn))); !errors.Is(err, thermo.ErrSchedules) {
-		t.Errorf("a new built-in schedule without a handle: %v, want ErrSchedules", err)
+	if got := newMSCH(t, mschConfig(withSchedules(newBuiltIn))).Schedules(); len(got) != 1 || !got[0].BuiltIn.Value {
+		t.Errorf("schedules %+v, want the configured built-in schedule", got)
 	}
 	if _, err := thermo.New(mschConfig(withSchedules(builtInSchedule(0x01), builtInSchedule(0x01)))); !errors.Is(err, thermo.ErrSchedules) {
 		t.Errorf("a repeated handle: %v, want ErrSchedules", err)
@@ -66,16 +68,18 @@ func TestSchedulesFromTheDevice(t *testing.T) {
 	if err := srv.SetActiveScheduleHandle([]byte{0x02}); err != nil {
 		t.Fatal(err)
 	}
-	wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{builtInSchedule(0x01)}), im.StatusInvalidInState, "active schedule")
-	wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{removable}), im.StatusConstraintError, "built-in")
-	wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{builtInSchedule(0x01), removable, builtInSchedule(0x03)}), im.StatusNotFound, "")
-	if err := srv.SetActiveScheduleHandle(nil); err != nil {
+	// Dropping the active schedule and the built-in one, adding a schedule
+	// with a handle of the host's own: accepted, the active handle cleared.
+	if err := srv.SetSchedules([]thermo.Schedule{builtInSchedule(0x03)}); err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.SetSchedules([]thermo.Schedule{builtInSchedule(0x01)}); err != nil {
-		t.Fatal(err)
+	if h := srv.ActiveScheduleHandle(); h != nil {
+		t.Errorf("the dropped active schedule %x is still active", h)
 	}
-	want := []uint32{tdef.AttrActiveScheduleHandle, tdef.AttrActiveScheduleHandle, tdef.AttrSchedules}
+	if got := srv.Schedules(); len(got) != 1 || !bytes.Equal(got[0].ScheduleHandle.Value, []byte{0x03}) || !got[0].BuiltIn.Value {
+		t.Errorf("schedules %+v, want the host's built-in schedule 03", got)
+	}
+	want := []uint32{tdef.AttrActiveScheduleHandle, tdef.AttrSchedules, tdef.AttrActiveScheduleHandle}
 	if got := rec.attrs(contract.OriginHostSet); !slices.Equal(got, want) {
 		t.Errorf("reported %v, want %v", got, want)
 	}
@@ -85,6 +89,36 @@ func TestSchedulesFromTheDevice(t *testing.T) {
 	plain := thermo.NewThermostatServer(thermo.DefaultThermostatConfig())
 	if err := plain.SetSchedules(nil); err == nil {
 		t.Error("SetSchedules without MSCH succeeded")
+	}
+}
+
+// TestHostReplaceOfSchedules (O-8): the host's replace takes a new
+// schedule with a fixed handle of its own, refuses one naming a preset no
+// preset carries (a content rule, ThermostatServer.ts:2775-2788 at
+// b25ed960) and leaves the stored list as it was, and clears the active
+// handle when it drops the active schedule.
+func TestHostReplaceOfSchedules(t *testing.T) {
+	t.Parallel()
+	srv := newSchedulesServer(t, schedulesConfig(5, nil))
+	fixed := newSchedule(scHandle([]byte("P1")), scBuiltIn(true))
+	if err := srv.SetSchedules([]thermo.Schedule{fixed}); err != nil {
+		t.Fatalf("a new schedule with a fixed handle: %v", err)
+	}
+	if got := srv.Schedules(); len(got) != 1 || !bytes.Equal(got[0].ScheduleHandle.Value, []byte("P1")) || !got[0].BuiltIn.Value {
+		t.Fatalf("schedules %+v, want P1, built in", got)
+	}
+	wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{fixed, newSchedule(scHandle([]byte("P2")), scPreset(filled(16, 9)))}), im.StatusConstraintError, "names no preset")
+	if got := srv.Schedules(); len(got) != 1 {
+		t.Errorf("schedules %+v after a refused replace, want P1 alone", got)
+	}
+	if err := srv.SetActiveScheduleHandle([]byte("P1")); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.SetSchedules([]thermo.Schedule{newSchedule(scHandle([]byte("P2")))}); err != nil {
+		t.Fatalf("a replace dropping the active schedule: %v", err)
+	}
+	if h := srv.ActiveScheduleHandle(); h != nil {
+		t.Errorf("ActiveScheduleHandle %x, want null once its schedule is gone", h)
 	}
 }
 
@@ -103,10 +137,8 @@ func (c *confirmingSchedulePort) CommitSchedules(_ context.Context, list []therm
 }
 
 // TestSchedulePortConfirmsACommit: the SchedulePort may confirm the list
-// a commit hands it through SetSchedules, new schedules with the handles
-// the commit issued — handles issued in the same change, as matter.js
-// admits a handle its own normalization issued (ThermostatServer.ts:2726-2738,
-// :3028-3048 at b25ed960).
+// a commit hands it through SetSchedules, the host's replace, new
+// schedules with the handles the commit issued.
 func TestSchedulePortConfirmsACommit(t *testing.T) {
 	port := &confirmingSchedulePort{}
 	p := chipThermostat(t, func(cfg *thermo.ThermostatConfig) { cfg.SchedulePort = port })
@@ -120,9 +152,6 @@ func TestSchedulePortConfirmsACommit(t *testing.T) {
 	if got := p.srv.Schedules(); len(got) != 1 || len(got[0].ScheduleHandle.Value) != 16 {
 		t.Errorf("schedules %+v, want the committed one", got)
 	}
-	// Outside a commit, the issued handle is the stored schedule's; a
-	// handle never issued is still NOT_FOUND.
-	wantStatusCode(t, p.srv.SetSchedules([]thermo.Schedule{builtInSchedule(0x0e)}), im.StatusNotFound, "")
 }
 
 // TestTypedSetOfSchedules: the typed server's Set takes Schedules and

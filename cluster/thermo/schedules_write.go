@@ -47,7 +47,7 @@ const validScheduleDays = tdef.ScheduleDayOfWeekSunday | tdef.ScheduleDayOfWeekM
 // scheduleRules is what the schedule validation reads besides the
 // schedules: the feature selection, the schedule types and counts, the
 // setpoint limits and deadband, the presets a preset handle must name, and
-// the handles the change in flight issued.
+// whose write it is.
 type scheduleRules struct {
 	features       uint32
 	types          []ScheduleType
@@ -62,10 +62,12 @@ type scheduleRules struct {
 	// (AtomicWriteHandler.ts:433-458: another peer's staged value is never
 	// seen, :449-452). Without PRES no handle is present.
 	presets []Preset
-	// issued are the handles the change in flight issued itself — matter.js
-	// issuedHandles (ThermostatServer.ts:2726-2738): a schedule carrying
-	// one is an addition, not an unknown handle.
-	issued map[string]bool
+	// host marks the host's authoritative replace (SetSchedules, the
+	// configured list): the content rules apply, matter.js's lifecycle
+	// rules of a Matter write do not — a handle the device never issued, a
+	// new built-in schedule, a changed BuiltIn (owner decision O-8,
+	// BD-Thermostat-HostSchedules).
+	host bool
 }
 
 // scheduleRules gathers the rules against presets; the caller holds s.mu.
@@ -81,7 +83,6 @@ func (s *ThermostatServer) scheduleRules(presets []Preset) scheduleRules {
 		perDay:         s.transitionsPerDay,
 		st:             s.setpointState(),
 		presets:        presets,
-		issued:         s.issuedScheduleHandles,
 	}
 }
 
@@ -220,34 +221,34 @@ func checkScheduleSizes(sc Schedule) error {
 
 // resolveBuiltIn is the handle rules of #validateScheduleWriteRequest
 // (ThermostatServer.ts:2717-2748 at b25ed960) and the BuiltIn
-// #normalizeSchedules settles on (:3040-3046): a handle the stored
-// schedules lack is NOT_FOUND unless the change in flight issued it; a
-// handle twice in the list, a new schedule claiming to be built in and a
-// BuiltIn that differs from the stored schedule's are CONSTRAINT_ERROR; a
-// null BuiltIn takes the stored schedule's, false without one.
+// #normalizeSchedules settles on (:3040-3046): a handle twice in the list
+// is CONSTRAINT_ERROR; for a Matter write a handle the stored schedules
+// lack is NOT_FOUND, and a new schedule claiming to be built in and a
+// BuiltIn that differs from the stored schedule's are CONSTRAINT_ERROR —
+// lifecycle rules the host's replace is not held to (r.host, decision
+// O-8); a null BuiltIn takes the stored schedule's, false without one.
 func (r scheduleRules) resolveBuiltIn(stored, pending []Schedule, sc Schedule) (spec.Nullable[bool], error) {
 	constraint := func(format string, args ...any) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: schedule: "+format, args...)
 	}
 	newBuiltIn := !sc.BuiltIn.Null && sc.BuiltIn.Value
 	if sc.ScheduleHandle.Null {
-		if newBuiltIn {
+		if newBuiltIn && !r.host {
 			return sc.BuiltIn, constraint("can not add a new built-in schedule")
+		}
+		if !sc.BuiltIn.Null {
+			return sc.BuiltIn, nil
 		}
 		return spec.ValueOf(false), nil
 	}
 	h := sc.ScheduleHandle.Value
 	match, ok := scheduleWithHandle(stored, h)
 	switch {
-	case !ok && !r.issued[handleKey(h)]:
+	case !ok && !r.host:
 		return sc.BuiltIn, spec.Errorf(im.StatusNotFound, "thermo: schedule: handle %s does not exist in the stored schedules", handleKey(h))
 	case scheduleHandleIn(pending, h):
 		return sc.BuiltIn, constraint("handle %s is already in the list", handleKey(h))
-	case !ok && newBuiltIn:
-		// The handle is one this change issued, so the schedule is an
-		// addition whatever it now carries (:2735-2738).
-		return sc.BuiltIn, constraint("can not add a new built-in schedule")
-	case ok && !sc.BuiltIn.Null && (match.BuiltIn.Null || match.BuiltIn.Value != sc.BuiltIn.Value):
+	case ok && !r.host && !sc.BuiltIn.Null && (match.BuiltIn.Null || match.BuiltIn.Value != sc.BuiltIn.Value):
 		return sc.BuiltIn, constraint("cannot change the built-in status of schedule %s", handleKey(h))
 	}
 	if !sc.BuiltIn.Null {
@@ -416,9 +417,8 @@ func validateScheduleCommit(stored, next []Schedule, active []byte) error {
 
 // issueScheduleHandles gives every schedule without a handle a new one,
 // 16 random bytes — matter.js #normalizeSchedules
-// (ThermostatServer.ts:3028-3036 at b25ed960) — and records each in
-// issued when it is not nil.
-func issueScheduleHandles(list []Schedule, issued map[string]bool) error {
+// (ThermostatServer.ts:3028-3036 at b25ed960).
+func issueScheduleHandles(list []Schedule) error {
 	for i := range list {
 		if !list[i].ScheduleHandle.Null {
 			continue
@@ -428,9 +428,6 @@ func issueScheduleHandles(list []Schedule, issued map[string]bool) error {
 			return fmt.Errorf("thermo: issue a schedule handle: %w", err)
 		}
 		list[i].ScheduleHandle = spec.ValueOf(h)
-		if issued != nil {
-			issued[handleKey(h)] = true
-		}
 	}
 	return nil
 }
@@ -475,25 +472,16 @@ func schedulesTLVEqual(a, b []Schedule) bool {
 // commitSchedules stores the schedules an atomic write staged, after
 // precommitAtomic passed: every new schedule gets a handle
 // ([issueScheduleHandles]), the [SchedulePort] stores the list — its
-// error fails the commit — and the list is stored and reported. While the
-// port runs, the handles this commit issued are the change in flight's
-// own, so the port may confirm the list through
-// [ThermostatServer.SetSchedules]. The caller holds s.op.
+// error fails the commit — and the list is stored and reported. The port
+// may confirm the list through [ThermostatServer.SetSchedules], the
+// host's replace. The caller holds s.op.
 func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedule) error {
 	list := deepcopy.Each(staged)
-	issued := map[string]bool{}
-	if err := issueScheduleHandles(list, issued); err != nil {
+	if err := issueScheduleHandles(list); err != nil {
 		return err
 	}
 	if s.schedulePort != nil {
-		s.mu.Lock()
-		s.issuedScheduleHandles = issued
-		s.mu.Unlock()
-		err := s.schedulePort.CommitSchedules(ctx, deepcopy.Each(list))
-		s.mu.Lock()
-		s.issuedScheduleHandles = nil
-		s.mu.Unlock()
-		if err != nil {
+		if err := s.schedulePort.CommitSchedules(ctx, deepcopy.Each(list)); err != nil {
 			return err
 		}
 	}

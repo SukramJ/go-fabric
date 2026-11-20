@@ -97,8 +97,12 @@ func TestParityMatterJS_SchedulesConfigurationTest(t *testing.T) {
 
 	t.Run("validates a local write when the application configured no schedules", func(t *testing.T) {
 		t.Parallel()
+		// matter.js first refuses a handle the device never issued
+		// (NOT_FOUND), a lifecycle rule the host's replace is not held to
+		// (BD-Thermostat-HostSchedules); the port refuses a content rule
+		// instead — a transition SystemMode equal to the schedule's.
 		srv := newSchedulesServer(t, schedulesConfig(5, nil))
-		wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{newSchedule(scHandle([]byte{1, 2, 3, 4}))}), im.StatusNotFound, "")
+		wantStatusCode(t, srv.SetSchedules([]thermo.Schedule{newSchedule(scTransitions(newScheduleTransition(trMode(tdef.SystemModeAuto))))}), im.StatusConstraintError, "")
 		if err := srv.SetSchedules([]thermo.Schedule{newSchedule()}); err != nil {
 			t.Fatal(err)
 		}
