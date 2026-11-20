@@ -23,8 +23,8 @@ var filterWireFixturesJSON []byte
 
 // TestFilterPayloadsMatchMatterJS runs the generated-definition wire path
 // end to end against matter.js: a ResetCondition request decodes through
-// commandFieldsReader into the generated request type of its cluster (the
-// spec registry), and the ReplacementProductList a server reads encodes
+// commandFieldsReader and its cluster's definition (the spec registry) to
+// no payload, a command without fields, and the ReplacementProductList a server reads encodes
 // through the value writer into matter.js's bytes.
 func TestFilterPayloadsMatchMatterJS(t *testing.T) {
 	t.Parallel()
@@ -43,16 +43,12 @@ func TestFilterPayloadsMatchMatterJS(t *testing.T) {
 			t.Parallel()
 			switch f.Kind {
 			case "commands":
-				got := decodeCommandFields(t, f.Cluster, hepa.CmdResetCondition, f.BytesHex)
-				var ok bool
-				switch f.Cluster {
-				case hepa.ClusterID:
-					_, ok = got.(hepa.ResetConditionRequest)
-				case carbon.ClusterID:
-					_, ok = got.(carbon.ResetConditionRequest)
-				}
-				if !ok {
-					t.Fatalf("decoded %T", got)
+				// ResetCondition has no fields: it decodes through the
+				// definition (a stray field would be refused) to no payload,
+				// as matter.js's TlvNoArguments decodes to nothing
+				// (packages/types/src/tlv/TlvVoid.ts:20-22 at b25ed960).
+				if got := decodeCommandFields(t, f.Cluster, hepa.CmdResetCondition, f.BytesHex); got != nil {
+					t.Fatalf("decoded %T, want no payload", got)
 				}
 			case "attributes":
 				var products []struct {

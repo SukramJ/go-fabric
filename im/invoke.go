@@ -315,7 +315,7 @@ func readCommandData(dec *tlv.Decoder, fieldsReader CommandFieldsReader) ([]Comm
 
 func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (CommandInvocation, error) {
 	var inv CommandInvocation
-	hasPath := false
+	hasPath, hasFields := false, false
 	var later laterErrors
 	for {
 		el, err := dec.Next()
@@ -331,6 +331,11 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			// b25ed960 (TlvField).
 			if !hasPath {
 				return CommandInvocation{}, fmt.Errorf("%w: %w", ErrInvalidInvokeRequest, missingField(tagCmdDataPath, "CommandDataIB.CommandPath"))
+			}
+			if !hasFields && fieldsReader != nil {
+				if err := readAbsentFields(fieldsReader, &inv); err != nil {
+					return CommandInvocation{}, err
+				}
 			}
 			return inv, nil
 		}
@@ -349,6 +354,7 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			inv.Path = p
 			hasPath = true
 		case tagCmdDataFields:
+			hasFields = true
 			if err := readCommandFields(dec, el, fieldsReader, &inv); err != nil {
 				return CommandInvocation{}, err
 			}
@@ -422,6 +428,34 @@ func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFie
 	}
 	inv.Fields = f
 	return nil
+}
+
+// emptyFields is the TLV of an empty anonymous structure: CommandFields
+// read for a CommandDataIB that carries none.
+var emptyFields = []byte{0x15, 0x18}
+
+// readAbsentFields reads the CommandFields of inv, whose CommandDataIB
+// carries none, as an empty structure: the fields reader decodes it as it
+// decodes an explicit {} — a command with a mandatory field answers the
+// reader's status (INVALID_COMMAND for a missing field), a command without
+// fields hands its reader's value on (nil for one the reader decodes by
+// definition). Absent and empty CommandFields thus take one decode path
+// (notes/parity/by_design.md, decision 334). matter.js reads an absent
+// request as {} in its model check (packages/node/src/node/integration/ProtocolService.ts:624-625
+// at b25ed960) and answers an explicit {} that lacks a mandatory field
+// INVALID_COMMAND (packages/types/src/tlv/TlvObject.ts:253-261,
+// packages/types/src/common/ValidationError.ts:45-47,
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:529-535); its
+// TLV check of an absent payload of a command it does not model-validate
+// fails with an uncaught TypeError, FAILURE (:549-551, TlvObject.ts:256),
+// which this module does not mirror.
+func readAbsentFields(fieldsReader CommandFieldsReader, inv *CommandInvocation) error {
+	dec := tlv.NewDecoder(emptyFields)
+	el, err := dec.Next()
+	if err != nil {
+		return fmt.Errorf("%w: empty fields: %w", ErrInvalidInvokeRequest, err)
+	}
+	return readCommandFields(dec, el, fieldsReader, inv)
 }
 
 // skipNonStructFields reports whether the CommandFields element el is
