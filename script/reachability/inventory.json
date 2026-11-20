@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10178,
+  "entry_points": 10181,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -36734,7 +36734,7 @@
       "identifier": "TestCameraSimAppPipeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 933
+      "line": 940
     },
     {
       "package": "examples/reference-bridge",
@@ -36748,7 +36748,7 @@
       "identifier": "TestCameraSimChime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 906
+      "line": 913
     },
     {
       "package": "examples/reference-bridge",
@@ -36776,7 +36776,7 @@
       "identifier": "TestCameraSimPushEventsKeepTheirOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 998
+      "line": 1005
     },
     {
       "package": "examples/reference-bridge",
@@ -36797,7 +36797,7 @@
       "identifier": "TestCameraSimStaleRecordingEndLeavesTheNewRecording",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 968
+      "line": 975
     },
     {
       "package": "examples/reference-bridge",
