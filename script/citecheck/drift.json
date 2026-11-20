@@ -126,6 +126,16 @@
     "occurrences": 2
   },
   {
+    "file": "bridge/attribute_value_reader.go",
+    "line": 497,
+    "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:446-460",
+    "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
+    "at": "b25ed960",
+    "identifier": "writeValue",
+    "nearest": 419,
+    "occurrences": 3
+  },
+  {
     "file": "bridge/bridge.go",
     "line": 1892,
     "citation": "NodeSession.ts:367-377",
@@ -593,7 +603,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1385,
+    "line": 1387,
     "citation": "packages/types/src/protocol/definitions/general.ts:33",
     "resolved": "packages/types/src/protocol/definitions/general.ts",
     "at": "b25ed960",
@@ -2882,6 +2892,16 @@
     "occurrences": 0
   },
   {
+    "file": "examples/reference-bridge/unit_testing.go",
+    "line": 40,
+    "citation": "unit-testing-cluster.ts:66-70",
+    "resolved": "support/chip-testing/src/cert/unit-testing-cluster.ts",
+    "at": "b25ed960",
+    "identifier": "listLongOctetString",
+    "nearest": 105,
+    "occurrences": 1
+  },
+  {
     "file": "groups/counter.go",
     "line": 55,
     "citation": "SessionManager.ts:981-1007",
@@ -3173,7 +3193,7 @@
   },
   {
     "file": "internal/chiptool/gocert_appliance_test.go",
-    "line": 49,
+    "line": 48,
     "citation": "tc-support.ts:1663-1682",
     "resolved": "support/chip-testing/test/cert/tc-support.ts",
     "identifier": "invokeWithResponseChecks",
@@ -3188,6 +3208,15 @@
     "identifier": "revokeReceived",
     "nearest": 245,
     "occurrences": 3
+  },
+  {
+    "file": "internal/chiptool/gocert_idm_test.go",
+    "line": 982,
+    "citation": "tc-idm-3.1-support.ts:158-162",
+    "resolved": "support/chip-testing/test/cert/tc-idm-3.1-support.ts",
+    "identifier": "expectChunkedWrite",
+    "nearest": 119,
+    "occurrences": 2
   },
   {
     "file": "internal/chiptool/gocert_light_test.go",
@@ -3290,6 +3319,16 @@
     "identifier": "network",
     "nearest": 245,
     "occurrences": 3
+  },
+  {
+    "file": "node/localization_stored_parity_matterjs_test.go",
+    "line": 157,
+    "citation": "packages/node/test/behaviors/localization-configuration/LocalizationConfigurationServerTest.ts:152-169",
+    "resolved": "packages/node/test/behaviors/localization-configuration/LocalizationConfigurationServerTest.ts",
+    "at": "b25ed960",
+    "identifier": "LocalizationConfigurationServer",
+    "nearest": 189,
+    "occurrences": 4
   },
   {
     "file": "node/node.go",

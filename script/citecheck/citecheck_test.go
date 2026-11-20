@@ -136,8 +136,14 @@ import (
 // 448 drifted before the lift's re-cites (17 hard errors, the stale
 // comments of the lift's P0 list); 441 after them. The remaining rows are
 // citations into files the lift moved that their reconcile units (P1–P5)
-// re-read, not new citations. 429 after wave P2b (E, A, B, K merged).
-const citecheckDriftRatchet = 429
+// re-read, not new citations. 429 after wave P2b (E, A, B, K merged);
+// 433 after its units I and F: four new rows whose sentence names the
+// construct the cited range sits in, read at b25ed960 — writeValue
+// (AttributeWriteResponse.ts:419) around :446-460, expectChunkedWrite
+// (tc-idm-3.1-support.ts:119) around :158-162, listLongOctetString beside
+// LONG_OCTET_STRING_ENTRY (unit-testing-cluster.ts:66-70), the describe
+// LocalizationConfigurationServer of its test file; none is a moved line.
+const citecheckDriftRatchet = 433
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -186,7 +192,7 @@ const citecheckDriftRatchet = 429
 // files it rewrote (2728 at db021da0 remain). Wave P2b relabelled 10
 // more at b25ed960 in the files its units touched (E, A, B); P2b-L2 one
 // more (client/exchange/manager.go).
-const citecheckOffPinRatchet = 2799
+const citecheckOffPinRatchet = 2796
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
