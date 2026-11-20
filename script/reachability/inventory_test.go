@@ -83,7 +83,7 @@ import (
 // secure/sigma.Initiator.PeerNodeID, transport/tcp.Dialer.OnPanicRecovered.
 // Lowered 24 -> 23 (F-db021da0-13): bridge/chunk_timeout_test.go wires
 // bridge.OperationalSessionLookup.WithRetransmitIntervalResolver.
-const reachabilityUnreachedRatchet = 23
+const reachabilityUnreachedRatchet = 22
 
 // reachabilityWhitelistRatchet holds, per class, the exemptions that take an
 // exported identifier out of the measure by a decision rather than by what its

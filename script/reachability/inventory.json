@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10140,
+  "entry_points": 10142,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,10 +295,10 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27846,
-    "reachable": 20879,
-    "whitelisted": 6944,
-    "unreachable": 23
+    "total_exported": 27848,
+    "reachable": 20880,
+    "whitelisted": 6946,
+    "unreachable": 22
   },
   "by_package": [
     {
@@ -351,12 +351,6 @@
     },
     {
       "package": "cluster/measurement",
-      "unreachable_funcs": 1,
-      "unreachable_types": 0,
-      "unreachable_other": 0
-    },
-    {
-      "package": "secure/operational",
       "unreachable_funcs": 1,
       "unreachable_types": 0,
       "unreachable_other": 0
@@ -513,13 +507,6 @@
       "identifier": "Node.OnOTAProviderStatusAsync",
       "file": "node/ota_provider.go",
       "line": 148,
-      "kind": "method"
-    },
-    {
-      "package": "secure/operational",
-      "identifier": "Entry.PeerMRPIntervals",
-      "file": "secure/operational/manager.go",
-      "line": 479,
       "kind": "method"
     },
     {
@@ -44199,6 +44186,13 @@
     },
     {
       "package": "secure/operational",
+      "identifier": "TestEntryPeerReadings",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/seam_establishing_test.go",
+      "line": 61
+    },
+    {
+      "package": "secure/operational",
       "identifier": "TestNewManager_SeedsRandomInitialSessionID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_session_seed_test.go",
@@ -44399,6 +44393,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/seam_test.go",
       "line": 15
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestSessionSeamOpenEstablishingAndComplete",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/seam_establishing_test.go",
+      "line": 17
     },
     {
       "package": "secure/operational",
