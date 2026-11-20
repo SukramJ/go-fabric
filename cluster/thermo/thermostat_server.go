@@ -239,8 +239,13 @@ type ThermostatConfig struct {
 	SchedulePort SchedulePort
 	// MaxThermostatSuggestions is how many thermostat suggestions the
 	// thermostat holds with ThermostatSuggestions (TSUGGEST, which needs
-	// PRES): at least 5, 0 for 5. The suggestions live in memory.
+	// PRES): at least 5, 0 for 5 — raised, with a notice, to cover the
+	// entries SuggestionStore holds.
 	MaxThermostatSuggestions uint8
+	// SuggestionStore persists ThermostatSuggestions and the manual
+	// override with TSUGGEST, so both survive a restart; nil keeps them in
+	// memory. A start drops the stored entries that name no preset.
+	SuggestionStore SuggestionStore
 	// Clock times the atomic writes; nil is the system clock.
 	Clock clock.Clock
 	// Sink is the optional host port; nil keeps the server self-contained.
@@ -480,7 +485,8 @@ func resolveFeatures(features uint32) (uint32, error) {
 // ThermostatSuggestions without Presets is refused with [ErrFeatures]; a
 // MaxThermostatSuggestions below 5 too; a negative
 // MinSetpointDeadBand with [ErrSetpoints], a preset configuration the
-// write rules refuse with [ErrPresets], a schedule configuration with
+// write rules refuse — or a [PresetStore] or [SuggestionStore] that fails
+// to load — with [ErrPresets], a schedule configuration with
 // [ErrSchedules].
 //
 // Limits and initial setpoints that violate the setpoint rules are
@@ -594,7 +600,7 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	}
 	if features&ThermostatFeatureTSUGGEST != 0 {
 		if err := s.seedSuggestions(cfg); err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrFeatures, err)
+			return nil, err
 		}
 	}
 

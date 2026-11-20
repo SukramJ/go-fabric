@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -63,6 +64,44 @@ func TestCASEServerResponderSessionEstablishing(t *testing.T) {
 		if got := r.serverMgr.SessionsFor(nodeAddr); len(got) != 1 || got[0] != server {
 			t.Fatalf("SessionsFor = %v", got)
 		}
+	})
+	t.Run("hands the session over at the Success's first transmission, before its acknowledgement", func(t *testing.T) {
+		t.Parallel()
+		// The session joins the established view — where the peer set
+		// adopts it — on its established event, at the Success's first
+		// transmission (CaseServer.ts:331, SessionManager.ts:1274-1280,
+		// PeerSet.ts:104-110 at b25ed960; findings F-b25ed960-35). The
+		// node's acknowledgements are lost, so the responder retransmits
+		// its Success: at the retransmission the session is handed over,
+		// while the send still waits for the acknowledgement.
+		r := newResponderRig(t)
+		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+		defer cancel()
+		r.nodeRec.setRefuse(func(d []byte) error {
+			if opcode, _, ok := unsecuredMessage(d); ok && opcode == mrp.StandaloneAckOpcode {
+				return errors.New("test: the Success's acknowledgement is lost")
+			}
+			return nil
+		})
+		var successes atomic.Int32
+		retransmitted := make(chan bool, 1)
+		r.serverRec.setHook(func(d []byte) {
+			if isSuccess(d) && successes.Add(1) == 2 {
+				retransmitted <- len(r.sessions) > 0
+			}
+		})
+		if _, _, err := r.open(ctx, r.nodeFabric); err != nil {
+			t.Fatalf("CASE: %v", err)
+		}
+		select {
+		case handedOver := <-retransmitted:
+			if !handedOver {
+				t.Fatal("the Success was retransmitted before the session was handed over")
+			}
+		case <-ctx.Done():
+			t.Fatal("the Success was not retransmitted")
+		}
+		r.server.Close()
 	})
 	t.Run("keeps the session and saves its record when the send of the Success fails after it went out", func(t *testing.T) {
 		t.Parallel()
@@ -155,7 +194,14 @@ func TestCASEServerResponderSessionEstablishing(t *testing.T) {
 			t.Fatalf("CASE: %v", err)
 		}
 		first := r.accepted(t)
-		before, _ := r.store.FindResumptionRecord(handshake.PeerAddress{FabricIndex: 1, NodeID: testNodeID})
+		// The session is handed over at its Success's first transmission,
+		// before the responder saves its record (CaseServer.ts:331, :357 at
+		// b25ed960): the record's id is read off the initiator's, which it
+		// saved on that Success, before its CASE returned.
+		before, ok := r.nodeStore.FindResumptionRecord(handshake.PeerAddress{FabricIndex: 3, NodeID: controllerNodeID})
+		if !ok {
+			t.Fatal("the initiator saved no resumption record")
+		}
 		reported := make(chan struct{}, 8)
 		r.serverRec.setHook(func(d []byte) {
 			opcode, payload, ok := unsecuredMessage(d)

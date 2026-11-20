@@ -92,11 +92,11 @@ func TestResponseFieldPresence(t *testing.T) {
 		ID: 0xFFF1FC09, Name: "Resp", Revision: 1,
 		Commands: []spec.Command{
 			{
-				ID: 1, Name: "Req", Direction: spec.Request, Response: "Resp", Conformance: op(spec.ConfMandatory),
+				ID: 1, Name: "Req", Direction: spec.Request, Decode: decodesAs[ctReq](), Response: "Resp", Conformance: op(spec.ConfMandatory),
 				Fields: []spec.Field{{ID: 0, Name: "Enable", Type: spec.Type{Kind: spec.KindBool}, Conformance: op(spec.ConfMandatory)}},
 			},
 			{
-				ID: 1, Name: "Resp", Direction: spec.Response, Conformance: op(spec.ConfMandatory),
+				ID: 1, Name: "Resp", Direction: spec.Response, Decode: decodesAs[ctResp](), Conformance: op(spec.ConfMandatory),
 				Fields: []spec.Field{{ID: 0, Name: "Result", Type: spec.Type{Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{
 					Text: "Req.Enable", Op: spec.ConfDot, Args: []spec.Conformance{name("Req"), name("Enable")},
 				}}},
@@ -120,13 +120,17 @@ func TestResponseFieldPresence(t *testing.T) {
 		{"missing", ctReq{Enable: &yes}, ctResp{}, true},
 		{"present", ctReq{Enable: &yes}, &ctResp{Result: &v}, false},
 		{"disallowed", ctReq{}, ctResp{Result: &v}, true},
-		{"absent payload", ctReq{Enable: &yes}, nil, false},
-		{"nil pointer", ctReq{Enable: &yes}, (*ctResp)(nil), false},
+		// An absent response is judged as {} (F-b25ed960-30, matter.js
+		// ProtocolService.ts:624-625, :717-733 at b25ed960): Result,
+		// required by Req.Enable, is missing; without Enable it is not.
+		{"absent payload", ctReq{Enable: &yes}, nil, true},
+		{"nil pointer", ctReq{Enable: &yes}, (*ctResp)(nil), true},
+		{"absent payload, nothing required", ctReq{}, nil, false},
 		{"not a struct", ctReq{Enable: &yes}, 3, false},
 		{"another type", ctReq{Enable: &yes}, ctOther{}, false},
 	} {
 		resp = c.resp
-		_, err := srv.MatterInvoke(context.Background(), 1, c.req)
+		_, err := wireInvoke(context.Background(), srv, 1, c.req)
 		var se *spec.StatusError
 		if got := errors.As(err, &se) && se.Status == im.StatusFailure; got != c.failure {
 			t.Errorf("%s: %v, want failure %v", c.name, err, c.failure)

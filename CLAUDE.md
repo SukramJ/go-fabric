@@ -307,6 +307,16 @@ an API break, a removal after the deprecation window, a migration note —
 greps all four, names the commit each was read at, and lists the four in its
 report, so a missing one is visible.
 
+That grep measures the **impact** of a change — who migrates, what the
+CHANGELOG and the migration guide must say — never whether the change is
+allowed. The four are the known consumers and the measuring points, not the
+audience: the public API is designed for the unknown embedder of a general
+Matter implementation, as matter.js's is. So zero hits does not shorten the
+deprecation window (`README.md` §The deprecation window applies to every
+exported identifier outside `internal/`), and a hit is no veto on a better
+shape — matter.js, the specification and the architecture standard decide
+the shape; a hit decides only how the migration is announced.
+
 ### Work that starts in a host
 
 Matter rules live here. A rule decided while working in a host — how this

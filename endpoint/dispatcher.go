@@ -85,6 +85,9 @@ type TopologyDispatcher struct {
 	// interface value behind one pointer.
 	acl atomic.Pointer[ACLLister]
 	aux atomic.Pointer[AuxiliaryACLLister]
+	// respWriter puts a response on the wire as the bridge does
+	// ([TopologyDispatcher.SetResponseWriter]); nil for none.
+	respWriter atomic.Pointer[im.CommandFieldsWriter]
 	// timedWrite reports an attribute with the timed access quality; nil
 	// is [schema.IsTimedWrite]. A test sets it: no attribute of the
 	// snapshot at the pin carries the quality. A pointer keeps the
@@ -210,6 +213,38 @@ func (d *TopologyDispatcher) SetAuxiliaryACL(l AuxiliaryACLLister) {
 		return
 	}
 	d.aux.Store(&l)
+}
+
+// SetResponseWriter wires the encoder that puts a command's response on
+// the wire (the bridge's: Bridge sets its response writer on every
+// dispatcher it assembles). With it, the response check after the server
+// ([spec.CheckResponseAsWritten]) judges a response in a hand-written form
+// — a cluster/core server's own response type — as write writes it: a
+// field the definition makes mandatory that the written response lacks
+// is FAILURE. Without one (nil, or a host that runs its own dispatcher
+// without setting it) such a response is not judged; the definition's own
+// generated responses and an absent response are judged either way. Safe
+// while requests are being dispatched.
+func (d *TopologyDispatcher) SetResponseWriter(write im.CommandFieldsWriter) {
+	if d == nil {
+		return
+	}
+	if write == nil {
+		d.respWriter.Store(nil)
+		return
+	}
+	d.respWriter.Store(&write)
+}
+
+// responseWriter is the wired response writer, nil when none is.
+func (d *TopologyDispatcher) responseWriter() im.CommandFieldsWriter {
+	if d == nil {
+		return nil
+	}
+	if p := d.respWriter.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // Compile-time assertion: TopologyDispatcher satisfies im.Dispatcher
@@ -732,7 +767,8 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 		if srv.MatterClusterID() != path.Cluster {
 			continue
 		}
-		resp, err := srv.MatterInvoke(contract.WithOrigin(im.WithCommandPath(ctx, path), contract.OriginCommand), path.Command, fields)
+		invokeCtx := contract.WithOrigin(im.WithCommandPath(ctx, path), contract.OriginCommand)
+		resp, err := invokeHeld(invokeCtx, srv, path.Command, fields, d.responseWriter())
 		if err != nil {
 			status, cs, hasCS := classifyError(err)
 			return im.InvokeResult{Path: path, Response: resp, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
@@ -818,7 +854,8 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 	for _, t := range d.commandTargets(path, authorize) {
 		ePath := path
 		ePath.Endpoint, ePath.HasEndpoint = t.ep.ID, true
-		resp, err := t.srv.MatterInvoke(contract.WithOrigin(im.WithCommandPath(ctx, ePath), contract.OriginCommand), path.Command, fields)
+		invokeCtx := contract.WithOrigin(im.WithCommandPath(ctx, ePath), contract.OriginCommand)
+		resp, err := invokeHeld(invokeCtx, t.srv, path.Command, fields, d.responseWriter())
 		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
 		if err != nil {
 			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err)
@@ -1302,6 +1339,86 @@ func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.Con
 	return res
 }
 
+// invokeHeld runs the wire command cmdID on srv between the definition's
+// two checks, as matter.js's invokeCommand runs a command between its
+// request and its response validation: the request held first
+// ([requestHeld]), then the server, then its response ([responseHeld]).
+// A request a hand-written reader decoded arrives as a [spec.HandForm]:
+// the definition judges its generated form, the server takes its own.
+//
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:641-797
+// at b25ed960 (invokeCommand: the request gate :671-705, the behavior's
+// method, completeResponse :717-733).
+func invokeHeld(ctx context.Context, srv contract.ClusterServer, cmdID uint32, fields any, write im.CommandFieldsWriter) (any, error) {
+	judged, served := spec.SplitHandForm(fields)
+	if err := requestHeld(ctx, srv, cmdID, judged); err != nil {
+		return nil, err
+	}
+	resp, err := srv.MatterInvoke(ctx, cmdID, served)
+	if err != nil {
+		return resp, err
+	}
+	if err := responseHeld(ctx, srv, cmdID, judged, resp, write); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// responseHeld holds the response srv answered the request of cmdID with
+// to the definition of srv's cluster ([spec.CheckResponseAsWritten]): the
+// presence of its fields against their conformance — an absent response
+// of a command whose response has a mandatory field is FAILURE — with the
+// server's FeatureMap and attributes, request (the form the definition
+// judged) resolving a conformance that names a request field. A response
+// in a hand-written form is judged as write puts it on the wire
+// ([TopologyDispatcher.SetResponseWriter]); without write it is not. A
+// handler that answers nothing on purpose ([im.NoResponse]), a command the server
+// does not accept, and a cluster without a registered definition are not
+// judged.
+//
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:717-733
+// at b25ed960 (completeResponse; the response validated as `data ?? {}`,
+// :624-625).
+func responseHeld(ctx context.Context, srv contract.ClusterServer, cmdID uint32, request, response any, write im.CommandFieldsWriter) error {
+	switch response.(type) {
+	case im.NoResponse, *im.NoResponse:
+		return nil
+	}
+	def := spec.Lookup(srv.MatterClusterID())
+	if def == nil {
+		return nil
+	}
+	if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), cmdID) {
+		return nil
+	}
+	return spec.CheckResponseAsWritten(ctx, def, featureMapOf(srv), cmdID, request, response, srv.MatterRead, write)
+}
+
+// requestHeld holds the request fields of cmdID to the definition of srv's
+// cluster before srv runs ([spec.AdmitRequest]) — the module's one request
+// gate, on every command that reaches a server over the wire (a concrete,
+// wildcard-endpoint or group invoke): the server's FeatureMap selects the
+// conformance and the enum members, its attributes resolve the ones a
+// constraint names, as [writtenHeld] holds a written value. A command the
+// server does not accept is left to the server, which answers it; a
+// cluster without a registered definition is not judged.
+//
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:347-350
+// at b25ed960 (each command of the per-endpoint cluster state bound to
+// invokeCommand, whose gate is :671-705), reached only from the wire path
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:316, :358)
+// after the accepted-command check (:269-271) and the access check.
+func requestHeld(ctx context.Context, srv contract.ClusterServer, cmdID uint32, fields any) error {
+	def := spec.Lookup(srv.MatterClusterID())
+	if def == nil {
+		return nil
+	}
+	if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), cmdID) {
+		return nil
+	}
+	return spec.AdmitRequest(ctx, def, featureMapOf(srv), cmdID, fields, srv.MatterRead)
+}
+
 // writtenHeld is the status the definition of srv's cluster answers a
 // controller's written value of attrID with ([spec.CheckWritten]): the
 // server's FeatureMap selects the enum values and conformance, its
@@ -1312,12 +1429,7 @@ func writtenHeld(srv contract.ClusterServer, attrID uint32, value im.AttributeVa
 	if def == nil {
 		return im.StatusSuccess
 	}
-	var features uint32
-	if v, ok := srv.MatterRead(cluster.AttrGlobalFeatureMap); ok {
-		if fm, ok := v.(uint32); ok {
-			features = fm
-		}
-	}
+	features := featureMapOf(srv)
 	v := value.Value
 	if value.IsNull {
 		v = nil

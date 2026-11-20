@@ -58,7 +58,7 @@ func TestDeprecatedHooksKeepTheirBehaviour(t *testing.T) {
 		t.Fatal(err)
 	}
 	calls := 0
-	if err := s.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { calls++; return nil, nil }); err != nil {
+	if err := s.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { calls++; return rvcrunmode.ChangeToModeResponse{}, nil }); err != nil {
 		t.Fatal(err)
 	}
 	req := rvcrunmode.ChangeToModeRequest{NewMode: 1}
@@ -102,7 +102,7 @@ func TestDeprecatedHooksHandlerAnswersChangeToMode(t *testing.T) {
 	var ran []string
 	if err := s.Hooks.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { //nolint:staticcheck // the deprecated field is the subject
 		ran = append(ran, "Hooks")
-		return nil, nil
+		return rvcrunmode.ChangeToModeResponse{}, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -110,12 +110,15 @@ func TestDeprecatedHooksHandlerAnswersChangeToMode(t *testing.T) {
 	if _, err := s.MatterInvoke(context.Background(), CmdChangeToMode, req); err != nil || len(ran) != 1 || currentOf(s) != 0 {
 		t.Fatalf("ChangeToMode with a handler on the deprecated field: %v, ran %v, CurrentMode %d; want the field's handler and no change", err, ran, currentOf(s))
 	}
-	if err := s.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { ran = append(ran, "Handle"); return nil, nil }); err != nil {
+	if err := s.Handle(CmdChangeToMode, func(context.Context, any) (any, error) {
+		ran = append(ran, "Handle")
+		return rvcrunmode.ChangeToModeResponse{}, nil
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Hooks.Handle(CmdChangeToMode, func(context.Context, any) (any, error) { //nolint:staticcheck // the deprecated field is the subject
 		ran = append(ran, "Hooks")
-		return nil, nil
+		return rvcrunmode.ChangeToModeResponse{}, nil
 	}); err != nil {
 		t.Fatal(err)
 	}

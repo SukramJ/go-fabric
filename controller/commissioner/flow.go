@@ -4,19 +4,17 @@
 package commissioner
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/sha256"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"math/big"
 	"net/netip"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,11 +67,21 @@ const (
 	csrNonceSize         = 32
 )
 
-// errUnexpectedResponse is a response the flow cannot use — matter.js
-// UnexpectedDataError (:1401-1403), or a missing response payload, which
-// matter.js's destructuring of undefined fails on. Neither is a
-// CommissioningError, so the failsafe stays armed (:463-465).
+// errUnexpectedResponse is a response the flow cannot use: one this
+// module's decoders refuse, or a missing response payload, which
+// matter.js's destructuring of undefined fails on. It is not a
+// CommissioningError (:463-465). An empty CSRResponse is not one: it is
+// the NOCSR check ResponseEmpty, a commissioning error
+// (NocsrValidator.ts:86-91 at b25ed960).
 var errUnexpectedResponse = errors.New("commissioner: unexpected response from the device")
+
+// errNoDACKey is the CSRResponse step reached without the DAC key the
+// attestation step keeps — matter.js's InternalError
+// (ControllerCommissioningFlow.ts:1450-1452 at b25ed960), a defect of the
+// flow and not a CommissioningError. No path of this flow reaches it: the
+// attestation step (10.1) runs before the CSR step (11.1), and it sets the
+// key or fails the flow.
+var errNoDACKey = errors.New("commissioner: internal error: CSRResponse received before the device attestation step set the DAC public key")
 
 // stepResult is CommissioningStepResultCode (:164-169).
 type stepResult int
@@ -109,14 +117,18 @@ type networkStatus struct {
 // requestor list, which only the OTA provider step this port leaves out
 // reads.
 type collectedData struct {
-	basicCommissioningInfo       *gencomm.BasicCommissioningInfo
-	productName                  string
-	networkFeatures              []networkFeature // nil until collected
-	networkStatus                []networkStatus  // nil until collected
-	successfullyConnected        bool
-	rootPartsList                []uint16
-	rootServerList               []uint32
-	vendorID, productID          uint16
+	basicCommissioningInfo *gencomm.BasicCommissioningInfo
+	productName            string
+	networkFeatures        []networkFeature // nil until collected
+	networkStatus          []networkStatus  // nil until collected
+	successfullyConnected  bool
+	rootPartsList          []uint16
+	rootServerList         []uint32
+	// vendorID and productID are BasicInformation's, nil when the device
+	// did not report them (collectedCommissioningData, its vendorId and
+	// productId optional: DeviceAttestationValidator.ts:239-243 at
+	// b25ed960).
+	vendorID, productID          *uint16
 	supportsConcurrentConnection *bool
 	fabricIndex                  uint8
 	// terms is the device's terms-and-conditions requirement, nil when
@@ -622,11 +634,11 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		errs = append(errs, err)
 	}
 	if ok[4] {
-		d.vendorID, err = spec.DecodeUint[uint16](16)(v[4])
+		d.vendorID, err = spec.DecodeOptional(spec.DecodeUint[uint16](16))(v[4])
 		errs = append(errs, err)
 	}
 	if ok[5] {
-		d.productID, err = spec.DecodeUint[uint16](16)(v[5])
+		d.productID, err = spec.DecodeOptional(spec.DecodeUint[uint16](16))(v[5])
 		errs = append(errs, err)
 	}
 	if ok[6] {
@@ -1123,12 +1135,16 @@ func (f *flow) random(n int) ([]byte, error) {
 	return b, err
 }
 
-// deviceAttestation is step 10.1 (:1218-1338): the DAC and the PAI
+// deviceAttestation is step 10.1: the DAC and the PAI
 // (CertificateChainRequest), the AttestationRequest with a 32-byte nonce,
-// attestation.Validate; a validation error becomes one error finding — the
-// attestation.Error's check, else ValidationError (:1286-1303); the
-// policy decides (:1305-1319); the DAC key kept, parsed from the DAC when
-// the policy accepted a failed validation (:1321-1331).
+// attestation.Validate; the policy decides (:1347-1364 at b25ed960); the
+// DAC key kept, parsed from the DAC when the policy accepted a failed
+// validation (:1366-1380 at b25ed960). A hard failure hands the policy the findings collected
+// before it and then its own error finding, the failure last; any other
+// validation error is one ValidationError finding; a rejection without a
+// failure names every error finding. Mirrors matter.js
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:1257-1386 at
+// b25ed960 (#deviceAttestation).
 func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	// An earlier run's pair never outlives this run: a run that fails or
 	// withholds the pair leaves none (review II, R2-P6-fsm-1811).
@@ -1175,23 +1191,31 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		baseErr = err
 		var ae *attestation.Error
 		if errors.As(err, &ae) {
-			findings = []attestation.Finding{{Level: attestation.LevelError, Check: ae.Check, Message: ae.Message}}
+			// The findings collected before the failure, then the failure
+			// (ControllerCommissioningFlow.ts:1332-1336 at b25ed960).
+			findings = append(slices.Clone(ae.PrecedingFindings), attestation.Finding{Level: attestation.LevelError, Check: ae.Check, Message: ae.Message})
 		} else {
 			findings = []attestation.Finding{{Level: attestation.LevelError, Check: attestation.ValidationError, Message: err.Error()}}
 		}
 	} else {
 		findings = result.Findings
 		f.dacKey = result.DACPublicKey
-		// Validate returned no error: the Certification Declaration names
-		// this vendor and product (decision 105). The pair is recorded only
-		// when the chain was verified as well and no error finding stands
-		// (owner decision 119): a finding that a check could not run (no
-		// trust store, DclServiceUnavailable) or a LevelError one the
-		// policy accepts below leaves it unattested, with one log line.
+		// No error from Validate no longer means the Certification
+		// Declaration names this vendor and product: a mismatch with the
+		// BasicInformation VendorID or ProductID, or a value not reported,
+		// is the LevelError finding CertificationDeclarationFieldMismatch
+		// (DeviceAttestationValidator.ts:579-595 at b25ed960). No error
+		// and no error finding is what says it does (decision 105). The
+		// pair is recorded only when the chain was verified as well and no
+		// error finding stands (owner decision 119): a finding that a check
+		// could not run (no trust store, DclServiceUnavailable) or a
+		// LevelError one the policy accepts below leaves it unattested,
+		// with one log line (attestedPairWithheld); the pair needs both
+		// values reported.
 		if why, withheld := attestedPairWithheld(result); withheld {
 			f.log.Info("matter.controller.commissioning.attested_identity_not_recorded", slog.String("reason", why))
-		} else {
-			f.attested = &[2]uint16{f.data.vendorID, f.data.productID}
+		} else if f.data.vendorID != nil && f.data.productID != nil {
+			f.attested = &[2]uint16{*f.data.vendorID, *f.data.productID}
 		}
 	}
 
@@ -1202,7 +1226,9 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		}
 		if !proceed {
 			if baseErr == nil {
-				baseErr = newError(ErrCommissioning, fmt.Sprintf("Device attestation produced %d finding(s) and was rejected by policy", len(findings)), nil)
+				// The rejection names every error finding
+				// (ControllerCommissioningFlow.ts:1350-1355 at b25ed960).
+				baseErr = newError(ErrCommissioning, rejectedByPolicy(findings), nil)
 			}
 			if reason != "" {
 				return 0, attestationRejected{newError(ErrCommissioning, reason, baseErr)}
@@ -1222,6 +1248,22 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 		f.dacKey = key
 	}
 	return stepSuccess, nil
+}
+
+// rejectedByPolicy is the message of a rejection of collected findings
+// (ControllerCommissioningFlow.ts:1350-1355 at b25ed960): the error
+// findings' messages, else the number of findings.
+func rejectedByPolicy(findings []attestation.Finding) string {
+	var msgs []string
+	for _, fd := range findings {
+		if fd.Level == attestation.LevelError {
+			msgs = append(msgs, fd.Message)
+		}
+	}
+	if len(msgs) > 0 {
+		return "Device attestation rejected by policy: " + strings.Join(msgs, "; ")
+	}
+	return fmt.Sprintf("Device attestation produced %d finding(s) and was rejected by policy", len(findings))
 }
 
 // attestedPairWithheld reports why an attestation that returned no error
@@ -1270,13 +1312,15 @@ func dacKeyOf(der []byte) (*ecdsa.PublicKey, error) {
 	return k, nil
 }
 
-// certificates is step 11.1 (:1388-1468): the CSRRequest with a 32-byte
-// nonce; empty elements or signature is unexpected data (:1401-1403); the
-// signature over elements ‖ challenge against the DAC key (:1405-1416);
-// the CSR's key (:1418-1419); AddTrustedRootCertificate, its answer unused
-// (:1421-1433); the
-// NOC (:1435-1439); AddNOC (:1441-1457) checked (:1459); the fabric index
-// kept (:1461-1462).
+// certificates is step 11.1: the CSRRequest with a 32-byte nonce; the CSRResponse validated by attestation.ValidateNOCSR against
+// the DAC key the attestation step kept, the nonce sent and the session's
+// challenge, which returns the CSR's key — every failure a commissioning
+// error, which no attestation policy accepts; AddTrustedRootCertificate,
+// its answer unused (:1463-1475); the NOC (:1477-1481); AddNOC
+// (:1483-1499) checked (:1501); the fabric index kept (:1503-1504), lines
+// at b25ed960. Mirrors matter.js
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:1436-1510 at
+// b25ed960 (#certificates).
 func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	nonce, err := f.random(csrNonceSize)
 	if err != nil {
@@ -1286,34 +1330,31 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	if err != nil {
 		return 0, err
 	}
-	var csr signedElements
+	var csr attestation.NOCSRResponse
 	if err := response(res, "CsrResponse", func(n spec.Node) (err error) {
-		csr, err = decodeSignedElements(n, "CsrResponse")
+		csr, err = decodeCSRResponse(n)
 		return err
 	}); err != nil {
 		return 0, err
 	}
-	if len(csr.elements) == 0 || len(csr.signature) == 0 {
-		return 0, fmt.Errorf("%w: Invalid response from device", errUnexpectedResponse)
+	// The DAC key is required: the attestation step sets it or fails, so
+	// its absence is a defect of the flow, not of the device's data
+	// (ControllerCommissioningFlow.ts:1450-1452 at b25ed960, an
+	// InternalError).
+	if f.dacKey == nil {
+		return 0, errNoDACKey
 	}
-	if f.dacKey != nil && !verifyRaw(f.dacKey, slices.Concat(csr.elements, f.challenge), csr.signature) {
-		return 0, newError(ErrCommissioning, "CSR signature verification failed against DAC public key", nil)
-	}
-	der, echoed, err := decodeCertSigningRequest(csr.elements)
+	operationalKey, err := attestation.ValidateNOCSR(
+		attestation.NOCSRContext{Challenge: f.challenge, CSRNonce: nonce, DACPublicKey: f.dacKey},
+		csr,
+	)
 	if err != nil {
-		return 0, fmt.Errorf("%w: NOCSRElements: %w", errUnexpectedResponse, err)
-	}
-	// Ahead of matter.js: the echoed nonce must be the one sent. matter.js
-	// draws the nonce (ControllerCommissioningFlow.ts:1412 at db021da0)
-	// and never reads it back; connectedhomeip refuses a mismatch
-	// (DefaultDeviceAttestationVerifier.cpp:868-870 at 6170af84,
-	// VerifyNodeOperationalCSRInformation). See notes/parity/by_design.md
-	// BD-chip-Commissioner-CsrNonceEchoed.
-	if !bytes.Equal(echoed, nonce) {
-		return 0, newError(ErrCommissioning, "CSR nonce mismatch: the device echoed a nonce other than the one sent", nil)
-	}
-	operationalKey, err := publicKeyFromCSR(der)
-	if err != nil {
+		var ne *attestation.NOCSRError
+		if errors.As(err, &ne) {
+			// NocsrError extends CommissioningError (NocsrValidator.ts:39
+			// at b25ed960).
+			return 0, newError(ErrCommissioning, ne.Message, ne)
+		}
 		return 0, err
 	}
 	if _, err := f.invoke(ctx, opCredsCluster, opcredsdef.CmdAddTrustedRootCertificate, opcredsdef.AddTrustedRootCertificateRequest{RootCaCertificate: f.fabric.CA.RootCert()}, true); err != nil {
@@ -1342,31 +1383,6 @@ func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 		f.data.fabricIndex = *nr.fabricIndex
 	}
 	return stepSuccess, nil
-}
-
-// publicKeyFromCSR is Certificate.getPublicKeyFromCsr
-// (certificate/kinds/Certificate.ts:782-843): version 0, an EC P-256 key,
-// ecdsa-with-SHA256, the CSR's own signature verified; the key as its
-// 65-byte uncompressed point.
-func publicKeyFromCSR(der []byte) ([]byte, error) {
-	req, err := x509.ParseCertificateRequest(der)
-	if err != nil {
-		return nil, fmt.Errorf("%w: CSR: %w", errUnexpectedResponse, err)
-	}
-	if req.Version != 0 {
-		return nil, fmt.Errorf("%w: unsupported CSR version %d", errUnexpectedResponse, req.Version)
-	}
-	key, ok := req.PublicKey.(*ecdsa.PublicKey)
-	if !ok || key.Curve != elliptic.P256() {
-		return nil, fmt.Errorf("%w: unsupported public key in CSR", errUnexpectedResponse)
-	}
-	if req.SignatureAlgorithm != x509.ECDSAWithSHA256 {
-		return nil, fmt.Errorf("%w: unsupported signature algorithm in CSR", errUnexpectedResponse)
-	}
-	if err := req.CheckSignature(); err != nil {
-		return nil, fmt.Errorf("%w: CSR signature: %w", errUnexpectedResponse, err)
-	}
-	return key.Bytes()
 }
 
 // reconnectWithDevice is step 18.1 (:2000-2052): a concurrent flow first
@@ -1463,15 +1479,4 @@ func (f *flow) updateFabricLabel(ctx context.Context) (stepResult, error) {
 		return 0, newError(errRecoverable, err.Error(), err)
 	}
 	return stepSuccess, nil
-}
-
-// verifyRaw verifies a raw 64-byte r‖s ECDSA signature over SHA-256 of msg
-// (matter.js crypto.verifyEcdsa with an EcdsaSignature in its default
-// form, :1408-1412).
-func verifyRaw(key *ecdsa.PublicKey, msg, sig []byte) bool {
-	if len(sig) != 64 {
-		return false
-	}
-	digest := sha256.Sum256(msg)
-	return ecdsa.Verify(key, digest[:], new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:]))
 }

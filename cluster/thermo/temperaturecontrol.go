@@ -124,8 +124,9 @@ var ErrTemperatureRefused = errors.New("thermo: the device cannot accept the cha
 type TemperatureControlServer struct {
 	*spec.Instance
 	cluster.AttributeChanges
-	// held routes MatterInvoke through [spec.InvokeHeld] — the request
-	// admitted and the response checked with the server's attributes, a
+	// held routes MatterInvoke through [spec.InvokeHeld] — the response
+	// checked with the server's attributes (the request's model check is
+	// the endpoint dispatcher's, [spec.AdmitRequest]), a
 	// host handler ([TemperatureControlServer.Handle]) ahead of the
 	// server's own logic (decision 154); events and veto are the server's.
 	held   spec.SelfHeld

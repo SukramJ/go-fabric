@@ -151,7 +151,7 @@ var floors = []packageFloor{
 		why: "measured 92.9-93.0 across five guard runs on 2026-11-04; review II phase 7 (decision 269, the CASE initiator's establishing session) moved it to 91.9-92.1 across six runs on 2026-11-19, a timing-dependent tenth either side of 92, so the floor sits one point under the measurement",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/client/interaction", min: 91},
-	{pkg: "github.com/SukramJ/go-fabric/client/handshake", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/client/handshake", min: 89},
 	{
 		pkg: "github.com/SukramJ/go-fabric/client/peer",
 		min: 91,
@@ -362,7 +362,7 @@ var floors = []packageFloor{
 	// package's own tests. Re-measure and raise them once the fuzz corpus
 	// has settled; `make cover-check` says by how much.
 	{pkg: "github.com/SukramJ/go-fabric/secure/mattercert", min: 94, why: "phase 32: 95.2 with the DER codec's refusal cases (der_edges_test.go)"},
-	{pkg: "github.com/SukramJ/go-fabric/secure/operational", min: 95},
+	{pkg: "github.com/SukramJ/go-fabric/secure/operational", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/secure/setup", min: 97},
 	{
 		pkg: "github.com/SukramJ/go-fabric/secure/sigma",

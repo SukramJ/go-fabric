@@ -76,13 +76,16 @@ type CASEServerConfig struct {
 	// record is saved. Nil neither resumes nor saves.
 	Resumption ResumptionStore
 	// OnSession is called with every session the responder established
-	// and its fabric index, once its establishment completed — matter.js's
+	// and its fabric index, as its establishment completes — matter.js's
 	// session joins SessionManager.sessions on its established event
 	// (SessionManager.ts:1274-1280 at b25ed960; CaseServer no longer adds
-	// it), the establishment completed at CaseServer.ts:206 (resumed) or
-	// :331 (full) — which a peer set observes to adopt the session. It is
-	// called after the Success's send returned, where matter.js adds at
-	// the Success's first transmission. Nil ignores it.
+	// it), the establishment completed at CaseServer.ts:206 (resumed, once
+	// the initiator's Success arrived) or :331 (full, at the first
+	// transmission of our Success, before its acknowledgement is awaited)
+	// — which a peer set observes to adopt the session
+	// (packages/protocol/src/peer/PeerSet.ts:104-110). It runs before the
+	// record is saved, as matter.js saves it after (:216-217, :356-357).
+	// Nil ignores it.
 	OnSession func(s *exchange.Session, fabricIndex uint8)
 	// Logger receives the diagnostics; nil is slog.Default().
 	Logger *slog.Logger
@@ -495,6 +498,7 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 		s.Close()
 		return err
 	}
+	c.handOver(s, fabric)
 	rec := *record
 	rec.ResumptionID = append([]byte(nil), result.Sigma2Resume.ResumptionID...)
 	c.established(s, fabric, rec)
@@ -505,9 +509,10 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 // around secure/sigma's crypto: Sigma2 sent, Sigma3 read and verified (a
 // fabric id mismatch is UnexpectedData, :303-305, an InvalidParam), the
 // session registered establishing (:309-327), Success sent with the
-// session established at its first transmission (:329-331, the send's
-// onTransmitted through exchangeseam.SendNotifyingTransmission), the
-// record built (:347-354) and saved (:357). A Success whose first
+// session established — and handed over ([CASEServerConfig.OnSession]) —
+// at its first transmission (:329-331, the send's onTransmitted through
+// exchangeseam.SendNotifyingTransmission), the record built (:347-354) and
+// saved (:357). A Success whose first
 // transmission fails — or that went out while the session was already
 // closing — closes the session and ends the handshake (:333-336); one that
 // went out and then fails (no acknowledgement) keeps the established
@@ -555,7 +560,11 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 	report := exchange.StatusReport{GeneralCode: mrp.SCStatusGeneralSuccess, ProtocolID: uint32(mrp.SecureChannelProtocolID), ProtocolCode: mrp.SCStatusProtocolSessionEstablishmentSuccess}
 	if err := exchangeseam.SendNotifyingTransmission(ctx, x, mrp.SCOpcodeStatusReport, report.Encode(),
 		exchange.SendOptions{ExpectedProcessingTime: ExpectedCryptoProcessingTime},
-		func() { established = exchangeseam.CompleteSecureSessionEstablishment(s) }); err != nil {
+		func() {
+			if established = exchangeseam.CompleteSecureSessionEstablishment(s); established {
+				c.handOver(s, fabric)
+			}
+		}); err != nil {
 		if !established {
 			s.Close()
 			return err
@@ -609,9 +618,20 @@ func completeEstablishmentOf(s *exchange.Session) error {
 	return nil
 }
 
-// established hands the session over and saves its record — the save of
+// handOver hands the established session to [CASEServerConfig.OnSession]:
+// matter.js's established event, which adds the session to
+// SessionManager.sessions (SessionManager.ts:1274-1280 at b25ed960) where
+// the peer set adopts it (PeerSet.ts:104-110).
+func (c *CASEServer) handOver(s *exchange.Session, fabric Fabric) {
+	if c.cfg.OnSession != nil {
+		c.cfg.OnSession(s, fabric.Identity.FabricIndex)
+	}
+}
+
+// established logs the session and saves its record — the save of
 // CaseServer.ts:217 and :357 at b25ed960, a failure only logged as the CASE
-// client logs it (CaseClient.ts:369-381).
+// client logs it (CaseClient.ts:369-381). The session was handed over
+// already ([CASEServer.handOver]).
 func (c *CASEServer) established(s *exchange.Session, fabric Fabric, rec ResumptionRecord) {
 	c.log.Info("matter.controller.case_server.session",
 		slog.Int("session_id", int(s.ID())), slog.Bool("resumed", s.Resumed()),
@@ -623,8 +643,5 @@ func (c *CASEServer) established(s *exchange.Session, fabric Fabric, rec Resumpt
 		if err := c.cfg.Resumption.SaveResumptionRecord(rec); err != nil {
 			c.log.Warn("matter.controller.case_server.resumption_save_failed", slog.Any("err", err))
 		}
-	}
-	if c.cfg.OnSession != nil {
-		c.cfg.OnSession(s, fabric.Identity.FabricIndex)
 	}
 }

@@ -128,7 +128,8 @@ import (
 // Host, and covered — the ones Set, Get, MarkChanged, OnWrite,
 // Handle<Command> or Emit<Event> reach, a derivation of what Get reads,
 // or the kit's own wiring — and deferred, the host methods whose types
-// live only in the kit's package so far. A method in none fails the test:
+// live only in the kit's package so far or that the facade does not reach
+// yet. A method in none fails the test:
 // a new kit method is decided before it ships.
 type hostCase struct {
 	kit      reflect.Type
@@ -172,6 +173,11 @@ var hostCases = map[uint32]hostCase{
 		"SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
 		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
 		"Suggestions",
+	}, deferred: []string{
+		// ActivatePreset (decision 318, P2-G): the application's activation
+		// of a preset with its setpoints; the device facade has no path to
+		// it yet, a host reaches it on the kit server it holds.
+		"ActivatePreset",
 	}},
 	h_color.ClusterID:  {kit: kitOf[*light.ColorControlServer](), covered: []string{"Color", "Set", "SetColorWriter", "SetScenes", "SetWriter", "SyncColorTemperatureWithLevel"}},
 	h_eco.ClusterID:    {kit: kitOf[*core.EcosystemInformation](), host: hostOf[h_eco.Host](h_eco.Wrap)},

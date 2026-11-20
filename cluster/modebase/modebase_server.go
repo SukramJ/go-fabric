@@ -828,8 +828,8 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 // runs when the host registered no handler with [Server.Handle]. A
 // handler registered on the deprecated [Server.Hooks] field answers
 // first, ahead of the request's decoding and outside cmd as before
-// decision 154 (decision 177); the request InvokeHeld admitted is not
-// held a second time there.
+// decision 154 (decision 177); the request's model check is the endpoint
+// dispatcher's ([spec.AdmitRequest]).
 func (s *Server) changeToMode(ctx context.Context, fields any) (any, error) {
 	if resp, handled, err := s.Hooks.Invoke(ctx, CmdChangeToMode, fields); handled { //nolint:staticcheck // the deprecated field's handler, honoured for its window
 		return resp, err

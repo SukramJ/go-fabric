@@ -32,7 +32,7 @@ func TestCheckRequestShapes(t *testing.T) {
 	def := &spec.Cluster{
 		ID: 0xFFF1_FC0C, Name: "Shapes", Revision: 1,
 		Commands: []spec.Command{{
-			ID: 0, Name: "Op", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory),
+			ID: 0, Name: "Op", Direction: spec.Request, Decode: decodesAs[listReq](), Response: "status", Conformance: op(spec.ConfMandatory),
 			Access: spec.Access{Write: spec.PrivilegeOperate}, Check: spec.RequestCheck{Refusal: im.StatusInvalidCommand},
 			Fields: []spec.Field{
 				{
@@ -76,7 +76,7 @@ func TestCheckRequestShapes(t *testing.T) {
 	if err := held.Handle(0, func(context.Context, any) (any, error) { calls++; return nil, nil }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := spec.InvokeHeld(context.Background(), &held, 0, listReq{Op: 2}); statusOf(err) != im.StatusInvalidCommand || calls != 0 {
+	if _, err := wireInvokeHeld(context.Background(), srv, &held, 0, listReq{Op: 2}); statusOf(err) != im.StatusInvalidCommand || calls != 0 {
 		t.Errorf("InvokeHeld of a refused request: %v, %d handler calls", err, calls)
 	}
 

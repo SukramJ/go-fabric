@@ -19,8 +19,9 @@ import (
 // answers the payload with, the server's relaxations included — the
 // definition carries them ([spec.Command.DecodeRequest], the relaxation
 // table of script/clustergen: DoorLock's request rules, ICD's
-// VerificationKey). ok is false, and nothing is read, for a cluster or
-// command no registered definition decodes.
+// VerificationKey); a command without fields decodes to nil. ok is
+// false, and nothing is read, for a cluster or command no registered
+// definition decodes.
 func decodeByDefinition(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (fields any, ok bool, err error) {
 	if handWrittenServers[path.Cluster] {
 		return nil, false, nil
@@ -38,6 +39,15 @@ func decodeByDefinition(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.El
 		return nil, true, fieldsReadError(def.Name+"."+cmd.Name, err)
 	}
 	fields, err = cmd.DecodeRequest(withFallbacks(path, n))
+	if err == nil && len(cmd.Fields) == 0 {
+		// A command without fields hands no payload on, whether its
+		// CommandFields arrived empty or absent (read as an empty
+		// structure, im.UnmarshalInvokeRequestTLV). Mirrors matter.js
+		// packages/types/src/tlv/TlvVoid.ts:20-22, :28-29 at b25ed960 (the
+		// request schema of a command without fields, TlvNoArguments,
+		// decodes to nothing and validates only undefined).
+		return nil, true, nil
+	}
 	return fields, true, err
 }
 

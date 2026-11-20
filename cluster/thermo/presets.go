@@ -39,7 +39,9 @@ type PresetType = tdef.PresetTypeStruct
 
 // ErrPresets reports a ThermostatConfig whose presets the server refuses:
 // a NumberOfPresets or PresetTypes outside their constraints, configured
-// presets the write rules refuse, or a [PresetStore] that fails to load.
+// presets the write rules refuse, or a [PresetStore] that fails to load —
+// with TSUGGEST also a [SuggestionStore] that fails to load or to save the
+// stored list pruned at the start.
 var ErrPresets = errors.New("thermo: preset configuration refused")
 
 // presetHandleLength is the length of a handle the server issues —
@@ -442,6 +444,32 @@ func (s *ThermostatServer) SetActivePresetHandle(ctx context.Context, handle []b
 		s.reevaluateSuggestions(ctx)
 	}
 	return err
+}
+
+// ActivatePreset activates the preset handle names (nil: none) with its
+// setpoints, as the application's setActivePresetRequest does in
+// matter.js: the SetActivePresetRequest command's path, run as the host —
+// a handle that names no stored preset is INVALID_COMMAND; otherwise it
+// becomes ActivePresetHandle (saved, announced, ActivePresetChange
+// emitted) and the setpoints of the occupancy in effect take the preset's,
+// each clamped to its limits, and the preset stays active (the moved
+// setpoints are the activation's, not a direct write). It is the path a
+// followed thermostat suggestion takes too: the moved setpoints reach the
+// [Sink] before they are stored, so the Sink must not call back into the
+// server. A handle that leaves the current thermostat suggestion's preset
+// overrides it. [ThermostatServer.SetActivePresetHandle] sets the handle
+// alone. Mirrors matter.js ThermostatServer.ts:551-553 at b25ed960
+// (setActivePresetRequest: handleSetActivePresetRequest, :523-538, then
+// #applyPresetSetpoints, :556-567); the preset staying active is the
+// method's documented contract (:505-521).
+func (s *ThermostatServer) ActivatePreset(ctx context.Context, handle []byte) error {
+	if s.features&ThermostatFeaturePRES == 0 {
+		return spec.Errorf(im.StatusUnsupportedCommand, "thermo: SetActivePresetRequest needs the Presets feature")
+	}
+	handle = bytes.Clone(handle) // nil stays null, an empty handle empty
+	s.op.Lock()
+	defer s.op.Unlock()
+	return s.activatePreset(contract.WithOrigin(ctx, contract.OriginHostSet), handle)
 }
 
 // storeActiveHandle saves and stores the active handle and reports

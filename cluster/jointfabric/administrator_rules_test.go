@@ -203,8 +203,10 @@ func TestAddICAC(t *testing.T) {
 		t.Errorf("unarmed: %v", err)
 	}
 	fx.arm(true)
-	if resp, err := call(fx.f.icac); err != nil || resp != nil {
-		t.Fatalf("AddICAC = %v, %v; want SUCCESS without a response", resp, err)
+	// chip answers a status alone (:390); the module answers the
+	// command's response with OK (decision 340).
+	if resp, err := call(fx.f.icac); err != nil || resp != (jfadef.IcacResponse{StatusCode: jfadef.ICACResponseStatusOk}) {
+		t.Fatalf("AddICAC = %v, %v; want ICACResponse OK", resp, err)
 	}
 	if _, err := call(fx.f.icac); statusOf(err) != im.StatusConstraintError { // :372
 		t.Errorf("second AddICAC: %v", err)
@@ -234,13 +236,18 @@ func TestAddICAC(t *testing.T) {
 }
 
 // TestTransferAnchorAnswersSuccess: connectedhomeip's handlers are empty
-// (:439-449).
+// (:439-449) and answer nothing to mirror. TransferAnchorRequest answers
+// its response refusing the transfer with NoUserConsent — no transfer is
+// performed (decision 341); TransferAnchorComplete, status-only, answers
+// SUCCESS.
 func TestTransferAnchorAnswersSuccess(t *testing.T) {
 	fx := newAdminFixture(t, AdministratorConfig{})
-	for _, cmd := range []uint32{jfadef.CmdTransferAnchorRequest, jfadef.CmdTransferAnchorComplete} {
-		if resp, err := fx.a.MatterInvoke(caseCtx(t.Context(), 3), cmd, struct{}{}); err != nil || resp != nil {
-			t.Errorf("command %#x: %v %v", cmd, resp, err)
-		}
+	want := jfadef.TransferAnchorResponse{StatusCode: jfadef.TransferAnchorResponseStatusTransferAnchorStatusNoUserConsent}
+	if resp, err := fx.a.MatterInvoke(caseCtx(t.Context(), 3), jfadef.CmdTransferAnchorRequest, nil); err != nil || resp != want {
+		t.Errorf("TransferAnchorRequest: %v %v, want %v", resp, err, want)
+	}
+	if resp, err := fx.a.MatterInvoke(caseCtx(t.Context(), 3), jfadef.CmdTransferAnchorComplete, nil); err != nil || resp != nil {
+		t.Errorf("TransferAnchorComplete: %v %v", resp, err)
 	}
 }
 

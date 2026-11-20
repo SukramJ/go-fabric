@@ -946,33 +946,27 @@ func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error
 // refuses — DoorLock echoes an index out of range with its constraint
 // switched off (GetWeekDayScheduleResponse, DoorLockServer.ts:704-707) and answers a cluster status code in the
 // global status enum (SetCredentialResponse DUPLICATE, :441). An absent
-// payload, or one whose Go type does not carry every field the definition
-// states (a hand-written decoder's), is not judged — db021da0's
-// `if (data === undefined) return`; at b25ed960 matter.js validates an
-// absent response as {} too (ProtocolService.ts:624-625), not adopted
-// here (pin lift b25ed960, P1-B: open).
-func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peers) error {
+// response — nil, or a nil pointer — is judged as one without fields, so
+// a mandatory field is missing and the command answers FAILURE: matter.js
+// validates `data ?? {}` for the response too (Mirrors matter.js
+// packages/node/src/node/integration/ProtocolService.ts:624-625, :718-733
+// at b25ed960, completeResponse; F-b25ed960-30). A payload in neither the
+// definition's generated form nor a declared one ([payloadValue]) is not
+// judged.
+func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peers, write im.CommandFieldsWriter) error {
 	req := i.def.Command(cmdID, Request)
-	if req == nil || response == nil {
+	if req == nil {
 		return nil
 	}
 	resp := i.def.responseOf(req)
 	if resp == nil || len(resp.Fields) == 0 {
 		return nil
 	}
-	rv := reflect.ValueOf(response)
-	for rv.Kind() == reflect.Pointer {
-		if rv.IsNil() {
-			return nil
-		}
-		rv = rv.Elem()
-	}
-	if rv.Kind() != reflect.Struct {
-		return nil
-	}
-	for fi := range resp.Fields {
-		if !rv.FieldByName(goFieldName(resp.Fields[fi].Name)).IsValid() {
-			return nil
+	rv, ok := payloadValue(resp, response, true)
+	if !ok {
+		var err error
+		if rv, ok, err = i.writtenResponse(req, resp, response, write); !ok || err != nil {
+			return err
 		}
 	}
 	scope := nameScope{peers: peers, conformance: true, outer: func(name string) (any, bool) {

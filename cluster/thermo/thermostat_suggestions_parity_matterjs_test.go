@@ -29,7 +29,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -44,6 +46,9 @@ import (
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/store/memstore"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // suggestClock is a fake clock and the Matter time read from it, which a
@@ -491,6 +496,22 @@ func TestParityMatterJS_ThermostatSuggestionsTest(t *testing.T) { //nolint:funle
 				t.Errorf("ids %d, %d, %d, want three distinct", first, second, third)
 			}
 		})
+
+		t.Run("continues after the highest stored value", func(t *testing.T) {
+			r := newRestartable(t)
+			c := r.online(func(cfg *thermo.ThermostatConfig) { r.store(cfg, r.stored(10, presetA)) })
+			if id := c.mustAdd(presetA, nil, 0); id != 11 {
+				t.Errorf("UniqueID %d, want 11", id)
+			}
+		})
+
+		t.Run("wraps after 255 and skips values in use", func(t *testing.T) {
+			r := newRestartable(t)
+			c := r.online(func(cfg *thermo.ThermostatConfig) { r.store(cfg, r.stored(0, presetA), r.stored(255, presetA)) })
+			if id := c.mustAdd(presetA, nil, 0); id != 1 {
+				t.Errorf("UniqueID %d, want 1", id)
+			}
+		})
 	})
 
 	t.Run("RemoveThermostatSuggestion", func(t *testing.T) {
@@ -668,6 +689,17 @@ func TestParityMatterJS_ThermostatSuggestionsTest(t *testing.T) { //nolint:funle
 	})
 
 	t.Run("following", func(t *testing.T) {
+		t.Run("re-evaluates when the application writes ThermostatSuggestions", func(t *testing.T) {
+			c := onlineSuggestions(t)
+			now := c.clk.epoch()
+			entry := thermo.Suggestion{UniqueId: 7, PresetHandle: presetB, EffectiveTime: now, ExpirationTime: now + 1800}
+			c.set(map[uint32]any{tdef.AttrThermostatSuggestions: spec.List[thermo.Suggestion]{entry}})
+			if sg, ok := readCurrent(t, c.srv); !ok || !equalSuggestion(sg, entry) {
+				t.Errorf("CurrentThermostatSuggestion %+v (%v), want %+v", sg, ok, entry)
+			}
+			c.wantActive(presetB)
+		})
+
 		t.Run("keeps adjusted setpoints while the suggestion's preset stays active", func(t *testing.T) {
 			c := onlineSuggestions(t)
 			c.mustAdd(presetB, nil, 0)
@@ -911,6 +943,149 @@ func TestParityMatterJS_ThermostatSuggestionsTest(t *testing.T) { //nolint:funle
 		})
 	})
 
+	t.Run("manual override across a restart", func(t *testing.T) {
+		// The two servers share the stores and the clock: matter.js's
+		// MockStorageService environment (ThermostatSuggestionsTest.ts:1211-1215).
+		// overriddenSuggestionId is not served; the case reads it from the
+		// store, where the server keeps it.
+
+		// overriddenBeforeRestart follows a suggestion for preset B that
+		// expires in 30 minutes, then a client activates preset A
+		// (ThermostatSuggestionsTest.ts:1218-1228).
+		overriddenBeforeRestart := func(r *restartable, next *uint32) uint8 {
+			r.t.Helper()
+			c := r.online(r.stores)
+			followed := c.mustAdd(presetB, nil, 0)
+			if next != nil {
+				c.mustAdd(presetB, next, 60)
+			}
+			c.activate(presetA)
+			c.settle()
+			r.wantOverride(&followed)
+			c.srv.MatterQuiesce()
+			return followed
+		}
+
+		t.Run("stays in effect when its entry is still current", func(t *testing.T) {
+			r := newRestartable(t)
+			id := overriddenBeforeRestart(r, nil)
+
+			c := r.online(r.stores)
+			c.wantCurrent(id)
+			r.wantOverride(&id)
+			c.wantReason(reasonOf(0))
+			c.wantActive(presetA)
+			c.wantHeating(2000)
+		})
+
+		t.Run("ends when another entry became current", func(t *testing.T) {
+			r := newRestartable(t)
+			followed := overriddenBeforeRestart(r, r.at(600))
+
+			r.clk.Advance(31 * time.Minute)
+			c := r.online(r.stores)
+			if id, ok := c.current(); !ok || id == followed {
+				t.Errorf("CurrentThermostatSuggestion %d (%v), want another than %d", id, ok, followed)
+			}
+			r.wantOverride(nil)
+			c.wantReason(nil)
+			c.wantActive(presetB)
+		})
+
+		t.Run("stays in effect while the time is not synchronized after the restart", func(t *testing.T) {
+			r := newRestartable(t)
+			first := r.online(r.stores)
+			id := first.mustAdd(presetB, nil, 0)
+			first.activate(presetA)
+			first.settle()
+			first.srv.MatterQuiesce()
+
+			r.clk.setSynced(false)
+			c := r.online(r.stores)
+			c.wantNoCurrent()
+			r.wantOverride(&id)
+
+			r.clk.setSynced(true)
+			c.reevaluate()
+			c.wantCurrent(id)
+			c.wantReason(reasonOf(0))
+			c.wantActive(presetA)
+		})
+
+		t.Run("ends when no entry is current any more and keeps the active preset", func(t *testing.T) {
+			r := newRestartable(t)
+			overriddenBeforeRestart(r, nil)
+
+			r.clk.Advance(31 * time.Minute)
+			c := r.online(r.stores)
+			c.wantNoCurrent()
+			r.wantOverride(nil)
+			c.wantActive(presetA)
+		})
+	})
+
+	t.Run("startup", func(t *testing.T) {
+		t.Run("removes stored entries that name no preset", func(t *testing.T) {
+			r := newRestartable(t)
+			c := r.online(func(cfg *thermo.ThermostatConfig) {
+				r.store(cfg, r.stored(1, presetA), r.stored(2, unknownPreset))
+			})
+			c.wantIDs(1)
+			c.wantCurrent(1)
+			if n := r.logged("matter.thermostat.suggestions_dropped"); n != 1 {
+				t.Errorf("%d notices of dropped entries, want 1", n)
+			}
+		})
+
+		t.Run("removes stored entries that expired", func(t *testing.T) {
+			r := newRestartable(t)
+			now := r.clk.epoch()
+			c := r.online(func(cfg *thermo.ThermostatConfig) {
+				r.store(cfg, thermo.Suggestion{UniqueId: 1, PresetHandle: presetA, EffectiveTime: now - 3600, ExpirationTime: now - 1})
+			})
+			c.wantIDs()
+			c.wantNoCurrent()
+		})
+
+		t.Run("raises MaxThermostatSuggestions to cover the stored entries", func(t *testing.T) {
+			r := newRestartable(t)
+			stored := make([]thermo.Suggestion, 0, 7)
+			for id := range uint8(7) {
+				stored = append(stored, r.stored(id+1, presetA))
+			}
+			c := r.online(func(cfg *thermo.ThermostatConfig) {
+				r.store(cfg, stored...)
+				cfg.MaxThermostatSuggestions = 5
+			})
+			if v, _ := c.srv.MatterRead(tdef.AttrMaxThermostatSuggestions); v != uint8(7) {
+				t.Errorf("MaxThermostatSuggestions %v, want 7", v)
+			}
+			if n := len(readSuggestions(t, c.srv)); n != 7 {
+				t.Errorf("%d entries, want 7", n)
+			}
+			if n := r.logged(`msg=matter.thermostat.limit_raised attribute=MaxThermostatSuggestions value=7`); n != 1 {
+				t.Errorf("%d notices raising MaxThermostatSuggestions to 7, want 1", n)
+			}
+		})
+
+		t.Run("sets up the endpoint when it is added to a node that is online", func(t *testing.T) {
+			// A node attaches its Matter time to every server of each
+			// topology it serves (node/matter_time.go attachMatterTime), the
+			// one an Add brings included: the server built with a stored
+			// entry follows it and arms the timer then. LocalTemperature has
+			// no part in the Go server's start (matter.js's
+			// externalMeasuredIndoorTemperature, LTNE, is the host's
+			// SetLocalTemperature here).
+			r := newRestartable(t)
+			c := r.online(func(cfg *thermo.ThermostatConfig) { r.store(cfg, r.stored(1, presetB)) })
+			c.wantCurrent(1)
+			c.wantActive(presetB)
+			if n := r.clk.Pending(); n != 1 {
+				t.Errorf("%d timers armed, want 1", n)
+			}
+		})
+	})
+
 	t.Run("setpoint hold", func(t *testing.T) {
 		t.Run("does not follow during a hold and follows once the hold ends", func(t *testing.T) {
 			c := onlineSuggestions(t)
@@ -1024,6 +1199,19 @@ func TestParityMatterJS_ThermostatSuggestionsTest(t *testing.T) { //nolint:funle
 	})
 
 	t.Run("preset activation", func(t *testing.T) {
+		t.Run("keeps a preset the application activates", func(t *testing.T) {
+			c := onlineSuggestions(t)
+			if err := c.srv.ActivatePreset(context.Background(), presetB); err != nil {
+				t.Fatal(err)
+			}
+			c.settle()
+			c.wantActive(presetB)
+			c.wantHeating(2100)
+			if got := readInt16(t, c.srv, tdef.AttrOccupiedCoolingSetpoint); got != 2500 {
+				t.Errorf("OccupiedCoolingSetpoint %d, want 2500", got)
+			}
+		})
+
 		t.Run("leaves the preset on a setpoint write after the activation committed", func(t *testing.T) {
 			// The activation is a client's; the setpoint write the
 			// application's, a change of its own.
@@ -1049,6 +1237,19 @@ func TestParityMatterJS_ThermostatSuggestionsTest(t *testing.T) { //nolint:funle
 			c.wantHeating(2050)
 			c.wantActive(presetB)
 			c.wantReason(nil)
+		})
+
+		t.Run("follows when the transaction that adds the entry moves the setpoint to keep a limit", func(t *testing.T) {
+			c := onlineSuggestions(t, func(cfg *thermo.ThermostatConfig) { cfg.InitialHeatingSetpoint = 2100 })
+			now := c.clk.epoch()
+			entry := thermo.Suggestion{UniqueId: 7, PresetHandle: presetB, EffectiveTime: now, ExpirationTime: now + 1800}
+			c.set(map[uint32]any{
+				tdef.AttrMaxHeatSetpointLimit:  int16(2050),
+				tdef.AttrThermostatSuggestions: spec.List[thermo.Suggestion]{entry},
+			})
+			c.wantReason(nil)
+			c.wantActive(presetB)
+			c.wantHeating(2050)
 		})
 
 		t.Run("follows the entry that becomes current after another one in the same transaction", func(t *testing.T) {
@@ -1332,4 +1533,110 @@ func (p *thermostatPair) writeAll(ctx context.Context, t *testing.T, reqs []inte
 	if err := statuses.Err(); err != nil {
 		t.Fatalf("write: %v", err)
 	}
+}
+
+// restartable is a server's stores and clock across restarts: matter.js's
+// MockStorageService environment (ThermostatSuggestionsTest.ts:1211-1215)
+// and MockTime. The log of every server it builds is kept.
+type restartable struct {
+	t      *testing.T
+	clk    *suggestClock
+	ms     *memstore.Store
+	log    syncBuffer
+	logger *slog.Logger
+}
+
+func newRestartable(t *testing.T) *restartable {
+	t.Helper()
+	r := &restartable{t: t, clk: newSuggestClock(), ms: memstore.New()}
+	r.logger = slog.New(slog.NewTextHandler(&r.log, nil))
+	return r
+}
+
+// stores wires the presets' and the suggestions' stores.
+func (r *restartable) stores(cfg *thermo.ThermostatConfig) {
+	cfg.PresetStore = store.NewThermostatPresetStore(r.ms, "thermostat")
+	cfg.SuggestionStore = store.NewThermostatSuggestionStore(r.ms, "thermostat")
+}
+
+// store wires the stores with list stored before the start.
+func (r *restartable) store(cfg *thermo.ThermostatConfig, list ...thermo.Suggestion) {
+	r.t.Helper()
+	r.stores(cfg)
+	enc := tlv.NewEncoder()
+	spec.List[thermo.Suggestion](list).EncodeTLV(enc, tlv.AnonymousTag())
+	b, err := enc.Bytes()
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	if err := cfg.SuggestionStore.SaveSuggestions(context.Background(), b, nil); err != nil {
+		r.t.Fatal(err)
+	}
+}
+
+// stored is storedSuggestion (ThermostatSuggestionsTest.ts:129-133): an
+// entry current for the next 30 minutes.
+func (r *restartable) stored(id uint8, handle []byte) thermo.Suggestion {
+	now := r.clk.epoch()
+	return thermo.Suggestion{UniqueId: id, PresetHandle: handle, EffectiveTime: now, ExpirationTime: now + 1800}
+}
+
+// at is nowS() + d seconds.
+func (r *restartable) at(d int64) *uint32 {
+	v := uint32(int64(r.clk.epoch()) + d) //nolint:gosec // a Matter epoch second
+	return &v
+}
+
+// online starts a server on the shared clock and log, attaches the Matter
+// time as a node does and settles its start.
+func (r *restartable) online(edit ...func(*thermo.ThermostatConfig)) *suggestCase {
+	r.t.Helper()
+	cfg := suggestionsConfig(r.clk, edit...)
+	cfg.Logger = r.logger
+	c := &suggestCase{t: r.t, clk: r.clk, srv: newTSUGGEST(r.t, cfg)}
+	c.settle()
+	return c
+}
+
+// wantOverride checks the stored override (matter.js's
+// overriddenSuggestionId, :3183): nil for none.
+func (r *restartable) wantOverride(want *uint8) {
+	r.t.Helper()
+	_, got, _, err := store.NewThermostatSuggestionStore(r.ms, "thermostat").LoadSuggestions(context.Background())
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	if (got == nil) != (want == nil) || (got != nil && *got != *want) {
+		r.t.Errorf("stored override %v, want %v", overrideText(got), overrideText(want))
+	}
+}
+
+func overrideText(p *uint8) any {
+	if p == nil {
+		return "none"
+	}
+	return *p
+}
+
+// logged counts the log lines that contain s.
+func (r *restartable) logged(s string) int {
+	return strings.Count(r.log.String(), s)
+}
+
+// syncBuffer is a bytes.Buffer the servers' timer goroutines log into.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }

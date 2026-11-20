@@ -6,6 +6,7 @@ package bridge
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -95,8 +96,11 @@ func handReader(path im.ConcreteCommandPath) (*spec.Cluster, handRead) {
 // validates every request against before the server runs, with the
 // server's relaxations the definition carries
 // (packages/protocol/src/action/server/CommandInvokeResponse.ts:474-487 at
-// db021da0; [spec.Command.DecodeRequest]) — and hands the same fields to
-// the hand-written reader. A command the reader does not decode goes on to
+// b25ed960; [spec.Command.DecodeRequest]) — and hands the same fields to
+// the hand-written reader. A command with fields the reader decodes is
+// handed on as a [spec.HandForm]: the generated form the definition
+// decoded, which the endpoint dispatcher's model gate judges, beside the
+// reader's, which the server takes. A command the reader does not decode goes on to
 // the definition's decoder, else is salvaged as a tag map, as before. The
 // fields container is consumed, so every refusal says so
 // ([im.FieldsContainerConsumed]).
@@ -114,7 +118,8 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 		return nil, &spec.FieldError{Status: im.StatusInvalidCommand, Msg: fmt.Sprintf("%s.%s: no request decoder to hold the request to", def.Name, cmd.Name)}
 	}
 	if cmd != nil {
-		if _, err := cmd.DecodeRequest(n); err != nil {
+		generated, err := cmd.DecodeRequest(n)
+		if err != nil {
 			return nil, err
 		}
 		// The hand reader reads the checked request: the top-level fields
@@ -134,7 +139,14 @@ func heldByDefinition(def *spec.Cluster, path im.ConcreteCommandPath, dec *tlv.D
 		}
 		fields, ok, err := read(path, sub)
 		if ok {
-			return fields, consumed(err)
+			if err != nil || len(cmd.Fields) == 0 || reflect.TypeOf(fields) == reflect.TypeOf(generated) {
+				return fields, consumed(err)
+			}
+			// The model gate judges the generated form the definition
+			// decoded from these bytes; the server takes its own
+			// (spec.HandForm, decision 339 — no mapping between the two
+			// Go types is consulted).
+			return spec.HandForm{Generated: generated, Hand: fields}, nil
 		}
 		if err != nil {
 			return nil, consumed(err)

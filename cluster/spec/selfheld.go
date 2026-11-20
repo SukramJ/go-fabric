@@ -61,33 +61,24 @@ func (h *HostHandlers) Register(inst *Instance, cmdID uint32, fn CommandHandler)
 }
 
 // Invoke runs the host's handler of cmdID; handled is false when the host
-// registered none, and the server's own logic runs. A response the
-// handler returns is held to the definition as [Server.MatterInvoke]
-// holds a handler's: one that breaks its fields' conformance answers
-// FAILURE. A name the response's conformance takes from the cluster's
-// attributes is not resolved here (the handlers hold no read of the
-// server's state).
+// registered none, and the server's own logic runs. The request's and the
+// response's model checks are the endpoint dispatcher's ([AdmitRequest],
+// [CheckResponse]), run around the server; a direct call is a local one
+// and is not validated.
 func (h *HostHandlers) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
-	return h.invoke(ctx, cmdID, fields, nil)
+	return h.invoke(ctx, cmdID, fields)
 }
 
-// invoke is [HostHandlers.Invoke] with the server's attributes resolving
-// the response's conformance names.
-func (h *HostHandlers) invoke(ctx context.Context, cmdID uint32, fields any, peers Peers) (resp any, handled bool, err error) {
+// invoke is [HostHandlers.Invoke].
+func (h *HostHandlers) invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
 	h.mu.Lock()
-	fn, inst := h.m[cmdID], h.inst
+	fn := h.m[cmdID]
 	h.mu.Unlock()
 	if fn == nil {
 		return nil, false, nil
 	}
 	resp, err = fn(ctx, fields)
-	if err != nil || inst == nil {
-		return resp, true, err
-	}
-	if err := inst.checkResponse(cmdID, fields, resp, peers); err != nil {
-		return nil, true, err
-	}
-	return resp, true, nil
+	return resp, true, err
 }
 
 // Events is a self-held server's event path: the emitter the endpoint
@@ -240,43 +231,18 @@ func (h *SelfHeld) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	h.srv.SetMatterEventEmitter(emitter)
 }
 
-// InvokeHeld is a self-held server's MatterInvoke: the request is held to
-// the definition first, as [Server.MatterInvoke] holds it, then the
-// host's handler of cmdID runs when one is registered ([SelfHeld.Handle]),
-// the store's — the server's own logic — otherwise. It is a function
-// rather than a method so that embedding [SelfHeld] promotes no second
-// invoke onto the server.
-//
-// The context the server's own logic runs with marks the request as
-// admitted, so a [Hooks.Invoke] the logic runs for the same instance and
-// command — a server keeping the deprecated Hooks field for its window
-// (decision 177) — does not hold it a second time.
+// InvokeHeld is a self-held server's MatterInvoke: the host's handler of
+// cmdID runs when one is registered ([SelfHeld.Handle]), the store's — the
+// server's own logic — otherwise. The request's model check is the
+// endpoint dispatcher's ([AdmitRequest]), run before the server; a direct
+// call is a local one and is not validated. It is a function rather than
+// a method so that embedding [SelfHeld] promotes no second invoke onto the
+// server.
 func InvokeHeld(ctx context.Context, h *SelfHeld, cmdID uint32, fields any) (any, error) {
-	if err := h.srv.admitRequest(ctx, cmdID, fields, h.srv.peers); err != nil {
-		return nil, err
-	}
-	if resp, handled, err := h.host.invoke(ctx, cmdID, fields, h.srv.peers); handled {
+	if resp, handled, err := h.host.invoke(ctx, cmdID, fields); handled {
 		return resp, err
 	}
-	return h.srv.dispatch(context.WithValue(ctx, admittedKey{}, admitted{h.srv.Instance, cmdID}), cmdID, fields)
-}
-
-// admittedKey is the context key under which [InvokeHeld] marks the
-// request it admitted for the server's own logic.
-type admittedKey struct{}
-
-// admitted names the request [InvokeHeld] admitted: the command of an
-// instance.
-type admitted struct {
-	inst  *Instance
-	cmdID uint32
-}
-
-// admittedBy reports whether ctx carries [InvokeHeld]'s mark that the
-// request of cmdID was admitted against inst.
-func admittedBy(ctx context.Context, inst *Instance, cmdID uint32) bool {
-	a, ok := ctx.Value(admittedKey{}).(admitted)
-	return ok && a.inst == inst && a.cmdID == cmdID
+	return h.srv.dispatch(ctx, cmdID, fields)
 }
 
 // RequestOf returns a decoded request payload as the generated request

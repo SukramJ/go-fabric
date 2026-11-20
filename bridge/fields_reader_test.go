@@ -425,6 +425,7 @@ func TestCommandFieldsReader_ArmFailSafe(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x0030, 0x00), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader ArmFailSafe: %v", err)
 	}
@@ -448,6 +449,7 @@ func TestCommandFieldsReader_RemoveFabric(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003E, 0x0A), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader RemoveFabric: %v", err)
 	}
@@ -471,6 +473,7 @@ func TestCommandFieldsReader_UpdateFabricLabel(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003E, 0x09), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader UpdateFabricLabel: %v", err)
 	}
@@ -493,6 +496,7 @@ func TestCommandFieldsReader_CommissioningComplete(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x0030, 0x04), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader CommissioningComplete: %v", err)
 	}
@@ -537,6 +541,7 @@ func TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime(t *testing
 			opener, _ := dec.Next()
 
 			v, err := commandFieldsReader(cmdPath(0x0008, tc.command), dec, opener)
+			_, v = spec.SplitHandForm(v) // the server's form
 			if err != nil {
 				t.Fatalf("commandFieldsReader %s: %v", tc.name, err)
 			}
@@ -578,6 +583,7 @@ func TestCommandFieldsReader_UnknownCommand_GenericTagMap(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x9999, 0x00), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader unknown: %v", err)
 	}
@@ -605,6 +611,7 @@ func TestCommandFieldsReader_AddNOC(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003E, 0x06), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader AddNOC: %v", err)
 	}
@@ -628,6 +635,7 @@ func TestCommandFieldsReader_UpdateNOC(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003E, 0x07), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader UpdateNOC: %v", err)
 	}
@@ -647,6 +655,7 @@ func TestCommandFieldsReader_AddTrustedRootCertificate(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003E, 0x0B), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader AddTrustedRootCertificate: %v", err)
 	}
@@ -667,6 +676,7 @@ func TestCommandFieldsReader_CSR(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003E, 0x04), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader CSR: %v", err)
 	}
@@ -686,6 +696,7 @@ func TestCommandFieldsReader_Attestation(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003E, 0x00), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader Attestation: %v", err)
 	}
@@ -705,6 +716,7 @@ func TestCommandFieldsReader_CertificateChain(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003E, 0x02), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader CertificateChain: %v", err)
 	}
@@ -726,6 +738,7 @@ func TestCommandFieldsReader_SetRegulatoryConfig(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x0030, 0x02), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader SetRegulatoryConfig: %v", err)
 	}
@@ -1313,6 +1326,7 @@ func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
 	opener, _ := dec.Next()
 
 	v, err := commandFieldsReader(cmdPath(0x003C, 0x00), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("commandFieldsReader OpenCommissioningWindow: %v", err)
 	}
@@ -1340,6 +1354,7 @@ func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
 	dec = tlv.NewDecoder(raw)
 	opener, _ = dec.Next()
 	v, err = commandFieldsReader(cmdPath(0x003C, 0x00), dec, opener)
+	_, v = spec.SplitHandForm(v) // the server's form
 	if err != nil {
 		t.Fatalf("a 13-bit discriminator: %v, want it decoded for the handler", err)
 	}
@@ -1370,6 +1385,7 @@ func TestCommandFieldsReader_LevelControlStepAbsentTransitionTime(t *testing.T) 
 		opener, _ := dec.Next()
 
 		v, err := commandFieldsReader(cmdPath(0x0008, command), dec, opener)
+		_, v = spec.SplitHandForm(v) // the server's form
 		if err != nil {
 			t.Fatalf("command 0x%02X: %v", command, err)
 		}

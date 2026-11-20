@@ -432,8 +432,8 @@ func (s *ControlServer) MatterInvoke(
 // [spec.InvokeHeld] runs when the host registered no handler with
 // [ControlServer.Handle]; the commands run one at a time (op). A handler
 // registered on the deprecated [ControlServer.Hooks] field answers first,
-// outside op as before decision 154 (decision 177); the request
-// InvokeHeld admitted is not held a second time there.
+// outside op as before decision 154 (decision 177); the request's
+// model check is the endpoint dispatcher's ([spec.AdmitRequest]).
 func (s *ControlServer) invoke(ctx context.Context, cmdID uint32, fields any) (response any, err error) {
 	if resp, handled, err := s.Hooks.Invoke(ctx, cmdID, fields); handled { //nolint:staticcheck // the deprecated field's handler, honoured for its window
 		return resp, err

@@ -21,8 +21,9 @@ func (h heldSource) MatterAttribute(attrID uint32) (any, bool) { return h(attrID
 // decision 154): its instance is the server's, its reads are read's, and
 // every request command of the definition is handed to invoke — the
 // server's own logic, which runs when the host registered no handler. The
-// request is admitted, and the response checked, with the server's
-// attributes resolving the names their conformance takes.
+// response is checked with the server's attributes resolving the names
+// their conformance takes; the request's model check is the endpoint
+// dispatcher's ([spec.AdmitRequest], decision 339).
 func newHeld(def *spec.Cluster, opts spec.Options, read func(uint32) (any, bool), invoke func(ctx context.Context, cmdID uint32, fields any) (any, error)) (*spec.Server, error) {
 	// Every command id of the definition: a response id is never
 	// dispatched (the instance accepts requests only), and one that shares

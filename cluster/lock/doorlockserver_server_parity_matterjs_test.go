@@ -12,7 +12,6 @@
 package lock_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/lock"
@@ -274,20 +273,20 @@ func TestDoorLockServerParity(t *testing.T) {
 	t.Run("refuses to store a user type Matter does not define", func(t *testing.T) {
 		f := createLock(t, nil)
 		// matter.js calls the local agent, whose request skips the command's
-		// constraint and the state's enum validation refuses the user (:800).
-		// The Go server's request gate validates the field before any
-		// handler (spec.Instance.CheckRequest, the command's stated refusal),
-		// so the port asks over the wire and the local call alike:
-		// INVALID_COMMAND naming the value.
+		// constraint, and refuses the user type 99
+		// (packages/node/test/behaviors/door-lock/DoorLockServerTest.ts:823-845
+		// at b25ed960, its comment :829, the message :843).
+		// The Go request gate holds a wire command only (decision 339,
+		// endpoint.TopologyDispatcher, as matter.js
+		// ProtocolService.ts:347-350 at b25ed960), so the port asks over the
+		// wire: INVALID_COMMAND, the command's stated refusal. A local
+		// MatterInvoke is not validated, and the server keeps no state
+		// validation of its own (F-b25ed960-36).
 		req := addPin(1, "1234", noUser)
 		req.UserType = spec.ValueOf(lockdef.UserTypeEnum(99))
 		se := f.refused(lockdef.CmdSetCredential, req)
 		if se.Status != im.StatusInvalidCommand {
 			t.Errorf("over the wire 0x%02X, want INVALID_COMMAND", se.Status)
-		}
-		_, err := f.srv.MatterInvoke(withPairFabric(), lockdef.CmdSetCredential, req)
-		if err == nil || !strings.Contains(err.Error(), "does not define the enum value 99") {
-			t.Errorf("local call %v, want the enum refusal", err)
 		}
 	})
 }

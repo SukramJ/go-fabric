@@ -364,6 +364,22 @@ func TestLiveSustainedSurvivesRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitOnOff(t, lv, reports, false)
+	// The restarted node resumes CASE, and the controller's responder
+	// establishes the resumed session — handing it to the peer — once it
+	// read the initiator's Success on the handshake's exchange
+	// (client/handshake/server.go resume: nextMessage, completeEstablishmentOf,
+	// handOver; CaseServer.ts:204-206, SessionManager.ts:1274-1280,
+	// PeerSet.ts:104-110 at b25ed960). The report travels on the new session,
+	// which is routed while it establishes (NodeSession.ts:223-225), and the
+	// controller serves the unsecured session and each secure session on
+	// their own ordered queues (transport/message SessionOrderKey,
+	// controller.New's ServeOrdered): nothing orders the report after the
+	// hand-over, so the report can be seen first. The session joins the
+	// peer right after; the test waits for it rather than read it once.
+	lv.wait(t, "the node's inbound session in the peer", 10*time.Second, func() bool {
+		s := lv.peer.NewestSession()
+		return s != nil && s.Addr().String() == lv.pair.Device.Node().Bridge().LocalAddr()
+	})
 	s := lv.peer.NewestSession()
 	if s == nil || s.Addr().String() != lv.pair.Device.Node().Bridge().LocalAddr() {
 		t.Fatalf("the peer's newest session is not the node's inbound one: %v", s)

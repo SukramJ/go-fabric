@@ -102,9 +102,13 @@ func TestContextWiring(t *testing.T) {
 	if addr, ok := com.Interaction(p).Provider().PeerAddress(); !ok || addr != p.Address() {
 		t.Fatalf("Interaction peer address %+v", addr)
 	}
-	if _, ok := resumption.FindResumptionRecord(fabric.AddressOf(commissionedNode)); !ok {
-		t.Fatal("no resumption record of the inbound session")
-	}
+	// The responder hands its session over at the Success's first
+	// transmission and saves the record after (decision 335, as matter.js
+	// CaseServer.ts:331, :357 at b25ed960), so the record follows.
+	eventually(t, "a resumption record of the inbound session", func() bool {
+		_, ok := resumption.FindResumptionRecord(fabric.AddressOf(commissionedNode))
+		return ok
+	})
 	com.Close()
 	short, cancelShort := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancelShort()

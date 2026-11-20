@@ -83,7 +83,7 @@ import (
 // secure/sigma.Initiator.PeerNodeID, transport/tcp.Dialer.OnPanicRecovered.
 // Lowered 24 -> 23 (F-db021da0-13): bridge/chunk_timeout_test.go wires
 // bridge.OperationalSessionLookup.WithRetransmitIntervalResolver.
-const reachabilityUnreachedRatchet = 23
+const reachabilityUnreachedRatchet = 22
 
 // reachabilityWhitelistRatchet holds, per class, the exemptions that take an
 // exported identifier out of the measure by a decision rather than by what its
@@ -103,12 +103,14 @@ const reachabilityUnreachedRatchet = 23
 // ActivateSecureSession, installed at init and called by client/handshake.
 // By hand 59 since pin lift b25ed960 unit P1-A: the CASE responder's
 // CompleteSecureSessionEstablishment and SendNotifyingTransmission, the
-// same kind of seam.
+// same kind of seam. By hand 61 since pin lift b25ed960 unit P2-J:
+// internal/sessionseam's OpenEstablishing and CompleteEstablishment, installed
+// by secure/operational at init and called by node/security.go.
 // The mock-fake-stub class 21 since phase 7: clock/clocktest's
 // Fake.AdvanceToNext, test support that production code never calls.
 var reachabilityWhitelistRatchet = map[string]int{
 	whitelistClassGenerated:         1101,
-	whitelistClassHand:              59,
+	whitelistClassHand:              61,
 	string(autoWhitelistMockPrefix): 21,
 }
 

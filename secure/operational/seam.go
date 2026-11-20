@@ -20,13 +20,17 @@ import (
 // *Manager.
 var errSeamManager = errors.New("operational: sessionseam: not a *operational.Manager")
 
+// errSeamStake is the error of an install hook handed something other than
+// a Stake.
+var errSeamStake = errors.New("operational: sessionseam: not an operational.Stake")
+
 func init() {
 	sessionseam.OpenAt = func(mgr any, id uint16, initiator bool, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (any, error) {
 		m, ok := mgr.(*Manager)
 		if !ok || m == nil {
 			return nil, errSeamManager
 		}
-		e, err := m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, initiator)
+		e, err := m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, initiator, false)
 		if err != nil {
 			return nil, err
 		}
@@ -39,5 +43,28 @@ func init() {
 		}
 		e, ok := entry.(*Entry)
 		return ok && m.closeEntry(e)
+	}
+	sessionseam.OpenEstablishing = func(mgr, stake any, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (any, error) {
+		m, ok := mgr.(*Manager)
+		if !ok || m == nil {
+			return nil, errSeamManager
+		}
+		s, ok := stake.(Stake)
+		if !ok {
+			return nil, errSeamStake
+		}
+		e, err := m.openFromSigma(s.ID, &s, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false, true)
+		if err != nil {
+			return nil, err
+		}
+		return e, nil
+	}
+	sessionseam.CompleteEstablishment = func(mgr, entry any) bool {
+		m, ok := mgr.(*Manager)
+		if !ok || m == nil {
+			return false
+		}
+		e, ok := entry.(*Entry)
+		return ok && m.completeEstablishment(e)
 	}
 }
