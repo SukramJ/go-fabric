@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10181,
+  "entry_points": 10183,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27873,
-    "reachable": 20885,
-    "whitelisted": 6966,
+    "total_exported": 27875,
+    "reachable": 20886,
+    "whitelisted": 6967,
     "unreachable": 22
   },
   "by_package": [
@@ -34810,6 +34810,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 83
+    },
+    {
+      "package": "device",
+      "identifier": "TestZonesThroughTheFacadeContinueAfterThePortsLastID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_camera_test.go",
+      "line": 74
     },
     {
       "package": "diag",
