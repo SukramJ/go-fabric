@@ -105,7 +105,7 @@ func dropFirstMandatory(resp *spec.Command) im.CommandFieldsWriter {
 // cluster/core server's hand-written response as the InvokeResponse
 // carries it: complete, it passes; lacking a field its definition makes
 // mandatory, it is FAILURE (matter.js validates every response in
-// invokeCommand, packages/node/src/node/integration/ProtocolService.ts:717-733
+// completeResponse, packages/node/src/node/integration/ProtocolService.ts:717-733
 // at b25ed960). Without a writer — a host's own dispatcher — the hand
 // form is not judged, as before.
 func TestHandWrittenResponseIsJudgedAsTheBridgeWritesIt(t *testing.T) {

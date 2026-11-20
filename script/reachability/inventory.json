@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10138,
+  "entry_points": 10139,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27843,
-    "reachable": 20877,
-    "whitelisted": 6943,
+    "total_exported": 27846,
+    "reachable": 20879,
+    "whitelisted": 6944,
     "unreachable": 23
   },
   "by_package": [
@@ -393,7 +393,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3274,
+      "line": 3278,
       "kind": "method"
     },
     {
@@ -4576,6 +4576,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/hand_read_fail_closed_test.go",
       "line": 22
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHandWrittenResponseIsJudgedAsTheBridgeWritesIt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/response_writer_hook_test.go",
+      "line": 111
     },
     {
       "package": "bridge",
