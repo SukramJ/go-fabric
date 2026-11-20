@@ -44,8 +44,8 @@ func TestTimeFormatLocalizationServerParityMatterJS(t *testing.T) {
 	} {
 		t.Helper()
 		srv, err := core.NewTimeFormatLocalization(core.TimeFormatLocalizationConfig{
-			HourFormat:         tfldef.HourFormatV24Hr,
-			ActiveCalendarType: tfldef.CalendarTypeCoptic,
+			HourFormat:         new(tfldef.HourFormatV24Hr),
+			ActiveCalendarType: new(tfldef.CalendarTypeCoptic),
 			SupportedCalendarTypes: []tfldef.CalendarTypeEnum{
 				tfldef.CalendarTypeBuddhist, tfldef.CalendarTypeChinese, tfldef.CalendarTypeCoptic,
 			},
@@ -55,6 +55,29 @@ func TestTimeFormatLocalizationServerParityMatterJS(t *testing.T) {
 		}
 		return srv
 	}
+
+	// :74-78. DetectingServer.with() is the server without CalendarFormat
+	// over the detected 24Hr; the Go form is NoFeatures with the host's
+	// detected HourFormat. matter.js asserts the hour format; the Go case
+	// adds the FeatureMap and the calendar attributes the server leaves out.
+	t.Run("starts without the CalendarFormat feature", func(t *testing.T) {
+		t.Parallel()
+		srv, err := core.NewTimeFormatLocalization(core.TimeFormatLocalizationConfig{HourFormat: new(tfldef.HourFormatV24Hr), NoFeatures: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v, _ := srv.MatterRead(tfldef.AttrHourFormat); v != uint8(tfldef.HourFormatV24Hr) {
+			t.Errorf("HourFormat %v, want 24Hr", v)
+		}
+		if v, _ := srv.MatterRead(0xFFFC); v != uint32(0) {
+			t.Errorf("FeatureMap %v (%T), want 0", v, v)
+		}
+		for _, attr := range []uint32{tfldef.AttrActiveCalendarType, tfldef.AttrSupportedCalendarTypes} {
+			if v, ok := srv.MatterRead(attr); ok {
+				t.Errorf("attribute 0x%04X served without CalendarFormat: %v", attr, v)
+			}
+		}
+	})
 
 	// :80-85.
 	t.Run("accepts valid date formats", func(t *testing.T) {
@@ -86,14 +109,14 @@ func TestTimeFormatLocalizationServerParityMatterJS(t *testing.T) {
 // TestTimeFormatLocalizationServerStartParityMatterJS ports the start-up,
 // write and restart cases of the describe "TimeFormatLocalizationServer"
 // (TimeFormatLocalizationServerTest.ts:99-316 at b25ed960) where they have
-// a Go subject. Left: the replacement of a configured or stored calendar
-// the list lacks (:117-123, :146-158, :241-260, :262-279) and the warning
-// that goes with it (:160-168) — ActiveCalendarType is always configured
-// here, and one the list lacks is refused
-// (BD-Matter-Localization-ConfiguredStartValueRefused); the count of
-// detections (:125-137) and the type-level override (:281-293),
-// TypeScript mechanisms; the server without CalendarFormat (:74-78), which
-// the Go constructor does not build.
+// a Go subject. An unset ActiveCalendarType (nil) starts at the list's
+// first (decision 358), which is matter.js's start where its detected
+// calendar is not listed (:117-123, :160-168). Left: the replacement of a
+// configured calendar the list lacks (:146-158) — one the list lacks is
+// refused (BD-Matter-Localization-ConfiguredStartValueRefused); the
+// stored-calendar cases (:241-260 on node, :262-279 without a node
+// subject); the count of detections (:125-137) and the type-level
+// override (:281-293), TypeScript mechanisms.
 func TestTimeFormatLocalizationServerStartParityMatterJS(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -107,7 +130,7 @@ func TestTimeFormatLocalizationServerStartParityMatterJS(t *testing.T) {
 	}
 	// detecting is DetectingServer's start: 24Hr, Gregorian.
 	detecting := func(supported ...tfldef.CalendarTypeEnum) core.TimeFormatLocalizationConfig {
-		return core.TimeFormatLocalizationConfig{HourFormat: tfldef.HourFormatV24Hr, ActiveCalendarType: tfldef.CalendarTypeGregorian, SupportedCalendarTypes: supported}
+		return core.TimeFormatLocalizationConfig{HourFormat: new(tfldef.HourFormatV24Hr), ActiveCalendarType: new(tfldef.CalendarTypeGregorian), SupportedCalendarTypes: supported}
 	}
 	read := func(t *testing.T, srv *spec.Server, attr uint32) uint8 {
 		t.Helper()
@@ -150,11 +173,37 @@ func TestTimeFormatLocalizationServerStartParityMatterJS(t *testing.T) {
 		checkSupported(t, srv, tfldef.CalendarTypeGregorian)
 	})
 
+	// :117-123. matter.js's detected Gregorian is not in the list, so it
+	// takes the list's first; the Go server, with no detected value,
+	// takes the first of the list for an unset ActiveCalendarType.
+	t.Run("starts with a supported calendar when the detected calendar is not in the configured list", func(t *testing.T) {
+		t.Parallel()
+		cfg := detecting(tfldef.CalendarTypeBuddhist, tfldef.CalendarTypeChinese)
+		cfg.ActiveCalendarType = nil
+		srv := build(t, cfg)
+		if got := read(t, srv, tfldef.AttrActiveCalendarType); got != uint8(tfldef.CalendarTypeBuddhist) {
+			t.Errorf("ActiveCalendarType %d, want Buddhist", got)
+		}
+		checkSupported(t, srv, tfldef.CalendarTypeBuddhist, tfldef.CalendarTypeChinese)
+	})
+
+	// :160-168. matter.js asserts no reset warning; the Go constructor
+	// takes no logger and warns about nothing, so the case is the start
+	// itself: an unset calendar is no error and no replacement.
+	t.Run("logs nothing about a reset on a first start without an ActiveCalendarType", func(t *testing.T) {
+		t.Parallel()
+		cfg := detecting(tfldef.CalendarTypeBuddhist, tfldef.CalendarTypeChinese)
+		cfg.ActiveCalendarType = nil
+		if _, err := core.NewTimeFormatLocalization(cfg); err != nil {
+			t.Fatalf("start without an ActiveCalendarType: %v", err)
+		}
+	})
+
 	// :139-144.
 	t.Run("builds SupportedCalendarTypes from a configured ActiveCalendarType", func(t *testing.T) {
 		t.Parallel()
 		cfg := detecting()
-		cfg.ActiveCalendarType = tfldef.CalendarTypeBuddhist
+		cfg.ActiveCalendarType = new(tfldef.CalendarTypeBuddhist)
 		srv := build(t, cfg)
 		if got := read(t, srv, tfldef.AttrActiveCalendarType); got != uint8(tfldef.CalendarTypeBuddhist) {
 			t.Errorf("ActiveCalendarType %d, want Buddhist", got)
@@ -224,9 +273,9 @@ func TestTimeFormatLocalizationServerStartParityMatterJS(t *testing.T) {
 		cfg.OnWrite = func(_ context.Context, attr uint32, v uint8) error {
 			switch attr {
 			case tfldef.AttrHourFormat:
-				stored.HourFormat = tfldef.HourFormatEnum(v)
+				stored.HourFormat = new(tfldef.HourFormatEnum(v))
 			case tfldef.AttrActiveCalendarType:
-				stored.ActiveCalendarType = tfldef.CalendarTypeEnum(v)
+				stored.ActiveCalendarType = new(tfldef.CalendarTypeEnum(v))
 			}
 			return nil
 		}
@@ -251,7 +300,7 @@ func TestTimeFormatLocalizationServerStartParityMatterJS(t *testing.T) {
 	t.Run("uses the overridden detected formats of a derived type", func(t *testing.T) {
 		t.Parallel()
 		srv := build(t, core.TimeFormatLocalizationConfig{
-			HourFormat: tfldef.HourFormatV12Hr, ActiveCalendarType: tfldef.CalendarTypeBuddhist,
+			HourFormat: new(tfldef.HourFormatV12Hr), ActiveCalendarType: new(tfldef.CalendarTypeBuddhist),
 			SupportedCalendarTypes: []tfldef.CalendarTypeEnum{tfldef.CalendarTypeBuddhist},
 		})
 		if got := read(t, srv, tfldef.AttrHourFormat); got != uint8(tfldef.HourFormatV12Hr) {
@@ -276,13 +325,51 @@ func TestTimeFormatLocalizationServerStartParityMatterJS(t *testing.T) {
 		checkSupported(t, srv, tfldef.CalendarTypeGregorian)
 	})
 
+	// Go's own (decision 358, BD-Matter-Localization-ConfiguredStartValueRefused):
+	// matter.js takes its detected hour format for an unset one
+	// (TimeFormatLocalizationServer.ts:18-20 at b25ed960) and its detected
+	// calendar for an unset one with an empty list (:24-28); detection is
+	// the host's, so both are refused.
+	t.Run("refuses an unset HourFormat", func(t *testing.T) {
+		t.Parallel()
+		cfg := detecting()
+		cfg.HourFormat = nil
+		if _, err := core.NewTimeFormatLocalization(cfg); !errors.Is(err, core.ErrLocalizationConfig) {
+			t.Fatalf("nil HourFormat: %v, want ErrLocalizationConfig", err)
+		}
+	})
+	t.Run("refuses neither an ActiveCalendarType nor SupportedCalendarTypes", func(t *testing.T) {
+		t.Parallel()
+		cfg := detecting()
+		cfg.ActiveCalendarType = nil
+		if _, err := core.NewTimeFormatLocalization(cfg); !errors.Is(err, core.ErrLocalizationConfig) {
+			t.Fatalf("no calendar: %v, want ErrLocalizationConfig", err)
+		}
+	})
+
+	// Go's own (decision 359): without the feature matter.js does not look
+	// at calendar state (:21-23); a calendar configured beside NoFeatures is
+	// refused, and HourFormat stays required.
+	t.Run("refuses a calendar configured beside NoFeatures", func(t *testing.T) {
+		t.Parallel()
+		for name, cfg := range map[string]core.TimeFormatLocalizationConfig{
+			"ActiveCalendarType":     {HourFormat: new(tfldef.HourFormatV24Hr), ActiveCalendarType: new(tfldef.CalendarTypeGregorian), NoFeatures: true},
+			"SupportedCalendarTypes": {HourFormat: new(tfldef.HourFormatV24Hr), SupportedCalendarTypes: []tfldef.CalendarTypeEnum{tfldef.CalendarTypeGregorian}, NoFeatures: true},
+			"no HourFormat":          {NoFeatures: true},
+		} {
+			if _, err := core.NewTimeFormatLocalization(cfg); !errors.Is(err, core.ErrLocalizationConfig) {
+				t.Errorf("%s: %v, want ErrLocalizationConfig", name, err)
+			}
+		}
+	})
+
 	// Go's own (BD-Matter-Localization-ConfiguredStartValueRefused): a
 	// configured calendar the configured list lacks is refused, where
 	// matter.js replaces it (:146-158).
 	t.Run("refuses a configured ActiveCalendarType that is not in the configured list", func(t *testing.T) {
 		t.Parallel()
 		cfg := detecting(tfldef.CalendarTypeBuddhist, tfldef.CalendarTypeGregorian)
-		cfg.ActiveCalendarType = tfldef.CalendarTypeHebrew
+		cfg.ActiveCalendarType = new(tfldef.CalendarTypeHebrew)
 		if _, err := core.NewTimeFormatLocalization(cfg); !errors.Is(err, core.ErrLocalizationConfig) {
 			t.Fatalf("Hebrew of [Buddhist Gregorian]: %v, want ErrLocalizationConfig", err)
 		}

@@ -90,7 +90,7 @@ func TestParityMatterJS_TimeFormatLocalization(t *testing.T) {
 	}
 	var written []write
 	srv, err := NewTimeFormatLocalization(TimeFormatLocalizationConfig{
-		HourFormat: tfldef.HourFormatV24Hr, ActiveCalendarType: tfldef.CalendarTypeGregorian,
+		HourFormat: new(tfldef.HourFormatV24Hr), ActiveCalendarType: new(tfldef.CalendarTypeGregorian),
 		OnWrite: func(_ context.Context, a uint32, v uint8) error { written = append(written, write{a, v}); return nil },
 	})
 	if err != nil {
@@ -128,11 +128,11 @@ func TestParityMatterJS_TimeFormatLocalization(t *testing.T) {
 		t.Errorf("persisted %v, want %v", written, want)
 	}
 	if _, err := NewTimeFormatLocalization(TimeFormatLocalizationConfig{
-		ActiveCalendarType: tfldef.CalendarTypeBuddhist, SupportedCalendarTypes: []tfldef.CalendarTypeEnum{tfldef.CalendarTypeGregorian},
+		HourFormat: new(tfldef.HourFormatV24Hr), ActiveCalendarType: new(tfldef.CalendarTypeBuddhist), SupportedCalendarTypes: []tfldef.CalendarTypeEnum{tfldef.CalendarTypeGregorian},
 	}); !errors.Is(err, ErrLocalizationConfig) {
 		t.Errorf("active not supported: %v", err)
 	}
-	refusing, _ := NewTimeFormatLocalization(TimeFormatLocalizationConfig{OnWrite: func(context.Context, uint32, uint8) error { return errors.New("no") }})
+	refusing, _ := NewTimeFormatLocalization(TimeFormatLocalizationConfig{HourFormat: new(tfldef.HourFormatV12Hr), ActiveCalendarType: new(tfldef.CalendarTypeGregorian), OnWrite: func(context.Context, uint32, uint8) error { return errors.New("no") }})
 	if err := refusing.MatterWrite(ctx, tfldef.AttrHourFormat, uint64(1)); err == nil {
 		t.Error("host refusal not answered")
 	}
