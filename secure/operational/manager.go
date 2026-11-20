@@ -314,17 +314,14 @@ func (m *Manager) SetOnSessionSuperseded(fn func(olderID, newerID uint16)) {
 }
 
 // supersededByLocked returns the established sessions newer supersedes,
-// oldest first. Caller MUST hold m.mu and MUST call it only once newer is
-// installed and established. Mirrors matter.js
+// oldest first. Caller MUST hold m.mu for writing and MUST call it only once newer, a
+// CASE session, is installed and established. Mirrors matter.js
 // packages/protocol/src/session/SessionManager.ts:757-763 at b25ed960
 // (the loop over the established sessions) and :1242-1250 (supersedes).
 // Unlike matter.js the PASE check covers older too: this table does not
 // guarantee a PASE session's unspecified peer node id, which matter.js
 // relies on for older (:1239-1241).
 func (m *Manager) supersededByLocked(newer *Entry) []*Entry {
-	if newer.isPase || newer.establishing || newer.Session == nil {
-		return nil
-	}
 	fabricIndex, peerNodeID := newer.FabricIndex(), newer.Session.PeerNodeID()
 	cats := newer.Session.PeerCATs()
 	bucket := m.livePeerBucketLocked(peerNodeID)
@@ -351,9 +348,6 @@ func (m *Manager) supersededByLocked(newer *Entry) []*Entry {
 // indexPeerLocked adds e, a CASE session just installed, to the peer
 // index. Caller holds m.mu.
 func (m *Manager) indexPeerLocked(e *Entry) {
-	if e.Session == nil {
-		return
-	}
 	if m.byPeer == nil {
 		m.byPeer = map[uint64][]*Entry{}
 	}
