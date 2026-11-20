@@ -116,22 +116,28 @@ func TestInteractionClientMessengerSubscribe(t *testing.T) {
 		s := newScripted(t)
 		reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
 		c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg})
+		// One DataVersionFilter, which fits (InteractionClientMessengerTest.ts:230
+		// at b25ed960).
+		filter := im.DataVersionFilter{Endpoint: 1, Cluster: 0, DataVersion: 1}
 		done := subscribeAsync(c, interaction.SubscribeRequest{
-			Attributes:       []im.ConcreteAttributePath{{}},
-			MinIntervalFloor: interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(time.Second),
+			Attributes:         []im.ConcreteAttributePath{{}},
+			DataVersionFilters: []im.DataVersionFilter{filter},
+			MinIntervalFloor:   interaction.Interval(0), MaxIntervalCeiling: interaction.Interval(time.Second),
 		})
 		req := s.next(t)
 		if req.proto.Opcode != im.OpcodeSubscribeRequest || len(req.payload) >= exchange.MaxPayloadSize {
 			t.Fatalf("opcode 0x%02X, %d bytes", req.proto.Opcode, len(req.payload))
 		}
 		// KeepSubscriptions (0), the floor (1), the ceiling (2),
-		// AttributeRequests (3), IsFabricFiltered (7), the revision.
-		if tags := icmTopTags(t, req.payload); !slices.Equal(tags, []uint32{0, 1, 2, 3, 7, 0xFF}) {
+		// AttributeRequests (3), IsFabricFiltered (7), DataVersionFilters
+		// (8), the revision.
+		if tags := icmTopTags(t, req.payload); !slices.Equal(tags, []uint32{0, 1, 2, 3, 7, 8, 0xFF}) {
 			t.Fatalf("SubscribeRequest fields %v", tags)
 		}
 		sr, err := im.UnmarshalSubscribeRequestTLV(tlv.NewDecoder(req.payload))
 		if err != nil || !sr.KeepSubscriptions || sr.MinIntervalFloor != 0 || sr.MaxIntervalCeiling != 1 || !sr.FabricFiltered ||
-			len(sr.AttributeRequests) != 1 || sr.AttributeRequests[0] != (im.ConcreteAttributePath{}) {
+			len(sr.AttributeRequests) != 1 || sr.AttributeRequests[0] != (im.ConcreteAttributePath{}) ||
+			len(sr.DataVersionFilters) != 1 || sr.DataVersionFilters[0] != filter {
 			t.Fatalf("SubscribeRequest %+v (%v)", sr, err)
 		}
 		priming := encode(t, func(e *tlv.Encoder) {
@@ -150,7 +156,34 @@ func TestInteractionClientMessengerSubscribe(t *testing.T) {
 		if res.sub.ID() != 1 || res.sub.MaxInterval() != 10*time.Second {
 			t.Fatalf("subscription %d, %v", res.sub.ID(), res.sub.MaxInterval())
 		}
-		res.sub.Close()
+		// allDataVersionFiltersSent (:233-234): every filter was sent, so the
+		// wildcard subscription primes compactly — an unacknowledged final
+		// report status closes it (ClientInteraction.ts:82-99).
+		interaction.ReportStatusUnacknowledged(res.sub, false)
+		select {
+		case <-res.sub.Done():
+		default:
+			t.Fatal("all DataVersionFilters sent, but the subscription was not counted as priming compactly")
+		}
+	})
+	t.Run("subscribes attributes with too many dataVersionFilters", func(t *testing.T) {
+		t.Parallel()
+		// The shortening itself is im's
+		// TestMessengerParity_SubscribeRequestWithManyDataVersionFilters;
+		// this case holds allDataVersionFiltersSent false (:282-283 at
+		// b25ed960) through the compact-priming estimate.
+		s := newScripted(t)
+		reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+		c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg})
+		filters := manyFilters(200)
+		sub := subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, DataVersionFilters: filters}, 1)
+		interaction.ReportStatusUnacknowledged(sub, false)
+		select {
+		case <-sub.Done():
+			t.Fatal("DataVersionFilters dropped, but the subscription was counted as priming compactly")
+		default:
+		}
+		sub.Close()
 	})
 }
 

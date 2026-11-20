@@ -254,6 +254,47 @@ type messenger struct {
 	// subscription it named.
 	reportAwaitsStatus   bool
 	reportSubscriptionID uint32
+	// unacknowledgedReportStatus is #unacknowledgedReportStatus
+	// (InteractionMessenger.ts:989 at b25ed960): which of our Success
+	// statuses to a data report the peer never acknowledged, "" when it
+	// acknowledged all of them.
+	unacknowledgedReportStatus unacknowledgedReportStatus
+}
+
+// unacknowledgedReportStatus is matter.js UnacknowledgedReportStatus
+// (InteractionMessenger.ts:981-985 at b25ed960): our Success status to a
+// report chunk that more chunks follow, or the one to the final chunk.
+type unacknowledgedReportStatus string
+
+const (
+	reportStatusChunk unacknowledgedReportStatus = "chunk"
+	reportStatusFinal unacknowledgedReportStatus = "final"
+)
+
+// isAckMissing reports a send the peer never acknowledged within its MRP
+// budget — matter.js PeerAckMissingError (PeerCommunicationError.ts:63-67
+// at b25ed960), which the Go exchange raises as the exact
+// [*exchange.PeerUnresponsiveError] (a [*exchange.PeerMessageMissingError]
+// is no match: errors.As takes the type, not its Is).
+func isAckMissing(err error) bool {
+	var unresponsive *exchange.PeerUnresponsiveError
+	return errors.As(err, &unresponsive)
+}
+
+// sendReportStatus answers rd with a StatusResponse Success and records a
+// status the peer never acknowledged. Mirrors matter.js
+// IncomingInteractionClientMessenger.#sendReportStatus
+// (packages/protocol/src/interaction/InteractionMessenger.ts:1056-1068 at
+// b25ed960).
+func (m *messenger) sendReportStatus(ctx context.Context, rd *im.ReportData) error {
+	err := m.sendStatus(ctx, im.StatusSuccess)
+	if err != nil && isAckMissing(err) {
+		m.unacknowledgedReportStatus = reportStatusFinal
+		if rd.MoreChunkedMessages {
+			m.unacknowledgedReportStatus = reportStatusChunk
+		}
+	}
+	return err
 }
 
 // close closes the exchange and ends its in-flight entry.

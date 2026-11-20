@@ -5,6 +5,7 @@ package interaction_test
 
 import (
 	"bytes"
+	"errors"
 	"net"
 	"slices"
 	"sync"
@@ -48,10 +49,19 @@ type fakeConn struct {
 	mu   sync.Mutex
 	to   map[uint32]*net.UDPAddr
 	dsts []*net.UDPAddr
+	// fail, when set, fails every send with errSocket and records nothing.
+	fail bool
 }
+
+// errSocket is the failure of a fakeConn set to fail.
+var errSocket = errors.New("socket failed")
 
 func (c *fakeConn) Send(to *net.UDPAddr, payload []byte) error {
 	c.mu.Lock()
+	if c.fail {
+		c.mu.Unlock()
+		return errSocket
+	}
 	c.dsts = append(c.dsts, to)
 	if hdr, _, err := message.UnmarshalHeader(payload); err == nil {
 		if c.to == nil {

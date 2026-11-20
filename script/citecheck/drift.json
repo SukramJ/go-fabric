@@ -794,7 +794,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 318,
+    "line": 359,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1013,7 +1013,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 316,
+    "line": 318,
     "citation": "InteractionMessenger.ts:1129",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ackWaitAbort",
@@ -1022,7 +1022,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 332,
+    "line": 355,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",

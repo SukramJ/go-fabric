@@ -222,7 +222,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	}()
 	// Fitted to the exchange's session, after the exchange chose it
 	// (InteractionMessenger.ts:1145-1165, W4-ctlim-11).
-	payload, err := encodeFitting(subscribeRequest(im.SubscribeRequest{
+	payload, allFiltersSent, err := encodeFittingAll(subscribeRequest(im.SubscribeRequest{
 		KeepSubscriptions:  !req.ReplaceSubscriptions,
 		MinIntervalFloor:   uint16(floor / time.Second),   //nolint:gosec // bounded to 65535 s by Subscribe
 		MaxIntervalCeiling: uint16(ceiling / time.Second), //nolint:gosec // bounded to 65535 s by Subscribe
@@ -280,6 +280,8 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	sub := c.subs.newSubscription(peer, req, c.log)
 	sub.id, sub.maxInterval = resp.SubscriptionID, resp.MaxInterval
 	sub.maxPeerResponseTime = c.provider.MaximumPeerResponseTime(SubscriptionProcessingTime, false)
+	// Mirrors matter.js ClientInteraction.ts:1086-1095, :1126 at b25ed960.
+	sub.compactPriming = primesCompactly(req, allFiltersSent)
 	c.subs.AddPeer(sub)
 	c.log.Info("matter.controller.interaction.subscribed",
 		slog.Uint64("subscription_id", uint64(resp.SubscriptionID)), slog.Int("max_interval", int(resp.MaxInterval)), slog.Duration("timeout", sub.timeout()))
@@ -326,6 +328,27 @@ func (c *Interaction) abandonSubscription(m *messenger, awaitReport bool) {
 func isStatusError(err error) bool {
 	var se *StatusError
 	return errors.As(err, &se)
+}
+
+// primesCompactly estimates whether a subscribe request like req primes
+// with little data: every attribute path names one attribute, or req
+// carried at least one DataVersionFilter and all of them were sent
+// (allFiltersSent); and it has no event paths or carries an event filter.
+// The estimate ignores attribute sizes and which clusters the filters
+// cover. Mirrors matter.js primesCompactly
+// (packages/protocol/src/action/client/ClientInteraction.ts:82-99 at
+// b25ed960).
+func primesCompactly(req SubscribeRequest, allFiltersSent bool) bool {
+	attributesCompact := true
+	for _, p := range req.Attributes {
+		if !p.HasEndpoint || !p.HasCluster || !p.HasAttribute {
+			attributesCompact = false
+			break
+		}
+	}
+	attributesCompact = attributesCompact || (allFiltersSent && len(req.DataVersionFilters) > 0)
+	eventsCompact := len(req.Events) == 0 || len(req.EventFilters) > 0
+	return attributesCompact && eventsCompact
 }
 
 // subscribeRequest is a SubscribeRequest whose DataVersionFilters
