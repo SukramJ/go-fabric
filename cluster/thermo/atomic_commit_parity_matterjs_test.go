@@ -14,11 +14,14 @@
 // atomic-write state directly, which is why the port runs in the package.
 //
 // "validates an attribute once the other pending attributes are staged"
-// observes, in matter.js, the Schedules a presets$AtomicChanged observer
-// reads during the commit; the Go server has no such observer, and the
-// commit's reading of the staged Schedules is the presets precommit's
-// in-use check (chip ThermostatClusterPresets.cpp:708-724 at 645b267a): a
-// preset the write drops that a staged schedule names is refused.
+// observes, in matter.js, that a presets$AtomicChanged observer reads the
+// Schedules staged in the same unit; the Go server has no such observer,
+// and the commit's reading of the staged Schedules is the Presets
+// $AtomicChanged check (#validatePresetCommit, ThermostatServer.ts:2048-2065
+// at b25ed960, atomicChanged): a preset the stored schedule names may go
+// when the unit's staged Schedules no longer name it, and may not when
+// they do — then the staged Schedules themselves, validated against the
+// unit's Presets, are refused too (SchedulesAtomicWriteTest.ts:516-535).
 package thermo
 
 import (
@@ -102,6 +105,22 @@ func scheduleAt(minute uint16) Schedule {
 	}
 }
 
+// usesPreset2 is schedule 01, Heat, switching to preset 02 on Monday at
+// 06:00.
+func usesPreset2() Schedule {
+	return Schedule{
+		ScheduleHandle: spec.ValueOf([]byte{0x01}), SystemMode: tdef.SystemModeHeat, BuiltIn: spec.ValueOf(false),
+		Transitions: []ScheduleTransition{{DayOfWeek: tdef.ScheduleDayOfWeekMonday, TransitionTime: 360, PresetHandle: &[]byte{0x02}}},
+	}
+}
+
+// scheduleWithHandle1 is scheduleAt(minute) as schedule 01.
+func scheduleWithHandle1(minute uint16) Schedule {
+	sc := scheduleAt(minute)
+	sc.ScheduleHandle = spec.ValueOf([]byte{0x01})
+	return sc
+}
+
 // newUnoccupiedPreset is newPreset({presetScenario: Unoccupied}).
 func newUnoccupiedPreset() Preset {
 	cool, heat := int16(2600), int16(2000)
@@ -171,28 +190,31 @@ func TestParityMatterJS_AtomicWriteHandlerCommitTest(t *testing.T) {
 				CoolingSetpoint: &cool, HeatingSetpoint: &heat, BuiltIn: spec.ValueOf(false),
 			})
 			cfg.ScheduleTypes[0].ScheduleTypeFeatures |= tdef.ScheduleTypeFeaturesSupportsPresets
-		}
-		usesPreset := Schedule{
-			ScheduleHandle: spec.NullOf[[]byte](), SystemMode: tdef.SystemModeHeat, BuiltIn: spec.NullOf[bool](),
-			Transitions: []ScheduleTransition{{DayOfWeek: tdef.ScheduleDayOfWeekMonday, TransitionTime: 360, PresetHandle: &[]byte{0x02}}},
+			cfg.Schedules = []Schedule{usesPreset2()}
 		}
 		withoutPreset2 := func(s *ThermostatServer) []Preset { return s.Presets()[:1] }
 
+		// The staged Schedules no longer name preset 02: it goes.
 		s := presetsAndSchedulesServer(t, withPresetSchedules)
 		atomicAs(t, s, atomicBeginWrite, both)
-		stage(t, s, schedulesAttr, []Schedule{usesPreset})
 		stage(t, s, presetsAttr, withoutPreset2(s))
-		wantStatuses(t, atomicAs(t, s, atomicCommitWrite, both), tdef.StatusFailure,
-			tdef.AtomicResponseAttributeStatusEntry{AttributeId: presetsAttr, StatusCode: tdef.StatusInvalidInState}, ok(schedulesAttr))
-		if len(s.Presets()) != 2 || len(s.Schedules()) != 0 {
-			t.Errorf("presets %d schedules %d after the refusal, want 2 and 0", len(s.Presets()), len(s.Schedules()))
+		stage(t, s, schedulesAttr, []Schedule{scheduleWithHandle1(360)})
+		wantStatuses(t, atomicAs(t, s, atomicCommitWrite, both), tdef.StatusSuccess, ok(presetsAttr), ok(schedulesAttr))
+		if len(s.Presets()) != 1 || len(s.Schedules()) != 1 || s.Schedules()[0].Transitions[0].PresetHandle != nil {
+			t.Errorf("presets %+v schedules %+v, want preset 02 gone with its reference", s.Presets(), s.Schedules())
 		}
 
-		// Without a staged schedule naming it, the preset goes.
+		// The staged Schedules still name it: both refused.
 		s = presetsAndSchedulesServer(t, withPresetSchedules)
 		atomicAs(t, s, atomicBeginWrite, both)
+		stage(t, s, schedulesAttr, []Schedule{usesPreset2()})
 		stage(t, s, presetsAttr, withoutPreset2(s))
-		wantStatuses(t, atomicAs(t, s, atomicCommitWrite, both), tdef.StatusSuccess, ok(presetsAttr), ok(schedulesAttr))
+		wantStatuses(t, atomicAs(t, s, atomicCommitWrite, both), tdef.StatusFailure,
+			tdef.AtomicResponseAttributeStatusEntry{AttributeId: presetsAttr, StatusCode: tdef.StatusInvalidInState},
+			tdef.AtomicResponseAttributeStatusEntry{AttributeId: schedulesAttr, StatusCode: tdef.StatusConstraintError})
+		if len(s.Presets()) != 2 || len(s.Schedules()) != 1 {
+			t.Errorf("presets %d schedules %d after the refusal, want 2 and 1", len(s.Presets()), len(s.Schedules()))
+		}
 	})
 
 	t.Run("discards a valid Schedules write when the Presets write fails", func(t *testing.T) {

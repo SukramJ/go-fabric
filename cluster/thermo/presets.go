@@ -349,14 +349,21 @@ func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, ac
 // stored write of matter.js (persistedPresets$Changing,
 // #handlePersistedPresetsChanging, ThermostatServer.ts:1300-1320, then the
 // commit). The caller holds s.op; presets are the caller's and are
-// normalised in place.
-func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) error {
+// normalised in place. local is a local write: with MSCH, a preset a
+// stored schedule names cannot be removed (#validatePresetCommit,
+// ThermostatServer.ts:2048-2065 at b25ed960); an atomic commit checked
+// that against its own unit's schedules before (atomicChanged).
+func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset, local bool) error {
 	s.lockPersist()
 	defer s.unlockPersist()
 	s.mu.RLock()
 	old := s.presets
 	active := bytes.Clone(s.activePresetHandle)
 	rules := s.presetRules()
+	var inUse error
+	if local {
+		inUse = s.presetsInUseBySchedules(old, presets, s.schedules)
+	}
 	s.mu.RUnlock()
 	issued := map[string]bool{}
 	if err := rules.validatePresetWrite(presets, old, false, issued); err != nil {
@@ -364,6 +371,9 @@ func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) e
 	}
 	if err := normalizePresetCommit(presets, old, false, issued, active); err != nil {
 		return err
+	}
+	if inUse != nil {
+		return inUse
 	}
 	if err := s.savePresets(ctx, presets, active); err != nil {
 		return err
@@ -385,7 +395,7 @@ func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset) e
 // the Presets setter stores for a command (:1687-1690,
 // AtomicWriteHandler.ts:299). The caller holds s.op.
 func (s *ThermostatServer) commitPresets(ctx context.Context, staged []Preset) error {
-	return s.applyPresets(ctx, deepcopy.Each(staged))
+	return s.applyPresets(ctx, deepcopy.Each(staged), false)
 }
 
 // SetPresets is a local write of the Presets attribute — matter.js
@@ -403,7 +413,7 @@ func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) err
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
-	if err := s.applyPresets(ctx, deepcopy.Each(presets)); err != nil {
+	if err := s.applyPresets(ctx, deepcopy.Each(presets), true); err != nil {
 		return err
 	}
 	s.reevaluateOnPresetsChange(ctx)

@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -32,7 +33,11 @@ func (d *droppingSchedulePort) CommitSchedules(context.Context, []thermo.Schedul
 func TestSetActiveScheduleRequestDoesNotStoreAHandleDroppedMeanwhile(t *testing.T) {
 	t.Parallel()
 	port := &droppingSchedulePort{keep: []thermo.Schedule{builtInSchedule(2)}}
-	cfg := mschConfig(withSchedules(builtInSchedule(1), builtInSchedule(2)))
+	// Schedule 1 is not built in: the host may drop it (a built-in
+	// schedule cannot be removed, ThermostatServer.ts:3064-3070 at b25ed960).
+	dropped := builtInSchedule(1)
+	dropped.BuiltIn = spec.ValueOf(false)
+	cfg := mschConfig(withSchedules(dropped, builtInSchedule(2)))
 	cfg.SchedulePort = port
 	srv := newMSCH(t, cfg)
 	port.srv = srv

@@ -1,22 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// MatterScheduleConfiguration, read and switch: a port of the reading and
-// switching cases of connectedhomeip
+// MatterScheduleConfiguration, the cases of connectedhomeip
 // src/app/clusters/thermostat-server/tests/TestThermostatClusterSchedules.cpp
-// at 645b267a (the harness image's CHIP commit 6170af84 has no schedules
-// server). matter.js does not implement the feature
-// (ThermostatServer.ts:82 at db021da0), so chip is the behavioural
-// authority (CLAUDE.md workflow step 5). chip's fixture (:37-98) is a
-// HEAT+MSCH thermostat with NumberOfSchedules 2, NumberOfScheduleTransitions
-// 4, NumberOfScheduleTransitionPerDay 2 and one schedule type, Heat, of two
-// schedules supporting names and setpoints; its delegate is the
-// SchedulePort, its SeedBuiltInSchedule a configured schedule — with one
-// transition, which the Schedules attribute's "1 to
-// numberOfScheduleTransitions" requires of a schedule the device supplies.
+// at 645b267a that matter.js's three Schedules suites at b25ed960 have no
+// counterpart for (schedules_*_parity_matterjs_test.go hold the rules
+// since matter.js implements the feature behind its forward feature
+// thermostat-msch, ThermostatServer.ts:267-271): the attributes and
+// commands served, the counts and ScheduleTypes read, the SchedulePort's
+// answers, the pending list a peer reads during its write, the field
+// sizes, and a second peer's write. The chip line numbers are this port's
+// earlier reading at 645b267a, not re-read at the pin. chip's fixture
+// (:37-98) is a HEAT+MSCH thermostat with NumberOfSchedules 2,
+// NumberOfScheduleTransitions 4, NumberOfScheduleTransitionPerDay 2 and
+// one schedule type, Heat, of two schedules supporting names and
+// setpoints; its delegate is the SchedulePort, its SeedBuiltInSchedule a
+// configured schedule — with one transition, which the Schedules
+// attribute's "1 to numberOfScheduleTransitions" requires of a schedule
+// the device supplies.
 //
 // Not ported: SetActiveScheduleRequestPropagatesDelegateGetError (:796) —
-// the active handle is the server's state, not read through the port.
+// the active handle is the server's state, not read through the port —
+// and AppendPendingScheduleRejectsTooManyTransitionsHardCap (:646), chip's
+// owned-storage capacity rather than a rule.
 package thermo_test
 
 import (
@@ -27,11 +33,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 )
 
 // mschConfig is chip's ThermostatSchedulesTestFixture (:84-98) on the
@@ -200,22 +209,6 @@ func TestChipActiveScheduleHandleDefaultsToNull(t *testing.T) {
 	}
 }
 
-// TestChipSetActiveScheduleRequestWithUnknownHandleIsInvalidCommand ports
-// SetActiveScheduleRequestWithUnknownHandleIsInvalidCommand (:153-168):
-// chip SetActiveSchedule (ThermostatClusterSchedules.cpp:743-758). The port
-// is not called.
-func TestChipSetActiveScheduleRequestWithUnknownHandleIsInvalidCommand(t *testing.T) {
-	t.Parallel()
-	port := &recordingSchedulePort{}
-	srv := newMSCH(t, mschConfig(func(cfg *thermo.ThermostatConfig) { cfg.SchedulePort = port }))
-	if got := statusOfErr(t, invokeSetActiveSchedule(srv, []byte{0x42})); got != im.StatusInvalidCommand {
-		t.Errorf("status %s, want INVALID_COMMAND", got)
-	}
-	if n := len(port.activeCalls()); n != 0 {
-		t.Errorf("port called %d times for an unknown handle", n)
-	}
-}
-
 // TestChipSetActiveScheduleRequestSucceedsAndGeneratesEvent ports
 // SetActiveScheduleRequestSucceedsAndGeneratesEvent (:170-197): the port
 // switches the device, the handle is stored and reported (chip's
@@ -290,80 +283,188 @@ func TestChipReadScheduleTypesReturnsConfiguredTypes(t *testing.T) {
 	}
 }
 
-// TestSchedulesFromTheDevice: the device's schedules each need a handle of
-// their own, a null BuiltIn is built in, an active handle that names no
-// schedule is cleared at construction and refused by the setter, and a
-// schedule list that drops the active schedule clears it; the setters do
-// not call the port and report as the host's change.
-func TestSchedulesFromTheDevice(t *testing.T) {
-	t.Parallel()
-	noHandle := builtInSchedule(0x01)
-	noHandle.ScheduleHandle = spec.NullOf[[]byte]()
-	if _, err := thermo.New(mschConfig(withSchedules(noHandle))); !errors.Is(err, thermo.ErrSchedules) {
-		t.Errorf("a schedule without a handle: %v, want ErrSchedules", err)
+// chipSchedule is chip's MakeSchedule (:52-63) with a null handle and
+// BuiltIn: a new Heat schedule with one transition.
+func chipSchedule(transitions ...thermo.ScheduleTransition) thermo.Schedule {
+	if len(transitions) == 0 {
+		transitions = []thermo.ScheduleTransition{heatTransition(0, tdef.ScheduleDayOfWeekMonday)}
 	}
-	if _, err := thermo.New(mschConfig(withSchedules(builtInSchedule(0x01), builtInSchedule(0x01)))); !errors.Is(err, thermo.ErrSchedules) {
-		t.Errorf("a repeated handle: %v, want ErrSchedules", err)
-	}
-	if _, err := thermo.New(mschConfig(func(cfg *thermo.ThermostatConfig) { cfg.ScheduleTypes = nil })); !errors.Is(err, thermo.ErrSchedules) {
-		t.Errorf("no schedule type: %v, want ErrSchedules (ScheduleTypes is 1 to 3)", err)
-	}
-
-	port := &recordingSchedulePort{setErr: errors.New("must not be called")}
-	nullBuiltIn := builtInSchedule(0x02)
-	nullBuiltIn.BuiltIn = spec.NullOf[bool]()
-	srv := newMSCH(t, mschConfig(withSchedules(builtInSchedule(0x01), nullBuiltIn), func(cfg *thermo.ThermostatConfig) {
-		cfg.SchedulePort, cfg.ActiveScheduleHandle = port, []byte{0x09}
-	}))
-	if h := srv.ActiveScheduleHandle(); h != nil {
-		t.Errorf("an active handle naming no schedule was kept: %x", h)
-	}
-	if got := srv.Schedules(); len(got) != 2 || got[1].BuiltIn.Null || !got[1].BuiltIn.Value {
-		t.Errorf("schedules %+v, want the null BuiltIn taken as built in", got)
-	}
-	rec := recordHoldChanges(t, srv)
-	if err := srv.SetActiveScheduleHandle([]byte{0x09}); !errors.Is(err, spec.ErrInvalidValue) {
-		t.Errorf("SetActiveScheduleHandle(09): %v, want spec.ErrInvalidValue", err)
-	}
-	if err := srv.SetActiveScheduleHandle([]byte{0x02}); err != nil {
-		t.Fatal(err)
-	}
-	if err := srv.SetSchedules([]thermo.Schedule{builtInSchedule(0x01)}); err != nil {
-		t.Fatal(err)
-	}
-	if h := srv.ActiveScheduleHandle(); h != nil {
-		t.Errorf("the dropped active schedule %x is still active", h)
-	}
-	want := []uint32{tdef.AttrActiveScheduleHandle, tdef.AttrSchedules, tdef.AttrActiveScheduleHandle}
-	if got := rec.attrs(contract.OriginHostSet); !slices.Equal(got, want) {
-		t.Errorf("reported %v, want %v", got, want)
-	}
-	if n := len(port.activeCalls()); n != 0 {
-		t.Errorf("the setters called the port %d times", n)
-	}
-	plain := thermo.NewThermostatServer(thermo.DefaultThermostatConfig())
-	if err := plain.SetSchedules(nil); err == nil {
-		t.Error("SetSchedules without MSCH succeeded")
+	return thermo.Schedule{
+		ScheduleHandle: spec.NullOf[[]byte](), SystemMode: tdef.SystemModeHeat,
+		Transitions: transitions, BuiltIn: spec.NullOf[bool](),
 	}
 }
 
-// TestTypedSetOfSchedules: the typed server's Set takes Schedules and
-// ActiveScheduleHandle through the setters; the schedule types and counts
-// are the configuration's.
-func TestTypedSetOfSchedules(t *testing.T) {
-	t.Parallel()
-	typed := tdef.Wrap(newMSCH(t, mschConfig()))
-	list := []tdef.ScheduleStruct{builtInSchedule(0x07)}
-	active := []byte{0x07}
-	if err := typed.Set(tdef.Patch{Schedules: &list, ActiveScheduleHandle: &active}); err != nil {
+// chipThermostat commissions the chip fixture with cfg's edits.
+func chipThermostat(t *testing.T, edit ...func(*thermo.ThermostatConfig)) *thermostatPair {
+	t.Helper()
+	return commissionedThermostat(t, func(*fabrictest.Site) thermo.ThermostatConfig { return mschConfig(edit...) })
+}
+
+// chipWrite writes Schedules from q and returns the first status other
+// than SUCCESS, SUCCESS when every chunk succeeded.
+func (p *thermostatPair) chipWrite(t *testing.T, q *fabrictest.Pair, list []thermo.Schedule) im.StatusCode {
+	t.Helper()
+	ctx := parityCtx(t)
+	ia, err := fabrictestseam.Connect(ctx, q)
+	if err != nil {
 		t.Fatal(err)
 	}
-	st := typed.Get()
-	if len(st.Schedules) != 1 || st.ActiveScheduleHandle == nil || !bytes.Equal(*st.ActiveScheduleHandle, active) {
-		t.Errorf("state schedules %+v active %v", st.Schedules, st.ActiveScheduleHandle)
+	var statuses interaction.WriteStatuses
+	err = p.site.Run(ctx, func(ctx context.Context) error {
+		var werr error
+		statuses, werr = ia.Write(ctx, []interaction.WriteRequest{{Path: p.attrPath(tdef.AttrSchedules), Value: spec.List[thermo.Schedule](list)}}, interaction.WriteOptions{})
+		return werr
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	n := uint8(3)
-	if err := typed.Set(tdef.Patch{NumberOfSchedules: &n}); !errors.Is(err, spec.ErrNotHeld) {
-		t.Errorf("Set NumberOfSchedules: %v, want spec.ErrNotHeld", err)
+	for _, s := range statuses {
+		if s.Status != im.StatusSuccess {
+			return s.Status
+		}
 	}
+	return im.StatusSuccess
+}
+
+func wantWrite(t *testing.T, got, want im.StatusCode) {
+	t.Helper()
+	if got != want {
+		t.Errorf("write status %s, want %s", got, want)
+	}
+}
+
+func wantCommit(t *testing.T, got tdef.AtomicResponse, command, attr tdef.Status) {
+	t.Helper()
+	if got.StatusCode != command || len(got.AttributeStatus) != 1 || got.AttributeStatus[0].StatusCode != attr {
+		t.Errorf("AtomicResponse %+v, want command %d, Schedules %d", got, command, attr)
+	}
+}
+
+// TestChipThermostatSchedulesWrite holds the write cases of chip's suite
+// that matter.js's suites do not name.
+func TestChipThermostatSchedulesWrite(t *testing.T) {
+	t.Run("BeginWriteSeedsPendingSchedulesFromExistingList (:214)", func(t *testing.T) {
+		// The peer holding the write reads the stored list until it writes
+		// (matter.js's schedules getter falls back to the stored value
+		// without a pending one, ThermostatServer.ts:3249-3261).
+		p := chipThermostat(t, withSchedules(builtInSchedule(0x01)))
+		p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+		pending := p.readSchedules(t, p.pair)
+		if len(pending) != 1 || pending[0].SystemMode != tdef.SystemModeHeat || !bytes.Equal(pending[0].ScheduleHandle.Value, []byte{0x01}) {
+			t.Errorf("pending %+v, want the built-in schedule 01", pending)
+		}
+	})
+
+	t.Run("PrecommitSucceedsWhenBuiltInScheduleIsPreserved (:254)", func(t *testing.T) {
+		p := chipThermostat(t, withSchedules(builtInSchedule(0x01)))
+		p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+		wantCommit(t, p.atomic(t, p.pair, commitWrite, schedulesAttribute), tdef.StatusSuccess, tdef.StatusSuccess)
+		if got := p.srv.Schedules(); len(got) != 1 {
+			t.Errorf("schedules %+v, want the built-in one", got)
+		}
+	})
+
+	for _, c := range []struct {
+		name string
+		edit func(*thermo.Schedule)
+	}{
+		{"AppendPendingScheduleRejectsOversizedHandle (:293)", func(s *thermo.Schedule) { s.ScheduleHandle = spec.ValueOf(make([]byte, 17)) }},
+		{"AppendPendingScheduleRejectsOversizedPresetHandle (:603)", func(s *thermo.Schedule) { h := make([]byte, 17); s.PresetHandle = &h }},
+		{"AppendPendingScheduleRejectsOversizedTransitionPresetHandle (:624)", func(s *thermo.Schedule) {
+			h := make([]byte, 17)
+			s.Transitions[0].PresetHandle = &h
+		}},
+		{"AppendPendingScheduleRejectsInvalidSystemMode (:672)", func(s *thermo.Schedule) { s.SystemMode = 0xFF }},
+		{"AppendPendingScheduleRejectsMissingOrOutOfRangeSetpoint (:998) missing", func(s *thermo.Schedule) { s.Transitions[0].HeatingSetpoint = nil }},
+		{"AppendPendingScheduleRejectsMissingOrOutOfRangeSetpoint (:998) out of range", func(s *thermo.Schedule) {
+			v := int16(5000)
+			s.Transitions[0].HeatingSetpoint = &v
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			p := chipThermostat(t)
+			p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+			sc := chipSchedule()
+			c.edit(&sc)
+			wantWrite(t, p.chipWrite(t, p.pair, []thermo.Schedule{sc}), im.StatusConstraintError)
+		})
+	}
+
+	t.Run("FullAtomicWriteRoundTripAppendsAndCommitsNewSchedule (:471)", func(t *testing.T) {
+		port := &recordingSchedulePort{}
+		p := chipThermostat(t, func(cfg *thermo.ThermostatConfig) { cfg.SchedulePort = port })
+		p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+		wantWrite(t, p.chipWrite(t, p.pair, []thermo.Schedule{chipSchedule()}), im.StatusSuccess)
+		wantCommit(t, p.atomic(t, p.pair, commitWrite, schedulesAttribute), tdef.StatusSuccess, tdef.StatusSuccess)
+		got := p.srv.Schedules()
+		if len(got) != 1 || len(got[0].ScheduleHandle.Value) != 16 {
+			t.Fatalf("schedules %+v, want one with an issued 16-byte handle", got)
+		}
+		if commits := port.commitCalls(); len(commits) != 1 || !bytes.Equal(commits[0][0].ScheduleHandle.Value, got[0].ScheduleHandle.Value) {
+			t.Errorf("port commits %+v, want the stored list", commits)
+		}
+	})
+
+	t.Run("RollbackWriteClearsPendingScheduleList (:495)", func(t *testing.T) {
+		port := &recordingSchedulePort{}
+		p := chipThermostat(t, withSchedules(builtInSchedule(0x01)), func(cfg *thermo.ThermostatConfig) { cfg.SchedulePort = port })
+		p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+		wantWrite(t, p.chipWrite(t, p.pair, []thermo.Schedule{builtInSchedule(0x01), chipSchedule()}), im.StatusSuccess)
+		if r := p.atomic(t, p.pair, rollbackWrite, schedulesAttribute); r.StatusCode != tdef.StatusSuccess {
+			t.Fatalf("RollbackWrite answered %+v", r)
+		}
+		if got := p.srv.Schedules(); len(got) != 1 {
+			t.Errorf("schedules %+v after the rollback, want the stored one", got)
+		}
+		if n := len(port.commitCalls()); n != 0 {
+			t.Errorf("the rollback reached the port %d times", n)
+		}
+	})
+
+	t.Run("ReadSchedulesDuringAtomicWriteReturnsPendingList (:533)", func(t *testing.T) {
+		p := chipThermostat(t)
+		p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+		wantWrite(t, p.chipWrite(t, p.pair, []thermo.Schedule{chipSchedule()}), im.StatusSuccess)
+		if pending := p.readSchedules(t, p.pair); len(pending) != 1 {
+			t.Errorf("pending %+v, want one schedule", pending)
+		}
+		if got := p.srv.Schedules(); len(got) != 0 {
+			t.Errorf("stored schedules %+v during the write, want none", got)
+		}
+	})
+
+	t.Run("WriteToSchedulesFromDifferentNodeDuringAtomicWriteIsInvalidInState (:558)", func(t *testing.T) {
+		// matter.js answers another peer's Schedules write INVALID_IN_STATE
+		// (AtomicWriteHandler.ts:54-56, :474-479).
+		p := chipThermostat(t)
+		p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+		q := p.secondPeer(t)
+		wantWrite(t, p.chipWrite(t, q, []thermo.Schedule{chipSchedule()}), im.StatusInvalidInState)
+	})
+
+	t.Run("AppendItemListOperationAppendsSingleSchedule (:581)", func(t *testing.T) {
+		p := chipThermostat(t)
+		p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+		wantWrite(t, p.chipWrite(t, p.pair, []thermo.Schedule{}), im.StatusSuccess)
+		wantWrite(t, p.chipWrite(t, p.pair, []thermo.Schedule{chipSchedule(), chipSchedule()}), im.StatusSuccess)
+		if pending := p.readSchedules(t, p.pair); len(pending) != 2 {
+			t.Errorf("pending %+v, want two schedules", pending)
+		}
+	})
+
+	t.Run("CommitFailsWhenDelegateCommitReturnsError (:821)", func(t *testing.T) {
+		port := &recordingSchedulePort{commitErr: errors.New("device storage full")}
+		p := chipThermostat(t, func(cfg *thermo.ThermostatConfig) { cfg.SchedulePort = port })
+		changes := recordThermostatChanges(p.srv)
+		p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+		wantWrite(t, p.chipWrite(t, p.pair, []thermo.Schedule{chipSchedule()}), im.StatusSuccess)
+		wantCommit(t, p.atomic(t, p.pair, commitWrite, schedulesAttribute), tdef.StatusFailure, tdef.StatusFailure)
+		if got := p.srv.Schedules(); len(got) != 0 {
+			t.Errorf("schedules %+v after a refused commit", got)
+		}
+		if changes.count(tdef.AttrSchedules) != 0 {
+			t.Error("Schedules reported after a refused commit")
+		}
+	})
 }

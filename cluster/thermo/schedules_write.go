@@ -19,86 +19,80 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// The write of Schedules (MSCH) through AtomicRequest: chip's
-// AppendPendingSchedule validation, PrecommitSchedules and the commit
-// (ThermostatClusterSchedules.cpp at 645b267a), on the atomic-write state
-// of atomic.go.
+// The write rules of Schedules (MSCH) — the atomic write of a controller,
+// the host's SetSchedules and the configured schedules alike — as
+// matter.js's ThermostatServer implements them behind its forward feature
+// thermostat-msch (packages/node/src/behaviors/thermostat/ThermostatServer.ts
+// at b25ed960: #validateScheduleWriteRequest :2693-2817,
+// #validateScheduleTransitions :2825-3003, #normalizeSchedules :3028-3048,
+// #validateScheduleCommit :3056-3086), on the atomic-write state of
+// atomic.go.
 
 // scheduleHandleLength is the length of a handle the server issues to a
-// new schedule, and the longest handle chip accepts
-// (ScheduleStructWithOwnedMembers.h:39 kScheduleHandleSize = 16 at
-// 645b267a; the schema's "max 16").
+// new schedule — matter.js entropy.randomBytes(16)
+// (ThermostatServer.ts:3032-3034 at b25ed960) — and the schema's "max 16"
+// (thermostat-cluster.element.ts:634).
 const scheduleHandleLength = 16
 
-// scheduleNameLength is the longest schedule name (chip
-// ScheduleStructWithOwnedMembers.h:41 kScheduleNameSize = 64; the schema's
-// "max 64").
+// scheduleNameLength is the longest schedule name, the schema's "max 64"
+// (thermostat-cluster.element.ts:636 at b25ed960).
 const scheduleNameLength = 64
 
 // validScheduleDays are the weekday bits a transition may carry: Sunday to
-// Saturday, not Away (ThermostatClusterSchedules.cpp:301-304).
+// Saturday, not Away (ThermostatServer.ts:2836-2845 at b25ed960).
 const validScheduleDays = tdef.ScheduleDayOfWeekSunday | tdef.ScheduleDayOfWeekMonday | tdef.ScheduleDayOfWeekTuesday |
 	tdef.ScheduleDayOfWeekWednesday | tdef.ScheduleDayOfWeekThursday | tdef.ScheduleDayOfWeekFriday |
 	tdef.ScheduleDayOfWeekSaturday
 
-// scheduleRules is what the pending-schedule validation reads besides the
+// scheduleRules is what the schedule validation reads besides the
 // schedules: the feature selection, the schedule types and counts, the
-// setpoint limits and deadband, and whether a preset handle names a
-// preset.
+// setpoint limits and deadband, the presets a preset handle must name, and
+// the handles the change in flight issued.
 type scheduleRules struct {
-	features      uint32
-	types         []ScheduleType
-	maxSchedules  int
-	maxTotal      int
-	perDay        *uint8
-	st            setpointState
-	presetPresent func(handle []byte) bool
+	features       uint32
+	types          []ScheduleType
+	maxSchedules   int
+	maxTransitions int
+	perDay         *uint8
+	st             setpointState
+	// presets are the presets a preset handle names: the writing peer's
+	// own pending Presets, else the stored ones — matter.js's presets
+	// getter (ThermostatServer.ts:3196-3222 at b25ed960), which consults
+	// AtomicWriteHandler.pendingValueForAttributeAndPeer
+	// (AtomicWriteHandler.ts:433-458: another peer's staged value is never
+	// seen, :449-452). Without PRES no handle is present.
+	presets []Preset
+	// issued are the handles the change in flight issued itself — matter.js
+	// issuedHandles (ThermostatServer.ts:2726-2738): a schedule carrying
+	// one is an addition, not an unknown handle.
+	issued map[string]bool
 }
 
-// scheduleRules gathers the rules; the caller holds s.mu. presetPresent
-// answers for the presets a Presets atomic write staged, when one holds
-// it, and for the stored presets otherwise — chip's
-// IsPresetHandlePresentInPresetsOrPending (ThermostatClusterPresets.cpp:480-491
-// at 645b267a); without PRES no handle is present
-// (ThermostatClusterBase.h:99-103).
-//
-// The staged presets may be another peer's: the atomic writes follow
-// matter.js, several peers each holding their own attribute, while chip
-// has one atomic state per endpoint (ThermostatClusterAtomic.cpp:318-326,
-// :121-140 at 6170af84; :360-363, :172-191 at 645b267a), so there the
-// case cannot arise. A peer's Schedules write is therefore judged against
-// the Presets another peer staged and has not committed; a removal that
-// peer later commits is refused while a stored or staged schedule names
-// the handle (presetsInUseBySchedules). No reference defines the
-// cross-peer answer (R2-P6-par-1565).
-func (s *ThermostatServer) scheduleRules() scheduleRules {
-	presets := s.presets
-	if st := s.atomic.forAttribute(s.clk.Now(), tdef.AttrPresets); st != nil {
-		if v, ok := st.staged(tdef.AttrPresets); ok {
-			if staged, isList := v.([]Preset); isList {
-				presets = staged
-			}
-		}
+// scheduleRules gathers the rules against presets; the caller holds s.mu.
+func (s *ThermostatServer) scheduleRules(presets []Preset) scheduleRules {
+	if s.features&ThermostatFeaturePRES == 0 {
+		presets = nil
 	}
-	pres := s.features&ThermostatFeaturePRES != 0
 	return scheduleRules{
-		features:     s.features,
-		types:        s.scheduleTypes,
-		maxSchedules: int(s.numberOfSchedules),
-		maxTotal:     int(s.numberOfScheduleTransitions),
-		perDay:       s.transitionsPerDay,
-		st:           s.setpointState(),
-		presetPresent: func(h []byte) bool {
-			return pres && slices.ContainsFunc(presets, func(p Preset) bool {
-				return !p.PresetHandle.Null && bytes.Equal(p.PresetHandle.Value, h)
-			})
-		},
+		features:       s.features,
+		types:          s.scheduleTypes,
+		maxSchedules:   int(s.numberOfSchedules),
+		maxTransitions: int(s.numberOfScheduleTransitions),
+		perDay:         s.transitionsPerDay,
+		st:             s.setpointState(),
+		presets:        presets,
+		issued:         s.issuedScheduleHandles,
 	}
 }
 
-// scheduleType is the ScheduleTypeStruct for mode, if any — chip
-// MaximumScheduleTypeCount and GetScheduleTypeFeatures
-// (ThermostatClusterSchedules.cpp:183-206, :257-281).
+// presetPresent reports whether a preset of the rules carries handle h.
+func (r scheduleRules) presetPresent(h []byte) bool {
+	return slices.ContainsFunc(r.presets, func(p Preset) bool {
+		return !p.PresetHandle.Null && bytes.Equal(p.PresetHandle.Value, h)
+	})
+}
+
+// scheduleType is the ScheduleTypeStruct for mode, if any.
 func (r scheduleRules) scheduleType(mode tdef.SystemModeEnum) (ScheduleType, bool) {
 	for _, t := range r.types {
 		if t.SystemMode == mode {
@@ -108,98 +102,101 @@ func (r scheduleRules) scheduleType(mode tdef.SystemModeEnum) (ScheduleType, boo
 	return ScheduleType{}, false
 }
 
-// heatLimits and coolLimits are chip's Setpoints::GetLimits
-// (Setpoints.cpp:41-59 at 6170af84): the user limits, with AUTO the
-// heating maximum held a deadband below the cooling maximum and the
-// cooling minimum a deadband above the heating minimum.
+// heatLimits and coolLimits are the bounds of a transition's setpoints —
+// matter.js heatSetpointMinimum … coolSetpointMaximum
+// (ThermostatServer.ts:1307-1321 at b25ed960): the user limit clipped to
+// the absolute one, with no deadband term (the deadband between a
+// transition's two setpoints is a check of its own, :2983-2991).
 func (r scheduleRules) heatLimits() (lo, hi int) {
-	lo, hi = r.st.minHeat, r.st.maxHeat
-	if r.st.auto {
-		hi = min(hi, r.st.maxCool-r.st.deadband)
-	}
-	return lo, hi
+	return max(r.st.minHeat, r.st.absMinHeat), min(r.st.maxHeat, r.st.absMaxHeat)
 }
 
 func (r scheduleRules) coolLimits() (lo, hi int) {
-	lo, hi = r.st.minCool, r.st.maxCool
-	if r.st.auto {
-		lo = max(lo, r.st.minHeat+r.st.deadband)
-	}
-	return lo, hi
+	return max(r.st.minCool, r.st.absMinCool), min(r.st.maxCool, r.st.absMaxCool)
 }
 
-// appendPending validates sc for appending to pending — chip
-// ThermostatSchedules::AppendPendingSchedule
-// (ThermostatClusterSchedules.cpp:795-998 at 645b267a) — and returns it
-// normalised (a null BuiltIn resolved). stored is the Schedules attribute.
-func (r scheduleRules) appendPending(stored, pending []Schedule, sc Schedule) (Schedule, error) {
+// validateSchedules validates list against the schedules it replaces and
+// returns it normalised (a null BuiltIn resolved) — matter.js
+// #validateScheduleWriteRequest (ThermostatServer.ts:2693-2817 at
+// b25ed960): per schedule the handle rules, the schedule type, the
+// transition count, the name, the preset and the transitions; the count
+// limits only after every schedule passed its own checks (:2793-2806).
+// A whole-list write and a controller's per-entry ADD come to the same
+// result, an entry being validated against the entries before it only.
+func (r scheduleRules) validateSchedules(stored, list []Schedule) ([]Schedule, error) {
 	constraint := func(format string, args ...any) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: schedule: "+format, args...)
 	}
 	exhausted := func(format string, args ...any) error {
 		return spec.Errorf(im.StatusResourceExhausted, "thermo: schedule: "+format, args...)
 	}
-	if err := checkScheduleSizes(sc); err != nil {
-		return sc, err
-	}
-	// IsValidScheduleEntry: SystemMode Auto, Cool or Heat (:48-66, :837-840).
-	switch sc.SystemMode {
-	case tdef.SystemModeAuto, tdef.SystemModeCool, tdef.SystemModeHeat:
-	default:
-		return sc, constraint("SystemMode %d is not Auto, Cool or Heat", sc.SystemMode)
-	}
-	builtIn, err := resolveBuiltIn(stored, pending, sc)
-	if err != nil {
-		return sc, err
-	}
-	sc.BuiltIn = builtIn
-	// The schedule type of the SystemMode (:905-940).
-	typ, ok := r.scheduleType(sc.SystemMode)
-	if !ok || typ.NumberOfSchedules == 0 {
-		return sc, constraint("no schedule type for SystemMode %d", sc.SystemMode)
-	}
-	feats := typ.ScheduleTypeFeatures
-	if sc.Name != nil && feats&tdef.ScheduleTypeFeaturesSupportsNames == 0 {
-		return sc, constraint("the schedule type does not support names")
-	}
-	if sc.PresetHandle != nil {
-		if feats&tdef.ScheduleTypeFeaturesSupportsPresets == 0 {
-			return sc, constraint("the schedule type does not support presets")
+	pending := make([]Schedule, 0, len(list))
+	var modes []tdef.SystemModeEnum
+	counts := map[tdef.SystemModeEnum]int{}
+	for _, sc := range deepcopy.Each(list) {
+		// The schema's field sizes, which answer first on the wire
+		// (thermostat-cluster.element.ts:634-657); kept for the host's
+		// SetSchedules, which no schema check precedes with the same order.
+		if err := checkScheduleSizes(sc); err != nil {
+			return nil, err
 		}
-		if !r.presetPresent(*sc.PresetHandle) {
-			return sc, constraint("preset handle %s names no preset", handleKey(*sc.PresetHandle))
+		builtIn, err := r.resolveBuiltIn(stored, pending, sc)
+		if err != nil {
+			return nil, err
+		}
+		sc.BuiltIn = builtIn
+		// The schedule type of the SystemMode (:2750-2756): a mode no type
+		// names — ScheduleTypes holds only Auto, Heat and Cool
+		// (#assertScheduleTypes, :2666-2687) — is CONSTRAINT_ERROR; a type
+		// of NumberOfSchedules 0 passes and is exhausted by the count below.
+		typ, ok := r.scheduleType(sc.SystemMode)
+		if !ok {
+			return nil, constraint("no ScheduleType defined for SystemMode %d", sc.SystemMode)
+		}
+		// Transitions per schedule (:2758-2762).
+		if len(sc.Transitions) > r.maxTransitions {
+			return nil, exhausted("%d transitions exceed NumberOfScheduleTransitions %d", len(sc.Transitions), r.maxTransitions)
+		}
+		if counts[sc.SystemMode] == 0 {
+			modes = append(modes, sc.SystemMode)
+		}
+		counts[sc.SystemMode]++
+		feats := typ.ScheduleTypeFeatures
+		if sc.Name != nil && feats&tdef.ScheduleTypeFeaturesSupportsNames == 0 {
+			return nil, constraint("the schedule type does not support names")
+		}
+		if sc.PresetHandle != nil {
+			if feats&tdef.ScheduleTypeFeaturesSupportsPresets == 0 {
+				return nil, constraint("the schedule type does not support presets")
+			}
+			if !r.presetPresent(*sc.PresetHandle) {
+				return nil, constraint("preset handle %s names no preset", handleKey(*sc.PresetHandle))
+			}
+		}
+		if err := r.validateTransitions(sc, feats); err != nil {
+			return nil, err
+		}
+		if err := r.validateTransitionsPerDay(sc); err != nil {
+			return nil, err
+		}
+		pending = append(pending, sc)
+	}
+	// The count limits, after every schedule (:2793-2806).
+	if len(pending) > r.maxSchedules {
+		return nil, exhausted("%d schedules exceed NumberOfSchedules %d", len(pending), r.maxSchedules)
+	}
+	for _, mode := range modes {
+		typ, _ := r.scheduleType(mode)
+		if counts[mode] > int(typ.NumberOfSchedules) {
+			return nil, exhausted("%d schedules of SystemMode %d exceed its type's %d", counts[mode], mode, typ.NumberOfSchedules)
 		}
 	}
-	if err := r.validateTransitions(sc, feats); err != nil {
-		return sc, err
-	}
-	if err := r.validateTransitionsPerDay(sc); err != nil {
-		return sc, err
-	}
-	// The counts with sc appended (:947-995).
-	count, typeCount, total := 1, 1, len(sc.Transitions)
-	for _, o := range pending {
-		count++
-		total += len(o.Transitions)
-		if o.SystemMode == sc.SystemMode {
-			typeCount++
-		}
-	}
-	switch {
-	case count > r.maxSchedules:
-		return sc, exhausted("%d schedules exceed NumberOfSchedules %d", count, r.maxSchedules)
-	case typeCount > int(typ.NumberOfSchedules):
-		return sc, exhausted("%d schedules of SystemMode %d exceed its type's %d", typeCount, sc.SystemMode, typ.NumberOfSchedules)
-	case total > r.maxTotal:
-		return sc, exhausted("%d transitions exceed NumberOfScheduleTransitions %d", total, r.maxTotal)
-	}
-	return sc, nil
+	return pending, nil
 }
 
-// checkScheduleSizes is AppendPendingSchedule's field-size check, made
-// before anything else (ThermostatClusterSchedules.cpp:798-834 at
-// 645b267a): the handle, the name, the preset handle and each
-// transition's preset handle.
+// checkScheduleSizes holds a schedule to the schema's sizes: the handle,
+// the name, the preset handle and each transition's preset handle
+// (thermostat-cluster.element.ts:634-657 at b25ed960).
 func checkScheduleSizes(sc Schedule) error {
 	constraint := func(format string, args ...any) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: schedule: "+format, args...)
@@ -221,44 +218,63 @@ func checkScheduleSizes(sc Schedule) error {
 	return nil
 }
 
-// resolveBuiltIn is AppendPendingSchedule's handle check and the BuiltIn
-// it settles on (ThermostatClusterSchedules.cpp:842-903 at 645b267a).
-func resolveBuiltIn(stored, pending []Schedule, sc Schedule) (spec.Nullable[bool], error) {
+// resolveBuiltIn is the handle rules of #validateScheduleWriteRequest
+// (ThermostatServer.ts:2717-2748 at b25ed960) and the BuiltIn
+// #normalizeSchedules settles on (:3040-3046): a handle the stored
+// schedules lack is NOT_FOUND unless the change in flight issued it; a
+// handle twice in the list, a new schedule claiming to be built in and a
+// BuiltIn that differs from the stored schedule's are CONSTRAINT_ERROR; a
+// null BuiltIn takes the stored schedule's, false without one.
+func (r scheduleRules) resolveBuiltIn(stored, pending []Schedule, sc Schedule) (spec.Nullable[bool], error) {
 	constraint := func(format string, args ...any) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: schedule: "+format, args...)
 	}
+	newBuiltIn := !sc.BuiltIn.Null && sc.BuiltIn.Value
 	if sc.ScheduleHandle.Null {
-		// A new schedule cannot claim to be built in (:842-850).
-		if !sc.BuiltIn.Null && sc.BuiltIn.Value {
-			return sc.BuiltIn, constraint("a new schedule cannot be built in")
+		if newBuiltIn {
+			return sc.BuiltIn, constraint("can not add a new built-in schedule")
 		}
 		return spec.ValueOf(false), nil
 	}
-	// (a) an existing schedule has the handle (:853-868) …
-	match, ok := scheduleWithHandle(stored, sc.ScheduleHandle.Value)
-	if !ok {
-		return sc.BuiltIn, spec.Errorf(im.StatusNotFound, "thermo: schedule: handle %s names no schedule", handleKey(sc.ScheduleHandle.Value))
+	h := sc.ScheduleHandle.Value
+	match, ok := scheduleWithHandle(stored, h)
+	switch {
+	case !ok && !r.issued[handleKey(h)]:
+		return sc.BuiltIn, spec.Errorf(im.StatusNotFound, "thermo: schedule: handle %s does not exist in the stored schedules", handleKey(h))
+	case scheduleHandleIn(pending, h):
+		return sc.BuiltIn, constraint("handle %s is already in the list", handleKey(h))
+	case !ok && newBuiltIn:
+		// The handle is one this change issued, so the schedule is an
+		// addition whatever it now carries (:2735-2738).
+		return sc.BuiltIn, constraint("can not add a new built-in schedule")
+	case ok && !sc.BuiltIn.Null && (match.BuiltIn.Null || match.BuiltIn.Value != sc.BuiltIn.Value):
+		return sc.BuiltIn, constraint("cannot change the built-in status of schedule %s", handleKey(h))
 	}
-	// (b) … no pending schedule has it yet (:869-876) …
-	if _, dup := scheduleWithHandle(pending, sc.ScheduleHandle.Value); dup {
-		return sc.BuiltIn, constraint("handle %s is already in the list", handleKey(sc.ScheduleHandle.Value))
+	if !sc.BuiltIn.Null {
+		return sc.BuiltIn, nil
 	}
-	// (c)/(d) … and BuiltIn matches the stored schedule's (:880-903).
-	if match.BuiltIn.Null {
-		return sc.BuiltIn, spec.Errorf(im.StatusInvalidInState, "thermo: schedule: stored schedule %s has no BuiltIn", handleKey(sc.ScheduleHandle.Value))
-	}
-	if sc.BuiltIn.Null {
+	if ok && !match.BuiltIn.Null {
 		return match.BuiltIn, nil
 	}
-	if sc.BuiltIn.Value != match.BuiltIn.Value {
-		return sc.BuiltIn, constraint("BuiltIn differs from the stored schedule's")
-	}
-	return sc.BuiltIn, nil
+	return spec.ValueOf(false), nil
 }
 
-// validateTransitions is chip ValidateScheduleTransitions
-// (ThermostatClusterSchedules.cpp:292-446 at 645b267a).
-func (r scheduleRules) validateTransitions(sc Schedule, feats tdef.ScheduleTypeFeaturesBitmap) error { //nolint:gocognit,gocyclo,cyclop,funlen // one rule per chip check, in chip's order
+// scheduleHandleIn reports whether a schedule of list carries handle h.
+func scheduleHandleIn(list []Schedule, h []byte) bool {
+	_, ok := scheduleWithHandle(list, h)
+	return ok
+}
+
+// validateTransitions is matter.js #validateScheduleTransitions
+// (ThermostatServer.ts:2825-3003 at b25ed960), every refusal
+// CONSTRAINT_ERROR. Where two rules hit one transition the order is
+// ours (decision C-7, D11: no wire difference, every one answers
+// CONSTRAINT_ERROR). The feature a transition's SystemMode needs is
+// matter.js's SystemModeEnum value conformance (:2919-2923), here a rule
+// of its own with the same status; the empty list and a TransitionTime
+// beyond 1439 are the schema's (thermostat-cluster.element.ts:639-645,
+// :653), held here as well for the host's SetSchedules.
+func (r scheduleRules) validateTransitions(sc Schedule, feats tdef.ScheduleTypeFeaturesBitmap) error { //nolint:gocognit,gocyclo,cyclop,funlen // one rule per matter.js check, in its order
 	constraint := func(i int, format string, args ...any) error {
 		return spec.Errorf(im.StatusConstraintError, "thermo: schedule transition %d: "+format, append([]any{i}, args...)...)
 	}
@@ -268,18 +284,21 @@ func (r scheduleRules) validateTransitions(sc Schedule, feats tdef.ScheduleTypeF
 	heatLo, heatHi := r.heatLimits()
 	coolLo, coolHi := r.coolLimits()
 	for i, t := range sc.Transitions {
+		// No Away bit, at least one day (:2836-2845).
 		if t.DayOfWeek == 0 || t.DayOfWeek&^validScheduleDays != 0 {
 			return constraint(i, "DayOfWeek 0x%02X has no weekday or a day outside Sunday to Saturday", t.DayOfWeek)
 		}
 		if t.TransitionTime > 1439 {
 			return constraint(i, "TransitionTime %d is beyond 1439", t.TransitionTime)
 		}
+		// No two transitions at one time on a shared day (:2847-2858).
 		for j := range i {
 			if p := sc.Transitions[j]; p.TransitionTime == t.TransitionTime && p.DayOfWeek&t.DayOfWeek != 0 {
 				return constraint(i, "repeats transition %d's time on a shared day", j)
 			}
 		}
 		setpointFields := t.SystemMode != nil || t.CoolingSetpoint != nil || t.HeatingSetpoint != nil
+		// A preset handle: supported, naming a preset, alone (:2866-2890).
 		if t.PresetHandle != nil {
 			if feats&tdef.ScheduleTypeFeaturesSupportsPresets == 0 {
 				return constraint(i, "the schedule type does not support presets")
@@ -291,10 +310,15 @@ func (r scheduleRules) validateTransitions(sc Schedule, feats tdef.ScheduleTypeF
 				return constraint(i, "a preset handle excludes SystemMode and the setpoints")
 			}
 		}
+		// Setpoint fields need SupportsSetpoints (:2893-2902).
 		if setpointFields && feats&tdef.ScheduleTypeFeaturesSupportsSetpoints == 0 {
 			return constraint(i, "the schedule type does not support setpoints")
 		}
 		if t.SystemMode != nil {
+			// Omitted when it equals the schedule's (:2905-2909).
+			if *t.SystemMode == sc.SystemMode {
+				return constraint(i, "SystemMode %d must be omitted when it equals the schedule's SystemMode", *t.SystemMode)
+			}
 			var need uint32
 			switch *t.SystemMode {
 			case tdef.SystemModeOff:
@@ -314,6 +338,9 @@ func (r scheduleRules) validateTransitions(sc Schedule, feats tdef.ScheduleTypeF
 				return constraint(i, "SystemMode %d needs a feature the thermostat lacks", *t.SystemMode)
 			}
 		}
+		// The setpoints of the effective mode (:2931-2991): present unless
+		// the transition or the schedule names a preset, allowed only where
+		// the mode heats or cools, within the limits, and a deadband apart.
 		mode := sc.SystemMode
 		if t.SystemMode != nil {
 			mode = *t.SystemMode
@@ -328,28 +355,29 @@ func (r scheduleRules) validateTransitions(sc Schedule, feats tdef.ScheduleTypeF
 				return constraint(i, "SystemMode %d needs a CoolingSetpoint", mode)
 			}
 		}
-		if t.HeatingSetpoint != nil && (!heats || int(*t.HeatingSetpoint) < heatLo || int(*t.HeatingSetpoint) > heatHi) {
-			return constraint(i, "HeatingSetpoint %d is outside SystemMode %d or the heating limits %d to %d", *t.HeatingSetpoint, mode, heatLo, heatHi)
-		}
 		if t.CoolingSetpoint != nil && (!cools || int(*t.CoolingSetpoint) < coolLo || int(*t.CoolingSetpoint) > coolHi) {
 			return constraint(i, "CoolingSetpoint %d is outside SystemMode %d or the cooling limits %d to %d", *t.CoolingSetpoint, mode, coolLo, coolHi)
 		}
+		if t.HeatingSetpoint != nil && (!heats || int(*t.HeatingSetpoint) < heatLo || int(*t.HeatingSetpoint) > heatHi) {
+			return constraint(i, "HeatingSetpoint %d is outside SystemMode %d or the heating limits %d to %d", *t.HeatingSetpoint, mode, heatLo, heatHi)
+		}
 		if t.HeatingSetpoint != nil && t.CoolingSetpoint != nil && int(*t.CoolingSetpoint)-int(*t.HeatingSetpoint) < r.st.deadband {
-			return constraint(i, "the setpoints are closer than the deadband")
+			return constraint(i, "the setpoints are closer than the deadband %d", r.st.deadband)
 		}
 	}
 	return nil
 }
 
-// validateTransitionsPerDay is chip ValidateTransitionsPerDay
-// (ThermostatClusterSchedules.cpp:457-488 at 645b267a): with a
-// NumberOfScheduleTransitionPerDay, no day — Away included — carries more
-// transitions; null is no limit.
+// validateTransitionsPerDay is the per-day count of
+// #validateScheduleTransitions (ThermostatServer.ts:2994-3002 at
+// b25ed960), after every transition passed: with a
+// NumberOfScheduleTransitionPerDay, no day carries more transitions; null
+// is no limit.
 func (r scheduleRules) validateTransitionsPerDay(sc Schedule) error {
 	if r.perDay == nil {
 		return nil
 	}
-	for bit := range 8 {
+	for bit := range 7 {
 		day := tdef.ScheduleDayOfWeekBitmap(1 << bit)
 		n := 0
 		for _, t := range sc.Transitions {
@@ -364,54 +392,33 @@ func (r scheduleRules) validateTransitionsPerDay(sc Schedule) error {
 	return nil
 }
 
-// pendingSchedules validates list as the pending schedules, entry by entry
-// in its order — chip WriteAttribute's ReplaceAll, which clears the
-// pending list and appends every entry through AppendPendingSchedule
-// (ThermostatClusterSchedules.cpp:579-604). The dispatcher hands an
-// AppendItem over as the staged list with the item after it, whose
-// re-validation from the start comes to the same result (an entry is
-// validated against the entries before it only). It returns the
-// normalised list.
-func (r scheduleRules) pendingSchedules(stored, list []Schedule) ([]Schedule, error) {
-	pending := make([]Schedule, 0, len(list))
-	for _, sc := range deepcopy.Each(list) {
-		n, err := r.appendPending(stored, pending, sc)
-		if err != nil {
-			return nil, err
-		}
-		pending = append(pending, n)
-	}
-	return pending, nil
-}
-
-// precommitSchedules is chip ThermostatSchedules::PrecommitSchedules
-// (ThermostatClusterSchedules.cpp:1000-1070 at 645b267a): a built-in
-// schedule the pending list dropped is CONSTRAINT_ERROR, and an active
-// schedule it dropped INVALID_IN_STATE.
-func precommitSchedules(stored, pending []Schedule, active []byte) error {
+// validateScheduleCommit is matter.js #validateScheduleCommit
+// (ThermostatServer.ts:3056-3086 at b25ed960): a built-in schedule the new
+// list drops is CONSTRAINT_ERROR, the active schedule it drops
+// INVALID_IN_STATE. The active handle always names a stored schedule
+// here (the setters and the start clear or refuse a dangling one), so
+// matter.js's "only if it named an old schedule" (:3073-3085) holds
+// without a check of its own (decision C-7, D8).
+func validateScheduleCommit(stored, next []Schedule, active []byte) error {
 	for _, sc := range stored {
 		if sc.BuiltIn.Null || !sc.BuiltIn.Value || sc.ScheduleHandle.Null {
 			continue
 		}
-		if _, ok := scheduleWithHandle(pending, sc.ScheduleHandle.Value); !ok {
+		if !scheduleHandleIn(next, sc.ScheduleHandle.Value) {
 			return spec.Errorf(im.StatusConstraintError, "thermo: cannot remove built-in schedule %s", handleKey(sc.ScheduleHandle.Value))
 		}
 	}
-	if active != nil {
-		if _, ok := scheduleWithHandle(pending, active); !ok {
-			return spec.Errorf(im.StatusInvalidInState, "thermo: cannot remove schedule %s while it is the active schedule", handleKey(active))
-		}
+	if active != nil && !scheduleHandleIn(next, active) {
+		return spec.Errorf(im.StatusInvalidInState, "thermo: cannot remove schedule %s while it is the active schedule", handleKey(active))
 	}
 	return nil
 }
 
-// issueScheduleHandles gives every schedule without a handle a new one:
-// chip leaves it to the delegate's CommitPendingSchedules
-// (ThermostatClusterSchedules.h:134-145 at 645b267a: "it is the
-// responsibility of this API to allocate unique schedule handles"); here
-// the server issues 16 random bytes, as matter.js does for a preset
-// (ThermostatServer.ts:1526 at db021da0).
-func issueScheduleHandles(list []Schedule) error {
+// issueScheduleHandles gives every schedule without a handle a new one,
+// 16 random bytes — matter.js #normalizeSchedules
+// (ThermostatServer.ts:3028-3036 at b25ed960) — and records each in
+// issued when it is not nil.
+func issueScheduleHandles(list []Schedule, issued map[string]bool) error {
 	for i := range list {
 		if !list[i].ScheduleHandle.Null {
 			continue
@@ -421,16 +428,20 @@ func issueScheduleHandles(list []Schedule) error {
 			return fmt.Errorf("thermo: issue a schedule handle: %w", err)
 		}
 		list[i].ScheduleHandle = spec.ValueOf(h)
+		if issued != nil {
+			issued[handleKey(h)] = true
+		}
 	}
 	return nil
 }
 
 // writeSchedules is a controller's write of Schedules: only the peer
-// holding an atomic write of it may write, any other request is
-// INVALID_IN_STATE — chip WriteAttribute (ThermostatClusterSchedules.cpp:562-578
-// at 645b267a), which answers another peer INVALID_IN_STATE too, where the
-// Presets write answers it BUSY. The list is validated as the pending
-// schedules ([scheduleRules.pendingSchedules]) and staged.
+// holding an atomic write of it may write, another peer's write is
+// INVALID_IN_STATE where Presets answers BUSY (AtomicWriteHandler.ts:54-56,
+// :474-479 at b25ed960); no atomic write is INVALID_IN_STATE (:467-469).
+// The list is validated against the stored schedules and the peer's own
+// pending Presets — schedules$AtomicChanging (ThermostatServer.ts:2581-2591)
+// — and staged normalised.
 func (s *ThermostatServer) writeSchedules(ctx context.Context, v any) error {
 	list, err := schedulesValue(v)
 	if err != nil {
@@ -438,9 +449,15 @@ func (s *ThermostatServer) writeSchedules(ctx context.Context, v any) error {
 	}
 	return s.stageAtomicAttribute(ctx, tdef.AttrSchedules, im.StatusInvalidInState, func() (any, error) {
 		s.mu.RLock()
-		stored, rules := s.schedules, s.scheduleRules()
+		presets := s.presets
+		if v, ok := s.pendingAtomicValue(ctx, tdef.AttrPresets); ok {
+			if pending, isList := v.([]Preset); isList {
+				presets = pending
+			}
+		}
+		stored, rules := s.schedules, s.scheduleRules(presets)
 		s.mu.RUnlock()
-		return rules.pendingSchedules(stored, list)
+		return rules.validateSchedules(stored, list)
 	})
 }
 
@@ -456,18 +473,27 @@ func schedulesTLVEqual(a, b []Schedule) bool {
 }
 
 // commitSchedules stores the schedules an atomic write staged, after
-// [precommitSchedules] passed: every new schedule gets a handle, the
-// [SchedulePort] stores the list — chip OnAtomicWriteCommit,
-// CommitPendingSchedules (ThermostatClusterSchedules.cpp:639-651 at
-// 645b267a), whose error fails the commit — and the list is stored and
-// reported. The caller holds s.op.
+// precommitAtomic passed: every new schedule gets a handle
+// ([issueScheduleHandles]), the [SchedulePort] stores the list — its
+// error fails the commit — and the list is stored and reported. While the
+// port runs, the handles this commit issued are the change in flight's
+// own, so the port may confirm the list through
+// [ThermostatServer.SetSchedules]. The caller holds s.op.
 func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedule) error {
 	list := deepcopy.Each(staged)
-	if err := issueScheduleHandles(list); err != nil {
+	issued := map[string]bool{}
+	if err := issueScheduleHandles(list, issued); err != nil {
 		return err
 	}
 	if s.schedulePort != nil {
-		if err := s.schedulePort.CommitSchedules(ctx, deepcopy.Each(list)); err != nil {
+		s.mu.Lock()
+		s.issuedScheduleHandles = issued
+		s.mu.Unlock()
+		err := s.schedulePort.CommitSchedules(ctx, deepcopy.Each(list))
+		s.mu.Lock()
+		s.issuedScheduleHandles = nil
+		s.mu.Unlock()
+		if err != nil {
 			return err
 		}
 	}
@@ -481,24 +507,16 @@ func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedul
 	return nil
 }
 
-// presetsInUseBySchedules is chip's PrecommitPresets check
-// (ThermostatClusterPresets.cpp:708-724 at 645b267a, with
-// ThermostatSchedules::IsPresetHandleInUse, ThermostatClusterSchedules.cpp:706-739):
-// with MSCH, a preset the new list drops that a schedule or a schedule
-// transition names is INVALID_IN_STATE. The schedules are the ones a
-// Schedules atomic write staged, when one holds it, and the stored ones
-// otherwise. The caller holds s.mu (read).
-func (s *ThermostatServer) presetsInUseBySchedules(old, next []Preset) error {
+// presetsInUseBySchedules is the schedules half of matter.js
+// #validatePresetCommit (ThermostatServer.ts:2048-2065 at b25ed960): with
+// MSCH, a preset the new list drops that a schedule or a schedule
+// transition of schedules names is INVALID_IN_STATE. schedules are the
+// ones of the change's own transaction: the Schedules the same commit
+// staged when they passed, the stored ones otherwise (:2051 reads
+// persistedSchedules).
+func (s *ThermostatServer) presetsInUseBySchedules(old, next []Preset, schedules []Schedule) error {
 	if s.features&ThermostatFeatureMSCH == 0 {
 		return nil
-	}
-	schedules := s.schedules
-	if st := s.atomic.forAttribute(s.clk.Now(), tdef.AttrSchedules); st != nil {
-		if v, ok := st.staged(tdef.AttrSchedules); ok {
-			if staged, isList := v.([]Schedule); isList {
-				schedules = staged
-			}
-		}
 	}
 	for _, p := range old {
 		if p.PresetHandle.Null || slices.ContainsFunc(next, func(n Preset) bool {

@@ -10,11 +10,12 @@
 // controller changes them with, persisted through a [PresetStore])
 // features, as matter.js's ThermostatServer serves them, and on request
 // the optional TemperatureSetpointHold (with TemperatureSetpointHoldDuration)
-// and ThermostatRunningState. Ahead of matter.js, which does not implement
-// it, the server serves MatterScheduleConfiguration (the device's week
-// programs, the active one, SetActiveScheduleRequest and the atomic write
-// of Schedules) after connectedhomeip's ThermostatSchedules, behind a
-// [SchedulePort] (schedules.go), and ThermostatSuggestions (the presets a
+// and ThermostatRunningState. MatterScheduleConfiguration (the device's
+// week programs, the active one, SetActiveScheduleRequest and the atomic
+// write of Schedules) follows matter.js, which implements it behind its
+// forward feature thermostat-msch (ThermostatServer.ts:177-178, :267-271
+// at b25ed960), behind the extension BD-chip-Thermostat-Schedules and a
+// [SchedulePort] (schedules.go); and ThermostatSuggestions (the presets a
 // controller suggests for a span of time, the one the thermostat follows)
 // after connectedhomeip's ThermostatSuggestions, on the node's Matter time
 // ([ThermostatServer.AttachMatterTime], suggestions.go).
@@ -86,9 +87,9 @@ const (
 )
 
 // servedFeatures are the features whose elements the server serves.
-// MatterScheduleConfiguration is served ahead of matter.js ("not
-// implemented yet", ThermostatServer.ts:82 and :126-128 at db021da0),
-// after connectedhomeip (schedules.go), and so are the Events feature's
+// MatterScheduleConfiguration is served as matter.js implements it behind
+// its forward feature thermostat-msch (ThermostatServer.ts:267-271 at
+// b25ed960; schedules.go), and so are the Events feature's
 // events, which matter.js does not emit (events.go), and
 // ThermostatSuggestions, which ThermostatServer.ts does not implement
 // either (suggestions.go). ScheduleConfiguration and Setback
@@ -222,10 +223,13 @@ type ThermostatConfig struct {
 	// NumberOfScheduleTransitionPerDay (nil for no per-day limit) configure
 	// MatterScheduleConfiguration (MSCH): the schedule types the device
 	// supports, the number of schedules and of transitions across them it
-	// holds, and the transitions a day may carry. Schedules are the
-	// device's own week programs — each with a handle, a null BuiltIn taken
-	// as built in — and ActiveScheduleHandle the one it follows (nil for
-	// none; one that names no schedule is cleared with a warning). The
+	// holds, and the transitions a day may carry. ScheduleTypes name Auto,
+	// Heat or Cool, each once, each supporting presets or setpoints.
+	// Schedules are the device's own week programs, held to the write rules
+	// a controller's are — a null handle gets one, a null BuiltIn is false
+	// (set BuiltIn for a program a controller may not remove) — and
+	// ActiveScheduleHandle the one it follows (nil for none; one that names
+	// no schedule is cleared with a warning). The
 	// device's later changes come back through [ThermostatServer.SetSchedules]
 	// and [ThermostatServer.SetActiveScheduleHandle].
 	ScheduleTypes                    []ScheduleType
@@ -445,6 +449,10 @@ type ThermostatServer struct {
 	schedules                   []Schedule
 	activeScheduleHandle        []byte
 	schedulePort                SchedulePort
+	// issuedScheduleHandles are the handles the commit in flight issued,
+	// while its SchedulePort runs (commitSchedules): the change's own,
+	// which the port may confirm through SetSchedules.
+	issuedScheduleHandles map[string]bool
 
 	// suggest is the TSUGGEST state (suggestions.go).
 	suggest suggestions
@@ -1045,9 +1053,8 @@ func (s *ThermostatServer) readOptionalLocked(attrID uint32) (any, bool) {
 // MatterReadFiltered implements [contract.FabricScopedReader] for the two
 // attributes whose value depends on the reader: Presets and Schedules,
 // which the peer holding an atomic write of them reads as it staged them —
-// matter.js's Presets getter (ThermostatServer.ts:1665-1685 at db021da0),
-// chip's Schedules read (ThermostatClusterSchedules.cpp:517-533 at
-// 645b267a). Every other attribute falls through to
+// matter.js's Presets and Schedules getters (ThermostatServer.ts:3196-3222,
+// :3244-3270 at b25ed960). Every other attribute falls through to
 // [ThermostatServer.MatterRead].
 func (s *ThermostatServer) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	if (attrID != tdef.AttrPresets && attrID != tdef.AttrSchedules) || !s.inst.Serves(attrID) {

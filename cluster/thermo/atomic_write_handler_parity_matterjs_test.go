@@ -3,7 +3,8 @@
 
 // A port of matter.js packages/node/test/behaviors/thermostat/AtomicWriteHandlerTest.ts
 // at 862ad75f: BeginWrite's command-level and per-attribute answers, the
-// timeout, and a write held by another peer.
+// timeout, and a write held by another peer — Presets BUSY and, ported at
+// b25ed960 (#4467), Schedules INVALID_IN_STATE.
 //
 // matter.js invokes on a MockServerNode as peers 1, 2 and 0 of one fabric
 // (invokeAs); the port invokes over the wire from fabrictest pairs: the
@@ -27,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/interaction"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/fabrictest"
@@ -169,7 +171,37 @@ func TestParityMatterJS_AtomicWriteHandlerTest(t *testing.T) {
 	// §7.15.3 mandates INVALID_IN_STATE, but CHIP and TC_TSTAT_4_2 step 15
 	// expect BUSY when another peer holds the atomic write
 	// (AtomicWriteHandlerTest.ts:371-372).
-	t.Run("rejects a write to an attribute held by a different peer with BUSY", func(t *testing.T) {
+	t.Run("rejects a Schedules write held by a different peer with INVALID_IN_STATE", func(t *testing.T) {
+		// createPresetsAndSchedulesNode (:186-214): the presets thermostat
+		// with one Heat schedule type of two schedules with setpoints.
+		p := commissionedThermostat(t, func(*fabrictest.Site) thermo.ThermostatConfig {
+			cfg := thermostatConfig(5, []thermo.Preset{})
+			cfg.Features |= thermo.ThermostatFeatureMSCH
+			cfg.ScheduleTypes = []thermo.ScheduleType{{SystemMode: tdef.SystemModeHeat, NumberOfSchedules: 2, ScheduleTypeFeatures: tdef.ScheduleTypeFeaturesSupportsSetpoints}}
+			cfg.NumberOfSchedules, cfg.NumberOfScheduleTransitions = 2, 2
+			return cfg
+		})
+		if err := p.pair.Grant(parityCtx(t), store.PrivilegeAdminister); err != nil {
+			t.Fatal(err)
+		}
+		decodeAtomicResponse(t, func() interaction.Result {
+			r, err := p.atomicRequest(parityCtx(t), p.pair, beginWrite, []uint32{tdef.AttrSchedules}, timeout)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return r
+		}())
+		second := p.secondPeer(t)
+		statuses := p.writeSchedulesUnchecked(t, second, []thermo.Schedule{})
+		if len(statuses) != 1 || statuses[0] != im.StatusInvalidInState {
+			t.Errorf("write statuses %v, want one INVALID_IN_STATE", statuses)
+		}
+	})
+
+	// §7.15.3 mandates INVALID_IN_STATE, but CHIP and TC_TSTAT_4_2 step 15
+	// expect BUSY when another peer holds the atomic write; matter.js
+	// matches CHIP for Presets (AtomicWriteHandlerTest.ts:397-398).
+	t.Run("rejects a write to Presets held by a different peer with BUSY", func(t *testing.T) {
 		p := createNode(t, store.PrivilegeAdminister)
 		ctx := parityCtx(t)
 		first, err := p.atomicRequest(ctx, p.pair, beginWrite, presets, timeout)
