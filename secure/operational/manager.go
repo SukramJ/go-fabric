@@ -62,6 +62,13 @@ type Manager struct {
 	// onSessionSuperseded fires once per older session a newly
 	// established one supersedes (SetOnSessionSuperseded).
 	onSessionSuperseded func(olderID, newerID uint16)
+	// byPeer indexes the CASE sessions installed by their peer node id, so
+	// the supersession check at an establishment reads the peer's sessions
+	// rather than the whole table. Entries are added at the install and
+	// dropped lazily: one no longer holding its id is pruned when its
+	// peer's bucket is read (supersededByLocked) or by the idle reaper
+	// (prunePeerIndexLocked). Guarded by mu.
+	byPeer map[uint64][]*Entry
 
 	// onGracefulClose, when non-nil, fires once per session BEFORE its
 	// key material is zeroised on every locally-initiated ("graceful")
@@ -320,8 +327,9 @@ func (m *Manager) supersededByLocked(newer *Entry) []*Entry {
 	}
 	fabricIndex, peerNodeID := newer.FabricIndex(), newer.Session.PeerNodeID()
 	cats := newer.Session.PeerCATs()
+	bucket := m.livePeerBucketLocked(peerNodeID)
 	var older []*Entry
-	for _, e := range m.sessions {
+	for _, e := range bucket {
 		if e == newer || e.Session == nil || e.establishing || e.isPase {
 			continue
 		}
@@ -338,6 +346,46 @@ func (m *Manager) supersededByLocked(newer *Entry) []*Entry {
 		return a.SessionID < b.SessionID
 	})
 	return older
+}
+
+// indexPeerLocked adds e, a CASE session just installed, to the peer
+// index. Caller holds m.mu.
+func (m *Manager) indexPeerLocked(e *Entry) {
+	if e.Session == nil {
+		return
+	}
+	if m.byPeer == nil {
+		m.byPeer = map[uint64][]*Entry{}
+	}
+	peer := e.Session.PeerNodeID()
+	m.byPeer[peer] = append(m.byPeer[peer], e)
+}
+
+// livePeerBucketLocked returns the indexed sessions of peerNodeID that
+// still hold their id, pruning the others. Caller holds m.mu for writing.
+func (m *Manager) livePeerBucketLocked(peerNodeID uint64) []*Entry {
+	bucket := m.byPeer[peerNodeID]
+	live := bucket[:0]
+	for _, e := range bucket {
+		if m.sessions[e.SessionID] == e {
+			live = append(live, e)
+		}
+	}
+	clear(bucket[len(live):])
+	if len(live) == 0 {
+		delete(m.byPeer, peerNodeID)
+		return nil
+	}
+	m.byPeer[peerNodeID] = live
+	return live
+}
+
+// prunePeerIndexLocked drops every indexed session that no longer holds
+// its id. Caller holds m.mu for writing.
+func (m *Manager) prunePeerIndexLocked() {
+	for peer := range m.byPeer {
+		m.livePeerBucketLocked(peer)
+	}
 }
 
 // equalCATSets reports whether a and b hold the same tags as sets.
@@ -866,6 +914,7 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		clock:                m.clk(),
 	}
 	m.sessions[id] = entry
+	m.indexPeerLocked(entry)
 	superseded := m.supersededByLocked(entry)
 	excess := m.evictExcessPeerSessionsLocked(entry)
 	m.mu.Unlock()
@@ -1220,6 +1269,7 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 	if occupant := m.installEntryLocked(id, entry); occupant != nil {
 		occupied = append(occupied, occupant)
 	}
+	m.indexPeerLocked(entry)
 	// The per-peer cap runs once the session is established: here for one
 	// installed established, at [Manager.completeEstablishment] for an
 	// establishing one (matter.js SessionManager.ts:757-769 at b25ed960,
@@ -1999,6 +2049,7 @@ func (m *Manager) reapIdle(idleTimeout time.Duration) {
 		e  *Entry
 	}
 	m.mu.Lock()
+	m.prunePeerIndexLocked()
 	var idle []idleEntry
 	for id, e := range m.sessions {
 		if e.Session == nil {
