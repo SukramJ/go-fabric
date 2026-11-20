@@ -60,7 +60,7 @@ func (timedValve) Close(context.Context) error                      { return nil
 // it moves again with the second SetUTCTime.
 func TestOneMatterTimePerNode(t *testing.T) {
 	t.Parallel()
-	rows := surface.NewExtensions(append([]string{"BD-chip-TimeSynchronization-Features", "BD-chip-Thermostat-Suggestions"}, valve.Ahead.IDs()...)...)
+	rows := surface.NewExtensions(append([]string{"BD-chip-TimeSynchronization-Features"}, valve.Ahead.IDs()...)...)
 	handle := []byte("Home")
 	heat := int16(2100)
 	count := uint8(1)
@@ -189,7 +189,7 @@ func TestOneMatterTimePerNode(t *testing.T) {
 func TestTimeSyncValveNeedsTheNodesTime(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	rows := surface.NewExtensions(append([]string{"BD-chip-Thermostat-Suggestions"}, valve.Ahead.IDs()...)...)
+	rows := surface.NewExtensions(valve.Ahead.IDs()...)
 	newValve := func(key string, features valvedef.Feature) node.Endpoint {
 		t.Helper()
 		v, err := device.NewWaterValve(device.Options{StableKey: device.StringKey(key), Name: key, Surface: surface.Policies{Extensions: rows}},
