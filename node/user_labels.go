@@ -134,6 +134,7 @@ func (n *Node) userLabel(ctx context.Context, key string, srv contract.ClusterSe
 		if uerr := json.Unmarshal([]byte(v), &labels); uerr != nil {
 			p.logger.Warn("label.restore", slog.String("key", key), slog.Any("err", uerr))
 		} else if setter, isSetter := srv.(spec.AttributeSetter); isSetter {
+			labels = shortenStoredLabels(p.logger, key, labels)
 			if err := setter.SetAttributes(map[uint32]any{userlabeldef.AttrLabelList: spec.List[userlabeldef.LabelStruct](labels)}); err != nil {
 				p.logger.Warn("label.restore", slog.String("key", key), slog.Any("err", err))
 			}
