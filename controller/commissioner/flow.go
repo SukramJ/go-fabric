@@ -1141,7 +1141,7 @@ func (f *flow) random(n int) ([]byte, error) {
 // before it and then its own error finding, the failure last; any other
 // validation error is one ValidationError finding; a rejection without a
 // failure names every error finding. Mirrors matter.js
-// packages/protocol/src/peer/ControllerCommissioningFlow.ts:1309-1356 at
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:1257-1386 at
 // b25ed960 (#deviceAttestation).
 func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	// An earlier run's pair never outlives this run: a run that fails or

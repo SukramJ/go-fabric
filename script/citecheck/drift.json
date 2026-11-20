@@ -1973,6 +1973,33 @@
     "occurrences": 10
   },
   {
+    "file": "controller/attestation/csr_parity_matterjs_test.go",
+    "line": 56,
+    "citation": "CertificatesTest.ts:714-718",
+    "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
+    "identifier": "DerBitString",
+    "nearest": 769,
+    "occurrences": 3
+  },
+  {
+    "file": "controller/attestation/csr_parity_matterjs_test.go",
+    "line": 79,
+    "citation": "CertificatesTest.ts:708-713",
+    "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
+    "identifier": "PublicKeyEcPrime256v1",
+    "nearest": 763,
+    "occurrences": 2
+  },
+  {
+    "file": "controller/attestation/csr_parity_matterjs_test.go",
+    "line": 97,
+    "citation": "CertificatesTest.ts:695",
+    "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
+    "identifier": "getPublicKeyFromCsr",
+    "nearest": 746,
+    "occurrences": 4
+  },
+  {
     "file": "controller/attestation/pqc.go",
     "line": 85,
     "citation": "AttestationCertificates.ts:33",
@@ -2001,7 +2028,7 @@
   },
   {
     "file": "controller/attestation/validate.go",
-    "line": 33,
+    "line": 40,
     "citation": "DAV:205-211",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "dclCertificateService",
@@ -2010,7 +2037,7 @@
   },
   {
     "file": "controller/attestation/validate.go",
-    "line": 57,
+    "line": 67,
     "citation": "DAV:225-228",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "ValidationResult",
@@ -2019,7 +2046,7 @@
   },
   {
     "file": "controller/attestation/validate.go",
-    "line": 108,
+    "line": 132,
     "citation": "DAV:268-274",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "vendorId",
@@ -2028,7 +2055,7 @@
   },
   {
     "file": "controller/attestation/validate.go",
-    "line": 244,
+    "line": 274,
     "citation": "DAV:341-354",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "notBefore",
@@ -2037,25 +2064,7 @@
   },
   {
     "file": "controller/attestation/validate.go",
-    "line": 358,
-    "citation": "DAV:532-538",
-    "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
-    "identifier": "VendorID",
-    "nearest": 579,
-    "occurrences": 9
-  },
-  {
-    "file": "controller/attestation/validate.go",
-    "line": 362,
-    "citation": "DAV:540-546",
-    "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
-    "identifier": "ProductID",
-    "nearest": 588,
-    "occurrences": 5
-  },
-  {
-    "file": "controller/attestation/validate.go",
-    "line": 472,
+    "line": 523,
     "citation": "Certificate.ts:650",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "serialNumber",
@@ -2522,33 +2531,6 @@
     "identifier": "ManualPairingCodeCodec",
     "nearest": 496,
     "occurrences": 1
-  },
-  {
-    "file": "controller/commissioner/certificates_parity_matterjs_test.go",
-    "line": 55,
-    "citation": "CertificatesTest.ts:714-718",
-    "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
-    "identifier": "DerBitString",
-    "nearest": 769,
-    "occurrences": 3
-  },
-  {
-    "file": "controller/commissioner/certificates_parity_matterjs_test.go",
-    "line": 78,
-    "citation": "CertificatesTest.ts:708-713",
-    "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
-    "identifier": "PublicKeyEcPrime256v1",
-    "nearest": 763,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/commissioner/certificates_parity_matterjs_test.go",
-    "line": 96,
-    "citation": "CertificatesTest.ts:695",
-    "resolved": "packages/protocol/test/certificate/CertificatesTest.ts",
-    "identifier": "getPublicKeyFromCsr",
-    "nearest": 746,
-    "occurrences": 4
   },
   {
     "file": "controller/commissioner/commissioner.go",
