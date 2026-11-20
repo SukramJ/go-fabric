@@ -63,8 +63,49 @@ func (b *Bridge) FailSafeExpired(ctx context.Context) {
 // (core.GeneralCommissioning.SetFailSafeSessionCloser), so an arm for a PASE
 // session opened after the close is not refused (review II,
 // R2-P2-comm-11).
+//
+// The closer runs on every end of the fail-safe without commissioning —
+// its timer, ArmFailSafe with expiry 0, an expiry by RevokeCommissioning,
+// the removal of its fabric — and never on CommissioningComplete. Such an
+// end is a failed commissioning attempt of the window the fail-safe was
+// armed in, when that window is still open; one armed with no window open,
+// or whose window closed or was replaced since, is not counted. Mirrors
+// matter.js packages/protocol/src/protocol/DeviceCommissioner.ts:160-174 at
+// b25ed960 (beginTimed: the window captured at the context's start, counted
+// when the context is destroyed) and :181-184 (#countFailedAttempt returns
+// when `this.#window !== window`). A successful commissioning is excluded by
+// order there (FailsafeContext.ts:152 emits commissioned, which closes the
+// window, before :159 closes the context); here the closer does not run on
+// that path at all.
 func (b *Bridge) failSafeSessionsClosed(ctx context.Context) []uint16 {
-	return b.closePASESessions(ctx, 0, nil)
+	closed := b.closePASESessions(ctx, 0, nil)
+	if armedIn := b.failSafeWindow.Swap(0); armedIn != 0 {
+		if w := b.attemptWindow.Load(); w != nil {
+			if generation, open := w.windowGeneration(); open && generation == armedIn {
+				b.recordFailedAttempt(attemptFailSafeEnded)
+			}
+		}
+	}
+	return closed
+}
+
+// trackFailSafeAttempt is the root's GeneralCommissioning's attempt tracker
+// (core.GeneralCommissioning.SetFailSafeAttemptTracker): when a fail-safe
+// context starts it records the window open now (none: 0), and when the
+// server closes it forgets the record, so the fail-safe the node's stop
+// expires counts for no window — matter.js closes the window before the
+// fail-safe at shutdown (DeviceCommissioner.ts:361-374 at b25ed960). It runs
+// under the server's lock and takes no lock of the bridge's.
+func (b *Bridge) trackFailSafeAttempt(_ context.Context, started bool) {
+	var armedIn uint64
+	if started {
+		if w := b.attemptWindow.Load(); w != nil {
+			if generation, open := w.windowGeneration(); open {
+				armedIn = generation
+			}
+		}
+	}
+	b.failSafeWindow.Store(armedIn)
 }
 
 // wireFailSafeExpiry has the root's GeneralCommissioning clear the PASE
@@ -76,11 +117,15 @@ func (b *Bridge) failSafeSessionsClosed(ctx context.Context) []uint16 {
 // R2-P0-sec-A03, owner decision 9). Like wireCommissioned and
 // adoptPASESessionOnAddNOC it covers a host that mounts
 // core.GeneralCommissioning; a host with a GeneralCommissioning server of
-// its own calls [Bridge.FailSafeExpired].
+// its own calls [Bridge.FailSafeExpired]. It wires the attempt tracker
+// (core.GeneralCommissioning.SetFailSafeAttemptTracker) beside the closer:
+// the two together count a fail-safe that ends without commissioning as a
+// failed commissioning attempt ([Bridge.failSafeSessionsClosed]).
 func (b *Bridge) wireFailSafeExpiry(servers []contract.ClusterServer) {
 	for _, s := range servers {
 		if gc, ok := s.(*core.GeneralCommissioning); ok {
 			gc.SetFailSafeSessionCloser(b.failSafeSessionsClosed)
+			gc.SetFailSafeAttemptTracker(b.trackFailSafeAttempt)
 		}
 	}
 }

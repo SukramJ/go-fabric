@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10184,
+  "entry_points": 10189,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27876,
-    "reachable": 20886,
-    "whitelisted": 6968,
+    "total_exported": 27881,
+    "reachable": 20887,
+    "whitelisted": 6972,
     "unreachable": 22
   },
   "by_package": [
@@ -387,7 +387,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3278,
+      "line": 3295,
       "kind": "method"
     },
     {
@@ -951,6 +951,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_removed_sessions_test.go",
       "line": 81
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAdministratorCommissioningAttemptLimitParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
+      "line": 386
     },
     {
       "package": "bridge",
@@ -2463,6 +2470,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/invoke_dataversion_once_test.go",
       "line": 160
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCommissioningAttemptLimitPASEFailureParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
+      "line": 359
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCommissioningAttemptLimitParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
+      "line": 123
     },
     {
       "package": "bridge",
@@ -42748,6 +42769,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/peer_client_internal_test.go",
       "line": 135
+    },
+    {
+      "package": "node",
+      "identifier": "TestCommissioningAttemptCapThroughFabricRemoved",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/commissioning_attempt_fabric_removed_internal_test.go",
+      "line": 21
     },
     {
       "package": "node",

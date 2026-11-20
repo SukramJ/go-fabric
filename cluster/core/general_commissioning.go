@@ -182,6 +182,9 @@ type GeneralCommissioning struct {
 	// failSafeSessionCloser closes the PASE sessions when the fail-safe
 	// expires and names them ([GeneralCommissioning.SetFailSafeSessionCloser]).
 	failSafeSessionCloser func(ctx context.Context) (closed []uint16)
+	// failSafeAttemptTracker is told when a fail-safe context starts and
+	// when the server closes ([GeneralCommissioning.SetFailSafeAttemptTracker]).
+	failSafeAttemptTracker func(ctx context.Context, started bool)
 	// Hook invoked every time ArmFailSafe arms the FailSafe window from
 	// the disarmed state — a re-arm extends the fail-safe in force and
 	// keeps its state, as matter.js failsafeContext.extend does. The bridge
@@ -479,13 +482,46 @@ func (g *GeneralCommissioning) SetFailSafeSessionCloser(fn func(ctx context.Cont
 	g.mu.Unlock()
 }
 
+// SetFailSafeAttemptTracker wires the bridge's record of which
+// commissioning attempt a fail-safe belongs to. fn(ctx, true) runs when an
+// arm from the disarmed state starts a new fail-safe context — ArmFailSafe's
+// and the internal arms' ([GeneralCommissioning.ArmOnPaseSession],
+// [GeneralCommissioning.ArmFailSafeFor]), not an extend — under the
+// server's lock, so before any end of that context reaches the session
+// closer ([GeneralCommissioning.SetFailSafeSessionCloser]). fn(ctx, false)
+// runs when [GeneralCommissioning.Close] closes the server: a fail-safe it
+// expires from then on — the node's stop — ends no commissioning attempt.
+// fn must not call back into this server. The bridge wires it
+// ([bridge.Bridge.AttachRootClusters]); a host leaves it alone. Pass nil to
+// detach.
+//
+// It is the position of matter.js
+// packages/protocol/src/protocol/DeviceCommissioner.ts:156-176 at b25ed960
+// (beginTimed, called only where GeneralCommissioningServer.ts:101-113
+// creates a new fail-safe context, captures the window open then), and of
+// its shutdown (:361-374), which closes the window before the fail-safe
+// context.
+func (g *GeneralCommissioning) SetFailSafeAttemptTracker(fn func(ctx context.Context, started bool)) {
+	g.mu.Lock()
+	g.failSafeAttemptTracker = fn
+	g.mu.Unlock()
+}
+
 // setArmFabricLocked records the fabric of the arming session as the one
 // the fail-safe is armed for and, for an arm that starts the context
-// (fresh), as the one that armed it. Caller holds g.mu.
-func (g *GeneralCommissioning) setArmFabricLocked(fabric uint8, fresh bool) {
+// (fresh), as the one that armed it, and tells the attempt tracker of the
+// start ([GeneralCommissioning.SetFailSafeAttemptTracker]) — under g.mu, so
+// the start is recorded before any end of this context can run (matter.js
+// packages/protocol/src/protocol/DeviceCommissioner.ts:156-176 at
+// b25ed960, beginTimed, which GeneralCommissioningServer.ts:101-113 calls
+// only where it creates a new fail-safe context). Caller holds g.mu.
+func (g *GeneralCommissioning) setArmFabricLocked(ctx context.Context, fabric uint8, fresh bool) {
 	g.failSafeFabricIndex = fabric
 	if fresh {
 		g.failSafeArmedFabric = fabric
+		if tracker := g.failSafeAttemptTracker; tracker != nil {
+			tracker(ctx, true)
+		}
 	}
 }
 
@@ -533,7 +569,7 @@ func (g *GeneralCommissioning) failSafeExpiryHooksLocked(e FailSafeExpiry) expir
 // SetOnCommissioned wires what ends the commissioning window after a
 // successful CommissioningComplete — matter.js DeviceCommissioner listens on
 // failsafeContext.commissioned and calls endCommissioning
-// (DeviceCommissioner.ts:160). The bridge wires it to its
+// (DeviceCommissioner.ts:164 at b25ed960). The bridge wires it to its
 // CommissioningWindow; it fires after the host's OnCommissioningComplete
 // hook. Pass nil to detach.
 func (g *GeneralCommissioning) SetOnCommissioned(fn func()) {
@@ -964,7 +1000,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// that the *same* CASE fabric closes the window the PASE/CASE
 	// session opened. PASE sessions surface as fabric==0, which is OK
 	// here — only Complete is fabric-gated.
-	g.setArmFabricLocked(sessFabric, !extending)
+	g.setArmFabricLocked(ctx, sessFabric, !extending)
 	// Bump DataVersion on successful arm so Apple's MTRDevice sees the cluster
 	// changed and does not skip it with DataVersionFilter=0.
 	// Mirrors chip src/app/clusters/general-commissioning-server/
@@ -1043,6 +1079,10 @@ func (g *GeneralCommissioning) Close(ctx context.Context) error {
 	g.mu.Lock()
 	g.closed = true
 	g.stopFailSafeWatchLocked()
+	if tracker := g.failSafeAttemptTracker; tracker != nil {
+		// What expires from here on is the stop's, not an attempt's.
+		tracker(ctx, false)
+	}
 	for {
 		done := g.expiryRollbacksDone
 		g.mu.Unlock()
@@ -1488,7 +1528,7 @@ func (g *GeneralCommissioning) armFailSafeFor(ctx context.Context, seconds uint3
 	// fail-safe was disarmed stays (review II, R2-P2-rr-dev-07). A re-arm
 	// keeps it too, and so does ArmFailSafeFor's fresh arm, which carries no
 	// Breadcrumb of its own (review II, N-findev-4).
-	g.setArmFabricLocked(fabricIndex, fresh)
+	g.setArmFabricLocked(ctx, fabricIndex, fresh)
 	g.dataVersion.Bump()
 	g.startFailSafeWatchLocked(ctx, fabricIndex, g.failSafeExpiresAt)
 	armedHook := g.onFailSafeArmed

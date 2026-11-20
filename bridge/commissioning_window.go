@@ -139,6 +139,13 @@ type CommissioningWindow struct {
 	// RevokeCommissioning closes it. Mirrors matter.js
 	// DeviceCommissioner.ts CommissioningWindow.byAdministrator == false.
 	own bool
+	// generation names the window open now, or the last one: it moves on
+	// every open — an administrator's window, the node's own, a restart of
+	// the node's own — as matter.js makes a new CommissioningWindow object
+	// there (packages/protocol/src/protocol/DeviceCommissioner.ts:274-299 at
+	// b25ed960). The bridge counts a failed commissioning attempt against
+	// the window a fail-safe was armed in by it ([Bridge.recordFailedAttempt]).
+	generation uint64
 
 	// fabricCounter, when set, gives OpenOwnWindow its default timeout
 	// (see [CommissioningWindow.SetFabricCounter]).
@@ -381,6 +388,14 @@ func (w *CommissioningWindow) IsOpen() bool {
 	return w.open
 }
 
+// windowGeneration returns the generation of the window open now and
+// whether one is open; with none open, the last window's.
+func (w *CommissioningWindow) windowGeneration() (generation uint64, open bool) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.generation, w.open
+}
+
 // IsOwnWindow reports whether the open window is one the node opened itself
 // ([CommissioningWindow.OpenOwnWindow]). A host's transition hook reads it to
 // tell the node's own window — commissionable with the configured passcode,
@@ -530,6 +545,7 @@ func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Du
 	}
 	w.open = true
 	w.own = true
+	w.generation++
 	w.openedAt = w.clock.Load().Now()
 	w.timeout = timeout
 	w.expiresAt = w.openedAt.Add(timeout)
@@ -727,6 +743,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		replaced = func() { runClose(hook, restore) }
 	}
 	w.open = true
+	w.generation++
 	w.discriminator = params.Discriminator
 	w.durationSec = params.CommissioningTimeoutSeconds
 	w.openedAt = w.clock.Load().Now()

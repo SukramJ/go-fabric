@@ -157,7 +157,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1892,
+    "line": 1908,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -167,7 +167,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1899,
+    "line": 1915,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -176,7 +176,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1931,
+    "line": 1947,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -186,7 +186,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2820,
+    "line": 2837,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
@@ -206,7 +206,7 @@
   },
   {
     "file": "bridge/commissioning_window.go",
-    "line": 1125,
+    "line": 1142,
     "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:524",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "randomBytes",

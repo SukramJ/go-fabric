@@ -3,12 +3,12 @@
 
 package bridge
 
-// White-box tests for the PASE brute-force cap: recordPaseFailure,
+// White-box tests for the PASE brute-force cap: recordFailedAttempt,
 // resetPaseFailures, and paseMaxErrors. Lives in package bridge (not
 // bridge_test) so it can call the unexported counter methods directly
 // instead of driving them indirectly through dispatchSecureChannel.
 // Mirrors matter.js PaseServer.ts PASE_COMMISSIONING_MAX_ERRORS — see
-// securechannel.go's recordPaseFailure doc comment for the full citation.
+// securechannel.go's recordFailedAttempt doc comment for the full citation.
 
 import (
 	"bytes"
@@ -70,7 +70,7 @@ func TestBridge_PaseFailures_RevokesWindowAtCap(t *testing.T) {
 	b.AttachMetrics(m)
 
 	for range paseMaxErrors {
-		b.recordPaseFailure()
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 
 	if got := w.CurrentWindow().Status; got != wire.WindowStatusClosed {
@@ -93,7 +93,7 @@ func TestBridge_PaseFailures_BelowCapKeepsWindowOpen(t *testing.T) {
 	w := openedWindow(t, b)
 
 	for range paseMaxErrors - 1 {
-		b.recordPaseFailure()
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 
 	if got := w.CurrentWindow().Status; got != wire.WindowStatusEnhanced {
@@ -112,11 +112,11 @@ func TestBridge_PaseFailures_ResetGivesFreshBudget(t *testing.T) {
 	w := openedWindow(t, b)
 
 	for range paseMaxErrors - 1 {
-		b.recordPaseFailure()
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 	b.resetPaseFailures()
 	for range paseMaxErrors - 1 {
-		b.recordPaseFailure()
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 
 	if got := w.CurrentWindow().Status; got != wire.WindowStatusEnhanced {
@@ -125,8 +125,8 @@ func TestBridge_PaseFailures_ResetGivesFreshBudget(t *testing.T) {
 }
 
 // TestBridge_PaseFailures_NoWindowIsNilSafe verifies that
-// recordPaseFailure is a no-op (not a panic) when no commissioning
-// window is attached — the missing-window guard in recordPaseFailure
+// recordFailedAttempt is a no-op (not a panic) when no commissioning
+// window is attached — the missing-window guard in recordFailedAttempt
 // must short-circuit before touching a nil *CommissioningWindow.
 func TestBridge_PaseFailures_NoWindowIsNilSafe(t *testing.T) {
 	t.Parallel()
@@ -136,7 +136,7 @@ func TestBridge_PaseFailures_NoWindowIsNilSafe(t *testing.T) {
 	}
 
 	for range paseMaxErrors {
-		b.recordPaseFailure()
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 }
 
@@ -162,7 +162,7 @@ func TestBridge_PaseLockoutClosesOnlyTheWindow(t *testing.T) {
 	w.SetPaseSessionCloser(closer)
 
 	for range paseMaxErrors {
-		b.recordPaseFailure()
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 
 	if got := w.CurrentWindow().Status; got != wire.WindowStatusClosed {
@@ -194,7 +194,7 @@ func TestBridge_PaseLockedOutAtCap(t *testing.T) {
 	b.AttachPaseHandler(a)
 
 	for range paseMaxErrors {
-		b.recordPaseFailure()
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 	if !b.paseLockedOut() {
 		t.Fatal("paseLockedOut = false at the cap; PASE would keep accepting guesses")
@@ -202,13 +202,13 @@ func TestBridge_PaseLockedOutAtCap(t *testing.T) {
 
 	// A well-formed PBKDFParamRequest must now be dropped without
 	// reaching the handler.
-	before := b.paseFailures.Load()
+	before := b.failedAttempts.Load()
 	reqBytes := buildTestPBKDFParamRequest(t, bytes.Repeat([]byte{0x22}, spake2.PBKDFRandomSize))
 	if err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodePBKDFParamRequest, 9, false, 0), reqBytes); err != nil {
 		t.Fatalf("dispatch while locked out: %v", err)
 	}
-	if got := b.paseFailures.Load(); got != before {
-		t.Errorf("paseFailures = %d, want %d — a locked-out PASE datagram must not reach the handler", got, before)
+	if got := b.failedAttempts.Load(); got != before {
+		t.Errorf("failedAttempts = %d, want %d — a locked-out PASE datagram must not reach the handler", got, before)
 	}
 
 	// A fresh acceptor (a new commissioning window) lifts the lock.
@@ -219,8 +219,8 @@ func TestBridge_PaseLockedOutAtCap(t *testing.T) {
 	if err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodePBKDFParamRequest, 10, false, 0), reqBytes); err != nil {
 		t.Fatalf("dispatch after re-attach: %v", err)
 	}
-	if got := b.paseFailures.Load(); got != 0 {
-		t.Errorf("paseFailures = %d after a valid request on a fresh acceptor, want 0", got)
+	if got := b.failedAttempts.Load(); got != 0 {
+		t.Errorf("failedAttempts = %d after a valid request on a fresh acceptor, want 0", got)
 	}
 }
 
@@ -240,7 +240,7 @@ func TestBridge_PaseLockedOutAtCap(t *testing.T) {
 //
 // Bite check: dropping the preserveLockoutOnReset guard in
 // resetPaseFailures (or the Store(true) around RevokeWindow in
-// recordPaseFailure) makes the restore closure clear the lockout, so
+// recordFailedAttempt) makes the restore closure clear the lockout, so
 // paseLockedOut() is false right after the cap and this test fails.
 func TestBridge_PaseLockout_SurvivesInternalRestore(t *testing.T) {
 	t.Parallel()
@@ -260,7 +260,7 @@ func TestBridge_PaseLockout_SurvivesInternalRestore(t *testing.T) {
 		}
 
 		for range paseMaxErrors {
-			b.recordPaseFailure()
+			b.recordFailedAttempt(attemptPASEPairing)
 		}
 
 		if !b.paseLockedOut() {
@@ -322,7 +322,7 @@ func TestBridge_PaseLockoutExpiresOnItsOwn(t *testing.T) {
 		b := newUnstartedBridge(t)
 
 		for range paseMaxErrors {
-			b.recordPaseFailure()
+			b.recordFailedAttempt(attemptPASEPairing)
 		}
 		if !b.paseLockedOut() {
 			t.Fatal("paseLockedOut = false at the cap; PASE would keep accepting guesses")
@@ -339,8 +339,8 @@ func TestBridge_PaseLockoutExpiresOnItsOwn(t *testing.T) {
 		if b.paseLockedOut() {
 			t.Fatal("PASE still locked out after the cooldown expired — an unauthenticated peer can disable pairing permanently")
 		}
-		if got := b.paseFailures.Load(); got != 0 {
-			t.Errorf("paseFailures = %d after the lockout expired, want 0 — the next window of guesses must start from a full budget", got)
+		if got := b.failedAttempts.Load(); got != 0 {
+			t.Errorf("failedAttempts = %d after the lockout expired, want 0 — the next window of guesses must start from a full budget", got)
 		}
 	})
 }
@@ -358,7 +358,7 @@ func TestBridge_PaseLockoutBacksOffOnRepeatedCaps(t *testing.T) {
 			t.Helper()
 			start := time.Now()
 			for range paseMaxErrors {
-				b.recordPaseFailure()
+				b.recordFailedAttempt(attemptPASEPairing)
 			}
 			b.mu.RLock()
 			until := b.paseLockoutUntil
@@ -418,12 +418,12 @@ func TestBridge_PaseAbortedByPeerStatusReport(t *testing.T) {
 	if b.claimPaseInFlight(onExchange(exchange + 2)) {
 		t.Fatal("a report on another exchange, or a success report, released the handshake")
 	}
-	if got := b.paseFailures.Load(); got != 0 {
-		t.Fatalf("paseFailures = %d before the peer's failure report, want 0", got)
+	if got := b.failedAttempts.Load(); got != 0 {
+		t.Fatalf("failedAttempts = %d before the peer's failure report, want 0", got)
 	}
 	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodeStatusReport, exchange, false, 0), failure)
-	if got := b.paseFailures.Load(); got != 1 {
-		t.Errorf("paseFailures = %d after the peer's failure report, want 1", got)
+	if got := b.failedAttempts.Load(); got != 1 {
+		t.Errorf("failedAttempts = %d after the peer's failure report, want 1", got)
 	}
 	if !b.claimPaseInFlight(onExchange(exchange + 2)) {
 		t.Fatal("the slot is still held after the commissioner aborted the handshake; its retry would be dropped as busy")

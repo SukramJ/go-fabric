@@ -58,7 +58,7 @@ func TestPASEMessagesOfOtherHandshakesLeaveAPairingInProgressAlone(t *testing.T)
 		_ = other.send(mrp.SCOpcodePake3, uint16(0x9000+i), []byte{0x15}, nil)
 	}
 	_ = other.send(mrp.SCOpcodePake1, paseExchange, []byte{0x15}, nil)
-	if got := r.b.paseFailures.Load(); got != 0 {
+	if got := r.b.failedAttempts.Load(); got != 0 {
 		t.Fatalf("PASE failures counted for other handshakes' messages during a pairing: %d, want 0", got)
 	}
 	if r.b.paseLockedOut() {

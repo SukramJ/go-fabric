@@ -127,8 +127,8 @@ func TestPaseAdapter_PBKDFParamRequestWithoutMandatoryFieldRejected(t *testing.T
 		b.AttachPaseHandler(adapter())
 		req := pbkdfRequestWith(t, absent(3), absent(4))
 		_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodePBKDFParamRequest, 7, false, 0), req)
-		if got := b.paseFailures.Load(); got != 1 {
-			t.Fatalf("paseFailures = %d, want 1", got)
+		if got := b.failedAttempts.Load(); got != 1 {
+			t.Fatalf("failedAttempts = %d, want 1", got)
 		}
 	})
 }
