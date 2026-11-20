@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10167,
+  "entry_points": 10171,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27866,
+    "total_exported": 27870,
     "reachable": 20885,
-    "whitelisted": 6959,
+    "whitelisted": 6963,
     "unreachable": 22
   },
   "by_package": [
@@ -1210,6 +1210,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/attribute_value_reader_structured_test.go",
       "line": 74
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttributeValueReader_ListAppendOfAScalarEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/attribute_value_reader_listappend_test.go",
+      "line": 47
     },
     {
       "package": "bridge",
@@ -33857,28 +33864,28 @@
       "identifier": "TestAheadDeclarationsAreThermo",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
-      "line": 55
+      "line": 47
     },
     {
       "package": "device",
       "identifier": "TestAheadThermostatDisabled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
-      "line": 77
+      "line": 69
     },
     {
       "package": "device",
       "identifier": "TestAheadThermostatEnabled",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
-      "line": 132
+      "line": 124
     },
     {
       "package": "device",
       "identifier": "TestAheadThermostatNotSelected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/surface_ahead_test.go",
-      "line": 107
+      "line": 99
     },
     {
       "package": "device",
@@ -36874,7 +36881,7 @@
       "identifier": "TestDaemonAtEveryLevel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/surface_level_test.go",
-      "line": 87
+      "line": 92
     },
     {
       "package": "examples/reference-bridge",
@@ -36920,10 +36927,10 @@
     },
     {
       "package": "examples/reference-bridge",
-      "identifier": "TestDemoThermostatSuggestionsAreGated",
+      "identifier": "TestDemoThermostatServesSuggestions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/thermostat_suggestions_test.go",
-      "line": 23
+      "line": 22
     },
     {
       "package": "examples/reference-bridge",
@@ -37196,7 +37203,7 @@
       "identifier": "TestNilEndpointSeesATypedNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/surface_level_test.go",
-      "line": 188
+      "line": 193
     },
     {
       "package": "examples/reference-bridge",
@@ -37392,14 +37399,14 @@
       "identifier": "TestSpecLevelFlag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/surface_level_test.go",
-      "line": 171
+      "line": 176
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestSpecLevelsDocIsCurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/surface_level_test.go",
-      "line": 138
+      "line": 143
     },
     {
       "package": "examples/reference-bridge",
@@ -37477,6 +37484,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
       "line": 313
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestUnitTestingListAppend",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/unit_testing_test.go",
+      "line": 177
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestUnitTestingServesWhatTheGoTHWrites",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/unit_testing_test.go",
+      "line": 108
     },
     {
       "package": "examples/reference-bridge",
@@ -42635,7 +42656,7 @@
       "identifier": "TestCASEResponderSessionEstablishingOnTheDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_establishing_internal_test.go",
-      "line": 82
+      "line": 90
     },
     {
       "package": "node",
@@ -42643,6 +42664,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_stake_lost_internal_test.go",
       "line": 40
+    },
+    {
+      "package": "node",
+      "identifier": "TestCASESessionEstablishedIsLoggedAtCompletion",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_establishing_internal_test.go",
+      "line": 195
     },
     {
       "package": "node",

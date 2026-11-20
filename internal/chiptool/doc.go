@@ -110,8 +110,9 @@
 // Every daemon the suite starts also carries --wifi, a simulated Wi-Fi link
 // behind WiFiNetworkDiagnostics on the root for the DGWIFI family, and
 // --media, a video player and a content app after chip's tv-app for the
-// media families: the PICS slices are generated from one daemon, so every
-// case runs against the same device.
+// media families, and --unit-testing, CHIP's UnitTesting cluster on the
+// Aggregator for the Go-TH leg's IDM cases: the PICS slices are generated
+// from one daemon, so every case runs against the same device.
 //
 // # The Go-TH leg
 //

@@ -21,16 +21,15 @@ import "github.com/SukramJ/go-fabric/surface"
 //     "`ThermostatServer.ts:272` at `b25ed960`: implemented in matter.js
 //     behind a forward gate, not released" (the `thermostat-events` gate
 //     line; owner decision 291).
-//   - BD-chip-Thermostat-Suggestions: ThermostatSuggestions
-//     ([ThermostatFeatureTSUGGEST]). The register's matter.js marker:
-//     "`ThermostatServer.ts:81`, the class doc's list of the features it
-//     does not implement (presence, as BD-chip-Thermostat-Schedules';
-//     absence: no suggestion text anywhere in the file, 1790 lines)".
+//
+// ThermostatSuggestions ([ThermostatFeatureTSUGGEST]) is no row: matter.js
+// serves it (packages/node/src/behaviors/thermostat/ThermostatServer.ts:2261-2293
+// at b25ed960, #setupSuggestions), and its row
+// BD-chip-Thermostat-Suggestions closed caught up (owner decision 336).
 //
 // The features' attributes, commands and events follow from the feature
 // bits; the rows add no further optional element.
 var Ahead = surface.AheadSet{
-	"BD-chip-Thermostat-Schedules":   {Features: ThermostatFeatureMSCH},
-	"BD-chip-Thermostat-Events":      {Features: ThermostatFeatureTEVT},
-	"BD-chip-Thermostat-Suggestions": {Features: ThermostatFeatureTSUGGEST},
+	"BD-chip-Thermostat-Schedules": {Features: ThermostatFeatureMSCH},
+	"BD-chip-Thermostat-Events":    {Features: ThermostatFeatureTEVT},
 }

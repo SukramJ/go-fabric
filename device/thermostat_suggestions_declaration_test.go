@@ -6,7 +6,6 @@ package device_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -14,12 +13,14 @@ import (
 	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/surface"
 )
 
-// TestThermostatDeclaresSuggestions: ThermostatSuggestions is ahead of
-// matter.js (thermo.Ahead), refused without its register row; with it the
-// declaration's Initial gives MaxThermostatSuggestions, and the server
+// TestThermostatDeclaresSuggestions: ThermostatSuggestions is served
+// without a register row — matter.js serves the feature
+// (packages/node/src/behaviors/thermostat/ThermostatServer.ts:2261-2293 at
+// b25ed960, #setupSuggestions), so it is no longer ahead of it (owner
+// decision 336); the declaration's Initial gives MaxThermostatSuggestions,
+// and the server
 // reads the node's Matter time, which the node hands it as the device
 // joins the topology: before that a suggestion answers INVALID_IN_STATE,
 // with the node's time it is taken and followed (the node's own wiring is
@@ -36,13 +37,9 @@ func TestThermostatDeclaresSuggestions(t *testing.T) {
 		Initial:  thermostatdef.Patch{NumberOfPresets: &count, PresetTypes: &types, Presets: &presets, MaxThermostatSuggestions: &limit},
 	}
 	opts := device.Options{StableKey: device.StringKey("thermo-tsuggest"), Name: "thermo"}
-	if _, err := device.NewThermostat(opts, decl); !errors.Is(err, surface.ErrExtensionNotEnabled) {
-		t.Fatalf("without the row: %v, want ErrExtensionNotEnabled", err)
-	}
-	opts.Surface = surface.Policies{Extensions: surface.NewExtensions("BD-chip-Thermostat-Suggestions")}
 	d, err := device.NewThermostat(opts, decl)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("TSUGGEST without any register row: %v", err)
 	}
 	srv := d.Thermostat()
 	if got := srv.Get().MaxThermostatSuggestions; got != limit {

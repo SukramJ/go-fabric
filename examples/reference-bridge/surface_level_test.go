@@ -12,7 +12,6 @@ import (
 	"math/bits"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -68,7 +67,13 @@ func servedElements(ep surface.Endpoint) []elementKey {
 		for _, id := range c.Attributes {
 			out = append(out, elementKey{ep.Key, c.ID, surface.KindAttribute, id})
 		}
-		for _, id := range slices.Concat(c.Accepted, c.Generated) {
+		// The requests alone: a level judges a command as a request
+		// (surface.ElementLevels, the device layer's candidates are the
+		// accepted commands) and a response follows its request. A
+		// generated id judged as a request named another command —
+		// Thermostat's AddThermostatSuggestionResponse 0x02 is the number
+		// of the request GetWeeklySchedule.
+		for _, id := range c.Accepted {
 			out = append(out, elementKey{ep.Key, c.ID, surface.KindCommand, id})
 		}
 		for _, id := range c.Events {

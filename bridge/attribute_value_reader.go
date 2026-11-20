@@ -471,6 +471,9 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 	case path.Cluster == thermostatdef.ClusterID && path.Attribute == thermostatdef.AttrSchedules && el.IsContainer:
 		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, true)
 	}
+	if v, ok := definedListItem(path, el, dec); ok {
+		return v, nil
+	}
 	v, err := primitiveAttributeValue(el, dec)
 	if err != nil {
 		return v, err
@@ -479,6 +482,46 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 		return v, nil
 	}
 	return im.AttributeValue{Value: []any{v.Value}}, nil
+}
+
+// definedListItem decodes an appended entry of a list a registered
+// definition decodes ([spec.Attribute.Decode]): the entry as a one-entry
+// list through the attribute's own decoder, so it comes out in the type
+// the definition decodes the whole list into — the type a REPLACE of the
+// list stored, which the dispatcher's append requires — and an entry the
+// list's entry type refuses is refused. ok is false for an attribute no
+// registered definition decodes as a list, and for a null entry, which
+// keep the primitive reader. A structured entry goes through
+// [generatedAttributeValue], as the replace of such a list does.
+//
+// Mirrors matter.js packages/protocol/src/action/server/AttributeWriteResponse.ts:446-460
+// at b25ed960 (writeValue: an ADD is decoded with the list schema's
+// elementSchema, :455, and pushed onto the list, :460).
+func definedListItem(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, bool) {
+	if el.IsNull {
+		return im.AttributeValue{}, false
+	}
+	def := spec.Lookup(path.Cluster)
+	if def == nil {
+		return im.AttributeValue{}, false
+	}
+	attr := def.Attribute(path.Attribute)
+	if attr == nil || attr.Decode == nil || attr.Type.Kind != spec.KindList {
+		return im.AttributeValue{}, false
+	}
+	if el.IsContainer {
+		v, err := generatedAttributeValue(def, path.Attribute, el, dec, true)
+		if err != nil {
+			return im.AttributeValue{Value: im.UndecodableValue{Err: err}}, true
+		}
+		return v, true
+	}
+	n := spec.Node{El: tlv.Element{Type: tlv.TypeArray, IsContainer: true}, Children: []spec.Node{{El: el}}}
+	v, err := attr.Decode(n)
+	if err != nil {
+		return im.AttributeValue{Value: refusedValue(def, err)}, true
+	}
+	return im.AttributeValue{Value: v}, true
 }
 
 // stampFabricPlaceholder sets the FabricIndex field (context tag 254) of

@@ -1525,7 +1525,7 @@ var ddStages = map[string][]string{
 	"trustedRoot": {"msg=matter.opcreds.cmd_ok command_name=AddTrustedRootCertificate "},
 	"adminAcl":    {"msg=matter.opcreds.cmd_ok command_name=AddNOC "},
 	// The CASE session the Sigma3 established (node/security.go
-	// case.session_established), logged as the session is installed.
+	// case.session_established), logged as its establishment completes.
 	"case":                  {"msg=case.session_established ", " fabric_index="},
 	"commissioningComplete": {logCommissioned},
 	// The daemon clears its PASE sessions after an OK CommissioningComplete

@@ -319,7 +319,7 @@ func TestGoCertificationCases(t *testing.T) {
 		ids = selected
 	}
 	bin := requireBridgeBinary(t)
-	flags := requireBridgeFlags(t, bin, "db", "listen", "wifi", "media", "app-pipe")
+	flags := requireBridgeFlags(t, bin, "db", "listen", "wifi", "media", "app-pipe", "unit-testing")
 	if os.Getenv(goCertEnv) != "" && *updateChipCases {
 		t.Logf("%s narrows the leg: only the cases run are rewritten in the golden file", goCertEnv)
 	}

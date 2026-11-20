@@ -1203,7 +1203,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	adapter.SetOnUnfinished(held.release)
 	// The session is installed establishing; the bridge reports its
 	// handshake's end ([caseEstablishment]).
-	establishing, err := newCaseEstablishment(adapter, sessions, ids, onOpened)
+	establishing, err := newCaseEstablishment(adapter, sessions, ids, logger, onOpened)
 	if err != nil {
 		return nil, err
 	}
@@ -1264,7 +1264,10 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 			}
 		}
 		establishing.put(entry)
-		logger.Info("case.session_established",
+		// Installed, not yet established: the bridge's report of the
+		// completed handshake establishes it, and case.session_established
+		// is logged there (caseEstablishment.complete; owner decision 353).
+		logger.Debug("case.session_establishing",
 			slog.Int("session_id", int(entry.SessionID)),
 			slog.Int("fabric_index", int(fabricIndex)),
 			slog.Uint64("node_id", peerNodeID))
@@ -1343,6 +1346,8 @@ type caseEstablishment struct {
 	// onOpened, when set, learns the id of every session established (the
 	// node's OnSessionOpened).
 	onOpened func(sessionID uint16)
+	// logger logs each session established (case.session_established).
+	logger *slog.Logger
 
 	// afterPut is ids.testAfterAdmit: a test seam run after each put.
 	afterPut func()
@@ -1355,8 +1360,8 @@ type caseEstablishment struct {
 // it installs (internal/bridgeseam SetCaseEstablishmentCompletion). A hook
 // the adapter does not take fails the adapter's construction: every session
 // it installs would stay establishing for good.
-func newCaseEstablishment(adapter *bridge.CaseAdapter, sessions *operational.Manager, ids *caseIdentities, onOpened func(sessionID uint16)) (*caseEstablishment, error) {
-	e := &caseEstablishment{sessions: sessions, onOpened: onOpened, afterPut: ids.testAfterAdmit}
+func newCaseEstablishment(adapter *bridge.CaseAdapter, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger, onOpened func(sessionID uint16)) (*caseEstablishment, error) {
+	e := &caseEstablishment{sessions: sessions, onOpened: onOpened, logger: logger, afterPut: ids.testAfterAdmit}
 	if !bridgeseam.SetCaseEstablishmentCompletion(adapter, e.complete) {
 		return nil, errors.New("node: the CASE adapter takes no establishment completion hook")
 	}
@@ -1384,6 +1389,19 @@ func (s *caseEstablishment) complete(sessionID uint16, completed bool) bool {
 	}
 	if !sessionseam.CompleteEstablishment(s.sessions, entry) {
 		return false
+	}
+	// Logged as the session is established — the state the pickers, the
+	// per-peer cap and OnSessionOpened see — not as it was installed:
+	// one meaning of "established" for state and log (owner decision 353).
+	if s.logger != nil {
+		var peer uint64
+		if entry.Session != nil {
+			peer = entry.Session.PeerNodeID()
+		}
+		s.logger.Info("case.session_established",
+			slog.Int("session_id", int(entry.SessionID)),
+			slog.Int("fabric_index", int(entry.FabricIndex())),
+			slog.Uint64("node_id", peer))
 	}
 	if s.onOpened != nil {
 		s.onOpened(entry.SessionID)
