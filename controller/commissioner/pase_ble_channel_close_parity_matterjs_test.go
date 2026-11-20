@@ -182,18 +182,13 @@ func TestPaseBleChannelClose(t *testing.T) {
 		defer mgr.Close()
 		ch.mgr = mgr
 		c, fabric := channelCommissioner(t)
-		done := make(chan error, 1)
-		go func() {
-			_, err := c.Commission(context.Background(), Options{Fabric: fabric, Passcode: 20202021, Channel: ch, Timeout: 90 * time.Second})
-			done <- err
-		}()
-		select {
-		case err := <-done:
-			if !errors.Is(err, errBLEGone) {
-				t.Fatalf("Commission: %v, want the channel's close as the cause", err)
-			}
-		case <-time.After(10 * time.Second):
-			t.Fatal("PASE waited for the device after its channel closed")
+		// matter.js gives PASE 90 s; the caller's bound here is 10 s, so a
+		// PASE that waits for the device fails on it instead.
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_, err = c.Commission(ctx, Options{Fabric: fabric, Passcode: 20202021, Channel: ch, Timeout: 90 * time.Second})
+		if !errors.Is(err, errBLEGone) {
+			t.Fatalf("Commission: %v, want the channel's close as the cause", err)
 		}
 		if lost, closedAt := ch.lostAt.Load(), ch.closedAt.Load(); closedAt == 0 || time.Duration(closedAt-lost) >= 5*time.Second {
 			t.Fatalf("the channel was released %v after its loss", time.Duration(closedAt-lost))

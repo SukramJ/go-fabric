@@ -66,20 +66,19 @@ func operationalInteraction(t *testing.T, clock *fakeClock, handle func(imReques
 	return interaction.New(mgr, s, discard()), s
 }
 
-// executeStanding runs the flow and fails the test when it does not
-// return while the fake clock stands: a flow that waited for a response
-// timeout would not return at all.
+// executeStanding runs the flow while the fake clock stands. A flow that
+// waited for a response timeout after the failure would wait until the
+// wall-clock bound ends its context, and then return that abort instead of
+// the step's error.
 func executeStanding(t *testing.T, f *flow) error {
 	t.Helper()
-	done := make(chan error, 1)
-	go func() { done <- f.execute(context.Background()) }()
-	select {
-	case err := <-done:
-		return err
-	case <-time.After(10 * time.Second):
-		t.Fatal("the flow waited after the failure")
-		return nil
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err := f.execute(ctx)
+	if ctx.Err() != nil {
+		t.Fatalf("the flow waited after the failure: %v", err)
 	}
+	return err
 }
 
 func TestCommissioningFailsafeExpiry(t *testing.T) {
