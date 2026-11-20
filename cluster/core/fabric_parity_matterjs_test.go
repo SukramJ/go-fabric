@@ -77,4 +77,18 @@ func TestFabricSetLabel(t *testing.T) {
 			t.Fatalf("label = %q after the rejection, want it unchanged", got)
 		}
 	})
+
+	// FabricTest.ts:140-144 at b25ed960 (#4995): 11 × "日" is 33 bytes in
+	// UTF-8 but 11 characters. This module counted the label's bytes
+	// already (BD-chip-FabricLabelBytes).
+	t.Run("rejects a label of fewer than 32 characters that exceeds 32 bytes", func(t *testing.T) {
+		t.Parallel()
+		got, err := fabricTestSetLabel(t, strings.Repeat("日", 11))
+		if err == nil || !strings.Contains(err.Error(), "32") {
+			t.Fatalf("UpdateFabricLabel(11 × 日) error = %v, want the 32 limit", err)
+		}
+		if got != "mock-fabric-1" {
+			t.Fatalf("label = %q after the rejection, want it unchanged", got)
+		}
+	})
 }

@@ -132,7 +132,17 @@ func TestGroupsServerSchemaRelaxation(t *testing.T) {
 		}
 	})
 
-	// :90-99
+	// :90-95 at b25ed960 (#4995): the bound counts UTF-8 bytes, so nine
+	// "é" — nine characters — are over it.
+	t.Run("refuses a GroupName of 9 two-byte characters, which is 18 bytes", func(t *testing.T) {
+		t.Parallel()
+		status, _ := invokeAddGroup(t, 1, strings.Repeat("é", 9))
+		if status != im.StatusConstraintError {
+			t.Errorf("AddGroupResponse status %v; want ConstraintError", status)
+		}
+	})
+
+	// :97-102 at b25ed960
 	t.Run("accepts an out-of-range GroupId and returns a command response from the handler", func(t *testing.T) {
 		t.Parallel()
 		status, gid := invokeAddGroup(t, 0, "grp")

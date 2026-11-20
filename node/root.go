@@ -550,6 +550,7 @@ func buildLabels(ctx context.Context, st store.Settings, logger *slog.Logger, ke
 			labels = nil
 			logger.Warn("label.restore", slog.String("key", key), slog.Any("err", uerr))
 		}
+		labels = shortenStoredLabels(logger, key, labels)
 	}
 	userLabel, err = mattercore.NewUserLabel(mattercore.UserLabelConfig{
 		Labels: labels,

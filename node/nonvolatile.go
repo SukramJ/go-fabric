@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -527,7 +528,14 @@ func (v *nonVolatile) restore(ctx context.Context, ep *endpoint.Endpoint, srv co
 		if !found || raw == "" {
 			continue
 		}
-		val, err := decodeNonVolatile(def.Attribute(id), raw)
+		val, cut, err := decodeNonVolatile(def.Attribute(id), raw)
+		if cut > 0 {
+			// The value is not logged: the generated model does not carry
+			// matter.js's isSecret, so a secret container cannot be told
+			// apart and redacted as matter.js redacts it (Datasource.ts:156-163).
+			v.n.logger.Warn("nonvolatile.restore", slog.String("key", a.key),
+				slog.String("what", "stored strings shortened to their bound in UTF-8 bytes"), slog.Int("count", cut))
+		}
 		if err != nil {
 			v.n.logger.Warn("nonvolatile.restore", slog.String("key", a.key), slog.Any("err", err))
 			continue
@@ -756,39 +764,161 @@ func (n *Node) persistNonVolatile(ctx context.Context, t *endpoint.Topology) {
 // decodeNonVolatile reads a stored value the way the bridge decodes a
 // controller's write of it: a container through the attribute's generated
 // decoder, a primitive as its wire type (bridge attributeValueReader).
-func decodeNonVolatile(a *spec.Attribute, raw string) (any, error) {
+// First every string in it longer than its numeric maximum in UTF-8 bytes
+// is cut to it ([shortenStored]); cut counts them. The cut value is what
+// the server is set to, and the store holds it once the restore or a later
+// change stores the attribute's value; until then each restore cuts again.
+func decodeNonVolatile(a *spec.Attribute, raw string) (val any, cut int, err error) {
 	b, err := hex.DecodeString(raw)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	n, err := spec.ReadElement(tlv.NewDecoder(b))
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
+	n, cut = shortenStored(a.Type, a.Constraint, nil, n)
 	el := n.El
 	switch {
 	case el.IsNull || el.Type == tlv.TypeNull:
-		return nil, nil
+		return nil, cut, nil
 	case el.IsContainer:
 		if a.Decode == nil {
-			return nil, fmt.Errorf("node: %s has no generated decoder", a.Name)
+			return nil, cut, fmt.Errorf("node: %s has no generated decoder", a.Name)
 		}
-		return a.Decode(n)
+		val, err = a.Decode(n)
+		return val, cut, err
 	}
 	switch el.Type {
 	case tlv.TypeBoolTrue:
-		return true, nil
+		return true, cut, nil
 	case tlv.TypeBoolFalse:
-		return false, nil
+		return false, cut, nil
 	case tlv.TypeUTF8Str1, tlv.TypeUTF8Str2, tlv.TypeUTF8Str4, tlv.TypeUTF8Str8:
-		return el.String, nil
+		return el.String, cut, nil
 	case tlv.TypeOctetStr1, tlv.TypeOctetStr2, tlv.TypeOctetStr4, tlv.TypeOctetStr8:
-		return slices.Clone(el.Octets), nil
+		return slices.Clone(el.Octets), cut, nil
 	case tlv.TypeSignedInt1, tlv.TypeSignedInt2, tlv.TypeSignedInt4, tlv.TypeSignedInt8:
-		return el.Int, nil
+		return el.Int, cut, nil
 	case tlv.TypeFloat4, tlv.TypeFloat8:
-		return el.Float, nil
+		return el.Float, cut, nil
 	default:
-		return el.Uint, nil
+		return el.Uint, cut, nil
 	}
+}
+
+// shortenStored cuts every character string in n, a stored value of type
+// t under constraint c, that is longer than its numeric maximum in UTF-8
+// bytes to that maximum, between two runes, and returns n with them cut
+// and their number. A string's maximum is the smaller of its own and the
+// entry maximum of the list that holds it (listMax, "max 10[max 32]");
+// strings in lists and structs are cut too; a bound that is not a number
+// cuts nothing. A value stored while the bound counted UTF-16 code units
+// can be longer than it now is. Mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:124-220 at
+// b25ed960 (shortenStoredStrings, Bytes.truncateUtf8, #4995), applied to
+// stored values at load (:656-661).
+func shortenStored(t spec.Type, c spec.Constraint, listMax *spec.Bound, n spec.Node) (out spec.Node, cut int) {
+	switch t.Kind { //nolint:exhaustive // only strings are cut; lists and structs are walked for them
+	case spec.KindString:
+		if n.El.IsContainer || n.El.Type < tlv.TypeUTF8Str1 || n.El.Type > tlv.TypeUTF8Str8 {
+			return n, 0
+		}
+		limit := -1
+		for _, b := range []*spec.Bound{c.Max, listMax} {
+			if b.IsInt() && (limit < 0 || int(b.Int) < limit) {
+				limit = int(b.Int)
+			}
+		}
+		if limit < 0 || len(n.El.String) <= limit {
+			return n, 0
+		}
+		end := limit
+		for end > 0 && !utf8.RuneStart(n.El.String[end]) {
+			end--
+		}
+		n.El.String, n.El.RawLength = n.El.String[:end], 0
+		return n, 1
+	case spec.KindList:
+		if t.Entry == nil || !n.El.IsContainer {
+			return n, 0
+		}
+		var entryMax *spec.Bound
+		if c.Entry != nil {
+			entryMax = c.Entry.Max
+		}
+		return shortenChildren(n, func(spec.Node) (spec.Type, spec.Constraint, *spec.Bound, bool) {
+			return t.Entry.Type, t.Entry.Constraint, entryMax, true
+		})
+	case spec.KindStruct:
+		if t.Struct == nil || !n.El.IsContainer {
+			return n, 0
+		}
+		return shortenChildren(n, func(ch spec.Node) (spec.Type, spec.Constraint, *spec.Bound, bool) {
+			if ch.El.Tag.Kind != tlv.TagKindContext {
+				return spec.Type{}, spec.Constraint{}, nil, false
+			}
+			for i := range t.Struct.Fields {
+				if f := &t.Struct.Fields[i]; f.ID == ch.El.Tag.Number {
+					return f.Type, f.Constraint, nil, true
+				}
+			}
+			return spec.Type{}, spec.Constraint{}, nil, false
+		})
+	}
+	return n, 0
+}
+
+// shortenChildren is [shortenStored] over a container's children, each
+// under the type, constraint and list maximum of returns; n's children are
+// copied before the first one changes.
+func shortenChildren(n spec.Node, of func(spec.Node) (spec.Type, spec.Constraint, *spec.Bound, bool)) (out spec.Node, cut int) {
+	total := 0
+	for i, ch := range n.Children {
+		t, c, listMax, ok := of(ch)
+		if !ok {
+			continue
+		}
+		short, k := shortenStored(t, c, listMax, ch)
+		if k == 0 {
+			continue
+		}
+		if total == 0 {
+			n.Children = slices.Clone(n.Children)
+		}
+		n.Children[i] = short
+		total += k
+	}
+	return n, total
+}
+
+// shortenStoredLabels is [shortenStored] for a UserLabel LabelList a
+// store of its own keeps as JSON (buildLabels, Node.userLabel): a Label or
+// Value stored while "max 16" counted UTF-16 code units is cut to 16 bytes
+// in UTF-8, so the list restores — a list over its bound would fail the
+// server's construction or be refused by its setter. A list within its
+// bounds comes back as it was; a cut is logged without the values (see
+// decodeNonVolatile's caller).
+func shortenStoredLabels(logger *slog.Logger, key string, labels []userlabeldef.LabelStruct) []userlabeldef.LabelStruct {
+	a := userlabeldef.Definition.Attribute(userlabeldef.AttrLabelList)
+	b, err := bridge.AttributeValueTLV(spec.List[userlabeldef.LabelStruct](labels))
+	if err != nil {
+		return labels
+	}
+	n, err := spec.ReadElement(tlv.NewDecoder(b))
+	if err != nil {
+		return labels
+	}
+	n, cut := shortenStored(a.Type, a.Constraint, nil, n)
+	if cut == 0 {
+		return labels
+	}
+	v, err := a.Decode(n)
+	list, ok := v.(spec.List[userlabeldef.LabelStruct])
+	if err != nil || !ok {
+		return labels
+	}
+	logger.Warn("label.restore", slog.String("key", key),
+		slog.String("what", "stored strings shortened to their bound in UTF-8 bytes"), slog.Int("count", cut))
+	return list
 }

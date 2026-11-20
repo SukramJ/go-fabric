@@ -132,8 +132,13 @@ func TestGroupsParityMatterJS(t *testing.T) {
 		if got := f.addGroup(t, f.ep3, 1, strings.Repeat("n", 17)); got != im.StatusConstraintError {
 			t.Errorf("17-character name: %v, want ConstraintError", got)
 		}
-		if got := f.addGroup(t, f.ep3, 1, strings.Repeat("ü", 16)); got != im.StatusSuccess {
-			t.Errorf("16-character name: %v, want Success (length counts characters, not bytes)", got)
+		// The bound counts UTF-8 bytes (GroupsServer.ts:101 at b25ed960,
+		// #4995): 16 × "ü" is 32 bytes, 8 × "ü" the 16 allowed.
+		if got := f.addGroup(t, f.ep3, 1, strings.Repeat("ü", 16)); got != im.StatusConstraintError {
+			t.Errorf("16 characters in 32 bytes: %v, want ConstraintError", got)
+		}
+		if got := f.addGroup(t, f.ep3, 1, strings.Repeat("ü", 8)); got != im.StatusSuccess {
+			t.Errorf("8 characters in 16 bytes: %v, want Success", got)
 		}
 		if got := f.addGroup(t, f.ep3, 0x0700, "unmapped"); got != im.StatusUnsupportedAccess {
 			t.Errorf("group without a GroupKeyMap entry: %v, want UnsupportedAccess", got)

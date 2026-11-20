@@ -175,7 +175,29 @@ func TestConstraintParityMatterJS(t *testing.T) {
 		})
 	})
 
-	// :555-565: "max 8{1}", one codepoint at most.
+	// :540-562 at b25ed960: "max 2" bounds the length in UTF-8 bytes
+	// (#4995), so "éa", two characters, is three bytes and over.
+	t.Run("string length", func(t *testing.T) {
+		t.Parallel()
+		c := spec.Constraint{Text: "max 2", Max: &spec.Bound{Int: 2}}
+		run(t, constraintCluster(spec.Type{Kind: spec.KindString}, c), c.Text, []check{
+			{"accepts if under", "ab", nil, true},
+			{"rejects if over", "abc", nil, false},
+			{"rejects if over in UTF-8 bytes", "éa", nil, false},
+		})
+	})
+
+	// :564-568 at b25ed960: "min 3" is reached by "éa" in bytes.
+	t.Run("string minimum length", func(t *testing.T) {
+		t.Parallel()
+		c := spec.Constraint{Text: "min 3", Min: &spec.Bound{Int: 3}}
+		run(t, constraintCluster(spec.Type{Kind: spec.KindString}, c), c.Text, []check{
+			{"accepts multi-byte characters that reach the minimum in bytes", "éa", nil, true},
+		})
+	})
+
+	// :570-584 at b25ed960: "max 8{1}", one codepoint at most; the length
+	// stays in bytes ("𩸽" is four), the codepoints a second bound.
 	t.Run("string length with codepoints", func(t *testing.T) {
 		t.Parallel()
 		c := spec.Constraint{Text: "max 8{1}", Max: &spec.Bound{Int: 8}, CpMax: 1}

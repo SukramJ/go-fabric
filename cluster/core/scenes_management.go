@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
-	"unicode/utf16"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -234,8 +233,11 @@ func LoadScenesState(data []byte, persist func([]byte)) (*ScenesState, error) {
 // validTable holds a restored table to the rules a scene command is held
 // to: an entry whose (fabric, group, scene) an earlier entry holds is
 // dropped, the entries beyond SceneTableSize too, and a name longer than
-// 16 UTF-16 units is cut to it. What it drops or cuts is logged (review
-// II, R2-P6-store-1212).
+// 16 bytes in UTF-8 is cut to it between two runes — a name stored while
+// the bound counted UTF-16 units can be longer. What it drops or cuts is
+// logged (review II, R2-P6-store-1212). The cut mirrors matter.js
+// packages/node/src/behavior/state/managed/Datasource.ts:124-163 at
+// b25ed960 (shortenStoredStrings, Bytes.truncateUtf8 at load, #4995).
 func (st *ScenesState) validTable(table []SceneEntry) []SceneEntry {
 	type key struct {
 		f uint8
@@ -256,11 +258,8 @@ func (st *ScenesState) validTable(table []SceneEntry) []SceneEntry {
 			continue
 		}
 		seen[k] = true
-		if name := []rune(e.Name); len(utf16.Encode(name)) > scenesMaxNameLength {
-			for len(utf16.Encode(name)) > scenesMaxNameLength {
-				name = name[:len(name)-1]
-			}
-			e.Name = string(name)
+		if name := truncateUTF8(e.Name, scenesMaxNameLength); name != e.Name {
+			e.Name = name
 			cut++
 		}
 		out = append(out, e)
@@ -360,13 +359,16 @@ func (st *ScenesState) infoFor(fabric uint8) *SceneInfoStruct {
 
 // remainingCapacity is the number of scenes fabric may still add: its own
 // quota left, bounded by the free entries of the endpoint's table, which
-// the other fabrics share — chip FabricTableImpl::GetRemainingCapacity
-// (src/app/storage/FabricTableImpl.ipp), the reading TC-S-2.6 asserts.
-// matter.js #countsForFabric counts the fabric quota only and so lets
-// three fabrics store 3×63 scenes in a 128-entry table; this follows the
-// spec's "may change … due to other clients associated with other
-// fabrics" and chip (notes/parity/by_design.md, ScenesManagement
-// RemainingCapacity). count is the fabric's own scene count.
+// the other fabrics share. Mirrors matter.js
+// packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:1051-1059
+// at b25ed960 (#remainingCapacityForFabric, #4963), which AddScene
+// (:268-269, RESOURCE_EXHAUSTED at 0) and GetSceneMembership (:479) read
+// as this does; chip FabricTableImpl::GetRemainingCapacity
+// (src/app/storage/FabricTableImpl.ipp) reads the same, the value TC-S-2.6
+// asserts. A change by one fabric moves the others' capacity
+// (:1031-1041 #updateRemainingCapacities): the FabricSceneInfo digest
+// holds the table's length, so every change reports it. count is the
+// fabric's own scene count.
 func (st *ScenesState) remainingCapacity(count int) int {
 	return max(min(st.fabricCapacity()-count, int(st.tableSize)-len(st.table)), 0)
 }
@@ -1063,17 +1065,14 @@ func (s *ScenesManagement) groupValid(ctx context.Context, fabric uint8, groupID
 
 func (s *ScenesManagement) addScene(ctx context.Context, fabric uint8, req AddSceneRequest) SceneStatusResponse {
 	resp := SceneStatusResponse{Command: scenesCmdAddScene, GroupID: req.GroupID, SceneID: req.SceneID}
-	// A SceneName over 16 is refused with the SceneID and TransitionTime
-	// bounds, as connectedhomeip refuses it
+	// A SceneName over 16 bytes in UTF-8 is refused with the SceneID and
+	// TransitionTime bounds. Mirrors matter.js
+	// packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts:292
+	// at b25ed960 (`Bytes.utf8Length(sceneName) > 16`, CONSTRAINT_ERROR with
+	// the scene id, #4995), as connectedhomeip refuses it
 	// (src/app/clusters/scenes-server/ScenesManagementCluster.cpp:535-541
 	// at 6170af84); it used to be cut to 16 and stored with SUCCESS.
-	// matter.js relaxes the request field so that its behaviour answers
-	// the status (ScenesManagementServer.ts:129-147 at db021da0) but then
-	// checks only SceneID and TransitionTime (:283); see
-	// notes/parity/by_design.md BD-chip-ScenesManagement-SceneNameLength.
-	// The length counts UTF-16 units, as matter.js's string constraint
-	// counts them (constraint.ts:200-211).
-	if req.SceneID > scenesMaxSceneID || req.TransitionTime > scenesMaxTransition || len(utf16.Encode([]rune(req.SceneName))) > scenesMaxNameLength {
+	if req.SceneID > scenesMaxSceneID || req.TransitionTime > scenesMaxTransition || spec.StringLength(req.SceneName) > scenesMaxNameLength {
 		resp.Status = im.StatusConstraintError
 		return resp
 	}

@@ -358,6 +358,15 @@ func TestUserLabelServerParity(t *testing.T) { //nolint:tparallel // each subtes
 		})
 	}
 
+	// :255-263 at b25ed960 (#4995): the bound counts UTF-8 bytes, so a
+	// label of nine "é" — nine characters, 18 bytes — is over it.
+	t.Run("rejects a label of 9 two-byte characters, which is 18 bytes", func(t *testing.T) {
+		lp := userLabelPair(t, 0)
+		lp.replaceAll(t, keepMe)
+		expectStatuses(t, lp.rawWrite(t, rawLabels{entry(strings.Repeat("é", 9), "v")}), []im.StatusCode{im.StatusConstraintError})
+		expectLabels(t, "stored", lp.stored(), keepMe)
+	})
+
 	// Value is mandatory: matter.js refuses an entry without it, where chip
 	// decodes it as empty (:255-256).
 	t.Run("rejects an entry without value in a REPLACE_ALL", func(t *testing.T) {
