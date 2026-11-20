@@ -163,6 +163,42 @@ func TestUnitTestingServesWhatTheGoTHWrites(t *testing.T) {
 	}
 }
 
+// TestUnitTestingServesEveryAttributeFromTheStart: a wildcard read of the
+// cluster on endpoint 1 returns all four attributes before any write, each
+// at matter.js's initial value (unit-testing-cluster.ts:91-106 at
+// b25ed960), and a subscription to floatSingle is established — chip's
+// TC-IDM-10.1 reads every attribute AttributeList names, and TC-IDM-4.1
+// step 7 subscribes to floatSingle (PR #562's chiptool.yml: both absent,
+// the subscribe refused InvalidAction).
+func TestUnitTestingServesEveryAttributeFromTheStart(t *testing.T) {
+	t.Parallel()
+	s := startUnitTestingNode(t)
+	ctx := context.Background()
+	wild := im.ConcreteAttributePath{Endpoint: 1, Cluster: unitTestingClusterID, HasEndpoint: true, HasCluster: true}
+	r, err := s.Read(ctx, wild)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, attr := range []uint32{unitTestingAttrFloatSingle, unitTestingAttrOctetString, unitTestingAttrStructAttr, unitTestingAttrListLongOctetString} {
+		if _, ok := r.Value(1, unitTestingClusterID, attr); !ok {
+			t.Errorf("the wildcard read of 1/UnitTesting returns no attribute 0x%02X", attr)
+		}
+	}
+	if v, ok := r.Value(1, unitTestingClusterID, unitTestingAttrFloatSingle); ok && (v.Type != tlv.TypeFloat4 || v.Float != 0) {
+		t.Errorf("floatSingle starts at %v (type 0x%02X), want single 0", v.Float, v.Type)
+	}
+	if v, ok := r.Value(1, unitTestingClusterID, unitTestingAttrOctetString); ok && (v.Type < tlv.TypeOctetStr1 || v.Type > tlv.TypeOctetStr8 || len(v.Octets) != 0) {
+		t.Errorf("octetString starts at %x (type 0x%02X), want the empty octet string", v.Octets, v.Type)
+	}
+	sub, err := s.Subscribe(ctx, 0, 30, unitTestingPath(unitTestingAttrFloatSingle))
+	if err != nil {
+		t.Fatalf("subscribe to floatSingle: %v", err)
+	}
+	if _, ok := sub.Priming.Value(1, unitTestingClusterID, unitTestingAttrFloatSingle); !ok {
+		t.Error("the priming report holds no floatSingle")
+	}
+}
+
 // TestUnitTestingListAppend is TC-IDM-3.1 step 13's write, as the Go-TH
 // leg sends it: the module's controller writes listLongOctetString with
 // three 512-byte entries, which fit no message, so the client sends it

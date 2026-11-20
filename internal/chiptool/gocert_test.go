@@ -584,7 +584,9 @@ func newGoTH(ctx context.Context, t *testing.T, bin string, flags map[string]boo
 	if listen == "" {
 		listen = fmt.Sprintf(":%d", matterPort)
 	}
-	dut := startBridgeWith(t, bin, flags, bridgeOptions{appPipe: pipe, listen: listen, extraArgs: c.daemonArgs})
+	// The DUT serves UnitTesting, as matter.js's all-clusters app does
+	// (bridgeOptions.unitTesting); the TS cases address it on endpoint 1.
+	dut := startBridgeWith(t, bin, flags, bridgeOptions{appPipe: pipe, listen: listen, extraArgs: c.daemonArgs, unitTesting: true})
 	th := &goTH{t: t, ctx: ctx, c: c, bin: bin, flags: flags, pics: pics, dut: dut}
 	// The controllers' log, kept for a failing case's dump.
 	th.log = slog.New(slog.NewTextHandler(&th.logs, &slog.HandlerOptions{Level: slog.LevelDebug}))

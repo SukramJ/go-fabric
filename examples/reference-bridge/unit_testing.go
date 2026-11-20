@@ -115,11 +115,11 @@ func unitTestingCluster() *spec.Cluster {
 		Attributes: []spec.Attribute{
 			{
 				ID: unitTestingAttrFloatSingle, Name: "floatSingle", Type: spec.Type{Name: "single", Kind: spec.KindFloat32},
-				Conformance: mandatory, Access: rw, Default: float32(0),
+				Conformance: mandatory, Access: rw,
 			},
 			{
 				ID: unitTestingAttrOctetString, Name: "octetString", Type: octets,
-				Conformance: mandatory, Access: rw, Default: []byte{},
+				Conformance: mandatory, Access: rw,
 			},
 			{
 				ID: unitTestingAttrStructAttr, Name: "structAttr", Type: spec.Type{Name: "SimpleStruct", Kind: spec.KindStruct, Struct: simpleStruct},
@@ -139,7 +139,10 @@ func unitTestingCluster() *spec.Cluster {
 // newUnitTesting registers the definition and returns its server holding
 // matter.js's initial state (unit-testing-cluster.ts:91-106 at b25ed960):
 // floatSingle 0, octetString empty, structAttr with every field at its
-// zero value, listLongOctetString four long entries.
+// zero value, listLongOctetString four long entries. Every value is
+// Initial: a definition's Default renders a number only as a float64 and
+// no octet string or list at all (cluster/spec defaultOf), and an
+// attribute without a value is absent from reads and subscriptions.
 func newUnitTesting() (*spec.Server, error) {
 	spec.Register(unitTestingDefinition)
 	zero8, no, empty, none := uint8(0), false, []byte{}, ""
@@ -149,6 +152,8 @@ func newUnitTesting() (*spec.Server, error) {
 		entries[i] = unitTestingLongOctetStringEntry
 	}
 	return spec.NewServer(unitTestingDefinition, spec.Options{}, spec.ServerConfig{Initial: map[uint32]any{
+		unitTestingAttrFloatSingle: float32(0),
+		unitTestingAttrOctetString: []byte{},
 		unitTestingAttrStructAttr: unitTestingSimpleStruct{
 			A: &zero8, B: &no, C: &zero8, D: &empty, E: &none, F: &zero8, G: &g, H: &h,
 		},
