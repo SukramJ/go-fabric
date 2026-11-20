@@ -172,7 +172,7 @@ func closesOnUnacknowledgedFinalStatus(t *testing.T, req interaction.SubscribeRe
 	}
 }
 
-// onOffCluster is ON_OFF of ClientInteractionSubscribeTest.ts:220: endpoint
+// onOffCluster is ON_OFF of ClientInteractionSubscribeTest.ts:219: endpoint
 // 1, cluster OnOff.
 var onOffCluster = im.ConcreteAttributePath{Endpoint: 1, Cluster: 0x0006, HasEndpoint: true, HasCluster: true}
 
