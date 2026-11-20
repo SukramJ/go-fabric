@@ -1383,6 +1383,8 @@ func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target sub
 			// An error status to a chunk ends the subscription as one to
 			// the last message does.
 			b.closeRefusedSubscription(sub.ID, 0, err)
+		case b.leftSession(sub.ID, target.sessionID):
+			b.requeueLeftSession(sub, owed, op, err)
 		default:
 			// Counted before the data is owed again: the report the
 			// requeue starts is the next update.
@@ -1408,6 +1410,8 @@ func (b *Bridge) deliverOngoingReport(sub *subscription.Subscription, target sub
 	switch {
 	case aborted:
 		owed.requeueAborted(sub)
+	case (!answered || answer.undecodable) && b.leftSession(sub.ID, target.sessionID):
+		b.requeueLeftSession(sub, owed, op, fmt.Errorf("%w: exchange %d", errChunkUnanswered, exch))
 	case answered && answer.undecodable:
 		// No status of the peer's, so no refusal: a failed update, its
 		// data owed again (owner decision 176; [errChunkAnswerUndecodable]).
@@ -1523,11 +1527,19 @@ func (b *Bridge) noteReportUndelivered(sessionID uint16, counter uint32) {
 	if !ok || owed.subID == 0 || !owed.settled.CompareAndSwap(false, true) {
 		return
 	}
-	// Counted before the data is owed again: the report the requeue
-	// starts is the next update.
-	b.noteSubscriptionSendError(owed.subID, "report_undelivered", mrp.ErrMaxRetransmissionsReached)
-	if m := b.subscriptionManagerLocked(); m != nil {
-		if sub, err := m.Get(owed.subID); err == nil {
+	m := b.subscriptionManagerLocked()
+	var sub *subscription.Subscription
+	if m != nil {
+		sub, _ = m.Get(owed.subID)
+	}
+	switch {
+	case sub != nil && b.leftSession(owed.subID, sessionID):
+		b.requeueLeftSession(sub, owed, "report_undelivered", mrp.ErrMaxRetransmissionsReached)
+	default:
+		// Counted before the data is owed again: the report the requeue
+		// starts is the next update.
+		b.noteSubscriptionSendError(owed.subID, "report_undelivered", mrp.ErrMaxRetransmissionsReached)
+		if sub != nil {
 			owed.requeue(sub)
 		}
 	}
