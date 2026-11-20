@@ -45,8 +45,16 @@ type emission struct {
 // (ClientStructure.ts:1634-1649).
 type pendingChange struct{ erase, install, rebuild bool }
 
-// structure is matter.js ClientStructure (node/client/ClientStructure.ts:123-1773
-// at db021da0): the endpoints and clusters the peer's reports describe. Its
+// partsList is one endpoint's PartsList as #synchronizeDescriptor reads it
+// (ClientStructure.ts:1093-1115 at b25ed960): the endpoint numbers it
+// names, in order and each once.
+type partsList struct {
+	order []uint16
+	has   map[uint16]bool
+}
+
+// structure is matter.js ClientStructure (node/client/ClientStructure.ts:123-1846
+// at b25ed960): the endpoints and clusters the peer's reports describe. Its
 // state is guarded by the node's lock; every method expects it held.
 type structure struct {
 	// mu is the owning Node's lock (Node.mu); it guards every field of the
@@ -68,12 +76,32 @@ type structure struct {
 	pendingOrder []*Endpoint
 	pending      map[*Endpoint]*pendingChange
 
-	// claimOrder and claims are #partClaims, part → claimants, both in
-	// insertion order (:127-135).
-	claimOrder  []*Endpoint
-	claims      map[*Endpoint][]*Endpoint
-	partsListOf map[*Endpoint]map[uint16]bool
+	// partsOrder and partsListOf are #partsListOf (ClientStructure.ts
+	// :136-144 at b25ed960): the parts each endpoint's current PartsList
+	// names, the endpoints in the order their first list arrived. Which
+	// endpoint owns a part is derived from them on every apply
+	// ([structure.placeParts]); no claim is stored.
+	partsOrder  []*Endpoint
+	partsListOf map[*Endpoint]*partsList
+	// composition is #composition (:157-165), read through
+	// [structure.compositionOf].
 	composition map[*Endpoint]schema.Composition
+	// reportedLists is EndpointStructure.reportedLists (:1893-1902): the
+	// Descriptor lists (DeviceTypeList, PartsList) the peer has reported
+	// for an endpoint, from the wire or the store.
+	reportedLists map[*Endpoint]map[uint32]bool
+	// onTheNode is #endpointsOnTheNode (:146-150): the endpoints on the
+	// node other than the root as of the last structural apply, nil while
+	// the root has not reported its PartsList
+	// ([structure.findEndpointsOnTheNode]). keptOffTheNode is
+	// #keptOffTheNode (:152-153): endpoints that left the node but stay,
+	// because they hold endpoints on the node.
+	onTheNode      map[uint16]bool
+	keptOffTheNode map[uint16]bool
+	// warnedIncompleteRootPartsList and warnedRootWithoutDeviceType keep
+	// those warnings to one per node and start (:155, :166).
+	warnedIncompleteRootPartsList bool
+	warnedRootWithoutDeviceType   bool
 
 	// recordedFabricFiltered is the fabric filter the cache records, nil
 	// before one is recorded — ClientNodeStore.cacheFabricFiltered
@@ -101,12 +129,13 @@ type structure struct {
 func newStructure(mu *sync.RWMutex, log *slog.Logger, p *persister) *structure {
 	s := &structure{
 		mu: mu, log: log, p: p,
-		endpoints:   map[uint16]*Endpoint{},
-		pending:     map[*Endpoint]*pendingChange{},
-		claims:      map[*Endpoint][]*Endpoint{},
-		partsListOf: map[*Endpoint]map[uint16]bool{},
-		composition: map[*Endpoint]schema.Composition{},
-		epoch:       &epoch{trusted: true},
+		endpoints:      map[uint16]*Endpoint{},
+		pending:        map[*Endpoint]*pendingChange{},
+		partsListOf:    map[*Endpoint]*partsList{},
+		composition:    map[*Endpoint]schema.Composition{},
+		reportedLists:  map[*Endpoint]map[uint32]bool{},
+		keptOffTheNode: map[uint16]bool{},
+		epoch:          &epoch{trusted: true},
 	}
 	s.root = newEndpoint(mu, 0)
 	s.root.deviceType, s.root.classification, s.root.name, s.root.installed = rootNodeDeviceType, "node", "RootNode", true
@@ -141,9 +170,12 @@ func (s *structure) takeEmissions() []emission {
 
 // loadCache builds the structure from the store — ClientStructure.loadCache
 // (:183-232): per endpoint the Descriptor first (:199-205), each cluster's
-// seed checked (:210) and synchronized (:211); the part claims resolved
-// (:215); only installations may be pending (:217-229); the structure
-// events emitted (:231).
+// seed checked (:210) and synchronized (:211); only installations may be
+// pending (:217-229); the structure events emitted (:231). Mirrors
+// matter.js ClientStructure.ts:251-258 at b25ed960 (loadCache): the
+// stored Descriptor lists count as reported (:251), and before the
+// installations the endpoints on the node are found, the root's list
+// checked and the parts placed (:256-258).
 func (s *structure) loadCache(stored []StoredEndpoint) error {
 	stored = s.cutBackStored(stored)
 	for _, se := range stored {
@@ -172,10 +204,13 @@ func (s *structure) loadCache(stored []StoredEndpoint) error {
 			c.cache = newCache(s.p, se.Number, sc.ID, values, sc.Version)
 			s.attachCache(ep, c)
 			s.checkUnlistedSeedValues(c)
+			s.noteReportedLists(ep, c, func(id uint32) bool { _, ok := c.cache.values[id]; return ok })
 			s.synchronizeCluster(ep, c, nil)
 		}
 	}
-	s.resolvePartClaims()
+	s.onTheNode = s.findEndpointsOnTheNode()
+	s.checkRootPartsList()
+	s.placeParts()
 	order, changes := s.pendingOrder, s.pending
 	s.pendingOrder, s.pending = nil, map[*Endpoint]*pendingChange{}
 	for _, ep := range order {
@@ -395,6 +430,10 @@ func (s *structure) updateCluster(b *batch, q *mutateContext) {
 	} else {
 		c.cache.externalSet(b.values, b.version)
 	}
+	// Mirrors matter.js ClientStructure.ts:713-715 at b25ed960
+	// (#updateCluster): the Descriptor lists the batch carries count as
+	// reported before the cluster is synchronized.
+	s.noteReportedLists(ep, c, func(id uint32) bool { v, ok := b.values[id]; return ok && v != nil })
 	s.synchronizeCluster(ep, c, q.clustersWithData)
 }
 
@@ -511,6 +550,27 @@ func (s *structure) synchronizeCluster(ep *Endpoint, c *Cluster, clustersWithDat
 	}
 }
 
+// noteReportedLists marks the DeviceTypeList and the PartsList reported
+// for ep when carries says a Descriptor value holds them. Mirrors
+// matter.js packages/node/src/node/client/ClientStructure.ts:983-999 at
+// b25ed960 (#noteReportedLists): the Descriptor behavior's state reads an
+// unreported mandatory list as empty, so whether the peer reported one is
+// kept apart.
+func (s *structure) noteReportedLists(ep *Endpoint, c *Cluster, carries func(id uint32) bool) {
+	if c.id != descriptor.ClusterID {
+		return
+	}
+	for _, id := range []uint32{descriptor.AttrDeviceTypeList, descriptor.AttrPartsList} {
+		if !carries(id) {
+			continue
+		}
+		if s.reportedLists[ep] == nil {
+			s.reportedLists[ep] = map[uint32]bool{}
+		}
+		s.reportedLists[ep][id] = true
+	}
+}
+
 // synchronizeDescriptor reads the Descriptor's lists (:851-1009).
 func (s *structure) synchronizeDescriptor(ep *Endpoint, values map[uint32]spec.Node, clustersWithData map[*Cluster]bool) {
 	if v, ok := values[descriptor.AttrDeviceTypeList]; ok && isList(v) {
@@ -558,6 +618,12 @@ func deviceTypeDefinition(devtype uint32) (*schema.DeviceTypeDefinition, bool) {
 // #synchronizeDescriptor (:858-905).
 func (s *structure) synchronizeDeviceTypes(ep *Endpoint, entries []descriptor.DeviceTypeStruct) {
 	s.noteComposition(ep, entries)
+	// Mirrors matter.js ClientStructure.ts:1013-1016 at b25ed960
+	// (#synchronizeDescriptor): the root's list is checked only once the
+	// peer has reported it.
+	if ep.number == 0 && s.reportedLists[ep][descriptor.AttrDeviceTypeList] {
+		s.checkRootDeviceTypes(entries)
+	}
 	for _, dt := range entries {
 		def, known := deviceTypeDefinition(dt.DeviceType)
 		isApp := known && isApplication(def.Classification)
@@ -584,8 +650,10 @@ func (s *structure) synchronizeDeviceTypes(ep *Endpoint, entries []descriptor.De
 }
 
 // noteComposition records how the endpoint composes its PartsList: known
-// once any entry names a device type, full-family when any of them is
-// (:1457-1478); a device type the schema does not know counts as a tree.
+// once any entry names a device type, full-family when any of them is; a
+// device type the schema does not know counts as a tree. Mirrors matter.js
+// ClientStructure.ts:1686-1707 at b25ed960 (#noteComposition); it is read
+// through [structure.compositionOf].
 func (s *structure) noteComposition(ep *Endpoint, entries []descriptor.DeviceTypeStruct) {
 	if len(entries) == 0 {
 		return
@@ -631,55 +699,39 @@ func (s *structure) synchronizeServerList(ep *Endpoint, v spec.Node, clustersWit
 	}
 }
 
-// synchronizePartsList is the PartsList half (:941-1008): each valid part
-// (EndpointNumber.isValid, 0 to 0xFFFE) gets this endpoint as a claimant,
-// claims on parts no longer named are withdrawn, and the root's list erases
-// every endpoint it no longer names unless it holds one it does (:971-1008).
-// A list naming the root or the endpoint itself claims nothing there: the
-// root has no owner and an endpoint is not its own part (review II,
-// R2-P2-alloc-01; [structure.closesCycle] refuses the longer cycles).
+// synchronizePartsList is the PartsList half of #synchronizeDescriptor.
+// Mirrors matter.js ClientStructure.ts:1093-1115 at b25ed960: the list's
+// valid endpoint numbers (EndpointNumber.isValid, 0 to 0xFFFE) other than
+// the root's, which is no endpoint's part (:1104-1107), each given its
+// endpoint; which endpoint owns a part is decided by
+// [structure.placeParts] once every list of the interaction is in.
 func (s *structure) synchronizePartsList(ep *Endpoint, v spec.Node) {
-	named := map[uint16]bool{}
-	used := map[uint64]bool{}
+	named := &partsList{has: map[uint16]bool{}}
 	for _, e := range v.Children {
-		if !isUint(e) {
-			continue
-		}
-		used[e.El.Uint] = true
-		if e.El.Uint > 0xFFFE {
+		if !isUint(e) || e.El.Uint == 0 || e.El.Uint > 0xFFFE {
 			continue
 		}
 		partNo := uint16(e.El.Uint)
-		named[partNo] = true
-		if partNo == 0 || partNo == ep.number {
+		if named.has[partNo] {
 			continue
 		}
-		part := s.endpointFor(partNo)
-		s.addClaim(part, ep)
+		named.has[partNo] = true
+		named.order = append(named.order, partNo)
+		s.endpointFor(partNo)
 	}
-	s.retractClaimsOf(ep, named)
+	if _, ok := s.partsListOf[ep]; !ok {
+		s.partsOrder = append(s.partsOrder, ep)
+	}
 	s.partsListOf[ep] = named
-	if ep.number != 0 {
+}
+
+// forgetPartsList drops ep's PartsList.
+func (s *structure) forgetPartsList(ep *Endpoint) {
+	if _, ok := s.partsListOf[ep]; !ok {
 		return
 	}
-	for _, no := range slices.Sorted(maps.Keys(s.endpoints)) {
-		d := s.endpoints[no]
-		if no == 0 || !d.installed || used[uint64(no)] {
-			continue
-		}
-		var keep []uint16
-		s.visitBelow(d, func(below *Endpoint) {
-			if used[uint64(below.number)] {
-				keep = append(keep, below.number)
-			}
-		})
-		if len(keep) > 0 {
-			s.log.Warn("matter.controller.client.endpoint_kept", slog.Int("endpoint", int(no)), slog.Any("holds", keep),
-				slog.String("reason", "the peer's root no longer names it but names endpoints it holds"))
-			continue
-		}
-		s.schedule(d, "erase")
-	}
+	delete(s.partsListOf, ep)
+	s.partsOrder = slices.DeleteFunc(s.partsOrder, func(x *Endpoint) bool { return x == ep })
 }
 
 // visitBelow calls f for every installed endpoint below ep, each once:
@@ -697,53 +749,6 @@ func (s *structure) visitBelowOnce(ep *Endpoint, f func(*Endpoint), seen map[*En
 		seen[c] = true
 		f(c)
 		s.visitBelowOnce(c, f, seen)
-	}
-}
-
-// addClaim adds claimant to part's claimants.
-func (s *structure) addClaim(part, claimant *Endpoint) {
-	cl, ok := s.claims[part]
-	if !ok {
-		s.claimOrder = append(s.claimOrder, part)
-	}
-	if !slices.Contains(cl, claimant) {
-		s.claims[part] = append(cl, claimant)
-	}
-}
-
-// deleteClaims forgets every claim on part.
-func (s *structure) deleteClaims(part *Endpoint) {
-	if _, ok := s.claims[part]; !ok {
-		return
-	}
-	delete(s.claims, part)
-	s.claimOrder = slices.DeleteFunc(s.claimOrder, func(x *Endpoint) bool { return x == part })
-}
-
-// removeClaimant withdraws claimant's claim on part.
-func (s *structure) removeClaimant(part, claimant *Endpoint) {
-	cl := slices.DeleteFunc(slices.Clone(s.claims[part]), func(x *Endpoint) bool { return x == claimant })
-	if len(cl) == 0 {
-		s.deleteClaims(part)
-		return
-	}
-	s.claims[part] = cl
-}
-
-// retractClaimsOf withdraws ep's claims on the parts its previous list
-// named and named does not (:1426-1447).
-func (s *structure) retractClaimsOf(ep *Endpoint, named map[uint16]bool) {
-	for _, partNo := range slices.Sorted(maps.Keys(s.partsListOf[ep])) {
-		if named[partNo] {
-			continue
-		}
-		part := s.endpoints[partNo]
-		if part == nil {
-			continue
-		}
-		if _, ok := s.claims[part]; ok {
-			s.removeClaimant(part, ep)
-		}
 	}
 }
 
@@ -804,8 +809,9 @@ func (s *structure) ownerOf(ep *Endpoint) *Endpoint {
 }
 
 // erase removes an endpoint that left the peer, and what it holds
-// (ClientStructure.ts:1266-1297 at db021da0, Endpoint.delete closing its
-// parts). Each endpoint is erased once: the walk does not rely on the tree
+// (ClientStructure.ts:1237-1262 at b25ed960, Endpoint.delete closing its
+// parts): its PartsList, composition, reported lists and kept mark go with
+// it (:1246-1249). Each endpoint is erased once: the walk does not rely on the tree
 // being acyclic (review II, R2-P2-alloc-01).
 func (s *structure) erase(ep *Endpoint) {
 	s.eraseOnce(ep, map[*Endpoint]bool{})
@@ -826,14 +832,10 @@ func (s *structure) eraseOnce(ep *Endpoint, seen map[*Endpoint]bool) {
 			s.detachCache(c)
 		}
 	}
-	s.deleteClaims(ep)
-	delete(s.partsListOf, ep)
+	s.forgetPartsList(ep)
 	delete(s.composition, ep)
-	for _, part := range slices.Clone(s.claimOrder) {
-		if slices.Contains(s.claims[part], ep) {
-			s.removeClaimant(part, ep)
-		}
-	}
+	delete(s.reportedLists, ep)
+	delete(s.keptOffTheNode, ep.number)
 	if ep.destroyed {
 		return
 	}
@@ -903,10 +905,22 @@ func (s *structure) install(ep *Endpoint) {
 	}
 }
 
-// applyPendingChanges resolves the part claims, then applies each queued
-// change in order: erase, else rebuild and install (:1269-1288).
+// applyPendingChanges decides which endpoints are on the node and the owner
+// of every part whose owner is now known, then applies each queued change
+// in order: erase, else rebuild and install. Mirrors matter.js
+// ClientStructure.ts:1370-1396 at b25ed960 (#applyPendingChanges): the
+// endpoints on the node found again (:1371-1373), the root's list checked
+// (:1374), the endpoints that left the node erased (:1375-1377), the parts
+// placed (:1378), then the queued changes (:1380-1395).
 func (s *structure) applyPendingChanges() {
-	s.resolvePartClaims()
+	previous := s.onTheNode
+	current := s.findEndpointsOnTheNode()
+	s.onTheNode = current
+	s.checkRootPartsList()
+	if previous != nil && current != nil {
+		s.eraseEndpointsOffTheNode(previous, current)
+	}
+	s.placeParts()
 	for len(s.pendingOrder) > 0 {
 		ep := s.pendingOrder[0]
 		s.pendingOrder = s.pendingOrder[1:]
@@ -925,39 +939,42 @@ func (s *structure) applyPendingChanges() {
 	}
 }
 
-// resolvePartClaims gives every part whose owner is now known an owner and
-// schedules its installation (:1300-1331): nothing is reparented
-// (:1305-1310), a part goes only below a placed owner (:1313) and only when
-// the root names it (:1319-1324).
-func (s *structure) resolvePartClaims() {
+// placeParts gives every part on the node whose owner is now known an
+// owner and schedules its installation. Mirrors matter.js
+// ClientStructure.ts:1408-1456 at b25ed960 (#placeParts): the claimants of
+// each part are read from the current PartsLists on every call
+// (:1409-1424), so a part that cannot be placed yet is considered again on
+// the next apply; nothing is reparented and only a part on the node is
+// placed (:1430-1434), and only below a placed owner (:1436-1439); the
+// other claimants are warned about (:1441-1448). An endpoint naming itself
+// claims nothing there (review II, R2-P2-alloc-01): matter.js counts it
+// among its own claimants, which leaves it unplaced when it is the
+// closest.
+func (s *structure) placeParts() {
+	var parts []*Endpoint
+	claimantsOf := map[*Endpoint][]*Endpoint{}
+	for _, claimant := range s.partsOrder {
+		for _, partNo := range s.partsListOf[claimant].order {
+			part := s.endpoints[partNo]
+			if part == nil || part == claimant {
+				continue
+			}
+			if _, ok := claimantsOf[part]; !ok {
+				parts = append(parts, part)
+			}
+			claimantsOf[part] = append(claimantsOf[part], claimant)
+		}
+	}
 	for placed := true; placed; {
 		placed = false
-		for _, part := range slices.Clone(s.claimOrder) {
-			claimants, ok := s.claims[part]
-			if !ok {
+		for _, part := range parts {
+			if s.isPlaced(part) || !s.isOnTheNode(part) {
 				continue
 			}
-			if s.ownerOf(part) != nil {
-				s.deleteClaims(part)
-				continue
-			}
-			owner, contenders := s.ownerFor(claimants)
+			owner, contenders := s.ownerFor(claimantsOf[part])
 			if owner == nil || !s.isPlaced(owner) {
 				continue
 			}
-			if s.closesCycle(part, owner) {
-				s.log.Warn("matter.controller.client.part_cycle_refused", slog.Int("parent", int(owner.number)), slog.Int("part", int(part.number)),
-					slog.String("reason", "the part holds its claimant"))
-				s.removeClaimant(part, owner)
-				placed = true
-				continue
-			}
-			s.deleteClaims(part)
-			if !s.isOnTheNode(part) {
-				continue
-			}
-			// The warning for the other claimants comes after the root's
-			// check of the part (ClientStructure.ts:1455-1471 at db021da0).
 			if len(contenders) > 0 {
 				others := make([]int, 0, len(contenders))
 				for _, o := range contenders {
@@ -973,56 +990,155 @@ func (s *structure) resolvePartClaims() {
 	}
 }
 
-// closesCycle: owning part would make it a child of its own descendant —
-// part is the root, owner itself, or on owner's chain of owners, installed
-// or pending. The walk is bounded by the number of endpoints, so an image
-// that is already cyclic ends it too (review II, R2-P2-alloc-01).
-func (s *structure) closesCycle(part, owner *Endpoint) bool {
-	if part.number == 0 {
-		return true
-	}
-	steps := 0
-	for a := owner; a != nil; a = s.ownerOf(a) {
-		if a == part || steps > len(s.endpoints) {
-			return true
-		}
-		steps++
-	}
-	return false
-}
-
 // isPlaced: the root, or an endpoint with an owner, installed or pending
-// (:1337-1339).
+// (ClientStructure.ts:1462-1464 at b25ed960).
 func (s *structure) isPlaced(ep *Endpoint) bool { return ep.number == 0 || s.ownerOf(ep) != nil }
 
-// isOnTheNode: the root names the endpoint, so far as it has said
-// (:1349-1357).
-func (s *structure) isOnTheNode(ep *Endpoint) bool {
-	if ep.number == 0 {
-		return true
+// isOnTheNode is #isOnTheNode (ClientStructure.ts:1470-1473 at b25ed960).
+func (s *structure) isOnTheNode(ep *Endpoint) bool { return s.isNumberOnTheNode(ep.number) }
+
+// isNumberOnTheNode: the root, or an endpoint on the node as of the last
+// structural apply; every endpoint while the root has not reported its
+// PartsList. Mirrors matter.js ClientStructure.ts:1475-1481 at b25ed960
+// (#isNumberOnTheNode).
+func (s *structure) isNumberOnTheNode(number uint16) bool {
+	return number == 0 || s.onTheNode == nil || s.onTheNode[number]
+}
+
+// findEndpointsOnTheNode is the endpoints on the node other than the root,
+// nil while the root has not reported its PartsList: those the root's
+// PartsList names, and those the PartsList of an endpoint on the node
+// names once the peer reported their DeviceTypeList or PartsList. Mirrors
+// matter.js ClientStructure.ts:1491-1511 at b25ed960
+// (#findEndpointsOnTheNode).
+func (s *structure) findEndpointsOnTheNode() map[uint16]bool {
+	rootParts := s.rootPartsList()
+	if rootParts == nil {
+		return nil
 	}
-	rootParts, ok := s.partsListOf[s.endpoints[0]]
-	return !ok || rootParts[ep.number]
+	found := make(map[uint16]bool, len(rootParts.order))
+	pending := slices.Clone(rootParts.order)
+	for _, no := range pending {
+		found[no] = true
+	}
+	for len(pending) > 0 {
+		no := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		ep := s.endpoints[no]
+		if ep == nil || s.partsListOf[ep] == nil {
+			continue
+		}
+		for _, part := range s.partsListOf[ep].order {
+			if found[part] || !s.hasReportedDescriptorList(part) {
+				continue
+			}
+			found[part] = true
+			pending = append(pending, part)
+		}
+	}
+	return found
+}
+
+// hasReportedDescriptorList: the peer reported the endpoint's
+// DeviceTypeList or PartsList (ClientStructure.ts:1513-1515 at b25ed960).
+func (s *structure) hasReportedDescriptorList(number uint16) bool {
+	ep := s.endpoints[number]
+	return ep != nil && len(s.reportedLists[ep]) > 0
+}
+
+// rootPartsList is the root's PartsList, nil while it has not reported one
+// (ClientStructure.ts:1517-1520 at b25ed960).
+func (s *structure) rootPartsList() *partsList {
+	root := s.endpoints[0]
+	if root == nil {
+		return nil
+	}
+	return s.partsListOf[root]
+}
+
+// eraseEndpointsOffTheNode schedules the erase of every placed endpoint
+// that left the node since previous. Mirrors matter.js
+// ClientStructure.ts:1529-1562 at b25ed960 (#eraseEndpointsOffTheNode):
+// only an endpoint the peer had on the node is erased (:1531-1536); one
+// that holds an endpoint still on the node is kept and checked again on
+// every apply, warned about the first time and logged at debug after
+// (:1538-1560).
+func (s *structure) eraseEndpointsOffTheNode(previous, current map[uint16]bool) {
+	candidates := maps.Clone(previous)
+	for no := range s.keptOffTheNode {
+		candidates[no] = true
+	}
+	for _, no := range slices.Sorted(maps.Keys(candidates)) {
+		ep := s.endpoints[no]
+		if current[no] || ep == nil || !s.isPlaced(ep) {
+			delete(s.keptOffTheNode, no)
+			continue
+		}
+		var held []uint16
+		s.visitBelow(ep, func(below *Endpoint) {
+			if current[below.number] {
+				held = append(held, below.number)
+			}
+		})
+		if len(held) == 0 {
+			delete(s.keptOffTheNode, no)
+			s.schedule(ep, "erase")
+			continue
+		}
+		attrs := []any{
+			slog.Int("endpoint", int(no)), slog.Any("holds", held),
+			slog.String("reason", "it is no longer on the node but holds endpoints that are"),
+		}
+		if s.keptOffTheNode[no] {
+			s.log.Debug("matter.controller.client.endpoint_kept", attrs...)
+			continue
+		}
+		s.log.Warn("matter.controller.client.endpoint_kept", attrs...)
+		s.keptOffTheNode[no] = true
+	}
+}
+
+// checkRootPartsList warns once per node and start when the root's
+// PartsList does not name every endpoint on the node. Mirrors matter.js
+// ClientStructure.ts:1565-1581 at b25ed960 (#checkRootPartsList).
+func (s *structure) checkRootPartsList() {
+	rootParts := s.rootPartsList()
+	if s.warnedIncompleteRootPartsList || rootParts == nil || s.onTheNode == nil {
+		return
+	}
+	var unnamed []uint16
+	for no := range s.onTheNode {
+		if !rootParts.has[no] {
+			unnamed = append(unnamed, no)
+		}
+	}
+	if len(unnamed) == 0 {
+		return
+	}
+	slices.Sort(unnamed)
+	s.warnedIncompleteRootPartsList = true
+	s.log.Warn("matter.controller.client.root_parts_list_incomplete", slog.Any("endpoints", unnamed),
+		slog.String("reason", "the root must list every endpoint; other endpoints name them, so they are on the node"))
 }
 
 // ownerFor is the claimant that owns a part, with the claimants that
 // conflict with that choice, nil while that cannot be told. Mirrors
-// matter.js packages/node/src/node/client/ClientStructure.ts:1509-1550
-// (#ownerFor at db021da0): a claimant the root does not name owns nothing
-// (:1513-1518), one whose composition is unknown makes the part wait
-// (:1520-1525); an ordinary claimant is closer to the part than any
-// full-family one (:1530-1532); among the candidates the closest wins
+// matter.js packages/node/src/node/client/ClientStructure.ts:1587-1627 at
+// b25ed960 (#ownerFor): a claimant not on the node owns nothing
+// (:1592-1596), one whose composition is unknown makes the part wait
+// (:1598-1603); an ordinary claimant is closer to the part than any
+// full-family one (:1608-1612); among the candidates the closest wins
 // ([structure.closestClaimant]); a full-family owner waits until every
-// endpoint it names has reported its own parts (:1538-1540). The
+// endpoint it names has reported its own parts (:1614-1617). The
 // contenders are the other ordinary claimants, or the full-family ones
-// that do not name the owner (:1543-1548).
+// that do not name the owner (:1619-1624).
 func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders []*Endpoint) {
 	var ordinary, fullFamily []*Endpoint
 	for _, c := range claimants {
 		if !s.isOnTheNode(c) {
 			continue
 		}
-		comp, ok := s.composition[c]
+		comp, ok := s.compositionOf(c)
 		if !ok {
 			return nil, nil
 		}
@@ -1052,7 +1168,7 @@ func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders
 		return owner, contenders
 	}
 	for _, c := range fullFamily {
-		if c != owner && !s.partsListOf[c][owner.number] {
+		if c != owner && !s.partsListOf[c].has[owner.number] {
 			contenders = append(contenders, c)
 		}
 	}
@@ -1063,18 +1179,18 @@ func (s *structure) ownerFor(claimants []*Endpoint) (owner *Endpoint, contenders
 // name: the one naming the fewest of the other claimants, then the one
 // with the shorter PartsList, then the one with the lower endpoint number
 // — the choice depends on the lists, not on the order they arrived in.
-// Mirrors matter.js ClientStructure.ts:1559-1580 (#closestClaimant at
-// db021da0).
+// Mirrors matter.js ClientStructure.ts:1636-1657 at b25ed960
+// (#closestClaimant).
 func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint {
 	rank := func(c *Endpoint) [3]int {
 		parts := s.partsListOf[c]
 		named := 0
 		for _, other := range claimants {
-			if other != c && parts[other.number] {
+			if other != c && parts.has[other.number] {
 				named++
 			}
 		}
-		return [3]int{named, len(parts), int(c.number)}
+		return [3]int{named, len(parts.order), int(c.number)}
 	}
 	closest, closestRank := candidates[0], rank(candidates[0])
 	for _, c := range candidates[1:] {
@@ -1086,13 +1202,12 @@ func (s *structure) closestClaimant(candidates, claimants []*Endpoint) *Endpoint
 }
 
 // partsAccountedFor: every endpoint ep names has reported a PartsList of
-// its own; an endpoint the root no longer names reports nothing more and
-// is not waited for. Mirrors matter.js ClientStructure.ts:1587-1601
-// (#partsAccountedFor at db021da0).
+// its own; an endpoint not on the node reports nothing more and is not
+// waited for. Mirrors matter.js ClientStructure.ts:1664-1676 at b25ed960
+// (#partsAccountedFor).
 func (s *structure) partsAccountedFor(ep *Endpoint) bool {
-	rootParts, rootReported := s.partsListOf[s.endpoints[0]]
-	for partNo := range s.partsListOf[ep] {
-		if rootReported && !rootParts[partNo] {
+	for _, partNo := range s.partsListOf[ep].order {
+		if !s.isNumberOnTheNode(partNo) {
 			continue
 		}
 		part := s.endpoints[partNo]
@@ -1104,6 +1219,31 @@ func (s *structure) partsAccountedFor(ep *Endpoint) bool {
 		}
 	}
 	return true
+}
+
+// compositionOf is how ep composes its PartsList, false while it has not
+// said. Mirrors matter.js ClientStructure.ts:1715-1720 at b25ed960
+// (#compositionOf): the root's PartsList lists every endpoint on the node,
+// so it is full-family whatever device types it reports.
+func (s *structure) compositionOf(ep *Endpoint) (schema.Composition, bool) {
+	if ep.number == 0 {
+		return schema.CompositionFullFamily, true
+	}
+	c, ok := s.composition[ep]
+	return c, ok
+}
+
+// checkRootDeviceTypes warns once per node and start when the root reports
+// no device type. Mirrors matter.js ClientStructure.ts:1731-1740 at
+// b25ed960 (#checkRootDeviceTypes); placing the endpoints does not depend
+// on it ([structure.compositionOf]).
+func (s *structure) checkRootDeviceTypes(entries []descriptor.DeviceTypeStruct) {
+	if s.warnedRootWithoutDeviceType || len(entries) > 0 {
+		return
+	}
+	s.warnedRootWithoutDeviceType = true
+	s.log.Warn("matter.controller.client.root_without_device_type",
+		slog.String("reason", "the root must report at least one device type; its PartsList is read as listing every endpoint on the node"))
 }
 
 // schedule queues a structural change (:1488-1495).

@@ -3,7 +3,10 @@
 
 // A port of matter.js packages/node/test/node/NodeLifecycleSeededTest.ts at
 // 862ad75f: when the client node considers its structure seeded, and the
-// warning for a node of its root only (Peers.ts #evaluateSeeded). matter.js
+// warning for a node of its root only (Peers.ts #evaluateSeeded); at
+// b25ed960 the placement cases of a7ac64f19 and 097e5a8da — an
+// aggregator's devices reported before the root's PartsList, and describe
+// "ClientNode with a root that reports no device type". matter.js
 // applies Descriptor reports to an unread peer through
 // clientStructureOf(peer).mutate; the port applies them to a node through
 // Node.apply. matter.js installs BasicInformation on the unread peer by
@@ -102,6 +105,28 @@ func (s *seededNode) warnings() int {
 }
 
 func (s *seededNode) apply(b *report) { s.n.apply(wildcard, &b.r, true) }
+
+// logged is the number of records logged as msg.
+func (s *seededNode) logged(msg string) int {
+	s.logs.mu.Lock()
+	defer s.logs.mu.Unlock()
+	n := 0
+	for _, m := range s.logs.msgs {
+		if m == msg {
+			n++
+		}
+	}
+	return n
+}
+
+// ownerIs fails unless endpoint ep is installed below owner.
+func ownerIs(t *testing.T, n *Node, ep, owner uint16) {
+	t.Helper()
+	e := n.Endpoint(ep)
+	if e == nil || e.Owner() == nil || e.Owner().Number() != owner {
+		t.Fatalf("endpoint %d: not below endpoint %d (%s)", ep, owner, tree(n))
+	}
+}
 
 func TestNodeLifecycleSeededParity(t *testing.T) {
 	t.Parallel()
@@ -272,6 +297,127 @@ func TestNodeLifecycleSeededParity(t *testing.T) {
 		s.apply(descriptorReports(0, []uint64{dtRootNode}, []uint16{0xFFFF}, true))
 		if !s.n.Seeded() || s.warnings() != 1 {
 			t.Fatalf("seeded %v, warnings %d", s.n.Seeded(), s.warnings())
+		}
+	})
+}
+
+// rootWithoutDeviceTypeMsg is ClientStructure's warning for a root whose
+// reported DeviceTypeList names no device type.
+const rootWithoutDeviceTypeMsg = "matter.controller.client.root_without_device_type"
+
+// TestNodeLifecycleSeededRootWithoutDeviceTypeParity is describe("ClientNode
+// with a root that reports no device type") (NodeLifecycleSeededTest.ts
+// :456-610 at b25ed960, a7ac64f19 and 097e5a8da).
+func TestNodeLifecycleSeededRootWithoutDeviceTypeParity(t *testing.T) {
+	t.Parallel()
+	both := func(rs ...*report) *report {
+		out := &report{}
+		for _, r := range rs {
+			out.r.Attributes = append(out.r.Attributes, r.r.Attributes...)
+		}
+		return out
+	}
+
+	t.Run("installs and seeds the endpoints the root names and warns once", func(t *testing.T) {
+		t.Parallel()
+		s := newSeededNode(t, &MemoryStore{})
+		s.apply(both(descriptorReports(0, []uint64{}, []uint16{1}, true), descriptorReports(1, []uint64{dtOnOffLight}, []uint16{}, false)))
+		if got := tree(s.n); got != "0:0x16:- 1:0x100:0" || !s.n.Seeded() || s.count() != 1 || s.logged(rootWithoutDeviceTypeMsg) != 1 {
+			t.Fatalf("tree %s, seeded %v ×%d, warnings %d", got, s.n.Seeded(), s.count(), s.logged(rootWithoutDeviceTypeMsg))
+		}
+		s.apply(descriptorReports(0, []uint64{}, []uint16{1}, true))
+		if n := s.logged(rootWithoutDeviceTypeMsg); n != 1 {
+			t.Fatalf("warnings %d after a second read, want one", n)
+		}
+	})
+
+	t.Run("places a nested part below its closest claimant", func(t *testing.T) {
+		t.Parallel()
+		s := newSeededNode(t, &MemoryStore{})
+		s.apply(both(
+			descriptorReports(0, []uint64{}, []uint16{1, 2}, true),
+			descriptorReports(1, []uint64{dtAggregator}, []uint16{2}, false),
+			descriptorReports(2, []uint64{dtOnOffLight}, []uint16{}, false)))
+		if !s.n.Seeded() {
+			t.Fatal("not seeded")
+		}
+		ownerIs(t, s.n, 1, 0)
+		ownerIs(t, s.n, 2, 1)
+	})
+
+	t.Run("places parts below an aggregator when the root reports only an application device type", func(t *testing.T) {
+		t.Parallel()
+		s := newSeededNode(t, &MemoryStore{})
+		s.apply(both(
+			descriptorReports(0, []uint64{dtOnOffLight}, []uint16{1, 2}, true),
+			descriptorReports(1, []uint64{dtAggregator}, []uint16{2}, false),
+			descriptorReports(2, []uint64{dtOnOffLight}, []uint16{}, false)))
+		ownerIs(t, s.n, 1, 0)
+		ownerIs(t, s.n, 2, 1)
+	})
+
+	t.Run("places the devices an aggregator names when the root also omits one of them", func(t *testing.T) {
+		t.Parallel()
+		s := newSeededNode(t, &MemoryStore{})
+		for range 2 {
+			s.apply(both(
+				descriptorReports(0, []uint64{}, []uint16{1, 2}, true),
+				descriptorReports(1, []uint64{dtAggregator}, []uint16{2, 3}, false),
+				descriptorReports(2, []uint64{dtOnOffLight}, []uint16{}, false),
+				descriptorReports(3, []uint64{dtOnOffLight}, []uint16{}, false)))
+		}
+		if !s.n.Seeded() {
+			t.Fatal("not seeded")
+		}
+		ownerIs(t, s.n, 1, 0)
+		ownerIs(t, s.n, 2, 1)
+		ownerIs(t, s.n, 3, 1)
+		if a, b := s.logged(rootWithoutDeviceTypeMsg), s.logged(incompleteRootMsg); a != 1 || b != 1 {
+			t.Fatalf("root without device type warned %d, incomplete root %d, want one each", a, b)
+		}
+	})
+
+	t.Run("restores the endpoints from storage and warns again after a restart", func(t *testing.T) {
+		t.Parallel()
+		st := &MemoryStore{}
+		s := newSeededNode(t, st)
+		s.apply(both(descriptorReports(0, []uint64{}, []uint16{1}, true), descriptorReports(1, []uint64{dtOnOffLight}, []uint16{}, false)))
+		restored := newSeededNode(t, st)
+		if got := tree(restored.n); got != "0:0x16:- 1:0x100:0" || !restored.n.Seeded() {
+			t.Fatalf("restored tree %s, seeded %v", got, restored.n.Seeded())
+		}
+		// One warning per start: matter.js counts two across both.
+		if a, b := s.logged(rootWithoutDeviceTypeMsg), restored.logged(rootWithoutDeviceTypeMsg); a != 1 || b != 1 {
+			t.Fatalf("warnings %d before and %d after the restart, want one each", a, b)
+		}
+	})
+
+	t.Run("does not warn about a non-root endpoint that reports no device type", func(t *testing.T) {
+		t.Parallel()
+		s := newSeededNode(t, &MemoryStore{})
+		s.apply(both(descriptorReports(0, []uint64{dtRootNode}, []uint16{1}, true), descriptorReports(1, []uint64{}, []uint16{}, false)))
+		ownerIs(t, s.n, 1, 0)
+		if n := s.logged(rootWithoutDeviceTypeMsg); n != 0 {
+			t.Fatalf("warnings %d", n)
+		}
+	})
+
+	t.Run("does not warn about a root that has not reported its DeviceTypeList", func(t *testing.T) {
+		t.Parallel()
+		s := newSeededNode(t, &MemoryStore{})
+		s.apply(descriptorReports(0, nil, []uint16{}, true))
+		s.apply(descriptorReports(0, nil, []uint16{}, true))
+		if n := s.logged(rootWithoutDeviceTypeMsg); n != 0 {
+			t.Fatalf("warnings %d", n)
+		}
+	})
+
+	t.Run("does not warn about a root that reports Root Node", func(t *testing.T) {
+		t.Parallel()
+		s := newSeededNode(t, &MemoryStore{})
+		s.apply(both(descriptorReports(0, []uint64{dtRootNode}, []uint16{1}, true), descriptorReports(1, []uint64{dtOnOffLight}, []uint16{}, false)))
+		if !s.n.Seeded() || s.logged(rootWithoutDeviceTypeMsg) != 0 {
+			t.Fatalf("seeded %v, warnings %d", s.n.Seeded(), s.logged(rootWithoutDeviceTypeMsg))
 		}
 	})
 }

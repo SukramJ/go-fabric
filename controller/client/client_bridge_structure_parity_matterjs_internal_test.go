@@ -2,15 +2,17 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/node/ClientBridgeStructureTest.ts
-// at 862ad75f, the cases that feed the client structure Descriptor reports:
+// at b25ed960, the cases that feed the client structure Descriptor reports:
 // how the controller builds the tree of a bridge peer — across two
-// interactions, with a root that omits an endpoint, with lists that change,
-// with an aggregator below an aggregator, with bridged devices of several
+// interactions, with an endpoint no PartsList on the node names, with a
+// root that names only its aggregator, with lists that change, with an
+// aggregator below an aggregator, with bridged devices of several
 // endpoints and claimants to rank. matter.js mutates the structure of a
-// commissioned peer whose device is a bare root; the port applies the same
-// reports to a node whose image holds that root (Node.apply), one apply per
-// interaction. The case over a real bridge is in
-// client_bridge_structure_parity_matterjs_test.go.
+// commissioned peer of MockSite's pair device, the root and an OnOffLight
+// on endpoint 1; the port applies the same reports to a node whose image
+// holds the root alone (Node.apply), one apply per interaction, and holds
+// the light too where a case depends on it ([pairPeer]). The case over a
+// real bridge is in client_bridge_structure_parity_matterjs_test.go.
 package client
 
 import (
@@ -116,7 +118,25 @@ func bridgePeer(t *testing.T) (*Node, *recorder, *warnRecorder) {
 	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID, clBasicInfo})
 	n.apply(wildcard, &b.r, true)
 	rec.take()
+	// The warnings of the commissioning (the bare root's root_only) are
+	// not the case's: matter.js captures after peerOf.
+	logs.mu.Lock()
+	logs.recs = nil
+	logs.mu.Unlock()
 	return n, rec, logs
+}
+
+// restartedBridge is the node of a controller restarted over st (site.close
+// and addController in ClientBridgeStructureTest.ts): loaded from the store,
+// nothing applied.
+func restartedBridge(t *testing.T, st Store) (*Node, *warnRecorder) {
+	t.Helper()
+	logs := &warnRecorder{}
+	n, err := New(Config{ID: "n", Store: st, Interaction: interaction.Bind(nil, interaction.Config{}), Logger: slog.New(logs)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n, logs
 }
 
 // treeOf is ClientBridgeStructureTest.ts treeOf: the depth-first paths of
@@ -167,12 +187,22 @@ func (h *warnRecorder) Handle(_ context.Context, r slog.Record) error {
 
 // severalParents are the several_parents warnings, their attributes as text.
 func (h *warnRecorder) severalParents() []string {
+	return h.warnings("matter.controller.client.several_parents")
+}
+
+// warnings are the warnings logged as msg, their attributes as text; every
+// warning when msg is empty.
+func (h *warnRecorder) warnings(msg string) []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	var out []string
 	for i := range h.recs {
 		r := &h.recs[i]
-		if r.Message != "matter.controller.client.several_parents" {
+		if msg != "" && r.Message != msg {
+			continue
+		}
+		if msg == "" {
+			out = append(out, r.Message)
 			continue
 		}
 		s := ""
@@ -222,7 +252,7 @@ func TestClientBridgeStructureTwoInteractionsParity(t *testing.T) {
 		treeIs(t, n, "/ep20", "/ep20/ep21", "/ep20/ep21/ep22", "/ep20/ep21/ep23")
 	})
 
-	t.Run("does not install a part the root has stopped naming while its owner was unknown", func(t *testing.T) {
+	t.Run("installs a part the root has stopped naming while an endpoint on the node still names it", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
 		n.apply(wildcard, &partsAttr(0, 10, all...).r, true)
@@ -235,7 +265,9 @@ func TestClientBridgeStructureTwoInteractionsParity(t *testing.T) {
 			bsDescriptor(dropped, one(dtTemperature, 2), nil, 11),
 		).r, true)
 
-		treeIs(t, n, "/ep20", "/ep20/ep21", "/ep20/ep21/ep22")
+		// The composed device the dropped sensor hangs from still names it,
+		// so it is still on the node.
+		treeIs(t, n, "/ep20", "/ep20/ep21", "/ep20/ep21/ep22", "/ep20/ep21/ep23")
 	})
 
 	t.Run("takes the device types of an endpoint that has only utility ones", func(t *testing.T) {
@@ -296,7 +328,7 @@ func TestClientBridgeStructureChangesParity(t *testing.T) {
 
 	t.Run("keeps an endpoint the root stopped naming while it holds endpoints the root names", func(t *testing.T) {
 		t.Parallel()
-		n, _, _ := bridgePeer(t)
+		n, _, logs := bridgePeer(t)
 		n.apply(wildcard, &oneInteraction(append([]*report{
 			partsAttr(0, 10, append([]uint16{bsAggregator}, bsSensors...)...),
 			bsDescriptor(bsAggregator, one(dtAggregator, 3), bsSensors, 10),
@@ -304,8 +336,13 @@ func TestClientBridgeStructureChangesParity(t *testing.T) {
 
 		treeIs(t, n, "/ep20", "/ep20/ep22", "/ep20/ep23")
 		n.apply(wildcard, &partsAttr(0, 11, bsSensors...).r, true)
+		n.apply(wildcard, &partsAttr(0, 12, bsSensors...).r, true)
 		treeIs(t, n, "/ep20", "/ep20/ep22", "/ep20/ep23")
-		n.apply(wildcard, &partsAttr(0, 12).r, true)
+		// matter.js: one "Keeping …" warning, then debug on every later apply.
+		if w := logs.warnings("matter.controller.client.endpoint_kept"); len(w) != 1 {
+			t.Fatalf("kept warnings %q, want one", w)
+		}
+		n.apply(wildcard, &partsAttr(0, 13).r, true)
 		treeIs(t, n)
 	})
 
@@ -547,12 +584,19 @@ func TestClientBridgeStructureNestedAggregatorParity(t *testing.T) {
 		treeIs(t, n, without(nestedTree, "/ep21")...)
 	})
 
-	t.Run("drops an endpoint the root stops naming while the nested aggregator still does", func(t *testing.T) {
+	t.Run("drops an endpoint the root stops naming once the nested aggregator stops naming it too", func(t *testing.T) {
 		t.Parallel()
 		n, _, _ := bridgePeer(t)
 		n.apply(wildcard, &nestedInteraction(nil).r, true)
+		treeIs(t, n, nestedTree...)
 		dropped := daliLights[0]
 		n.apply(wildcard, &partsAttr(0, 11, slices.DeleteFunc(slices.Clone(rootParts), func(e uint16) bool { return e == dropped })...).r, true)
+		treeIs(t, n, nestedTree...)
+		remaining := daliLights[1:]
+		n.apply(wildcard, &oneInteraction(
+			bsDescriptor(zigbeeAggregator, one(dtAggregator, 2), append(append(slices.Clone(zigbeeLights), daliAggregator), remaining...), 12),
+			bsDescriptor(daliAggregator, []dtRev{{dtBridged, 3}, {dtAggregator, 2}}, remaining, 12),
+		).r, true)
 		treeIs(t, n, without(nestedTree, "/ep21")...)
 	})
 }
@@ -602,13 +646,32 @@ func TestClientBridgeStructureSeveralEndpointsParity(t *testing.T) {
 			bsDescriptor(43, one(dtLight, 3), nil, 10))
 	})
 
-	t.Run("does not wait for an endpoint the root no longer names", func(t *testing.T) {
+	t.Run("does not wait for an endpoint only a list below the root names and the peer never reported", func(t *testing.T) {
 		t.Parallel()
 		expect(t, map[uint16]uint16{1: 0, 41: 1, 42: 41},
 			partsAttr(0, 10, 1, 41, 42),
 			bsDescriptor(1, one(dtAggregator, 2), []uint16{41, 42}, 10),
 			bsDescriptor(41, one(dtBridged, 3), []uint16{42, 43}, 10),
 			bsDescriptor(42, one(dtLight, 3), nil, 10))
+	})
+
+	t.Run("ignores the root in a PartsList below it", func(t *testing.T) {
+		t.Parallel()
+		expect(t, map[uint16]uint16{1: 0, 2: 1},
+			partsAttr(0, 10, 1, 2),
+			bsDescriptor(1, one(dtAggregator, 2), []uint16{0, 2}, 10),
+			bsDescriptor(2, one(dtLight, 3), nil, 10))
+	})
+
+	// Each light claims the other, so neither can be placed below the
+	// other first.
+	t.Run("stops on PartsLists that name each other", func(t *testing.T) {
+		t.Parallel()
+		expect(t, map[uint16]uint16{1: 0},
+			partsAttr(0, 10, 1),
+			bsDescriptor(1, one(dtAggregator, 2), []uint16{2, 3}, 10),
+			bsDescriptor(2, one(dtLight, 3), []uint16{3}, 10),
+			bsDescriptor(3, one(dtLight, 3), []uint16{2}, 10))
 	})
 
 	for _, order := range []string{"ascending", "descending"} {
@@ -669,15 +732,23 @@ func TestClientBridgeStructureSeveralEndpointsParity(t *testing.T) {
 		}
 	})
 
-	t.Run("does not warn about an endpoint the root no longer names", func(t *testing.T) {
+	t.Run("warns that the root does not name an endpoint other endpoints name", func(t *testing.T) {
 		t.Parallel()
 		_, logs := parentsAfter(t,
 			partsAttr(0, 10, 10, 11),
 			bsDescriptor(10, one(dtLight, 3), []uint16{12}, 10),
 			bsDescriptor(11, one(dtLight, 3), []uint16{12}, 10),
 			bsDescriptor(12, one(dtLight, 3), nil, 10))
-		if w := logs.severalParents(); len(w) != 0 {
+		// matter.js: "… does not name endpoints 12 in the PartsList of its
+		// root endpoint …", then "Taking ep10 as the parent of ep12 …".
+		if w := logs.warnings(""); !slices.Equal(w, []string{incompleteRootMsg, "matter.controller.client.several_parents"}) {
 			t.Fatalf("warnings %q", w)
+		}
+		if w := logs.warnings(incompleteRootMsg); len(w) != 1 || w[0] != "endpoints=[12] reason=the root must list every endpoint; other endpoints name them, so they are on the node " {
+			t.Fatalf("incomplete root warning %q", w)
+		}
+		if w := logs.severalParents(); len(w) != 1 || w[0] != "parent=10 part=12 also_named_by=[11] reason=an endpoint has a single parent " {
+			t.Fatalf("several parents %q", w)
 		}
 	})
 
@@ -698,5 +769,177 @@ func TestClientBridgeStructureSeveralEndpointsParity(t *testing.T) {
 			bsDescriptor(11, one(dtLight, 3), nil, 10),
 			bsDescriptor(12, one(dtAggregator, 2), []uint16{13}, 10),
 			bsDescriptor(13, rev1(dtLight, dtBridged), nil, 10))
+	})
+}
+
+// incompleteRootMsg is ClientStructure's warning for a root PartsList that
+// does not name every endpoint on the node.
+const incompleteRootMsg = "matter.controller.client.root_parts_list_incomplete"
+
+// pairPeer is peerOf of describe("a peer whose root names only its
+// aggregator"): the image of a commissioned peer over st whose device is
+// MockSite's pair device — the root and an OnOffLight on endpoint 1
+// (observed in the matter.js run log at b25ed960: "device2.part0 ready
+// endpoint#: 1 type: OnOffLight"), so endpoint 1 is placed below the root
+// before the case reports anything.
+func pairPeer(t *testing.T, st Store) (*Node, *warnRecorder) {
+	t.Helper()
+	logs := &warnRecorder{}
+	n, err := New(Config{ID: "n", Store: st, Interaction: interaction.Bind(nil, interaction.Config{}), Logger: slog.New(logs)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := &report{}
+	b.endpoint(0, []uint64{dtRootNode}, []uint32{descriptor.ClusterID, clBasicInfo}, 1)
+	b.endpoint(1, []uint64{dtOnOffLight}, []uint32{descriptor.ClusterID})
+	n.apply(wildcard, &b.r, true)
+	logs.mu.Lock()
+	logs.recs = nil
+	logs.mu.Unlock()
+	return n, logs
+}
+
+// TestClientBridgeStructureRootNamesOnlyAggregatorParity is describe("a
+// peer whose root names only its aggregator") (ClientBridgeStructureTest.ts
+// :419-662 at b25ed960). Left: "keeps an endpoint added locally that no
+// PartsList names" (endpoints.require; the Go image is built from reports
+// and its store only) and "places devices reported before the root names
+// their aggregator" (the image drops the data of an endpoint no PartsList
+// reached from the root names, [structure.admit]).
+func TestClientBridgeStructureRootNamesOnlyAggregatorParity(t *testing.T) {
+	t.Parallel()
+	const aggregatorEP = 1
+	lights := []uint16{2, 3}
+	bridgeReports := func(rootParts []uint16, version uint32) []*report {
+		out := make([]*report, 0, 2+len(lights))
+		out = append(out,
+			partsAttr(0, version, rootParts...),
+			bsDescriptor(aggregatorEP, one(dtAggregator, 2), lights, version))
+		for _, l := range lights {
+			out = append(out, bsDescriptor(l, one(dtLight, 3), nil, version))
+		}
+		return out
+	}
+	// bridgeOf: each part of the root followed by its own parts.
+	bridgeOf := func(n *Node) []uint16 {
+		var out []uint16
+		for _, p := range n.Endpoint(0).Parts() {
+			out = append(out, p.Number())
+			for _, below := range p.Parts() {
+				out = append(out, below.Number())
+			}
+		}
+		return out
+	}
+	bridgeIs := func(t *testing.T, n *Node, want ...uint16) {
+		t.Helper()
+		if got := bridgeOf(n); !slices.Equal(got, want) {
+			t.Fatalf("bridge %v, want %v", got, want)
+		}
+	}
+	all := append([]uint16{aggregatorEP}, lights...)
+	const incompleteRoot = "endpoints=[2 3] reason=the root must list every endpoint; other endpoints name them, so they are on the node "
+
+	t.Run("places the devices the aggregator names and warns once", func(t *testing.T) {
+		t.Parallel()
+		n, logs := pairPeer(t, &MemoryStore{})
+		n.apply(wildcard, &oneInteraction(bridgeReports([]uint16{aggregatorEP}, 10)...).r, true)
+		n.apply(wildcard, &oneInteraction(bridgeReports([]uint16{aggregatorEP}, 11)...).r, true)
+		bridgeIs(t, n, all...)
+		if w := logs.warnings(incompleteRootMsg); len(w) != 1 || w[0] != incompleteRoot {
+			t.Fatalf("warnings %q", w)
+		}
+	})
+
+	t.Run("keeps the devices when the root stops naming them", func(t *testing.T) {
+		t.Parallel()
+		n, _ := pairPeer(t, &MemoryStore{})
+		n.apply(wildcard, &oneInteraction(bridgeReports(all, 10)...).r, true)
+		bridgeIs(t, n, all...)
+		n.apply(wildcard, &partsAttr(0, 11, aggregatorEP).r, true)
+		bridgeIs(t, n, all...)
+	})
+
+	t.Run("does not wait for a device the aggregator names but the peer never reported", func(t *testing.T) {
+		t.Parallel()
+		n, _ := pairPeer(t, &MemoryStore{})
+		chunks := make([]*report, 0, 2+len(lights))
+		chunks = append(chunks,
+			partsAttr(0, 10, aggregatorEP),
+			bsDescriptor(aggregatorEP, one(dtAggregator, 2), append(slices.Clone(lights), 9), 10))
+		for _, l := range lights {
+			chunks = append(chunks, bsDescriptor(l, one(dtLight, 3), nil, 10))
+		}
+		n.apply(wildcard, &oneInteraction(chunks...).r, true)
+		bridgeIs(t, n, all...)
+		if !n.Seeded() {
+			t.Fatal("not seeded")
+		}
+	})
+
+	t.Run("places a device the peer reports after the aggregator named it", func(t *testing.T) {
+		t.Parallel()
+		n, _ := pairPeer(t, &MemoryStore{})
+		r := bridgeReports([]uint16{aggregatorEP}, 10)
+		n.apply(wildcard, &oneInteraction(r[0], r[1], r[2]).r, true)
+		bridgeIs(t, n, aggregatorEP, lights[0])
+		n.apply(wildcard, &r[3].r, true)
+		bridgeIs(t, n, all...)
+	})
+
+	t.Run("does not place a device the aggregator names before the peer reports its Descriptor lists", func(t *testing.T) {
+		t.Parallel()
+		n, _ := pairPeer(t, &MemoryStore{})
+		r := bridgeReports([]uint16{aggregatorEP}, 10)
+		n.apply(wildcard, &oneInteraction(r[0], r[1], r[2], descriptorAttr(lights[1], spec.AttrClusterRevision, uintNode(3), 10)).r, true)
+		bridgeIs(t, n, aggregatorEP, lights[0])
+	})
+
+	t.Run("does not erase an endpoint the root stops naming before it was placed", func(t *testing.T) {
+		t.Parallel()
+		const unplacedEP = 5
+		n, logs := pairPeer(t, &MemoryStore{})
+		// The root claims endpoint 5 by a full-family list, which waits for
+		// endpoint 5's own PartsList.
+		n.apply(wildcard, &oneInteraction(
+			partsAttr(0, 10, aggregatorEP, unplacedEP),
+			bsDescriptor(aggregatorEP, one(dtAggregator, 2), nil, 10),
+		).r, true)
+		bridgeIs(t, n, aggregatorEP)
+		n.apply(wildcard, &partsAttr(0, 11, aggregatorEP).r, true)
+		bridgeIs(t, n, aggregatorEP)
+		if w := logs.warnings(""); len(w) != 0 {
+			t.Fatalf("warnings %q", w)
+		}
+	})
+
+	t.Run("restores the devices from storage after a restart", func(t *testing.T) {
+		t.Parallel()
+		st := &MemoryStore{}
+		n, _ := pairPeer(t, st)
+		n.apply(wildcard, &oneInteraction(bridgeReports([]uint16{aggregatorEP}, 10)...).r, true)
+		bridgeIs(t, n, all...)
+		restored, _ := restartedBridge(t, st)
+		bridgeIs(t, restored, all...)
+		if !restored.Seeded() {
+			t.Fatal("restored node not seeded")
+		}
+	})
+
+	t.Run("warns again and erases a device the peer removed while the controller was stopped", func(t *testing.T) {
+		t.Parallel()
+		st := &MemoryStore{}
+		n, _ := pairPeer(t, st)
+		n.apply(wildcard, &oneInteraction(bridgeReports([]uint16{aggregatorEP}, 10)...).r, true)
+		restored, logs := restartedBridge(t, st)
+		if w := logs.warnings(incompleteRootMsg); len(w) != 1 || w[0] != incompleteRoot {
+			t.Fatalf("warnings after the restart %q, want one", w)
+		}
+		kept, removed := lights[0], lights[1]
+		restored.apply(wildcard, &bsDescriptor(aggregatorEP, one(dtAggregator, 2), []uint16{kept}, 11).r, true)
+		bridgeIs(t, restored, aggregatorEP, kept)
+		if restored.Endpoint(removed) != nil {
+			t.Fatalf("endpoint %d is still there", removed)
+		}
 	})
 }
