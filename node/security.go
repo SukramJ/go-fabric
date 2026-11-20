@@ -653,18 +653,7 @@ func wireSecurity(
 		br.SessionClosed(id)
 		events.closed(id)
 	})
-	// A newer CASE session of the same subscriber takes the subscriptions
-	// of the sessions it supersedes before the eviction its establishment
-	// causes closes any of them (matter.js SessionManager.ts:750-769,
-	// ServerSubscription.ts:819-834 at b25ed960). A newer session closed
-	// before the move ran has had its close hook already: what moved onto
-	// it closes here.
-	sessions.SetOnSessionSuperseded(func(olderID, newerID uint16) {
-		br.SessionSuperseded(olderID, newerID)
-		if _, err := sessions.Get(newerID); err != nil {
-			subs.CloseSession(newerID)
-		}
-	})
+	wireSupersession(sessions, br, subs)
 	subs.SetOnSessionSubscriptionsChanged(events.subscriptionsChanged)
 	br.AttachSessionRegistry(sessions)
 
@@ -1525,3 +1514,19 @@ const (
 	handshakeAdapterTTL   = time.Minute
 	handshakeReapInterval = handshakeAdapterTTL / 4
 )
+
+// wireSupersession hands a newer CASE session of the same subscriber the
+// subscriptions of the sessions it supersedes, before the eviction its
+// establishment causes closes any of them (matter.js
+// packages/protocol/src/session/SessionManager.ts:750-769,
+// packages/node/src/node/server/ServerSubscription.ts:819-834 at b25ed960).
+// A newer session closed before the move ran has had its close hook
+// already: what moved onto it closes here.
+func wireSupersession(sessions *operational.Manager, br *bridge.Bridge, subs *subscription.Manager) {
+	sessions.SetOnSessionSuperseded(func(olderID, newerID uint16) {
+		br.SessionSuperseded(olderID, newerID)
+		if _, err := sessions.Get(newerID); err != nil {
+			subs.CloseSession(newerID)
+		}
+	})
+}

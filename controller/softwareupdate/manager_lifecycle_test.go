@@ -300,7 +300,7 @@ func TestManagerNodeDeletedDisarmsWithoutAQueuedUpdate(t *testing.T) {
 	var lost atomic.Int32
 	armer := peer.NewRebootResubscribeArmer(peer.RebootArmerContext{
 		Clock: clk, PeerLost: func(exchange.PeerAddress) { lost.Add(1) },
-		ClosePeerSessionsBefore: func(exchange.PeerAddress, time.Time) {}, CloseSubscriptions: func(exchange.PeerAddress) {},
+		ClosePeerSessionsRegisteredBefore: func(exchange.PeerAddress, peer.ArmerSession) {}, CloseSubscriptions: func(exchange.PeerAddress) {},
 		Logger: slog.New(slog.DiscardHandler),
 	})
 	m, err := New(Config{Registry: &client.Registry{}, Images: NewImages(ImagesConfig{}), Clock: clk, Armer: armer, Logger: slog.New(slog.DiscardHandler)})

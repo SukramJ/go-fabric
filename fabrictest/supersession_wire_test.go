@@ -36,9 +36,10 @@ func deviceSessions(t *testing.T, p *fabrictest.Pair) map[uint16][]uint32 {
 	t.Helper()
 	out := map[uint16][]uint32{}
 	if err := p.Device.Act(func(n *node.Node) error {
-		for _, s := range n.SessionDiagnostics().Sessions {
-			if !s.PASE {
-				out[s.ID] = slices.Clone(s.SubscriptionIDs)
+		sessions := n.SessionDiagnostics().Sessions
+		for i := range sessions {
+			if !sessions[i].PASE {
+				out[sessions[i].ID] = slices.Clone(sessions[i].SubscriptionIDs)
 			}
 		}
 		return nil
