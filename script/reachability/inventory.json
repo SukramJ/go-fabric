@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10170,
+  "entry_points": 10171,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27869,
+    "total_exported": 27870,
     "reachable": 20885,
-    "whitelisted": 6962,
+    "whitelisted": 6963,
     "unreachable": 22
   },
   "by_package": [
@@ -1210,6 +1210,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/attribute_value_reader_structured_test.go",
       "line": 74
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttributeValueReader_ListAppendOfAScalarEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/attribute_value_reader_listappend_test.go",
+      "line": 47
     },
     {
       "package": "bridge",
@@ -37483,14 +37490,14 @@
       "identifier": "TestUnitTestingListAppend",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/unit_testing_test.go",
-      "line": 164
+      "line": 177
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestUnitTestingServesWhatTheGoTHWrites",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/unit_testing_test.go",
-      "line": 97
+      "line": 108
     },
     {
       "package": "examples/reference-bridge",

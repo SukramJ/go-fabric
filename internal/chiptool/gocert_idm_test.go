@@ -496,8 +496,7 @@ func caseIDM31() goCertCase {
 			},
 			{
 				n: "13", line: 464, title: "write a large list larger than 1 MTU",
-				finding: idm31ListAppendFinding,
-				run:     func(th *goTH) error { return idm31WriteLongList(th, n) },
+				run: func(th *goTH) error { return idm31WriteLongList(th, n) },
 			},
 			{n: "14", line: 492, title: "write one attribute three times", at: "TSUIC.S", need: "TSUIC.S.A0000", run: func(th *goTH) error {
 				for range 3 {
@@ -970,14 +969,6 @@ func idm31WriteStruct(th *goTH, n *client.Node) error {
 	th.note("wrote %s to %s: Success, reads back field by field", describeNode(got), describePath(p))
 	return nil
 }
-
-// idm31ListAppendFinding is the findings-register bullet step 13 fails
-// with: the daemon answers each list-append of an octet-string entry
-// CONSTRAINT_ERROR (bridge listItemValue decodes the entry as []any, and
-// endpoint appendListValue refuses an item whose slice type is not the
-// stored list's [][]byte), so the chunked write's ADDs fail.
-// PROVISIONAL id, assigned by the coordinator at integration (P2b-F report).
-const idm31ListAppendFinding = "F-b25ed960-39"
 
 // reClientWriteChunks is the Go client's own record of a write: the
 // number of WriteRequest messages it sent (client/interaction/write.go,

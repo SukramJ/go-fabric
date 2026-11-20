@@ -6,14 +6,25 @@ package main
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/controller"
+	"github.com/SukramJ/go-fabric/controller/attestation"
+	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -152,30 +163,113 @@ func TestUnitTestingServesWhatTheGoTHWrites(t *testing.T) {
 	}
 }
 
-// TestUnitTestingListAppend is the shape of a chunked write of
-// listLongOctetString, the evidence TC-IDM-3.1 step 13 asks for: a REPLACE
-// with an empty list, then each entry appended (ListIndex null) — the
-// chunks client/interaction's chunkWrite sends for a list too large for one
-// message. The daemon answers the ADD CONSTRAINT_ERROR: bridge's
-// listItemValue decodes an appended scalar entry as []any, and the
-// dispatcher's appendListValue refuses an item whose slice type differs
-// from the stored list's ([][]byte). The gap is the module's, not this
-// cluster's (P2b-F report, finding); the test is skipped until it closes.
+// TestUnitTestingListAppend is TC-IDM-3.1 step 13's write, as the Go-TH
+// leg sends it: the module's controller writes listLongOctetString with
+// three 512-byte entries, which fit no message, so the client sends it
+// chunked — a REPLACE with the empty list, then one ADD (ListIndex null)
+// per entry over several WriteRequest messages — and the list reads back
+// with three entries; the controller's own Debug line counts the
+// messages, the step's evidence (owner decision C-21). Each ADD is decoded
+// with the definition's entry type, as matter.js decodes it with the
+// list's elementSchema
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:446-460 at
+// b25ed960); before, the daemon answered every ADD CONSTRAINT_ERROR.
 func TestUnitTestingListAppend(t *testing.T) {
 	t.Parallel()
-	t.Skip("module gap: a list-append of a scalar entry to a [][]byte list answers CONSTRAINT_ERROR (bridge listItemValue, endpoint appendListValue); P2b-F report")
-	s := startUnitTestingNode(t)
-	listPath := unitTestingPath(unitTestingAttrListLongOctetString)
-	write(t, s, listPath, func(e *tlv.Encoder, tag tlv.Tag) {
-		e.StartArray(tag)
-		_ = e.EndContainer()
-	})
-	appendPath := listPath
-	appendPath.ListAppend = true
-	for range 3 {
-		write(t, s, appendPath, func(e *tlv.Encoder, tag tlv.Tag) { e.PutOctets(tag, unitTestingLongOctetStringEntry) })
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	logger := slog.New(slog.DiscardHandler)
+	dir := t.TempDir()
+	applier := &otaApplier{vendorID: testVendorID, productID: testProductID, dir: filepath.Join(dir, "ota"), logger: logger}
+	actions, err := mattercore.NewActions(mattercore.ActionsConfig{Host: newFleet().actions})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if v := readBack(t, s, unitTestingAttrListLongOctetString); len(v.Children) != 3 {
-		t.Errorf("listLongOctetString after the chunked write: %d entries, want 3", len(v.Children))
+	ut, err := newUnitTesting()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const passcode, discriminator = 20202021, 3840
+	cfg := nodeConfig(flags{dbPath: filepath.Join(dir, "daemon.db"), listen: "127.0.0.1:0", label: "reference-daemon", salt: "go-fabric-ref-salt", iterations: 1000},
+		passcode, discriminator, node.TCPConfig{}, applier, actions, logger)
+	cfg.AggregatorServers = append(cfg.AggregatorServers, ut)
+	site.AddNode(cfg)
+
+	var logs bytes.Buffer
+	var mu sync.Mutex
+	ctlLog := slog.New(slog.NewTextHandler(lockedWriter{&mu, &logs}, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	ccfg := site.ControllerConfig(fabrictest.ControllerOptions{Logger: ctlLog})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	var c *controller.Controller
+	if err := site.Run(ctx, func(ctx context.Context) (err error) { c, err = controller.New(ctx, ccfg); return err }); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = site.Run(context.Background(), c.Close) })
+	code, err := setup.ManualCode(discriminator, passcode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := unitTestingPath(unitTestingAttrListLongOctetString)
+	entries := [][]byte{unitTestingLongOctetStringEntry, unitTestingLongOctetStringEntry, unitTestingLongOctetStringEntry}
+	value := listOfOctets(entries)
+	var st client.WriteStatuses
+	var read *client.Report
+	if err := site.Run(ctx, func(ctx context.Context) error {
+		n, err := c.Pair(ctx, code, controller.PairOptions{OnAttestationFailure: attestation.Accept()})
+		if err != nil {
+			return err
+		}
+		mu.Lock()
+		logs.Reset()
+		mu.Unlock()
+		if st, err = n.Write(ctx, []client.WriteRequest{{Path: p, Value: value}}, client.WriteOptions{}); err != nil {
+			return err
+		}
+		read, err = n.Read(ctx, client.ReadRequest{ReadRequest: client.ReadPaths{Attributes: []im.ConcreteAttributePath{p}}, IncludeKnownVersions: true})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Err(); err != nil {
+		t.Fatalf("the chunked write: %v (statuses %+v)", err, st)
+	}
+	v, ok := read.Value(p.Endpoint, p.Cluster, p.Attribute)
+	if !ok || len(v.Children) != len(entries) {
+		t.Fatalf("listLongOctetString after the chunked write: %d entries (ok %v), want %d", len(v.Children), ok, len(entries))
+	}
+	for i, e := range v.Children {
+		if !bytes.Equal(e.El.Octets, unitTestingLongOctetStringEntry) {
+			t.Errorf("entry %d reads back %d bytes, not the long entry", i, len(e.El.Octets))
+		}
+	}
+	mu.Lock()
+	m := regexp.MustCompile(`msg=matter\.controller\.interaction\.write .*?chunks=(\d+)`).FindStringSubmatch(logs.String())
+	mu.Unlock()
+	if m == nil {
+		t.Fatal("the controller logged no matter.controller.interaction.write line for the write")
+	}
+	if chunks, _ := strconv.Atoi(m[1]); chunks < 2 {
+		t.Errorf("the write went as %d WriteRequest message, want at least 2 (chunked)", chunks)
 	}
 }
+
+// lockedWriter serialises the controller's log writes into a buffer.
+type lockedWriter struct {
+	mu *sync.Mutex
+	w  *bytes.Buffer
+}
+
+func (l lockedWriter) Write(b []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(b)
+}
+
+// listOfOctets encodes a list of octet strings.
+func listOfOctets(entries [][]byte) spec.Encodable {
+	return encodableFunc(func(enc *tlv.Encoder, tag tlv.Tag) { spec.PutList(spec.PutBytes)(enc, tag, entries) })
+}
+
+type encodableFunc func(enc *tlv.Encoder, tag tlv.Tag)
+
+func (f encodableFunc) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { f(enc, tag) }
