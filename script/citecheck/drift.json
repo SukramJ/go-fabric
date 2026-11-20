@@ -127,7 +127,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1888,
+    "line": 1892,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -137,7 +137,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1895,
+    "line": 1899,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -146,7 +146,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1927,
+    "line": 1931,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -156,7 +156,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2816,
+    "line": 2820,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
@@ -2862,7 +2862,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 584,
+    "line": 619,
     "citation": "packages/protocol/src/action/server/AttributeWriteResponse.ts:243-251",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "at": "db021da0",
@@ -2872,7 +2872,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 1143,
+    "line": 1178,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",

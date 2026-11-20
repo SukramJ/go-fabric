@@ -1464,6 +1464,10 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	b.mu.RUnlock()
 	dispatcher.SetACLLister(pinnableACL(aclLister))
 	dispatcher.SetAuxiliaryACL(auxACL)
+	// The response check after each server judges a cluster/core server's
+	// hand-written response as the InvokeResponse carries it: through the
+	// writer that encodes it (decision 343).
+	dispatcher.SetResponseWriter(defaultCommandFieldsWriter)
 
 	// Wire MatterEventReceiver-aware cluster servers so they can fire
 	// events through the bridge's event emitter pipeline. The

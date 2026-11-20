@@ -32,9 +32,9 @@ func (s answeringServer) MatterInvoke(context.Context, uint32, any) (any, error)
 // cluster/core servers as every other: an absent response of a command
 // whose response has a mandatory field is FAILURE (F-b25ed960-30, matter.js
 // ProtocolService.ts:624-625, :717-733 at b25ed960), the generated form of
-// a response is judged, a handler's deliberate NoResponse is not, and a
-// hand-written response form — which only the bridge's response writer
-// turns into the definition's bytes — is not judged here.
+// a response is judged, a handler's deliberate NoResponse is not, and —
+// with no response writer set (a host's own dispatcher) — a hand-written
+// response form is not judged; the bridge sets its writer (decision 343).
 func TestResponseCheckReachesEveryServer(t *testing.T) {
 	for _, c := range []struct {
 		name    string
@@ -64,7 +64,7 @@ func TestResponseCheckReachesEveryServer(t *testing.T) {
 			if res := d.InvokeAuthorized(caseCtx(false), im.ConcreteCommandPath{Cluster: c.cluster, Command: c.cmd}, req, nil); len(res) != 1 || res[0].Status != c.status {
 				t.Errorf("InvokeAuthorized (wildcard, group): %+v, want one %v", res, c.status)
 			}
-			if err := responseHeld(context.Background(), srv, c.cmd, nil, c.resp); spec.StatusOf(err) != c.status {
+			if err := responseHeld(context.Background(), srv, c.cmd, nil, c.resp, nil); spec.StatusOf(err) != c.status {
 				t.Errorf("responseHeld: %v", err)
 			}
 		})
