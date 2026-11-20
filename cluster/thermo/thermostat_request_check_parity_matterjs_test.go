@@ -34,7 +34,16 @@ func TestThermostatRequestCheckParityMatterJS(t *testing.T) {
 			AbsMaxCoolSetpointLimit: 3200,
 			InitialCoolingSetpoint:  2600,
 		})
-		_, err := srv.MatterInvoke(context.Background(), tdef.CmdSetpointRaiseLower, tdef.SetpointRaiseLowerRequest{Mode: mode, Amount: 5})
+		// The request passes the endpoint dispatcher's gate first, as an
+		// interaction-layer invoke does (decision 339, endpoint
+		// requestHeld): the server's FeatureMap and attributes.
+		ctx, req := context.Background(), tdef.SetpointRaiseLowerRequest{Mode: mode, Amount: 5}
+		fm, _ := srv.MatterRead(0xFFFC)
+		features, _ := fm.(uint32)
+		if err := spec.AdmitRequest(ctx, tdef.Definition, features, tdef.CmdSetpointRaiseLower, req, srv.MatterRead); err != nil {
+			return spec.StatusOf(err)
+		}
+		_, err := srv.MatterInvoke(ctx, tdef.CmdSetpointRaiseLower, req)
 		return spec.StatusOf(err)
 	}
 	t.Run("SetpointRaiseLower through the interaction layer", func(t *testing.T) {
@@ -47,13 +56,6 @@ func TestThermostatRequestCheckParityMatterJS(t *testing.T) {
 		})
 		t.Run("refuses a mode the enum does not define with CONSTRAINT_ERROR", func(t *testing.T) { // :527-529
 			t.Parallel()
-			// ThermostatServer.MatterInvoke runs the host's handler
-			// (spec.HostHandlers.Invoke) and its own logic without the
-			// request gate (spec.Instance.admitRequest), so the handler
-			// answers mode 3 with INVALID_COMMAND. Owner decision 319: one
-			// central request gate where the bridge decodes by definition,
-			// unit P2-request-gate (finding F-b25ed960-29).
-			t.Skip("ThermostatServer.MatterInvoke holds no request gate; decision 319, P2-request-gate, F-b25ed960-29")
 			if got := raiseLowerOnCoolingThermostat(t, tdef.SetpointRaiseLowerModeEnum(3)); got != im.StatusConstraintError {
 				t.Errorf("status %v, want CONSTRAINT_ERROR", got)
 			}
