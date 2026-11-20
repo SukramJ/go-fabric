@@ -498,7 +498,7 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 // definition's decoder as the wrong type ([spec.ErrWrongType]): an
 // undecodable value, which ends the write interaction with FAILURE (owner
 // decision 161), as matter.js's element schema throws a non-status error
-// that writeValue rethrows (AttributeWriteResponse.ts:463-469 at b25ed960;
+// that writeValue rethrows (AttributeWriteResponse.ts:463-470 at b25ed960;
 // TlvObject.ts:205-207 refuses another TLV type). Before P2b-F it reached
 // the dispatcher as []any and answered CONSTRAINT_ERROR on its path.
 //

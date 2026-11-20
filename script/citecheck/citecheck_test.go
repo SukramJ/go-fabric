@@ -143,7 +143,9 @@ import (
 // (tc-idm-3.1-support.ts:119) around :158-162, listLongOctetString beside
 // LONG_OCTET_STRING_ENTRY (unit-testing-cluster.ts:66-70), the describe
 // LocalizationConfigurationServer of its test file; none is a moved line.
-const citecheckDriftRatchet = 433
+// 435 after P2b-F's follow-up: two rows naming writeValue
+// (AttributeWriteResponse.ts:419) around its catch block :463-470, read.
+const citecheckDriftRatchet = 435
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit

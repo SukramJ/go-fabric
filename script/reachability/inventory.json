@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10172,
+  "entry_points": 10176,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27871,
+    "total_exported": 27872,
     "reachable": 20885,
-    "whitelisted": 6964,
+    "whitelisted": 6965,
     "unreachable": 22
   },
   "by_package": [
@@ -401,7 +401,7 @@
       "package": "client/exchange",
       "identifier": "Manager.LocalFixedMrpBackoff",
       "file": "client/exchange/manager.go",
-      "line": 249,
+      "line": 254,
       "kind": "method"
     },
     {
@@ -9561,6 +9561,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/exchange/exchange_table_test.go",
       "line": 56
+    },
+    {
+      "package": "client/exchange",
+      "identifier": "TestInitiatingMessageOutlivesTheReleaseOfTheSessionItFound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/exchange/inbound_release_test.go",
+      "line": 23
     },
     {
       "package": "client/exchange",

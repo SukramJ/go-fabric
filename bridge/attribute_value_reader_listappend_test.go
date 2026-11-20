@@ -96,7 +96,7 @@ func TestAttributeValueReader_ListAppendOfAScalarEntry(t *testing.T) {
 // decision 161; im valueGateFor). matter.js's element schema throws a
 // non-status error for another TLV type (packages/types/src/tlv/TlvObject.ts:205-207
 // at b25ed960), which writeValue rethrows
-// (packages/protocol/src/action/server/AttributeWriteResponse.ts:463-469).
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:463-470).
 // Before P2b-F the entry reached the dispatcher as []any and answered
 // CONSTRAINT_ERROR on its path (measured over a node, P2b-F report).
 func TestScalarAppendedToAStructListEndsTheWrite(t *testing.T) {
