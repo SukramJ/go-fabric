@@ -1304,7 +1304,7 @@
       "path": "packages/general/test/util/BytesTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "matter.js's Bytes helpers over JavaScript typed arrays and strings (hex, base64, string, concat, views, utf8Length, truncateUtf8); the module uses encoding/hex, encoding/base64, Go byte slices and len of a string. Pin lift b25ed960: the cut of a string at a byte bound (truncateUtf8) gets a Go subject with unit P2-A (decision 294).",
+      "reason": "matter.js's Bytes helpers over JavaScript typed arrays and strings (hex, base64, string, concat, views, utf8Length, truncateUtf8); the module uses encoding/hex, encoding/base64, Go byte slices and len of a string. Pin lift b25ed960: the cut of a string at a byte bound (truncateUtf8) gets a Go subject with unit P2b-A (decision 294).",
       "snapshotSha": "6e58f39f99608db4266ac3c8bf1f4e15437c10c2"
     },
     {
@@ -2413,7 +2413,7 @@
       "path": "packages/node/test/behavior/state/managed/DatasourceTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "matter.js's Datasource: transactional state, id- and name-keyed containers, stored-value migration, the shortening of stored strings over their byte limit and persistence of the TypeScript state layer. Pin lift b25ed960: what a device serves after a stored string was shortened is StoredNodeLabelTest.ts (unit P2-A).",
+      "reason": "matter.js's Datasource: transactional state, id- and name-keyed containers, stored-value migration, the shortening of stored strings over their byte limit and persistence of the TypeScript state layer. Pin lift b25ed960: what a device serves after a stored string was shortened is StoredNodeLabelTest.ts (unit P2b-A).",
       "snapshotSha": "9bf40762a56cf52166ae684e33c0a362d3510572"
     },
     {
@@ -2865,7 +2865,7 @@
           "reason": "matter.js's duration metatype, held as milliseconds (Seconds(30) = 30000); spec.Kind has no duration, a duration attribute is a plain integer in its definition's unit"
         }
       ],
-      "reason": "Reference, expression, dotted, percent and codepoint bounds over spec.Instance.ValidateWrite; the duration metatype and id-keyed record slots have no Go subject. Pin lift b25ed960: the two cases that count a string bound in UTF-8 bytes (#4995) are open, unit P2-A.",
+      "reason": "Reference, expression, dotted, percent and codepoint bounds over spec.Instance.ValidateWrite; the duration metatype and id-keyed record slots have no Go subject. Pin lift b25ed960: the two cases that count a string bound in UTF-8 bytes (#4995) are open, unit P2b-A.",
       "snapshotSha": "5eaa02019d5683777044a85181fce454fe5eadae"
     },
     {
@@ -3471,7 +3471,7 @@
     {
       "path": "packages/node/test/behaviors/basic-information/StoredNodeLabelTest.ts",
       "status": "planned",
-      "reason": "Pin lift b25ed960, unit P2-A: a stored NodeLabel over 32 bytes in UTF-8 served and stored shortened at start (#4995, decision 294); 1 case.",
+      "reason": "Pin lift b25ed960, unit P2b-A: a stored NodeLabel over 32 bytes in UTF-8 served and stored shortened at start (#4995, decision 294); 1 case.",
       "snapshotSha": "20c3a77f0ce1e645808b6f6d6a3b3fddd29d2082"
     },
     {
@@ -3487,7 +3487,7 @@
       "missing": [
         "detects a lost peer by the missing ack of a report status and resubscribes once it is back"
       ],
-      "reason": "The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). The default subscription of a bound client runs on two fabrictest devices of one fabric, the switch's node client stack on the site: the subscription NetworkClient sets on the bound ClientNode (defaultSubscription, autoSubscribe, a SustainedSubscription) is Resolution.Interaction.Subscribe with Sustain at the WiFi ceiling the ClientNode asks (PhysicalDeviceProperties.ts:24); the isolation is Network.Filter, the restart Device.Stop and Start. Pin lift b25ed960: the lost peer detected by the unacknowledged report status (#4943) is open, unit P2-E.",
+      "reason": "The group kind and the group sends run on a commissioned fabrictest device with its group messages on the multicast model (node/binding_integration_parity_matterjs_test.go). The default subscription of a bound client runs on two fabrictest devices of one fabric, the switch's node client stack on the site: the subscription NetworkClient sets on the bound ClientNode (defaultSubscription, autoSubscribe, a SustainedSubscription) is Resolution.Interaction.Subscribe with Sustain at the WiFi ceiling the ClientNode asks (PhysicalDeviceProperties.ts:24); the isolation is Network.Filter, the restart Device.Stop and Start. Pin lift b25ed960: the lost peer detected by the unacknowledged report status (#4943) is open, unit P2b-E.",
       "snapshotSha": "d4807cf9c2ee54741c94d00d84858d557c9484a4"
     },
     {
@@ -3657,7 +3657,7 @@
         "measures the lockout on the monotonic clock",
         "refuses to store a user type Matter does not define"
       ],
-      "reason": "66 of 71 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The file names no face credential; since phase 36 serves FACE (DoorLockServer.ts:86-98), four SetCredential cases of describe(\"DoorLockServer\") run once more with the Face type (doorlockserver_face_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System). Pin lift b25ed960: the three request-validation cases of #5012 are ported (doorlockserver_server_parity_matterjs_test.go, doorlockserver_schedulerestricted_parity_matterjs_test.go); the gate's refusal before a host handler is held by cluster/lock request_gate_test.go. Pin lift b25ed960, P2-H: \"refuses to store a user type Matter does not define\" asserts the wire answer only (INVALID_COMMAND through the dispatcher's gate); matter.js's refusal of the local call (DoorLockServerTest.ts:823-845 at b25ed960) has no Go subject since the request check moved to the wire path (decision 339), findings F-b25ed960-36.",
+      "reason": "69 of 71 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The file names no face credential; since phase 36 serves FACE (DoorLockServer.ts:86-98), four SetCredential cases of describe(\"DoorLockServer\") run once more with the Face type (doorlockserver_face_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System). Pin lift b25ed960: the three request-validation cases of #5012 are ported (doorlockserver_server_parity_matterjs_test.go, doorlockserver_schedulerestricted_parity_matterjs_test.go); the gate's refusal before a host handler is held by cluster/lock request_gate_test.go. Pin lift b25ed960, P2-H: \"refuses to store a user type Matter does not define\" asserts the wire answer only (INVALID_COMMAND through the dispatcher's gate); matter.js's refusal of the local call (DoorLockServerTest.ts:823-845 at b25ed960) has no Go subject since the request check moved to the wire path (decision 339), findings F-b25ed960-36.",
       "snapshotSha": "978448f0403d2851b727a867901fe956f70a8d64"
     },
     {
@@ -3834,7 +3834,7 @@
       "missing": [
         "refuses a GroupName of 9 two-byte characters, which is 18 bytes"
       ],
-      "reason": "The base AddGroup constraints (the generated definition's decoder refuses GroupId 0 and a 17-character GroupName) and the server's relaxed request path (an out-of-range GroupId and an over-long GroupName answered with an AddGroupResponse carrying ConstraintError) are ported, the latter over the wire of a fabrictest pair. Pin lift b25ed960: the GroupName bound in UTF-8 bytes (#4995) is open, unit P2-A.",
+      "reason": "The base AddGroup constraints (the generated definition's decoder refuses GroupId 0 and a 17-character GroupName) and the server's relaxed request path (an out-of-range GroupId and an over-long GroupName answered with an AddGroupResponse carrying ConstraintError) are ported, the latter over the wire of a fabrictest pair. Pin lift b25ed960: the GroupName bound in UTF-8 bytes (#4995) is open, unit P2b-A.",
       "snapshotSha": "a094dc99372ba1b389352572e5e1dcd88a75892f"
     },
     {
@@ -4211,7 +4211,7 @@
         "limits a fabric's remaining capacity by the entries other fabrics use",
         "refuses a scene name over 16 bytes in UTF-8"
       ],
-      "reason": "The one it runs over the wire of a fabrictest pair on a bridged OnOffLight: Off, scene 1 with a 1 s transition and scene 2 at the 60 000 000 ms transition-time maximum added on group 0 with OnOff=1, scene 1 recalled, 1.5 s advanced, OnOff read true; the local server case stays. Pin lift b25ed960: the scenes of a removed fabric leaving at removal and at start (#4988) are the removal contract's (MatterDropFabric, the node's reconcile at start); the remaining capacity across fabrics (#4963) and the scene name bound in UTF-8 bytes (#4995) are open, unit P2-A.",
+      "reason": "The one it runs over the wire of a fabrictest pair on a bridged OnOffLight: Off, scene 1 with a 1 s transition and scene 2 at the 60 000 000 ms transition-time maximum added on group 0 with OnOff=1, scene 1 recalled, 1.5 s advanced, OnOff read true; the local server case stays. Pin lift b25ed960: the scenes of a removed fabric leaving at removal and at start (#4988) are the removal contract's (MatterDropFabric, the node's reconcile at start); the remaining capacity across fabrics (#4963) and the scene name bound in UTF-8 bytes (#4995) are open, unit P2b-A.",
       "snapshotSha": "f73f1c3d3a4d590162c70d809a1dc000454f3cb0"
     },
     {
@@ -4589,7 +4589,7 @@
     {
       "path": "packages/node/test/behaviors/user-label/UserLabelServerTest.ts",
       "status": "partial",
-      "reason": "Ported over the wire on a commissioned fabrictest light (#4900): REPLACE_ALL alone and chunked with ADD, the empty list, the 16-character limits, the maxLabels limit with RESOURCE_EXHAUSTED for a REPLACE_ALL and the crossing ADD, the 255 default, the LabelStruct constraints in both write forms, UNSUPPORTED_ACCESS for an Operate-only writer and persistence across a restart on the same store, and the lone ADD answered BUSY with the list kept (the IM write path's marker, issue 438). No server fix was needed. Pin lift b25ed960: the label bound in UTF-8 bytes (#4995) is open, unit P2-A.",
+      "reason": "Ported over the wire on a commissioned fabrictest light (#4900): REPLACE_ALL alone and chunked with ADD, the empty list, the 16-character limits, the maxLabels limit with RESOURCE_EXHAUSTED for a REPLACE_ALL and the crossing ADD, the 255 default, the LabelStruct constraints in both write forms, UNSUPPORTED_ACCESS for an Operate-only writer and persistence across a restart on the same store, and the lone ADD answered BUSY with the list kept (the IM write path's marker, issue 438). No server fix was needed. Pin lift b25ed960: the label bound in UTF-8 bytes (#4995) is open, unit P2b-A.",
       "snapshotSha": "2d7c6b76f52fc5ab9db6b12cd29d00b1e3de1f8a",
       "go": [
         "node:TestUserLabelServerParity"
@@ -5483,7 +5483,7 @@
         "subscribes to a peer that is not initially available (recreate)",
         "replaces a subscription that primes compactly once the peer does not acknowledge a report status"
       ],
-      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282). Pin lift wave P4 (#433): a peer whose Sigma1 messages are all lost gets one Sigma1 for at least the MRP budget, then fresh ones three times each with the backoff continued, on the connection process over a silent socket (client/peer:TestConnectionRefreshesUnacknowledgedSigma1Parity). Pin lift b25ed960: the subscription replaced once the peer does not acknowledge a report status (#4943) is open, unit P2-E.",
+      "reason": "Staggered addresses and the last-known address as fallback keep their client/peer tests; on fabrictest (controller/client:TestClientConnectivityParity) a command to a stopped device fails and succeeds once it is back, the default subscription is lost and re-established with a new id after a timeout and a long absence and signals alive, a close during the reconnection and a shutdown while an exchange is being established log no error, disable ends the subscription and enable starts a fresh one, a restart keeps an uncommissioned node and subscribes to a device once it is back. Missing: a second device address, a moved address and blocked or stale DNS-SD (fabrictest gives a device one address and answers DNS-SD in-process; the peer-level tests cover the connection logic), the online/offline lifecycle events of sessions (no such events on client.Node; Hooks.ConnectionStateChanged is the subscription's state), a non-sustained subscription closed by disabling the node (client.Node.Disable closes the default subscription only — a register candidate), and hosts closed and recreated on the site's stored state (fabrictest keeps stores per host object; Restart is the supported path). Disable closes every subscription of the node, not only the default one (fix: ClientNode.disable cancelling the interaction, ClientNode.ts:239-253, ClientInteraction.ts:270-282). Pin lift wave P4 (#433): a peer whose Sigma1 messages are all lost gets one Sigma1 for at least the MRP budget, then fresh ones three times each with the backoff continued, on the connection process over a silent socket (client/peer:TestConnectionRefreshesUnacknowledgedSigma1Parity). Pin lift b25ed960: the subscription replaced once the peer does not acknowledge a report status (#4943) is open, unit P2b-E.",
       "snapshotSha": "436f7020d3096f94939c16b820c0e45432850fde"
     },
     {
@@ -6891,7 +6891,7 @@
           "reason": "MockTime.stepWallClock: a Go time.Time carries a monotonic reading and the engine has no wall clock to step"
         }
       ],
-      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION (over the wire, with the SUCCESS answer that keeps the subscription, in bridge:TestKeepAliveStatusParity), endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go), and repeated MRP exhaustion as one failed update each, the subscription ended at the third and the sessions kept (bridge/subscribe_send_error_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges. Pin lift b25ed960: describe \"on superseded sessions\" (e3551a69d, #4882) is open, unit P2-B.",
+      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION (over the wire, with the SUCCESS answer that keeps the subscription, in bridge:TestKeepAliveStatusParity), endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go), and repeated MRP exhaustion as one failed update each, the subscription ended at the third and the sessions kept (bridge/subscribe_send_error_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges. Pin lift b25ed960: describe \"on superseded sessions\" (e3551a69d, #4882) is open, unit P2b-B.",
       "snapshotSha": "dcbced15be4acf1ed7686c0a1ee2d399850259b3"
     },
     {
@@ -7525,7 +7525,7 @@
         "counts a subscription of events without an event filter as not compact",
         "counts a subscription of events with an event filter as compact"
       ],
-      "reason": "Interaction.Close (ClientInteraction.ts:264-297 at 862ad75f), its in-flight set and the abandoned establishment (:1084-1097, InteractionMessenger.ts:1116-1137) run on the scripted peer: an aborted subscribe returns at once and Close ends the wait for its report; a report that arrives after the abort, and one being processed when the interaction closes, are answered INVALID_SUBSCRIPTION once. Missing: the reuse of an abandoned subscribe's request object (Go requests are values) and a failing exchange close (the Go exchange's Close cannot fail) have no Go shape; the three BDX cases need the client-side BDX initiation (ClientInteraction.initBdx, :1185-1215), which the Go client has not. Pin lift b25ed960: the compact-priming estimate of a subscription (#4943) is open, unit P2-E.",
+      "reason": "Interaction.Close (ClientInteraction.ts:264-297 at 862ad75f), its in-flight set and the abandoned establishment (:1084-1097, InteractionMessenger.ts:1116-1137) run on the scripted peer: an aborted subscribe returns at once and Close ends the wait for its report; a report that arrives after the abort, and one being processed when the interaction closes, are answered INVALID_SUBSCRIPTION once. Missing: the reuse of an abandoned subscribe's request object (Go requests are values) and a failing exchange close (the Go exchange's Close cannot fail) have no Go shape; the three BDX cases need the client-side BDX initiation (ClientInteraction.initBdx, :1185-1215), which the Go client has not. Pin lift b25ed960: the compact-priming estimate of a subscription (#4943) is open, unit P2b-E.",
       "snapshotSha": "3208cf7822dfaeb118e49e676e0a10565016f343"
     },
     {
@@ -7562,7 +7562,7 @@
     {
       "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionHandlerTest.ts",
       "status": "planned",
-      "reason": "Pin lift b25ed960, unit P2-E: a subscription closed when the peer never acknowledged the status of a report or of a report chunk (#4943); 6 cases.",
+      "reason": "Pin lift b25ed960, unit P2b-E: a subscription closed when the peer never acknowledged the status of a report or of a report chunk (#4943); 6 cases.",
       "snapshotSha": "15da7483d8ab539dd4de5c4f962a856e303add3e"
     },
     {
@@ -7578,13 +7578,13 @@
         "stops the timeout timer when the last subscription leaves",
         "stops the timeout timer when the last subscription leaves as it times out"
       ],
-      "reason": "The liveness expiry at the deadline instant and the three reportStarted cases (session announced, a panicking callback contained, nothing announced after close) are ported on the scripted rig; the two wall-clock-step cases need a wall clock apart from the monotonic one, which clocktest.Fake (one reading) does not have. Pin lift b25ed960: the timeout timer stopped with the last subscription (#4947) is open, unit P2-E.",
+      "reason": "The liveness expiry at the deadline instant and the three reportStarted cases (session announced, a panicking callback contained, nothing announced after close) are ported on the scripted rig; the two wall-clock-step cases need a wall clock apart from the monotonic one, which clocktest.Fake (one reading) does not have. Pin lift b25ed960: the timeout timer stopped with the last subscription (#4947) is open, unit P2b-E.",
       "snapshotSha": "0a900e12f928a8687e2a602e1e27acd81929c889"
     },
     {
       "path": "packages/protocol/test/action/client/subscription/PeerSubscriptionTest.ts",
       "status": "planned",
-      "reason": "Pin lift b25ed960, unit P2-E: reportStatusUnacknowledged of a peer subscription — closed for a chunk status, for a final status only with compact priming, kept when a newer report started (#4943); 6 cases.",
+      "reason": "Pin lift b25ed960, unit P2b-E: reportStatusUnacknowledged of a peer subscription — closed for a chunk status, for a final status only with compact priming, kept when a newer report started (#4943); 6 cases.",
       "snapshotSha": "c38a12eee3806a38c9dc5d01ec9657d50c16929e"
     },
     {
@@ -8778,7 +8778,7 @@
           "reason": "the session set two Fabric objects share after a replacement (#4930); a Go fabric is a store row and its sessions are closed by fabric index (operational.Manager.CloseFabric)"
         }
       ],
-      "reason": "Adding, persistence, removal, all eight index-allocation cases on the SQLite fabric table, and the UpdateNOC replacement keeping group and ACL state, keeping group changes across the fail-safe restore and refusing another root are ported; the event forwarding between replaced Fabric objects has no Go counterpart (a Go fabric is a store row), this module holds no ICD client registrations, and UpdateNOC carries no IPK, so a replacement with another IPK cannot be expressed. The table-full case is store.AddFabric's (TestFabric_AddExhausted); no test adds a fabric twice at one explicit index. Pin lift b25ed960: a stored label over 32 bytes shortened at load (#4995, decision 294) is open, unit P2-A.",
+      "reason": "Adding, persistence, removal, all eight index-allocation cases on the SQLite fabric table, and the UpdateNOC replacement keeping group and ACL state, keeping group changes across the fail-safe restore and refusing another root are ported; the event forwarding between replaced Fabric objects has no Go counterpart (a Go fabric is a store row), this module holds no ICD client registrations, and UpdateNOC carries no IPK, so a replacement with another IPK cannot be expressed. The table-full case is store.AddFabric's (TestFabric_AddExhausted); no test adds a fabric twice at one explicit index. Pin lift b25ed960: a stored label over 32 bytes shortened at load (#4995, decision 294) is open, unit P2b-A.",
       "snapshotSha": "cc956c2491bcc44b885290b52099f6f19ef9a856"
     },
     {
@@ -8799,7 +8799,7 @@
         "has no session for the peer when its established session closes while another one is establishing",
         "has no session for the peer while its only session is establishing"
       ],
-      "reason": "Destination IDs 1 and 3 against the matter.js vectors, the label length constraint through UpdateFabricLabel and the session teardown of a fabric removal are ported; destination ID 2 needs the root key of TestFabric, which matter.js's MockCrypto certificate authority generates and the test file does not state, and deleteSession has no Go counterpart, as a Go fabric holds no session set. Pin lift b25ed960: the label bound in UTF-8 bytes (#4995) is open, unit P2-A; the establishing session a fabric does not count as a session for its peer (#4882) is open, unit P2-B; the establishing session closed with its fabric runs on the controller's teardown over SessionsFor (client/exchange:TestFabricSessionsForPeer, P1-A), the CASE server refusing it at completion.",
+      "reason": "Destination IDs 1 and 3 against the matter.js vectors, the label length constraint through UpdateFabricLabel and the session teardown of a fabric removal are ported; destination ID 2 needs the root key of TestFabric, which matter.js's MockCrypto certificate authority generates and the test file does not state, and deleteSession has no Go counterpart, as a Go fabric holds no session set. Pin lift b25ed960: the label bound in UTF-8 bytes (#4995) is open, unit P2b-A; the establishing session a fabric does not count as a session for its peer (#4882) is open, unit P2b-B; the establishing session closed with its fabric runs on the controller's teardown over SessionsFor (client/exchange:TestFabricSessionsForPeer, P1-A), the CASE server refusing it at completion.",
       "snapshotSha": "6b6f02fa0090d5fc1c9107da4f2b672243c510a9"
     },
     {
@@ -8963,7 +8963,7 @@
         "does not consider a report with SuppressResponse as waiting for a status",
         "does not consider a report waiting for a status once it was answered"
       ],
-      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137). The write chunking across messages runs through Interaction.Write (client/interaction:TestInteractionClientMessengerWriteChunking; fix: InteractionMessenger.ts:1269-1450). The abandonSubscription group's behaviour is ported through the abandoned subscribe (client/interaction:TestClientInteractionSubscribe*), not as messenger-level cases. Pin lift b25ed960: the allDataVersionFiltersSent result the two subscribe cases now read is unit P2-E's (compact priming).",
+      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137). The write chunking across messages runs through Interaction.Write (client/interaction:TestInteractionClientMessengerWriteChunking; fix: InteractionMessenger.ts:1269-1450). The abandonSubscription group's behaviour is ported through the abandoned subscribe (client/interaction:TestClientInteractionSubscribe*), not as messenger-level cases. Pin lift b25ed960: the allDataVersionFiltersSent result the two subscribe cases now read is unit P2b-E's (compact priming).",
       "snapshotSha": "f55d0921b2a0e9d917cc846ad2266ada1e3413b1"
     },
     {
@@ -9425,7 +9425,7 @@
         "keeps the subscription when the report arrives over our session created after a returning session still establishing",
         "characterization: re-subscribes when the only report arrives over a session whose handshake fails"
       ],
-      "reason": "The armer on a session table and a subscription set that implement its context as SessionManager and ClientSubscriptions do, on the fake clock: the return, the grace window, the evidence of post-return reports, re-arming, the return-timeout recovery (client/peer/reboot_armer_parity_matterjs_test.go). The OTA call site that arms a peer is the controller's update manager (controller/softwareupdate, OnStatusChange on Applying; SoftwareUpdateManager.ts:1253-1321 at 862ad75f), its outcome cases in controller/softwareupdate:TestManagerAppliedUpdateAfterResubscriptionParity. Pin lift b25ed960: the return taken by registration order and the reports over sessions still establishing (#4882, #4943) are open, unit P2-B (its pre note compares them).",
+      "reason": "The armer on a session table and a subscription set that implement its context as SessionManager and ClientSubscriptions do, on the fake clock: the return, the grace window, the evidence of post-return reports, re-arming, the return-timeout recovery (client/peer/reboot_armer_parity_matterjs_test.go). The OTA call site that arms a peer is the controller's update manager (controller/softwareupdate, OnStatusChange on Applying; SoftwareUpdateManager.ts:1253-1321 at 862ad75f), its outcome cases in controller/softwareupdate:TestManagerAppliedUpdateAfterResubscriptionParity. Pin lift b25ed960: the return taken by registration order and the reports over sessions still establishing (#4882, #4943) are open, unit P2b-B (its pre note compares them).",
       "snapshotSha": "fc3bed1dd9aaddc0f0af1d1e35ea626072abc625"
     },
     {
@@ -11505,7 +11505,7 @@
           "reason": "TlvSchema.validate of an untyped JavaScript value; a Go value has its static type, and a wire element of the wrong type is refused by the typed decoders (cluster/spec DecodeBool, DecodeUintIn, DecodeStringIn)"
         }
       ],
-      "reason": "Strings and byte strings encoded, decoded and measured, the IS1 truncation of a character string (and none of a byte string), the length bound against the raw length, and the 4..6 bounds on cluster/spec DecodeStringIn / DecodeBytesIn. Missing: the encoder writes an IS1 inside a character string matter.js's validate refuses (findings register, phase 33). Pin lift b25ed960: the length field and the bounds of a character string in UTF-8 bytes (#4995) are open, unit P2-A.",
+      "reason": "Strings and byte strings encoded, decoded and measured, the IS1 truncation of a character string (and none of a byte string), the length bound against the raw length, and the 4..6 bounds on cluster/spec DecodeStringIn / DecodeBytesIn. Missing: the encoder writes an IS1 inside a character string matter.js's validate refuses (findings register, phase 33). Pin lift b25ed960: the length field and the bounds of a character string in UTF-8 bytes (#4995) are open, unit P2b-A.",
       "snapshotSha": "8427cef413ef020969ae798d4415e05a3066ed12"
     },
     {

@@ -281,7 +281,7 @@ func TestDoorLockServerParity(t *testing.T) {
 		// ProtocolService.ts:347-350 at b25ed960), so the port asks over the
 		// wire: INVALID_COMMAND, the command's stated refusal. A local
 		// MatterInvoke is not validated, and the server keeps no state
-		// validation of its own (P2-H report, finding candidate).
+		// validation of its own (F-b25ed960-36).
 		req := addPin(1, "1234", noUser)
 		req.UserType = spec.ValueOf(lockdef.UserTypeEnum(99))
 		se := f.refused(lockdef.CmdSetCredential, req)
