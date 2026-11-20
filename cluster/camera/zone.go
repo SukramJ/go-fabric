@@ -77,9 +77,19 @@ type ZonesConfig struct {
 	// 0 starts at chip's 1 (ZoneManagementCluster.h:135).
 	Sensitivity uint8
 	// Zones and Triggers are the ones the host persisted, chip's
-	// LoadZones and LoadTriggers (:113-172).
+	// LoadZones and LoadTriggers (:113-172). A zone ID used twice is
+	// refused (ErrZonesConfig).
 	Zones    []Zone
 	Triggers []ZoneTrigger
+	// LastZoneID is the ID the server assigned last, as the host
+	// persisted it with Zones: the server gives a new zone the ID after
+	// it, skipping IDs in use, so that the ID of a removed zone is not
+	// reused. nil continues after the highest ID in use. The host learns
+	// each ID the server assigns through [ZonePort]'s
+	// CreateTwoDCartesianZone and persists it there; matter.js keeps it as
+	// the server's nonvolatile lastZoneId
+	// (ZoneManagementServer.ts:253-260 at b25ed960).
+	LastZoneID *uint16
 	// Port is the zone and trigger store; required.
 	Port ZonePort
 	// DataVersion is an optional host-owned tracker.
@@ -91,15 +101,16 @@ type ZonesConfig struct {
 	DataVersion *cluster.DataVersionTracker
 }
 
-// Zones implements [contract.ClusterServer] for ZoneManagement: chip's
-// server logic over the generated server — the zones and triggers it
-// keeps, the validation of a zone (its constraints, the vertex bounds, a
-// duplicate, a self-intersecting polygon) and of a trigger before the
-// host's [ZonePort] stores it, the user-defined zone budget, the
-// Sensitivity write, and the ZoneTriggered and ZoneStopped events the host
-// reports. The rules are connectedhomeip's ZoneManagementCluster.cpp and
-// zone-geometry.h at 6170af84 (matter.js's server is the generated
-// behaviour).
+// Zones implements [contract.ClusterServer] for ZoneManagement over the
+// generated server: the zones and triggers it keeps, the zone ID it
+// assigns, the validation of a zone (its constraints, the vertex bounds,
+// a duplicate, a self-intersecting polygon) and of a trigger before the
+// host's [ZonePort] stores it, the zone limits, the Sensitivity write, and
+// the ZoneTriggered and ZoneStopped events the host reports. The command
+// rules are matter.js's ZoneManagementServer.ts and
+// TwoDCartesianGeometry.ts at b25ed960; the configuration rules matter.js
+// leaves to the model and the Sensitivity write are connectedhomeip's
+// ZoneManagementCluster.cpp at 6170af84.
 type Zones struct {
 	*spec.Instance
 	spec.SelfHeld
@@ -117,7 +128,7 @@ type Zones struct {
 	endpoint    uint16
 	zones       []Zone
 	triggers    []ZoneTrigger
-	userDefined int
+	lastZoneID  *uint16
 	sensitivity uint8
 }
 
@@ -137,7 +148,10 @@ var (
 )
 
 // NewZones builds a ZoneManagement server on cfg.Port. The configuration
-// rules are chip's Startup (ZoneManagementCluster.cpp:60-106).
+// rules are chip's Startup (ZoneManagementCluster.cpp:60-106) and
+// matter.js's initialize (ZoneManagementServer.ts:70-78 at b25ed960):
+// MaxZones not below MaxUserDefinedZones with USERDEFINED, and no zone ID
+// used twice.
 func NewZones(cfg ZonesConfig) (*Zones, error) {
 	if cfg.Port == nil {
 		return nil, ErrNoZonePort
@@ -159,9 +173,15 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 		}
 		z.sensitivity = cfg.Sensitivity
 	}
+	if id, ok := repeatedZoneID(cfg.Zones); ok { // ZoneManagementServer.ts:76, :178-186
+		return nil, fmt.Errorf("%w: ZoneID %d is not unique", ErrZonesConfig, id)
+	}
 	z.zones = deepcopy.Each(cfg.Zones)
 	z.triggers = deepcopy.Each(cfg.Triggers)
-	z.userDefined = min(countUserZones(z.zones), int(cfg.MaxUserDefinedZones)) // :135-136
+	if cfg.LastZoneID != nil {
+		last := *cfg.LastZoneID
+		z.lastZoneID = &last
+	}
 	handlers := map[uint32]spec.CommandHandler{
 		zmdef.CmdCreateTwoDCartesianZone: serial(&z.op, z.createTwoDCartesianZone),
 		zmdef.CmdUpdateTwoDCartesianZone: serial(&z.op, z.updateTwoDCartesianZone),
@@ -195,6 +215,52 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 		return nil, fmt.Errorf("%w: %w", ErrZonesConfig, err)
 	}
 	return z, nil
+}
+
+// repeatedZoneID reports the first zone ID zones use twice. Mirrors
+// matter.js ZoneManagementServer.ts:178-186 at b25ed960
+// (#assertUniqueZoneIds).
+func repeatedZoneID(zones []Zone) (uint16, bool) {
+	seen := make(map[uint16]bool, len(zones))
+	for _, z := range zones {
+		if seen[z.ZoneId] {
+			return z.ZoneId, true
+		}
+		seen[z.ZoneId] = true
+	}
+	return 0, false
+}
+
+// maxZoneID is the highest zone ID the server assigns; the next ID after
+// it is 0 (matter.js ZoneManagementServer.ts:24 at b25ed960, MAX_ZONE_ID).
+const maxZoneID = 0xfffe
+
+// nextZoneID is the ID of a new zone: the one after last, skipping IDs in
+// use, so that a new zone does not take the ID of a zone just removed;
+// without a last ID, the one after the highest ID in use, because
+// manufacturer zones count toward the same sequence; 0 after maxZoneID.
+// Mirrors matter.js ZoneManagementServer.ts:236-250 at b25ed960
+// (#nextZoneId). The caller holds the zone limit, so an ID is free.
+func nextZoneID(zones []Zone, last *uint16) uint16 {
+	used := make(map[uint16]bool, len(zones))
+	id := -1
+	for _, z := range zones {
+		used[z.ZoneId] = true
+		id = max(id, int(z.ZoneId))
+	}
+	if last != nil {
+		id = int(*last)
+	}
+	for {
+		if id >= maxZoneID {
+			id = 0
+		} else {
+			id++
+		}
+		if !used[uint16(id)] { //nolint:gosec // 0 to maxZoneID
+			return uint16(id) //nolint:gosec // 0 to maxZoneID
+		}
+	}
 }
 
 func countUserZones(zones []Zone) int {
@@ -306,11 +372,11 @@ func (z *Zones) SetAttributes(values map[uint32]any) error {
 }
 
 // zoneTables is the state a command changes: Zones, Triggers and the
-// user-defined zone count.
+// last assigned zone ID.
 type zoneTables struct {
-	zones       []Zone
-	triggers    []ZoneTrigger
-	userDefined int
+	zones      []Zone
+	triggers   []ZoneTrigger
+	lastZoneID *uint16
 }
 
 // change applies edit to a copy of the tables and publishes the attribute
@@ -321,7 +387,7 @@ func (z *Zones) change(attrID uint32, edit func(*zoneTables)) error {
 	z.pub.Lock()
 	defer z.pub.Unlock()
 	z.mu.Lock()
-	t := zoneTables{zones: deepcopy.Each(z.zones), triggers: deepcopy.Each(z.triggers), userDefined: z.userDefined}
+	t := zoneTables{zones: deepcopy.Each(z.zones), triggers: deepcopy.Each(z.triggers), lastZoneID: z.lastZoneID}
 	z.mu.Unlock()
 	edit(&t)
 	var v any = spec.List[Zone](nonNil(t.zones))
@@ -332,7 +398,7 @@ func (z *Zones) change(attrID uint32, edit func(*zoneTables)) error {
 		return commitError(fmt.Errorf("camera: ZoneManagement: %w", err))
 	}
 	z.mu.Lock()
-	z.zones, z.triggers, z.userDefined = t.zones, t.triggers, t.userDefined
+	z.zones, z.triggers, z.lastZoneID = t.zones, t.triggers, t.lastZoneID
 	z.mu.Unlock()
 	return nil
 }
@@ -355,10 +421,10 @@ func validateTwoDZone(zone TwoDZone) error {
 }
 
 // checkVertices holds the vertices to TwoDCartesianMax
-// (DYNAMIC_CONSTRAINT_ERROR, :477-486, :542-551), a duplicate zone of the
-// same use and vertices other than exclude (ALREADY_EXISTS, :495-498,
-// :560-563) and a self-intersecting polygon (DYNAMIC_CONSTRAINT_ERROR,
-// :500-504, :565-569), in chip's order.
+// (DYNAMIC_CONSTRAINT_ERROR), a duplicate zone of the same use and
+// vertices other than exclude (ALREADY_EXISTS) and a self-intersecting
+// polygon (DYNAMIC_CONSTRAINT_ERROR), in that order. Mirrors matter.js
+// ZoneManagementServer.ts:205-234 at b25ed960 (#assertVertices).
 func (z *Zones) checkVertices(zone TwoDZone, exclude *uint16) error {
 	maxV := z.cfg.TwoDCartesianMax
 	for _, v := range zone.Vertices {
@@ -375,8 +441,9 @@ func (z *Zones) checkVertices(zone TwoDZone, exclude *uint16) error {
 	return nil
 }
 
-// zoneExists is chip's ZoneAlreadyExists (:661-699): a zone other than
-// exclude with the use and the same vertices in the same order.
+// zoneExists reports a zone other than exclude with the use and the same
+// vertices in the same order (matter.js ZoneManagementServer.ts:218-224,
+// TwoDCartesianGeometry.ts:17-22 at b25ed960, verticesEqual).
 func (z *Zones) zoneExists(use zmdef.ZoneUseEnum, vertices []Vertex, exclude *uint16) bool {
 	z.mu.Lock()
 	defer z.mu.Unlock()
@@ -399,11 +466,26 @@ func zoneRequestOf[T any](fields any, name string) (T, error) {
 	return req, nil
 }
 
+// assertFocusSupported refuses a Focus zone without FOCUSZONES
+// (CONSTRAINT_ERROR). Mirrors matter.js ZoneManagementServer.ts:199-203 at
+// b25ed960 (#assertFocusSupported).
+func (z *Zones) assertFocusSupported(zone TwoDZone) error {
+	if zone.Use == zmdef.ZoneUseFocus && !z.HasFeature("FOCUSZONES") {
+		return spec.Errorf(im.StatusConstraintError, "ZoneManagement: a Focus zone without FOCUSZONES")
+	}
+	return nil
+}
+
 // createTwoDCartesianZone carries out CreateTwoDCartesianZone. Mirrors
-// chip HandleCreateTwoDCartesianZone (ZoneManagementCluster.cpp:462-521):
-// the zone's checks, a Focus zone only with FOCUSZONES (CONSTRAINT_ERROR),
-// the user-defined budget (RESOURCE_EXHAUSTED), the vertex checks, then
-// the port's id and the zone added as a user-defined 2D Cartesian zone.
+// matter.js ZoneManagementServer.ts:80-107 at b25ed960
+// (createTwoDCartesianZone): the zone's constraints (the interaction
+// layer's, ZoneManagementServerTest.ts:756-768), a Focus zone only with
+// FOCUSZONES, RESOURCE_EXHAUSTED once MaxUserDefinedZones user-defined
+// zones or MaxZones zones exist, the vertex checks, then the next zone ID
+// ([nextZoneID]). The port stores the zone under that ID before the
+// server keeps it: a refusal of the port leaves Zones and the last ID as
+// they were, as matter.js discards the state of a command an override
+// refuses after super (:61-63).
 func (z *Zones) createTwoDCartesianZone(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.CreateTwoDCartesianZoneRequest](fields, "CreateTwoDCartesianZone")
 	if err != nil {
@@ -412,40 +494,61 @@ func (z *Zones) createTwoDCartesianZone(ctx context.Context, fields any) (any, e
 	if err := validateTwoDZone(req.Zone); err != nil {
 		return nil, err
 	}
-	if req.Zone.Use == zmdef.ZoneUseFocus && !z.HasFeature("FOCUSZONES") { // :472
-		return nil, spec.Errorf(im.StatusConstraintError, "ZoneManagement: a Focus zone without FOCUSZONES")
-	}
-	z.mu.Lock()
-	full := z.userDefined >= int(z.cfg.MaxUserDefinedZones)
-	z.mu.Unlock()
-	if full { // :473
-		return nil, spec.Errorf(im.StatusResourceExhausted, "ZoneManagement: %d user-defined zones", z.cfg.MaxUserDefinedZones)
-	}
-	if err := z.checkVertices(req.Zone, nil); err != nil {
+	if err := z.assertFocusSupported(req.Zone); err != nil { // :83
 		return nil, err
 	}
-	id, err := z.port.CreateTwoDCartesianZone(ctx, req.Zone) // :509
-	if err != nil {
+	z.mu.Lock()
+	users, all := countUserZones(z.zones), len(z.zones)
+	z.mu.Unlock()
+	if users >= int(z.cfg.MaxUserDefinedZones) || all >= int(z.cfg.MaxZones) { // :85-91
+		return nil, spec.Errorf(im.StatusResourceExhausted,
+			"ZoneManagement: zone limit reached with %d of %d user-defined zones and %d of %d zones",
+			users, z.cfg.MaxUserDefinedZones, all, z.cfg.MaxZones)
+	}
+	if err := z.checkVertices(req.Zone, nil); err != nil { // :93
+		return nil, err
+	}
+	z.mu.Lock()
+	id := nextZoneID(z.zones, z.lastZoneID) // :95
+	z.mu.Unlock()
+	if err := z.port.CreateTwoDCartesianZone(ctx, id, req.Zone); err != nil {
 		return nil, portError("CreateTwoDCartesianZone", err)
 	}
 	zone := req.Zone.Clone()
 	if err := z.change(zmdef.AttrZones, func(t *zoneTables) {
-		t.zones = append(t.zones, Zone{ // :512-515
+		t.zones = append(t.zones, Zone{ // :96-104
 			ZoneId: id, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser,
 			TwoDCartesianZone: &zone,
 		})
-		t.userDefined++
+		t.lastZoneID = &id // :105
 	}); err != nil {
 		return nil, err
 	}
 	return zmdef.CreateTwoDCartesianZoneResponse{ZoneId: id}, nil
 }
 
+// requireUserZone is the zone of id: NOT_FOUND for an unknown zone,
+// CONSTRAINT_ERROR for one that is not user-defined. Mirrors matter.js
+// ZoneManagementServer.ts:188-197 at b25ed960 (#requireUserZone).
+func (z *Zones) requireUserZone(id uint16) (Zone, error) {
+	z.mu.Lock()
+	defer z.mu.Unlock()
+	i := slices.IndexFunc(z.zones, func(zone Zone) bool { return zone.ZoneId == id })
+	if i < 0 {
+		return Zone{}, spec.Errorf(im.StatusNotFound, "ZoneManagement: zone %d not found", id)
+	}
+	if z.zones[i].ZoneSource != zmdef.ZoneSourceUser {
+		return Zone{}, spec.Errorf(im.StatusConstraintError, "ZoneManagement: zone %d is not user-defined", id)
+	}
+	return z.zones[i], nil
+}
+
 // updateTwoDCartesianZone carries out UpdateTwoDCartesianZone. Mirrors
-// chip HandleUpdateTwoDCartesianZone (:523-582): the zone's checks; an
-// unknown zone is NOT_FOUND, a manufacturer's CONSTRAINT_ERROR, one of
-// another type DYNAMIC_CONSTRAINT_ERROR; the vertex checks; then the
-// port, and the zone replaced as user-defined.
+// matter.js ZoneManagementServer.ts:109-121 at b25ed960
+// (updateTwoDCartesianZone): the zone's constraints, then an unknown zone
+// NOT_FOUND, one not user-defined CONSTRAINT_ERROR, one of another type
+// DYNAMIC_CONSTRAINT_ERROR, a Focus zone only with FOCUSZONES, the vertex
+// checks; then the port, and the zone's area replaced.
 func (z *Zones) updateTwoDCartesianZone(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.UpdateTwoDCartesianZoneRequest](fields, "UpdateTwoDCartesianZone")
 	if err != nil {
@@ -454,34 +557,26 @@ func (z *Zones) updateTwoDCartesianZone(ctx context.Context, fields any) (any, e
 	if err := validateTwoDZone(req.Zone); err != nil {
 		return nil, err
 	}
-	z.mu.Lock()
-	i := slices.IndexFunc(z.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId })
-	var found Zone
-	if i >= 0 {
-		found = z.zones[i]
-	}
-	z.mu.Unlock()
-	switch {
-	case i < 0: // :534
-		return nil, spec.Errorf(im.StatusNotFound, "ZoneManagement: zone %d not found", req.ZoneId)
-	case found.ZoneSource == zmdef.ZoneSourceMfg: // :537
-		return nil, spec.Errorf(im.StatusConstraintError, "ZoneManagement: zone %d is the manufacturer's", req.ZoneId)
-	case found.ZoneType != zmdef.ZoneTypeTwoDcartZone: // :538
-		return nil, spec.Errorf(im.StatusDynamicConstraintError, "ZoneManagement: zone %d is no 2D Cartesian zone", req.ZoneId)
-	}
-	if err := z.checkVertices(req.Zone, &req.ZoneId); err != nil {
+	found, err := z.requireUserZone(req.ZoneId) // :110
+	if err != nil {
 		return nil, err
 	}
-	if err := z.port.UpdateTwoDCartesianZone(ctx, req.ZoneId, req.Zone); err != nil { // :574
+	if found.ZoneType != zmdef.ZoneTypeTwoDcartZone { // :111-113
+		return nil, spec.Errorf(im.StatusDynamicConstraintError, "ZoneManagement: zone %d is no 2D Cartesian zone", req.ZoneId)
+	}
+	if err := z.assertFocusSupported(req.Zone); err != nil { // :115
+		return nil, err
+	}
+	if err := z.checkVertices(req.Zone, &req.ZoneId); err != nil { // :116
+		return nil, err
+	}
+	if err := z.port.UpdateTwoDCartesianZone(ctx, req.ZoneId, req.Zone); err != nil {
 		return nil, portError("UpdateTwoDCartesianZone", err)
 	}
 	zone := req.Zone.Clone()
 	if err := z.change(zmdef.AttrZones, func(t *zoneTables) {
-		if i := slices.IndexFunc(t.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId }); i >= 0 { // :577-579
-			t.zones[i] = Zone{
-				ZoneId: req.ZoneId, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser,
-				TwoDCartesianZone: &zone,
-			}
+		if i := slices.IndexFunc(t.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId }); i >= 0 { // :118-120
+			t.zones[i].TwoDCartesianZone = &zone
 		}
 	}); err != nil {
 		return nil, err
@@ -489,65 +584,58 @@ func (z *Zones) updateTwoDCartesianZone(ctx context.Context, fields any) (any, e
 	return nil, nil
 }
 
-// removeZone carries out RemoveZone. Mirrors chip HandleRemoveZone
-// (:584-610): an unknown zone is NOT_FOUND, one not user-defined
-// CONSTRAINT_ERROR, one with a trigger INVALID_IN_STATE; then the port.
+// removeZone carries out RemoveZone. Mirrors matter.js
+// ZoneManagementServer.ts:123-130 at b25ed960 (removeZone): an unknown
+// zone is NOT_FOUND, one not user-defined CONSTRAINT_ERROR, one a trigger
+// uses INVALID_IN_STATE; then the port.
 func (z *Zones) removeZone(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.RemoveZoneRequest](fields, "RemoveZone")
 	if err != nil {
 		return nil, err
 	}
-	z.mu.Lock()
-	i := slices.IndexFunc(z.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId })
-	var found Zone
-	if i >= 0 {
-		found = z.zones[i]
+	if _, err := z.requireUserZone(req.ZoneId); err != nil { // :124
+		return nil, err
 	}
+	z.mu.Lock()
 	triggered := slices.ContainsFunc(z.triggers, func(t ZoneTrigger) bool { return t.ZoneId == req.ZoneId })
 	z.mu.Unlock()
-	switch {
-	case i < 0: // :590
-		return nil, spec.Errorf(im.StatusNotFound, "ZoneManagement: zone %d not found", req.ZoneId)
-	case found.ZoneSource != zmdef.ZoneSourceUser: // :593
-		return nil, spec.Errorf(im.StatusConstraintError, "ZoneManagement: zone %d is not user-defined", req.ZoneId)
-	case triggered: // :595-598
+	if triggered { // :125-127
 		return nil, spec.Errorf(im.StatusInvalidInState, "ZoneManagement: zone %d has a trigger", req.ZoneId)
 	}
-	if err := z.port.RemoveZone(ctx, req.ZoneId); err != nil { // :600
+	if err := z.port.RemoveZone(ctx, req.ZoneId); err != nil {
 		return nil, portError("RemoveZone", err)
 	}
 	if err := z.change(zmdef.AttrZones, func(t *zoneTables) {
 		t.zones = slices.DeleteFunc(t.zones, func(zone Zone) bool { return zone.ZoneId == req.ZoneId })
-		if t.userDefined > 0 { // :604-607
-			t.userDefined--
-		}
 	}); err != nil {
 		return nil, err
 	}
 	return nil, nil
 }
 
-// validateTrigger is chip's ValidateTrigger (:612-627): InitialDuration at
-// least 1, AugmentationDuration at most and MaxDuration at least
-// InitialDuration (CONSTRAINT_ERROR); a Sensitivity exactly with
-// PERZONESENS (INVALID_COMMAND), 1 to SensitivityMax (CONSTRAINT_ERROR).
+// validateTrigger holds InitialDuration at least 1, AugmentationDuration
+// at most and MaxDuration at least InitialDuration (CONSTRAINT_ERROR); a
+// Sensitivity exactly with PERZONESENS (INVALID_COMMAND), 1 to
+// SensitivityMax (CONSTRAINT_ERROR). Mirrors matter.js
+// ZoneManagementServer.ts:133-152 at b25ed960 (createOrUpdateTrigger).
 func (z *Zones) validateTrigger(t ZoneTrigger) error {
 	switch {
-	case t.InitialDuration < 1, t.AugmentationDuration > t.InitialDuration, t.MaxDuration < t.InitialDuration: // :614-616
+	case t.InitialDuration < 1, t.AugmentationDuration > t.InitialDuration, t.MaxDuration < t.InitialDuration: // :135-139
 		return spec.Errorf(im.StatusConstraintError, "ZoneManagement: trigger durations %d/%d/%d", t.InitialDuration, t.AugmentationDuration, t.MaxDuration)
-	case z.HasFeature("PERZONESENS") != (t.Sensitivity != nil): // :618
+	case z.HasFeature("PERZONESENS") != (t.Sensitivity != nil): // :141-147
 		return spec.Errorf(im.StatusInvalidCommand, "ZoneManagement: trigger Sensitivity does not match PERZONESENS")
-	case t.Sensitivity != nil && (*t.Sensitivity < 1 || *t.Sensitivity > z.cfg.SensitivityMax): // :619-624
+	case t.Sensitivity != nil && (*t.Sensitivity < 1 || *t.Sensitivity > z.cfg.SensitivityMax): // :148-152
 		return spec.Errorf(im.StatusConstraintError, "ZoneManagement: trigger Sensitivity %d outside 1 to %d", *t.Sensitivity, z.cfg.SensitivityMax)
 	}
 	return nil
 }
 
-// createOrUpdateTrigger carries out CreateOrUpdateTrigger. Mirrors chip
-// HandleCreateOrUpdateTrigger (:629-647) and AddOrUpdateTrigger
-// (:402-429): the trigger's checks; an unknown zone is NOT_FOUND, a 2D
-// zone of another use than Motion CONSTRAINT_ERROR; then the port creates
-// or updates it.
+// createOrUpdateTrigger carries out CreateOrUpdateTrigger. Mirrors
+// matter.js ZoneManagementServer.ts:132-167 at b25ed960
+// (createOrUpdateTrigger): the trigger's checks; an unknown zone is
+// NOT_FOUND, a 2D zone of another use than Motion CONSTRAINT_ERROR; then
+// the port creates or updates it, and the trigger replaces the zone's or
+// is appended.
 func (z *Zones) createOrUpdateTrigger(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.CreateOrUpdateTriggerRequest](fields, "CreateOrUpdateTrigger")
 	if err != nil {
@@ -566,20 +654,20 @@ func (z *Zones) createOrUpdateTrigger(ctx context.Context, fields any) (any, err
 	exists := slices.ContainsFunc(z.triggers, func(x ZoneTrigger) bool { return x.ZoneId == t.ZoneId })
 	z.mu.Unlock()
 	switch {
-	case i < 0: // :639
+	case i < 0: // :154-157
 		return nil, spec.Errorf(im.StatusNotFound, "ZoneManagement: zone %d not found", t.ZoneId)
-	case found.TwoDCartesianZone != nil && found.TwoDCartesianZone.Use != zmdef.ZoneUseMotion: // :642-644
+	case found.TwoDCartesianZone != nil && found.TwoDCartesianZone.Use != zmdef.ZoneUseMotion: // :158-161
 		return nil, spec.Errorf(im.StatusConstraintError, "ZoneManagement: zone %d is no Motion zone", t.ZoneId)
 	}
 	t = t.Clone()
-	if exists { // :417-424
+	if exists {
 		if err := z.port.UpdateTrigger(ctx, t); err != nil {
 			return nil, portError("UpdateTrigger", err)
 		}
-	} else if err := z.port.CreateTrigger(ctx, t); err != nil { // :409-416
+	} else if err := z.port.CreateTrigger(ctx, t); err != nil {
 		return nil, portError("CreateTrigger", err)
 	}
-	if err := z.change(zmdef.AttrTriggers, func(tt *zoneTables) {
+	if err := z.change(zmdef.AttrTriggers, func(tt *zoneTables) { // :163-166
 		if j := slices.IndexFunc(tt.triggers, func(x ZoneTrigger) bool { return x.ZoneId == t.ZoneId }); j >= 0 {
 			tt.triggers[j] = t
 		} else {
@@ -591,18 +679,18 @@ func (z *Zones) createOrUpdateTrigger(ctx context.Context, fields any) (any, err
 	return nil, nil
 }
 
-// removeTrigger carries out RemoveTrigger. Mirrors chip
-// HandleRemoveTrigger (:649-659) and RemoveTrigger (:431-443): an unknown
-// trigger is NOT_FOUND; then the port.
+// removeTrigger carries out RemoveTrigger. Mirrors matter.js
+// ZoneManagementServer.ts:169-176 at b25ed960 (removeTrigger): a zone
+// without a trigger is NOT_FOUND; then the port.
 func (z *Zones) removeTrigger(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.RemoveTriggerRequest](fields, "RemoveTrigger")
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := z.TriggerFor(req.ZoneId); !ok { // :653-656
+	if _, ok := z.TriggerFor(req.ZoneId); !ok { // :171-173
 		return nil, spec.Errorf(im.StatusNotFound, "ZoneManagement: no trigger for zone %d", req.ZoneId)
 	}
-	if err := z.port.RemoveTrigger(ctx, req.ZoneId); err != nil { // :433
+	if err := z.port.RemoveTrigger(ctx, req.ZoneId); err != nil {
 		return nil, portError("RemoveTrigger", err)
 	}
 	if err := z.change(zmdef.AttrTriggers, func(t *zoneTables) {

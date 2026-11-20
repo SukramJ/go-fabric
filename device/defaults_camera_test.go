@@ -38,8 +38,8 @@ func (fakeAudio) AudioStreamDeallocate(context.Context, uint16) error { return n
 
 type fakeZones struct{}
 
-func (fakeZones) CreateTwoDCartesianZone(context.Context, zmdef.TwoDCartesianZoneStruct) (uint16, error) {
-	return 1, nil
+func (fakeZones) CreateTwoDCartesianZone(context.Context, uint16, zmdef.TwoDCartesianZoneStruct) error {
+	return nil
 }
 
 func (fakeZones) UpdateTwoDCartesianZone(context.Context, uint16, zmdef.TwoDCartesianZoneStruct) error {

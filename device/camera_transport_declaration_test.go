@@ -54,8 +54,8 @@ func (transportPorts) ValidateBandwidthLimit(context.Context, padef.StreamUsageE
 }
 func (transportPorts) CMAFSessionNumber(uint16) (uint64, bool) { return 0, false }
 
-func (transportPorts) CreateTwoDCartesianZone(context.Context, zmdef.TwoDCartesianZoneStruct) (uint16, error) {
-	return 1, nil
+func (transportPorts) CreateTwoDCartesianZone(context.Context, uint16, zmdef.TwoDCartesianZoneStruct) error {
+	return nil
 }
 
 func (transportPorts) UpdateTwoDCartesianZone(context.Context, uint16, zmdef.TwoDCartesianZoneStruct) error {

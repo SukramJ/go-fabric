@@ -21,15 +21,18 @@
 //     src/app/clusters/camera-av-settings-user-level-management-server/
 //     CameraAvSettingsUserLevelManagementLogic.cpp), cited by line; the
 //     Ahead-of-matter.js register in notes/parity/by_design.md lists them.
-//   - [AvStream] serves CameraAvStreamManagement (0x0551) and [Zones]
-//     ZoneManagement (0x0550), both after connectedhomeip as well
-//     (src/app/clusters/camera-av-stream-management-server/
-//     CameraAVStreamManagementCluster.cpp, src/app/clusters/
-//     zone-management-server/ZoneManagementCluster.cpp and zone-geometry.h
+//   - [AvStream] serves CameraAvStreamManagement (0x0551) after
+//     connectedhomeip as well (src/app/clusters/
+//     camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp
 //     at 6170af84): the allocated streams behind a port per encoder and the
-//     capture, reference-counted for the transports; the zones and
-//     triggers behind the [ZonePort], with chip's polygon rules
-//     ([ZoneSelfIntersecting]).
+//     capture, reference-counted for the transports.
+//   - [Zones] serves ZoneManagement (0x0550) after matter.js
+//     (packages/node/src/behaviors/zone-management/ZoneManagementServer.ts
+//     and TwoDCartesianGeometry.ts at b25ed960): the zones and triggers
+//     behind the [ZonePort], the zone IDs the server assigns
+//     ([ZonesConfig].LastZoneID), the polygon rules
+//     ([ZoneSelfIntersecting]); the configuration limits and the
+//     Sensitivity write follow connectedhomeip's ZoneManagementCluster.cpp.
 //   - [Provider] serves WebRtcTransportProvider (0x0553) and [PushTransport]
 //     serves PushAvStreamTransport (0x0555), the camera's two transports, after
 //     connectedhomeip (src/app/clusters/webrtc-transport-provider-server/

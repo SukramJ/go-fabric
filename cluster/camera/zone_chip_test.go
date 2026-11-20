@@ -3,7 +3,10 @@
 
 // ZoneManagement: a port of connectedhomeip
 // src/app/clusters/zone-management-server/tests/TestZoneManagementCluster.cpp
-// and TestZonePolygon.cpp at 6170af84, by meaning. chip's ClusterTester
+// at 6170af84, by meaning — kept for the cases matter.js's
+// ZoneManagementServerTest.ts at b25ed960 has no counterpart for
+// (zone_parity_matterjs_test.go ports that file; its polygon table
+// contains TestZonePolygon.cpp's and replaces it). chip's ClusterTester
 // reads, writes and invokes the cluster directly; here the server's
 // MatterRead, MatterWrite and MatterInvoke do, the MockDelegate (:38-145)
 // is mockZones, chip's attribute storage is the host's (the change
@@ -33,25 +36,27 @@ const (
 
 var zoneTwoDMax = camera.Vertex{X: 640, Y: 480}
 
-// mockZones is chip's MockDelegate (:38-145): ids counting from 1, the
-// calls counted, the triggers kept.
+// mockZones is chip's MockDelegate (:38-145): the calls counted, the
+// zone IDs the server assigned kept (chip's delegate assigned them, from
+// 1; the server does since pin lift b25ed960, decision 290), the
+// triggers kept.
 type mockZones struct {
 	mu                         sync.Mutex
-	nextID                     uint16
+	ids                        []uint16
 	created, updated, removed  int
 	triggers                   []camera.ZoneTrigger
 	createErr, createTriggerEr error
 }
 
-func (m *mockZones) CreateTwoDCartesianZone(context.Context, camera.TwoDZone) (uint16, error) {
+func (m *mockZones) CreateTwoDCartesianZone(_ context.Context, id uint16, _ camera.TwoDZone) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.createErr != nil {
-		return 0, m.createErr
+		return m.createErr
 	}
-	m.nextID++
+	m.ids = append(m.ids, id)
 	m.created++
-	return m.nextID, nil
+	return nil
 }
 
 func (m *mockZones) UpdateTwoDCartesianZone(context.Context, uint16, camera.TwoDZone) error {
@@ -243,7 +248,9 @@ func TestChipZoneManagement(t *testing.T) { //nolint:funlen // one subtest per c
 		z, m := newChipZones(t, twoDUser)
 		resp, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("Zone One", triangle(0)))
 		wantCode(t, "create", st, im.StatusSuccess)
-		if r, _ := resp.(zmdef.CreateTwoDCartesianZoneResponse); r.ZoneId != 1 || m.created != 1 {
+		// chip's delegate answered 1; the server assigns 0 to the first
+		// zone (ZoneManagementServer.ts:243-250 at b25ed960).
+		if r, _ := resp.(zmdef.CreateTwoDCartesianZoneResponse); r.ZoneId != 0 || m.created != 1 || !slices.Equal(m.ids, []uint16{0}) {
 			t.Fatalf("response %+v, created %d", resp, m.created)
 		}
 		zones := z.ZoneList()
@@ -251,13 +258,13 @@ func TestChipZoneManagement(t *testing.T) { //nolint:funlen // one subtest per c
 			t.Fatalf("zones %+v", zones)
 		}
 		_, st = invokeZones(z, zmdef.CmdUpdateTwoDCartesianZone, zmdef.UpdateTwoDCartesianZoneRequest{
-			ZoneId: 1, Zone: camera.TwoDZone{Name: "Zone Two", Use: zmdef.ZoneUseMotion, Vertices: triangle(100)},
+			ZoneId: 0, Zone: camera.TwoDZone{Name: "Zone Two", Use: zmdef.ZoneUseMotion, Vertices: triangle(100)},
 		})
 		wantCode(t, "update", st, im.StatusSuccess)
 		if zones := z.ZoneList(); m.updated != 1 || len(zones) != 1 || zones[0].TwoDCartesianZone.Name != "Zone Two" {
 			t.Fatalf("updated %d, zones %+v", m.updated, zones)
 		}
-		_, st = invokeZones(z, zmdef.CmdRemoveZone, zmdef.RemoveZoneRequest{ZoneId: 1})
+		_, st = invokeZones(z, zmdef.CmdRemoveZone, zmdef.RemoveZoneRequest{ZoneId: 0})
 		wantCode(t, "remove", st, im.StatusSuccess)
 		if m.removed != 1 || len(z.ZoneList()) != 0 {
 			t.Fatalf("removed %d, zones %d", m.removed, len(z.ZoneList()))
@@ -299,45 +306,4 @@ type zoneEvents struct{ events []any }
 
 func (e *zoneEvents) MatterEmitEvent(_ uint16, _, _ uint32, data any, _ contract.EventPriority) {
 	e.events = append(e.events, data)
-}
-
-// TestChipZonePolygon ports TestZonePolygon.cpp (:48-142).
-func TestChipZonePolygon(t *testing.T) {
-	v := func(xy ...uint16) []camera.Vertex {
-		out := make([]camera.Vertex, 0, len(xy)/2)
-		for i := 0; i+1 < len(xy); i += 2 {
-			out = append(out, camera.Vertex{X: xy[i], Y: xy[i+1]})
-		}
-		return out
-	}
-	valid := map[string][]camera.Vertex{ // TestValidZones :48-80
-		"simple triangle":         v(10, 10, 20, 10, 20, 20),
-		"simple rectangle":        v(10, 10, 20, 10, 20, 20, 10, 20),
-		"convex pentagon":         v(10, 10, 20, 10, 20, 20, 15, 25, 10, 20),
-		"concave pentagon":        v(10, 10, 20, 10, 20, 20, 15, 15, 10, 20),
-		"arrow head":              v(10, 10, 20, 20, 30, 10, 20, 15),
-		"three collinear of four": v(10, 10, 20, 10, 30, 10, 20, 15),
-	}
-	for name, zone := range valid {
-		if camera.ZoneSelfIntersecting(zone) {
-			t.Errorf("%s: self-intersecting", name)
-		}
-	}
-	intersecting := map[string][]camera.Vertex{ // TestSelfIntersectingZones :82-139
-		"hourglass":                    v(10, 10, 20, 20, 20, 10, 10, 20),
-		"apex crossing the base":       v(10, 10, 20, 10, 20, 20, 15, 5, 10, 20),
-		"overlapping first edges":      v(2, 2, 10, 2, 7, 2, 10, 1, 1, 1),
-		"duplicates and inner loops":   v(0, 0, 1, 0, 2, 0, 2, 1, 1, 0, 0, 1),
-		"duplicates and overlaps":      v(0, 0, 2, 0, 2, 1, 2, 0, 1, 0),
-		"duplicate, overlapping edges": v(0, 0, 1, 0, 0, 0, 0, 1),
-		"adjacent duplicates":          v(0, 0, 0, 0, 1, 0, 0, 1),
-		"first and last duplicate":     v(0, 0, 1, 0, 1, 1, 0, 0),
-		"three overlapping":            v(0, 0, 2, 0, 1, 0),
-		"four collinear, overlapping":  v(0, 0, 2, 0, 1, 0, 3, 0),
-	}
-	for name, zone := range intersecting {
-		if !camera.ZoneSelfIntersecting(zone) {
-			t.Errorf("%s: not self-intersecting", name)
-		}
-	}
 }

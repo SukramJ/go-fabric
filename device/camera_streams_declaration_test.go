@@ -91,8 +91,8 @@ func TestCameraServesTheKitZones(t *testing.T) {
 
 type zonePort struct{}
 
-func (zonePort) CreateTwoDCartesianZone(context.Context, zmdef.TwoDCartesianZoneStruct) (uint16, error) {
-	return 1, nil
+func (zonePort) CreateTwoDCartesianZone(context.Context, uint16, zmdef.TwoDCartesianZoneStruct) error {
+	return nil
 }
 
 func (zonePort) UpdateTwoDCartesianZone(context.Context, uint16, zmdef.TwoDCartesianZoneStruct) error {
