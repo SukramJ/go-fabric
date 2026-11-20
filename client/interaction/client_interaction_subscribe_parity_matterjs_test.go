@@ -151,3 +151,96 @@ func TestClientInteractionSubscribeClosedWhileProcessingParity(t *testing.T) {
 		}
 	})
 }
+
+// closesOnUnacknowledgedFinalStatus subscribes with req on the scripted
+// peer and reports whether an unacknowledged final report status ends the
+// subscription — closesOnUnacknowledgedFinalStatus of
+// ClientInteractionSubscribeTest.ts:199-218 at b25ed960.
+func closesOnUnacknowledgedFinalStatus(t *testing.T, req interaction.SubscribeRequest) bool {
+	t.Helper()
+	s := newScripted(t)
+	reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+	c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg})
+	sub := subscribed(t, s, c, req, 1)
+	interaction.ReportStatusUnacknowledged(sub, false)
+	select {
+	case <-sub.Done():
+		return true
+	default:
+		sub.Close()
+		return false
+	}
+}
+
+// onOffCluster is ON_OFF of ClientInteractionSubscribeTest.ts:220: endpoint
+// 1, cluster OnOff.
+var onOffCluster = im.ConcreteAttributePath{Endpoint: 1, Cluster: 0x0006, HasEndpoint: true, HasCluster: true}
+
+// TestClientInteractionSubscribeCompactPrimingParity ports the "compact
+// priming" group (ClientInteractionSubscribeTest.ts:387-422 at b25ed960,
+// #4943): the estimate primesCompactly (ClientInteraction.ts:82-99) makes
+// of the subscribe request, seen through whether an unacknowledged final
+// report status closes the subscription.
+func TestClientInteractionSubscribeCompactPrimingParity(t *testing.T) {
+	t.Parallel()
+	onOffFilter := im.DataVersionFilter{Endpoint: 1, Cluster: 0x0006, DataVersion: 1}
+	cases := []struct {
+		name string
+		req  interaction.SubscribeRequest
+		want bool
+	}{
+		{
+			"counts a subscription of single attributes as compact",
+			interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}},
+			true,
+		},
+		{
+			"counts a subscription of all attributes of a cluster as not compact",
+			interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOffCluster}},
+			false,
+		},
+		{
+			"counts a wildcard subscription without DataVersionFilters as not compact",
+			interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}},
+			false,
+		},
+		{
+			"counts a wildcard subscription whose DataVersionFilters all fit as compact",
+			interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, DataVersionFilters: []im.DataVersionFilter{onOffFilter}},
+			true,
+		},
+		{
+			"counts a wildcard subscription whose DataVersionFilters do not all fit as not compact",
+			interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{}}, DataVersionFilters: manyFilters(200)},
+			false,
+		},
+		{
+			"counts a subscription of events without an event filter as not compact",
+			interaction.SubscribeRequest{Events: []im.ConcreteEventPath{{}}},
+			false,
+		},
+		{
+			"counts a subscription of events with an event filter as compact",
+			interaction.SubscribeRequest{Events: []im.ConcreteEventPath{{}}, EventFilters: []im.EventMinimumNumber{{EventMin: 5}}},
+			true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := closesOnUnacknowledgedFinalStatus(t, tc.req); got != tc.want {
+				t.Fatalf("closed %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// manyFilters is n DataVersionFilters of OnOff on endpoints 0…n-1 at the
+// largest data version (ClientInteractionSubscribeTest.ts:408-411).
+func manyFilters(n int) []im.DataVersionFilter {
+	filters := make([]im.DataVersionFilter, n)
+	for i := range filters {
+		filters[i] = im.DataVersionFilter{Endpoint: uint16(i), Cluster: 0x0006, DataVersion: 1<<32 - 1} //nolint:gosec // n stays below 2^16
+	}
+	return filters
+}

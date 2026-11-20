@@ -336,6 +336,14 @@ type Subscription struct {
 	isReading           bool
 	timeoutAt           time.Time
 	isClosed            bool
+	// compactPriming is PeerSubscription's #compactPriming
+	// (PeerSubscription.ts:20, :30, :40 at b25ed960): the subscribe
+	// request is estimated to prime with little data ([primesCompactly]),
+	// standing in for the request that would replace the subscription.
+	compactPriming bool
+	// reportsStarted is #reportsStarted (:21): the reports the peer
+	// started sending on the subscription.
+	reportsStarted int
 
 	// sustained is the state of a sustained subscription, nil for a
 	// plain one.
@@ -388,6 +396,48 @@ func (s *Subscription) timedOut() {
 		slog.Uint64("subscription_id", uint64(s.ID())), slog.Int("fabric_index", int(s.peer.FabricIndex)),
 		slog.Uint64("node_id", s.peer.NodeID), slog.Duration("timeout", s.timeout()))
 	s.Close()
+}
+
+// nextReportNumber counts a report the peer started sending on the
+// subscription and returns the number to pass to
+// [Subscription.reportStatusUnacknowledged] for it. Mirrors matter.js
+// PeerSubscription.nextReportNumber (PeerSubscription.ts:59-66 at
+// b25ed960).
+func (s *Subscription) nextReportNumber() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reportsStarted++
+	return s.reportsStarted
+}
+
+// reportStatusUnacknowledged decides whether the subscription is lost
+// because the peer did not acknowledge our status response to report
+// number n ([Subscription.nextReportNumber]), and closes it if so — so
+// its owner replaces it before its timeout, as a sustained subscription
+// does. A status to a chunk with more to follow closes it; one to a final
+// report only when its priming is compact; a subscription that is closed,
+// or on which a newer report started, is kept as it is. Mirrors matter.js
+// PeerSubscription.reportStatusUnacknowledged
+// (PeerSubscription.ts:68-120 at b25ed960, the table :76-80).
+func (s *Subscription) reportStatusUnacknowledged(n int, status unacknowledgedReportStatus) {
+	s.mu.Lock()
+	ignore := s.isClosed || n != s.reportsStarted
+	keep := status == reportStatusFinal && !s.compactPriming
+	id := s.id
+	s.mu.Unlock()
+	attrs := []any{
+		slog.Uint64("subscription_id", uint64(id)), slog.Int("fabric_index", int(s.peer.FabricIndex)),
+		slog.Uint64("node_id", s.peer.NodeID), slog.String("status", string(status)),
+	}
+	switch {
+	case ignore:
+		s.log.Debug("matter.controller.interaction.report_status_unacknowledged_ignored", attrs...)
+	case keep:
+		s.log.Debug("matter.controller.interaction.report_status_unacknowledged_kept", attrs...)
+	default:
+		s.log.Info("matter.controller.interaction.subscription_lost_report_status_unacknowledged", attrs...)
+		s.Close()
+	}
 }
 
 // Close closes the subscription: its work is aborted, it leaves the
