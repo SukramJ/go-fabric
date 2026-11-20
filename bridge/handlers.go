@@ -704,12 +704,16 @@ func (a *CaseAdapter) completeEstablishment(sessionID uint16, completed bool) bo
 // awaitResumeSuccess records that the resumed session sessionID waits for
 // the initiator's Success on the exchange key names: set before the
 // Sigma2_Resume goes out, so a Success that arrives before the send
-// returned finds it ([Bridge.handleCase]).
-func (a *CaseAdapter) awaitResumeSuccess(key HandshakeKey, sessionID uint16) {
+// returned finds it ([Bridge.handleCase]). A wait it replaces is returned
+// (prev, true) for the caller to fail: no session is left waiting without
+// its deadline.
+func (a *CaseAdapter) awaitResumeSuccess(key HandshakeKey, sessionID uint16) (prev uint16, replaced bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.stopAwaitedResumeTimerLocked()
+	prev, replaced = a.awaitedResume, a.awaitedResume != 0 && a.awaitedResume != sessionID
 	a.awaitedResume, a.awaitedResumeKey, a.awaitedResumeAcked = sessionID, key, false
+	return prev, replaced
 }
 
 // armAwaitedResume (re)starts the deadline of the wait for the initiator's

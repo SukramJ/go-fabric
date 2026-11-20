@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10134,
+  "entry_points": 10135,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27836,
+    "total_exported": 27837,
     "reachable": 20874,
-    "whitelisted": 6939,
+    "whitelisted": 6940,
     "unreachable": 23
   },
   "by_package": [
@@ -1622,6 +1622,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_establishment_test.go",
       "line": 47
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCASEResumeSecondSigma1FailsTheFirstWait",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_resume_second_sigma1_test.go",
+      "line": 76
     },
     {
       "package": "bridge",
