@@ -16,6 +16,7 @@ import (
 	"net"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,20 +29,48 @@ func TestServerSubscriptionSupersessionReporter(t *testing.T) {
 	t.Parallel()
 	attrPath := im.ConcreteAttributePath{HasEndpoint: true, HasCluster: true, HasAttribute: true, Endpoint: 1, Cluster: 0x0006, Attribute: 0x0000}
 	const former, newer uint16 = 40, 41
+	// inMove marks, per bridge, a SessionSuperseded call made from within a
+	// lookup (supersedeQuietly).
+	var (
+		inMoveMu sync.Mutex
+		inMove   = map[*Bridge]*atomic.Bool{}
+	)
+	inMoveOf := func(b *Bridge) *atomic.Bool {
+		inMoveMu.Lock()
+		defer inMoveMu.Unlock()
+		return inMove[b]
+	}
+	supersedeQuietly := func(b *Bridge) {
+		flag := inMoveOf(b)
+		flag.Store(true)
+		defer flag.Store(false)
+		b.SessionSuperseded(former, newer)
+	}
 	peerAddr := &net.UDPAddr{IP: net.IPv6loopback, Port: 5540}
 
 	// setup attaches a manager to a started bridge with one subscription
-	// on former, routed there. No session is known to the lookup, so every
-	// send fails before a datagram leaves; onLookup sees each session a
-	// send looks up.
+	// on former, routed there. The lookup knows every session, but each one
+	// it hands out is closed, so every send fails before a datagram leaves;
+	// onLookup sees each session a send looks up — and the lookup of the
+	// newer session SessionSuperseded makes after a move, which
+	// [supersedeQuietly] keeps out of the record.
 	setup := func(t *testing.T, onLookup func(id uint16)) (*Bridge, *subscription.Manager, *subscription.Subscription) {
 		t.Helper()
 		b := newStartedBridge(t)
+		closed, err := channel.New(channel.Config{EncryptKey: make([]byte, 16), DecryptKey: make([]byte, 16)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		closed.Close()
+		quiet := &atomic.Bool{}
+		inMoveMu.Lock()
+		inMove[b] = quiet
+		inMoveMu.Unlock()
 		b.AttachSessionLookup(sessionLookupFunc(func(id uint16) (*channel.Session, bool) {
-			if onLookup != nil {
+			if onLookup != nil && !quiet.Load() {
 				onLookup(id)
 			}
-			return nil, false
+			return closed, true
 		}))
 		m := subscription.NewManager(subscription.Config{}, nil, nil)
 		b.AttachSubscriptionManager(m)
@@ -119,7 +148,7 @@ func TestServerSubscriptionSupersessionReporter(t *testing.T) {
 			}
 			mu.Unlock()
 			if first {
-				b.SessionSuperseded(former, newer)
+				supersedeQuietly(b)
 			}
 		})
 		m.OnAttributeChanged(attrPath)
@@ -151,7 +180,7 @@ func TestServerSubscriptionSupersessionReporter(t *testing.T) {
 			first := len(sends) == 1
 			mu.Unlock()
 			if first {
-				b.SessionSuperseded(former, newer)
+				supersedeQuietly(b)
 			}
 		})
 		sent := func() int {

@@ -6,6 +6,7 @@ package bridge
 import (
 	"log/slog"
 
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im/subscription"
 )
 
@@ -28,6 +29,12 @@ import (
 // former session say nothing about the new one") and :569-577 (a failure on
 // the session it left is no error count, the update is resent at once).
 // Calling it for sessions that carry no subscription is a no-op.
+//
+// The hook names both sessions by id outside the registry's lock, so the
+// method checks what it can: nothing moves when newerID resolves to
+// another fabric or subject node than the subscriptions on olderID, and
+// what moved onto a newerID the session lookup no longer holds — closed
+// before the move, its close hook already run — is closed here.
 func (b *Bridge) SessionSuperseded(olderID, newerID uint16) {
 	if olderID == newerID {
 		return
@@ -42,7 +49,19 @@ func (b *Bridge) SessionSuperseded(olderID, newerID uint16) {
 	if m == nil {
 		return
 	}
+	if !b.supersedingSubjectMatches(m, olderID, newerID) {
+		return
+	}
 	ids := m.MoveSession(olderID, newerID)
+	// A newer session closed between its establishment and this call has
+	// had its close hook already, which found nothing on it yet: what just
+	// moved onto it closes here, as the close would have closed it. Read
+	// after the move, so a close after this point finds the moved
+	// subscriptions itself.
+	if len(ids) > 0 && !b.sessionLive(newerID) {
+		m.CloseSession(newerID)
+		return
+	}
 	b.subUpdateMu.Lock()
 	var moved int
 	for _, subID := range ids {
@@ -57,6 +76,46 @@ func (b *Bridge) SessionSuperseded(olderID, newerID uint16) {
 			slog.Int("to_session", int(newerID)),
 			slog.Int("subscriptions", moved))
 	}
+}
+
+// sessionLive reports whether the session lookup still holds sessionID;
+// true without a lookup, which cannot tell.
+func (b *Bridge) sessionLive(sessionID uint16) bool {
+	b.mu.RLock()
+	sessions := b.sessions
+	b.mu.RUnlock()
+	if sessions == nil {
+		return true
+	}
+	_, ok := sessions.Lookup(sessionID)
+	return ok
+}
+
+// supersedingSubjectMatches reports whether newerID's fabric and subject
+// node are those of every subscription on olderID. The session registry
+// established newerID as a session of the same subject, but the hook names
+// both by id outside its lock: an id freed and allocated again in between
+// would name another subject's session, and nothing moves onto it. A
+// session the bridge cannot resolve — closed, or no resolver wired — is
+// not judged here.
+func (b *Bridge) supersedingSubjectMatches(m *subscription.Manager, olderID, newerID uint16) bool {
+	fabricIndex := b.resolveSessionFabric(newerID)
+	nodeID, _ := b.resolveSessionSubject(newerID)
+	if fabricIndex == 0 || fabricIndex == endpoint.FabricIndexUnresolvable || nodeID == 0 {
+		return true
+	}
+	for _, info := range m.Snapshot() {
+		if info.SessionID == olderID && (info.FabricIndex != fabricIndex || info.PeerNodeID != nodeID) {
+			if b.logger != nil {
+				b.logger.Warn("matter.subscribe.session_superseded.subject_mismatch",
+					slog.Int("from_session", int(olderID)),
+					slog.Int("to_session", int(newerID)),
+					slog.Int("subscription_id", int(info.ID)))
+			}
+			return false
+		}
+	}
+	return true
 }
 
 // supersededTarget is target re-pointed at newerID. The subject — fabric,

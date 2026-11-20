@@ -653,7 +653,7 @@ func wireSecurity(
 		br.SessionClosed(id)
 		events.closed(id)
 	})
-	wireSupersession(sessions, br, subs)
+	wireSupersession(sessions, br)
 	subs.SetOnSessionSubscriptionsChanged(events.subscriptionsChanged)
 	br.AttachSessionRegistry(sessions)
 
@@ -1520,13 +1520,8 @@ const (
 // establishment causes closes any of them (matter.js
 // packages/protocol/src/session/SessionManager.ts:750-769,
 // packages/node/src/node/server/ServerSubscription.ts:819-834 at b25ed960).
-// A newer session closed before the move ran has had its close hook
-// already: what moved onto it closes here.
-func wireSupersession(sessions *operational.Manager, br *bridge.Bridge, subs *subscription.Manager) {
-	sessions.SetOnSessionSuperseded(func(olderID, newerID uint16) {
-		br.SessionSuperseded(olderID, newerID)
-		if _, err := sessions.Get(newerID); err != nil {
-			subs.CloseSession(newerID)
-		}
-	})
+// The bridge's method closes what it moved onto a newer session already
+// closed (bridge.Bridge.SessionSuperseded).
+func wireSupersession(sessions *operational.Manager, br *bridge.Bridge) {
+	sessions.SetOnSessionSuperseded(br.SessionSuperseded)
 }
