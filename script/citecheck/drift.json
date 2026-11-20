@@ -548,7 +548,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 275,
+    "line": 280,
     "citation": "ExchangeManager.ts:391-440",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "addProtocolHandler",
@@ -557,7 +557,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 282,
+    "line": 287,
     "citation": "SecureChannelProtocol.ts:146-148",
     "resolved": "packages/protocol/src/securechannel/SecureChannelProtocol.ts",
     "identifier": "CaseServer",
@@ -566,7 +566,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 289,
+    "line": 294,
     "citation": "ExchangeManager.ts:393-405",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "requiresSecureSession",
@@ -575,7 +575,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 399,
+    "line": 404,
     "citation": "SessionManager.ts:504-557",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -584,7 +584,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 460,
+    "line": 465,
     "citation": "NodeSession.ts:316-318",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "suppressPeerLoss",
@@ -593,7 +593,7 @@
   },
   {
     "file": "client/exchange/manager.go",
-    "line": 1313,
+    "line": 1385,
     "citation": "packages/types/src/protocol/definitions/general.ts:33",
     "resolved": "packages/types/src/protocol/definitions/general.ts",
     "at": "b25ed960",
@@ -639,7 +639,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 280,
+    "line": 285,
     "citation": "NodeSession.ts:408-413",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "peerAddress",
@@ -648,7 +648,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 398,
+    "line": 419,
     "citation": "NodeSession.ts:320-322",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "isPeerLost",
@@ -657,7 +657,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 436,
+    "line": 457,
     "citation": "NodeSession.ts:311-314",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerLoss",
@@ -666,7 +666,7 @@
   },
   {
     "file": "client/exchange/session.go",
-    "line": 444,
+    "line": 465,
     "citation": "NodeSession.ts:354-362",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "deferredClose",
