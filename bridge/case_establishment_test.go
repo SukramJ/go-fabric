@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -152,3 +153,102 @@ func setResumeCompletion(t *testing.T, rr *resumeRig, provided bool, rec *comple
 	}
 	a.setOnCompletion(rec.hook)
 }
+
+// TestCASEResumeWaitsForSuccessUntilItsDeadline: a resumed session waits for
+// the initiator's Success for the exchange's response time from its
+// Sigma2_Resume's acknowledgement; at the deadline the handshake fails and
+// the session is closed by entry through the host's hook, not left to the
+// idle reaper (a host without the hook installs established: no deadline).
+// Another message than a StatusReport on the exchange fails it at once; so
+// does the Sigma2_Resume's give-up.
+// matter.js packages/protocol/src/session/case/CaseServer.ts:204-210,
+// MessageExchange.ts:894-908, SecureChannelMessenger.ts:94-98 at b25ed960
+// (Fable post-read M1, L1, L4).
+func TestCASEResumeWaitsForSuccessUntilItsDeadline(t *testing.T) {
+	t.Parallel()
+	acked := func(t *testing.T, hooked bool) (*resumeRig, *completions) {
+		t.Helper()
+		rr, sigma1 := newResumeRig(t, false)
+		rec := &completions{}
+		if hooked {
+			setResumeCompletion(t, rr, false, rec)
+		}
+		if err := rr.p.send(mrp.SCOpcodeSigma1, 0x0400, sigma1, nil); err != nil {
+			t.Fatal(err)
+		}
+		_, counter, _ := rr.p.recv(mrp.SCOpcodeSigma2Resume, "Sigma2_Resume")
+		if err := rr.p.send(mrp.StandaloneAckOpcode, 0x0400, nil, &counter); err != nil {
+			t.Fatal(err)
+		}
+		return rr, rec
+	}
+	t.Run("closes the session by entry at the deadline when the Success never comes", func(t *testing.T) {
+		t.Parallel()
+		rr, rec := acked(t, true)
+		wait := rr.r.b.caseSigma3Wait(false)
+		rr.clk.Advance(wait - time.Millisecond)
+		if got := rec.snapshot(); len(got) != 0 {
+			t.Fatalf("completions %+v before the deadline", got)
+		}
+		rr.clk.Advance(time.Millisecond)
+		if got := rec.snapshot(); len(got) != 1 || got[0].sessionID != 0x2001 || got[0].completed {
+			t.Fatalf("completions %+v at the deadline, want session 0x2001 failed", got)
+		}
+		if got := rr.closed(); len(got) != 0 {
+			t.Fatalf("closed %v by id; the hook closes by entry", got)
+		}
+		rr.clk.Advance(sessionIdleTimeoutForTest)
+		if len(rec.snapshot()) != 1 {
+			t.Fatal("the deadline fired more than once")
+		}
+	})
+	t.Run("has no deadline for a host that installs established", func(t *testing.T) {
+		t.Parallel()
+		rr, _ := acked(t, false)
+		rr.clk.Advance(2 * rr.r.b.caseSigma3Wait(false))
+		if got := rr.closed(); len(got) != 0 {
+			t.Fatalf("closed %v: the session was installed established", got)
+		}
+	})
+	t.Run("a Success before the deadline stops it", func(t *testing.T) {
+		t.Parallel()
+		rr, rec := acked(t, true)
+		report := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, nil)
+		if err := rr.p.send(mrp.SCOpcodeStatusReport, 0x0400, report, nil); err != nil {
+			t.Fatal(err)
+		}
+		rr.clk.Advance(2 * rr.r.b.caseSigma3Wait(false))
+		if got := rec.snapshot(); len(got) != 1 || !got[0].completed {
+			t.Fatalf("completions %+v, want one, completed", got)
+		}
+	})
+	t.Run("another message on the exchange fails the resumption", func(t *testing.T) {
+		t.Parallel()
+		rr, rec := acked(t, true)
+		if err := rr.p.send(mrp.SCOpcodeSigma3, 0x0400, []byte{0x15, 0x18}, nil); err != nil {
+			t.Fatal(err)
+		}
+		if got := rec.snapshot(); len(got) != 1 || got[0].sessionID != 0x2001 || got[0].completed {
+			t.Fatalf("completions %+v, want session 0x2001 failed", got)
+		}
+	})
+	t.Run("the Sigma2_Resume's give-up closes the session by entry", func(t *testing.T) {
+		t.Parallel()
+		rr, sigma1 := newResumeRig(t, false)
+		rec := &completions{}
+		setResumeCompletion(t, rr, false, rec)
+		if err := rr.p.send(mrp.SCOpcodeSigma1, 0x0400, sigma1, nil); err != nil {
+			t.Fatal(err)
+		}
+		rr.p.recv(mrp.SCOpcodeSigma2Resume, "Sigma2_Resume")
+		rr.giveUp()
+		if got := rec.snapshot(); len(got) != 1 || got[0].sessionID != 0x2001 || got[0].completed {
+			t.Fatalf("completions %+v, want session 0x2001 failed", got)
+		}
+	})
+}
+
+// sessionIdleTimeoutForTest is the idle reaper's timeout
+// (secure/operational SessionIdleTimeout), the bound a resumed session's
+// wait had before it had a deadline.
+const sessionIdleTimeoutForTest = 5 * time.Minute

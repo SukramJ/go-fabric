@@ -1188,8 +1188,8 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	// the record up in SessionManager and saves a fresh one after every
 	// session: after the initiator's success report on a resume, after
 	// Sigma3 on a full handshake
-	// (packages/protocol/src/session/case/CaseServer.ts:219, :344 at
-	// db021da0). Here the record is replaced when the session is installed,
+	// (packages/protocol/src/session/case/CaseServer.ts:217, :357 at
+	// b25ed960). Here the record is replaced when the session is installed,
 	// before Sigma2_Resume is sent (review II, R2-P6-sec-3320); TC-SC-3.2
 	// checks the resume.
 	responder.SetResumptionStore(resumptionLookup{sessions: sessions, claims: &ids.claims})
@@ -1202,7 +1202,10 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	adapter.SetOnUnfinished(held.release)
 	// The session is installed establishing; the bridge reports its
 	// handshake's end ([caseEstablishment]).
-	establishing := newCaseEstablishment(adapter, sessions, ids, onOpened)
+	establishing, err := newCaseEstablishment(adapter, sessions, ids, onOpened)
+	if err != nil {
+		return nil, err
+	}
 	adapter.SetOnSessionEstablished(func(keys sigma.SessionKeys, peerSessionID uint16) error {
 		// Everything is read back off the responder rather than captured at
 		// factory time: the destination resolver may have landed on a
@@ -1251,7 +1254,8 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		}
 		// The initiator's Sigma1 SessionParameters size the session's
 		// retransmissions and name its transports (matter.js
-		// CaseServer.ts:339 `sessionParameters: secureSession.parameters`).
+		// CaseServer.ts:352 at b25ed960 `sessionParameters:
+		// secureSession.parameters`).
 		if resp := adapter.SnapshotResponder(); resp != nil {
 			if p, ok := resp.PeerSessionParameters(); ok {
 				entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
@@ -1272,8 +1276,8 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 				// that resumes from the same record keeps them (review II,
 				// Fable P-5). A resumed session keeps the parameters of the
 				// record it resumed from, the id alone renewed — matter.js
-				// re-saves the old record with the new id (CaseServer.ts:213,
-				// :219 at db021da0; Fable P-5a).
+				// re-saves the old record with the new id (CaseServer.ts:214,
+				// :217 at b25ed960; Fable P-5a).
 				params, _ := resp.PeerSessionParameters()
 				if info := resp.ResumeInfo(); info.Resumed {
 					if prev, err := sessions.LookupResumption(context.Background(), info.PresentedResumptionID); err == nil {
@@ -1322,8 +1326,15 @@ func openEstablishing(sessions *operational.Manager, stake operational.Stake, fa
 // Until then no picker returns a session and the per-peer cap leaves it
 // out; the host learns of it (onOpened) once it is established, as
 // matter.js's SessionsBehavior and DeviceAdvertiser observe the
-// established set (packages/protocol/src/session/SessionManager.ts:383-385,
-// :1266-1284; case/CaseServer.ts:177-210, :314-344 at b25ed960). An entry is the installed
+// established set (packages/node/src/behavior/system/sessions/SessionsBehavior.ts:51-53,
+// packages/protocol/src/protocol/DeviceAdvertiser.ts:116; the set:
+// packages/protocol/src/session/SessionManager.ts:383-385, :1266-1284;
+// case/CaseServer.ts:177-210, :314-344 at b25ed960). A resumed session
+// waiting for the initiator's Success has a deadline; at its expiry the
+// bridge reports the handshake failed ([bridge.CaseAdapter], the resume's
+// wait). The resumption record is still saved at the install, before the
+// establishment, where matter.js saves it after (CaseServer.ts:216-217,
+// :356-357). An entry is the installed
 // session itself, so the completion or the close reaches that session and
 // never another one that holds its id by then (decision 159).
 type caseEstablishment struct {
@@ -1340,14 +1351,18 @@ type caseEstablishment struct {
 }
 
 // newCaseEstablishment is the bookkeeping of adapter, whose completion hook
-// it installs (internal/bridgeseam SetCaseEstablishmentCompletion).
-func newCaseEstablishment(adapter *bridge.CaseAdapter, sessions *operational.Manager, ids *caseIdentities, onOpened func(sessionID uint16)) *caseEstablishment {
+// it installs (internal/bridgeseam SetCaseEstablishmentCompletion). A hook
+// the adapter does not take fails the adapter's construction: every session
+// it installs would stay establishing for good.
+func newCaseEstablishment(adapter *bridge.CaseAdapter, sessions *operational.Manager, ids *caseIdentities, onOpened func(sessionID uint16)) (*caseEstablishment, error) {
 	e := &caseEstablishment{sessions: sessions, onOpened: onOpened, afterPut: ids.testAfterAdmit}
-	bridgeseam.SetCaseEstablishmentCompletion(adapter, e.complete)
+	if !bridgeseam.SetCaseEstablishmentCompletion(adapter, e.complete) {
+		return nil, errors.New("node: the CASE adapter takes no establishment completion hook")
+	}
 	if ids.testEstablishment != nil {
 		ids.testEstablishment(e)
 	}
-	return e
+	return e, nil
 }
 
 // complete is the bridge's report on the session sessionID installed

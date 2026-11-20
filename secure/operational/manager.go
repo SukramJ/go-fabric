@@ -726,7 +726,7 @@ func randomInitialSessionID() uint16 {
 // [MaxSessionsPerPeer], at which point the least recently active ones
 // are force-closed (no CloseSession on the wire). Mirrors matter.js
 // packages/protocol/src/session/SessionManager.ts:204-206
-// (MAX_SESSIONS_PER_PEER) and :779-808 (#evictExcessSessionsFor) at
+// (MAX_SESSIONS_PER_PEER) and :779-810 (#evictExcessSessionsFor) at
 // b25ed960; the session is installed established, so the check runs at
 // once, as matter.js runs it for a session created without
 // `establishing` (#sessionEstablished, :757-769, on RegisteredSessions.add,
@@ -1610,7 +1610,8 @@ func (m *Manager) PASESessionIDs() []uint16 {
 // teardown it was written for closes the peer's subscriptions, not its
 // sessions (subscription.Manager.ClosePeer). There is no replacement
 // that sends the farewell; [Manager.Close] on each id
-// [Manager.SessionIDsForPeer] returns closes the sessions without one.
+// [Manager.SessionIDsForPeer] returns closes the established sessions
+// without one — a session still establishing is not among those ids.
 // Removable in v0.25.0 (review II, R2-P2 design note 4).
 func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	m.mu.Lock()
@@ -2168,7 +2169,7 @@ func (m *Manager) SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint
 // pickers read the established set (maybeSessionFor,
 // packages/protocol/src/session/SessionManager.ts:683-700 at b25ed960; the
 // isEstablishing table, NodeSession.ts:214-217), so a request is not
-// routed onto a session the initiator has not been told is up.
+// routed onto a session whose handshake has not completed.
 func (m *Manager) NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usable func(id uint16) bool) (uint16, bool) {
 	type candidate struct {
 		id   uint16

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -663,6 +664,12 @@ type CaseAdapter struct {
 	// none.
 	awaitedResume    uint16
 	awaitedResumeKey HandshakeKey
+	// awaitedResumeTimer, once armed, ends the wait at its deadline
+	// ([CaseAdapter.armAwaitedResume]); stopped when the wait ends.
+	awaitedResumeTimer clock.Timer
+	// awaitedResumeAcked is set once the deadline was rearmed at the
+	// Sigma2_Resume's acknowledgement, which happens once.
+	awaitedResumeAcked bool
 }
 
 // setOnCompletion installs fn, the host's hook that completes or ends the
@@ -701,7 +708,44 @@ func (a *CaseAdapter) completeEstablishment(sessionID uint16, completed bool) bo
 func (a *CaseAdapter) awaitResumeSuccess(key HandshakeKey, sessionID uint16) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.awaitedResume, a.awaitedResumeKey = sessionID, key
+	a.stopAwaitedResumeTimerLocked()
+	a.awaitedResume, a.awaitedResumeKey, a.awaitedResumeAcked = sessionID, key, false
+}
+
+// armAwaitedResume (re)starts the deadline of the wait for the initiator's
+// Success on the exchange key names: expire runs with the waiting session
+// once d passed on clk, unless the wait ended before. A deadline armed
+// before is replaced, at the acknowledgement (atAck) once only; without a
+// wait on key nothing is armed.
+func (a *CaseAdapter) armAwaitedResume(key HandshakeKey, clk clock.Clock, d time.Duration, atAck bool, expire func(sessionID uint16)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.awaitedResume == 0 || a.awaitedResumeKey != key || (atAck && a.awaitedResumeAcked) {
+		return
+	}
+	a.awaitedResumeAcked = a.awaitedResumeAcked || atAck
+	a.stopAwaitedResumeTimerLocked()
+	a.awaitedResumeTimer = clk.AfterFunc(d, func() {
+		if id, ok := a.takeAwaitedResume(key); ok {
+			expire(id)
+		}
+	})
+}
+
+// stopAwaitedResumeTimerLocked stops the wait's deadline. Caller holds a.mu.
+func (a *CaseAdapter) stopAwaitedResumeTimerLocked() {
+	if a.awaitedResumeTimer != nil {
+		a.awaitedResumeTimer.Stop()
+		a.awaitedResumeTimer = nil
+	}
+}
+
+// completesEstablishment reports whether a host hook completes or ends the
+// establishment of the adapter's sessions ([CaseAdapter.setOnCompletion]).
+func (a *CaseAdapter) completesEstablishment() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.onCompletion != nil
 }
 
 // takeAwaitedResume returns, once, the resumed session that waits for the
@@ -713,6 +757,7 @@ func (a *CaseAdapter) takeAwaitedResume(key HandshakeKey) (uint16, bool) {
 	if id == 0 || a.awaitedResumeKey != key {
 		return 0, false
 	}
+	a.stopAwaitedResumeTimerLocked()
 	a.awaitedResume, a.awaitedResumeKey = 0, HandshakeKey{}
 	return id, true
 }

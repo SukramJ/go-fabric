@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Package bridgeseam carries the one-way seam through which the
-// bridge/bridgetest support package reaches bridge internals.
+// Package bridgeseam carries the one-way seams through which packages of
+// this module reach bridge internals that are not public API: the
+// bridge/bridgetest support package and fabrictest (test support), and the
+// node facade, which completes the establishment of the CASE responder
+// sessions it installs ([SetCaseEstablishmentCompletion], a production
+// hook).
 //
 // Direction of the edge: package bridge installs the hooks below from its
 // init; bridgetest reads them, fabrictest and node one each
-// ([UseListener], [SetCaseEstablishmentCompletion]). The seam exists because Go has no visibility
-// level between "exported to every consumer" and "this package only" — and
-// bridgetest is necessarily a different package from bridge. Without the
-// seam, every affordance bridgetest offers would have to be a method on
-// bridge.Bridge, i.e. production API that exists only to serve tests.
+// ([UseListener], [SetCaseEstablishmentCompletion]). The seam exists
+// because Go has no visibility level between "exported to every consumer"
+// and "this package only" — and bridgetest and node are necessarily other
+// packages than bridge. Without the seam, every affordance bridgetest
+// offers would have to be a method on bridge.Bridge, i.e. production API
+// that exists only to serve tests, and the facade's completion hook an
+// exported CaseAdapter setter no other host needs.
 //
 // The seam is module-internal, so it cannot itself become a consumer-visible
 // surface: an external module can import bridgetest and nothing else.
