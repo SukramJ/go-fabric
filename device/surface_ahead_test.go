@@ -37,7 +37,7 @@ var thermostatAheadRows = []struct {
 func aheadThermostat(key string, features thermostatdef.Feature, p *surface.Policies) (*Thermostat, error) {
 	decl := thermostatdef.Declare{Features: thermostatdef.FeatureHeating | features}
 	if features&thermostatdef.FeatureMatterScheduleConfiguration != 0 {
-		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1}}
+		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1, ScheduleTypeFeatures: thermostatdef.ScheduleTypeFeaturesSupportsSetpoints}}
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
 	}

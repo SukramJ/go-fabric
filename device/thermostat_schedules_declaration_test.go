@@ -57,8 +57,8 @@ func TestThermostatDeclaresSchedules(t *testing.T) {
 	}
 	srv := d.Thermostat()
 	st := srv.Get()
-	if len(st.Schedules) != 1 || st.Schedules[0].BuiltIn.Null || !st.Schedules[0].BuiltIn.Value {
-		t.Fatalf("schedules %+v, want the declared one, built in", st.Schedules)
+	if len(st.Schedules) != 1 || st.Schedules[0].BuiltIn.Null || st.Schedules[0].BuiltIn.Value {
+		t.Fatalf("schedules %+v, want the declared one, its null BuiltIn false", st.Schedules)
 	}
 	ctx := im.WithCommandPath(context.Background(), im.ConcreteCommandPath{Endpoint: 1, Cluster: thermostatdef.ClusterID, Command: thermostatdef.CmdSetActiveScheduleRequest, HasEndpoint: true})
 	if _, err := srv.Underlying().MatterInvoke(ctx, thermostatdef.CmdSetActiveScheduleRequest, thermostatdef.SetActiveScheduleRequestRequest{ScheduleHandle: []byte{0x01}}); err != nil {

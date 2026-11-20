@@ -147,7 +147,7 @@ func thermostat(t *testing.T, key string, withSchedules bool, p *surface.Policie
 	decl := thermostatdef.Declare{Features: thermostatdef.FeatureHeating}
 	if withSchedules {
 		decl.Features |= msch
-		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1}}
+		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1, ScheduleTypeFeatures: thermostatdef.ScheduleTypeFeaturesSupportsSetpoints}}
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
 	}
