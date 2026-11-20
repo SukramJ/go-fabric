@@ -25,8 +25,8 @@ const (
 
 // ErrNoSession is a provider without a session to run the exchange on —
 // matter.js's SessionClosedError "No existing session to <address>"
-// (PeerExchangeProvider.ts:118), kept under this name — and a closed
-// dedicated session.
+// (packages/protocol/src/peer/PeerExchangeProvider.ts:116-118 at
+// b25ed960), kept under this name — and a closed dedicated session.
 var ErrNoSession = errors.New("interaction: no session")
 
 // ExchangeOptions configures [Provider.InitiateExchange] — the part of
@@ -86,6 +86,18 @@ type ClientRequest struct {
 	// peer.ErrTCPUnsupported. nil and false are no requirement; an invoke
 	// tells them apart for its inference (ClientInteraction.ts:716-719).
 	LargeMessage *bool
+	// RequireExistingSession runs the interaction only on a session that
+	// exists when it starts: a peer without an active session fails it with
+	// [ErrNoSession] instead of being connected first — for a best-effort
+	// message that is worthless once the peer must be reconnected. It is
+	// [ExchangeOptions].RequireExistingSession. A provider bound to one
+	// session never establishes one, so it changes nothing there; an invoke
+	// that carries it goes on its own; a sustained subscription
+	// re-establishes its session by design and refuses it with
+	// [ErrMalformedRequest]. Mirrors matter.js ClientRequest.requireExistingSession
+	// (packages/protocol/src/action/client/ClientRequest.ts:42-55 at
+	// b25ed960), passed to the exchange at ClientInteraction.ts:1278.
+	RequireExistingSession bool
 }
 
 // large reports a large-message request.
@@ -94,7 +106,10 @@ func (r ClientRequest) large() bool { return r.LargeMessage != nil && *r.LargeMe
 // exchangeOptions are the exchange options of the request: a large message
 // requires TCP (ClientInteraction.ts:1235).
 func (r ClientRequest) exchangeOptions() ExchangeOptions {
-	o := ExchangeOptions{Network: r.Network, AdditionalMrpDelay: r.AdditionalMrpDelay, AddressOverride: r.AddressOverride}
+	o := ExchangeOptions{
+		Network: r.Network, AdditionalMrpDelay: r.AdditionalMrpDelay, AddressOverride: r.AddressOverride,
+		RequireExistingSession: r.RequireExistingSession,
+	}
 	if r.large() {
 		tcp := exchange.TransportTCP
 		o.RequiredTransport = &tcp
