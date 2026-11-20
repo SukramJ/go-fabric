@@ -12,11 +12,11 @@ import (
 	"reflect"
 	"strings"
 	"unicode"
-	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // StatusError carries an exact IM status to the dispatcher: the one
@@ -410,11 +410,12 @@ func (i *Instance) checkLength(t Type, c Constraint, value any, peers Peers) (v 
 		return nil, fmt.Sprintf("%v is not a %s", value, t.Name)
 	}
 	if !i.satisfies(c, float64(n), peers) {
-		return nil, fmt.Sprintf("length %d violates %q", n, c.Text)
+		return nil, fmt.Sprintf("length %d bytes violates %q", n, c.Text)
 	}
-	// After the length, a string's codepoints against cpMax. Mirrors
-	// matter.js packages/node/src/behavior/state/validation/constraint.ts:213-232
-	// at db021da0 ([...value].length > cpMax is a ConstraintError;
+	// After the length in bytes, a string's codepoints against cpMax: the
+	// second unit stays the codepoint. Mirrors matter.js
+	// packages/node/src/behavior/state/validation/constraint.ts:217-235
+	// at b25ed960 ([...value].length > cpMax is a ConstraintError;
 	// W3-clugen-02).
 	if s, ok := value.(string); ok && c.CpMax > 0 {
 		if cp := utf8.RuneCountInString(s); cp > c.CpMax {
@@ -820,14 +821,30 @@ func IntRange(bits int, nullable bool) (lo, hi int64) {
 	return lo, hi
 }
 
-// StringLength is the length matter.js's TlvString bounds a string by:
-// JavaScript's String.length, the number of UTF-16 code units.
+// StringLength is the length a character string is bounded by: the
+// number of bytes of its UTF-8 encoding as it goes on the wire, ill-formed
+// UTF-8 counted as the U+FFFD the encoder writes in its place
+// ([tlv.Encoder.PutUTF8]). Mirrors matter.js
+// packages/general/src/util/Bytes.ts:133-153 at b25ed960 (utf8Length, the
+// length of TextEncoder's output, a lone surrogate counted as its U+FFFD),
+// which the string constraint (packages/node/src/behavior/state/validation/constraint.ts:203-206)
+// and TlvString (packages/types/src/tlv/TlvString.ts:29-31) bound a string
+// by since #4995; it counted UTF-16 code units before (owner decision 294).
 func StringLength(s string) int {
-	n := 0
-	for _, r := range s {
-		n += utf16.RuneLen(r)
+	if utf8.ValidString(s) {
+		return len(s)
 	}
-	return n
+	enc := tlv.NewEncoder()
+	enc.PutUTF8(tlv.AnonymousTag(), s)
+	b, err := enc.Bytes()
+	if err != nil {
+		return len(s)
+	}
+	el, err := tlv.NewDecoder(b).Next()
+	if err != nil {
+		return len(s)
+	}
+	return len(el.String)
 }
 
 func asUint(v any) (uint64, bool) {

@@ -96,7 +96,7 @@ func TestValidateWrite(t *testing.T) {
 		{5, int64(1), float64(1)},
 		{6, true, true},
 		{7, "abcd", "abcd"},
-		{7, "äöü", "äöü"},
+		{7, "äö", "äö"}, // four bytes in UTF-8 (#4995)
 		{8, []byte{1, 2}, []byte{1, 2}},
 		{9, []any{1}, []any{1}},
 		{10, uint8(0), uint64(0)},
@@ -131,6 +131,7 @@ func TestValidateWrite(t *testing.T) {
 		{0, uint16(256), im.StatusConstraintError},
 		{0, int64(-1), im.StatusConstraintError},
 		{0, "1", im.StatusConstraintError},
+		{7, "äöü", im.StatusConstraintError}, // three characters, six bytes over "max 4" (#4995)
 		{1, uint32(0xFFFFFF), im.StatusConstraintError},
 		{2, int64(-32768), im.StatusConstraintError},
 		{2, int64(-27316), im.StatusConstraintError},
@@ -184,8 +185,13 @@ func TestRanges(t *testing.T) {
 	if lo, hi := spec.IntRange(99, false); lo != math.MinInt64 || hi != math.MaxInt64 {
 		t.Error("IntRange 64")
 	}
-	if spec.StringLength("a😀") != 3 {
-		t.Error("StringLength counts UTF-16 code units")
+	// UTF-8 bytes as encoded (Bytes.utf8Length at b25ed960, #4995):
+	// "😀" is four bytes (two UTF-16 code units), "é" two, and an
+	// ill-formed byte the three of the U+FFFD the encoder writes.
+	for s, want := range map[string]int{"a😀": 5, "é": 2, "": 0, "a\xff": 4, "\xe2\x82": 3} {
+		if got := spec.StringLength(s); got != want {
+			t.Errorf("StringLength(%q) = %d, want %d", s, got, want)
+		}
 	}
 }
 

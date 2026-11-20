@@ -239,8 +239,9 @@ func DecodeFloat64(n Node) (float64, error) {
 // DecodeString decodes a UTF-8 string.
 func DecodeString(n Node) (string, error) { return DecodeStringIn(0, math.MaxInt)(n) }
 
-// DecodeStringIn decodes a UTF-8 string whose length — UTF-16 code units, as
-// matter.js's TlvString counts it — lies in lo..hi.
+// DecodeStringIn decodes a UTF-8 string whose length in UTF-8 bytes
+// ([StringLength]) lies in lo..hi, as matter.js's TlvString bounds it
+// (packages/types/src/tlv/TlvString.ts:92-100 at b25ed960, #4995).
 func DecodeStringIn(lo, hi int) Decoder[string] {
 	return func(n Node) (string, error) {
 		if n.El.Type < tlv.TypeUTF8Str1 || n.El.Type > tlv.TypeUTF8Str8 {
@@ -250,13 +251,13 @@ func DecodeStringIn(lo, hi int) Decoder[string] {
 			return "", invalid("string is not valid UTF-8")
 		}
 		// A string the decoder cut at an IS1 is bounded by the length it
-		// arrived with first, as matter.js TlvString.ts:57-69 at db021da0
-		// checks `value.length > maxLength` before it slices.
+		// arrived with first, in bytes, as matter.js TlvString.ts:69-77 at
+		// b25ed960 checks `byteLengthOf(value) > maxLength` before it slices.
 		if int64(n.El.RawLength) > int64(hi) {
-			return "", outOfRange("string length %d before its IS1 exceeds %d", n.El.RawLength, hi)
+			return "", outOfRange("string length %d bytes before its IS1 exceeds %d", n.El.RawLength, hi)
 		}
 		if l := StringLength(n.El.String); l < lo || l > hi {
-			return "", outOfRange("string length %d outside %d..%d", l, lo, hi)
+			return "", outOfRange("string length %d bytes outside %d..%d", l, lo, hi)
 		}
 		return n.El.String, nil
 	}
