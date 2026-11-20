@@ -62,13 +62,15 @@ type TimeFormatLocalizationConfig struct {
 // whose initialize (:17-42) returns after the hour format (:21-23). It
 // seeds an empty or unset SupportedCalendarTypes with [ActiveCalendarType]
 // (:24-28), keeps an ActiveCalendarType that is set and supported
-// (:29-32), and takes the list's first for an unset one (:34-35; matter.js
-// prefers its detected calendar when listed). The detected values are the
-// host's here — matter.js's detectedHourFormat / detectedCalendarType
-// getters are override points (:44-96) — and arrive as HourFormat and
-// ActiveCalendarType. Four rules depart, the same as LocalizationConfiguration's
-// (decisions 289, 296, 358, 359; notes/parity/by_design.md
-// BD-Matter-Localization-ConfiguredStartValueRefused): matter.js replaces a
+// (:29-32), and takes the list's first for an unset one (:34-35). The
+// detected values are the host's here — matter.js's detectedHourFormat /
+// detectedCalendarType getters are override points (:44-96) — and arrive
+// as HourFormat and ActiveCalendarType. These rules depart, on the
+// principle of LocalizationConfiguration's (decisions 289, 296, 358, 359;
+// notes/parity/by_design.md
+// BD-Matter-Localization-ConfiguredStartValueRefused): matter.js prefers
+// its detected calendar for an unset one when the list holds it (:34-35),
+// where the list's first is taken here; matter.js replaces a
 // set calendar the list lacks, with a warning (:36-40), where a configured
 // ActiveCalendarType is the host's explicit statement and one the list
 // lacks is refused with [ErrLocalizationConfig]; matter.js takes its

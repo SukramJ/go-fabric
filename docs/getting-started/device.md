@@ -189,7 +189,7 @@ with `node.ErrInvalidConfig` when any check fails. It checks:
   (VendorName, ProductName, ProductLabel, NodeLabel, SerialNumber,
   HardwareVersionString, SoftwareVersionString) is inside its attribute's
   constraint in the generated definition — a SerialNumber longer than 32
-  (UTF-16 code units) fails;
+  bytes in UTF-8 fails, as matter.js counts string lengths since #4995;
 - `LocationCapability` is a valid regulatory location (zero is IndoorOutdoor,
   matter.js's default), and `IndoorOnly` comes with no other value;
 - `Network.WiFi`, when set, has its `Driver`, its `Reporter` or both;

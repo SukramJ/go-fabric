@@ -20,7 +20,7 @@ import (
 )
 
 func TestDoorLockServerScheduleRestrictedAccessParity(t *testing.T) {
-	// `denies a ${UserType[userType]} with no schedules configured` (:819-828).
+	// `denies a ${UserType[userType]} with no schedules configured` (:853-856 at b25ed960).
 	for _, userType := range []lockdef.UserTypeEnum{
 		lockdef.UserTypeWeekDayScheduleUser, lockdef.UserTypeYearDayScheduleUser, lockdef.UserTypeScheduleRestrictedUser,
 	} {

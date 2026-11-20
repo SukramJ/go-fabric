@@ -111,7 +111,8 @@ func (r *Subscriptions) sendStatus(ctx context.Context, m *messenger, status im.
 	}
 }
 
-// handleReport is ClientSubscriptionHandler.#handleExchange (:62-145).
+// handleReport is ClientSubscriptionHandler.#handleExchange (:63-160 at
+// b25ed960).
 //
 // A report whose status the peer never acknowledged is handed to the
 // subscription once the report ends, unless the registry is blocked
