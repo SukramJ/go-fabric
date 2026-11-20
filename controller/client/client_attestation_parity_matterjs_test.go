@@ -206,7 +206,9 @@ func TestClientAttestationTrustStoreParity(t *testing.T) {
 	t.Run("emits TrustedAsTestCertificate finding, callback rejects", func(t *testing.T) {
 		t.Parallel()
 		r := runAttestation(t, testOnly(), attestation.Policy{Decide: reject})
-		r.expectRejected(t, rejectedByPolicy)
+		// ClientAttestationTest.ts:524 at b25ed960: the message names the
+		// error finding (P2-D, #4939).
+		r.expectRejected(t, `Device attestation rejected by policy: PAA .* is a test/development certificate`)
 		if lvl, ok := r.has(attestation.TrustedAsTestCertificate); !ok || lvl != attestation.LevelError {
 			t.Fatalf("findings %+v: want TrustedAsTestCertificate as an error", r.findings)
 		}
