@@ -82,7 +82,7 @@ func TestPASEMessagesThatStartNoHandshakeBuildNoAdapter(t *testing.T) {
 	}
 	requireAcknowledgedOnly(t, r.b, 0x4000, "a Pake1 without a PBKDFParamRequest")
 	requireAcknowledgedOnly(t, r.b, 0x4001, "a Pake3 without a PBKDFParamRequest")
-	if got := r.b.paseFailures.Load(); got != 0 {
+	if got := r.b.failedAttempts.Load(); got != 0 {
 		t.Fatalf("PASE failures = %d, want 0: no pairing began", got)
 	}
 }
@@ -106,7 +106,7 @@ func TestPASEContinuationsThatStartNoHandshakeAreDroppedOnTheSingleton(t *testin
 	_ = peer.send(mrp.SCOpcodePake3, 0x4001, []byte{0x15, 0x18}, nil)
 	requireAcknowledgedOnly(t, r.b, 0x4000, "a Pake1 without a PBKDFParamRequest")
 	requireAcknowledgedOnly(t, r.b, 0x4001, "a Pake3 without a PBKDFParamRequest")
-	if got := r.b.paseFailures.Load(); got != 0 {
+	if got := r.b.failedAttempts.Load(); got != 0 {
 		t.Fatalf("PASE failures = %d, want 0: no pairing began", got)
 	}
 	if got := made.Load(); got != 0 {
@@ -116,7 +116,7 @@ func TestPASEContinuationsThatStartNoHandshakeAreDroppedOnTheSingleton(t *testin
 	r.b.claimPaseInFlight(HandshakeKey{InitiatorNodeID: 0x0B0B, ExchangeID: 0x4100})
 	_ = peer.send(mrp.SCOpcodePake1, 0x4002, []byte{0x15, 0x18}, nil)
 	requireAcknowledgedOnly(t, r.b, 0x4002, "a Pake1 beside another exchange's handshake")
-	if got := r.b.paseFailures.Load(); got != 0 {
+	if got := r.b.failedAttempts.Load(); got != 0 {
 		t.Fatalf("PASE failures = %d, want 0: the Pake1 began no pairing", got)
 	}
 }

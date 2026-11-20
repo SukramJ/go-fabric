@@ -553,15 +553,17 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 
 	case mrp.SCOpcodePBKDFParamRequest, mrp.SCOpcodePake1, mrp.SCOpcodePake3:
 		if b.paseLockedOut() {
-			// Brute-force cap reached for the currently installed
-			// acceptor: stop processing PASE entirely until the lockout
-			// cooldown expires or a new commissioning window installs a
-			// fresh acceptor. matter.js aborts commissioning at
-			// PASE_COMMISSIONING_MAX_ERRORS (PaseServer.ts:95-110) and its
-			// PaseServer dies with the window; ours can outlive every
-			// window, so the refusal has to live on the receive path — and
-			// has to expire, or the refusal itself becomes the denial of
-			// service.
+			// Cap of failed commissioning attempts reached: stop
+			// processing PASE entirely until the lockout cooldown expires
+			// or a new commissioning window installs a fresh acceptor.
+			// matter.js closes the window at
+			// MAX_FAILED_COMMISSIONING_ATTEMPTS and removes its PASE
+			// commissioner with it
+			// (packages/protocol/src/protocol/DeviceCommissioner.ts:191-198,
+			// :318-334 at b25ed960); ours can outlive every window, so the
+			// refusal has to live on the receive path — and has to expire,
+			// or the refusal itself becomes the denial of service
+			// (BD-Matter-PASE-TimedLockout).
 			b.logger.Warn("matter.rx.sc.pase_locked_out",
 				slog.String("src", srcString(src)),
 				slog.Int("opcode", int(proto.Opcode)),
@@ -898,12 +900,34 @@ func (b *Bridge) dispatchPase(
 	return nil
 }
 
-// paseMaxErrors is the number of PASE pairing failures within a
-// commissioning window that aborts the window. Mirrors matter.js
-// PaseServer.ts PASE_COMMISSIONING_MAX_ERRORS (= 20). Without this cap an
+// paseMaxErrors is the number of failed commissioning attempts within a
+// commissioning window that closes the window ([Bridge.recordFailedAttempt]).
+// Mirrors matter.js packages/protocol/src/protocol/DeviceCommissioner.ts:44
+// at b25ed960 (MAX_FAILED_COMMISSIONING_ATTEMPTS = 20). Without this cap an
 // attacker on the LAN could hammer passcode guesses for the whole window
 // — up to 900 s commissioned, or 48 h for an uncommissioned bridge.
 const paseMaxErrors = 20
+
+// failedAttempt is what made a commissioning attempt fail.
+type failedAttempt uint8
+
+const (
+	// attemptPASEPairing: a PASE pairing failed before its session was
+	// established.
+	attemptPASEPairing failedAttempt = iota
+	// attemptFailSafeEnded: a fail-safe armed in the open window ended
+	// without commissioning.
+	attemptFailSafeEnded
+)
+
+// String is the reason matter.js logs for the attempt
+// (DeviceCommissioner.ts:171, :251 at b25ed960).
+func (a failedAttempt) String() string {
+	if a == attemptFailSafeEnded {
+		return "fail-safe ended without commissioning"
+	}
+	return "PASE pairing failed"
+}
 
 // maxUnsecuredWindows caps the number of per-SourceNodeID duplicate-detection
 // windows held for unsecured traffic at one time. SourceNodeID is
@@ -985,7 +1009,7 @@ const (
 // ran out without its handshake ending
 // counts one PASE failure when the slot is taken again — by anybody, the
 // same initiator included — so twenty abandoned claims engage the lockout
-// twenty failed passcode attempts engage ([Bridge.recordPaseFailure]).
+// twenty failed passcode attempts engage ([Bridge.recordFailedAttempt]).
 // matter.js runs the timer once per pairing (PaseServer.ts:127-131 at
 // db021da0), ignores every new exchange while it runs (:80-86), and counts
 // every error of the pairing it accepted (:94-110); review II,
@@ -1022,7 +1046,7 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 				slog.Int("exchange_id", int(expired.ExchangeID)),
 				slog.Duration("timeout", pasePairingTimeout))
 		}
-		b.recordPaseFailure()
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 	return paseClaimTaken
 }
@@ -1052,7 +1076,7 @@ func (b *Bridge) endRepeatedPairing(src net.Addr, requestHdr *message.Header, pr
 	if err := b.sendHandshakeFailureReport(src, requestHdr, proto, body, handshakePeerTimingOf(nil, b.clk().Now())); err != nil {
 		b.logger.Debug("matter.rx.sc.pase_request_repeated.status_report_send_failed", slog.Any("err", err))
 	}
-	b.recordPaseFailure()
+	b.recordFailedAttempt(attemptPASEPairing)
 	b.releasePaseInFlight(key)
 	b.releaseHandshake(src, key)
 }
@@ -1201,29 +1225,54 @@ func (b *Bridge) releasePaseInFlight(key HandshakeKey) {
 	}
 }
 
-// recordPaseFailure increments the PASE failure counter and, when it
-// reaches [paseMaxErrors], closes the open commissioning window and
-// engages a timed PASE lockout. Mirrors matter.js PaseServer.ts:95-110
-// (count → MaximumPasePairingErrorsReachedError) + DeviceCommissioner.ts:78-82
-// at db021da0 (tooManyPaseErrors → endCommissioning). At b25ed960 that
-// mechanism is gone: matter.js counts failed attempts per window — a PASE
-// pairing that fails before its session is established (pairingFailed,
-// wired at DeviceCommissioner.ts:251) and a fail-safe that ends without
-// commissioning (:160-174) — and closes the window at
-// MAX_FAILED_COMMISSIONING_ATTEMPTS = 20 (:44, :198); the fail-safe half is
-// pin-lift unit P3-C, the timed lockout stays ahead of matter.js
-// (BD-Matter-PASE-TimedLockout). The window closes
-// as the end of commissioning closes it ([CommissioningWindow.EndCommissioning]),
-// not as RevokeCommissioning does: matter.js's
-// #closeWindow (DeviceCommissioner.ts:318-334) stops the timer,
-// removes the PASE commissioner and leaves commissioning mode, and touches
-// neither the fail-safe nor a PASE session — a commissioning already past
-// PASE keeps its fail-safe and its pending fabric. Called from the
-// handlePase error path for genuine pairing failures only (not
-// missing-handler or state-replay retransmits).
-func (b *Bridge) recordPaseFailure() {
-	b.count(contract.MetricPASEFailures)
-	if b.paseFailures.Add(1) != paseMaxErrors {
+// recordFailedAttempt counts one failed commissioning attempt and, when the
+// count reaches [paseMaxErrors], closes the open commissioning window and
+// engages a timed PASE lockout. Mirrors matter.js
+// packages/protocol/src/protocol/DeviceCommissioner.ts:181-199 at b25ed960
+// (#countFailedAttempt): a window counts a PASE pairing that failed before
+// its session was established (pairingFailed, wired at :251) and a fail-safe
+// that ends without commissioning (:160-174, here
+// [Bridge.failSafeSessionsClosed]), from 0 at each open (:289-299; here the
+// first attempt after a window opened starts the count again), and closes
+// the window at MAX_FAILED_COMMISSIONING_ATTEMPTS (:44, :191-198). The
+// window closes as the end of commissioning closes it
+// ([CommissioningWindow.EndCommissioning]), not as RevokeCommissioning does:
+// matter.js's #closeWindow (:308-334) stops the timer, removes the PASE
+// commissioner and leaves commissioning mode, and touches neither the
+// fail-safe nor a PASE session — a commissioning already past PASE keeps
+// its fail-safe and its pending fabric.
+//
+// Ahead of matter.js (BD-Matter-PASE-TimedLockout): the cap engages a timed
+// PASE lockout as well, whichever kind of attempt reached it (owner
+// decision O-4), and PASE failures on a standing acceptor with no window
+// open are counted too — matter.js has no PASE server then. The PASE half
+// is counted from the handlePase error path for genuine pairing failures
+// only (not missing-handler or state-replay retransmits), an expired
+// pairing claim, a repeated PBKDFParamRequest and the peer's failure
+// StatusReport; only it moves [contract.MetricPASEFailures].
+func (b *Bridge) recordFailedAttempt(reason failedAttempt) {
+	if reason == attemptPASEPairing {
+		b.count(contract.MetricPASEFailures)
+	}
+	var generation uint64
+	if w := b.attemptWindow.Load(); w != nil {
+		generation, _ = w.windowGeneration()
+	}
+	b.failedAttemptsMu.Lock()
+	if generation != b.failedAttemptsWindow {
+		// A window opened since the last attempt: its count starts at 0.
+		b.failedAttemptsWindow = generation
+		b.failedAttempts.Store(0)
+	}
+	n := b.failedAttempts.Add(1)
+	b.failedAttemptsMu.Unlock()
+	if b.logger != nil {
+		b.logger.Info("matter.commissioning.attempt_failed",
+			slog.Int("attempt", int(n)),
+			slog.Int("max", paseMaxErrors),
+			slog.String("reason", reason.String()))
+	}
+	if n != paseMaxErrors {
 		// Below the cap, or a straggler arriving between the cap and the
 		// lockout taking effect. Only the transition to exactly
 		// paseMaxErrors engages the lockout, so the close + diagnostic
@@ -1236,7 +1285,8 @@ func (b *Bridge) recordPaseFailure() {
 	b.logger.Warn("matter.rx.sc.pase_bruteforce",
 		slog.Int("max_errors", paseMaxErrors),
 		slog.Duration("lockout", cooldown),
-		slog.String("hint", "too many PASE pairing failures; closing the commissioning window and refusing PASE for the lockout period"))
+		slog.String("reason", reason.String()),
+		slog.String("hint", "too many failed commissioning attempts; closing the commissioning window and refusing PASE for the lockout period"))
 	b.diagRing().Record(diagevent.Event{
 		Kind:     diagevent.KindPairing,
 		Severity: diagevent.SeverityError,
@@ -1286,7 +1336,7 @@ func (b *Bridge) engagePaseLockout() time.Duration {
 	}
 	cooldown = min(cooldown, paseLockoutMaxCooldown)
 	b.paseLockoutUntil = b.clk().Now().Add(cooldown)
-	b.paseFailures.Store(0)
+	b.failedAttempts.Store(0)
 	return cooldown
 }
 
@@ -1319,12 +1369,12 @@ func (b *Bridge) paseLockedOut() bool {
 // Exception: when the brute-force cap's own RevokeWindow drives the
 // re-attach (preserveLockoutOnReset is raised), an in-force lockout and its
 // streak are kept. Otherwise the lockout would be cleared the instant it was
-// engaged — see [Bridge.recordPaseFailure].
+// engaged — see [Bridge.recordFailedAttempt].
 func (b *Bridge) resetPaseFailures() {
-	b.paseFailures.Store(0)
+	b.failedAttempts.Store(0)
 	b.mu.Lock()
 	// An in-force lockout survives the internal restore the brute-force cap
-	// itself triggers (see [Bridge.recordPaseFailure]): clearing it there
+	// itself triggers (see [Bridge.recordFailedAttempt]): clearing it there
 	// would unlock PASE the instant it locked. Every other caller — a fresh
 	// operator-initiated window open — leaves preserveLockoutOnReset clear
 	// and gets a clean budget.
@@ -1421,7 +1471,7 @@ func (b *Bridge) handlePase(
 			// Brute-force protection: a genuine pairing failure (bad Pake1
 			// decode, confirmation mismatch, …). Count it and lock PASE
 			// once too many accumulate.
-			b.recordPaseFailure()
+			b.recordFailedAttempt(attemptPASEPairing)
 		}
 		// The handshake is over: it died before Pake3, so the Pake3
 		// branch's release never runs and the single-active-PASE slot
@@ -2677,7 +2727,7 @@ func (b *Bridge) abortPaseOnStatusReport(src net.Addr, requestHdr *message.Heade
 		slog.Int("exchange_id", int(proto.ExchangeID)),
 		slog.Int("general_code", int(generalCode)),
 		slog.Int("protocol_code", int(protocolCode)))
-	b.recordPaseFailure()
+	b.recordFailedAttempt(attemptPASEPairing)
 	b.releasePaseInFlight(key)
 	b.abandonHandshakeReplies(key)
 	// The report itself is acked by the pump, like any reliable message

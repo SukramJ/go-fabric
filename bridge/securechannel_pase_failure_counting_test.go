@@ -19,7 +19,7 @@ package bridge
 //
 // Lives in package bridge (not bridge_test) so it can reach the
 // unexported PaseAdapter internals, dispatchSecureChannel, and the
-// paseFailures counter. Reuses helpers from handlers_test.go
+// failedAttempts counter. Reuses helpers from handlers_test.go
 // (newVerifierFactory, buildTestPBKDFParamRequest), securechannel_test.go
 // (scProto, scHdr) and receive_test.go (newStartedBridge, loopbackSrc).
 
@@ -108,7 +108,7 @@ func TestPaseAdapter_NonDefaultPasscodeID_Rejected(t *testing.T) {
 
 // TestDispatchSecureChannel_NonDefaultPasscodeID_CountsPaseFailure drives
 // a non-default-passcode PBKDFParamRequest through the production router
-// and asserts the rejection reaches recordPaseFailure — the pre-fix
+// and asserts the rejection reaches recordFailedAttempt — the pre-fix
 // adapter answered with a response and never counted the attempt.
 func TestDispatchSecureChannel_NonDefaultPasscodeID_CountsPaseFailure(t *testing.T) {
 	t.Parallel()
@@ -121,8 +121,8 @@ func TestDispatchSecureChannel_NonDefaultPasscodeID_CountsPaseFailure(t *testing
 	reqBytes := buildTestPBKDFParamRequestPasscodeID(t, bytes.Repeat([]byte{0x22}, spake2.PBKDFRandomSize), 5)
 	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodePBKDFParamRequest, 7, false, 0), reqBytes)
 
-	if got := b.paseFailures.Load(); got != 1 {
-		t.Fatalf("paseFailures = %d after a non-default-passcode PBKDFParamRequest, want 1 — the rejection must reach recordPaseFailure", got)
+	if got := b.failedAttempts.Load(); got != 1 {
+		t.Fatalf("failedAttempts = %d after a non-default-passcode PBKDFParamRequest, want 1 — the rejection must reach recordFailedAttempt", got)
 	}
 }
 
@@ -188,13 +188,13 @@ func TestDispatchSecureChannel_Pake1Failure_CountsPaseFailure(t *testing.T) {
 	if err := b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodePBKDFParamRequest, exchangeID, false, 0), reqBytes); err != nil {
 		t.Fatalf("dispatch valid PBKDFParamRequest: %v", err)
 	}
-	if got := b.paseFailures.Load(); got != 0 {
-		t.Fatalf("paseFailures = %d after a valid PBKDFParamRequest, want 0", got)
+	if got := b.failedAttempts.Load(); got != 0 {
+		t.Fatalf("failedAttempts = %d after a valid PBKDFParamRequest, want 0", got)
 	}
 
 	badPake1 := spake2.EncodePake1(make([]byte, 10)) // wrong pA length
 	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodePake1, exchangeID, false, 0), badPake1)
-	if got := b.paseFailures.Load(); got != 1 {
-		t.Fatalf("paseFailures = %d after a malformed Pake1, want 1 — Pake1 decode failures must count toward the brute-force cap", got)
+	if got := b.failedAttempts.Load(); got != 1 {
+		t.Fatalf("failedAttempts = %d after a malformed Pake1, want 1 — Pake1 decode failures must count toward the brute-force cap", got)
 	}
 }

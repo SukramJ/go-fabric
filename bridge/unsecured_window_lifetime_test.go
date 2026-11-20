@@ -108,7 +108,7 @@ func TestUnsecuredWindowLivesWithItsHandshake(t *testing.T) {
 	if err := sendAtCounter(commissioner, pake3Counter, mrp.SCOpcodePake3, paseExchange, spake2.EncodePake3(cA), &counter); err != nil {
 		t.Fatalf("retransmitted Pake3 reached the handshake handler: %v", err)
 	}
-	if n := r.b.paseFailures.Load(); n != 0 {
+	if n := r.b.failedAttempts.Load(); n != 0 {
 		t.Fatalf("retransmitted Pake3 counted %d PASE failures, want 0", n)
 	}
 	if n := pendingOnUnsecuredExchange(r.b, paseExchange); n != 1 {
@@ -166,7 +166,7 @@ func TestUnsecuredWindowOutlivesAnotherExchangeOfItsSource(t *testing.T) {
 	// handshake's exchange is live.
 	beginPase(t, r.b, HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: exchange})
 	_ = sendAtCounter(peer, pake1Counter, mrp.SCOpcodePake1, exchange, []byte{0x15, 0x18}, nil)
-	failures := r.b.paseFailures.Load()
+	failures := r.b.failedAttempts.Load()
 	if !r.b.unsecuredExchangeLive(HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: exchange}) {
 		t.Fatal("the handshake's exchange holds no state after its failure report")
 	}
@@ -184,7 +184,7 @@ func TestUnsecuredWindowOutlivesAnotherExchangeOfItsSource(t *testing.T) {
 	if err := sendAtCounter(peer, pake1Counter, mrp.SCOpcodePake1, exchange, []byte{0x15, 0x18}, nil); err != nil {
 		t.Fatalf("the retransmission reached the handshake handler: %v", err)
 	}
-	if n := r.b.paseFailures.Load(); n != failures {
+	if n := r.b.failedAttempts.Load(); n != failures {
 		t.Fatalf("the retransmission counted %d PASE failures, want %d: it was not a duplicate", n, failures)
 	}
 }
