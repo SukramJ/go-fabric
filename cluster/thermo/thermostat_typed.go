@@ -342,19 +342,17 @@ func suggestionsValue(v any) ([]Suggestion, error) {
 }
 
 // setSuggestionsLocked replaces ThermostatSuggestions with a copy of list
-// and reports whether it changed, noting the change — and
-// CurrentThermostatSuggestion's, null until the re-evaluation, when the
-// current entry left the list. The caller holds s.mu and re-evaluates
-// when it changed.
+// and reports whether it changed, noting the change. CurrentThermostatSuggestion
+// is left to the re-evaluation, which announces it once with its final
+// value, as matter.js evaluates in the writing transaction and its
+// observers see only that value (ThermostatServer.ts:2296-2307 at
+// b25ed960); until it runs a read of an entry that left the list is null.
+// The caller holds s.mu and re-evaluates when it changed.
 func (s *ThermostatServer) setSuggestionsLocked(list []Suggestion, note func(id uint32, moved bool)) bool {
 	if bytes.Equal(encodeSuggestions(list), encodeSuggestions(s.suggest.list)) {
 		return false
 	}
 	s.suggest.list = cloneSuggestions(list)
-	if s.suggest.has && !slices.ContainsFunc(list, func(sg Suggestion) bool { return sg.UniqueId == s.suggest.current }) {
-		s.suggest.has = false
-		note(tdef.AttrCurrentThermostatSuggestion, true)
-	}
 	note(tdef.AttrThermostatSuggestions, true)
 	return true
 }

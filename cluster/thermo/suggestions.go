@@ -296,7 +296,9 @@ func equalOverride(a, b *uint8) bool {
 // The first call after a start that restored stored suggestions or an
 // override re-evaluates them, as matter.js does when the node comes online
 // (#nodeOnline, ThermostatServer.ts:401-411 at b25ed960): expired entries
-// leave, the current one is followed or stays overridden.
+// leave, the current one is followed or stays overridden. matter.js
+// re-evaluates there unconditionally (:407-410); Go skips the evaluation
+// of an empty list without an override, which changes nothing.
 func (s *ThermostatServer) AttachMatterTime(matterTime clock.MatterTime) {
 	if matterTime == nil {
 		return

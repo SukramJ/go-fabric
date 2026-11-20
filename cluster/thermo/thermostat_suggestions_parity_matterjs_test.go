@@ -1574,7 +1574,7 @@ func (r *restartable) store(cfg *thermo.ThermostatConfig, list ...thermo.Suggest
 	}
 }
 
-// stored is storedSuggestion (ThermostatSuggestionsTest.ts:127-131): an
+// stored is storedSuggestion (ThermostatSuggestionsTest.ts:129-133): an
 // entry current for the next 30 minutes.
 func (r *restartable) stored(id uint8, handle []byte) thermo.Suggestion {
 	now := r.clk.epoch()

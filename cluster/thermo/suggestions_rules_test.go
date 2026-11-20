@@ -615,3 +615,34 @@ func TestSuggestionsSurviveARestart(t *testing.T) {
 		t.Errorf("UniqueID after the restart %d, want %d", id, second+1)
 	}
 }
+
+// TestSuggestionsSetAttributesAnnouncesCurrentOnce: a write that drops
+// the current entry announces CurrentThermostatSuggestion once, from the
+// re-evaluation, with its final value — no intermediate null (matter.js
+// evaluates in the writing transaction).
+func TestSuggestionsSetAttributesAnnouncesCurrentOnce(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	now := clk.epoch()
+	first := thermo.Suggestion{UniqueId: 1, PresetHandle: handleB, EffectiveTime: now, ExpirationTime: now + 1800}
+	next := thermo.Suggestion{UniqueId: 2, PresetHandle: handleB, EffectiveTime: now, ExpirationTime: now + 1800}
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrThermostatSuggestions: spec.List[thermo.Suggestion]{first}}); err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(0)
+	changes := recordChanges(srv)
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrThermostatSuggestions: spec.List[thermo.Suggestion]{next}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := changes(); slices.Contains(got, tdef.AttrCurrentThermostatSuggestion) {
+		t.Errorf("the write announced CurrentThermostatSuggestion before the re-evaluation: %v", got)
+	}
+	clk.Advance(0)
+	if got := changes(); !slices.Contains(got, tdef.AttrCurrentThermostatSuggestion) {
+		t.Errorf("the re-evaluation did not announce CurrentThermostatSuggestion: %v", got)
+	}
+	if cur, ok := srv.CurrentSuggestion(); !ok || cur.UniqueId != 2 {
+		t.Errorf("CurrentSuggestion %+v, %v, want 2", cur, ok)
+	}
+}
