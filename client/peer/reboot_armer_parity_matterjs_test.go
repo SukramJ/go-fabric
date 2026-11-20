@@ -4,14 +4,16 @@
 package peer
 
 // A port of matter.js packages/protocol/test/peer/RebootResubscribeArmerTest.ts
-// at 862ad75f. matter.js drives the armer on a real SessionManager and
+// at b25ed960. matter.js drives the armer on a real SessionManager and
 // ClientSubscriptions; the port drives it on a session table and a
 // subscription set that implement the armer's context the way those two do
-// (handlePeerShutdown closes the sessions created before the time,
-// handlePeerLoss every session, closeForPeer the peer's subscriptions), on
-// the fake clock, whose AfterFunc callbacks run inside Advance — so the
-// MockTime.macrotasks and MockTime.resolve waits of the original have no
-// counterpart.
+// (handlePeerShutdown with a session closes the sessions registered before
+// it, sessionsRegisteredSince lists those registered at or after it,
+// handlePeerLoss gives up every session, closeForPeer closes the peer's
+// subscriptions), on the fake clock, whose AfterFunc callbacks run inside
+// Advance — so the MockTime.macrotasks and MockTime.resolve waits of the
+// original have no counterpart. A session the table registers is handed to
+// SessionAdded once established, as the controller feeds the armer.
 
 import (
 	"slices"
@@ -29,6 +31,8 @@ type armerTestSession struct {
 	peer      exchange.PeerAddress
 	initiator bool
 	createdAt time.Time
+	// position is the registration position in the fixture's table.
+	position int
 }
 
 func (s *armerTestSession) Peer() exchange.PeerAddress { return s.peer }
@@ -36,13 +40,14 @@ func (s *armerTestSession) Initiator() bool            { return s.initiator }
 func (s *armerTestSession) CreatedAt() time.Time       { return s.createdAt }
 
 type armerFixture struct {
-	clock     *clocktest.Fake
-	armer     *RebootResubscribeArmer
-	mu        sync.Mutex
-	sessions  []*armerTestSession
-	subs      map[int]bool
-	nextSub   int
-	peerLosts int
+	clock      *clocktest.Fake
+	armer      *RebootResubscribeArmer
+	mu         sync.Mutex
+	sessions   []*armerTestSession
+	registered int
+	subs       map[int]bool
+	nextSub    int
+	peerLosts  int
 }
 
 func newArmerFixture(t *testing.T) *armerFixture {
@@ -50,12 +55,25 @@ func newArmerFixture(t *testing.T) *armerFixture {
 	f := &armerFixture{clock: clocktest.New(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)), subs: map[int]bool{}}
 	f.armer = NewRebootResubscribeArmer(RebootArmerContext{
 		Clock: f.clock,
-		ClosePeerSessionsBefore: func(peer exchange.PeerAddress, before time.Time) {
+		ClosePeerSessionsRegisteredBefore: func(peer exchange.PeerAddress, keep ArmerSession) {
+			k, _ := keep.(*armerTestSession)
 			f.mu.Lock()
 			defer f.mu.Unlock()
 			f.sessions = slices.DeleteFunc(f.sessions, func(s *armerTestSession) bool {
-				return s.peer == peer && s.createdAt.Before(before)
+				return s.peer == peer && (k == nil || s.position < k.position)
 			})
+		},
+		SessionsRegisteredSince: func(of ArmerSession) []ArmerSession {
+			o, _ := of.(*armerTestSession)
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			var out []ArmerSession
+			for _, s := range f.sessions {
+				if o != nil && s.peer == o.peer && s.position >= o.position {
+					out = append(out, s)
+				}
+			}
+			return out
 		},
 		PeerLost: func(peer exchange.PeerAddress) {
 			f.mu.Lock()
@@ -73,13 +91,32 @@ func newArmerFixture(t *testing.T) *armerFixture {
 	return f
 }
 
+// createSession is the test's createSession(isInitiator, establishing): it
+// registers a session and, unless it is establishing, establishes it.
 func (f *armerFixture) createSession(initiator bool) *armerTestSession {
-	s := &armerTestSession{peer: armerPeer, initiator: initiator, createdAt: f.clock.Now()}
-	f.mu.Lock()
-	f.sessions = append(f.sessions, s)
-	f.mu.Unlock()
+	s := f.createEstablishing(initiator)
 	f.armer.SessionAdded(s)
 	return s
+}
+
+// createEstablishing registers a session whose handshake still runs.
+func (f *armerFixture) createEstablishing(initiator bool) *armerTestSession {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s := &armerTestSession{peer: armerPeer, initiator: initiator, createdAt: f.clock.Now(), position: f.registered}
+	f.registered++
+	f.sessions = append(f.sessions, s)
+	return s
+}
+
+// completeEstablishment establishes s.
+func (f *armerFixture) completeEstablishment(s *armerTestSession) { f.armer.SessionAdded(s) }
+
+// forceClose closes s, a handshake that failed.
+func (f *armerFixture) forceClose(s *armerTestSession) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sessions = slices.DeleteFunc(f.sessions, func(x *armerTestSession) bool { return x == s })
 }
 
 func (f *armerFixture) registerSubscription() int {
@@ -138,6 +175,31 @@ func TestRebootResubscribeArmerParity(t *testing.T) {
 				t.Fatalf("older %v returned %v", f.sessionLives(older), f.sessionLives(returned))
 			}
 		})
+		t.Run("closes an older session created in the same instant as the returning session", func(t *testing.T) {
+			t.Parallel()
+			f := newArmerFixture(t)
+			older := f.createSession(false)
+			f.armer.Arm(armerPeer, 0)
+			returned := f.createSession(false)
+			if !returned.createdAt.Equal(older.createdAt) {
+				t.Fatal("created at different times")
+			}
+			if f.sessionLives(older) || !f.sessionLives(returned) {
+				t.Fatalf("older %v returned %v", f.sessionLives(older), f.sessionLives(returned))
+			}
+		})
+		t.Run("does not take a session whose handshake fails as the return", func(t *testing.T) {
+			t.Parallel()
+			f := newArmerFixture(t)
+			older := f.createSession(false)
+			f.armer.Arm(armerPeer, 0)
+			f.clock.Advance(time.Second)
+			failed := f.createEstablishing(false)
+			f.forceClose(failed)
+			if !f.sessionLives(older) {
+				t.Fatal("older closed")
+			}
+		})
 		t.Run("re-subscribes when no report arrives within the grace window", func(t *testing.T) {
 			t.Parallel()
 			f := newArmerFixture(t)
@@ -175,6 +237,88 @@ func TestRebootResubscribeArmerParity(t *testing.T) {
 			f.clock.Advance(30 * time.Second)
 			if !f.isSubscribed(sub) {
 				t.Fatal("re-subscribed")
+			}
+		})
+		t.Run("keeps the subscription when the priming report arrives before the returning session is established", func(t *testing.T) {
+			t.Parallel()
+			f := newArmerFixture(t)
+			sub := f.registerSubscription()
+			f.armer.Arm(armerPeer, 0)
+			returning := f.createEstablishing(false)
+			f.reportOver(returning)
+			f.completeEstablishment(returning)
+			f.clock.Advance(30 * time.Second)
+			if !f.isSubscribed(sub) {
+				t.Fatal("re-subscribed")
+			}
+		})
+		t.Run("keeps the subscription when a report arrives over a session still establishing after the return", func(t *testing.T) {
+			t.Parallel()
+			f := newArmerFixture(t)
+			sub := f.registerSubscription()
+			f.armer.Arm(armerPeer, 0)
+			f.createSession(false)
+			f.reportOver(f.createEstablishing(false))
+			f.clock.Advance(30 * time.Second)
+			if !f.isSubscribed(sub) {
+				t.Fatal("re-subscribed")
+			}
+		})
+		t.Run("keeps the subscription when a report arrives over a session that was establishing when the peer returned", func(t *testing.T) {
+			t.Parallel()
+			f := newArmerFixture(t)
+			sub := f.registerSubscription()
+			f.armer.Arm(armerPeer, 0)
+			returning := f.createEstablishing(false)
+			second := f.createEstablishing(false)
+			f.completeEstablishment(returning)
+			f.reportOver(second)
+			f.clock.Advance(30 * time.Second)
+			if !f.isSubscribed(sub) {
+				t.Fatal("re-subscribed")
+			}
+		})
+		t.Run("re-subscribes when the only report arrives over a handshake that started before the returning session was created", func(t *testing.T) {
+			t.Parallel()
+			f := newArmerFixture(t)
+			sub := f.registerSubscription()
+			f.armer.Arm(armerPeer, 0)
+			stale := f.createEstablishing(false)
+			f.clock.Advance(time.Second)
+			f.reportOver(stale)
+			f.createSession(false)
+			f.clock.Advance(30 * time.Second)
+			if f.isSubscribed(sub) {
+				t.Fatal("still subscribed")
+			}
+		})
+		t.Run("keeps the subscription when the report arrives over our session created after a returning session still establishing", func(t *testing.T) {
+			t.Parallel()
+			f := newArmerFixture(t)
+			sub := f.registerSubscription()
+			f.armer.Arm(armerPeer, 0)
+			returning := f.createEstablishing(false)
+			f.clock.Advance(time.Second)
+			initiated := f.createSession(true)
+			f.reportOver(initiated)
+			f.completeEstablishment(returning)
+			f.clock.Advance(30 * time.Second)
+			if !f.isSubscribed(sub) {
+				t.Fatal("re-subscribed")
+			}
+		})
+		t.Run("characterization: re-subscribes when the only report arrives over a session whose handshake fails", func(t *testing.T) {
+			t.Parallel()
+			f := newArmerFixture(t)
+			sub := f.registerSubscription()
+			f.armer.Arm(armerPeer, 0)
+			failed := f.createEstablishing(false)
+			f.reportOver(failed)
+			f.forceClose(failed)
+			f.createSession(false)
+			f.clock.Advance(30 * time.Second)
+			if f.isSubscribed(sub) {
+				t.Fatal("still subscribed")
 			}
 		})
 		t.Run("re-subscribes when the only report arrives over a pre-reboot session", func(t *testing.T) {
@@ -425,4 +569,29 @@ func TestRebootResubscribeArmerParity(t *testing.T) {
 			f.armer.Disarm(armerPeer)
 		})
 	})
+}
+
+// TestRebootResubscribeArmerDeprecatedTimeClose: a context that sets only
+// the deprecated ClosePeerSessionsBefore keeps its behaviour for the
+// deprecation window — the sessions created before the returning one
+// close, one created in the same instant stays (matter.js's deprecated
+// Timestamp form, SessionManager.ts:719-721 at b25ed960).
+func TestRebootResubscribeArmerDeprecatedTimeClose(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	var closedBefore []time.Time
+	armer := NewRebootResubscribeArmer(RebootArmerContext{
+		Clock: clk,
+		ClosePeerSessionsBefore: func(_ exchange.PeerAddress, before time.Time) { //nolint:staticcheck // the deprecated form, held for its window
+			closedBefore = append(closedBefore, before)
+		},
+	})
+	t.Cleanup(armer.Close)
+	armer.Arm(armerPeer, 0)
+	clk.Advance(time.Second)
+	returned := &armerTestSession{peer: armerPeer, createdAt: clk.Now()}
+	armer.SessionAdded(returned)
+	if len(closedBefore) != 1 || !closedBefore[0].Equal(returned.createdAt) {
+		t.Fatalf("ClosePeerSessionsBefore called with %v; want once with the returning session's creation time", closedBefore)
+	}
 }

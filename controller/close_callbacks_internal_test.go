@@ -35,7 +35,8 @@ func TestBackgroundCallbacksOutliveClose(t *testing.T) {
 	fire := func() {
 		ac.PeerLost(p)
 		ac.CloseSubscriptions(p)
-		ac.ClosePeerSessionsBefore(p, time.Now())
+		ac.ClosePeerSessionsRegisteredBefore(p, armerSession{c: c})
+		ac.SessionsRegisteredSince(armerSession{c: c})
 	}
 	stop := make(chan struct{})
 	var wg sync.WaitGroup

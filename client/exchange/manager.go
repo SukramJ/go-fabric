@@ -1581,6 +1581,28 @@ func (m *Manager) HandlePeerLossBefore(peer PeerAddress, cause error, keep *Sess
 	m.handlePeerLoss(peer, cause, before, time.Time{}, nil)
 }
 
+// SessionsRegisteredSince returns the open secure sessions with the peer
+// of session that registered at or after it, in registration order —
+// session itself among them while it is open: the sessions
+// [Manager.HandlePeerLossBefore] keeps when it is given session. For a
+// session that never registered with m the result is empty. Mirrors
+// matter.js packages/protocol/src/session/SessionManager.ts:412-424 at
+// b25ed960 (sessionsRegisteredSince: positionOf, else []; sessionsFor
+// filtered by isRegisteredBefore).
+func (m *Manager) SessionsRegisteredSince(session *Session) []*Session {
+	if session == nil || session.m != m || session.secure == nil {
+		return nil
+	}
+	peer := PeerAddress{FabricIndex: session.fabricIndex, NodeID: session.secure.PeerNodeID()}
+	var out []*Session
+	for _, s := range m.SessionsFor(peer) {
+		if s.position >= session.position {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // handlePeerLoss gives up the sessions with peer registered before
 // registeredBefore and, for a non-zero asOf, created before asOf; current
 // is the exchange that observed the loss, spared until it ends.
