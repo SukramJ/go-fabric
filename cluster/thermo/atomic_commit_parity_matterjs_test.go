@@ -17,7 +17,7 @@
 // observes, in matter.js, that a presets$AtomicChanged observer reads the
 // Schedules staged in the same unit; the Go server has no such observer,
 // and the commit's reading of the staged Schedules is the Presets
-// $AtomicChanged check (#validatePresetCommit, ThermostatServer.ts:2048-2065
+// $AtomicChanged check (#validatePresetCommit, ThermostatServer.ts:2032-2065
 // at b25ed960, atomicChanged): a preset the stored schedule names may go
 // when the unit's staged Schedules no longer name it, and may not when
 // they do — then the staged Schedules themselves, validated against the

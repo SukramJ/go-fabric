@@ -142,14 +142,14 @@ func assertScheduleTypes(types []ScheduleType) error {
 		switch t.SystemMode {
 		case tdef.SystemModeAuto, tdef.SystemModeHeat, tdef.SystemModeCool:
 		default:
-			return fmt.Errorf("ScheduleTypes may only name Auto, Heat or Cool, not SystemMode %d", t.SystemMode)
+			return fmt.Errorf("thermo: ScheduleTypes may only name Auto, Heat or Cool, not SystemMode %d", t.SystemMode)
 		}
 		if seen[t.SystemMode] {
-			return fmt.Errorf("ScheduleTypes names SystemMode %d more than once", t.SystemMode)
+			return fmt.Errorf("thermo: ScheduleTypes names SystemMode %d more than once", t.SystemMode)
 		}
 		seen[t.SystemMode] = true
 		if t.ScheduleTypeFeatures&(tdef.ScheduleTypeFeaturesSupportsPresets|tdef.ScheduleTypeFeaturesSupportsSetpoints) == 0 {
-			return fmt.Errorf("ScheduleTypes entry for SystemMode %d supports neither presets nor setpoints", t.SystemMode)
+			return fmt.Errorf("thermo: ScheduleTypes entry for SystemMode %d supports neither presets nor setpoints", t.SystemMode)
 		}
 	}
 	return nil

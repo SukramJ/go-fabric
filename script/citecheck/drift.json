@@ -1740,7 +1740,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 375,
+    "line": 385,
     "citation": "ThermostatServer.ts:1508-1510",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#handlePersistedPresetsChanged",
@@ -1749,7 +1749,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 382,
+    "line": 392,
     "citation": "ThermostatServer.ts:1289-1291",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "AtomicChanging",
@@ -1758,7 +1758,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 393,
+    "line": 403,
     "citation": "ThermostatServer.ts:1687-1690",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "hasLocalActor",
@@ -1767,7 +1767,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 554,
+    "line": 564,
     "citation": "ThermostatServer.ts:281-316",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "setActivePresetRequest",
@@ -1848,7 +1848,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 171,
+    "line": 172,
     "citation": "ThermostatServer.ts:927-931",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#userLimit",
@@ -1857,7 +1857,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 186,
+    "line": 187,
     "citation": "ThermostatServer.ts:560-570",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "externallyMeasuredOccupancy",
@@ -1866,7 +1866,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 268,
+    "line": 272,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-603",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "db021da0",
@@ -1876,7 +1876,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 319,
+    "line": 323,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "SetpointRaiseLower",
@@ -1885,7 +1885,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1224,
+    "line": 1231,
     "citation": "ThermostatServer.ts:1104",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "b25ed960",
@@ -1895,7 +1895,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1508,
+    "line": 1515,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1904,7 +1904,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1650,
+    "line": 1657,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "db021da0",
@@ -1914,7 +1914,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1826,
+    "line": 1833,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",

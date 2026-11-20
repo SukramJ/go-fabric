@@ -615,7 +615,7 @@ func (s *ThermostatServer) precommitAtomic(st *atomicWriteState, attr uint32, v 
 // staged attribute of the unit was staged (AtomicWriteHandler.ts:314-320
 // at b25ed960): with MSCH, Presets refused when it drops a preset a
 // schedule of the unit's transaction names (#validatePresetCommit,
-// ThermostatServer.ts:2048-2065) — schedules the unit's Schedules when
+// ThermostatServer.ts:2032-2065) — schedules the unit's Schedules when
 // they staged, nil for the stored ones.
 func (s *ThermostatServer) atomicChanged(attr uint32, v any, schedules []Schedule) error {
 	if attr != tdef.AttrPresets {

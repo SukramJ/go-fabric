@@ -508,7 +508,7 @@ func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedul
 }
 
 // presetsInUseBySchedules is the schedules half of matter.js
-// #validatePresetCommit (ThermostatServer.ts:2048-2065 at b25ed960): with
+// #validatePresetCommit (ThermostatServer.ts:2032-2065 at b25ed960): with
 // MSCH, a preset the new list drops that a schedule or a schedule
 // transition of schedules names is INVALID_IN_STATE. schedules are the
 // ones of the change's own transaction: the Schedules the same commit
