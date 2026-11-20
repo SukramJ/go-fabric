@@ -630,12 +630,8 @@ var (
 // endpoint is not this endpoint's; the three EnergyReporting codes stop,
 // start the load or start the generator; any other code is not handled.
 // Mirrors matter.js FakeElectricalReadingsHandler.ts:67-87 at b25ed960
-// (handleTestEventTrigger), the codes :16-19. matter.js's dispatcher offers
-// a trigger to the endpoints' handlers until the first accepts it
-// (support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts:20-36
-// at b25ed960, #offerToEndpointHandlers); here the meter's one handler
-// covers both of its measurement endpoints, so endpoint bits of 0 reach
-// both (the meter's composition, decision 303).
+// (handleTestEventTrigger), the codes :16-19. Endpoint bits of 0 reach
+// both of the meter's measurement endpoints — a divergence, see the branch.
 func (m *demoElectricalMeter) fakeReadingsTrigger(trigger uint64) bool {
 	code := trigger &^ fakeReadingsEndpointMask
 	if code != triggerFakeReadingsStop && code != triggerFakeReadingsLoadStart && code != triggerFakeReadingsGenStart {
@@ -647,6 +643,17 @@ func (m *demoElectricalMeter) fakeReadingsTrigger(trigger uint64) bool {
 	m.mu.Unlock()
 	handled := false
 	for _, r := range readings {
+		// Divergence (decision C-10): with endpoint bits 0 every one of the
+		// meter's measurement endpoints (the meter's and its ElectricalSensor
+		// part's) takes the trigger. matter.js's dispatcher stops at the
+		// first endpoint whose handler accepts
+		// (support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts:28
+		// at b25ed960, !handled), chip's delegate at the first handler
+		// (src/app/TestEventTriggerDelegate.h:78-85 at 6170af84), whose
+		// energy-management app reads on the fixed endpoint 1
+		// (EnergyReportingEventTriggers.cpp:38, :52). The two endpoints are
+		// one meter's, and the CSA cases trigger with endpoint bits 0
+		// whichever endpoint they read.
 		if endpoint != 0 && !r.at(endpoint) {
 			continue
 		}
