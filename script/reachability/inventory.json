@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10115,
+  "entry_points": 10118,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27798,
-    "reachable": 20851,
-    "whitelisted": 6924,
+    "total_exported": 27801,
+    "reachable": 20852,
+    "whitelisted": 6926,
     "unreachable": 23
   },
   "by_package": [
@@ -789,6 +789,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_values_list_test.go",
       "line": 20
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAbsentCommandFieldsDecodeAsEmpty",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/absent_fields_test.go",
+      "line": 21
     },
     {
       "package": "bridge",
@@ -14123,7 +14130,7 @@
       "identifier": "TestAnchorOnCommissioningComplete",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/administrator_rules_test.go",
-      "line": 252
+      "line": 259
     },
     {
       "package": "cluster/jointfabric",
@@ -14151,7 +14158,7 @@
       "identifier": "TestAnnounceWithoutTrustAnchorsFailsClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/administrator_rules_test.go",
-      "line": 302
+      "line": 309
     },
     {
       "package": "cluster/jointfabric",
@@ -14305,7 +14312,7 @@
       "identifier": "TestICACCommandsNeedTheAccessingFabricsFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/administrator_rules_test.go",
-      "line": 283
+      "line": 290
     },
     {
       "package": "cluster/jointfabric",
@@ -14550,7 +14557,7 @@
       "identifier": "TestTransferAnchorAnswersSuccess",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/jointfabric/administrator_rules_test.go",
-      "line": 238
+      "line": 243
     },
     {
       "package": "cluster/jointfabric",
@@ -15894,7 +15901,7 @@
       "identifier": "RequestOf",
       "reason": "generic: the self-held servers call instantiations of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/selfheld.go",
-      "line": 286
+      "line": 261
     },
     {
       "package": "cluster/spec",
@@ -15964,7 +15971,7 @@
       "identifier": "TestCompilerBranches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/field_conformance_internal_test.go",
-      "line": 60
+      "line": 63
     },
     {
       "package": "cluster/spec",
@@ -15992,7 +15999,7 @@
       "identifier": "TestEnumAndValidatorBranches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/field_conformance_internal_test.go",
-      "line": 165
+      "line": 168
     },
     {
       "package": "cluster/spec",
@@ -16006,7 +16013,7 @@
       "identifier": "TestFieldValueShapes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/field_conformance_internal_test.go",
-      "line": 140
+      "line": 143
     },
     {
       "package": "cluster/spec",
@@ -16020,14 +16027,14 @@
       "identifier": "TestPatchBranches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/field_conformance_internal_test.go",
-      "line": 265
+      "line": 286
     },
     {
       "package": "cluster/spec",
       "identifier": "TestResponseCheckShapes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/field_conformance_internal_test.go",
-      "line": 224
+      "line": 233
     },
     {
       "package": "cluster/spec",
@@ -35824,6 +35831,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 1398
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestRequestGateReachesEveryServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/request_gate_test.go",
+      "line": 68
     },
     {
       "package": "endpoint",
