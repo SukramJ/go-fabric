@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/handshake"
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -510,7 +511,37 @@ func (f *flow) invoke(ctx context.Context, cluster, command uint32, fields spec.
 
 // invokeWith is #invokeCommand with the request options (:506-530).
 func (f *flow) invokeWith(ctx context.Context, cluster, command uint32, fields spec.Encodable, opts interaction.InvokeOptions) (interaction.Result, error) {
-	return f.interaction().Invoke(ctx, im.ConcreteCommandPath{Endpoint: rootEndpoint, Cluster: cluster, Command: command}, fields, opts)
+	ia := f.interaction()
+	res, err := ia.Invoke(ctx, im.ConcreteCommandPath{Endpoint: rootEndpoint, Cluster: cluster, Command: command}, fields, opts)
+	return res, f.channelLoss(ia, err)
+}
+
+// channelLoss is err of an interaction over the commissioning channel's
+// PASE session with the channel's close as its cause, when the channel
+// closed and err is the closed session's: the session the channel's loss
+// force-closed (establishOverChannel) refuses a new exchange with
+// exchange.ErrSessionClosed alone, and the flow reads the cause as a
+// commissioning-channel drop (isChannelDrop). Mirrors matter.js
+// packages/protocol/src/peer/ControllerCommissioner.ts:508-518 at
+// b25ed960 (#closeOnBleLoss: the PASE session force-closed with a
+// BleChannelClosedError, "ControllerCommissioningFlow treats the
+// resulting BleDisconnectedError as a commissioning-channel drop").
+// Interactions over another manager — the CASE session after the
+// Reconnect step — are left as they are.
+func (f *flow) channelLoss(ia *interaction.Interaction, err error) error {
+	ch := f.opts.Channel
+	if err == nil || ch == nil || !errors.Is(err, exchange.ErrSessionClosed) || ia.Provider().Manager() != ch.Exchanges() {
+		return err
+	}
+	select {
+	case <-ch.Closed():
+	default:
+		return err
+	}
+	if cause := ch.ClosedCause(); cause != nil && !errors.Is(err, cause) {
+		return fmt.Errorf("%w: %w", err, cause)
+	}
+	return err
 }
 
 // response decodes the fields of a command's response into v.
@@ -527,9 +558,10 @@ func response(res interaction.Result, what string, decode func(spec.Node) error)
 // readValues is #readConcreteAttributeValues (:474-503): one read of root
 // endpoint attributes, the values in request order, absent ones not ok.
 func (f *flow) readValues(ctx context.Context, paths ...im.ConcreteAttributePath) ([]spec.Node, []bool, error) {
-	report, err := f.interaction().Read(ctx, paths...)
+	ia := f.interaction()
+	report, err := ia.Read(ctx, paths...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, f.channelLoss(ia, err)
 	}
 	values, ok := make([]spec.Node, len(paths)), make([]bool, len(paths))
 	for i, p := range paths {
@@ -654,7 +686,8 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		return 0, fmt.Errorf("%w: initial data: %w", errUnexpectedResponse, err)
 	}
 
-	report, err := f.ia.Read(ctx,
+	ia := f.interaction()
+	report, err := ia.Read(ctx,
 		im.ConcreteAttributePath{Cluster: netcomm.ClusterID, Attribute: spec.AttrFeatureMap, HasCluster: true, HasAttribute: true},
 		im.ConcreteAttributePath{Cluster: netcomm.ClusterID, Attribute: netcomm.AttrNetworks, HasCluster: true, HasAttribute: true},
 		im.ConcreteAttributePath{Cluster: otareq.ClusterID, Attribute: otareq.AttrDefaultOtaProviders, HasCluster: true, HasAttribute: true},
@@ -664,7 +697,7 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		rootAttr(gencomm.ClusterID, gencomm.AttrTcUpdateDeadline),
 	)
 	if err != nil {
-		return 0, err
+		return 0, f.channelLoss(ia, err)
 	}
 	if d.terms, err = readTerms(report); err != nil {
 		return 0, err
