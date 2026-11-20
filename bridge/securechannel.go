@@ -1237,7 +1237,7 @@ func (b *Bridge) releasePaseInFlight(key HandshakeKey) {
 // the window at MAX_FAILED_COMMISSIONING_ATTEMPTS (:44, :191-198). The
 // window closes as the end of commissioning closes it
 // ([CommissioningWindow.EndCommissioning]), not as RevokeCommissioning does:
-// matter.js's #closeWindow (:308-334) stops the timer, removes the PASE
+// matter.js's #closeWindow (:318-334) stops the timer, removes the PASE
 // commissioner and leaves commissioning mode, and touches neither the
 // fail-safe nor a PASE session — a commissioning already past PASE keeps
 // its fail-safe and its pending fabric.
@@ -1254,11 +1254,15 @@ func (b *Bridge) recordFailedAttempt(reason failedAttempt) {
 	if reason == attemptPASEPairing {
 		b.count(contract.MetricPASEFailures)
 	}
+	b.failedAttemptsMu.Lock()
+	// The generation is read under failedAttemptsMu, so attempts racing a
+	// window open are ordered with the read: the count starts again once,
+	// not once per interleaving. Lock order failedAttemptsMu → w.mu (read);
+	// nothing holding w.mu takes failedAttemptsMu.
 	var generation uint64
 	if w := b.attemptWindow.Load(); w != nil {
 		generation, _ = w.windowGeneration()
 	}
-	b.failedAttemptsMu.Lock()
 	if generation != b.failedAttemptsWindow {
 		// A window opened since the last attempt: its count starts at 0.
 		b.failedAttemptsWindow = generation
@@ -2700,9 +2704,12 @@ type paseCloseNotifierSetter interface {
 // commissioner answers it with a failure StatusReport — chip's initiator
 // does so when Pake2's key confirmation fails, which is how a wrong
 // passcode surfaces. matter.js PaseServer.onNewExchange sees the report as
-// a ChannelStatusResponseError: it counts a pairing error toward
-// PASE_COMMISSIONING_MAX_ERRORS, cancels the pairing without answering,
-// and frees the server for the next attempt (PaseServer.ts:94-118).
+// a ChannelStatusResponseError: it cancels the pairing without answering
+// and frees the server for the next attempt, and since the pairing failed
+// before its session was established it emits pairingFailed, which the
+// window counts as a failed commissioning attempt
+// (packages/protocol/src/session/pase/PaseServer.ts:100-106, :116-118;
+// packages/protocol/src/protocol/DeviceCommissioner.ts:251 at b25ed960).
 // Without it the handshake kept the single-active-PASE slot until
 // pasePairingTimeout, every retry in that minute was dropped as busy, and
 // the twenty wrong-passcode attempts of TC-CADMIN-1.9 timed out instead

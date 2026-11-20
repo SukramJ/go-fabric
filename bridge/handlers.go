@@ -514,13 +514,14 @@ func (a *PaseAdapter) establishedSession() (uint16, bool) {
 // error, or spake2.ErrConfirmationFailed) instead of emitting its own
 // StatusReport. The SecureChannel router's handlePase path then sends
 // exactly one StatusReport(FAILURE) AND counts the attempt toward the
-// PASE brute-force cap. matter.js counts every PASE pairing failure —
-// an incorrect key confirmation included — toward
-// PASE_COMMISSIONING_MAX_ERRORS; swallowing the error here let an
-// attacker guess passcodes without ever tripping the cap. Mirrors
-// matter.js packages/protocol/src/session/pase/PaseServer.ts:178-181
-// (throw UnexpectedDataError on incorrect key confirmation) → :94-95
-// (catch → #pairingErrors++).
+// cap of failed commissioning attempts. matter.js counts every PASE
+// pairing that fails before its session is established — an incorrect key
+// confirmation included — as a failed attempt of the window; swallowing the
+// error here let an attacker guess passcodes without ever tripping the cap.
+// Mirrors matter.js packages/protocol/src/session/pase/PaseServer.ts:180
+// at b25ed960 (throw UnexpectedDataError on incorrect key confirmation) →
+// :100-106 (catch, cancelPairing) → :116-118 (pairingFailed, counted by
+// packages/protocol/src/protocol/DeviceCommissioner.ts:251).
 func (a *PaseAdapter) ProcessPake3(payload []byte) (opcode uint8, respPayload []byte, err error) {
 	cb, sharedSecret, peerSessionID, err := a.consumePake3(payload)
 	if err != nil {

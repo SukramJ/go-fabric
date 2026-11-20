@@ -569,7 +569,7 @@ func (g *GeneralCommissioning) failSafeExpiryHooksLocked(e FailSafeExpiry) expir
 // SetOnCommissioned wires what ends the commissioning window after a
 // successful CommissioningComplete — matter.js DeviceCommissioner listens on
 // failsafeContext.commissioned and calls endCommissioning
-// (DeviceCommissioner.ts:160). The bridge wires it to its
+// (DeviceCommissioner.ts:164 at b25ed960). The bridge wires it to its
 // CommissioningWindow; it fires after the host's OnCommissioningComplete
 // hook. Pass nil to detach.
 func (g *GeneralCommissioning) SetOnCommissioned(fn func()) {

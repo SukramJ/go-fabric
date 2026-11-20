@@ -175,8 +175,14 @@ func TestCommissioningAttemptLimitParity(t *testing.T) {
 
 	// :119 — PaseServer.ts:39-44, :116-118: a pairing that established its
 	// session does not emit pairingFailed; its fail-safe decides the
-	// attempt. The session's own 60 s arm (GeneralCommissioningServer.ts:57-67)
-	// runs out.
+	// attempt. Ported as its outcome only: no pairing runs here, the
+	// session's own 60 s arm (GeneralCommissioningServer.ts:57-67) is made
+	// directly and runs out, and one attempt is counted. That the pairing
+	// itself counts no PASE failure is not driven through a pairing (the
+	// claim slot is released at Pake3 success, securechannel.go handlePase,
+	// so a late failure of that handshake is not counted); the metric
+	// assertion below only holds that the fail-safe's end does not move
+	// MetricPASEFailures.
 	t.Run("counts a pairing whose final status report fails only through its fail-safe", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
