@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10115,
+  "entry_points": 10119,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27798,
-    "reachable": 20851,
-    "whitelisted": 6924,
+    "total_exported": 27805,
+    "reachable": 20852,
+    "whitelisted": 6930,
     "unreachable": 23
   },
   "by_package": [
@@ -519,7 +519,7 @@
       "package": "secure/operational",
       "identifier": "Entry.PeerMRPIntervals",
       "file": "secure/operational/manager.go",
-      "line": 460,
+      "line": 479,
       "kind": "method"
     },
     {
@@ -1608,6 +1608,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
       "line": 45
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCASEResponderEstablishment",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_establishment_test.go",
+      "line": 46
     },
     {
       "package": "bridge",
@@ -41094,14 +41101,28 @@
       "identifier": "CloseEntry",
       "reason": "assigned by secure/operational at init and called by node/security.go; a function variable installed through a seam has no call edge the analyzer can follow",
       "file": "internal/sessionseam/sessionseam.go",
-      "line": 42
+      "line": 44
+    },
+    {
+      "package": "internal/sessionseam",
+      "identifier": "CompleteEstablishment",
+      "reason": "assigned by secure/operational at init and called by node/security.go; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/sessionseam/sessionseam.go",
+      "line": 62
     },
     {
       "package": "internal/sessionseam",
       "identifier": "OpenAt",
       "reason": "assigned by secure/operational at init and called by the module's test fixtures; a function variable installed through a seam has no call edge the analyzer can follow",
       "file": "internal/sessionseam/sessionseam.go",
-      "line": 35
+      "line": 37
+    },
+    {
+      "package": "internal/sessionseam",
+      "identifier": "OpenEstablishing",
+      "reason": "assigned by secure/operational at init and called by node/security.go; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/sessionseam/sessionseam.go",
+      "line": 54
     },
     {
       "package": "logring",
@@ -42319,7 +42340,7 @@
       "identifier": "TestAResumptionRecordWithinOneIdentityStays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_resumption_after_update_internal_test.go",
-      "line": 108
+      "line": 111
     },
     {
       "package": "node",
@@ -42467,6 +42488,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
       "line": 134
+    },
+    {
+      "package": "node",
+      "identifier": "TestCASEResponderSessionEstablishingOnTheDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_establishing_internal_test.go",
+      "line": 82
     },
     {
       "package": "node",
@@ -44227,6 +44255,13 @@
     },
     {
       "package": "secure/operational",
+      "identifier": "TestSessionManagerEstablishing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/establishing_parity_matterjs_test.go",
+      "line": 56
+    },
+    {
+      "package": "secure/operational",
       "identifier": "TestSessionManagerEvictsOnlyForSessionsThePeerEstablished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/sessionmanager_parity_matterjs_test.go",
@@ -44266,6 +44301,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/seam_test.go",
       "line": 15
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestSessionViews",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/establishing_parity_matterjs_test.go",
+      "line": 224
     },
     {
       "package": "secure/operational",
