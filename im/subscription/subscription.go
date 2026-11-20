@@ -52,7 +52,7 @@ type Subscription struct {
 	// Deprecated: Read [Subscription.CurrentSessionID]: since the session
 	// can change while the subscription lives, a direct read races with
 	// [Manager.MoveSession]. The field stays for the deprecation window,
-	// removable in v0.27.0.
+	// removable in v0.26.0.
 	SessionID uint16
 
 	// MinIntervalFloor / MaxIntervalCeiling come from the request

@@ -59,7 +59,7 @@ type RebootArmerContext struct {
 	// older one then survives the return; set
 	// ClosePeerSessionsRegisteredBefore, which cuts by registration order,
 	// as matter.js deprecates the Timestamp form (SessionManager.ts:719-721
-	// at b25ed960). Removable in v0.27.0.
+	// at b25ed960). Removable in v0.26.0.
 	ClosePeerSessionsBefore func(peer exchange.PeerAddress, t time.Time)
 	// ClosePeerSessionsRegisteredBefore closes the peer's sessions that
 	// registered before keep — the dead pre-reboot ones — and keeps keep
