@@ -496,13 +496,15 @@ func (r *Registry) remove(n *Node) {
 
 // Forget drops n from the registry and the database without reaching it:
 // its subscriptions close, its rows and its peer go. For a node that no
-// longer exists — the controller's former own node (phase 37) — not for a
-// node still on the fabric, which [Node.Decommission] removes from both
-// sides. A store that fails to erase the rows is returned and the node,
+// longer exists — the controller's former own node (phase 37) — or a node
+// that failed to load, which no fabric operation touches; not for a node
+// still on the fabric, which [Node.Decommission] removes from both sides. A store that fails to erase the rows is returned and the node,
 // closed, stays in the registry, so a Forget again retries the erase.
 func (r *Registry) Forget(ctx context.Context, n *Node) error { return r.deleteNode(ctx, n, nil) }
 
-// deleteNode deletes a node — ClientNode.delete (node/ClientNode.ts:213-225):
+// deleteNode deletes a node — matter.js ClientNode.delete
+// (packages/node/src/node/ClientNode.ts:251-263 at b25ed960; the protocol
+// peer of the address read first, :252, deleted in the finally, :256-262):
 // it is closed and forgotten, its store erased, and the protocol peer of
 // addr (the node's peer address when nil) deleted even when the teardown
 // failed. A node whose teardown failed stays in the registry.

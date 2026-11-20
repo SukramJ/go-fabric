@@ -721,8 +721,8 @@ func (n *Node) Record() Record {
 // b25ed960 (ClientNode.peerAddress): a loaded commissioning state is
 // authoritative, set or cleared (:397-402); a state that did not load
 // answers from storage (:408-418). Its cache (:404-406) answers a state
-// unloaded after a load, which a Node does not have: a loaded record stays
-// in memory until Erase, and a failed node never loads.
+// unloaded after a load and repeats the storage answer (:412); a Node
+// keeps a loaded record until Erase, and storedAddr is the stored answer.
 func (n *Node) PeerAddress() (addr PeerAddress, ok bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -741,10 +741,10 @@ func (n *Node) PeerAddress() (addr PeerAddress, ok bool) {
 // packages/node/src/node/NodeLifecycle.ts:94-96 at b25ed960
 // (lifecycle.isCommissioned): false at construction (:23), set by the
 // initialized, commissioned and decommissioned events (:38-46), which the
-// commissioning state emits at its initialization with whether it holds a
-// peerAddress and when the peerAddress changes
+// commissioning state emits, when the node's parts are ready, with whether
+// it holds a peerAddress, and when the peerAddress changes
 // (packages/node/src/behavior/system/commissioning/CommissioningClient.ts
-// :711, :762-771 at b25ed960). A node that failed to load is not
+// :193, :698-712, :762-771 at b25ed960). A node that failed to load is not
 // commissioned, though [Node.PeerAddress] answers its stored address —
 // PeersLoadFailureTest.ts:123-125 at b25ed960 leaves such a peer out of
 // peers.commissioned (the orphaned-fabric case).
