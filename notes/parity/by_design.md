@@ -5640,8 +5640,8 @@ files were added after the harness commit. At `6170af84`,
 `ThermostatClusterSchedules.cpp`, `ScheduleStructWithOwnedMembers.h` or
 `tests/TestThermostatClusterSchedules.cpp` (`git ls-tree`), so a citation of
 those files holds only at `645b267a`; their text there was not re-read.
-Since pin lift b25ed960, unit P3-A, the schedule rules no longer cite these
-files; what follows them is the `SchedulePort` alone.
+Since pin lift b25ed960, unit P3-A, the schedule rules follow matter.js; these
+files remain the source of the `SchedulePort` and of the chip cases matter.js's suites have no counterpart for (`cluster/thermo/schedules_chip_test.go`).
 
 ### BD-Matter-Thermostat-Hold-ReachesHost — a TemperatureSetpointHold write reaches the Sink; matter.js only stores it
 
