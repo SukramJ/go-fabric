@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -651,6 +652,114 @@ type CaseAdapter struct {
 	// adapter, is told that a Sigma1 began a handshake on it
 	// ([CaseAdapter.sigma1BeganHandshake]).
 	onBegun func()
+	// onCompletion, set by the host that installs its sessions
+	// establishing (node, through internal/bridgeseam), is told when the
+	// handshake of a session onEstablished installed completed or failed
+	// ([CaseAdapter.completeEstablishment]); nil installs established, and
+	// nothing is told.
+	onCompletion func(sessionID uint16, completed bool) bool
+	// awaitedResume is the resumed session whose Sigma2_Resume went out on
+	// the exchange awaitedResumeKey names and that waits for the
+	// initiator's Success ([CaseAdapter.awaitResumeSuccess]); zero for
+	// none.
+	awaitedResume    uint16
+	awaitedResumeKey HandshakeKey
+	// awaitedResumeTimer, once armed, ends the wait at its deadline
+	// ([CaseAdapter.armAwaitedResume]); stopped when the wait ends.
+	awaitedResumeTimer clock.Timer
+	// awaitedResumeAcked is set once the deadline was rearmed at the
+	// Sigma2_Resume's acknowledgement, which happens once.
+	awaitedResumeAcked bool
+}
+
+// setOnCompletion installs fn, the host's hook that completes or ends the
+// establishment of a session onEstablished installed (internal/bridgeseam
+// SetCaseEstablishmentCompletion).
+func (a *CaseAdapter) setOnCompletion(fn func(sessionID uint16, completed bool) bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onCompletion = fn
+}
+
+// completeEstablishment tells the host that the handshake of the session
+// sessionID completed — completed true: a new session's Success went out
+// for the first time, or a resumed one's initiator sent its Success — or
+// failed before it did — completed false: the host closes the session. It
+// reports whether the session is established: false when it was closed
+// while establishing, or the handshake failed. Without a host hook the
+// session was installed established, and the report is completed.
+// Mirrors matter.js packages/protocol/src/session/case/CaseServer.ts:204-210
+// and :329-344 at b25ed960 (completeEstablishmentOf, and the force close of
+// a session whose handshake failed while it was establishing).
+func (a *CaseAdapter) completeEstablishment(sessionID uint16, completed bool) bool {
+	a.mu.RLock()
+	fn := a.onCompletion
+	a.mu.RUnlock()
+	if fn == nil {
+		return completed
+	}
+	return fn(sessionID, completed)
+}
+
+// awaitResumeSuccess records that the resumed session sessionID waits for
+// the initiator's Success on the exchange key names: set before the
+// Sigma2_Resume goes out, so a Success that arrives before the send
+// returned finds it ([Bridge.handleCase]).
+func (a *CaseAdapter) awaitResumeSuccess(key HandshakeKey, sessionID uint16) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.stopAwaitedResumeTimerLocked()
+	a.awaitedResume, a.awaitedResumeKey, a.awaitedResumeAcked = sessionID, key, false
+}
+
+// armAwaitedResume (re)starts the deadline of the wait for the initiator's
+// Success on the exchange key names: expire runs with the waiting session
+// once d passed on clk, unless the wait ended before. A deadline armed
+// before is replaced, at the acknowledgement (atAck) once only; without a
+// wait on key nothing is armed.
+func (a *CaseAdapter) armAwaitedResume(key HandshakeKey, clk clock.Clock, d time.Duration, atAck bool, expire func(sessionID uint16)) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.awaitedResume == 0 || a.awaitedResumeKey != key || (atAck && a.awaitedResumeAcked) {
+		return
+	}
+	a.awaitedResumeAcked = a.awaitedResumeAcked || atAck
+	a.stopAwaitedResumeTimerLocked()
+	a.awaitedResumeTimer = clk.AfterFunc(d, func() {
+		if id, ok := a.takeAwaitedResume(key); ok {
+			expire(id)
+		}
+	})
+}
+
+// stopAwaitedResumeTimerLocked stops the wait's deadline. Caller holds a.mu.
+func (a *CaseAdapter) stopAwaitedResumeTimerLocked() {
+	if a.awaitedResumeTimer != nil {
+		a.awaitedResumeTimer.Stop()
+		a.awaitedResumeTimer = nil
+	}
+}
+
+// completesEstablishment reports whether a host hook completes or ends the
+// establishment of the adapter's sessions ([CaseAdapter.setOnCompletion]).
+func (a *CaseAdapter) completesEstablishment() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.onCompletion != nil
+}
+
+// takeAwaitedResume returns, once, the resumed session that waits for the
+// initiator's Success on the exchange key names.
+func (a *CaseAdapter) takeAwaitedResume(key HandshakeKey) (uint16, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	id := a.awaitedResume
+	if id == 0 || a.awaitedResumeKey != key {
+		return 0, false
+	}
+	a.stopAwaitedResumeTimerLocked()
+	a.awaitedResume, a.awaitedResumeKey = 0, HandshakeKey{}
+	return id, true
 }
 
 // SetOnUnfinished installs fn, called once with the session id the
@@ -920,11 +1029,14 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		// Sigma2_Resume fast path: the session is installed, the host told
 		// and the resumption record replaced before the reply is sent; the
 		// record is consumed at its acceptance, where the responder claims
-		// its id. matter.js sends Sigma2_Resume first, adds the session once
-		// the send is acknowledged and saves the record after the
-		// initiator's success report
-		// (packages/protocol/src/session/case/CaseServer.ts:196-201, :211,
-		// :216, :219 at db021da0). A session whose Sigma2_Resume is not
+		// its id. A host that installs establishing (node) installs the
+		// session establishing, as matter.js creates it before its
+		// Sigma2_Resume (packages/protocol/src/session/case/CaseServer.ts:177-190
+		// at b25ed960); it is established once the initiator's Success
+		// arrives (:204-206, [Bridge.settleAwaitedResume]) and closed when
+		// the initiator reports a failure instead (:207-210). matter.js
+		// saves the record after that Success (:216-217); here it is saved
+		// at the install. A session whose Sigma2_Resume is not
 		// acknowledged is closed ([Bridge.closeUnacknowledgedResume];
 		// review II, R2-P6-sec-3320).
 		out := sigma.MarshalSigma2Resume(*result.Sigma2Resume)
@@ -1118,6 +1230,11 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	a.established = true
 	a.establishedSessionID = r.SessionID()
 	a.mu.Unlock()
+	// A host that installs establishing (node) installs the session
+	// establishing here, before the Success is sent; it is established at
+	// the Success's first transmission ([Bridge.handleCase],
+	// [CaseAdapter.completeEstablishment]). Mirrors matter.js
+	// packages/protocol/src/session/case/CaseServer.ts:314-331 at b25ed960.
 	if a.onEstablished != nil {
 		keys, ok := r.SessionKeys()
 		if !ok {

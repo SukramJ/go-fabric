@@ -50,7 +50,10 @@ func TestNoResumptionRecordOutlivesAnUpdateAfterTheAdmit(t *testing.T) {
 		st := fabricStore(t, fx)
 		sessions := operational.NewManager(st)
 		fx.ids.resumptions = st
-		adapter, err := buildCaseAdapter(sessions, fx.ids, nil, slog.New(slog.DiscardHandler), func(uint16) { fx.updateWithRecords(t, st, sessions) })
+		// After the admit, before the record: the host learns of the
+		// session only once its Success went out, after the record.
+		fx.ids.testAfterAdmit = func() { fx.updateWithRecords(t, st, sessions) }
+		adapter, err := buildCaseAdapter(sessions, fx.ids, nil, slog.New(slog.DiscardHandler), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

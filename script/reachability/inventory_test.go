@@ -103,12 +103,14 @@ const reachabilityUnreachedRatchet = 23
 // ActivateSecureSession, installed at init and called by client/handshake.
 // By hand 59 since pin lift b25ed960 unit P1-A: the CASE responder's
 // CompleteSecureSessionEstablishment and SendNotifyingTransmission, the
-// same kind of seam.
+// same kind of seam. By hand 61 since pin lift b25ed960 unit P2-J:
+// internal/sessionseam's OpenEstablishing and CompleteEstablishment, installed
+// by secure/operational at init and called by node/security.go.
 // The mock-fake-stub class 21 since phase 7: clock/clocktest's
 // Fake.AdvanceToNext, test support that production code never calls.
 var reachabilityWhitelistRatchet = map[string]int{
 	whitelistClassGenerated:         1101,
-	whitelistClassHand:              59,
+	whitelistClassHand:              61,
 	string(autoWhitelistMockPrefix): 21,
 }
 

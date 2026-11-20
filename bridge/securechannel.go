@@ -531,6 +531,16 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 		return nil
 	}
 
+	if requestHdr.SessionID == 0 && endsAwaitedResume(proto.Opcode) {
+		// A message other than the awaited StatusReport on the exchange of
+		// a resumption fails it: matter.js's read of the initiator's
+		// Success throws on another message type and force-closes the
+		// session (SecureChannelMessenger.ts:94-98,
+		// packages/protocol/src/session/case/CaseServer.ts:204-210 at
+		// b25ed960).
+		b.endAwaitedResume(handshakeKeyOf(requestHdr, proto.ExchangeID))
+	}
+
 	switch proto.Opcode {
 	case mrp.StandaloneAckOpcode:
 		// Pure StandaloneAck has no payload after the protocol header.
@@ -610,6 +620,9 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 			if general, _, _, ok := decodeStatusReport(payload); ok && general != mrp.SCStatusGeneralSuccess {
 				b.releaseHandshake(src, handshakeKeyOf(requestHdr, proto.ExchangeID))
 			}
+			// The initiator's answer to a Sigma2_Resume ends the wait of
+			// the session the resumption installed.
+			b.settleAwaitedResume(handshakeKeyOf(requestHdr, proto.ExchangeID), payload)
 		}
 		if b.abortPaseOnStatusReport(src, requestHdr, proto, payload) {
 			return nil
@@ -1093,7 +1106,11 @@ func (b *Bridge) paseHandshakeOfAnother(key HandshakeKey) bool {
 // yet — a Sigma2_Resume — ends with its handshake, so the session is
 // closed ([Bridge.closeUnacknowledgedResume]).
 func (b *Bridge) abandonHandshakeReplies(key HandshakeKey) {
+	ended, byEntry := b.endAwaitedResume(key)
 	for _, id := range b.dropHandshakeReplies(key) {
+		if byEntry && id == ended {
+			continue
+		}
 		b.closeUnacknowledgedResume(id)
 	}
 }
@@ -1528,21 +1545,198 @@ func (b *Bridge) handleCase(
 	// rebroadcast. matter.js makes every non-standalone-ack reply
 	// reliable (MessageExchange.ts:602); the Sigma3 piggyback ack stops
 	// the retransmit via the universal inbound Ack path (receive.go).
+	//
+	// A resumed session waits for the initiator's Success from before its
+	// Sigma2_Resume goes out, so a Success that overtakes this send's
+	// return finds it ([Bridge.settleAwaitedResume]).
+	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	var installed uint16
-	if a, ok := handler.(*CaseAdapter); ok && respOpcode == mrp.SCOpcodeSigma2Resume {
-		installed, _ = a.takeResumeInstall()
+	resumer, _ := handler.(*CaseAdapter)
+	if resumer != nil && respOpcode == mrp.SCOpcodeSigma2Resume {
+		if installed, _ = resumer.takeResumeInstall(); installed != 0 {
+			resumer.awaitResumeSuccess(key, installed)
+			b.armResumeDeadline(resumer, key, isConnRoute(src), true)
+		}
 	}
+	establisher, establishing := sigma3EstablisherOf(handler)
 	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt), installed); err != nil {
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		if installed != 0 {
 			// matter.js closes the session when the Sigma2_Resume cannot
-			// be sent (CaseServer.ts:202-206 at db021da0).
-			b.closeUnacknowledgedResume(installed)
+			// be sent (CaseServer.ts:207-210 at b25ed960).
+			if id, ok := resumer.takeAwaitedResume(key); ok && !b.failResume(resumer, id) {
+				b.closeUnacknowledgedResume(id)
+			}
+		}
+		if establisher != nil {
+			// The Success did not go out: the session, still
+			// establishing, is closed and the handshake fails (matter.js
+			// CaseServer.ts:332-336 at b25ed960).
+			establisher.completeEstablishment(establishing, false)
 		}
 		return err
 	}
+	if establisher != nil {
+		// The Success went out for the first time: the session is
+		// established, before its acknowledgement is awaited — the
+		// initiator may use it from now on (matter.js CaseServer.ts:329-331
+		// at b25ed960, the send's onTransmitted hook). A session closed
+		// meanwhile stays closed (:344, :367-376).
+		if !establisher.completeEstablishment(establishing, true) {
+			b.logger.Debug("matter.rx.sc.case_closed_before_established",
+				slog.String("src", srcString(src)),
+				slog.Int("session_id", int(establishing)))
+		}
+	}
 	b.dischargeOwedReplyAck(requestHdr, proto)
 	return nil
+}
+
+// sigma3EstablisherOf returns the adapter whose Sigma3 established a
+// session in this step and that session's id, read before the Success is
+// sent; nil when the step established nothing or its handler is not a
+// [CaseAdapter].
+func sigma3EstablisherOf(handler any) (a *CaseAdapter, sessionID uint16) {
+	step, ok := handler.(*sigma3Step)
+	if !ok || step.outcome != sigma3Established {
+		return nil, 0
+	}
+	a, ok = step.handler.(*CaseAdapter)
+	if !ok {
+		return nil, 0
+	}
+	if sessionID, ok = a.establishedSession(); !ok {
+		return nil, 0
+	}
+	return a, sessionID
+}
+
+// settleAwaitedResume ends the wait of a resumed session for the
+// initiator's StatusReport on the exchange key names: a Success
+// (general and protocol code Success) establishes it, any other report
+// fails its handshake and closes it. A report on an exchange no resumed
+// session waits on changes nothing. The handler is resolved without
+// building one: a provider is asked only for a key whose Sigma1 record it
+// still holds. Mirrors matter.js
+// packages/protocol/src/session/case/CaseServer.ts:204-210 at b25ed960
+// (waitForSuccess, then completeEstablishmentOf; a failure force-closes the
+// session) and SecureChannelMessenger.ts:247-272 (what counts as Success).
+func (b *Bridge) settleAwaitedResume(key HandshakeKey, payload []byte) {
+	a := b.awaitingResumeAdapter(key)
+	if a == nil {
+		return
+	}
+	id, ok := a.takeAwaitedResume(key)
+	if !ok {
+		return
+	}
+	general, _, protocolCode, decoded := decodeStatusReport(payload)
+	success := decoded && general == mrp.SCStatusGeneralSuccess && protocolCode == mrp.SCStatusProtocolSessionEstablishmentSuccess
+	if !a.completeEstablishment(id, success) {
+		b.logger.Debug("matter.rx.sc.resume_not_established",
+			slog.Int("session_id", int(id)),
+			slog.Int("general_code", int(general)))
+	}
+}
+
+// endsAwaitedResume reports whether a message of opcode on the unsecured
+// session ends the wait of a resumed session on its exchange
+// ([Bridge.endAwaitedResume]): every opcode but the StatusReport that
+// answers it, an acknowledgement, and a Sigma1 — copies of the Sigma1 that
+// began the resumption reach the router (Apple sends it over several
+// interfaces; the router answers them from its Sigma1 record,
+// [Bridge.handleSigma1]), and one of other bytes on the key of a completed
+// handshake begins nothing (errSigma1OverCompleted).
+func endsAwaitedResume(opcode uint8) bool {
+	switch opcode {
+	case mrp.SCOpcodeStatusReport, mrp.StandaloneAckOpcode, mrp.SCOpcodeSigma1:
+		return false
+	}
+	return true
+}
+
+// awaitingResumeAdapter is the CASE adapter that may hold a resumed
+// session waiting on the exchange key names, resolved without building
+// one: a provider is asked only for a key whose Sigma1 record it still
+// holds, otherwise the singleton handler; nil when neither is a
+// [CaseAdapter].
+func (b *Bridge) awaitingResumeAdapter(key HandshakeKey) *CaseAdapter {
+	b.mu.RLock()
+	_, held := b.sigma1Replied[key]
+	provider, singleton := b.caseProvider, b.caseHandler
+	b.mu.RUnlock()
+	h := singleton
+	if provider != nil && held {
+		if p := provider(key); p != nil {
+			h = p
+		}
+	}
+	a, _ := h.(*CaseAdapter)
+	return a
+}
+
+// armResumeDeadline (re)starts the deadline of a's wait for the initiator's
+// Success on the exchange key names. matter.js reads that Success with the
+// exchange's response timeout, which starts once its Sigma2_Resume's send
+// returned — acknowledged over MRP, written over a connection — and on its
+// expiry force-closes the session
+// (packages/protocol/src/session/case/CaseServer.ts:204-210,
+// MessageExchange.ts:894-908 at b25ed960), the timeout the responder's
+// wait for Sigma3 has too ([Bridge.caseSigma3Wait]). Over a connection
+// (overConn) it runs from the send. Over UDP it runs from the
+// acknowledgement ([Bridge.unsecuredReplyAcknowledged]); armed at the send
+// (atSend) it first covers the reply's whole time on the unsecured session
+// ([unsecuredEntryLifetime]) as well, so a Sigma2_Resume whose entry lost
+// its place in the retransmit table still ends the wait. Only a session a
+// host installed establishing waits ([CaseAdapter.completesEstablishment]):
+// one installed established has nothing to wait for.
+func (b *Bridge) armResumeDeadline(a *CaseAdapter, key HandshakeKey, overConn, atSend bool) {
+	if !a.completesEstablishment() {
+		return
+	}
+	d := b.caseSigma3Wait(overConn)
+	if atSend && !overConn {
+		d += unsecuredEntryLifetime
+	}
+	a.armAwaitedResume(key, b.clk(), d, !atSend, func(id uint16) {
+		b.logger.Info("matter.rx.sc.resume_success_timeout",
+			slog.Int("session_id", int(id)))
+		b.failResume(a, id)
+	})
+}
+
+// endAwaitedResume ends the wait of a resumed session on the exchange key
+// names without its Success: the handshake failed, and a session a host
+// installed establishing is closed ([Bridge.failResume]). Nothing waits on
+// key: nothing happens. It returns the session it ended and whether that
+// was closed (by entry); one installed established is left to the callers
+// that close by id, as before.
+func (b *Bridge) endAwaitedResume(key HandshakeKey) (sessionID uint16, byEntry bool) {
+	a := b.awaitingResumeAdapter(key)
+	if a == nil {
+		return 0, false
+	}
+	id, ok := a.takeAwaitedResume(key)
+	if !ok {
+		return 0, false
+	}
+	return id, b.failResume(a, id)
+}
+
+// failResume closes the resumed session id, a's, whose handshake failed
+// before it was established: through a's host hook, which closes the
+// installed session itself and not whatever holds its id by then (decision
+// 159) — a force close, no CloseSession (matter.js CaseServer.ts:207-210 at
+// b25ed960); for a host without the hook nothing here: it installed the
+// session established, and the callers close it by id where they did
+// before ([Bridge.closeUnacknowledgedResume]). It
+// reports whether the session was closed by entry.
+func (b *Bridge) failResume(a *CaseAdapter, id uint16) bool {
+	if !a.completesEstablishment() {
+		return false
+	}
+	a.completeEstablishment(id, false)
+	return true
 }
 
 // closeUnacknowledgedResume closes the secure session a resumption installed
@@ -1552,9 +1746,17 @@ func (b *Bridge) handleCase(
 // its handshake was ended ([Bridge.abandonHandshakeReplies]). That is
 // matter.js's outcome: its send returns only once the message is
 // acknowledged (packages/protocol/src/protocol/MessageExchange.ts:822-830
-// at db021da0), a send that fails — its acknowledgement missing included —
-// closes the session (packages/protocol/src/session/case/CaseServer.ts:202-206),
-// and the session is added only after it (:211). The controller's CASE
+// at db021da0), and a send that fails — its acknowledgement missing
+// included — force-closes the session, which was registered before the
+// send and is not yet established
+// (packages/protocol/src/session/case/CaseServer.ts:177-190, :197-210 at
+// b25ed960). A session a host installed establishing was closed by entry
+// before, where the handshake key is known ([Bridge.endAwaitedResume]),
+// and is not closed by id again here — except on the give-up of the
+// retransmit table ([tickOutboundReliable]), which names only the id: that
+// close finds the id free, as the allocator's cursor has moved past it
+// (secure/operational allocateIDLocked) — short of a table with no other
+// free id, a residual of the id-only report (Fable post-read L1). The controller's CASE
 // responder closes such a session too (client/handshake). It is a liveness
 // rule, not a defence: an acknowledgement authenticates nothing. An entry
 // that lost its place in the retransmit table to a newer one
@@ -2057,8 +2259,9 @@ func (b *Bridge) sigma1RecordHeld(key HandshakeKey) bool {
 //     closes that session (CaseServer.ts:95-98), which leaves the manager's
 //     table (packages/protocol/src/session/UnsecuredSession.ts:94-102).
 //     For a resumption matter.js holds the session longer: its
-//     Sigma2_Resume sent and acknowledged (CaseServer.ts:196-201), it
-//     waits for the initiator's success report (:216) and lets go when
+//     Sigma2_Resume sent and acknowledged (CaseServer.ts:197-202 at
+//     b25ed960), it waits for the initiator's success report (:205) and
+//     lets go when
 //     that arrives or the wait runs out; the record here ends with the
 //     Sigma2_Resume's acknowledgement, which that report is when it
 //     carries it.
@@ -2156,6 +2359,9 @@ func (b *Bridge) endOverSigma1Records() {
 // db021da0), and the CASE server's error path closes the handshake's
 // unsecured session (packages/protocol/src/session/case/CaseServer.ts:61-99).
 func (b *Bridge) unsecuredReplyGivenUp(key HandshakeKey) {
+	// A resumed session whose Sigma2_Resume was given up never establishes;
+	// it is closed by entry before its record of the handshake ends.
+	b.endAwaitedResume(key)
 	b.mu.RLock()
 	rec, ok := b.sigma1Replied[key]
 	tracker := b.outboundReliable
@@ -2177,6 +2383,11 @@ func (b *Bridge) unsecuredReplyGivenUp(key HandshakeKey) {
 // and a record that ends with it ends here, not only once its source's
 // window is looked at (review II, R2-P4-fr-sec-05).
 func (b *Bridge) unsecuredReplyAcknowledged(key HandshakeKey) {
+	// A resumed session's wait for the initiator's Success runs from its
+	// Sigma2_Resume's acknowledgement ([Bridge.armResumeDeadline]).
+	if a := b.awaitingResumeAdapter(key); a != nil {
+		b.armResumeDeadline(a, key, false, false)
+	}
 	b.mu.Lock()
 	if rec, ok := b.sigma1Replied[key]; ok && rec.bySingleton && rec.completed == nil && rec.sigma2AckedAt.IsZero() {
 		rec.sigma2AckedAt = b.clk().Now()

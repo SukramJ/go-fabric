@@ -1,15 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// Package bridgeseam carries the one-way seam through which the
-// bridge/bridgetest support package reaches bridge internals.
+// Package bridgeseam carries the one-way seams through which packages of
+// this module reach bridge internals that are not public API: the
+// bridge/bridgetest support package and fabrictest (test support), and the
+// node facade, which completes the establishment of the CASE responder
+// sessions it installs ([SetCaseEstablishmentCompletion], a production
+// hook).
 //
 // Direction of the edge: package bridge installs the hooks below from its
-// init; bridgetest reads them. The seam exists because Go has no visibility
-// level between "exported to every consumer" and "this package only" — and
-// bridgetest is necessarily a different package from bridge. Without the
-// seam, every affordance bridgetest offers would have to be a method on
-// bridge.Bridge, i.e. production API that exists only to serve tests.
+// init; bridgetest reads them, fabrictest and node one each
+// ([UseListener], [SetCaseEstablishmentCompletion]). The seam exists
+// because Go has no visibility level between "exported to every consumer"
+// and "this package only" — and bridgetest and node are necessarily other
+// packages than bridge. Without the seam, every affordance bridgetest
+// offers would have to be a method on bridge.Bridge, i.e. production API
+// that exists only to serve tests, and the facade's completion hook an
+// exported CaseAdapter setter no other host needs.
 //
 // The seam is module-internal, so it cannot itself become a consumer-visible
 // surface: an external module can import bridgetest and nothing else.
@@ -101,3 +108,17 @@ var UseListener func(b any, open func() (*udp.Listener, error)) bool
 // subscriptions of the previous run wait for their re-establishment.
 // Reports ok false when b is not a bridge.
 var SubscriptionPersistence func(b any) (enabled bool, former int, ok bool)
+
+// SetCaseEstablishmentCompletion installs fn on the CASE adapter a (a
+// *bridge.CaseAdapter): the hook through which a host that installs its
+// responder sessions establishing — node, which reads this seam beside
+// bridgetest — learns when the handshake of a session the adapter's
+// onEstablished installed completed (completed true: a new session's
+// Success went out for the first time, a resumed one's initiator sent its
+// Success) or failed before it did (completed false: the host closes the
+// session). fn reports whether the session is established. matter.js
+// packages/protocol/src/session/case/CaseServer.ts:204-210, :329-344 at
+// b25ed960. Reports false when a is not a *bridge.CaseAdapter. Not public
+// API: the adapter's exported callbacks stay the ones a host that installs
+// established sessions needs.
+var SetCaseEstablishmentCompletion func(a any, fn func(sessionID uint16, completed bool) bool) bool

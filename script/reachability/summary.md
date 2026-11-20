@@ -1,15 +1,15 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)
-Entry points: 10123 across 290 test packages, and 368 package initializers.
+Entry points: 10128 across 290 test packages, and 368 package initializers.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 27822 |
-| Reached by a test | 20872 |
-| Whitelisted | 6927 |
+| Total exported | 27830 |
+| Reached by a test | 20873 |
+| Whitelisted | 6934 |
 | **Unreached** | **23** |
 
 ## Top-20 packages by unreached exported identifiers
@@ -53,7 +53,7 @@ Entry points: 10123 across 290 test packages, and 368 package initializers.
 | node | ICD.OnModeChangeAsync | node/icd.go | 319 |
 | node | Node.OTAProviderEndpoint | node/ota_provider.go | 165 |
 | node | Node.OnOTAProviderStatusAsync | node/ota_provider.go | 148 |
-| secure/operational | Entry.PeerMRPIntervals | secure/operational/manager.go | 460 |
+| secure/operational | Entry.PeerMRPIntervals | secure/operational/manager.go | 479 |
 | secure/sigma | Initiator.PeerNodeID | secure/sigma/initiator.go | 175 |
 | transport/tcp | Dialer.OnPanicRecovered | transport/tcp/dialer.go | 36 |
 
