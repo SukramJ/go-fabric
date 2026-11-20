@@ -26,10 +26,10 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// schedulesAttribute is schedule-helpers.ts:22 SCHEDULES_ATTRIBUTE.
+// schedulesAttribute is schedule-helpers.ts:24 SCHEDULES_ATTRIBUTE.
 const schedulesAttribute = tdef.AttrSchedules
 
-// newScheduleTransition is schedule-helpers.ts:28-47: Monday at 06:00,
+// newScheduleTransition is schedule-helpers.ts:30-49: Monday at 06:00,
 // heating 20.00 °C and cooling 26.00 °C — no setpoints when edit gives the
 // transition a preset handle (the defaults apply only off the preset path).
 func newScheduleTransition(edit ...func(*thermo.ScheduleTransition)) thermo.ScheduleTransition {
@@ -48,7 +48,7 @@ func newScheduleTransition(edit ...func(*thermo.ScheduleTransition)) thermo.Sche
 	return out
 }
 
-// newSchedule is schedule-helpers.ts:49-57: a new Auto schedule — no
+// newSchedule is schedule-helpers.ts:55-63: a new Auto schedule — no
 // handle, one transition, not built in.
 func newSchedule(edit ...func(*thermo.Schedule)) thermo.Schedule {
 	sc := thermo.Schedule{
@@ -117,7 +117,7 @@ func scTransitions(trs ...thermo.ScheduleTransition) func(*thermo.Schedule) {
 	return func(sc *thermo.Schedule) { sc.Transitions = trs }
 }
 
-// schedulesConfig is schedule-helpers.ts:59-96 thermostatConfig on
+// schedulesConfig is schedule-helpers.ts:65-98 thermostatConfig on
 // SchedulesThermostatServer (:12-18: Heating, Cooling, AutoMode, Presets,
 // MatterScheduleConfiguration): preset-helpers' thermostat (the occupied
 // setpoints, MinSetpointDeadBand 2.5 °C, five Occupied presets, none
@@ -149,7 +149,7 @@ func autoType(n uint8, feats tdef.ScheduleTypeFeaturesBitmap) thermo.ScheduleTyp
 	return thermo.ScheduleType{SystemMode: tdef.SystemModeAuto, NumberOfSchedules: n, ScheduleTypeFeatures: feats}
 }
 
-// heatingOnlySchedulesConfig is schedule-helpers.ts:105-128: Heating,
+// heatingOnlySchedulesConfig is schedule-helpers.ts:116-137: Heating,
 // Presets and MatterScheduleConfiguration without Cooling and AutoMode,
 // HeatingOnly (derived from the features), one Heat schedule type
 // supporting setpoints, and presets as well when presets is given.
@@ -184,7 +184,7 @@ func schedulesThermostatPair(t *testing.T, cfg thermo.ThermostatConfig) *thermos
 	return commissionedThermostat(t, func(*fabrictest.Site) thermo.ThermostatConfig { return cfg })
 }
 
-// writeSchedulesUnchecked is SchedulesAtomicWriteTest.ts:62-82: the
+// writeSchedulesUnchecked is SchedulesAtomicWriteTest.ts:67-81: the
 // controller's whole-list write of Schedules from q — REPLACE-ALL and one
 // append per schedule — and the status of each write request.
 func (p *thermostatPair) writeSchedulesUnchecked(t *testing.T, q *fabrictest.Pair, schedules []thermo.Schedule) []im.StatusCode {

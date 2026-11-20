@@ -1731,15 +1731,6 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 350,
-    "citation": "ThermostatServer.ts:1300-1320",
-    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
-    "identifier": "#handlePersistedPresetsChanging",
-    "nearest": 1753,
-    "occurrences": 2
-  },
-  {
-    "file": "cluster/thermo/presets.go",
     "line": 385,
     "citation": "ThermostatServer.ts:1508-1510",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",

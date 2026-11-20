@@ -491,8 +491,8 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 // CommitSchedules) undoes the attributes already committed — their
 // previous value is stored and handed to the port again — and its status
 // stands for every attribute. Mirrors matter.js
-// packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:314-326 at
-// db021da0: any failure rolls the one transaction back, and a failure
+// packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:322-334 at
+// b25ed960: any failure rolls the one transaction back, and a failure
 // while committing "cannot be traced to one attribute, so it stands for
 // each of them" (AtomicWriteHandlerTest.ts:491-517 "discards a valid
 // Presets write when the Schedules write fails"; W3-clua1-02). The
@@ -570,15 +570,14 @@ func atomicAttributeName(attr uint32) string {
 
 // precommitAtomic is an attribute's $AtomicChanging and store at commit
 // (AtomicWriteHandler.ts:298-312 at b25ed960): Presets validated as
-// staged against the stored presets and normalised on a copy, refused
-// when it removes a built-in or the active preset (presets$AtomicChanging,
-// the stored write's checks; ThermostatServer.ts:1774-1792); Schedules
-// held to the attribute's schema and validated again against the stored
-// schedules and the Presets staged in the same unit — the peer's pending
-// value, which the presets getter returns until the state closes
-// (:3196-3222) — then refused when it drops a built-in or the active
-// schedule (persistedSchedules$Changing, :2603-2630). st is the unit's
-// state.
+// staged against the stored presets (presets$AtomicChanging,
+// ThermostatServer.ts:1760-1762) and, on a normalised copy, refused when
+// it removes a built-in or the active preset (#validatePresetCommit
+// :2032-2080, which matter.js runs in presets$AtomicChanged, :1983-1985);
+// Schedules held to the attribute's schema and validated again against
+// the stored schedules and the peer's pending Presets, here the Presets
+// staged in the same unit (schedules$AtomicChanging, :2581-2591; the
+// presets getter, :3196-3222). st is the unit's state.
 func (s *ThermostatServer) precommitAtomic(st *atomicWriteState, attr uint32, v any) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -602,11 +601,8 @@ func (s *ThermostatServer) precommitAtomic(st *atomicWriteState, attr uint32, v 
 				presets = pending
 			}
 		}
-		next, err := s.scheduleRules(presets).validateSchedules(s.schedules, staged)
-		if err != nil {
-			return err
-		}
-		return validateScheduleCommit(s.schedules, next, s.activeScheduleHandle)
+		_, err := s.scheduleRules(presets).validateSchedules(s.schedules, staged)
+		return err
 	}
 	return nil
 }
@@ -615,19 +611,26 @@ func (s *ThermostatServer) precommitAtomic(st *atomicWriteState, attr uint32, v 
 // staged attribute of the unit was staged (AtomicWriteHandler.ts:314-320
 // at b25ed960): with MSCH, Presets refused when it drops a preset a
 // schedule of the unit's transaction names (#validatePresetCommit,
-// ThermostatServer.ts:2032-2065) — schedules the unit's Schedules when
-// they staged, nil for the stored ones.
+// ThermostatServer.ts:2032-2080; its schedules half :2048-2065) —
+// schedules the unit's Schedules when they staged, nil for the stored
+// ones; Schedules refused when it drops a built-in or the active schedule
+// (schedules$AtomicChanged, :3009-3014, #validateScheduleCommit
+// :3056-3086).
 func (s *ThermostatServer) atomicChanged(attr uint32, v any, schedules []Schedule) error {
-	if attr != tdef.AttrPresets {
-		return nil
-	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if schedules == nil {
-		schedules = s.schedules
+	switch attr {
+	case tdef.AttrPresets:
+		if schedules == nil {
+			schedules = s.schedules
+		}
+		staged, _ := v.([]Preset)
+		return s.presetsInUseBySchedules(s.presets, staged, schedules)
+	case tdef.AttrSchedules:
+		staged, _ := v.([]Schedule)
+		return validateScheduleCommit(s.schedules, staged, s.activeScheduleHandle)
 	}
-	staged, _ := v.([]Preset)
-	return s.presetsInUseBySchedules(s.presets, staged, schedules)
+	return nil
 }
 
 // commitAtomic applies a staged value after every precommit passed. The

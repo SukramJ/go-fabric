@@ -36,7 +36,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// startupRefusal is SchedulesConfigurationTest.ts:24-38: the reason
+// startupRefusal is SchedulesConfigurationTest.ts:30-43: the reason
 // thermo.New refuses cfg, "" when it accepts it.
 func startupRefusal(t *testing.T, cfg thermo.ThermostatConfig) string {
 	t.Helper()

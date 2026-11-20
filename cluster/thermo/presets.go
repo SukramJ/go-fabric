@@ -347,11 +347,11 @@ func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, ac
 
 // applyPresets validates, normalises, persists and stores presets — the
 // stored write of matter.js (persistedPresets$Changing,
-// #handlePersistedPresetsChanging, ThermostatServer.ts:1300-1320, then the
+// #handlePersistedPresetsChanging, ThermostatServer.ts:1774-1803 at b25ed960, then the
 // commit). The caller holds s.op; presets are the caller's and are
 // normalised in place. local is a local write: with MSCH, a preset a
 // stored schedule names cannot be removed (#validatePresetCommit,
-// ThermostatServer.ts:2032-2065 at b25ed960); an atomic commit checked
+// ThermostatServer.ts:2032-2080; its schedules half :2048-2065 at b25ed960); an atomic commit checked
 // that against its own unit's schedules before (atomicChanged).
 func (s *ThermostatServer) applyPresets(ctx context.Context, presets []Preset, local bool) error {
 	s.lockPersist()

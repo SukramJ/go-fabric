@@ -22,7 +22,7 @@ import (
 // decision O-8, BD-Thermostat-HostSchedules): held to matter.js's content
 // rules (ThermostatServer.ts:2693-3003 at b25ed960) and normalised — a
 // null handle gets one, a null BuiltIn takes the stored schedule's or
-// false (:3028-3048) — while matter.js's lifecycle rules of a Matter write
+// false (:3028-3049) — while matter.js's lifecycle rules of a Matter write
 // do not apply: a handle the device never issued is a new schedule, a
 // schedule may arrive built in, a built-in schedule may be dropped, and a
 // dropped active schedule is cleared (as the start clears a dangling
@@ -94,7 +94,7 @@ func TestSchedulesFromTheDevice(t *testing.T) {
 
 // TestHostReplaceOfSchedules (O-8): the host's replace takes a new
 // schedule with a fixed handle of its own, refuses one naming a preset no
-// preset carries (a content rule, ThermostatServer.ts:2775-2788 at
+// preset carries (a content rule, ThermostatServer.ts:2772-2788 at
 // b25ed960) and leaves the stored list as it was, and clears the active
 // handle when it drops the active schedule.
 func TestHostReplaceOfSchedules(t *testing.T) {

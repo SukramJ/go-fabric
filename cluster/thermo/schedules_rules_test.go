@@ -5,7 +5,7 @@
 // names, each against the rule it holds the Go server to:
 // #validateScheduleWriteRequest and #validateScheduleTransitions in
 // matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts at
-// b25ed960 (:2693-2817, :2825-3003), the presets getter a peer reads
+// b25ed960 (:2693-2807, :2825-3002), the presets getter a peer reads
 // (:3196-3222), and AtomicWriteHandler.ts:433-458 (another peer's staged
 // value is never seen). The fixtures are schedule-helpers' (the port in
 // schedule_helpers_parity_matterjs_test.go).
@@ -59,7 +59,7 @@ func TestScheduleWriteRules(t *testing.T) {
 	})
 
 	t.Run("the handle rules come before the schedule type", func(t *testing.T) {
-		// TS:2717-2748 before TS:2750-2755: an unknown handle on a schedule
+		// TS:2718-2748 before TS:2750-2755: an unknown handle on a schedule
 		// of a mode no type names is NOT_FOUND.
 		p := schedulesThermostatPair(t, schedulesConfig(5, nil))
 		p.atomic(t, p.pair, beginWrite, schedulesAttribute)

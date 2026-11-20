@@ -177,7 +177,7 @@ func (s *ThermostatServer) validateHostSchedules(stored, list []Schedule) ([]Sch
 // (#validateScheduleWriteRequest, #validateScheduleTransitions,
 // ThermostatServer.ts:2693-3003 at b25ed960: the schedule types and
 // counts, names, presets, transitions, limits and deadband, each handle
-// once) and normalised (:3028-3048: a null handle gets one, a null BuiltIn
+// once) and normalised (:3028-3049: a null handle gets one, a null BuiltIn
 // takes the stored schedule's or false). matter.js's lifecycle rules of a
 // Matter write do not apply: a handle the device never issued is a new
 // schedule, a schedule may arrive built in or change its BuiltIn, and a

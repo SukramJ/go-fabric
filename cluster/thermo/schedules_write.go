@@ -23,14 +23,14 @@ import (
 // the host's SetSchedules and the configured schedules alike — as
 // matter.js's ThermostatServer implements them behind its forward feature
 // thermostat-msch (packages/node/src/behaviors/thermostat/ThermostatServer.ts
-// at b25ed960: #validateScheduleWriteRequest :2693-2817,
-// #validateScheduleTransitions :2825-3003, #normalizeSchedules :3028-3048,
+// at b25ed960: #validateScheduleWriteRequest :2693-2807,
+// #validateScheduleTransitions :2825-3002, #normalizeSchedules :3028-3049,
 // #validateScheduleCommit :3056-3086), on the atomic-write state of
 // atomic.go.
 
 // scheduleHandleLength is the length of a handle the server issues to a
 // new schedule — matter.js entropy.randomBytes(16)
-// (ThermostatServer.ts:3032-3034 at b25ed960) — and the schema's "max 16"
+// (ThermostatServer.ts:3036-3040 at b25ed960) — and the schema's "max 16"
 // (thermostat-cluster.element.ts:634).
 const scheduleHandleLength = 16
 
@@ -118,7 +118,7 @@ func (r scheduleRules) coolLimits() (lo, hi int) {
 
 // validateSchedules validates list against the schedules it replaces and
 // returns it normalised (a null BuiltIn resolved) — matter.js
-// #validateScheduleWriteRequest (ThermostatServer.ts:2693-2817 at
+// #validateScheduleWriteRequest (ThermostatServer.ts:2693-2807 at
 // b25ed960): per schedule the handle rules, the schedule type, the
 // transition count, the name, the preset and the transitions; the count
 // limits only after every schedule passed its own checks (:2793-2806).
@@ -220,8 +220,8 @@ func checkScheduleSizes(sc Schedule) error {
 }
 
 // resolveBuiltIn is the handle rules of #validateScheduleWriteRequest
-// (ThermostatServer.ts:2717-2748 at b25ed960) and the BuiltIn
-// #normalizeSchedules settles on (:3040-3046): a handle twice in the list
+// (ThermostatServer.ts:2718-2748 at b25ed960) and the BuiltIn
+// #normalizeSchedules settles on (:3041-3047): a handle twice in the list
 // is CONSTRAINT_ERROR; for a Matter write a handle the stored schedules
 // lack is NOT_FOUND, and a new schedule claiming to be built in and a
 // BuiltIn that differs from the stored schedule's are CONSTRAINT_ERROR —
@@ -267,7 +267,7 @@ func scheduleHandleIn(list []Schedule, h []byte) bool {
 }
 
 // validateTransitions is matter.js #validateScheduleTransitions
-// (ThermostatServer.ts:2825-3003 at b25ed960), every refusal
+// (ThermostatServer.ts:2825-3002 at b25ed960), every refusal
 // CONSTRAINT_ERROR. Where two rules hit one transition the order is
 // ours (decision C-7, D11: no wire difference, every one answers
 // CONSTRAINT_ERROR). The feature a transition's SystemMode needs is
@@ -396,10 +396,10 @@ func (r scheduleRules) validateTransitionsPerDay(sc Schedule) error {
 // validateScheduleCommit is matter.js #validateScheduleCommit
 // (ThermostatServer.ts:3056-3086 at b25ed960): a built-in schedule the new
 // list drops is CONSTRAINT_ERROR, the active schedule it drops
-// INVALID_IN_STATE. The active handle always names a stored schedule
-// here (the setters and the start clear or refuse a dangling one), so
-// matter.js's "only if it named an old schedule" (:3073-3085) holds
-// without a check of its own (decision C-7, D8).
+// INVALID_IN_STATE — only if the active handle names a stored schedule
+// (:3073-3085, the clause :3077-3080): a handle the host left dangling,
+// set between a commit's checks and its store, does not block every later
+// commit.
 func validateScheduleCommit(stored, next []Schedule, active []byte) error {
 	for _, sc := range stored {
 		if sc.BuiltIn.Null || !sc.BuiltIn.Value || sc.ScheduleHandle.Null {
@@ -409,7 +409,7 @@ func validateScheduleCommit(stored, next []Schedule, active []byte) error {
 			return spec.Errorf(im.StatusConstraintError, "thermo: cannot remove built-in schedule %s", handleKey(sc.ScheduleHandle.Value))
 		}
 	}
-	if active != nil && !scheduleHandleIn(next, active) {
+	if active != nil && !scheduleHandleIn(next, active) && scheduleHandleIn(stored, active) {
 		return spec.Errorf(im.StatusInvalidInState, "thermo: cannot remove schedule %s while it is the active schedule", handleKey(active))
 	}
 	return nil
@@ -417,7 +417,7 @@ func validateScheduleCommit(stored, next []Schedule, active []byte) error {
 
 // issueScheduleHandles gives every schedule without a handle a new one,
 // 16 random bytes — matter.js #normalizeSchedules
-// (ThermostatServer.ts:3028-3036 at b25ed960).
+// (ThermostatServer.ts:3028-3040 at b25ed960).
 func issueScheduleHandles(list []Schedule) error {
 	for i := range list {
 		if !list[i].ScheduleHandle.Null {
@@ -438,7 +438,9 @@ func issueScheduleHandles(list []Schedule) error {
 // :474-479 at b25ed960); no atomic write is INVALID_IN_STATE (:467-469).
 // The list is validated against the stored schedules and the peer's own
 // pending Presets — schedules$AtomicChanging (ThermostatServer.ts:2581-2591)
-// — and staged normalised.
+// — and staged with its null BuiltIn resolved, which is Go's own: matter.js
+// stages the value as written and resolves it at pre-commit (:3004-3007,
+// :3041-3047; findings register, F3).
 func (s *ThermostatServer) writeSchedules(ctx context.Context, v any) error {
 	list, err := schedulesValue(v)
 	if err != nil {
@@ -496,7 +498,7 @@ func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedul
 }
 
 // presetsInUseBySchedules is the schedules half of matter.js
-// #validatePresetCommit (ThermostatServer.ts:2032-2065 at b25ed960): with
+// #validatePresetCommit (ThermostatServer.ts:2032-2080; its schedules half :2048-2065 at b25ed960): with
 // MSCH, a preset the new list drops that a schedule or a schedule
 // transition of schedules names is INVALID_IN_STATE. schedules are the
 // ones of the change's own transaction: the Schedules the same commit

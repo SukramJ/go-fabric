@@ -172,7 +172,7 @@ func TestParityMatterJS_AtomicWriteHandlerTest(t *testing.T) {
 	// expect BUSY when another peer holds the atomic write
 	// (AtomicWriteHandlerTest.ts:371-372).
 	t.Run("rejects a Schedules write held by a different peer with INVALID_IN_STATE", func(t *testing.T) {
-		// createPresetsAndSchedulesNode (:186-214): the presets thermostat
+		// createPresetsAndSchedulesNode (:184-214): the presets thermostat
 		// with one Heat schedule type of two schedules with setpoints.
 		p := commissionedThermostat(t, func(*fabrictest.Site) thermo.ThermostatConfig {
 			cfg := thermostatConfig(5, []thermo.Preset{})
