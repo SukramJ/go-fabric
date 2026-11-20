@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -53,12 +54,73 @@ func SplitHandForm(fields any) (judged, served any) {
 // at b25ed960 (completeResponse in invokeCommand, the same function that
 // holds the request, :671-705; the response validated as `data ?? {}`,
 // :624-625; a failure a FailureError).
-func CheckResponse(_ context.Context, def *Cluster, features, cmdID uint32, request, response any, peers Peers) error {
+func CheckResponse(ctx context.Context, def *Cluster, features, cmdID uint32, request, response any, peers Peers) error {
+	return CheckResponseAsWritten(ctx, def, features, cmdID, request, response, peers, nil)
+}
+
+// CheckResponseAsWritten is [CheckResponse] for a server whose responses
+// may be in a hand-written form the definition does not know: such a
+// response is judged as write — the encoder that puts it on the wire —
+// writes it. The written bytes are decoded through the definition's
+// response decoder: a field the definition makes mandatory ("M") and the
+// bytes do not carry is FAILURE, and a response the decoder reads is
+// judged as [CheckResponse] judges its generated form; one the decoder
+// refuses for a value outside its type or constraint is not judged
+// further, as a response's types and constraints are not judged here.
+// A nil write is [CheckResponse]: a hand-written form is not judged.
+// The endpoint dispatcher passes the bridge's response writer
+// (TopologyDispatcher.SetResponseWriter).
+func CheckResponseAsWritten(_ context.Context, def *Cluster, features, cmdID uint32, request, response any, peers Peers, write im.CommandFieldsWriter) error {
 	if def == nil {
 		return nil
 	}
 	i := &Instance{def: def, features: features}
-	return i.checkResponse(cmdID, request, response, peers)
+	return i.checkResponse(cmdID, request, response, peers, write)
+}
+
+// writtenResponse is response — a form [payloadValue] does not judge — as
+// write puts it on the wire, decoded through resp's decoder: rv the
+// generated form, ok whether it is judged further, err the FAILURE of a
+// mandatory field the bytes lack. Nothing is judged without write, for an
+// absent response (payloadValue judged it) or a response command without
+// a decoder.
+func (i *Instance) writtenResponse(req, resp *Command, response any, write im.CommandFieldsWriter) (reflect.Value, bool, error) {
+	if write == nil || response == nil || resp.Decode == nil {
+		return reflect.Value{}, false, nil
+	}
+	enc := tlv.NewEncoder()
+	write(enc, tlv.AnonymousTag(), response)
+	raw, err := enc.Bytes()
+	if err != nil || len(raw) == 0 {
+		return reflect.Value{}, false, nil //nolint:nilerr // a response the written bytes do not decode is not judged further; its types and constraints are not the response check's
+	}
+	dec := tlv.NewDecoder(raw)
+	open, err := dec.Next()
+	if err != nil || !open.IsContainer || open.Type != tlv.TypeStructure {
+		return reflect.Value{}, false, nil //nolint:nilerr // a response the written bytes do not decode is not judged further; its types and constraints are not the response check's
+	}
+	n, err := ReadContainer(dec, open)
+	if err != nil {
+		return reflect.Value{}, false, nil //nolint:nilerr // a response the written bytes do not decode is not judged further; its types and constraints are not the response check's
+	}
+	present := map[uint32]bool{}
+	for _, c := range n.Children {
+		if c.El.Tag.Kind == tlv.TagKindContext {
+			present[c.El.Tag.Number] = true
+		}
+	}
+	for fi := range resp.Fields {
+		if f := &resp.Fields[fi]; f.Conformance.Op == ConfMandatory && !present[f.ID] {
+			return reflect.Value{}, false, Errorf(im.StatusFailure, "%s: response validation failed for %s: %s.%s: mandatory field missing from the written response %T",
+				i.def.Name, req.Name, resp.Name, f.Name, response)
+		}
+	}
+	generated, err := resp.Decode(n)
+	if err != nil {
+		return reflect.Value{}, false, nil //nolint:nilerr // a response the written bytes do not decode is not judged further; its types and constraints are not the response check's
+	}
+	rv, ok := payloadValue(resp, generated, true)
+	return rv, ok, nil
 }
 
 // payloadValue is a request or response payload v of cmd as the struct

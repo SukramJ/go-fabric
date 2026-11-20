@@ -953,7 +953,7 @@ func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error
 // at b25ed960, completeResponse; F-b25ed960-30). A payload in neither the
 // definition's generated form nor a declared one ([payloadValue]) is not
 // judged.
-func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peers) error {
+func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peers, write im.CommandFieldsWriter) error {
 	req := i.def.Command(cmdID, Request)
 	if req == nil {
 		return nil
@@ -964,7 +964,10 @@ func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peer
 	}
 	rv, ok := payloadValue(resp, response, true)
 	if !ok {
-		return nil
+		var err error
+		if rv, ok, err = i.writtenResponse(req, resp, response, write); !ok || err != nil {
+			return err
+		}
 	}
 	scope := nameScope{peers: peers, conformance: true, outer: func(name string) (any, bool) {
 		if request != nil && sameName(name, req.Name) {
