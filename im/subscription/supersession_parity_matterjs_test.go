@@ -4,7 +4,7 @@
 package subscription
 
 // Ports by meaning of matter.js
-// packages/node/test/node/server/ServerSubscriptionTest.ts at b25ed960, the
+// packages/node/test/node/ServerSubscriptionTest.ts at b25ed960, the
 // subscription-side rows of the session supersession cases (:1490-1882):
 // the move onto a superseding session ([Manager.MoveSession]) and the
 // resend at once of a report that failed on the session the subscription

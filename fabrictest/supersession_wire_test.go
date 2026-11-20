@@ -167,7 +167,7 @@ func TestServerSubscriptionSessionSupersessionOverTheWire(t *testing.T) {
 		waitOnReported(ctx, t, site, p, pl, ep, reports)
 	})
 
-	// packages/node/test/node/server/ServerSubscriptionTest.ts:1882 — there
+	// packages/node/test/node/ServerSubscriptionTest.ts:1882 — there
 	// with sessions of other CATs in between, which do not supersede; here
 	// the controller's sessions all carry its CATs, so the subscription
 	// follows each newer session, and the eviction of the session it was

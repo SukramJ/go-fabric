@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10149,
+  "entry_points": 10167,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27859,
+    "total_exported": 27866,
     "reachable": 20885,
-    "whitelisted": 6952,
+    "whitelisted": 6959,
     "unreachable": 22
   },
   "by_package": [
@@ -415,7 +415,7 @@
       "package": "cluster/core",
       "identifier": "ScenesState.ForgetFabric",
       "file": "cluster/core/scenes_management.go",
-      "line": 538,
+      "line": 540,
       "kind": "method"
     },
     {
@@ -7271,7 +7271,7 @@
       "identifier": "TestServerSubscriptionSupersessionReporter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/supersession_parity_matterjs_test.go",
-      "line": 27
+      "line": 28
     },
     {
       "package": "bridge",
@@ -7355,6 +7355,13 @@
       "identifier": "TestSessionParametersForStatesTCPOnlyWhenOffered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_session_params_test.go",
+      "line": 52
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSessionSupersededGuards",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/supersession_guard_test.go",
       "line": 52
     },
     {
@@ -10145,6 +10152,13 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "ReportStatusUnacknowledged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 142
+    },
+    {
+      "package": "client/interaction",
       "identifier": "SetTimedWrite",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
@@ -10310,6 +10324,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/large_message_parity_matterjs_test.go",
       "line": 65
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestPeerSubscriptionReportStatusUnacknowledgedParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/peer_subscription_parity_matterjs_test.go",
+      "line": 69
     },
     {
       "package": "client/interaction",
@@ -15727,7 +15748,7 @@
       "identifier": "Bind",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 384
+      "line": 385
     },
     {
       "package": "cluster/spec",
@@ -15748,35 +15769,35 @@
       "identifier": "DecodeList",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 294
+      "line": 295
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeListIn",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 298
+      "line": 299
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeNullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 360
+      "line": 361
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeOptional",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 324
+      "line": 325
     },
     {
       "package": "cluster/spec",
       "identifier": "DecodeStruct",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 283
+      "line": 284
     },
     {
       "package": "cluster/spec",
@@ -15832,7 +15853,7 @@
       "identifier": "List",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 455
+      "line": 456
     },
     {
       "package": "cluster/spec",
@@ -15853,14 +15874,14 @@
       "identifier": "NullOf",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 352
+      "line": 353
     },
     {
       "package": "cluster/spec",
       "identifier": "Nullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 339
+      "line": 340
     },
     {
       "package": "cluster/spec",
@@ -15888,49 +15909,49 @@
       "identifier": "Put",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 468
+      "line": 469
     },
     {
       "package": "cluster/spec",
       "identifier": "PutInt",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 477
+      "line": 478
     },
     {
       "package": "cluster/spec",
       "identifier": "PutList",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 500
+      "line": 501
     },
     {
       "package": "cluster/spec",
       "identifier": "PutNullable",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 512
+      "line": 513
     },
     {
       "package": "cluster/spec",
       "identifier": "PutOptional",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 524
+      "line": 525
     },
     {
       "package": "cluster/spec",
       "identifier": "PutStruct",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 496
+      "line": 497
     },
     {
       "package": "cluster/spec",
       "identifier": "PutUint",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 473
+      "line": 474
     },
     {
       "package": "cluster/spec",
@@ -16081,6 +16102,13 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "TestPayloadFormOfAPointerDecoder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/payload_form_internal_test.go",
+      "line": 49
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "TestResponseCheckShapes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/field_conformance_internal_test.go",
@@ -16161,7 +16189,7 @@
       "identifier": "ValueOf",
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
-      "line": 356
+      "line": 357
     },
     {
       "package": "cluster/spec/accesscontrol",
@@ -34956,7 +34984,7 @@
       "identifier": "TestAssemblyRefusesBridgedInfoBeyondItsConstraint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/bridged_info_check_test.go",
-      "line": 22
+      "line": 24
     },
     {
       "package": "endpoint",
@@ -35026,7 +35054,7 @@
       "identifier": "TestBridgedInfoCheckIsTheServingEndpoints",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/bridged_info_check_test.go",
-      "line": 70
+      "line": 75
     },
     {
       "package": "endpoint",
@@ -42884,6 +42912,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestRestoreShortensStoredStrings",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/nonvolatile_shorten_internal_test.go",
+      "line": 27
+    },
+    {
+      "package": "node",
       "identifier": "TestRetransmitIntervalFollowsThePeer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/retransmit_interval_internal_test.go",
@@ -42930,6 +42965,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/setup_pin_error_internal_test.go",
       "line": 19
+    },
+    {
+      "package": "node",
+      "identifier": "TestShortenStoredLabels",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/nonvolatile_shorten_internal_test.go",
+      "line": 125
     },
     {
       "package": "node",
@@ -44309,6 +44351,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
       "line": 190
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestPeerIndexDropsClosedSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/fabric_session_parity_matterjs_test.go",
+      "line": 54
     },
     {
       "package": "secure/operational",
@@ -47539,10 +47588,10 @@
     },
     {
       "package": "tlv",
-      "identifier": "TestUTF16Length",
+      "identifier": "TestTlvStringLengthFieldInBytesParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "tlv/utf8_test.go",
-      "line": 85
+      "file": "tlv/string_bytes_parity_matterjs_test.go",
+      "line": 18
     },
     {
       "package": "tlv",

@@ -339,7 +339,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2398,
+    "line": 2410,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -2110,7 +2110,7 @@
   },
   {
     "file": "controller/client/client_attestation_parity_matterjs_test.go",
-    "line": 255,
+    "line": 269,
     "citation": "ClientAttestationTest.ts:621-634",
     "resolved": "packages/node/test/node/ClientAttestationTest.ts",
     "identifier": "CustomRejection",
@@ -2308,7 +2308,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 82,
+    "line": 85,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -2317,7 +2317,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 99,
+    "line": 102,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -2326,7 +2326,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 443,
+    "line": 446,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -2426,16 +2426,7 @@
   },
   {
     "file": "controller/client/record.go",
-    "line": 727,
-    "citation": "CommissioningClient.ts:586",
-    "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
-    "identifier": "peerAddress",
-    "nearest": 531,
-    "occurrences": 21
-  },
-  {
-    "file": "controller/client/record.go",
-    "line": 736,
+    "line": 769,
     "citation": "CommissioningClient.ts:600-635",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#operationalAddressesChanged",
@@ -2444,7 +2435,7 @@
   },
   {
     "file": "controller/client/registry.go",
-    "line": 444,
+    "line": 432,
     "citation": "CommissioningClient.ts:685-714",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#bindPeer",
@@ -3154,7 +3145,7 @@
   },
   {
     "file": "im/subscription/subscription.go",
-    "line": 386,
+    "line": 415,
     "citation": "packages/node/src/node/server/ServerSubscription.ts:412",
     "resolved": "packages/node/src/node/server/ServerSubscription.ts",
     "identifier": "#sendUpdatesActivated",
@@ -3377,7 +3368,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 1191,
+    "line": 1192,
     "citation": "packages/protocol/src/session/case/CaseServer.ts:217",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "at": "b25ed960",
@@ -3507,7 +3498,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 70,
+    "line": 80,
     "citation": "packages/protocol/src/protocol/ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
@@ -3516,7 +3507,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 74,
+    "line": 84,
     "citation": "packages/protocol/src/session/NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -3525,7 +3516,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 77,
+    "line": 87,
     "citation": "NodeSession.ts:305",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -3534,7 +3525,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 155,
+    "line": 165,
     "citation": "NodeSession.ts:368",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -3543,7 +3534,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 412,
+    "line": 554,
     "citation": "SessionManager.ts:484",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getPaseSession",
@@ -3552,7 +3543,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 698,
+    "line": 840,
     "citation": "packages/protocol/src/session/SessionManager.ts:213",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "#nextSessionId",
@@ -3561,7 +3552,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1078,
+    "line": 1226,
     "citation": "packages/protocol/src/session/NodeSession.ts:82",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "attestationKey",
@@ -3570,7 +3561,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1111,
+    "line": 1259,
     "citation": "NodeSession.ts:403",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "gracefulClose",
@@ -3579,7 +3570,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1113,
+    "line": 1261,
     "citation": "ExchangeManager.ts:716-726",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "CloseSession",
@@ -3588,7 +3579,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1309,
+    "line": 1464,
     "citation": "packages/protocol/src/session/SessionManager.ts:490-508",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getNextAvailableSessionId",
@@ -3597,7 +3588,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1335,
+    "line": 1490,
     "citation": "packages/protocol/src/session/SessionManager.ts:513",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "getSession",
@@ -3606,7 +3597,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1400,
+    "line": 1555,
     "citation": "NodeSession.ts:305-309",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -3615,7 +3606,7 @@
   },
   {
     "file": "secure/operational/manager.go",
-    "line": 1928,
+    "line": 2088,
     "citation": "ExchangeManager.ts:693",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "gracefulClose",
