@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"slices"
 
 	"github.com/SukramJ/go-fabric/internal/deepcopy"
@@ -156,14 +157,15 @@ func (s *ThermostatServer) presetRules() presetRules {
 }
 
 // validatePresetWrite is matter.js #validatePresetWriteRequest
-// (ThermostatServer.ts:1367-1493): presets a client wants to store, against
-// the presets they replace (seeding — old undefined — admits the handles
-// the application states). issued are the handles this write's
-// normalisation issued.
+// (ThermostatServer.ts:1850-1975 at b25ed960): presets a client wants to
+// store, against the presets they replace (seeding — old undefined —
+// admits the handles the application states). issued are the handles this
+// write's normalisation issued. Each appended preset is checked in order:
+// its handle, scenario and name support, then the total and per-scenario
+// counts, then the duplicate name (:1913-1943 at b25ed960), so an unknown
+// handle in an over-long list is NOT_FOUND and one more unnamed preset for
+// a full scenario RESOURCE_EXHAUSTED.
 func (r presetRules) validatePresetWrite(presets, old []Preset, seeding bool, issued map[string]bool) error {
-	if len(presets) > r.numberOfPresets {
-		return spec.Errorf(im.StatusResourceExhausted, "Number of presets (%d) exceeds NumberOfPresets (%d)", len(presets), r.numberOfPresets)
-	}
 	oldByHandle := map[string]Preset{}
 	for _, p := range old {
 		if !p.PresetHandle.Null {
@@ -177,7 +179,7 @@ func (r presetRules) validatePresetWrite(presets, old []Preset, seeding bool, is
 	names := map[tdef.PresetScenarioEnum][]*string{}
 	counts := map[tdef.PresetScenarioEnum]int{}
 	seen := map[string]bool{}
-	for _, p := range presets {
+	for index, p := range presets {
 		name := presetName(p)
 		builtIn := !p.BuiltIn.Null && p.BuiltIn.Value
 		scenario := presetScenarioName(p.PresetScenario)
@@ -211,19 +213,25 @@ func (r presetRules) validatePresetWrite(presets, old []Preset, seeding bool, is
 		if !ok {
 			return spec.Errorf(im.StatusConstraintError, "No PresetType defined for scenario %s", scenario)
 		}
-		// The specification counts null — "no name" — as a value that may
-		// not repeat within a scenario.
-		if slices.ContainsFunc(names[p.PresetScenario], func(n *string) bool { return equalName(n, name) }) {
-			return spec.Errorf(im.StatusConstraintError, "Duplicate preset name %s for scenario %s", nameJSON(name), scenario)
-		}
 		if name != nil && t.PresetTypeFeatures&tdef.PresetTypeFeaturesSupportsNames == 0 {
 			return spec.Errorf(im.StatusConstraintError, "Preset names are not supported for scenario %s", scenario)
 		}
-		names[p.PresetScenario] = append(names[p.PresetScenario], name)
-		if counts[p.PresetScenario] == int(t.NumberOfPresets) {
-			return spec.Errorf(im.StatusResourceExhausted, "Number of presets (%d) for scenario %s exceeds allowed number (%d)", counts[p.PresetScenario], scenario, t.NumberOfPresets)
+		// Mirrors matter.js ThermostatServer.ts:1919-1932 at b25ed960
+		// (#validatePresetWriteRequest): the total and the per-scenario
+		// count, for this appended preset.
+		if index+1 > r.numberOfPresets {
+			return spec.Errorf(im.StatusResourceExhausted, "Number of presets (%d) exceeds NumberOfPresets (%d)", len(presets), r.numberOfPresets)
+		}
+		if count := counts[p.PresetScenario]; count == int(t.NumberOfPresets) {
+			return spec.Errorf(im.StatusResourceExhausted, "Number of presets (%d) for scenario %s exceeds allowed number (%d)", count+1, scenario, t.NumberOfPresets)
 		}
 		counts[p.PresetScenario]++
+		// The specification counts null — "no name" — as a value that may
+		// not repeat within a scenario (:1934-1943 at b25ed960).
+		if slices.ContainsFunc(names[p.PresetScenario], func(n *string) bool { return equalName(n, name) }) {
+			return spec.Errorf(im.StatusConstraintError, "Duplicate preset name %s for scenario %s", nameJSON(name), scenario)
+		}
+		names[p.PresetScenario] = append(names[p.PresetScenario], name)
 
 		if r.cool {
 			if p.CoolingSetpoint == nil {
@@ -393,7 +401,11 @@ func (s *ThermostatServer) SetPresets(ctx context.Context, presets []Preset) err
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
-	return s.applyPresets(ctx, deepcopy.Each(presets))
+	if err := s.applyPresets(ctx, deepcopy.Each(presets)); err != nil {
+		return err
+	}
+	s.reevaluateOnPresetsChange(ctx)
+	return nil
 }
 
 // Presets returns a copy of the stored presets (matter.js
@@ -425,12 +437,18 @@ func (s *ThermostatServer) SetActivePresetHandle(ctx context.Context, handle []b
 	}
 	s.op.Lock()
 	defer s.op.Unlock()
-	return s.storeActiveHandle(ctx, bytes.Clone(handle))
+	reevaluate, err := s.storeActiveHandle(ctx, bytes.Clone(handle))
+	if reevaluate {
+		s.reevaluateSuggestions(ctx)
+	}
+	return err
 }
 
-// storeActiveHandle saves and stores the active handle; the caller holds
-// s.op.
-func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte) error {
+// storeActiveHandle saves and stores the active handle and reports
+// whether the change started or ended a thermostat suggestion's override
+// (trackOverrideLocked): the caller then re-evaluates the suggestions,
+// once it holds no persist. The caller holds s.op.
+func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte) (reevaluate bool, err error) {
 	s.lockPersist()
 	defer s.unlockPersist()
 	s.mu.RLock()
@@ -438,38 +456,43 @@ func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte)
 	same := bytes.Equal(s.activePresetHandle, handle) && (s.activePresetHandle == nil) == (handle == nil)
 	s.mu.RUnlock()
 	if same {
-		return nil
+		return false, nil
 	}
 	if err := s.savePresets(ctx, presets, handle); err != nil {
-		return err
+		return false, err
 	}
 	s.mu.Lock()
 	s.activePresetHandle = handle
+	reevaluate = s.trackOverrideLocked(handle, false)
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
-	return nil
+	return reevaluate, nil
 }
 
 // clearActivePresetOnDirectWrite clears the active preset after a direct
 // (not a command's) setpoint change of the setpoints in effect — matter.js
-// #assert(Un)occupied*SetpointChanging (ThermostatServer.ts:682-706,
-// :744-768 at db021da0): a setpoint someone set by hand is no longer the
-// preset's. It takes persist and s.mu, never s.op, so the inbound setters
+// #assert(Un)occupied*SetpointChanging (ThermostatServer.ts:1150-1166,
+// :1203-1220 at b25ed960) through #leavePresetOnSetpointWrite (:764-789):
+// a setpoint someone set by hand is no longer the preset's. It takes persist and s.mu, never s.op, so the inbound setters
 // may call it while a write waits on the Sink (issue #63); persist keeps
-// its save from overtaking a preset write's (R2-P6-store-1501).
-func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, unoccupied bool) {
+// its save from overtaking a preset write's (R2-P6-store-1501). It
+// reports whether the cleared handle started a thermostat suggestion's
+// override (trackOverrideLocked): the caller re-evaluates the suggestions
+// then — at once when it holds s.op, else scheduled.
+func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, unoccupied bool) (reevaluate bool) {
 	if s.features&ThermostatFeaturePRES == 0 {
-		return
+		return false
 	}
 	s.lockPersist()
 	s.mu.Lock()
 	if s.activePresetHandle == nil || s.occupiedLocked() == unoccupied {
 		s.mu.Unlock()
 		s.unlockPersist()
-		return
+		return false
 	}
 	previous := s.activePresetHandle
 	s.activePresetHandle = nil
+	reevaluate = s.trackOverrideLocked(nil, true)
 	presets := s.presets
 	s.mu.Unlock()
 	err := s.savePresets(ctx, presets, nil)
@@ -482,6 +505,7 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 	// through SetActivePreset(null), which emits ActivePresetChange
 	// (ThermostatCluster.h:215-224, ThermostatClusterPresets.cpp:499).
 	s.emitActivePresetChange(ctx, previous, nil)
+	return reevaluate
 }
 
 // presetRequest normalises the SetActivePresetRequest payload: the bridge
@@ -570,21 +594,42 @@ func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) er
 			return err
 		}
 	}
-	if err := s.storeActiveHandle(ctx, handle); err != nil {
+	reevaluate, err := s.storeActiveHandle(ctx, handle)
+	if err != nil {
 		return err
 	}
 	// chip's SetActivePreset emits the event on every accepted request,
 	// the unchanged handle included (ThermostatClusterPresets.cpp:461-500).
 	s.emitActivePresetChange(ctx, previous, handle)
+	if reevaluate {
+		s.reevaluateSuggestions(ctx)
+	}
 	return nil
 }
 
+// limitCoveringStored is the value for a limit attribute that the stored
+// list does not exceed: a configuration that lowers a limit below what
+// clients already stored raises it, with a notice, and the stored entries
+// stay. Mirrors matter.js ThermostatServer.ts:393-399 at b25ed960
+// (#limitCoveringStored), applied to NumberOfPresets at :299-304.
+func (s *ThermostatServer) limitCoveringStored(name string, limit uint8, required int, found string) uint8 {
+	if required <= int(limit) {
+		return limit
+	}
+	raised := uint8(min(required, math.MaxUint8)) //nolint:gosec // clamped to a uint8
+	s.logger().Info("matter.thermostat.limit_raised",
+		slog.String("attribute", name), slog.Int("value", int(raised)),
+		slog.String("reason", fmt.Sprintf("%s is %d but %s", name, limit, found)))
+	return raised
+}
+
 // seedPresets is matter.js initialize's preset part
-// (ThermostatServer.ts:134-152) with the validation its commit runs
-// (persistedPresets$Changing with no old value, :1300-1320): the stored
-// presets when the PresetStore has them, else the configured ones —
-// validated as a seed and normalised — saved; then an ActivePresetHandle
-// that matches no preset is cleared with a warning.
+// (ThermostatServer.ts:294-319 at b25ed960) with the validation its commit
+// runs (persistedPresets$Changing with no old value, :1774-1791): the
+// stored presets when the PresetStore has them — NumberOfPresets raised to
+// cover them — else the configured ones — validated as a seed and
+// normalised — saved; then an ActivePresetHandle that matches no preset is
+// cleared with a warning.
 func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 	ctx := context.Background()
 	if v, err := s.inst.CheckValue(tdef.AttrNumberOfPresets, cfg.NumberOfPresets, nil); err != nil {
@@ -611,6 +656,7 @@ func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 				return fmt.Errorf("%w: %w", ErrPresets, err)
 			}
 			active, loaded = bytes.Clone(h), true
+			s.numberOfPresets = s.limitCoveringStored("NumberOfPresets", s.numberOfPresets, len(presets), fmt.Sprintf("%d presets are stored", len(presets)))
 		}
 	}
 	if !loaded {

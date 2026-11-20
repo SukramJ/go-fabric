@@ -16,8 +16,8 @@ import (
 )
 
 // TestPresetWriteRules holds the remaining rules of matter.js
-// #validatePresetWriteRequest (ThermostatServer.ts:1367-1493 at db021da0),
-// #normalizePresets (:1516-1537) and #validatePresetCommit (:1544-1580) to
+// #validatePresetWriteRequest (ThermostatServer.ts:1850-1975 at b25ed960),
+// #normalizePresets (:2001-2025) and #validatePresetCommit (:2032-2080) to
 // their statuses and texts, on local writes.
 func TestPresetWriteRules(t *testing.T) {
 	t.Parallel()
@@ -43,7 +43,7 @@ func TestPresetWriteRules(t *testing.T) {
 		"a built-in changed":    {[]thermo.Preset{newPreset(withHandle([]byte{7}))}, im.StatusConstraintError, "Cannot change built-in status"},
 		"a new built-in":        {[]thermo.Preset{stored, newPreset(func(p *thermo.Preset) { p.BuiltIn = spec.ValueOf(true) })}, im.StatusConstraintError, "Can not add a new built-in preset"},
 		"a name twice":          {[]thermo.Preset{stored, newPreset(withName("a")), newPreset(withName("a"))}, im.StatusConstraintError, `Duplicate preset name "a" for scenario Occupied`},
-		"a type's count":        {[]thermo.Preset{stored, newPreset(sleep), newPreset(sleep, withName("b"))}, im.StatusResourceExhausted, "Number of presets (1) for scenario Sleep exceeds allowed number (1)"},
+		"a type's count":        {[]thermo.Preset{stored, newPreset(sleep), newPreset(sleep, withName("b"))}, im.StatusResourceExhausted, "Number of presets (2) for scenario Sleep exceeds allowed number (1)"},
 		"no cooling setpoint":   {[]thermo.Preset{stored, newPreset(noCool, withName("c"))}, im.StatusConstraintError, "missing required coolingSetpoint"},
 		"no heating setpoint":   {[]thermo.Preset{stored, newPreset(noHeat, withName("h"))}, im.StatusConstraintError, "missing required heatingSetpoint"},
 		"cooling out of bounds": {[]thermo.Preset{stored, newPreset(hot, withName("t"))}, im.StatusConstraintError, "Preset coolingSetpoint (3300) for scenario Occupied is out of bounds [1600, 3200]"},

@@ -8,7 +8,9 @@ package exchange
 // duplicate as peer activity, and inbound unsecured sessions no handler
 // adopts. The subject is the controller's Manager; matter.js's session
 // subscriptions have no Go counterpart, so "conveys the failing exchange" is
-// held as the session sparing that exchange and closing once it ends.
+// held as the session sparing that exchange and closing once it ends. At
+// b25ed960 the peer loss an exchange reports spares the sessions registered
+// after the exchange started.
 
 import (
 	"context"
@@ -61,6 +63,27 @@ func TestExchangeManagerPeerLoss(t *testing.T) {
 		if !s.IsClosed() {
 			t.Error("session not closed once the failing exchange ended")
 		}
+	})
+	t.Run("keeps a session of the peer registered after the failing exchange started", func(t *testing.T) {
+		t.Parallel()
+		// The cutoff is the registration count the exchange took at its
+		// creation (ExchangeManager.ts:623, :650 at b25ed960), not a time.
+		m, s, _, _ := emFailingPeer(t, false)
+		x, _ := m.Initiate(s, mrp.SecureChannelProtocolID, Options{})
+		newer, err := m.NewSecureSession(SecureSessionConfig{
+			ID: 0x0401, Addr: peerAddr, Channel: newSecureConfig(),
+			PeerParameters: PeerParameters(nil), FabricIndex: 1,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := x.Send(context.Background(), 0, nil, SendOptions{}); !errors.Is(err, ErrNetwork) {
+			t.Fatalf("Send = %v", err)
+		}
+		if !s.IsPeerLost() || newer.IsPeerLost() {
+			t.Fatalf("lost: the exchange's session %v, the newer one %v", s.IsPeerLost(), newer.IsPeerLost())
+		}
+		x.Close()
 	})
 	for _, tc := range []struct {
 		name            string

@@ -123,9 +123,8 @@ type payload struct {
 
 // requestCheck is a request command's entry of the relaxation table.
 type requestCheck struct {
-	unchecked bool
-	refusal   uint8
-	ref       string
+	refusal uint8
+	ref     string
 }
 
 type generator struct {
@@ -1035,20 +1034,13 @@ func (g *generator) writePayload(w *writer, p *payload, what string) {
 		w.p("\treturn spec.DecodeFields(n, %q,", p.what)
 		for _, f := range p.fields {
 			dec := decExpr(f)
-			switch {
-			case f.relaxed != "":
+			if f.relaxed != "" {
 				// The server judges the value (the relaxation table,
 				// relaxed.go); the decoder holds the type's width only.
 				unbounded := *f
 				unbounded.v = nil
 				dec = decExpr(&unbounded)
 				w.p("\t\t// %s: the constraint %q is the server's to judge (%s).", f.name, constraintText(f), f.relaxed)
-			case p.check != nil && p.check.unchecked && p.command != nil && p.response == nil:
-				// The request is not held to its constraints (the
-				// relaxation table's unchecked cluster).
-				unbounded := *f
-				unbounded.v = nil
-				dec = decExpr(&unbounded)
 			}
 			if !f.mandatory {
 				dec = "spec.DecodeOptional(" + dec + ")"
@@ -1190,6 +1182,13 @@ func baseDec(t typeInfo, v *value) string {
 		return "spec.DecodeStruct[" + t.goType + "]"
 	case kindList:
 		entry := decExpr(t.elem)
+		if t.elem.relaxed != "" {
+			// The server judges each entry (relaxed.go,
+			// relaxRequestListEntry); the decoder holds its width only.
+			unbounded := *t.elem
+			unbounded.v = nil
+			entry = decExpr(&unbounded)
+		}
 		if lo, hi, ok := lengthBounds(c); ok {
 			return fmt.Sprintf("spec.DecodeListIn(%s, %d, %d)", entry, lo, hi)
 		}

@@ -827,15 +827,6 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 	for i := range resp.Responses {
 		rewriteInvokeResponseCommand(&resp.Responses[i])
 	}
-	// SuppressResponse handling per Matter §8.8.3.2.1: a suppress-response invoke
-	// still ships its InvokeResponse when a CommandDataIB was generated, but sends
-	// nothing when the response carries only CommandStatusIB entries. Mirrors
-	// matter.js packages/node/src/node/server/InteractionServer.ts:1168-1199 at db021da0
-	// (the held `suppressedBuffer` is discarded — no message sent — when no
-	// cmd-response is produced). The command side-effects already ran inside
-	// HandleInvokeRequest; we only elide the wire reply and send the owed
-	// MRP ack (the controller opted out of the StatusResponse handshake, so the
-	// Standalone Ack is all it expects; [Bridge.ackUnansweredRequest]).
 	// Every command of the request was answered with nothing — a handler
 	// returned [im.NoResponse], which leaves its command out: no
 	// InvokeResponse is sent, only the owed acknowledgement (review II,
@@ -859,7 +850,21 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 			slog.Int("invokes", len(req.Invokes)))
 		return nil
 	}
-	if req.SuppressResponse && !resp.HasCommandData() {
+	// SuppressResponse: the commands have run inside HandleInvokeRequest,
+	// and no InvokeResponse is sent — also when a command produced a
+	// CommandDataIB. Mirrors matter.js
+	// packages/node/src/node/server/InteractionServer.ts:1104-1109 at
+	// b25ed960 (the `if (suppressResponse)` branch: `for await (const _chunk of
+	// results);` then return; #5011, 8addfb158, which removed the held
+	// response db021da0 flushed on the first CommandDataIB). matter.js
+	// decides here over the spec reading this module followed before
+	// (§8.8.3.2.1: a generated CommandDataIB is still sent). We only send
+	// the owed MRP ack (the controller opted out of the StatusResponse
+	// handshake, so the Standalone Ack is all it expects;
+	// [Bridge.ackUnansweredRequest]). A suppressed request whose every
+	// command was left out has already ended in the branch above, the same
+	// way.
+	if req.SuppressResponse {
 		b.ackUnansweredRequest(requestHdr, proto)
 		b.logger.Debug("matter.rx.im.invoke.suppressed",
 			slog.String("src", srcString(src)),

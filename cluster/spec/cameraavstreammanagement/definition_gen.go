@@ -1919,7 +1919,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Fields: []spec.Field{
-				{ID: 0, Name: "StreamPriorities", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "StreamUsageEnum", Kind: spec.KindEnum, Bits: 8, Enum: StreamUsageEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
+				{ID: 0, Name: "StreamPriorities", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "StreamUsageEnum", Kind: spec.KindEnum, Bits: 8, Enum: StreamUsageEnumDef}, Relaxed: "connectedhomeip src/app/clusters/camera-av-stream-management-server/CameraAVStreamManagementCluster.cpp:2577-2585 at 6170af84 (BD-chip-CameraAvStreamManagement-RulesInServer)"}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 			},
 			Decode: decodeSetStreamPrioritiesRequest,
 		},

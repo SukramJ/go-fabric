@@ -151,11 +151,11 @@ func (i *Instance) ValidateWrite(attrID uint32, value any, peers Peers) (any, er
 // inPeer evaluates an "in" constraint: v must be one of the entries of the
 // peer attribute named by in. An unresolved peer is an empty set, which
 // admits nothing — unlike an unresolved bound. Mirrors matter.js
-// packages/node/src/behavior/state/validation/constraint.ts:153-163 (the
+// packages/node/src/behavior/state/validation/constraint.ts:157-168 (the
 // "in" validator throws ConstraintError) and
 // packages/model/src/aspects/Constraint.ts:164-170 (test: a non-array
 // operand is a one-entry set, an undefined one an empty set, membership by
-// identity).
+// identity) at b25ed960.
 func (i *Instance) inPeer(in string, v any, peers Peers) bool {
 	if peers == nil {
 		return false
@@ -230,6 +230,13 @@ func (i *Instance) checkValueIn(name string, t Type, nullable bool, c Constraint
 	switch t.Kind {
 	case KindUint, KindEnum, KindBitmap:
 		v, why = i.checkUnsigned(t, nullable, c, value, peers)
+		if n, ok := asUint(value); ok && why != "" && t.Kind == KindEnum && n <= UintMax(t.Bits, nullable) && enumUndefined(t.Enum, n) {
+			// Mirrors matter.js
+			// packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
+			// at b25ed960 (createEnumValidator: UnknownEnumValueError, the
+			// only check for a value the enum does not define).
+			return nil, Errorf(im.StatusConstraintError, "%s: %s: Matter does not define the enum value %d for %s: %w", i.def.Name, name, n, t.Enum.Name, ErrUnknownEnumValue)
+		}
 		if n, ok := v.(uint64); ok && why == "" && scope.bits && t.Kind == KindBitmap && t.Bitmap != nil {
 			if err := i.checkBitConformance(name, t.Bitmap, n); err != nil {
 				return nil, err
@@ -267,14 +274,18 @@ func (i *Instance) checkValueIn(name string, t Type, nullable bool, c Constraint
 
 // checkUnsigned checks an unsigned integer, enum or bitmap: its width,
 // its enum's conformant values or its bitmap's defined bits, its
-// constraint. It returns the value as a uint64, or why it is refused.
+// constraint. It returns the value as a uint64, or why it is refused. An
+// enum without members accepts every value of its width: its values are
+// defined outside it (matter.js
+// packages/node/src/behavior/state/validation/ValueValidator.ts:171-172 at
+// b25ed960, definesValues).
 func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any, peers Peers) (v any, why string) {
 	limit := UintMax(t.Bits, nullable)
 	n, ok := asUint(value)
 	switch {
 	case !ok || n > limit:
 		return nil, fmt.Sprintf("%v outside 0..%d", value, limit)
-	case t.Kind == KindEnum && t.Enum != nil && !i.EnumSupported(t.Enum, n):
+	case t.Kind == KindEnum && t.Enum != nil && definesValues(t.Enum) && !i.EnumSupported(t.Enum, n):
 		return nil, fmt.Sprintf("%d is not a supported %s value", n, t.Enum.Name)
 	case t.Kind == KindBitmap && nullable && n>>(bitWidth(t.Bits)-1) != 0:
 		// A nullable bitmap reserves its most-significant bit for null
@@ -290,6 +301,29 @@ func (i *Instance) checkUnsigned(t Type, nullable bool, c Constraint, value any,
 		return nil, fmt.Sprintf("%d violates %q", n, c.Text)
 	}
 	return n, ""
+}
+
+// definesValues reports whether the enum e has a member: a value or a
+// range.
+func definesValues(e *Enum) bool { return len(e.Values) > 0 || len(e.Ranges) > 0 }
+
+// enumUndefined reports whether v is a value the enum e, which has
+// members, does not define: no member's id and in no range member.
+func enumUndefined(e *Enum, v uint64) bool {
+	if e == nil || !definesValues(e) {
+		return false
+	}
+	for vi := range e.Values {
+		if e.Values[vi].Value == v {
+			return false
+		}
+	}
+	for ri := range e.Ranges {
+		if e.Ranges[ri].Contains(v) {
+			return false
+		}
+	}
+	return true
 }
 
 // checkBitConformance refuses a value that sets a bit, or any bit of a
@@ -401,7 +435,13 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 		return Errorf(im.StatusConstraintError, "%s: %s %v is not a list", i.def.Name, name, value)
 	}
 	if !i.satisfies(c, float64(rv.Len()), peers) {
-		return Errorf(im.StatusConstraintError, "%s: %s length %d violates %q", i.def.Name, name, rv.Len(), c.Text)
+		// The list's own constraint, then its entries: each error to
+		// scope.reject (matter.js
+		// packages/node/src/behavior/state/validation/ValueValidator.ts:500-508,
+		// the entries :481-493, at b25ed960).
+		if err := scope.reject(Errorf(im.StatusConstraintError, "%s: %s length %d violates %q", i.def.Name, name, rv.Len(), c.Text)); err != nil {
+			return err
+		}
 	}
 	if t.Entry == nil {
 		return nil
@@ -410,8 +450,12 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 	if c.Entry != nil {
 		entry = *c.Entry
 	}
+	// A relaxed entry ([Field.Relaxed]) is held to its type's width: the
+	// server judges its value, an enum's member among them.
+	et, entry := held(t.Entry.Type, entry, t.Entry.Relaxed)
 	for n := range rv.Len() {
-		if _, err := i.checkValueIn(fmt.Sprintf("%s[%d]", name, n), t.Entry.Type, t.Entry.Quality.Nullable, entry, entryValue(rv.Index(n).Interface()), nil, scope); err != nil {
+		_, err := i.checkValueIn(fmt.Sprintf("%s[%d]", name, n), et, t.Entry.Quality.Nullable, entry, entryValue(rv.Index(n).Interface()), nil, scope)
+		if err := scope.reject(err); err != nil {
 			return err
 		}
 	}
@@ -436,10 +480,11 @@ func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers
 // define, and a choice group with too few or too many fields are refused
 // with CONSTRAINT_ERROR ([ErrConformance], [ErrEnumValueConformance],
 // [ErrUnknownEnumValue]). Mirrors matter.js
-// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467
-// (createStructValidator) over conformance.ts:19-55
-// (createConformanceValidator) and conformance-compiler.ts:87-220
-// (astToFunction) at db021da0.
+// packages/node/src/behavior/state/validation/ValueValidator.ts:375-453
+// (createStructValidator) over conformance.ts:20-58
+// (createConformanceValidator) and conformance-compiler.ts:86-863
+// (astToFunction) at b25ed960; each field's conformance, then its value
+// ([Instance.checkFields]).
 func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScope) error {
 	if d, ok := value.(DefinitionFormer); ok {
 		value = d.DefinitionForm()
@@ -454,31 +499,32 @@ func (i *Instance) checkStruct(name string, s *Struct, value any, scope nameScop
 	if s == nil {
 		return nil
 	}
-	if scope.conformance {
-		if err := i.checkFieldConformance(i.def.Name+": "+name, s, rv, scope); err != nil {
-			return err
-		}
-	}
-	for fi := range s.Fields {
-		f := &s.Fields[fi]
+	fieldValue := func(f *Field) error {
 		if scope.written && f.ID == fabricIndexFieldID {
-			continue
+			return nil
 		}
 		fv, mapped := mappedField(rv, f.Name)
 		if !mapped {
-			continue
+			return nil
 		}
 		if !fv.IsValid() {
 			return Errorf(im.StatusConstraintError, "%s: %s has no field %s", i.def.Name, name, f.Name)
 		}
 		if fv.Kind() == reflect.Pointer {
 			if fv.IsNil() {
-				continue
+				return nil
 			}
 			fv = fv.Elem()
 		}
 		t, c := held(f.Type, f.Constraint, f.Relaxed)
-		if _, err := i.checkValueIn(name+"."+f.Name, t, f.Quality.Nullable, c, entryValue(fv.Interface()), nil, scope); err != nil {
+		_, err := i.checkValueIn(name+"."+f.Name, t, f.Quality.Nullable, c, entryValue(fv.Interface()), nil, scope)
+		return err
+	}
+	if scope.conformance {
+		return i.checkFields(i.def.Name+": "+name, s, rv, scope, fieldValue)
+	}
+	for fi := range s.Fields {
+		if err := scope.reject(fieldValue(&s.Fields[fi])); err != nil {
 			return err
 		}
 	}

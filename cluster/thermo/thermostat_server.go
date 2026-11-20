@@ -889,9 +889,11 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 	}
 	s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	// A local change of an occupied setpoint is a direct one: it ends the
-	// active preset (ThermostatServer.ts:744-768 at db021da0).
-	if len(changed) > 0 {
-		s.clearActivePresetOnDirectWrite(context.Background(), false)
+	// active preset (ThermostatServer.ts:764-789, :1203-1220 at b25ed960);
+	// changed is empty unless the written setpoint itself moved, so a
+	// companion the reconcile moved never ends it on its own.
+	if len(changed) > 0 && s.clearActivePresetOnDirectWrite(context.Background(), false) {
+		s.scheduleSuggestionReevaluation()
 	}
 }
 
@@ -1213,7 +1215,7 @@ func (s *ThermostatServer) writePresets(ctx context.Context, v any) error {
 // derives or which forbid nothing the enum allows.
 //
 // With a [Sink] the mode goes to the host first (matter.js
-// systemMode$Changing, ThermostatServer.ts:614 at db021da0, runs before
+// systemMode$Changing, ThermostatServer.ts:1104 at b25ed960, runs before
 // the state changes); a refusal stores nothing. The Sink runs without
 // s.mu; once it consented the mode is stored over whatever
 // [ThermostatServer.SetSystemMode] stored meanwhile. The caller holds
@@ -1243,7 +1245,8 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) (change
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginControllerWrite, thermoAttrSystemMode)
 	if running {
-		// matter.js sets it as a local actor (asLocalActor, :1196).
+		// matter.js sets it as a local actor (asLocalActor,
+		// ThermostatServer.ts:1671 at b25ed960).
 		s.changes.NotifyFrom(contract.OriginHostSet, tdef.AttrThermostatRunningMode)
 	}
 	s.emitChanges(ctx, before, after)
@@ -1349,27 +1352,15 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		changed := s.commitSetpoints(st)
 		s.mu.Unlock()
 		s.flushSetpointEvents(ctx)
-		if !t.limit {
-			s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
-			return changed, nil
+		if !t.limit && s.clearActivePresetOnDirectWrite(ctx, t.unoccu) {
+			s.reevaluateSuggestions(ctx)
 		}
-		// A setpoint the limit's reconcile moved is a direct change of
-		// that setpoint: it ends the active preset when it is in effect.
-		// Mirrors matter.js packages/node/src/behaviors/thermostat/
-		// ThermostatServer.ts at db021da0: the limit's $Changing
-		// reconciles (#assertMaxHeatSetpointLimitChanging :730-733), the
-		// moved setpoint's $Changing runs in the same pre-commit with the
-		// write's session (packages/node/src/behavior/state/managed/
-		// Datasource.ts:1185-1215), which is no command, and sets
-		// activePresetHandle to null (:682-706, :744-768).
-		for _, id := range changed {
-			switch id {
-			case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint:
-				s.clearActivePresetOnDirectWrite(ctx, false)
-			case thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint:
-				s.clearActivePresetOnDirectWrite(ctx, true)
-			}
-		}
+		// A setpoint the limit's reconcile moved keeps the active preset:
+		// it only moved to keep the limits or the deadband. Mirrors
+		// matter.js packages/node/src/behaviors/thermostat/
+		// ThermostatServer.ts:764-789 at b25ed960
+		// (#leavePresetOnSetpointWrite skips a value
+		// #noteReconciledSetpoints recorded, :1447-1482).
 		return changed, nil
 	}
 	// The Sink hears the value the server will store: the written
@@ -1416,7 +1407,9 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	changed := s.commitSetpoints(next)
 	s.mu.Unlock()
 	s.flushSetpointEvents(ctx)
-	s.clearActivePresetOnDirectWrite(ctx, t.unoccu)
+	if s.clearActivePresetOnDirectWrite(ctx, t.unoccu) {
+		s.reevaluateSuggestions(ctx)
+	}
 	return changed, nil
 }
 

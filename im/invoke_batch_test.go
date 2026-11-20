@@ -130,10 +130,12 @@ func TestValidateInvokeBatch_MaxPathsPerInvoke(t *testing.T) {
 	}
 }
 
-// TestInvokeResponse_HasCommandData verifies the CommandDataIB detection that
-// gates the SuppressResponse "send nothing" decision (Matter §8.8.3.2.1;
-// matter.js InteractionServer.ts:1168-1199 at db021da0): a response is "command data"
-// bearing iff at least one entry is a CommandDataIB (IsStatus=false).
+// TestInvokeResponse_HasCommandData pins the exported
+// [InvokeResponse.HasCommandData] contract: a response is "command data"
+// bearing iff at least one entry is a CommandDataIB (IsStatus=false). It no
+// longer gates the SuppressResponse decision (matter.js 8addfb158, #5011:
+// InteractionServer.ts:1104-1109 at b25ed960 never answers a suppressed
+// invoke); the method stays public API, nothing in the module calls it.
 func TestInvokeResponse_HasCommandData(t *testing.T) {
 	t.Parallel()
 	statusOnly := InvokeResponse{Responses: []InvokeResponseEntry{
@@ -157,7 +159,7 @@ func TestInvokeResponse_HasCommandData(t *testing.T) {
 // TestHandleInvokeRequest_ResponseSuppressResponseAlwaysFalse pins that the
 // InvokeResponseMessage the bridge marshals never carries SuppressResponse=true
 // even when the request set it: matter.js always emits the deprecated field as
-// false (InteractionServer.ts:1111-1112 at db021da0 `emptyInvokeResponse.suppressResponse:
+// false (InteractionServer.ts:1114 at b25ed960 `emptyInvokeResponse.suppressResponse:
 // false`) and lets the send/no-send decision live at the dispatch layer.
 func TestHandleInvokeRequest_ResponseSuppressResponseAlwaysFalse(t *testing.T) {
 	t.Parallel()

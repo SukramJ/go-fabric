@@ -151,6 +151,12 @@ type confLocation struct {
 // written marks a controller's written value ([CheckWritten]): the
 // FabricIndex field of its structs is the accessing fabric's, assigned
 // before validation, and is not judged.
+//
+// errs collects the errors of every field instead of stopping at the
+// first ([nameScope.reject]); nil stops at the first. Only the request
+// gate collects ([Instance.admitRequest]). Mirrors matter.js
+// packages/node/src/behavior/state/validation/location.ts:64-80 at
+// b25ed960 (ValidationLocation.errors, ValidationLocation.reject).
 type nameScope struct {
 	written     bool
 	peers       Peers
@@ -158,6 +164,17 @@ type nameScope struct {
 	conformance bool
 	enums       bool
 	bits        bool
+	errs        *[]error
+}
+
+// reject is err for a scope that collects no errors; for one that does,
+// err is recorded and the check goes on (nil). A nil err is nil.
+func (s nameScope) reject(err error) error {
+	if err == nil || s.errs == nil {
+		return err
+	}
+	*s.errs = append(*s.errs, err)
+	return nil
 }
 
 // sameName reports whether two specification names name one element, as
@@ -681,9 +698,12 @@ func literalOf(text string) confValue {
 	return confValue{v: strings.Trim(text, `"`), defined: true}
 }
 
-// fieldValidator judges one field's presence and, for an enum, its value
-// against the conformance (astToFunction, conformance-compiler.ts:87-220,
-// with addEnumMemberValidation :763-868).
+// fieldValidator judges one field's presence and, for an enum, its
+// value's member against the conformance (astToFunction,
+// conformance-compiler.ts:86-863, with addEnumMemberValidation :762-862
+// at b25ed960). A relaxed field ([Field.Relaxed]) has no member check:
+// matter.js switches a field's whole validation off (validate = false,
+// conformance.ts:36-40 at b25ed960).
 type fieldValidator func(own confValue, loc *confLocation) error
 
 func (i *Instance) fieldValidator(where string, s *Struct, f *Field, enums bool) fieldValidator {
@@ -744,15 +764,19 @@ func (i *Instance) fieldValidator(where string, s *Struct, f *Field, enums bool)
 			return nil
 		}
 	}
-	if disallows || !enums || f.Type.Kind != KindEnum || f.Type.Enum == nil {
+	if disallows || !enums || f.Relaxed != "" || f.Type.Kind != KindEnum || f.Type.Enum == nil {
 		return main
 	}
 	return i.withEnumMembers(where, f, c, main)
 }
 
-// withEnumMembers is addEnumMemberValidation (conformance-compiler.ts:763-868
-// at db021da0): a value must be a member's id or lie in a range member,
-// and that member's conformance must allow it.
+// withEnumMembers is addEnumMemberValidation (conformance-compiler.ts:762-862
+// at b25ed960): the member a value names — by its id, or by the range
+// that holds it — must be allowed by its conformance. A value the enum
+// does not define is the datatype check's to refuse, "the only check for
+// it" ([ErrUnknownEnumValue], [Instance.checkValueIn];
+// packages/node/src/behavior/state/validation/ValueValidator.ts:158-185
+// at b25ed960), so it passes here (conformance-compiler.ts:855-859).
 func (i *Instance) withEnumMembers(where string, f *Field, c *confCompiler, main fieldValidator) fieldValidator {
 	e := f.Type.Enum
 	if len(e.Values) == 0 && len(e.Ranges) == 0 {
@@ -807,7 +831,7 @@ func (i *Instance) withEnumMembers(where string, f *Field, c *confCompiler, main
 			}
 		}
 		if !found {
-			return Errorf(im.StatusConstraintError, "%s.%s: Matter does not define the enum value %d for %s: %w", where, f.Name, v, f.Name, ErrUnknownEnumValue)
+			return nil
 		}
 		code := m.node.code
 		if code == codeEvaluate {
@@ -824,31 +848,54 @@ func (i *Instance) withEnumMembers(where string, f *Field, c *confCompiler, main
 
 // checkFieldConformance judges every field of the struct value rv against
 // its conformance with the struct as the record, then the choice groups'
-// counts (createStructValidator,
-// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467 at
-// db021da0).
+// counts ([Instance.checkFields] without the fields' values).
 func (i *Instance) checkFieldConformance(where string, s *Struct, rv reflect.Value, scope nameScope) error {
+	return i.checkFields(where, s, rv, scope, nil)
+}
+
+// checkFields judges each field of the struct value rv in turn — its
+// conformance with the struct as the record, then, with value set, its
+// value (value(f)) — and then the choice groups' counts. Each error goes
+// to scope.reject: the first ends the check, unless scope collects them.
+// Mirrors matter.js
+// packages/node/src/behavior/state/validation/ValueValidator.ts:375-453
+// (createStructValidator: each member's validator in turn, its error
+// rejected :422-426, then the choices :429-449) over conformance.ts:20-58
+// (createConformanceValidator: the member's conformance, its error
+// rejected :44-52, then its value :54-56) at b25ed960 — with one
+// difference: matter.js throws a choice error (:432-438, :441-448), so
+// the first failing choice group ends the struct's check even with a
+// collector, while a collecting scope here records every failing group,
+// by name. The status is the same: the choices come after every field in
+// both, and the first error decides.
+func (i *Instance) checkFields(where string, s *Struct, rv reflect.Value, scope nameScope, value func(f *Field) error) error {
 	loc := &confLocation{siblings: rv, fields: s, choices: map[string]*confChoice{}, scope: scope}
 	for fi := range s.Fields {
 		f := &s.Fields[fi]
-		if f.Conformance.Op == ConfDeprecated && f.Type.Kind == KindAny && f.Type.Name == "" {
-			continue
+		if f.Conformance.Op != ConfDeprecated || f.Type.Kind != KindAny || f.Type.Name != "" {
+			if validate := i.fieldValidator(where, s, f, scope.enums); validate != nil {
+				if err := scope.reject(validate(fieldValueOf(fieldOfStruct(rv, f.Name)), loc)); err != nil {
+					return err
+				}
+			}
 		}
-		validate := i.fieldValidator(where, s, f, scope.enums)
-		if validate == nil {
-			continue
-		}
-		if err := validate(fieldValueOf(fieldOfStruct(rv, f.Name)), loc); err != nil {
-			return err
+		if value != nil {
+			if err := scope.reject(value(f)); err != nil {
+				return err
+			}
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(loc.choices)) {
 		ch := loc.choices[name]
-		if ch.count < ch.target && !ch.orLess {
-			return Errorf(im.StatusConstraintError, "%s: Conformance choice %q: Too few fields present (%d of min %d): %w", where, name, ch.count, ch.target, ErrConformance)
+		var err error
+		switch {
+		case ch.count < ch.target && !ch.orLess:
+			err = Errorf(im.StatusConstraintError, "%s: Conformance choice %q: Too few fields present (%d of min %d): %w", where, name, ch.count, ch.target, ErrConformance)
+		case ch.count > ch.target && !ch.orMore:
+			err = Errorf(im.StatusConstraintError, "%s: Conformance choice %q: Too many fields present (%d of max %d): %w", where, name, ch.count, ch.target, ErrConformance)
 		}
-		if ch.count > ch.target && !ch.orMore {
-			return Errorf(im.StatusConstraintError, "%s: Conformance choice %q: Too many fields present (%d of max %d): %w", where, name, ch.count, ch.target, ErrConformance)
+		if err := scope.reject(err); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -888,9 +935,9 @@ func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error
 // name the response does not hold — and answers a failure FAILURE: a field
 // mandatory by the request left out, one the conformance does not allow
 // present. Mirrors matter.js
-// packages/node/src/node/integration/ProtocolService.ts:601-626
-// (validateCommandPayload), :681-684 (outerResolve: the request by the
-// request command's name) and :733-740 at db021da0 (a response validation
+// packages/node/src/node/integration/ProtocolService.ts:610-631
+// (validateCommandPayload), :707-710 (outerResolve: the request by the
+// request command's name) and :717-733 at b25ed960 (a response validation
 // error is a FailureError).
 //
 // The fields' types, constraints and enum values, and the structs nested
@@ -900,7 +947,10 @@ func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error
 // switched off (GetWeekDayScheduleResponse, DoorLockServer.ts:704-707) and answers a cluster status code in the
 // global status enum (SetCredentialResponse DUPLICATE, :441). An absent
 // payload, or one whose Go type does not carry every field the definition
-// states (a hand-written decoder's), is not judged (:609-611).
+// states (a hand-written decoder's), is not judged — db021da0's
+// `if (data === undefined) return`; at b25ed960 matter.js validates an
+// absent response as {} too (ProtocolService.ts:624-625), not adopted
+// here (pin lift b25ed960, P1-B: open).
 func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peers) error {
 	req := i.def.Command(cmdID, Request)
 	if req == nil || response == nil {

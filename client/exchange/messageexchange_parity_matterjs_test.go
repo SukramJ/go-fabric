@@ -6,7 +6,8 @@ package exchange
 // A port of matter.js packages/protocol/test/protocol/MessageExchangeTest.ts
 // at 862ad75f: peer-loss declaration, the unacked state, the BDX liveness
 // kick and retransmission cap, timers that outlive their message, activity,
-// close, cross-protocol StatusReports and the ack-wait abort.
+// close, cross-protocol StatusReports and the ack-wait abort; at b25ed960
+// the onTransmitted hook of a send (TestMessageExchangeOnTransmitted).
 //
 // matter.js drives MessageExchange through ProtocolMocks.NodeSession and
 // calls onMessageReceived directly; the Go exchange runs on a secure session
@@ -18,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -639,6 +641,102 @@ func TestMessageExchangeAckWaitAbort(t *testing.T) {
 		}
 		if n := len(e.conn.datagrams()); n != 0 {
 			t.Errorf("datagrams = %d, want 0", n)
+		}
+	})
+}
+
+// TestMessageExchangeOnTransmitted ports describe "onTransmitted"
+// (MessageExchangeTest.ts:1005-1070 at b25ed960): Exchange.send's onTransmitted
+// (exchangeseam.SendNotifyingTransmission).
+func TestMessageExchangeOnTransmitted(t *testing.T) {
+	t.Parallel()
+	t.Run("runs once, after the first transmission and before the ack, not for retransmissions or acks", func(t *testing.T) {
+		t.Parallel()
+		e := mxNew(t, false, nil)
+		x := e.exchange(t, mrp.SecureChannelProtocolID)
+		transmittedAt := make(chan int, 4)
+		done := make(chan error, 1)
+		go func() {
+			done <- x.send(context.Background(), 1, nil, SendOptions{}, func() { transmittedAt <- len(e.conn.datagrams()) })
+		}()
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		select {
+		case n := <-transmittedAt:
+			if n != 1 {
+				t.Fatalf("ran after %d datagrams, want 1", n)
+			}
+		case <-ctx.Done():
+			t.Fatal("did not run after the first transmission")
+		}
+		if !x.HasUnackedMessage() {
+			t.Fatal("no unacknowledged message")
+		}
+		other := inbound(x, 7, mrp.SecureChannelProtocolID, 1)
+		other.RequiresAck = true
+		x.sendStandaloneAckFor(other)
+		for range 20 {
+			e.clock.Advance(3 * time.Second)
+		}
+		if err := waitErr(t, done); err == nil {
+			t.Fatal("the send without an ack succeeded")
+		}
+		transmissions := 0
+		for _, b := range e.conn.datagrams() {
+			if e.peer.decode(t, b).proto.Opcode == 1 {
+				transmissions++
+			}
+		}
+		if transmissions <= 1 {
+			t.Fatalf("transmissions = %d, want retransmissions", transmissions)
+		}
+		if len(transmittedAt) != 0 {
+			t.Fatalf("ran %d more times", len(transmittedAt))
+		}
+	})
+	t.Run("runs on a reliable channel, which sends without MRP", func(t *testing.T) {
+		t.Parallel()
+		m, conn, _ := newTestManager(t, Config{Reliable: true})
+		s, _ := newSecurePair(t, m, 0x0391, false)
+		x, _ := m.Initiate(s, mrp.SecureChannelProtocolID, Options{})
+		var transmittedAt []int
+		if err := x.send(context.Background(), 1, nil, SendOptions{}, func() { transmittedAt = append(transmittedAt, conn.count()) }); err != nil {
+			t.Fatal(err)
+		}
+		if s.UsesMRP() {
+			t.Fatal("UsesMRP on a reliable manager")
+		}
+		if !slices.Equal(transmittedAt, []int{1}) {
+			t.Fatalf("transmitted at %v, want [1]", transmittedAt)
+		}
+	})
+	t.Run("runs when the ack wait was aborted before the send", func(t *testing.T) {
+		t.Parallel()
+		e := mxNew(t, false, nil)
+		x := e.exchange(t, mrp.SecureChannelProtocolID)
+		abort := make(chan struct{})
+		close(abort)
+		var transmittedAt []int
+		if err := x.send(context.Background(), 1, nil, SendOptions{AckWaitAbort: abort}, func() { transmittedAt = append(transmittedAt, len(e.conn.datagrams())) }); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(transmittedAt, []int{1}) {
+			t.Fatalf("transmitted at %v, want [1]", transmittedAt)
+		}
+	})
+	t.Run("does not run when the first transmission fails", func(t *testing.T) {
+		t.Parallel()
+		e := mxNew(t, false, nil)
+		e.conn.mu.Lock()
+		e.conn.fail = errors.New("simulated network failure")
+		e.conn.mu.Unlock()
+		x := e.exchange(t, mrp.SecureChannelProtocolID)
+		transmitted := 0
+		if err := x.send(context.Background(), 1, nil, SendOptions{}, func() { transmitted++ }); !errors.Is(err, ErrNetwork) {
+			t.Fatalf("Send = %v, want ErrNetwork", err)
+		}
+		if transmitted != 0 {
+			t.Fatalf("ran %d times", transmitted)
 		}
 	})
 }

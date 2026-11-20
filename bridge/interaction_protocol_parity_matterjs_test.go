@@ -32,8 +32,9 @@ const (
 // behaviours InteractionProtocolTest.ts gives EventedOnOffServer through
 // its event handlers.
 type scriptedOnOff struct {
-	mu sync.Mutex
-	on bool
+	mu       sync.Mutex
+	on       bool
+	dataRuns int // cmdData invocations: the effect a response command had
 }
 
 func (s *scriptedOnOff) MatterClusterID() uint32 { return 0x0006 }
@@ -78,6 +79,7 @@ func (s *scriptedOnOff) MatterInvoke(_ context.Context, cmdID uint32, _ any) (an
 	case cmdThrows:
 		return nil, errors.New("boom")
 	case cmdData:
+		s.dataRuns++
 		return dataResponse{}, nil
 	case cmdBusy:
 		return nil, busyError{}
@@ -97,6 +99,12 @@ func (s *scriptedOnOff) isOn() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.on
+}
+
+func (s *scriptedOnOff) dataCalls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.dataRuns
 }
 
 type scriptedSource struct{ srv *scriptedOnOff }
@@ -196,8 +204,9 @@ func TestInteractionProtocolBridgeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// :2317-2334: under SuppressResponse a command that fails sends
-	// nothing and changes nothing.
+	// InteractionProtocolTest.ts:2313-2330 at b25ed960: under
+	// SuppressResponse a command that fails sends nothing and changes
+	// nothing.
 	t.Run("sends no response under SuppressResponse when a command throws", func(t *testing.T) {
 		t.Parallel()
 		h, srv, ep := newScriptedHarness(t)
@@ -209,44 +218,34 @@ func TestInteractionProtocolBridgeParityMatterJS(t *testing.T) {
 		}
 	})
 
-	// :2351-2370: a command that generates a CommandDataIB is answered
-	// under SuppressResponse with that one entry.
-	t.Run("sends the response under SuppressResponse when a CommandDataIB is generated", func(t *testing.T) {
+	// InteractionProtocolTest.ts:2332-2345 at b25ed960: a command that
+	// answers with a status only runs and sends nothing.
+	t.Run("sends no response under SuppressResponse when only a status is generated", func(t *testing.T) {
 		t.Parallel()
-		h, _, ep := newScriptedHarness(t)
-		op, payload, ok := h.exchange(im.OpcodeInvokeRequest, encodeInvokeEntries(t, true, ep, invokeEntry{cmd: cmdData, fields: true}))
-		if !ok || op != im.OpcodeInvokeResponse {
-			t.Fatalf("reply opcode 0x%02X (ok=%v), want InvokeResponse", op, ok)
+		h, srv, ep := newScriptedHarness(t)
+		if op, _, ok := h.exchange(im.OpcodeInvokeRequest, encodeInvokeEntries(t, true, ep, invokeEntry{cmd: 0x01, fields: true})); ok {
+			t.Fatalf("reply opcode 0x%02X, want none", op)
 		}
-		entries := invokeResponses(t, payload)
-		if len(entries) != 1 {
-			t.Fatalf("%d entries, want 1", len(entries))
-		}
-		path := entries[0].mustChild(t, 0).mustChild(t, 0)
-		if path.mustChild(t, 1).El.Uint != 0x0006 || path.mustChild(t, 2).El.Uint != uint64(cmdDataResponse) {
-			t.Fatalf("command path %+v, want the response command", path)
+		if !srv.isOn() {
+			t.Fatal("command did not run")
 		}
 	})
 
-	// :2372-2386: a held status goes out with the CommandDataIB that forces
-	// the response: status ref 0, command ref 1.
-	t.Run("under SuppressResponse, flushes a held status alongside the forcing CommandDataIB", func(t *testing.T) {
+	// InteractionProtocolTest.ts:2347-2361 at b25ed960 (#5011, matter.js
+	// 8addfb158): a batch of a status-only command (ref 0) and one that
+	// generates a CommandDataIB (ref 1) runs both and sends nothing. It
+	// replaces db021da0's two cases that held the response for the
+	// CommandDataIB.
+	t.Run("sends no response under SuppressResponse when a CommandDataIB is generated", func(t *testing.T) {
 		t.Parallel()
-		h, _, ep := newScriptedHarness(t)
-		op, payload, ok := h.exchange(im.OpcodeInvokeRequest, encodeInvokeEntries(t, true, ep,
+		h, srv, ep := newScriptedHarness(t)
+		if op, _, ok := h.exchange(im.OpcodeInvokeRequest, encodeInvokeEntries(t, true, ep,
 			invokeEntry{cmd: 0x01, fields: true, ref: 0, hasRef: true},
-			invokeEntry{cmd: cmdData, fields: true, ref: 1, hasRef: true}))
-		if !ok || op != im.OpcodeInvokeResponse {
-			t.Fatalf("reply opcode 0x%02X (ok=%v), want InvokeResponse", op, ok)
+			invokeEntry{cmd: cmdData, fields: true, ref: 1, hasRef: true})); ok {
+			t.Fatalf("reply opcode 0x%02X, want none", op)
 		}
-		entries := invokeResponses(t, payload)
-		if len(entries) != 2 {
-			t.Fatalf("%d entries, want 2", len(entries))
-		}
-		status, ok1 := entries[0].child(1)
-		command, ok2 := entries[1].child(0)
-		if !ok1 || !ok2 || status.mustChild(t, 2).El.Uint != 0 || command.mustChild(t, 2).El.Uint != 1 {
-			t.Fatalf("entries %+v, want status ref 0 then command ref 1", entries)
+		if !srv.isOn() || srv.dataCalls() != 1 {
+			t.Fatalf("on %v, data command runs %d, want on and 1", srv.isOn(), srv.dataCalls())
 		}
 	})
 

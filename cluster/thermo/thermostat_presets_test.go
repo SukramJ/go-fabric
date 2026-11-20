@@ -329,14 +329,14 @@ func TestPresetConfigurationRefused(t *testing.T) {
 	}
 }
 
-// TestLimitWriteThatMovesTheSetpointInEffectEndsThePreset holds that a
-// user setpoint limit write whose reconcile moves a setpoint in effect
-// ends the active preset, and one that moves none keeps it. Mirrors
-// matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts at
-// db021da0: #assertMaxHeatSetpointLimitChanging reconciles (:730-733), and
-// the setpoint the reconcile moved runs its own $Changing as a direct
-// change, which sets activePresetHandle to null (:757-768).
-func TestLimitWriteThatMovesTheSetpointInEffectEndsThePreset(t *testing.T) {
+// TestLimitWriteThatMovesTheSetpointInEffectKeepsThePreset holds that a
+// user setpoint limit write — a controller's or the application's — whose
+// reconcile moves a setpoint in effect keeps the active preset, while the
+// application's direct write of that setpoint ends it. Mirrors matter.js
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:764-789 at
+// b25ed960 (#leavePresetOnSetpointWrite skips the value
+// #noteReconciledSetpoints recorded, :1447-1482); #4993 changed it.
+func TestLimitWriteThatMovesTheSetpointInEffectKeepsThePreset(t *testing.T) {
 	t.Parallel()
 	srv := mustNew(t, thermostatConfig(5, []thermo.Preset{setpointPreset(1, 2200, 2700)}))
 	if err := activate(t, srv, []byte{1}); err != nil {
@@ -356,7 +356,24 @@ func TestLimitWriteThatMovesTheSetpointInEffectEndsThePreset(t *testing.T) {
 	if got := readInt16(t, srv, tdef.AttrOccupiedHeatingSetpoint); got != 2100 {
 		t.Fatalf("OccupiedHeatingSetpoint %d after MaxHeatSetpointLimit 2100, want 2100", got)
 	}
+	if h := srv.ActivePresetHandle(); !bytes.Equal(h, []byte{1}) {
+		t.Errorf("active handle %x after a limit write that moved the setpoint in effect, want 01", h)
+	}
+	// The application's limit change moves it again and keeps the preset.
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrMaxHeatSetpointLimit: int16(2050)}); err != nil {
+		t.Fatal(err)
+	}
+	if got := readInt16(t, srv, tdef.AttrOccupiedHeatingSetpoint); got != 2050 {
+		t.Fatalf("OccupiedHeatingSetpoint %d after the application's MaxHeatSetpointLimit 2050, want 2050", got)
+	}
+	if h := srv.ActivePresetHandle(); !bytes.Equal(h, []byte{1}) {
+		t.Errorf("active handle %x after the application's limit change moved the setpoint, want 01", h)
+	}
+	// Its direct write of the setpoint ends the preset.
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrOccupiedHeatingSetpoint: int16(2000)}); err != nil {
+		t.Fatal(err)
+	}
 	if h := srv.ActivePresetHandle(); h != nil {
-		t.Errorf("active handle %x after a limit write that moved the setpoint in effect, want null", h)
+		t.Errorf("active handle %x after the application's setpoint write, want null", h)
 	}
 }

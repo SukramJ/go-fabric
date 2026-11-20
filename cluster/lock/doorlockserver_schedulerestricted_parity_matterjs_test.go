@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/lock"
 	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -90,6 +91,30 @@ func TestDoorLockServerScheduleRestrictedAccessParity(t *testing.T) {
 			StartHour: 0, StartMinute: 0, EndHour: 23, EndMinute: 59,
 		})
 		f.expectScheduledDenial(lockdef.OperationErrorRestricted)
+	})
+
+	// :859-894 at b25ed960: GetWeekDaySchedule's index fields are not held
+	// to their constraint (constraint = false,
+	// DoorLockServer.ts:1520-1522), so the handler answers index 0 in its
+	// response; the response echoes the index, so its Status is read raw,
+	// as matter.js decodes it without validating.
+	t.Run("answers a GetWeekDaySchedule index outside the supported range in the response", func(t *testing.T) {
+		f := setUpScheduledLock(t, nil, scheduledUser(lockdef.UserTypeWeekDayScheduleUser, nil))
+		res := f.must(lockdef.CmdGetWeekDaySchedule, lockdef.GetWeekDayScheduleRequest{WeekDayIndex: 0, UserIndex: 1})
+		if st := statusField(res, 2); st != uint64(lockdef.StatusInvalidCommand) {
+			t.Errorf("payload status %d, want INVALID_COMMAND", st)
+		}
+	})
+
+	// :896-919 at b25ed960: a request without command fields is validated
+	// as {} (ProtocolService.ts:624-625), its mandatory fields missing, and
+	// the command's onValidationError answers INVALID_COMMAND
+	// (DoorLockServer.ts:1509).
+	t.Run("answers a GetWeekDaySchedule without command fields with INVALID_COMMAND", func(t *testing.T) {
+		f := setUpScheduledLock(t, nil, scheduledUser(lockdef.UserTypeWeekDayScheduleUser, nil))
+		if se := f.refused(lockdef.CmdGetWeekDaySchedule, nil); se.Status != im.StatusInvalidCommand {
+			t.Errorf("interaction status 0x%02X, want INVALID_COMMAND", se.Status)
+		}
 	})
 }
 

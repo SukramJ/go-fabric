@@ -1,67 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// ThermostatSuggestions: the ports of connectedhomeip's
-// src/app/clusters/thermostat-server/tests/TestThermostatSuggestionsAndHold.cpp
-// (TestSuggestionsAttributesAndAddRemoveCommands, :161-242) and of the
-// python case src/python_testing/TC_TSTAT_4_3.py, both at 6170af84, at the
-// server's API. matter.js does not implement the feature (ThermostatServer.ts
-// at 862ad75f has no suggestion text), so chip is the behavioural authority
-// (CLAUDE.md workflow step 5, register row BD-chip-Thermostat-Suggestions).
-//
-// Not ported: TestThermostatSuggestionStruct (:39-84) — the struct's
-// copies are Go values; TestHoldAttributesReadWrite (:86-135) and
-// TestOccupancyFeatureAndEvents (:137-159) — the hold and occupancy cases
-// of the same file, which the module's hold and occupancy tests cover.
+// ThermostatSuggestions, the connectedhomeip cases matter.js's
+// ThermostatSuggestionsTest.ts (ported at b25ed960 in
+// thermostat_suggestions_parity_matterjs_test.go) does not hold: chip's
+// unit test TestSuggestionsAttributesAndAddRemoveCommands
+// (src/app/clusters/thermostat-server/tests/TestThermostatSuggestionsAndHold.cpp:161-242
+// at 6170af84) — a 17-byte handle, a lifetime above 1440 minutes and the
+// change notifications of the commands — and the certification case
+// src/python_testing/TC_TSTAT_4_3.py, which the chip-tool harness runs
+// against the reference daemon; its steps here pin the server's answers
+// at the API. Kept because neither appears in the matter.js port.
 package thermo_test
 
 import (
 	"bytes"
 	"context"
 	"slices"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
-
-// suggestClock is a fake clock and the Matter time read from it, which a
-// test may hold unsynchronised.
-type suggestClock struct {
-	*clocktest.Fake
-	mu       sync.Mutex
-	unsynced bool
-}
-
-func newSuggestClock() *suggestClock {
-	// kValidRealTimeMicroseconds (TestThermostatSuggestionsAndHold.cpp:37):
-	// 1700000000 s after the Unix epoch.
-	return &suggestClock{Fake: clocktest.New(time.Unix(1700000000, 0))}
-}
-
-func (c *suggestClock) matterTime() (uint32, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.unsynced {
-		return 0, false
-	}
-	return clock.MatterTimeOf(c.Fake)()
-}
-
-func (c *suggestClock) setSynced(synced bool) {
-	c.mu.Lock()
-	c.unsynced = !synced
-	c.mu.Unlock()
-}
-
-func (c *suggestClock) epoch() uint32 { v, _ := c.matterTime(); return v }
 
 // handleA, handleB and handleC are the presets of tsuggestConfig.
 var (
@@ -96,92 +59,6 @@ func tsuggestConfig(clk *suggestClock, edit ...func(*thermo.ThermostatConfig)) t
 		e(&cfg)
 	}
 	return cfg
-}
-
-func newTSUGGEST(t *testing.T, cfg thermo.ThermostatConfig) *thermo.ThermostatServer {
-	t.Helper()
-	srv, err := thermo.New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The Matter time is attached, as a node attaches its own.
-	if c, ok := cfg.Clock.(*suggestClock); ok {
-		srv.AttachMatterTime(c.matterTime)
-	}
-	return srv
-}
-
-// addSuggestion invokes AddThermostatSuggestion; effective nil is null.
-func addSuggestion(srv *thermo.ThermostatServer, handle []byte, effective *uint32, minutes uint16) (uint8, error) {
-	req := tdef.AddThermostatSuggestionRequest{PresetHandle: handle, ExpirationInMinutes: minutes, EffectiveTime: spec.Nullable[uint32]{Null: true}}
-	if effective != nil {
-		req.EffectiveTime = spec.ValueOf(*effective)
-	}
-	resp, err := srv.MatterInvoke(context.Background(), tdef.CmdAddThermostatSuggestion, req)
-	if err != nil {
-		return 0, err
-	}
-	return resp.(tdef.AddThermostatSuggestionResponse).UniqueId, nil
-}
-
-func removeSuggestion(srv *thermo.ThermostatServer, id uint8) error {
-	_, err := srv.MatterInvoke(context.Background(), tdef.CmdRemoveThermostatSuggestion, tdef.RemoveThermostatSuggestionRequest{UniqueId: id})
-	return err
-}
-
-// readSuggestions reads ThermostatSuggestions.
-func readSuggestions(t *testing.T, srv *thermo.ThermostatServer) []thermo.Suggestion {
-	t.Helper()
-	v, ok := srv.MatterRead(tdef.AttrThermostatSuggestions)
-	if !ok {
-		t.Fatal("ThermostatSuggestions not served")
-	}
-	return v.(spec.List[thermo.Suggestion])
-}
-
-// readCurrent reads CurrentThermostatSuggestion; false for null.
-func readCurrent(t *testing.T, srv *thermo.ThermostatServer) (thermo.Suggestion, bool) {
-	t.Helper()
-	v, ok := srv.MatterRead(tdef.AttrCurrentThermostatSuggestion)
-	if !ok {
-		t.Fatal("CurrentThermostatSuggestion not served")
-	}
-	if v == nil {
-		return thermo.Suggestion{}, false
-	}
-	return v.(thermo.Suggestion), true
-}
-
-// readReason reads ThermostatSuggestionNotFollowingReason; nil for null.
-func readReason(t *testing.T, srv *thermo.ThermostatServer) *uint16 {
-	t.Helper()
-	v, ok := srv.MatterRead(tdef.AttrThermostatSuggestionNotFollowingReason)
-	if !ok {
-		t.Fatal("ThermostatSuggestionNotFollowingReason not served")
-	}
-	if v == nil {
-		return nil
-	}
-	n := v.(uint16)
-	return &n
-}
-
-// recordChanges collects the attribute ids srv reports.
-func recordChanges(srv *thermo.ThermostatServer) func() []uint32 {
-	var mu sync.Mutex
-	var ids []uint32
-	srv.OnAttributeChange(func(c contract.Change) {
-		mu.Lock()
-		ids = append(ids, c.Attributes...)
-		mu.Unlock()
-	})
-	return func() []uint32 {
-		mu.Lock()
-		defer mu.Unlock()
-		out := slices.Clone(ids)
-		ids = nil
-		return out
-	}
 }
 
 // TestChipSuggestionsAttributesAndAddRemoveCommands ports
@@ -392,9 +269,4 @@ func TestChipSuggestionsTC_TSTAT_4_3(t *testing.T) { //nolint:funlen // one case
 	if _, err := addSuggestion(srv, handleB, new(clk.epoch()), 30); statusOfErr(t, err) != im.StatusResourceExhausted {
 		t.Errorf("step 11: %v, want RESOURCE_EXHAUSTED", err)
 	}
-}
-
-func equalSuggestion(a, b thermo.Suggestion) bool {
-	return a.UniqueId == b.UniqueId && bytes.Equal(a.PresetHandle, b.PresetHandle) &&
-		a.EffectiveTime == b.EffectiveTime && a.ExpirationTime == b.ExpirationTime
 }

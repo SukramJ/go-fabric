@@ -9,10 +9,10 @@
 //     instead of dispatching any command — mirrors matter.js
 //     CommandInvokeResponse.ts:68-99, :196-212 at db021da0
 //     (process/#processConcrete);
-//   - a SuppressResponse invoke that yields only CommandStatusIB entries
-//     (no CommandDataIB) sends nothing — mirrors matter.js
-//     InteractionServer.ts:1168-1199 at db021da0 (the held suppressedBuffer
-//     is discarded).
+//   - a SuppressResponse invoke sends nothing — mirrors matter.js
+//     InteractionServer.ts:1104-1109 at b25ed960 (the suppressResponse branch runs
+//     the commands and returns); the case with a CommandDataIB is
+//     TestInteractionProtocolBridgeParityMatterJS.
 //
 // Lives in package bridge so it can call [Bridge.dispatch] directly, matching
 // timed_conformance_test.go / write_chunked_dispatch_test.go.
@@ -186,7 +186,7 @@ func TestDispatchInvokeRequest_BatchExceedsMaxPaths_RejectsInvalidAction(t *test
 // SuppressResponse invoke of a single command that resolves to a status-only
 // result (UnsupportedEndpoint on an endpoint absent from the topology) and
 // asserts NO datagram is emitted. Mirrors matter.js InteractionServer.ts:
-// 1070-1074 — a suppress-response invoke with no CommandDataIB sends nothing.
+// 1104-1109 at b25ed960 — a suppress-response invoke sends nothing.
 // The paired positive control (suppressResponse=false → InvokeResponse) is
 // TestDispatchInvokeRequest_ReplyIsMRPReliable in reply_reliability_test.go.
 func TestDispatchInvokeRequest_SuppressResponseStatusOnly_SendsNothing(t *testing.T) {

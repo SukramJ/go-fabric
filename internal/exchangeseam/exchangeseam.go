@@ -18,13 +18,21 @@
 // sees, when the only honest caller is a test. The seam is
 // module-internal, so it cannot become a consumer-visible surface.
 //
-// The second is the CASE initiator's (client/handshake): a secure session
+// The second is the establishing CASE session (client/handshake), in the
+// two forms the session's role selects. The initiator's: a secure session
 // registered before Sigma3 goes out, which holds what the responder sends
 // on it until the initiator has the responder's Success, and its
-// activation then. Ahead of matter.js (BD-Matter-CASEClient-SessionBeforeSigma3);
-// the establishing state is the handshake's affair, not a consumer's, so
-// it is not a field of exchange.SecureSessionConfig.
+// activation then. Ahead of matter.js (BD-Matter-CASEClient-SessionBeforeSigma3).
+// The responder's: a secure session registered establishing at its
+// creation, which processes what the initiator sends and is seen by peer
+// loss and close, and its completion when the Success went out (full
+// handshake) or arrived (resumption) — matter.js NodeSession.isEstablishing
+// and completeEstablishment (NodeSession.ts:209-251 at b25ed960). The
+// establishing state is the handshake's affair, not a consumer's, so it is
+// not a field of exchange.SecureSessionConfig.
 package exchangeseam
+
+import "context"
 
 // NotifyActivity records traffic on sess (an *exchange.Session, threaded
 // through as any because this package must not import client/exchange):
@@ -35,10 +43,12 @@ var NotifyActivity func(sess any, received bool)
 
 // NewEstablishingSecureSession registers in m (an *exchange.Manager) the
 // secure session cfg (an exchange.SecureSessionConfig) describes, before
-// its handshake finished: messages that decrypt on it are held, and
-// exchange.Manager.SessionsFor does not list it, until
-// ActivateSecureSession. It returns the *exchange.Session. Set by
-// client/exchange's init.
+// its handshake finished. For an initiator (cfg.Responder false) messages
+// that decrypt on it are held, and exchange.Manager.SessionsFor does not
+// list it, until ActivateSecureSession. For a responder (cfg.Responder
+// true) its messages are processed and SessionsFor lists it; the per-peer
+// cap ignores it until CompleteSecureSessionEstablishment. It returns the
+// *exchange.Session. Set by client/exchange's init.
 // fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
 var NewEstablishingSecureSession func(m, cfg any) (any, error)
 
@@ -48,3 +58,20 @@ var NewEstablishingSecureSession func(m, cfg any) (any, error)
 // client/exchange's init.
 // fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
 var ActivateSecureSession func(sess any)
+
+// SendNotifyingTransmission is exchange.Exchange.Send on x (an
+// *exchange.Exchange) with opts (an exchange.SendOptions) that also runs
+// onTransmitted once, when the first transmission of the message went
+// out, before the wait for its acknowledgement — matter.js
+// ExchangeSendOptions.onTransmitted (MessageExchange.ts:132-137 at
+// b25ed960); the CASE responder's Success completes its session's
+// establishment with it. Set by client/exchange's init.
+// fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
+var SendNotifyingTransmission func(ctx context.Context, x any, opcode uint8, payload []byte, opts any, onTransmitted func()) error
+
+// CompleteSecureSessionEstablishment ends the establishment of sess (a
+// CASE responder's *exchange.Session from NewEstablishingSecureSession)
+// and reports whether it is established: false when the session is
+// closing and so never established. Set by client/exchange's init.
+// fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
+var CompleteSecureSessionEstablishment func(sess any) bool

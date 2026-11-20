@@ -185,7 +185,7 @@ func (c *Controller) armerContext() peer.RebootArmerContext {
 		// skips once Close cleared it (review II, R2-P6-conc-2305).
 		PeerLost: func(p exchange.PeerAddress) {
 			if mgr := c.live.mgr.Load(); mgr != nil {
-				mgr.HandlePeerLoss(p, errRebootReturnTimeout, time.Time{})
+				mgr.HandlePeerLossBefore(p, errRebootReturnTimeout, nil)
 			}
 		},
 		CloseSubscriptions: func(p exchange.PeerAddress) {

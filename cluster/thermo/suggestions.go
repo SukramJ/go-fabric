@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
-	"math"
 	"slices"
 	"time"
 
@@ -27,19 +26,22 @@ import (
 // (CurrentThermostatSuggestion), switches to its preset and says why when
 // it does not (ThermostatSuggestionNotFollowingReason).
 //
-// matter.js does not implement the feature (ThermostatServer.ts at
-// 862ad75f has no suggestion logic; register row
-// BD-chip-Thermostat-Suggestions, notes/parity/by_design.md). The server
-// follows connectedhomeip, which keeps the rules in the cluster and the
-// list in a delegate: the command checks and their order
-// (src/app/clusters/thermostat-server/ThermostatClusterSuggestions.cpp:160-246
-// at 6170af84), RemoveThermostatSuggestion (:248-269), the removal of
-// expired suggestions (:41-67) and the change notifications (:271-333).
-// The list, the unique ids, the choice of the current suggestion and its
-// expiry timer are the reference delegate's
-// (examples/thermostat/thermostat-common/src/thermostat-suggestions-delegate-impl.cpp:120-298
-// at 6170af84), held here by the server itself. Where this server goes
-// beyond the reference delegate the entry says so.
+// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts
+// at b25ed960 (#4993; class doc :196-213): the commands
+// (:613-660), the re-evaluation (#reevaluateSuggestions and
+// #determineCurrentSuggestion, :2368-2477), the timer (#restartSuggestionTimer,
+// :2497-2529), the unique ids (#nextSuggestionUniqueId, :2532-2540), the
+// manual override (#trackOverrideOnPresetChange, :2324-2348) and the
+// suggestions of a removed preset (#reevaluateOnPresetsChange, :2556-2565).
+// Ours, with matter.js's protected defaults as the model: the host's own
+// not-following reasons arrive through SetAttributes (matter.js's
+// overridable suggestionNotFollowingReason, :750-757), the Matter time
+// through [ThermostatServer.AttachMatterTime] (matter.js's
+// hasSynchronizedTime, :701-707). Not ported: matter.js's
+// selectThermostatSuggestion seam (:727-733; the earliest EffectiveTime,
+// which this server applies), and the retry back-off after a
+// re-evaluation that did not take effect (:75-78, :2512-2519), which is
+// transaction machinery with no counterpart here.
 
 // ThermostatFeatureTSUGGEST is the ThermostatSuggestions feature (bit 10,
 // conformance "[PRES]": New refuses it without Presets, as
@@ -93,6 +95,23 @@ type suggestions struct {
 	// quiesced marks the timer MatterQuiesce stopped: the SetEndpoint of
 	// a reassembly that puts the server back re-evaluates and arms it.
 	quiesced bool
+	// lastID is the UniqueID issued last (matter.js
+	// internal.lastSuggestionUniqueId, ThermostatServer.ts:2287 at
+	// b25ed960, seeded with the largest stored id — 0 here, where the
+	// list starts empty).
+	lastID uint8
+	// overridden is matter.js's overriddenSuggestionId (:3183 at
+	// b25ed960): the UniqueID of the entry a client or the application
+	// overrode by changing ActivePresetHandle away from its preset;
+	// overriddenSet is false for none.
+	overridden    uint8
+	overriddenSet bool
+	// setpointWritten marks a SetAttributes that wrote a setpoint of the
+	// current occupancy directly and scheduled the re-evaluation:
+	// matter.js's #setpointChangedInTransaction (:796-808 at b25ed960, the
+	// current occupancy's pair :803-808) for the one local change that, in
+	// Go, is a transaction. The next re-evaluation reads and clears it.
+	setpointWritten bool
 }
 
 // seedSuggestions takes the TSUGGEST configuration: MaxThermostatSuggestions
@@ -241,19 +260,17 @@ func suggestionRemoveRequest(fields any) (tdef.RemoveThermostatSuggestionRequest
 	return tdef.RemoveThermostatSuggestionRequest{}, spec.Errorf(im.StatusInvalidCommand, "thermo: RemoveThermostatSuggestion carried %T", fields)
 }
 
-// handleAddThermostatSuggestion is connectedhomeip's
-// ThermostatSuggestions::AddThermostatSuggestion
-// (ThermostatClusterSuggestions.cpp:159-246 at 6170af84), its checks in its
-// order: a preset handle longer than 16 bytes or a lifetime outside 30 to
-// 1440 minutes is CONSTRAINT_ERROR (:163-171), a Matter time that is not
-// synchronised INVALID_IN_STATE (:173-178), a handle that names no preset
-// NOT_FOUND (:180-184), a full list RESOURCE_EXHAUSTED — before the
-// expired suggestions are removed, as there (:186-190, :200-207) — and an
-// EffectiveTime more than 24 h ahead INVALID_COMMAND (:192-198). The
-// suggestion takes the next unique id, takes effect at EffectiveTime (null:
-// now) and expires ExpirationInMinutes later (:209-233); the list changed
-// (:235), the current suggestion is re-evaluated (:237-238) and the
-// response carries the id (:240-243).
+// handleAddThermostatSuggestion is AddThermostatSuggestion. Mirrors
+// matter.js ThermostatServer.ts:613-646 at b25ed960
+// (addThermostatSuggestion): the field constraints first — a preset handle
+// longer than 16 bytes or a lifetime outside 30 to 1440 minutes is
+// CONSTRAINT_ERROR, matter.js's schema check (:609) —, then a Matter time
+// that is not synchronised INVALID_IN_STATE, a handle that names no preset
+// NOT_FOUND, a full list RESOURCE_EXHAUSTED (expired entries count) and
+// an EffectiveTime more than 24 h ahead INVALID_COMMAND. The suggestion
+// takes the next unique id, takes effect at EffectiveTime (null: now) and
+// expires ExpirationInMinutes later; the current suggestion is
+// re-evaluated and the response carries the id.
 func (s *ThermostatServer) handleAddThermostatSuggestion(ctx context.Context, fields any) (any, error) {
 	req, err := suggestionAddRequest(fields)
 	if err != nil {
@@ -273,9 +290,7 @@ func (s *ThermostatServer) handleAddThermostatSuggestion(ctx context.Context, fi
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.mu.Lock()
-	known := slices.ContainsFunc(s.presets, func(p Preset) bool {
-		return !p.PresetHandle.Null && bytes.Equal(p.PresetHandle.Value, req.PresetHandle)
-	})
+	known := s.presetFor(req.PresetHandle)
 	full := len(s.suggest.list) >= int(s.suggest.max)
 	switch {
 	case !known:
@@ -288,12 +303,11 @@ func (s *ThermostatServer) handleAddThermostatSuggestion(ctx context.Context, fi
 		s.mu.Unlock()
 		return nil, spec.Errorf(im.StatusInvalidCommand, "thermo: EffectiveTime %d is more than 24 h after %d", req.EffectiveTime.Value, now)
 	}
+	// The id is taken against the list as stored, expired entries
+	// included; they go after (matter.js ThermostatServer.ts:624, :637 at
+	// b25ed960, pruning only in the re-evaluation, :2429-2432).
+	id := s.nextSuggestionIDLocked()
 	_, currentGone := s.removeExpiredLocked(now)
-	id, ok := s.nextSuggestionIDLocked()
-	if !ok {
-		s.mu.Unlock()
-		return nil, spec.Errorf(im.StatusFailure, "thermo: no free suggestion id")
-	}
 	effective := now
 	if !req.EffectiveTime.Null {
 		effective = req.EffectiveTime.Value
@@ -314,13 +328,12 @@ func (s *ThermostatServer) handleAddThermostatSuggestion(ctx context.Context, fi
 	return tdef.AddThermostatSuggestionResponse{UniqueId: id}, nil
 }
 
-// handleRemoveThermostatSuggestion is connectedhomeip's
-// RemoveThermostatSuggestion (ThermostatClusterSuggestions.cpp:248-269 at
-// 6170af84): an id no suggestion carries is NOT_FOUND (:69-95); otherwise
-// the suggestion goes, the list changed, the expired suggestions go too
-// and the current suggestion is re-evaluated (:262-266). Removing the
-// current suggestion nulls it (the reference delegate's
-// RemoveFromThermostatSuggestionsList, thermostat-suggestions-delegate-impl.cpp:144-148).
+// handleRemoveThermostatSuggestion is RemoveThermostatSuggestion. Mirrors
+// matter.js ThermostatServer.ts:653-660 at b25ed960
+// (removeThermostatSuggestion): an id no suggestion carries is NOT_FOUND;
+// otherwise the suggestion goes and the current suggestion is
+// re-evaluated, which also removes the expired entries. Removing the
+// current suggestion nulls it until the re-evaluation chooses again.
 func (s *ThermostatServer) handleRemoveThermostatSuggestion(ctx context.Context, fields any) error {
 	req, err := suggestionRemoveRequest(fields)
 	if err != nil {
@@ -358,7 +371,7 @@ func (s *ThermostatServer) handleRemoveThermostatSuggestion(ctx context.Context,
 }
 
 // removeExpiredLocked drops every suggestion whose ExpirationTime is at
-// or before now (ThermostatClusterSuggestions.cpp:41-67 at 6170af84) and
+// or before now (matter.js ThermostatServer.ts:2429 at b25ed960) and
 // reports whether one went and whether the current one did — it is no
 // longer current. The caller holds s.mu.
 func (s *ThermostatServer) removeExpiredLocked(now uint32) (removed, currentGone bool) {
@@ -375,48 +388,41 @@ func (s *ThermostatServer) removeExpiredLocked(now uint32) (removed, currentGone
 	return len(s.suggest.list) != n, currentGone
 }
 
-// nextSuggestionIDLocked is the reference delegate's GetUniqueID
-// (thermostat-suggestions-delegate-impl.cpp:169-197 at 6170af84): one
-// above the largest id held; past 255 the lowest free id from 0, and none
-// when the search reaches 255. The caller holds s.mu.
-func (s *ThermostatServer) nextSuggestionIDLocked() (uint8, bool) {
-	var highest uint8
-	for _, sg := range s.suggest.list {
-		highest = max(highest, sg.UniqueId)
-	}
-	id := highest + 1
-	if id != 0 {
-		return id, true
-	}
+// nextSuggestionIDLocked is the UniqueID after the last one issued that no
+// entry carries, modulo 256, so a just-removed id is not issued again at
+// once. Mirrors matter.js ThermostatServer.ts:2532-2540 at b25ed960
+// (#nextSuggestionUniqueId); the list never holds all 256 values (at most
+// MaxThermostatSuggestions, a uint8). The caller holds s.mu.
+func (s *ThermostatServer) nextSuggestionIDLocked() uint8 {
 	held := func(id uint8) bool {
 		return slices.ContainsFunc(s.suggest.list, func(sg Suggestion) bool { return sg.UniqueId == id })
 	}
+	id := s.suggest.lastID + 1
 	for held(id) {
 		id++
-		if id == math.MaxUint8 {
-			return 0, false
-		}
 	}
-	return id, true
+	s.suggest.lastID = id
+	return id
 }
 
-// reevaluateSuggestions is connectedhomeip's ReEvaluateCurrentSuggestion
-// (ThermostatClusterSuggestions.cpp:271-333 at 6170af84) over the
-// reference delegate's (thermostat-suggestions-delegate-impl.cpp:234-298):
-// without a synchronised Matter time nothing changes (:238-244); otherwise
-// the expired suggestions go, the current suggestion is the one with the
-// earliest EffectiveTime at or before now (:248-249, :275-298; the first
-// added on a tie), and CurrentThermostatSuggestion is reported when it
-// changed (ThermostatClusterSuggestions.cpp:297-308). The thermostat follows it — switches to its preset,
-// as SetActivePresetRequest does, and reports
-// ThermostatSuggestionNotFollowingReason null (:254-262) — unless a hold
-// is on (OngoingHold, the reason the reference delegate's TODO at
-// thermostat-suggestions-delegate-impl.cpp:258-260 and the commented
-// asserts of src/python_testing/TC_TSTAT_4_3.py:368-375 name) or the device reported
-// reasons of its own; then the reason is reported and the active preset
-// stays. The timer is armed for the current suggestion's expiry
-// (thermostat-suggestions-delegate-impl.cpp:264-269) and, beyond the reference delegate, for the next suggestion to take
-// effect. The caller holds s.op.
+// reevaluateSuggestions re-evaluates the current suggestion. Mirrors
+// matter.js ThermostatServer.ts:2368-2477 at b25ed960
+// (#reevaluateSuggestions, #determineCurrentSuggestion,
+// #setCurrentSuggestion): without a synchronised Matter time
+// CurrentThermostatSuggestion and the reason are null, the override stays
+// and the timer stops (:2421-2426, :2499-2503); otherwise the expired
+// entries go, the current suggestion is the one with the earliest
+// EffectiveTime at or before now, the first in the list on a tie
+// (:727-733), and the thermostat follows it — activates its preset as
+// SetActivePresetRequest does and moves the setpoints (:2460) — unless a
+// reason applies: the host's own reasons or OngoingHold while a hold is
+// on (suggestionNotFollowingReason, :750-757), else the empty reason for
+// an overridden entry (:2449-2450), which also starts with a setpoint the
+// same SetAttributes wrote while the preset is not active (:2451-2454). A
+// reason keeps the active preset. Another entry or none becoming current
+// ends the override (:2467-2477). The timer is armed for the earliest
+// EffectiveTime or ExpirationTime of all entries still ahead (:2505-2510).
+// The caller holds s.op.
 func (s *ThermostatServer) reevaluateSuggestions(ctx context.Context) {
 	if s.features&ThermostatFeatureTSUGGEST == 0 {
 		return
@@ -425,70 +431,191 @@ func (s *ThermostatServer) reevaluateSuggestions(ctx context.Context) {
 	// after this point re-reads the time itself.
 	s.mu.Lock()
 	s.suggest.pending = false
+	written := s.suggest.setpointWritten
+	s.suggest.setpointWritten = false
 	s.mu.Unlock()
 	now, synced := s.matterNow()
-	if !synced {
-		return
-	}
 	s.mu.Lock()
 	before, hadBefore := s.suggest.current, s.suggest.has
-	removed, _ := s.removeExpiredLocked(now)
-	var current *Suggestion
-	var wake uint32
-	for i := range s.suggest.list {
-		sg := &s.suggest.list[i]
-		if sg.EffectiveTime <= now {
-			if current == nil || sg.EffectiveTime < current.EffectiveTime {
-				current = sg
-			}
-		} else if wake == 0 || sg.EffectiveTime < wake {
-			wake = sg.EffectiveTime
-		}
-	}
-	var follow []byte
-	var reason *uint16
-	if current != nil {
-		s.suggest.current, s.suggest.has = current.UniqueId, true
-		if wake == 0 || current.ExpirationTime < wake {
-			wake = current.ExpirationTime
-		}
-		bits := s.suggest.hostReason
-		if s.hold == holdOn {
-			bits |= uint16(tdef.ThermostatSuggestionNotFollowingReasonOngoingHold)
-		}
-		if bits != 0 {
-			reason = &bits
-		} else if !bytes.Equal(s.activePresetHandle, current.PresetHandle) || s.activePresetHandle == nil {
-			follow = bytes.Clone(current.PresetHandle)
-		}
-	} else {
+	if !synced {
+		// Without synchronised time no entry is known to be current, so an
+		// override stays until time returns.
 		s.suggest.has = false
+		reasonChanged := s.suggest.reason != nil
+		s.suggest.reason = nil
+		s.armSuggestionTimerLocked(0, 0)
+		s.mu.Unlock()
+		s.notifySuggestionChanges(ctx, false, hadBefore, reasonChanged)
+		return
 	}
+	removed, _ := s.removeExpiredLocked(now)
+	follow, reason, wake := s.determineCurrentLocked(now, written)
 	currentChanged := hadBefore != s.suggest.has || (s.suggest.has && before != s.suggest.current)
 	reasonChanged := !equalReason(s.suggest.reason, reason)
 	s.suggest.reason = reason
 	s.armSuggestionTimerLocked(now, wake)
 	s.mu.Unlock()
 
-	var ids []uint32
-	if removed {
-		ids = append(ids, tdef.AttrThermostatSuggestions)
-	}
-	if currentChanged {
-		ids = append(ids, tdef.AttrCurrentThermostatSuggestion)
-	}
-	if reasonChanged {
-		ids = append(ids, tdef.AttrThermostatSuggestionNotFollowingReason)
-	}
-	if len(ids) > 0 {
-		s.changes.NotifyFrom(contract.OriginFrom(ctx), ids...)
-	}
+	s.notifySuggestionChanges(ctx, removed, currentChanged, reasonChanged)
 	if follow != nil {
 		if err := s.activatePreset(ctx, follow); err != nil {
 			s.logger().Warn("matter.thermostat.suggestion_not_followed",
 				slog.String("preset_handle", handleKey(follow)), slog.String("reason", err.Error()))
 		}
 	}
+}
+
+// determineCurrentLocked chooses the current suggestion among the entries
+// in effect at now, sets it and the override, and returns the preset to
+// follow (nil: none), the reason not to follow (nil: null) and the
+// earliest EffectiveTime or ExpirationTime still ahead (0: none). written
+// is suggest.setpointWritten. Mirrors matter.js ThermostatServer.ts:2434-2477
+// at b25ed960 (#determineCurrentSuggestion, #setCurrentSuggestion), the
+// timer's times :2505-2510 (#restartSuggestionTimer). The caller holds
+// s.mu.
+func (s *ThermostatServer) determineCurrentLocked(now uint32, written bool) (follow []byte, reason *uint16, wake uint32) {
+	var current *Suggestion
+	soonest := func(t uint32) {
+		if t > now && (wake == 0 || t < wake) {
+			wake = t
+		}
+	}
+	for i := range s.suggest.list {
+		sg := &s.suggest.list[i]
+		if sg.EffectiveTime <= now && (current == nil || sg.EffectiveTime < current.EffectiveTime) {
+			current = sg
+		}
+		soonest(sg.EffectiveTime)
+		soonest(sg.ExpirationTime)
+	}
+	if current == nil {
+		s.suggest.has = false
+		s.suggest.overriddenSet = false
+		return nil, nil, wake
+	}
+	id := current.UniqueId
+	presetActive := s.activePresetHandle != nil && bytes.Equal(s.activePresetHandle, current.PresetHandle)
+	bits := s.suggest.hostReason
+	if s.hold == holdOn {
+		bits |= uint16(tdef.ThermostatSuggestionNotFollowingReasonOngoingHold)
+	}
+	var none uint16
+	switch {
+	case bits != 0:
+		reason = &bits
+	case s.suggest.overriddenSet && s.suggest.overridden == id:
+		reason = &none
+	case !presetActive && written:
+		s.suggest.overridden, s.suggest.overriddenSet = id, true
+		reason = &none
+	}
+	s.suggest.current, s.suggest.has = id, true
+	if s.suggest.overriddenSet && s.suggest.overridden != id {
+		s.suggest.overriddenSet = false
+	}
+	if reason == nil && !presetActive {
+		follow = bytes.Clone(current.PresetHandle)
+	}
+	return follow, reason, wake
+}
+
+// notifySuggestionChanges reports the suggestion attributes a
+// re-evaluation changed.
+func (s *ThermostatServer) notifySuggestionChanges(ctx context.Context, list, current, reason bool) {
+	var ids []uint32
+	if list {
+		ids = append(ids, tdef.AttrThermostatSuggestions)
+	}
+	if current {
+		ids = append(ids, tdef.AttrCurrentThermostatSuggestion)
+	}
+	if reason {
+		ids = append(ids, tdef.AttrThermostatSuggestionNotFollowingReason)
+	}
+	if len(ids) > 0 {
+		s.changes.NotifyFrom(contract.OriginFrom(ctx), ids...)
+	}
+}
+
+// trackOverrideLocked is matter.js's #trackOverrideOnPresetChange
+// (ThermostatServer.ts:2310-2348 at b25ed960), run when ActivePresetHandle
+// changed to handle: against the current suggestion — or, while none is
+// current, the overridden entry — a change to its preset ends the
+// override, a change to another value (null included) overrides it,
+// except a setpoint write (setpointWrite) during a hold, which belongs to
+// the hold: the last re-evaluation's reason carries OngoingHold. Following
+// only activates the suggestion's preset, so it never overrides. It
+// reports whether the override changed; the caller then re-evaluates. The
+// caller holds s.mu.
+func (s *ThermostatServer) trackOverrideLocked(handle []byte, setpointWrite bool) bool {
+	if s.features&ThermostatFeatureTSUGGEST == 0 {
+		return false
+	}
+	var current *Suggestion
+	for i := range s.suggest.list {
+		sg := &s.suggest.list[i]
+		if (s.suggest.has && sg.UniqueId == s.suggest.current) ||
+			(!s.suggest.has && s.suggest.overriddenSet && sg.UniqueId == s.suggest.overridden) {
+			current = sg
+			break
+		}
+	}
+	if current == nil {
+		return false
+	}
+	matches := handle != nil && bytes.Equal(handle, current.PresetHandle)
+	belongsToHold := setpointWrite && s.suggest.reason != nil &&
+		*s.suggest.reason&uint16(tdef.ThermostatSuggestionNotFollowingReasonOngoingHold) != 0
+	if !matches && belongsToHold {
+		return false
+	}
+	if matches {
+		if !s.suggest.overriddenSet {
+			return false
+		}
+		s.suggest.overriddenSet = false
+		return true
+	}
+	if s.suggest.overriddenSet && s.suggest.overridden == current.UniqueId {
+		return false
+	}
+	s.suggest.overridden, s.suggest.overriddenSet = current.UniqueId, true
+	return true
+}
+
+// reevaluateOnPresetsChange removes the suggestions that name a preset the
+// presets no longer carry and re-evaluates. Mirrors matter.js
+// ThermostatServer.ts:2556-2565 at b25ed960 (#reevaluateOnPresetsChange,
+// called from the presets' commit, :1792-1794). The caller holds s.op.
+func (s *ThermostatServer) reevaluateOnPresetsChange(ctx context.Context) {
+	if s.features&ThermostatFeatureTSUGGEST == 0 {
+		return
+	}
+	s.mu.Lock()
+	n := len(s.suggest.list)
+	currentGone := false
+	s.suggest.list = slices.DeleteFunc(s.suggest.list, func(sg Suggestion) bool {
+		if s.presetFor(sg.PresetHandle) {
+			return false
+		}
+		if s.suggest.has && sg.UniqueId == s.suggest.current {
+			s.suggest.has, currentGone = false, true
+		}
+		return true
+	})
+	removed := len(s.suggest.list) != n
+	s.mu.Unlock()
+	s.notifySuggestionChanges(ctx, removed, currentGone, false)
+	s.reevaluateSuggestions(ctx)
+}
+
+// presetFor reports whether a stored preset carries handle (matter.js
+// #presetFor, ThermostatServer.ts:2542-2546 at b25ed960). The caller holds
+// s.mu.
+func (s *ThermostatServer) presetFor(handle []byte) bool {
+	return slices.ContainsFunc(s.presets, func(p Preset) bool {
+		return !p.PresetHandle.Null && bytes.Equal(p.PresetHandle.Value, handle)
+	})
 }
 
 // equalReason compares two nullable ThermostatSuggestionNotFollowingReason values.
@@ -519,12 +646,10 @@ func (s *ThermostatServer) armSuggestionTimerLocked(now, wake uint32) {
 	s.suggest.timer = s.clk.AfterFunc(time.Duration(wake-now)*time.Second, s.suggestionTimerFired)
 }
 
-// suggestionTimerFired re-evaluates the suggestions when the current one
-// expired or a later one took effect — the reference delegate's
-// TimerExpiredCallback (thermostat-suggestions-delegate-impl.cpp:213-222
-// at 6170af84), which removes no expired suggestion; this server does,
-// so the expired current suggestion is not chosen again. It takes the
-// command queue, as a command does.
+// suggestionTimerFired re-evaluates the suggestions when an entry's
+// EffectiveTime or ExpirationTime arrived (matter.js
+// #reevaluateSuggestionsOnTimer, ThermostatServer.ts:2392-2406 at
+// b25ed960). It takes the command queue, as a command does.
 func (s *ThermostatServer) suggestionTimerFired() {
 	s.op.Lock()
 	defer s.op.Unlock()

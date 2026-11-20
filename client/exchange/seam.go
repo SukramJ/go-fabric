@@ -4,6 +4,7 @@
 package exchange
 
 import (
+	"context"
 	"errors"
 
 	"github.com/SukramJ/go-fabric/internal/exchangeseam"
@@ -37,5 +38,20 @@ func init() {
 		if s, ok := sess.(*Session); ok {
 			s.activate()
 		}
+	}
+	exchangeseam.SendNotifyingTransmission = func(ctx context.Context, xch any, opcode uint8, payload []byte, opts any, onTransmitted func()) error {
+		x, ok := xch.(*Exchange)
+		if !ok {
+			return errors.New("exchange: send on a foreign exchange")
+		}
+		o, ok := opts.(SendOptions)
+		if !ok {
+			return errors.New("exchange: send with foreign options")
+		}
+		return x.send(ctx, opcode, payload, o, onTransmitted)
+	}
+	exchangeseam.CompleteSecureSessionEstablishment = func(sess any) bool {
+		s, ok := sess.(*Session)
+		return ok && s.completeEstablishment()
 	}
 }

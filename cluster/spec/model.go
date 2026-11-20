@@ -182,8 +182,10 @@ type Field struct {
 	// its constraint, nor an enum to its values. matter.js relaxes a field
 	// by extending its server's schema (constraint "none",
 	// packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-75
-	// at b25ed960); empty for a field held to the model. Written by
-	// script/clustergen from its relaxation table (relaxed.go).
+	// at b25ed960); empty for a field held to the model. On a list's
+	// [Type.Entry] it relaxes each entry, the list's own constraint
+	// staying the model's. Written by script/clustergen from its
+	// relaxation table (relaxed.go).
 	Relaxed string
 }
 
@@ -352,16 +354,28 @@ type Command struct {
 
 // RequestCheck is a server's departure from the request check matter.js
 // applies before the server runs (requestTlv.validate,
-// packages/protocol/src/action/server/CommandInvokeResponse.ts:474-487 at
-// db021da0). Written by script/clustergen from its relaxation table.
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:474-488,
+// and the model's validation, packages/node/src/node/integration/
+// ProtocolService.ts:671-705, at b25ed960). Written by script/clustergen
+// from its relaxation table.
 type RequestCheck struct {
-	// Unchecked: no request field is held to its constraint — matter.js's
-	// skipCommandValidation (packages/node/src/node/integration/
-	// ProtocolService.ts:343-348 at db021da0); the type's width still is.
+	// Unchecked: the request is not judged by the gate, and a generated
+	// decoder holds no request field to its constraint; the type's width
+	// still is.
+	//
+	// Deprecated: matter.js no longer skips a cluster's request validation
+	// (db021da0's skipCommandValidation is gone at b25ed960) and no
+	// generated definition states it; a command with its own refusal
+	// states a Refusal. A host-written definition that sets it keeps its
+	// behaviour until the field is removed. Removable in v0.26.0.
 	Unchecked bool
 	// Refusal is the status a request the definition refuses answers in
-	// place of the schema's own; zero keeps the schema's. matter.js's
-	// Supervision onValidationError (ProtocolService.ts:662-679).
+	// place of the schema's own — every error of its request, the
+	// decoder's and the gate's; zero keeps the schema's. matter.js's
+	// Supervision onValidationError, which answers errors[0]
+	// (ProtocolService.ts:693-694 at b25ed960), and whose command skips the
+	// request schema's own check (modelValidatedCommands,
+	// CommandInvokeResponse.ts:317, :359 at b25ed960).
 	Refusal im.StatusCode
 	// Ref is the reference line of the departure.
 	Ref string

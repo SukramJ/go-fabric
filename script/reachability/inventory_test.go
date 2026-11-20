@@ -101,11 +101,14 @@ const reachabilityUnreachedRatchet = 23
 // and its methods, among others). By hand 57 since review II, phase 7
 // (decision 269): internal/exchangeseam's NewEstablishingSecureSession and
 // ActivateSecureSession, installed at init and called by client/handshake.
+// By hand 59 since pin lift b25ed960 unit P1-A: the CASE responder's
+// CompleteSecureSessionEstablishment and SendNotifyingTransmission, the
+// same kind of seam.
 // The mock-fake-stub class 21 since phase 7: clock/clocktest's
 // Fake.AdvanceToNext, test support that production code never calls.
 var reachabilityWhitelistRatchet = map[string]int{
 	whitelistClassGenerated:         1101,
-	whitelistClassHand:              57,
+	whitelistClassHand:              59,
 	string(autoWhitelistMockPrefix): 21,
 }
 

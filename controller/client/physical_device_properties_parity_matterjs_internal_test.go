@@ -7,7 +7,9 @@
 // the client's intervalBounds over a Properties value). The Go subject of
 // this protocol test lives in controller/client, so it is ported here. A
 // matter.js call without properties is the zero Properties; the jitter is
-// math/rand's, as matter.js's crypto randomness.
+// math/rand's, as matter.js's crypto randomness. The ICD idle-synced
+// ceiling cases follow the test at b25ed960
+// (PhysicalDevicePropertiesTest.ts:240-332).
 package client
 
 import (
@@ -175,6 +177,7 @@ func TestPhysicalDevicePropertiesMaxIntervalCeilingParity(t *testing.T) {
 
 func TestPhysicalDevicePropertiesICDCeilingParity(t *testing.T) {
 	t.Parallel()
+	battery := func(p *Properties) { p.BatteryPowered, p.MainsPowered = true, false }
 	icd := func(idle *time.Duration, f func(p *Properties)) Properties {
 		p := baseProperties()
 		p.IntermittentlyConnected, p.IdleModeDuration = true, idle
@@ -189,11 +192,9 @@ func TestPhysicalDevicePropertiesICDCeilingParity(t *testing.T) {
 		req  *time.Duration
 		want time.Duration
 	}{
-		{"uses idleModeDuration exactly as the ceiling for an ICD peer, with no jitter", icd(dur(60*time.Second), nil), nil, 60 * time.Second},
+		{"uses idleModeDuration exactly as the ceiling when it equals the device ceiling, with no jitter", icd(dur(60*time.Second), nil), nil, 60 * time.Second},
 		{"scales the ceiling to a long idleModeDuration, with no jitter", icd(dur(60*time.Minute), nil), nil, 3600 * time.Second},
-		{"prefers idleModeDuration over the battery ceiling for a battery-powered ICD, with no jitter", icd(dur(60*time.Second), func(p *Properties) {
-			p.BatteryPowered, p.MainsPowered = true, false
-		}), nil, 60 * time.Second},
+		{"prefers a longer idleModeDuration over the battery ceiling for a battery-powered ICD, with no jitter", icd(dur(60*time.Minute), battery), nil, 3600 * time.Second},
 		{"clamps a huge idleModeDuration to the uint16 wire max, with no jitter", icd(dur(100_000*time.Second), nil), nil, math.MaxUint16 * time.Second},
 		{"passes an explicitly requested ceiling through unchanged for an ICD peer, with no jitter", icd(dur(60*time.Second), nil), dur(45 * time.Second), 45 * time.Second},
 	} {
@@ -204,6 +205,24 @@ func TestPhysicalDevicePropertiesICDCeilingParity(t *testing.T) {
 			}
 		})
 	}
+	// PhysicalDevicePropertiesTest.ts:263-288 at b25ed960: an
+	// IdleModeDuration shorter than the device ceiling leaves the device
+	// ceiling, with its jitter.
+	t.Run("uses the device ceiling for an ICD whose idleModeDuration is shorter", func(t *testing.T) {
+		t.Parallel()
+		f, c := bounds(icd(dur(2*time.Second), func(p *Properties) {
+			p.SupportsThread, p.SupportsWifi = true, false
+		}), nil, nil)
+		if f != 0 {
+			t.Fatalf("floor %v, want 0", f)
+		}
+		expectJittered(t, c, 60)
+	})
+	t.Run("uses the battery ceiling for a battery-powered ICD whose idleModeDuration is shorter", func(t *testing.T) {
+		t.Parallel()
+		_, c := bounds(icd(dur(60*time.Second), battery), nil, nil)
+		expectJittered(t, c, 600)
+	})
 	t.Run("falls back to the generic ICD ceiling when idleModeDuration is unknown", func(t *testing.T) {
 		t.Parallel()
 		_, c := bounds(icd(nil, nil), nil, nil)

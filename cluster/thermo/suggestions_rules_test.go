@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-// ThermostatSuggestions beyond the chip ports (suggestions_chip_test.go):
-// the expiry and effective-time timer on the server's clock, the expired
-// suggestions an Add removes, the unique ids, the device's own reasons, the
-// hold the host reports, a Sink that refuses the preset, and the
-// configuration. Every case runs on the fake clock.
+// ThermostatSuggestions beyond the matter.js port
+// (thermostat_suggestions_parity_matterjs_test.go) and the chip cases
+// (suggestions_tc_tstat_4_3_test.go): the expiry and effective-time timer
+// on the server's clock, the expired suggestions an Add removes, the
+// unique ids, the device's own reasons, the hold the host reports, a Sink
+// that refuses the preset, and the configuration. Every case runs on the
+// fake clock.
 package thermo_test
 
 import (
@@ -118,33 +120,108 @@ func TestAddRemovesExpiredSuggestionsAfterTheFullCheck(t *testing.T) {
 	}
 }
 
-// TestSuggestionUniqueIDs pins the reference delegate's GetUniqueID
-// (thermostat-suggestions-delegate-impl.cpp:169-197 at 6170af84): one
-// above the largest id held, and past 255 the lowest free id from 0.
+// TestSuggestionUniqueIDs pins the unique ids after the last one issued,
+// modulo 256 and skipping the ids held — matter.js
+// ThermostatServer.ts:2532-2540 at b25ed960 (#nextSuggestionUniqueId) —
+// on the ids this server issued itself: ThermostatSuggestionsTest.ts's
+// "wraps after 255 and skips values in use" starts from stored entries,
+// which the server does not hold (see the register entry).
 func TestSuggestionUniqueIDs(t *testing.T) {
 	t.Parallel()
 	clk := newSuggestClock()
 	srv := newTSUGGEST(t, tsuggestConfig(clk))
-	prev, err := addSuggestion(srv, handleB, nil, 30)
-	if err != nil || prev != 1 {
-		t.Fatalf("first id %d, %v; want 1", prev, err)
+	held, err := addSuggestion(srv, handleB, nil, 30)
+	if err != nil || held != 1 {
+		t.Fatalf("first id %d, %v; want 1", held, err)
 	}
 	for want := 2; want <= 255; want++ {
 		id, err := addSuggestion(srv, handleB, nil, 30)
 		if err != nil || int(id) != want {
 			t.Fatalf("id %d, %v; want %d", id, err, want)
 		}
-		if err := removeSuggestion(srv, prev); err != nil {
+		if err := removeSuggestion(srv, id); err != nil {
 			t.Fatal(err)
 		}
-		prev = id
 	}
 	if id, err := addSuggestion(srv, handleB, nil, 30); err != nil || id != 0 {
 		t.Errorf("after 255: id %d, %v; want 0", id, err)
 	}
-	if id, err := addSuggestion(srv, handleB, nil, 30); err != nil || id != 1 {
-		t.Errorf("after 255 and 0: id %d, %v; want 1", id, err)
+	if id, err := addSuggestion(srv, handleB, nil, 30); err != nil || id != 2 {
+		t.Errorf("after 0, with 1 held: id %d, %v; want 2", id, err)
 	}
+}
+
+// TestSuggestionUniqueIDSkipsAnExpiredEntryNotYetRemoved pins the next id
+// taken against the list as stored, expired entries included, before the
+// Add removes them — matter.js ThermostatServer.ts:624, :637 at
+// b25ed960 (addThermostatSuggestion), which prunes only in the
+// re-evaluation (:2429-2432): after the wrap, id 1 is still held by an
+// expired entry and is skipped.
+func TestSuggestionUniqueIDSkipsAnExpiredEntryNotYetRemoved(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	if id, err := addSuggestion(srv, handleB, nil, 30); err != nil || id != 1 {
+		t.Fatalf("first id %d, %v; want 1", id, err)
+	}
+	for want := 2; want <= 255; want++ {
+		id, err := addSuggestion(srv, handleB, nil, 30)
+		if err != nil || int(id) != want {
+			t.Fatalf("id %d, %v; want %d", id, err, want)
+		}
+		if err := removeSuggestion(srv, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if id, err := addSuggestion(srv, handleB, nil, 30); err != nil || id != 0 {
+		t.Fatalf("after 255: id %d, %v; want 0", id, err)
+	}
+	clk.StepWall(31 * time.Minute) // 1 and 0 expire; the timer does not fire
+	id, err := addSuggestion(srv, handleB, nil, 30)
+	if err != nil || id != 2 {
+		t.Errorf("with 1 held by an expired entry: id %d, %v; want 2", id, err)
+	}
+	if got := readSuggestions(t, srv); len(got) != 1 || got[0].UniqueId != id {
+		t.Errorf("ThermostatSuggestions %v, want only the new one", got)
+	}
+}
+
+// TestSetpointOfTheOtherOccupancyIsNoOverride pins that only a setpoint of
+// the occupancy in effect, written in the change that ends the hold, makes
+// the current suggestion an override — matter.js ThermostatServer.ts:803-808
+// at b25ed960 (#setpointChangedInTransaction): with the thermostat occupied,
+// an UnoccupiedHeatingSetpoint written as the hold ends is followed past,
+// and an OccupiedHeatingSetpoint is the override.
+func TestSetpointOfTheOtherOccupancyIsNoOverride(t *testing.T) {
+	t.Parallel()
+	withOccupancy := func(cfg *thermo.ThermostatConfig) {
+		cfg.Features |= thermo.ThermostatFeatureOCC
+		heat, cool := int16(1800), int16(2800)
+		cfg.InitialUnoccupiedHeatingSetpoint, cfg.InitialUnoccupiedCoolingSetpoint = &heat, &cool
+		occupied := true
+		cfg.Occupied = &occupied
+	}
+	holdOffAnd := func(attr uint32) map[uint32]any {
+		return map[uint32]any{
+			tdef.AttrTemperatureSetpointHold: uint8(tdef.TemperatureSetpointHoldSetpointHoldOff),
+			attr:                             int16(1900),
+		}
+	}
+
+	c := onlineSuggestions(t, withOccupancy)
+	c.hold(true)
+	c.mustAdd(presetB, nil, 0)
+	c.wantActive(nil)
+	c.set(holdOffAnd(tdef.AttrUnoccupiedHeatingSetpoint))
+	c.wantReason(nil)
+	c.wantActive(presetB)
+
+	c = onlineSuggestions(t, withOccupancy)
+	c.hold(true)
+	c.mustAdd(presetB, nil, 0)
+	c.set(holdOffAnd(tdef.AttrOccupiedHeatingSetpoint))
+	c.wantReason(reasonOf(0))
+	c.wantActive(nil)
 }
 
 // TestDeviceReasonsKeepTheThermostatOffTheSuggestion pins the device's own

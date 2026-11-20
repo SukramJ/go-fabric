@@ -5,6 +5,7 @@ package spec
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"reflect"
@@ -14,39 +15,66 @@ import (
 )
 
 // CheckRequest holds a decoded request payload of the request command
-// cmdID to the definition's Fields: each field's type, constraint — peers
-// resolve the attributes a constraint names, and a constraint that lists
-// an enum's members ("add, modify") admits those members only — and enum
-// value (defined, and its member's conformance allowing it), and every
-// field's conformance (one the conformance requires left out, one it does
-// not allow present, a choice group's count). A refused request is
-// CONSTRAINT_ERROR ([ErrConformance], [ErrEnumValueConformance],
-// [ErrUnknownEnumValue] where they apply).
+// cmdID to the definition's Fields: each field's conformance (one the
+// conformance requires left out, one it does not allow present, a choice
+// group's count) and its member of an enum the conformance does not
+// allow, then its type, constraint — peers resolve the attributes a
+// constraint names, and a constraint that lists an enum's members ("add,
+// modify") admits those members only — and an enum value the enum does
+// not define, field by field. A refused request is CONSTRAINT_ERROR
+// ([ErrConformance], [ErrEnumValueConformance], [ErrUnknownEnumValue]
+// where they apply); the first error is returned.
 //
-// A nil payload, a command the definition does not state, and a payload
-// whose Go type does not carry every field the definition states (a
-// hand-written decoder's own form) are not judged. It is the request's
-// twin of the response check [Server.MatterInvoke] applies.
+// A nil payload is judged as a request without fields: a mandatory field
+// is missing (matter.js validates `data ?? {}`,
+// packages/node/src/node/integration/ProtocolService.ts:624-625 at
+// b25ed960). A command the definition does not state, a command without
+// fields, and a payload whose Go type does not carry every field the
+// definition states (a hand-written decoder's own form) are not judged.
+// It is the request's twin of the response check [Server.MatterInvoke]
+// applies.
 func (i *Instance) CheckRequest(cmdID uint32, fields any, peers Peers) error {
+	if errs := i.requestErrors(cmdID, fields, peers, false); len(errs) > 0 {
+		return errs[0]
+	}
+	return nil
+}
+
+// requestErrors are the errors [Instance.CheckRequest] finds in the
+// request: with all, every one of every field, in the order matter.js
+// records them (matter.js
+// packages/node/src/behavior/state/validation/ValueValidator.ts:375-509 at
+// b25ed960, under a ValidationLocation.errors collector); else the first
+// alone.
+func (i *Instance) requestErrors(cmdID uint32, fields any, peers Peers, all bool) []error {
 	cmd, rv, ok := i.requestOf(cmdID, fields)
 	if !ok {
 		return nil
 	}
+	var errs []error
 	scope := nameScope{peers: peers, conformance: true, enums: true}
-	s := &Struct{Name: cmd.Name, Fields: cmd.Fields}
-	if err := i.checkFieldConformance(i.def.Name+": "+cmd.Name, s, rv, scope); err != nil {
-		return err
+	if all {
+		scope.errs = &errs
 	}
-	return i.checkRequestFields(cmd, rv, peers, scope)
+	s := &Struct{Name: cmd.Name, Fields: cmd.Fields}
+	value := func(f *Field) error { return i.checkRequestField(cmd.Name, f, rv, peers, scope) }
+	if err := i.checkFields(i.def.Name+": "+cmd.Name, s, rv, scope, value); err != nil {
+		errs = append(errs, err)
+	}
+	return errs
 }
 
 // requestOf is the request command cmdID and its payload as a struct
-// value carrying every field the command states; ok is false for a
-// payload [Instance.CheckRequest] does not judge.
+// value carrying every field the command states — an empty struct for a
+// nil payload; ok is false for a payload [Instance.CheckRequest] does not
+// judge.
 func (i *Instance) requestOf(cmdID uint32, fields any) (*Command, reflect.Value, bool) {
 	cmd := i.def.Command(cmdID, Request)
-	if cmd == nil || fields == nil || len(cmd.Fields) == 0 {
+	if cmd == nil || len(cmd.Fields) == 0 {
 		return nil, reflect.Value{}, false
+	}
+	if fields == nil {
+		return cmd, reflect.ValueOf(struct{}{}), true
 	}
 	if d, ok := fields.(DefinitionFormer); ok {
 		fields = d.DefinitionForm()
@@ -69,33 +97,31 @@ func (i *Instance) requestOf(cmdID uint32, fields any) (*Command, reflect.Value,
 	return cmd, rv, true
 }
 
-// checkRequestFields holds each field of the request rv to its type and
-// constraint under scope; peers resolve a constraint naming an attribute.
-func (i *Instance) checkRequestFields(cmd *Command, rv reflect.Value, peers Peers, scope nameScope) error {
-	name := cmd.Name
-	for fi := range cmd.Fields {
-		f := &cmd.Fields[fi]
-		fv, mapped := mappedField(rv, f.Name)
-		if !mapped {
-			continue
+// checkRequestField holds the field f of the request rv of the command
+// name to its type and constraint under scope; peers resolve a constraint
+// naming an attribute. A field the payload does not carry — every field
+// of a nil payload's empty struct — is not judged.
+func (i *Instance) checkRequestField(name string, f *Field, rv reflect.Value, peers Peers, scope nameScope) error {
+	fv, mapped := mappedField(rv, f.Name)
+	if !mapped || !fv.IsValid() {
+		return nil
+	}
+	if fv.Kind() == reflect.Pointer {
+		if fv.IsNil() {
+			return nil
 		}
-		if fv.Kind() == reflect.Pointer {
-			if fv.IsNil() {
-				continue
-			}
-			fv = fv.Elem()
-		}
-		t, c := held(f.Type, f.Constraint, f.Relaxed)
-		v := entryValue(fv.Interface())
-		if _, err := i.checkValueIn(name+"."+f.Name, t, f.Quality.Nullable, c, v, peers, scope); err != nil {
-			return err
-		}
-		if v == nil {
-			continue
-		}
-		if n, ok := asUint(v); ok && !enumListAdmits(t, c, n) {
-			return Errorf(im.StatusConstraintError, "%s: %s.%s %d is not one of %q", i.def.Name, name, f.Name, n, c.Text)
-		}
+		fv = fv.Elem()
+	}
+	t, c := held(f.Type, f.Constraint, f.Relaxed)
+	v := entryValue(fv.Interface())
+	if _, err := i.checkValueIn(name+"."+f.Name, t, f.Quality.Nullable, c, v, peers, scope); err != nil {
+		return err
+	}
+	if v == nil {
+		return nil
+	}
+	if n, ok := asUint(v); ok && !enumListAdmits(t, c, n) {
+		return Errorf(im.StatusConstraintError, "%s: %s.%s %d is not one of %q", i.def.Name, name, f.Name, n, c.Text)
 	}
 	return nil
 }
@@ -131,29 +157,42 @@ func enumListAdmits(t Type, c Constraint, v uint64) bool {
 }
 
 // admitRequest is the request gate of [Server.MatterInvoke] and
-// [InvokeHeld], run before any handler — the server's own or a host's. A
-// command whose [RequestCheck] is Unchecked is not judged. A request
-// [Instance.CheckRequest] refuses is refused with the command's stated
-// [RequestCheck.Refusal]; for a command that states none the failure is
-// logged and the command runs. The request's types and constraints are
-// its decoder's to refuse, before the server runs: a generated
-// definition's decoder holds them (decision 64), a hand-written one holds
-// what its author's decoder holds, and a hand-written definition states a
-// Refusal for a command whose requests the gate is to refuse.
+// [InvokeHeld], run before any handler — the server's own or a host's —
+// on every error [Instance.CheckRequest] finds in the request, not only
+// the first: a command that states a [RequestCheck.Refusal] answers the
+// first error with it; else a value an enum does not define anywhere in
+// the request is refused with CONSTRAINT_ERROR ([ErrUnknownEnumValue]);
+// else the errors are logged and the command runs. A command whose
+// [RequestCheck] is Unchecked (deprecated) is not judged. The request's
+// types and constraints are its decoder's to refuse, before the server
+// runs: a generated definition's decoder holds them (decision 64), a
+// hand-written one holds what its author's decoder holds, and a
+// hand-written definition states a Refusal for a command whose requests
+// the gate is to refuse.
+//
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:671-705
+// at b25ed960 (the gate in invokeCommand, :641-797: the errors collected :675-689, then
+// onValidationError(errors[0]) :693-694, a thrown UnknownEnumValueError
+// :692, :695-696, else a warning :697-702).
 func (i *Instance) admitRequest(ctx context.Context, cmdID uint32, fields any, peers Peers) error {
 	cmd := i.def.Command(cmdID, Request)
 	if cmd == nil || cmd.Check.Unchecked {
 		return nil
 	}
-	err := i.CheckRequest(cmdID, fields, peers)
-	if err == nil {
+	errs := i.requestErrors(cmdID, fields, peers, true)
+	if len(errs) == 0 {
 		return nil
 	}
 	if cmd.Check.Refusal != 0 {
-		return Errorf(cmd.Check.Refusal, "%s: %s: %w", i.def.Name, cmd.Name, err)
+		return Errorf(cmd.Check.Refusal, "%s: %s: %w", i.def.Name, cmd.Name, errs[0])
 	}
-	logger().WarnContext(ctx, "spec: the request does not fit its definition; the command runs",
-		"cluster", i.def.Name, "command", cmd.Name, "error", fmt.Sprint(err))
+	for _, err := range errs {
+		if errors.Is(err, ErrUnknownEnumValue) {
+			return err
+		}
+	}
+	logger().WarnContext(ctx, "spec: request validation error; the command runs",
+		"cluster", i.def.Name, "command", cmd.Name, "error", fmt.Sprint(errors.Join(errs...)))
 	return nil
 }
 

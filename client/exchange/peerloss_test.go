@@ -164,8 +164,8 @@ func TestExchangePeerLossLosesItsOwnSessionAtTheSameInstant(t *testing.T) {
 	s := newFabricSession(t, m, 0x0361)
 	x, _ := m.Initiate(s, im.InteractionModelProtocolID, Options{})
 	later := newFabricSession(t, m, 0x0362)
-	if !s.CreatedAt().Equal(x.createdAt) || !later.CreatedAt().Equal(x.createdAt) {
-		t.Fatalf("the clock moved: session %v, exchange %v, later %v", s.CreatedAt(), x.createdAt, later.CreatedAt())
+	if now := clock.Now(); !s.CreatedAt().Equal(now) || !later.CreatedAt().Equal(now) {
+		t.Fatalf("the clock moved: session %v, exchange %v, later %v", s.CreatedAt(), now, later.CreatedAt())
 	}
 	done := sendAsync(x, im.OpcodeReadRequest, nil, SendOptions{})
 	conn.nextOn(t, x)

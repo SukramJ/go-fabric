@@ -326,13 +326,15 @@ const (
 )
 
 // intervalBounds is PhysicalDeviceProperties.subscriptionIntervalBoundsFor
-// (PhysicalDeviceProperties.ts:64-164): an ICD's floor is 0, announced only
-// when the caller gave one (:94-102); the default floor is 1 s for a
-// Thread node before Matter 1.3 without a Generic Switch, else 0
-// (:103-115); the default ceiling by the node's kind (:117-126); an ICD's
-// or the caller's ceiling is kept, at least the floor (:137-144); a
-// default one gets up to max(10 %, 10 s) of jitter, whole seconds
-// (:146-157); at most 65535 s (:158).
+// (PhysicalDeviceProperties.ts:64-177 at b25ed960): an ICD's floor is 0,
+// announced only when the caller gave one (:107-115); the default floor is
+// 1 s for a Thread node before Matter 1.3 without a Generic Switch, else 0
+// (:116-128); the device ceiling by the node's kind (:130-137); an ICD's
+// IdleModeDuration is the default ceiling only when it is at least that
+// device ceiling (:138-140, doc :68-72) — a shorter one gets the device
+// ceiling with its jitter; an ICD's or the caller's ceiling is kept, at least
+// the floor (:151-157); a default one gets up to max(10 %, 10 s) of jitter,
+// whole seconds (:158-170); at most 65535 s (:171).
 func intervalBounds(p Properties, reqFloor, reqCeiling *time.Duration, rand func() float64, log *slog.Logger) (floor, ceiling time.Duration) {
 	hasFloor := reqFloor != nil
 	if hasFloor {
@@ -352,19 +354,25 @@ func intervalBounds(p Properties, reqFloor, reqCeiling *time.Duration, rand func
 			floor = floorThreadLegacy
 		}
 	}
-	isICDCeiling := p.IntermittentlyConnected && p.IdleModeDuration != nil
-	var def time.Duration
+	var deviceCeiling time.Duration
 	switch {
-	case isICDCeiling:
-		def = min(*p.IdleModeDuration, maxCeiling)
 	case p.BatteryPowered && !p.MainsPowered:
-		def = ceilingBattery
+		deviceCeiling = ceilingBattery
 	case p.ThreadSleepyEndDevice:
-		def = ceilingThreadSleepy
+		deviceCeiling = ceilingThreadSleepy
 	case p.SupportsThread:
-		def = ceilingThread
+		deviceCeiling = ceilingThread
 	default:
-		def = ceilingWifi
+		deviceCeiling = ceilingWifi
+	}
+	// Mirrors matter.js packages/protocol/src/peer/PhysicalDeviceProperties.ts:138-140
+	// at b25ed960 (subscriptionIntervalBoundsFor, isIcdCeiling): an ICD's
+	// IdleModeDuration below the device ceiling would only let it report more
+	// often, so it gets the device ceiling instead.
+	isICDCeiling := p.IntermittentlyConnected && p.IdleModeDuration != nil && *p.IdleModeDuration >= deviceCeiling
+	def := deviceCeiling
+	if isICDCeiling {
+		def = min(*p.IdleModeDuration, maxCeiling)
 	}
 	explicit := reqCeiling != nil
 	ceiling = def

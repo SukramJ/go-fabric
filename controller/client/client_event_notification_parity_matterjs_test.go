@@ -14,6 +14,7 @@ package client_test
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 
@@ -270,6 +271,71 @@ func TestClientEventNotificationEventNumbersParity(t *testing.T) {
 		got := sp.seen(t, 2)
 		if len(got) != 2 || got[1].number <= got[0].number || client.MaxEventNumber(sp.node) != got[1].number {
 			t.Fatalf("events %+v, stored %d", got, client.MaxEventNumber(sp.node))
+		}
+	})
+
+	// ClientEventNotificationTest.ts:1004-1032 at b25ed960: the
+	// device drops the subscription, its sessions stay, and the two events
+	// are not delivered again. That the replacement asks above the stored
+	// event number is the Go client's mechanism; matter.js's is not read.
+	t.Run("does not deliver events again when the device drops the subscription and the session stays", func(t *testing.T) {
+		t.Parallel()
+		sp := newSwitchPair(t, false)
+		sp.press(t)
+		sp.press(t)
+		got := sp.seen(t, 2)
+		if len(got) != 2 || client.MaxEventNumber(sp.node) != got[1].number {
+			t.Fatalf("events %+v, stored %d", got, client.MaxEventNumber(sp.node))
+		}
+		var mu sync.Mutex
+		resubscribed := 0
+		client.ObserveRequests(sp.node, func(r interaction.SubscribeRequest) {
+			if len(r.EventFilters) == 1 {
+				mu.Lock()
+				resubscribed++
+				mu.Unlock()
+			}
+		})
+		sessionIDs := func() []uint16 {
+			sessions := sp.pair.Device.Node().SessionDiagnostics().Sessions
+			ids := make([]uint16, 0, len(sessions))
+			for _, s := range sessions {
+				ids = append(ids, s.ID)
+			}
+			return ids
+		}
+		sessions := sessionIDs()
+		// matter.js runs session.closeSubscriptions() on every device
+		// session: the subscriptions end, the sessions stay
+		// (subscription.Manager.CloseSession closes, never terminates).
+		if err := sp.pair.Device.Act(func(n *node.Node) error {
+			for _, id := range sessions {
+				n.Subscriptions().CloseSession(id)
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sp.site.Eventually(parityCtx(t), "the replacement subscription", func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return resubscribed > 0 && sp.node.SubscriptionActive() && sp.pair.Device.Node().Subscriptions().Active() > 0
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := sp.site.Settle(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+		if after := sessionIDs(); !slices.Equal(after, sessions) {
+			t.Fatalf("device sessions %v, want %v", after, sessions)
+		}
+		if got := sp.seen(t, 2); len(got) != 2 {
+			t.Fatalf("%d events after the replacement, want 2: %+v", len(got), got)
+		}
+		sp.press(t)
+		got = sp.seen(t, 3)
+		if len(got) != 3 || got[2].number <= got[1].number {
+			t.Fatalf("events %+v, want a third above %d", got, got[1].number)
 		}
 	})
 

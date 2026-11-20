@@ -12,6 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -407,4 +408,50 @@ func TestIdentify_InvokeIdentifyCommandWithBridgeTagMap(t *testing.T) {
 	if got := v.(uint16); got != 30 {
 		t.Fatalf("IdentifyTime after Identify(30) = %d, want 30", got)
 	}
+}
+
+// effectRecorder is a host IdentifyHandler that records the effects
+// TriggerEffect hands it.
+type effectRecorder struct{ effects [][2]uint8 }
+
+func (*effectRecorder) MatterIdentify(context.Context, uint16) error { return nil }
+
+func (r *effectRecorder) MatterTriggerEffect(_ context.Context, effect, variant uint8) error {
+	r.effects = append(r.effects, [2]uint8{effect, variant})
+	return nil
+}
+
+// TestIdentifyTriggerEffectUndefinedValuesParityMatterJS ports
+// ProtocolServiceTest.ts:505-514 and :516-538 at b25ed960
+// ("with cluster-specific handling of invalid requests"): TriggerEffect's
+// fields are not validated (IdentifyServer.ts:162-166, validate = false),
+// so an EffectIdentifier the enum does not define is answered SUCCESS and
+// handed over as received, and an EffectVariant it does not define runs
+// as Default (:134-139).
+func TestIdentifyTriggerEffectUndefinedValuesParityMatterJS(t *testing.T) {
+	t.Parallel()
+	invoke := func(t *testing.T, req identifydef.TriggerEffectRequest) [][2]uint8 {
+		t.Helper()
+		id := core.NewIdentify()
+		rec := &effectRecorder{}
+		id.SetHandler(rec)
+		if _, err := id.MatterInvoke(context.Background(), identifydef.CmdTriggerEffect, req); err != nil {
+			t.Fatalf("TriggerEffect %+v: %v, want SUCCESS", req, err)
+		}
+		return rec.effects
+	}
+	t.Run("accepts an identify effect the enum does not define", func(t *testing.T) {
+		t.Parallel()
+		got := invoke(t, identifydef.TriggerEffectRequest{EffectIdentifier: 3, EffectVariant: identifydef.EffectVariantDefault})
+		if !slices.Equal(got, [][2]uint8{{3, 0}}) {
+			t.Errorf("effects %v, want [[3 0]]", got)
+		}
+	})
+	t.Run("runs the default identify effect variant for a variant the enum does not define", func(t *testing.T) {
+		t.Parallel()
+		got := invoke(t, identifydef.TriggerEffectRequest{EffectIdentifier: identifydef.EffectIdentifierBlink, EffectVariant: 0x42})
+		if !slices.Equal(got, [][2]uint8{{uint8(identifydef.EffectIdentifierBlink), uint8(identifydef.EffectVariantDefault)}}) {
+			t.Errorf("effects %v, want Blink with Default", got)
+		}
+	})
 }

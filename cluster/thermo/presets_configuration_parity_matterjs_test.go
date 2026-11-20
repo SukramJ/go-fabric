@@ -2,8 +2,9 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behaviors/thermostat/PresetsConfigurationTest.ts
-// at 862ad75f: the write rules without configured presets, and presets
-// the configuration supplies.
+// at b25ed960: the write rules without configured presets, presets the
+// configuration supplies, and a start whose stored presets exceed
+// NumberOfPresets (#4467).
 //
 // The remote case runs over the wire on a commissioned fabrictest pair;
 // the others on a fabrictest device (MockServerNode.createOnline), a local
@@ -25,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
@@ -131,6 +133,30 @@ func TestParityMatterJS_PresetsConfigurationTest(t *testing.T) {
 		}
 		if got := servedPresets(t, srv); len(got) != 1 || len(got[0].PresetHandle.Value) != 16 {
 			t.Errorf("presets %+v, want one with an issued handle", got)
+		}
+	})
+
+	t.Run("starts with more stored presets than NumberOfPresets allows and raises the limit", func(t *testing.T) {
+		// One PresetStore across both starts is the environment's storage;
+		// the second start configures NumberOfPresets 1.
+		ps := &gatedPresetStore{}
+		namedPresets := func(numberOfPresets uint8, presets []thermo.Preset) thermo.ThermostatConfig {
+			cfg := thermostatConfig(numberOfPresets, presets)
+			cfg.PresetTypes[0].PresetTypeFeatures = tdef.PresetTypeFeaturesSupportsNames
+			cfg.PresetStore = ps
+			return cfg
+		}
+		onlineThermostat(t, namedPresets(5, []thermo.Preset{
+			newPreset(withHandle([]byte{1}), withName("Home")),
+			newPreset(withHandle([]byte{2}), withName("Office")),
+		}))
+
+		_, _, srv := onlineThermostat(t, namedPresets(1, nil))
+		if n := len(srv.Presets()); n != 2 {
+			t.Errorf("%d stored presets, want 2", n)
+		}
+		if v, _ := srv.MatterRead(tdef.AttrNumberOfPresets); v != uint8(2) {
+			t.Errorf("NumberOfPresets reads %v (%T), want 2", v, v)
 		}
 	})
 }

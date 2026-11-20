@@ -14,8 +14,8 @@ import (
 // changes to Off, Heat or Cool sets ThermostatRunningMode to the same
 // mode when the attribute is served, by a controller's write and by the
 // host's SetSystemMode alike, and emits RunningModeChange; Auto leaves it
-// — matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:1185,
-// :1194-1206 at db021da0 (#handleSystemModeChange; W3-clua1-01).
+// — matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:1661,
+// :1669-1681 at b25ed960 (#handleSystemModeChange; W3-clua1-01).
 func TestParityMatterJS_SystemModeDrivesRunningMode(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

@@ -10,3 +10,9 @@ package spec
 func SetWindowHooksForTests(s *Server, stored, left func()) {
 	s.storedForTests, s.leftForTests = stored, left
 }
+
+// RequestErrorsForTests is every error the request gate finds in the
+// request fields of cmdID ([Instance.admitRequest]'s collector).
+func RequestErrorsForTests(i *Instance, cmdID uint32, fields any) []error {
+	return i.requestErrors(cmdID, fields, nil, true)
+}

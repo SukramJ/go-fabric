@@ -1051,6 +1051,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "CertificateType", Type: spec.Type{Name: "CertificateChainTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: CertificateChainTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 			},
+			Check:  spec.RequestCheck{Refusal: 0x85, Ref: "matter.js packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:635-638 at b25ed960"},
 			Decode: decodeCertificateChainRequestRequest,
 		},
 		{

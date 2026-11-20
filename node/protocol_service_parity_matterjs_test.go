@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -29,9 +30,15 @@ import (
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
+	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	ncdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/client"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
@@ -50,7 +57,7 @@ const (
 	tagFabricIndex         = 0xFE
 )
 
-// adminEntry is AcesWithoutFabric (ProtocolServiceTest.ts:97-102) for an
+// adminEntry is AcesWithoutFabric (ProtocolServiceTest.ts:105-110 at b25ed960) for an
 // Administer CASE entry with no subjects and no targets: the ACL a fabric
 // writes, its fabric index the device's.
 type adminEntry struct{}
@@ -108,7 +115,7 @@ func readWith(t *testing.T, p *fabrictest.Pair, noFabricFilter bool, path im.Con
 }
 
 // The synthetic TestCluster of the command-validation cases
-// (ProtocolServiceTest.ts:498-532): TestRequest (Enable, Value max 10)
+// (ProtocolServiceTest.ts:693-727 at b25ed960): TestRequest (Enable, Value max 10)
 // answered by TestResponse, whose Result is mandatory when
 // TestRequest.Enable.
 const testClusterID = 0xFFF1FC01
@@ -186,7 +193,7 @@ func testDevice(t *testing.T, handler func(req testRequest) testResponse) (p *fa
 	return p, ep
 }
 
-// testRequestFields is TlvTestRequest (ProtocolServiceTest.ts:500).
+// testRequestFields is TlvTestRequest (ProtocolServiceTest.ts:693 at b25ed960).
 type testRequestFields testRequest
 
 func (r testRequestFields) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
@@ -351,31 +358,187 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 			}
 		})
 
-		t.Run("invokes", func(t *testing.T) {
-			var received *onoffdef.OffWithEffectRequest
-			srv, err := spec.NewServer(onoffdef.Definition, spec.Options{Features: uint32(onoffdef.FeatureLighting)}, spec.ServerConfig{
-				Unimplemented: true,
-				Handlers: map[uint32]spec.CommandHandler{
-					onoffdef.CmdOffWithEffect: spec.HandlerOf(func(_ context.Context, req onoffdef.OffWithEffectRequest) (struct{}, error) {
-						received = &req
-						return struct{}{}, nil
-					}),
-				},
+		// describe("invoke") (:317-540 at b25ed960): the request is held to
+		// the model before the handler, every error collected
+		// (ProtocolService.ts:671-705 at b25ed960).
+		t.Run("invoke", func(t *testing.T) {
+			// invokeOffWithEffect is :318-350: OnOff with Lighting, its
+			// OffWithEffect handler recording the request.
+			invokeOffWithEffect := func(t *testing.T, req onoffdef.OffWithEffectRequest) (*onoffdef.OffWithEffectRequest, error) {
+				t.Helper()
+				var received *onoffdef.OffWithEffectRequest
+				srv, err := spec.NewServer(onoffdef.Definition, spec.Options{Features: uint32(onoffdef.FeatureLighting)}, spec.ServerConfig{
+					Unimplemented: true,
+					Handlers: map[uint32]spec.CommandHandler{
+						onoffdef.CmdOffWithEffect: spec.HandlerOf(func(_ context.Context, req onoffdef.OffWithEffectRequest) (struct{}, error) {
+							received = &req
+							return struct{}{}, nil
+						}),
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				p := quietSite(t).CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
+					Bridged: []node.Endpoint{fabrictest.Endpoint("light", onoff.DeviceTypeOnOffLight, srv)},
+				}})
+				ep, _ := p.Device.EndpointOf("light")
+				_, err = fabrictest.Invoke(parityCtx(t), p, client.CommandAt(ep, onoffdef.ClusterID, onoffdef.CmdOffWithEffect), req)
+				return received, err
+			}
+
+			t.Run("invokes", func(t *testing.T) {
+				received, err := invokeOffWithEffect(t, onoffdef.OffWithEffectRequest{EffectIdentifier: 0, EffectVariant: 1})
+				if err != nil {
+					t.Fatalf("invoke: %v, want Success", err)
+				}
+				if received == nil || received.EffectIdentifier != 0 || received.EffectVariant != 1 {
+					t.Errorf("received %+v", received)
+				}
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			p := quietSite(t).CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
-				Bridged: []node.Endpoint{fabrictest.Endpoint("light", onoff.DeviceTypeOnOffLight, srv)},
-			}})
-			ep, _ := p.Device.EndpointOf("light")
-			if _, err := fabrictest.Invoke(parityCtx(t), p, client.CommandAt(ep, onoffdef.ClusterID, onoffdef.CmdOffWithEffect),
-				onoffdef.OffWithEffectRequest{EffectIdentifier: 0, EffectVariant: 1}); err != nil {
-				t.Fatalf("invoke: %v, want Success", err)
-			}
-			if received == nil || received.EffectIdentifier != 0 || received.EffectVariant != 1 {
-				t.Errorf("received %+v", received)
-			}
+
+			t.Run("refuses a request with an enum value the enum does not define with CONSTRAINT_ERROR", func(t *testing.T) {
+				received, err := invokeOffWithEffect(t, onoffdef.OffWithEffectRequest{EffectIdentifier: 2, EffectVariant: 0})
+				if status := imStatus(t, err); status != im.StatusConstraintError {
+					t.Errorf("invoke: %v, want CONSTRAINT_ERROR", err)
+				}
+				if received != nil {
+					t.Errorf("the handler ran: %+v", received)
+				}
+			})
+
+			t.Run("refuses an undefined enum value also when an earlier field has an error that only gets a warning", func(t *testing.T) {
+				// UpdateFlags carries a reserved bit, and Action is undefined.
+				var ran atomic.Bool
+				features := ccdef.FeatureHueSaturation | ccdef.FeatureEnhancedHue | ccdef.FeatureColorLoop
+				srv, err := spec.NewServer(ccdef.Definition, spec.Options{Features: uint32(features)}, spec.ServerConfig{
+					Unimplemented: true,
+					Handlers: map[uint32]spec.CommandHandler{
+						ccdef.CmdColorLoopSet: func(context.Context, any) (any, error) { ran.Store(true); return nil, nil },
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				p := quietSite(t).CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
+					Bridged: []node.Endpoint{fabrictest.Endpoint("light", onoff.DeviceTypeOnOffLight, srv)},
+				}})
+				ep, _ := p.Device.EndpointOf("light")
+				_, err = fabrictest.Invoke(parityCtx(t), p, client.CommandAt(ep, ccdef.ClusterID, ccdef.CmdColorLoopSet),
+					ccdef.ColorLoopSetRequest{UpdateFlags: 0x11, Action: 3})
+				if status := imStatus(t, err); status != im.StatusConstraintError {
+					t.Errorf("invoke: %v, want CONSTRAINT_ERROR", err)
+				}
+				if ran.Load() {
+					t.Error("the handler ran")
+				}
+			})
+
+			t.Run("accepts any value for an enum that defines no values", func(t *testing.T) {
+				req := onoffdef.OffWithEffectRequest{EffectIdentifier: 0, EffectVariant: 7}
+				received, err := invokeOffWithEffect(t, req)
+				if err != nil {
+					t.Fatalf("invoke: %v, want Success", err)
+				}
+				if received == nil || received.EffectVariant != 7 {
+					t.Errorf("received %+v", received)
+				}
+				// No "Request validation error" warning: the gate logs only
+				// a request its check finds an error in.
+				inst, err := spec.New(onoffdef.Definition, spec.Options{Features: uint32(onoffdef.FeatureLighting)})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := inst.CheckRequest(onoffdef.CmdOffWithEffect, req, nil); err != nil {
+					t.Errorf("the request check found %v", err)
+				}
+			})
+
+			t.Run("with cluster-specific handling of invalid requests", func(t *testing.T) {
+				// invokeOnNode is :426-451, on the device's own servers.
+				root := func(t *testing.T) *fabrictest.Pair {
+					t.Helper()
+					return quietSite(t).CommissionedPair(fabrictest.PairOptions{})
+				}
+				invokeOnNode := func(t *testing.T, p *fabrictest.Pair, ep uint16, cluster, cmd uint32, fields spec.Encodable) (interaction.Result, error) {
+					t.Helper()
+					return fabrictest.Invoke(parityCtx(t), p, client.CommandAt(ep, cluster, cmd), fields)
+				}
+
+				t.Run("answers an undefined certificate type with INVALID_COMMAND", func(t *testing.T) {
+					_, err := invokeOnNode(t, root(t), 0, opcredsdef.ClusterID, opcredsdef.CmdCertificateChainRequest,
+						opcredsdef.CertificateChainRequestRequest{CertificateType: 3})
+					if status := imStatus(t, err); status != im.StatusInvalidCommand {
+						t.Errorf("invoke: %v, want INVALID_COMMAND", err)
+					}
+				})
+
+				t.Run("keeps the TLV check for a command without configuration in a cluster with configured commands", func(t *testing.T) {
+					_, err := invokeOnNode(t, root(t), 0, opcredsdef.ClusterID, opcredsdef.CmdAttestationRequest, tlvFields(func(*tlv.Encoder) {}))
+					if status := imStatus(t, err); status != im.StatusInvalidCommand {
+						t.Errorf("invoke: %v, want INVALID_COMMAND", err)
+					}
+				})
+
+				t.Run("answers an undefined regulatory location with ValueOutsideRange in the response", func(t *testing.T) {
+					res, err := invokeOnNode(t, root(t), 0, gencommdef.ClusterID, gencommdef.CmdSetRegulatoryConfig,
+						gencommdef.SetRegulatoryConfigRequest{NewRegulatoryConfig: 3, CountryCode: "XX", Breadcrumb: 1})
+					if err != nil || !res.HasFields {
+						t.Fatalf("invoke = %+v, %v; want a response", res, err)
+					}
+					if got, ok := field(res.Fields, 0); !ok || got.Uint != uint64(gencommdef.CommissioningErrorValueOutsideRange) {
+						t.Errorf("ErrorCode %+v, want ValueOutsideRange", got)
+					}
+				})
+
+				t.Run("answers a missing mandatory field with INVALID_COMMAND for a command with a field override", func(t *testing.T) {
+					_, err := invokeOnNode(t, root(t), 0, gencommdef.ClusterID, gencommdef.CmdSetRegulatoryConfig, tlvFields(func(enc *tlv.Encoder) {
+						enc.PutUTF8(tlv.ContextTag(1), "XX")
+						spec.PutUint[uint8](enc, tlv.ContextTag(2), 1)
+					}))
+					if status := imStatus(t, err); status != im.StatusInvalidCommand {
+						t.Errorf("invoke: %v, want INVALID_COMMAND", err)
+					}
+				})
+
+				// identifyingPair is a pair whose bridged endpoint's source is
+				// the host's IdentifyHandler, recording each effect.
+				identifyingPair := func(t *testing.T) (*fabrictest.Pair, uint16, *effectSource) {
+					t.Helper()
+					src := &effectSource{}
+					p := quietSite(t).CommissionedPair(fabrictest.PairOptions{Device: fabrictest.Topology{
+						Bridged: []node.Endpoint{identifyingEndpoint{inner: kitLight(t, "light"), src: src}},
+					}})
+					ep, ok := p.Device.EndpointOf("light")
+					if !ok {
+						t.Fatal("the light has no endpoint number")
+					}
+					return p, ep, src
+				}
+
+				t.Run("accepts an identify effect the enum does not define", func(t *testing.T) {
+					p, ep, src := identifyingPair(t)
+					if _, err := invokeOnNode(t, p, ep, identifydef.ClusterID, identifydef.CmdTriggerEffect,
+						identifydef.TriggerEffectRequest{EffectIdentifier: 3, EffectVariant: identifydef.EffectVariantDefault}); err != nil {
+						t.Fatalf("invoke: %v, want SUCCESS", err)
+					}
+					if got := src.recorded(); !slices.Equal(got, [][2]uint8{{3, 0}}) {
+						t.Errorf("effects %v, want [[3 0]]", got)
+					}
+				})
+
+				t.Run("runs the default identify effect variant for a variant the enum does not define", func(t *testing.T) {
+					p, ep, src := identifyingPair(t)
+					if _, err := invokeOnNode(t, p, ep, identifydef.ClusterID, identifydef.CmdTriggerEffect,
+						identifydef.TriggerEffectRequest{EffectIdentifier: identifydef.EffectIdentifierBlink, EffectVariant: 0x42}); err != nil {
+						t.Fatalf("invoke: %v, want SUCCESS", err)
+					}
+					want := [][2]uint8{{uint8(identifydef.EffectIdentifierBlink), uint8(identifydef.EffectVariantDefault)}}
+					if got := src.recorded(); !slices.Equal(got, want) {
+						t.Errorf("effects %v, want %v", got, want)
+					}
+				})
+			})
 		})
 
 		t.Run("excludes deprecated global attributes like EventList from protocol", func(t *testing.T) {
@@ -395,7 +558,7 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 		})
 
 		t.Run("tags manufacturer-specific attributes in a standard cluster with skipCustomElements", func(t *testing.T) {
-			// ProtocolServiceTest.ts:379-414: an attribute with an MEI prefix
+			// ProtocolServiceTest.ts:572-607 at b25ed960: an attribute with an MEI prefix
 			// in a standard-range cluster (0x1234) is skipped by
 			// skipCustomElements and not by skipGlobalAttributes — the
 			// per-attribute branch of im.ApplyWildcardPathFlags (matter.js
@@ -418,10 +581,10 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 			}
 		})
 		t.Run("shares one state reference between local reads without a transaction", func(t *testing.T) {
-			t.Skip("ProtocolServiceTest.ts:416: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")
+			t.Skip("ProtocolServiceTest.ts:609 at b25ed960: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")
 		})
 		t.Run("requires a transaction to read cluster state for a remote subject", func(t *testing.T) {
-			t.Skip("ProtocolServiceTest.ts:437: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")
+			t.Skip("ProtocolServiceTest.ts:630 at b25ed960: the protocol state read with or without a transaction has no Go subject: a Go server answers each read from its own state, there is no transaction model")
 		})
 
 		t.Run("all attribute TLV schemas can encode their values", func(t *testing.T) {
@@ -458,7 +621,7 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 		})
 
 		t.Run("rejects request with constraint violation", func(t *testing.T) {
-			// ProtocolServiceTest.ts:574-606: value 99 against "max 10" is
+			// ProtocolServiceTest.ts:767-800 at b25ed960: value 99 against "max 10" is
 			// answered CONSTRAINT_ERROR, not with a command response; the
 			// handler never runs.
 			var ran atomic.Bool
@@ -486,6 +649,42 @@ func TestProtocolServiceParityMatterJS(t *testing.T) {
 			}
 		})
 	})
+}
+
+// effectSource is a bridged endpoint's source that is the host's
+// IdentifyHandler: it records the effects TriggerEffect hands it.
+type effectSource struct {
+	contract.EndpointSource
+	mu      sync.Mutex
+	effects [][2]uint8
+}
+
+func (*effectSource) MatterIdentify(context.Context, uint16) error { return nil }
+
+func (s *effectSource) MatterTriggerEffect(_ context.Context, effect, variant uint8) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.effects = append(s.effects, [2]uint8{effect, variant})
+	return nil
+}
+
+func (s *effectSource) recorded() [][2]uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.effects)
+}
+
+// identifyingEndpoint is inner with src as its source.
+type identifyingEndpoint struct {
+	inner node.Endpoint
+	src   *effectSource
+}
+
+func (e identifyingEndpoint) Spec() endpoint.Spec {
+	s := e.inner.Spec()
+	e.src.EndpointSource = s.Source
+	s.Source = e.src
+	return s
 }
 
 // listOf is the unsigned entries of a list.

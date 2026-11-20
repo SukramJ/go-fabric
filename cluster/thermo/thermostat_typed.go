@@ -104,6 +104,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	s.mu.Lock()
 	before := s.eventStateLocked()
 	st := s.setpointState()
+	direct := directSetpointWrites(st, checked)
 	setpoints, err := st.applySet(checked)
 	if err != nil {
 		s.mu.Unlock()
@@ -158,6 +159,11 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	}
 	s.setOptionalLocked(checked, note)
 	reevaluate := s.setSuggestionReasonLocked(checked) || slices.Contains(changed, thermoAttrTemperatureSetpointHold)
+	if reevaluate && s.features&ThermostatFeatureTSUGGEST != 0 && s.currentOccupancyWrittenLocked(direct) {
+		// The re-evaluation this change schedules belongs to the same
+		// change as the setpoint written here (suggest.setpointWritten).
+		s.suggest.setpointWritten = true
+	}
 	after := s.eventStateLocked()
 	s.mu.Unlock()
 	s.emitChanges(context.Background(), before, after)
@@ -170,22 +176,58 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	}
 	if setpoints {
-		s.clearActivePresetAfterSet(moved)
+		s.clearActivePresetAfterSet(direct)
 	}
 	return nil
 }
 
+// directSetpointWrites are the occupied and unoccupied setpoints a
+// SetAttributes sets to a value other than the stored one: the setpoints
+// whose $Changing matter.js runs with the application's value. A setpoint
+// only the reconcile moves is not among them.
+func directSetpointWrites(st setpointState, checked map[uint32]any) []uint32 {
+	var direct []uint32
+	for _, id := range []uint32{thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint, thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint} {
+		if n, ok := checked[id].(int16); ok && int(n) != st.value(id) {
+			direct = append(direct, id)
+		}
+	}
+	return direct
+}
+
+// currentOccupancyWrittenLocked reports whether direct holds a setpoint of
+// the occupancy in effect: the occupied pair when occupied, the unoccupied
+// pair otherwise. Mirrors matter.js
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:803-808 at
+// b25ed960 (#setpointChangedInTransaction looks only at the two setpoints
+// of the current occupancy). The caller holds s.mu.
+func (s *ThermostatServer) currentOccupancyWrittenLocked(direct []uint32) bool {
+	heat, cool := thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint
+	if !s.occupiedLocked() {
+		heat, cool = thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint
+	}
+	return slices.Contains(direct, heat) || slices.Contains(direct, cool)
+}
+
 // clearActivePresetAfterSet ends the active preset in effect for each
-// occupied or unoccupied setpoint a SetAttributes moved, as a local
-// direct change does.
-func (s *ThermostatServer) clearActivePresetAfterSet(moved []uint32) {
-	for _, id := range moved {
+// occupied or unoccupied setpoint a SetAttributes wrote directly, as a
+// local direct change does; a setpoint that only moved to keep the limits
+// or the deadband keeps it. Mirrors matter.js
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:764-789 at
+// b25ed960 (#leavePresetOnSetpointWrite skips a value
+// #noteReconciledSetpoints recorded, :1447-1482).
+func (s *ThermostatServer) clearActivePresetAfterSet(direct []uint32) {
+	reevaluate := false
+	for _, id := range direct {
 		switch id {
 		case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint:
-			s.clearActivePresetOnDirectWrite(context.Background(), false)
+			reevaluate = s.clearActivePresetOnDirectWrite(context.Background(), false) || reevaluate
 		case thermoAttrUnoccupiedHeatingSetpoint, thermoAttrUnoccupiedCoolingSetpoint:
-			s.clearActivePresetOnDirectWrite(context.Background(), true)
+			reevaluate = s.clearActivePresetOnDirectWrite(context.Background(), true) || reevaluate
 		}
+	}
+	if reevaluate {
+		s.scheduleSuggestionReevaluation()
 	}
 }
 
