@@ -3654,9 +3654,10 @@
         "cluster/lock:TestDoorLockServerFaceCredentialParity"
       ],
       "missing": [
-        "measures the lockout on the monotonic clock"
+        "measures the lockout on the monotonic clock",
+        "refuses to store a user type Matter does not define"
       ],
-      "reason": "67 of 71 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The file names no face credential; since phase 36 serves FACE (DoorLockServer.ts:86-98), four SetCredential cases of describe(\"DoorLockServer\") run once more with the Face type (doorlockserver_face_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System). Pin lift b25ed960: the three request-validation cases of #5012 are ported (doorlockserver_server_parity_matterjs_test.go, doorlockserver_schedulerestricted_parity_matterjs_test.go); the gate's refusal before a host handler is held by cluster/lock request_gate_test.go.",
+      "reason": "66 of 71 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The file names no face credential; since phase 36 serves FACE (DoorLockServer.ts:86-98), four SetCredential cases of describe(\"DoorLockServer\") run once more with the Face type (doorlockserver_face_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System). Pin lift b25ed960: the three request-validation cases of #5012 are ported (doorlockserver_server_parity_matterjs_test.go, doorlockserver_schedulerestricted_parity_matterjs_test.go); the gate's refusal before a host handler is held by cluster/lock request_gate_test.go. Pin lift b25ed960, P2-H: \"refuses to store a user type Matter does not define\" asserts the wire answer only (INVALID_COMMAND through the dispatcher's gate); matter.js's refusal of the local call (DoorLockServerTest.ts:823-845 at b25ed960) has no Go subject since the request check moved to the wire path (decision 339), findings F-b25ed960-36.",
       "snapshotSha": "978448f0403d2851b727a867901fe956f70a8d64"
     },
     {
@@ -4373,16 +4374,13 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/thermo:TestParityMatterJS_Thermostat_StartupReconciliation",
         "cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest",
         "cluster/thermo:TestThermostatRequestCheckParityMatterJS"
       ],
-      "missing": [
-        "refuses a mode the enum does not define with CONSTRAINT_ERROR"
-      ],
-      "reason": "Every case runs on a fabrictest device with matter.js's vectors (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest): the configured user limits, deadband and presets are ThermostatConfig fields, a local write of a setpoint or a user limit is MatterWrite inside Device.Act and of an absolute limit SetAbsoluteSetpointLimit, the errors carry matter.js's texts. Pin lift b25ed960: the Heat case through the interaction layer (#5012) is ported (cluster/thermo:TestThermostatRequestCheckParityMatterJS); the SetpointRaiseLower case that refuses an undefined mode waits for one request gate on every server's invoke path, findings F-b25ed960-29 (decision 319, unit P2-request-gate). The six ControlSequenceOfOperation cases (#5000) are left by design (BD-Matter-Thermostat-ControlSequenceFromFeatures, coordinator decision C-3).",
+      "reason": "Every case runs on a fabrictest device with matter.js's vectors (cluster/thermo:TestParityMatterJS_ThermostatBehaviorTest): the configured user limits, deadband and presets are ThermostatConfig fields, a local write of a setpoint or a user limit is MatterWrite inside Device.Act and of an absolute limit SetAbsoluteSetpointLimit, the errors carry matter.js's texts. Pin lift b25ed960: the Heat case through the interaction layer (#5012) is ported (cluster/thermo:TestThermostatRequestCheckParityMatterJS); the SetpointRaiseLower case that refuses an undefined mode runs through the request gate spec.AdmitRequest (cluster/thermo:TestThermostatRequestCheckParityMatterJS; P2-H, decision 339). The six ControlSequenceOfOperation cases (#5000) are left by design (BD-Matter-Thermostat-ControlSequenceFromFeatures, coordinator decision C-3).",
       "snapshotSha": "11e14b7fde55b5074a44d7f08d49e7e0ba1cd3ab",
       "left": [
         {
@@ -4425,24 +4423,9 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatSuggestionsTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/thermo:TestParityMatterJS_ThermostatSuggestionsTest"
-      ],
-      "missing": [
-        "continues after the highest stored value",
-        "wraps after 255 and skips values in use",
-        "stays in effect when its entry is still current",
-        "ends when another entry became current",
-        "stays in effect while the time is not synchronized after the restart",
-        "ends when no entry is current any more and keeps the active preset",
-        "removes stored entries that name no preset",
-        "removes stored entries that expired",
-        "raises MaxThermostatSuggestions to cover the stored entries",
-        "sets up the endpoint when it is added to a node that is online",
-        "re-evaluates when the application writes ThermostatSuggestions",
-        "follows when the transaction that adds the entry moves the setpoint to keep a limit",
-        "keeps a preset the application activates"
       ],
       "left": [
         {
@@ -4531,7 +4514,7 @@
           "reason": "BD-Matter-Thermostat-Suggestions-Seams: the Matter time port carries whole epoch seconds, so the timer fires within the due second, under one second late and never early (coordinator decision C-10)"
         }
       ],
-      "reason": "The server runs on the fake clock with the Matter time attached as a node attaches its own: matter.js's application `set` is SetAttributes, `reevaluate` MatterTimeChanged, a `command: true` call MatterInvoke; the two controller describes run over a commissioned fabrictest pair. overriddenSuggestionId is not served, so the cases read the override through ThermostatSuggestionNotFollowingReason. The templated its run once per expansion; the two orders of one transaction are one SetAttributes (a Go map has no order). 61 of 91 cases ported (P1-E, #4993; chip's suggestions_chip_test.go retired, its chip-only cases kept in suggestions_tc_tstat_4_3_test.go). Missing, unit P2-thermo-suggestions: the cases that need the stored list and override (decision 316, findings F-b25ed960-26), the application's write of ThermostatSuggestions (decision 317, F-b25ed960-27) and its activation of a preset with the setpoints (decision 318, F-b25ed960-28).",
+      "reason": "The server runs on the fake clock with the Matter time attached as a node attaches its own: matter.js's application `set` is SetAttributes, `reevaluate` MatterTimeChanged, a `command: true` call MatterInvoke; the two controller describes run over a commissioned fabrictest pair. overriddenSuggestionId is not served, so the cases read the override through ThermostatSuggestionNotFollowingReason. The templated its run once per expansion; the two orders of one transaction are one SetAttributes (a Go map has no order). 74 of 91 cases ported (P1-E, #4993; P2-G: the stored list and override through ThermostatConfig.SuggestionStore over a memstore shared across the restart, the application's write through SetAttributes, its activation through ActivatePreset; chip's suggestions_chip_test.go retired, its chip-only cases kept in suggestions_tc_tstat_4_3_test.go). The restart cases read overriddenSuggestionId from the store; \"sets up the endpoint when it is added to a node that is online\" attaches the Matter time as the node does for each topology (node/matter_time.go) and does not assert LocalTemperature, which the Go start does not take.",
       "snapshotSha": "3439897dea94cb7b4e5b5d1f591a75d1c65fd76f"
     },
     {
@@ -4841,13 +4824,14 @@
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
       "status": "partial",
       "go": [
-        "node:TestProtocolServiceParityMatterJS"
+        "node:TestProtocolServiceParityMatterJS",
+        "endpoint:TestRequestGateReachesEveryServer"
       ],
       "missing": [
         "shares one state reference between local reads without a transaction",
         "requires a transaction to read cluster state for a remote subject"
       ],
-      "reason": "The protocol service ports over the wire from commissioned fabrictest pairs, a second fabric commissioned by a second controller: fabric-filtered ACL and NOCs, the fabric reports and the Leave event of a subscription, the command lists of a server with one implemented command, the FeatureMap, invoke, no EventList in any AttributeList, a wildcard read of every attribute, and the TestCluster's response held to the request's qualified conformance (FAILURE, spec.Server.checkResponse), and its request held to the bound its decoder states as clustergen emits it (CONSTRAINT_ERROR before the handler runs) (node/protocol_service_parity_matterjs_test.go); the transaction model has no Go subject. Pin lift b25ed960: describe(\"invoke\") is ported — an undefined enum value refused with CONSTRAINT_ERROR before the handler, also behind a warning-only error, a member-less enum, and the clusters' own handling of invalid requests (the device's OperationalCredentials, GeneralCommissioning and Identify servers); the generic cases run on host handlers behind the spec gate (node/protocol_service_parity_matterjs_test.go), not on cluster/light's ColorControl, whose invoke path has no gate yet (findings F-b25ed960-29).",
+      "reason": "The protocol service ports over the wire from commissioned fabrictest pairs, a second fabric commissioned by a second controller: fabric-filtered ACL and NOCs, the fabric reports and the Leave event of a subscription, the command lists of a server with one implemented command, the FeatureMap, invoke, no EventList in any AttributeList, a wildcard read of every attribute, and the TestCluster's response held to the request's qualified conformance (FAILURE, spec.CheckResponse in the endpoint dispatcher since P2-H), and its request held to the bound its decoder states as clustergen emits it (CONSTRAINT_ERROR before the handler runs) (node/protocol_service_parity_matterjs_test.go); the transaction model has no Go subject. Pin lift b25ed960: describe(\"invoke\") is ported — an undefined enum value refused with CONSTRAINT_ERROR before the handler, also behind a warning-only error, a member-less enum, and the clusters' own handling of invalid requests (the device's OperationalCredentials, GeneralCommissioning and Identify servers); the generic cases run on host handlers behind the gate (node/protocol_service_parity_matterjs_test.go). Pin lift b25ed960, P2-H: the gate runs in endpoint.TopologyDispatcher for every server a wire command reaches (ProtocolService.ts:347-350, :671-705; decision 339); a hand-read request is judged in its generated form (spec.HandForm); the table on the real servers is endpoint:TestRequestGateReachesEveryServer.",
       "snapshotSha": "a1874e4c26cfc2f639a2d3af4dc3442decfc4199"
     },
     {
@@ -5411,7 +5395,8 @@
         "controller/dcl:TestCommissionRevokedDAC",
         "controller/client:TestClientAttestationNoTrustStoreParity",
         "controller/client:TestClientAttestationTrustStoreParity",
-        "controller/client:TestClientAttestationCallbackContractParity"
+        "controller/client:TestClientAttestationCallbackContractParity",
+        "controller/commissioner:TestClientAttestationBasicInformationVendorIDParity"
       ],
       "missing": [
         "self-heals a corrupt cached PAA by re-fetching from DCL",
@@ -5422,12 +5407,9 @@
         "dynamically fetches revocation data from DCL during commissioning",
         "commissions when policy accepts",
         "emits TrustedAsTestCertificate for the test PAA and the test CD signer, callback rejects",
-        "reports DacFormatInvalid and rejects when policy rejects",
-        "reports CertificationDeclarationFieldMismatch, callback rejects",
-        "reports CertificationDeclarationFieldMismatch, callback accepts → commissioning proceeds",
-        "names every error finding when the policy rejects"
+        "reports DacFormatInvalid and rejects when policy rejects"
       ],
-      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest. Pin lift b25ed960: the BasicInformation VendorID that does not match the CD, reported as the finding CertificationDeclarationFieldMismatch, and the rejection message naming every error finding (#4939) are open, unit P2-D.",
+      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest. Pin lift b25ed960 (P2-D): the BasicInformation VendorID that does not match the CD (#4939/#4940) runs through the flow's attestation step on the commissioner's scripted device (TestClientAttestationBasicInformationVendorIDParity), BasicInformation set to 0xFFF2 in the collected data instead of on a MockSite device; the rejection message naming every error finding is also asserted by controller/client:TestClientAttestationTrustStoreParity (ClientAttestationTest.ts:524).",
       "snapshotSha": "7c8ce4d9b7c67d834fcc8aa5736a771f5645680b"
     },
     {
@@ -5439,26 +5421,13 @@
         "controller/client:TestClientBridgeStructureRootOmitsParity",
         "controller/client:TestClientBridgeStructureChangesParity",
         "controller/client:TestClientBridgeStructureNestedAggregatorParity",
-        "controller/client:TestClientBridgeStructureSeveralEndpointsParity"
+        "controller/client:TestClientBridgeStructureSeveralEndpointsParity",
+        "controller/client:TestClientBridgeStructureRootNamesOnlyAggregatorParity"
       ],
       "missing": [
         "puts a sensor the bridge adds to a composed device below that device",
         "keeps each aggregator's own devices below it",
-        "reports the nested aggregator as an aggregator",
-        "installs a part the root has stopped naming while an endpoint on the node still names it",
-        "drops an endpoint the root stops naming once the nested aggregator stops naming it too",
-        "warns that the root does not name an endpoint other endpoints name",
-        "ignores the root in a PartsList below it",
-        "stops on PartsLists that name each other",
-        "places the devices the aggregator names and warns once",
-        "keeps the devices when the root stops naming them",
-        "does not wait for a device the aggregator names but the peer never reported",
-        "places a device the peer reports after the aggregator named it",
-        "does not place a device the aggregator names before the peer reports its Descriptor lists",
-        "places devices reported before the root names their aggregator",
-        "does not erase an endpoint the root stops naming before it was placed",
-        "restores the devices from storage after a restart",
-        "warns again and erases a device the peer removed while the controller was stopped"
+        "reports the nested aggregator as an aggregator"
       ],
       "left": [
         {
@@ -5467,7 +5436,7 @@
           "reason": "endpoint.require placeholders and hand-built peer structures"
         }
       ],
-      "reason": "How the client builds a bridge peer's tree: a composed device's parts below it on a real bridge (fabrictest), and on Descriptor reports applied to the image (Node.apply) — the claims kept across two interactions, the root omitting an endpoint, lists that change, an aggregator below an aggregator, bridged devices of several endpoints, the claimant ranking and the several-parents warning (controller/client:TestClientBridgeStructure*; fix: the claimant naming the fewest other claimants, then the shorter list, then the lower number owns a part whatever the arrival order, an endpoint the root no longer names is not waited for and not warned about, ClientStructure.ts:1436-1599 at db021da0). Missing: a sensor added to a composed device at run time and deleted again (device.Device has no part removal), and the real nested-aggregator device (the Go node serves one Aggregator at endpoint 1; the fed case covers the client's placement). Pin lift b25ed960: the three cases renamed with their expectation reversed, the PartsList cycles and describe \"a peer whose root names only its aggregator\" (097e5a8da) are open, unit P2-C.",
+      "reason": "How the client builds a bridge peer's tree: a composed device's parts below it on a real bridge (fabrictest), and on Descriptor reports applied to the image (Node.apply) — the claims kept across two interactions, the root omitting an endpoint, lists that change, an aggregator below an aggregator, bridged devices of several endpoints, the claimant ranking and the several-parents warning (controller/client:TestClientBridgeStructure*; fix: the claimant naming the fewest other claimants, then the shorter list, then the lower number owns a part whatever the arrival order, an endpoint the root no longer names is not waited for and not warned about, ClientStructure.ts:1436-1599 at db021da0). Missing: a sensor added to a composed device at run time and deleted again (device.Device has no part removal), and the real nested-aggregator device (the Go node serves one Aggregator at endpoint 1; the fed case covers the client's placement). Pin lift b25ed960 (097e5a8da, P2-C): placement from the current lists. An endpoint is on the node when the root's PartsList, or that of an endpoint on the node, names it once it reported; only endpoints that were on the node are erased; the root is ignored in other lists; one warning for an incomplete root list. Describe 'a peer whose root names only its aggregator' is ported on the pair device (root + OnOffLight on endpoint 1, pairPeer); devices reported before the root names their aggregator are admitted by decision 342.",
       "snapshotSha": "aa02f0a0c940e11ad3d153b739b1b1c7146bfdf7"
     },
     {
@@ -6267,8 +6236,11 @@
     },
     {
       "path": "packages/node/test/node/CsrNonceCommissioningTest.ts",
-      "status": "planned",
-      "reason": "Commissioning stopped when the CSRResponse carries another CSRNonce: the check exists on chip's behaviour (controller/commissioner TestCertificatesCsrNonceEchoed, BD-chip-Commissioner-CsrNonceEchoed); pin-lift b25ed960 unit P2-D moves it onto matter.js's NOCSR validation and ports the case.",
+      "status": "ported",
+      "go": [
+        "controller/commissioner:TestCsrNonceCommissioningParity"
+      ],
+      "reason": "On the commissioner's scripted device with a CSA test chain: the attestation step, then the CSR step; the device signs NOCSRElements over the inverted nonce (WrongCsrNonceServer) and the flow stops with the NocsrError CsrNonceMismatch as ErrCommissioning before AddTrustedRootCertificate; a control subtest echoes the nonce.",
       "snapshotSha": "88eb201fa1fa2c695fba0e7ad0286754e4ea8e80"
     },
     {
@@ -6408,23 +6380,15 @@
       "status": "partial",
       "go": [
         "controller/client:TestNodeLifecycleSeededParity",
-        "controller/client:TestNodeLifecycleSeededPairParity"
+        "controller/client:TestNodeLifecycleSeededPairParity",
+        "controller/client:TestNodeLifecycleSeededRootWithoutDeviceTypeParity"
       ],
       "missing": [
         "seeds a node built by hand once an endpoint beyond the root is added",
         "seeds a node built by hand on BasicInformation install when endpoints are already present",
-        "uses ClientNodeLifecycle for a client node and plain NodeLifecycle for a server node",
-        "places an aggregator's devices reported before the root's PartsList once the root names it",
-        "installs and seeds the endpoints the root names and warns once",
-        "places a nested part below its closest claimant",
-        "places parts below an aggregator when the root reports only an application device type",
-        "places the devices an aggregator names when the root also omits one of them",
-        "restores the endpoints from storage and warns again after a restart",
-        "does not warn about a non-root endpoint that reports no device type",
-        "does not warn about a root that has not reported its DeviceTypeList",
-        "does not warn about a root that reports Root Node"
+        "uses ClientNodeLifecycle for a client node and plain NodeLifecycle for a server node"
       ],
-      "reason": "When the client node is seeded — BasicInformation present and every endpoint the root's reported PartsList names installed, a root-only node included, more than the root without a PartsList — and the root-only warning (once, not for a node-scoped device type, not without a reported DeviceTypeList) run on Node.apply with Descriptor reports (controller/client:TestNodeLifecycleSeededParity) and on fabrictest for the commissioned pair and the restored peer (TestNodeLifecycleSeededPairParity); fix: the seeding rule of Peers.ts #evaluateSeeded (:760-797) at 862ad75f — the Go node seeded only with more than one endpoint. matter.js also reads an unreported mandatory list as empty; the Go image holds no value. Missing: nodes built by hand (endpoints.require, behaviors.require — the Go image is built from reports and its store only) and the ClientNodeLifecycle/NodeLifecycle class split (no lifecycle class hierarchy in Go). Pin lift b25ed960: the placement of an aggregator's devices and describe \"ClientNode with a root that reports no device type\" (a7ac64f19, 097e5a8da) are open, unit P2-C.",
+      "reason": "When the client node is seeded — BasicInformation present and every endpoint the root's reported PartsList names installed, a root-only node included, more than the root without a PartsList — and the root-only warning (once, not for a node-scoped device type, not without a reported DeviceTypeList) run on Node.apply with Descriptor reports (controller/client:TestNodeLifecycleSeededParity) and on fabrictest for the commissioned pair and the restored peer (TestNodeLifecycleSeededPairParity); fix: the seeding rule of Peers.ts #evaluateSeeded (:760-797) at 862ad75f — the Go node seeded only with more than one endpoint. matter.js also reads an unreported mandatory list as empty; the Go image holds no value. Missing: nodes built by hand (endpoints.require, behaviors.require — the Go image is built from reports and its store only) and the ClientNodeLifecycle/NodeLifecycle class split (no lifecycle class hierarchy in Go). Pin lift b25ed960 (a7ac64f19, 097e5a8da, P2-C): describe 'ClientNode with a root that reports no device type' is ported (TestNodeLifecycleSeededRootWithoutDeviceTypeParity; one warning per node and start, so matter.js's two warnings across a restart are one per Go node), and 'places an aggregator's devices reported before the root's PartsList once the root names it' is in TestNodeLifecycleSeededParity (decision 342).",
       "snapshotSha": "e037c87521b89ae9eddf56c890938bb8c99e0da1"
     },
     {
@@ -6935,21 +6899,19 @@
       "status": "partial",
       "go": [
         "client/exchange:TestSessionViews",
-        "client/handshake:TestCASEServerResponderSessionEstablishing"
+        "client/handshake:TestCASEServerResponderSessionEstablishing",
+        "secure/operational:TestSessionViews"
       ],
       "missing": [
-        "SessionManager.sessionsForFabricIndex() sees both sessions",
-        "SessionManager.findOldestInactiveSession() picks the oldest of both sessions, which is the establishing one",
         "SessionManager.forFabric() sees the established session",
         "SessionManager.getPaseSession() sees the established session",
-        "SessionManager.getActiveSessionInformation() sees the established session",
         "Peer.subscriptions sees both sessions",
         "SessionsBehavior events opened and closed sees the established session",
         "InteractionServer clearing the subscriptions of a Subscribe with keepSubscriptions false sees both sessions",
         "InteractionServer deferring reports for an invoke with DelayReportData sees both sessions",
         "GeneralDiagnostics DeviceLoadStatus counting subscriptions sees both sessions"
       ],
-      "reason": "The rows with a subject on the controller's exchange.Manager (P1-A, #4882): sessionsFor, getSession (routing; the establishing session's message is served), closeAllSessions (Manager.Close), handlePeerLoss, the per-peer eviction and CloseSession on a graceful close (client/exchange:TestSessionViews). PeerSet adoption is the CASE server's OnSession after the establishment, called once the Success's send returned, where matter.js adopts at its first transmission (client/handshake:TestCASEServerResponderSessionEstablishing; findings F-b25ed960-35). Missing, no controller subject: sessionsForFabricIndex, findOldestInactiveSession, forFabric, getPaseSession, getActiveSessionInformation, Peer.subscriptions, SessionsBehavior, the InteractionServer and GeneralDiagnostics rows — the device side's, decision 312's P2 unit (findings F-b25ed960-23). The it names are the template's expansions.",
+      "reason": "The rows with a subject on the controller's exchange.Manager (P1-A, #4882): sessionsFor, getSession (routing; the establishing session's message is served), closeAllSessions (Manager.Close), handlePeerLoss, the per-peer eviction and CloseSession on a graceful close (client/exchange:TestSessionViews). PeerSet adoption is the CASE server's OnSession at the establishment, the Success's first transmission (client/handshake:TestCASEServerResponderSessionEstablishing; P2-J, decision 335). The device side's table answers sessionsForFabricIndex (CloseFabric), getSession, closeAllSessions, findOldestInactiveSession (the id-space eviction), handlePeerLoss, getActiveSessionInformation (Sessions), the per-peer eviction and CloseSession (secure/operational:TestSessionViews; P2-J, decision 312). Missing: sessionsFor() (Go's SessionIDsForPeer is the picker's fallback and lists established sessions only), forFabric (no Go reader of that view), getPaseSession (no establishing PASE session in Go), PeerSet adopting the sessions that predate it (no device-side peer set), Peer.subscriptions, SessionsBehavior events (node:TestCASEResponderSessionEstablishingOnTheDevice asserts onOpened only at establishment, not the Observers' opened/closed of a session closed while establishing), the InteractionServer and GeneralDiagnostics rows (subscriptions are not kept by the session table, im/subscription). The it names are the template's expansions.",
       "snapshotSha": "0e89c2168cdfb70c564c146ab78c3c230d30f275"
     },
     {
@@ -8012,7 +7974,7 @@
     },
     {
       "path": "packages/protocol/test/certificate/DeviceAttestationValidatorTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/attestation:TestCertificateRules",
         "controller/attestation:TestParityChecks",
@@ -8035,15 +7997,7 @@
         "controller/attestation:TestDeviceAttestationValidatorTestCertificatePAA",
         "controller/attestation:TestDeviceAttestationValidatorTestCDSigner"
       ],
-      "missing": [
-        "refuses elements of 901 bytes before decoding them, but decodes 900 bytes",
-        "reports CertificationDeclarationFieldMismatch when CD vendorId does not match BasicInformation",
-        "reports CertificationDeclarationFieldMismatch when productId not in CD product_id_array",
-        "reports CertificationDeclarationFieldMismatch when the device did not report VendorID",
-        "reports CertificationDeclarationFieldMismatch when the device did not report ProductID",
-        "keeps the VendorID finding when a later DAC check stops validation"
-      ],
-      "reason": "Every it case is ported through attestation.Validate with the check and the matter.js message regex, the DclCertificateService standing as a StaticStore and its signed CRLs as the Revocations interface; the PAI with an unreadable key is CertificateUnparseable as upstream but with the step-1 message, because crypto/x509 reads the key while parsing. Pin lift wave P2 (#431) ports the CD signer cases of db021da0: an unlisted signer is CdSignerUnknown, the built-in test signer a recoverable TrustedAsTestCertificate under a production-only policy, certification_type 3 refused. Pin lift b25ed960: the RESP_MAX bound on the attestation elements (#4940) and the CD/BasicInformation mismatch as an error-level finding, the unreported form included (#4939, decision 295), are open, unit P2-D; the two mismatch cases ported before assert the throw of db021da0.",
+      "reason": "Every it case is ported through attestation.Validate with the check and the matter.js message regex, the DclCertificateService standing as a StaticStore and its signed CRLs as the Revocations interface; the PAI with an unreadable key is CertificateUnparseable as upstream but with the step-1 message, because crypto/x509 reads the key while parsing. Pin lift wave P2 (#431) ports the CD signer cases of db021da0: an unlisted signer is CdSignerUnknown, the built-in test signer a recoverable TrustedAsTestCertificate under a production-only policy, certification_type 3 refused. Pin lift b25ed960 (P2-D, #4939/#4940/#4938): the BasicInformation VendorID/ProductID mismatch and an unreported value as the error finding CertificationDeclarationFieldMismatch (decision 295), the findings a hard failure carries (Error.PrecedingFindings), AttestationElements over RESP_MAX as the hard failure AttestationElementsTooLong.",
       "snapshotSha": "0106b91119d6a9f9fa1c247824f6a765ee960835"
     },
     {
@@ -8140,8 +8094,18 @@
     },
     {
       "path": "packages/protocol/test/certificate/NocsrValidatorTest.ts",
-      "status": "planned",
-      "reason": "Pin lift b25ed960, unit P2-D: the commissioner's validation of a CSRResponse — the RESP_MAX bound, the attestation signature, the CSRNonce, the CSR's structure, signature and key (#4938); 14 cases.",
+      "status": "ported",
+      "go": [
+        "controller/attestation:TestNocsrValidatorParity"
+      ],
+      "left": [
+        {
+          "it": "passes a defect of its own crypto through unchanged",
+          "class": "js-runtime-only",
+          "reason": "attestation.ValidateNOCSR verifies with crypto/ecdsa and has no injectable crypto; there is no InternalError to tell from peer data (PeerData.ts isLocalDefect)."
+        }
+      ],
+      "reason": "attestation.ValidateNOCSR is NocsrValidator.validate, check for check; the CSR is Go's x509.CreateCertificateRequest, not createCertificateSigningRequest.",
       "snapshotSha": "84475a5dde09d2878f3ac5641ca92121774b019e"
     },
     {
@@ -9837,9 +9801,10 @@
         "client/exchange:TestSessionManagerSessionParameterSetter",
         "client/peer:TestNewestSessionActivityParityMatterJS",
         "client/exchange:TestSessionManagerEstablishing",
-        "client/exchange:TestSessionManagerPeerLossByRegistrationOrder"
+        "client/exchange:TestSessionManagerPeerLossByRegistrationOrder",
+        "secure/operational:TestSessionManagerEstablishing"
       ],
-      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. The peer-shutdown case after a backward clock step runs on the sweep's monotonic cutoff, Manager.ClosePeerLostSince (seam wave, issue #396): matter.js runs both causes through #handlePeerLoss with asOf on Time.nowUs, and the shutdown cause's keepSubscriptions is the controller's own subscriptions, no device-side subject. Pin lift b25ed960 (#4882): the supersession of a peer's older sessions and the per-peer cap counted at establishment (eleven cases of describe \"session supersession\") are open, unit P2-B; the establishing state is ported on the controller's exchange.Manager (client/exchange:TestSessionManagerEstablishing, the observer being the per-peer cap; \"finds an establishing session only once it is established\" by meaning in client/handshake, OnSession after the establishment; \"neither counts nor evicts an establishing session for the per-peer cap\" with it, coordinator decision C-8), and peer loss by registration order (client/exchange:TestSessionManagerPeerLossByRegistrationOrder) but for \"returns the sessions of the peer registered at or after a session\", unit P2-B (sessionsRegisteredSince's one user is the armer) (P1-A).",
+      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. The peer-shutdown case after a backward clock step runs on the sweep's monotonic cutoff, Manager.ClosePeerLostSince (seam wave, issue #396): matter.js runs both causes through #handlePeerLoss with asOf on Time.nowUs, and the shutdown cause's keepSubscriptions is the controller's own subscriptions, no device-side subject. Pin lift b25ed960 (#4882): the supersession of a peer's older sessions (eleven cases of describe \"session supersession\") is open, unit P2b-B; the establishing state is ported on the controller's exchange.Manager (client/exchange:TestSessionManagerEstablishing, the observer being the per-peer cap; \"finds an establishing session only once it is established\" by meaning in client/handshake, OnSession at the establishment; \"neither counts nor evicts an establishing session for the per-peer cap\" with it, coordinator decision C-8); on the device side's table too (secure/operational:TestSessionManagerEstablishing, the CASE responder of bridge/node, P2-J), with the per-peer cap run at establishment over established sessions, and peer loss by registration order (client/exchange:TestSessionManagerPeerLossByRegistrationOrder) but for \"returns the sessions of the peer registered at or after a session\", unit P2b-B (sessionsRegisteredSince's one user is the armer) (P1-A).",
       "snapshotSha": "a2f189858045a968dbb38c27baf6a0438ed50cdf",
       "left": [
         {
