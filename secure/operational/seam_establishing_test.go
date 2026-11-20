@@ -4,6 +4,7 @@
 package operational
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/internal/sessionseam"
@@ -44,10 +45,10 @@ func TestSessionSeamOpenEstablishingAndComplete(t *testing.T) {
 		t.Fatal("the entry is still establishing after its completion")
 	}
 
-	if _, err := sessionseam.OpenEstablishing(struct{}{}, s, 1, 0x10, 0x20, 0x2000, nil, closeParityKeys(2)); err != errSeamManager {
+	if _, err := sessionseam.OpenEstablishing(struct{}{}, s, 1, 0x10, 0x20, 0x2000, nil, closeParityKeys(2)); !errors.Is(err, errSeamManager) {
 		t.Fatalf("OpenEstablishing with a non-manager: %v, want errSeamManager", err)
 	}
-	if _, err := sessionseam.OpenEstablishing(m, struct{}{}, 1, 0x10, 0x20, 0x2000, nil, closeParityKeys(3)); err != errSeamStake {
+	if _, err := sessionseam.OpenEstablishing(m, struct{}{}, 1, 0x10, 0x20, 0x2000, nil, closeParityKeys(3)); !errors.Is(err, errSeamStake) {
 		t.Fatalf("OpenEstablishing with a non-stake: %v, want errSeamStake", err)
 	}
 	if sessionseam.CompleteEstablishment(struct{}{}, e) || sessionseam.CompleteEstablishment(m, struct{}{}) {
