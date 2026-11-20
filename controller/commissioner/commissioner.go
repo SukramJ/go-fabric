@@ -503,7 +503,7 @@ func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, tim
 			s.HandlePeerLoss(ch.ClosedCause())
 		}
 		if err == nil {
-			err = errors.New("BLE transport closed while PASE completed")
+			err = errors.New("commissioner: BLE transport closed while PASE completed")
 		}
 		return nil, fmt.Errorf("commissioner: commissioning channel closed during PASE: %w: %w", err, ch.ClosedCause())
 	default:

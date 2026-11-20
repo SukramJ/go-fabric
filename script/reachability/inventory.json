@@ -31547,7 +31547,7 @@
       "identifier": "TestCommissioningFailsafeExpiry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
-      "line": 85
+      "line": 84
     },
     {
       "package": "controller/commissioner",
@@ -31771,14 +31771,14 @@
       "identifier": "TestFailsafeExpiryAwaitsTheRearmInFlight",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
-      "line": 281
+      "line": 280
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFailsafeExpiryChecksTheResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
-      "line": 250
+      "line": 249
     },
     {
       "package": "controller/commissioner",
