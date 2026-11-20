@@ -136,8 +136,16 @@ import (
 // 448 drifted before the lift's re-cites (17 hard errors, the stale
 // comments of the lift's P0 list); 441 after them. The remaining rows are
 // citations into files the lift moved that their reconcile units (P1–P5)
-// re-read, not new citations.
-const citecheckDriftRatchet = 430
+// re-read, not new citations. 429 after wave P2b (E, A, B, K merged);
+// 433 after its units I and F: four new rows whose sentence names the
+// construct the cited range sits in, read at b25ed960 — writeValue
+// (AttributeWriteResponse.ts:419) around :446-460, expectChunkedWrite
+// (tc-idm-3.1-support.ts:119) around :158-162, listLongOctetString beside
+// LONG_OCTET_STRING_ENTRY (unit-testing-cluster.ts:66-70), the describe
+// LocalizationConfigurationServer of its test file; none is a moved line.
+// 435 after P2b-F's follow-up: two rows naming writeValue
+// (AttributeWriteResponse.ts:419) around its catch block :463-470, read.
+const citecheckDriftRatchet = 435
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -183,8 +191,11 @@ const citecheckDriftRatchet = 430
 // binding no .ts file stays as written. The registers' 308 citations moved
 // with the same rule; their ratchet did not move. P1-B (pin lift
 // b25ed960, #5012) re-read and relabelled 37 more in the request-check
-// files it rewrote (2728 at db021da0 remain).
-const citecheckOffPinRatchet = 2810
+// files it rewrote (2728 at db021da0 remain). Wave P2b relabelled 10
+// more at b25ed960 in the files its units touched (E, A, B); P2b-L2 one
+// more (client/exchange/manager.go). The P2b register commit relabelled
+// one more (controller/commissioner/fabric.go's MaxLabelLength).
+const citecheckOffPinRatchet = 2795
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

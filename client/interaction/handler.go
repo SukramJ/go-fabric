@@ -111,8 +111,15 @@ func (r *Subscriptions) sendStatus(ctx context.Context, m *messenger, status im.
 	}
 }
 
-// handleReport is ClientSubscriptionHandler.#handleExchange (:62-145).
-func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *exchange.Message) error {
+// handleReport is ClientSubscriptionHandler.#handleExchange (:63-160 at
+// b25ed960).
+//
+// A report whose status the peer never acknowledged is handed to the
+// subscription once the report ends, unless the registry is blocked
+// (shutdown); a missing acknowledgement of a chunk's status, which ends
+// the report, is no failure of it. Mirrors matter.js
+// ClientSubscriptionHandler.ts:107 and :142-158 at b25ed960.
+func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *exchange.Message) (err error) {
 	initial, err := decodeReport(first.Payload)
 	if err != nil {
 		return err
@@ -130,15 +137,27 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 		r.sendStatus(ctx, m, im.StatusInvalidSubscription)
 		return nil
 	}
+	reportNumber := sub.nextReportNumber()
 	sub.mu.Lock()
 	sub.isReading = true
 	sub.mu.Unlock()
 	defer func() {
+		if err != nil && m.unacknowledgedReportStatus == reportStatusChunk && isAckMissing(err) {
+			err = nil
+		}
 		sub.mu.Lock()
 		sub.isReading = false
 		sub.timeoutAt = time.Time{}
 		sub.mu.Unlock()
 		r.ResetTimer()
+		if unacknowledged := m.unacknowledgedReportStatus; unacknowledged != "" {
+			if r.IsBlocked() {
+				r.log.Debug("matter.controller.interaction.report_status_unacknowledged_during_shutdown",
+					slog.Uint64("subscription_id", uint64(initial.SubscriptionID)))
+			} else {
+				sub.reportStatusUnacknowledged(reportNumber, unacknowledged)
+			}
+		}
 	}()
 	r.announceReport(session)
 	if len(initial.Reports) == 0 && len(initial.EventReports) == 0 {

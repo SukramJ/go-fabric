@@ -405,12 +405,24 @@ func TestBasicInfo_RestoreNodeLabelValid(t *testing.T) {
 	}
 }
 
+// TestBasicInfo_RestoreNodeLabelTooLong: a stored NodeLabel over its 32
+// bytes in UTF-8 restores cut to them between two runes (Datasource.ts:149-165
+// at b25ed960, #4995; decision 294) — it used to be refused, and the
+// default served instead.
 func TestBasicInfo_RestoreNodeLabelTooLong(t *testing.T) {
 	t.Parallel()
-	b := newValidBasicInfo(t)
-	err := b.RestoreNodeLabel(strings.Repeat("y", 33))
-	if err == nil {
-		t.Fatal("expected error for RestoreNodeLabel > 32 bytes, got nil")
+	for stored, want := range map[string]string{
+		strings.Repeat("y", 33):       strings.Repeat("y", 32),
+		strings.Repeat("日", 11):       strings.Repeat("日", 10),
+		"a" + strings.Repeat("é", 16): "a" + strings.Repeat("é", 15),
+	} {
+		b := newValidBasicInfo(t)
+		if err := b.RestoreNodeLabel(stored); err != nil {
+			t.Fatalf("RestoreNodeLabel(%d bytes): %v", len(stored), err)
+		}
+		if v, _ := b.MatterRead(0x0005); v.(tlv.BoundedString).Value != want {
+			t.Errorf("NodeLabel %q, want %q", v.(tlv.BoundedString).Value, want)
+		}
 	}
 }
 

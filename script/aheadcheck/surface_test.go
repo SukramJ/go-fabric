@@ -155,7 +155,6 @@ type measure func(t *testing.T, row string, with bool) surface.Cluster
 var measurements = map[string]measure{
 	"BD-chip-Thermostat-Schedules":                    measureThermostat,
 	"BD-chip-Thermostat-Events":                       measureThermostat,
-	"BD-chip-Thermostat-Suggestions":                  measureThermostat,
 	"BD-chip-TimeSynchronization-Features":            measureTimeSynchronization,
 	"BD-Thread-NetComm-ThreadVariant":                 measureNetworkCommissioning,
 	"BD-chip-GeneralCommissioning-TermsAndConditions": measureGeneralCommissioning,
@@ -166,14 +165,10 @@ var measurements = map[string]measure{
 // measureThermostat builds a heating Thermostat through the device layer
 // with every Thermostat row enabled, with or without the row's features;
 // MatterScheduleConfiguration carries the one schedule type the server
-// needs to start, and ThermostatSuggestions ("[PRES]") is measured on a
-// thermostat with Presets.
+// needs to start.
 func measureThermostat(t *testing.T, row string, with bool) surface.Cluster {
 	t.Helper()
 	features := thermostatdef.FeatureHeating
-	if thermo.Ahead[row].Features&thermo.ThermostatFeatureTSUGGEST != 0 {
-		features |= thermostatdef.FeaturePresets
-	}
 	decl := thermostatdef.Declare{}
 	if with {
 		features |= thermostatdef.Feature(thermo.Ahead[row].Features)
@@ -182,11 +177,6 @@ func measureThermostat(t *testing.T, row string, with bool) surface.Cluster {
 		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1}}
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
-	}
-	if features&thermostatdef.FeaturePresets != 0 {
-		types := []thermostatdef.PresetTypeStruct{{PresetScenario: thermostatdef.PresetScenarioOccupied, NumberOfPresets: 1}}
-		one := uint8(1)
-		decl.Initial.PresetTypes, decl.Initial.NumberOfPresets = &types, &one
 	}
 	decl.Features = features
 	p := surface.Policies{Extensions: surface.NewExtensions(thermo.Ahead.IDs()...)}

@@ -14,31 +14,20 @@ import (
 	"github.com/SukramJ/go-fabric/device"
 )
 
-// TestDemoThermostatSuggestionsAreGated: the demo thermostat serves
-// ThermostatSuggestions only when --extensions names
-// BD-chip-Thermostat-Suggestions, and with it a suggestion of one of its
-// presets is taken and followed on the node's Matter time, which the node
-// hands the server as the device joins its topology (attached here as the
-// node attaches it).
-func TestDemoThermostatSuggestionsAreGated(t *testing.T) {
+// TestDemoThermostatServesSuggestions: the demo thermostat serves
+// ThermostatSuggestions by default, without --extensions (owner decision
+// 336), and a suggestion of one of its presets is taken and followed on
+// the node's Matter time, which the node hands the server as the device
+// joins its topology (attached here as the node attaches it).
+func TestDemoThermostatServesSuggestions(t *testing.T) {
 	t.Parallel()
 	opts := device.Options{StableKey: device.StringKey("demo-thermostat"), Name: "Thermostat"}
-	plain, err := newDemoThermostat("Thermostat").device(opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fm, _ := plain.Thermostat().Underlying().MatterRead(spec.AttrFeatureMap); fm.(uint32)&uint32(thermostatdef.FeatureThermostatSuggestions) != 0 {
-		t.Errorf("FeatureMap 0x%X serves TSUGGEST without the row", fm)
-	}
-
-	policies, err := surfacePolicies(flags{extensions: suggestionsRow})
-	if err != nil {
-		t.Fatal(err)
-	}
-	opts.Surface = policies
 	d, err := newDemoThermostat("Thermostat").device(opts)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if fm, _ := d.Thermostat().Underlying().MatterRead(spec.AttrFeatureMap); fm.(uint32)&uint32(thermostatdef.FeatureThermostatSuggestions) == 0 {
+		t.Errorf("FeatureMap 0x%X does not serve TSUGGEST by default", fm)
 	}
 	srv := d.Thermostat()
 	if got := srv.Get().MaxThermostatSuggestions; got != 5 {

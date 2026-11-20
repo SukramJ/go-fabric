@@ -70,6 +70,7 @@ var handResponses = []struct {
 	{0x0062, "StoreScene", mattercore.SceneStatusResponse{}},
 	{0x0062, "GetSceneMembership", mattercore.GetSceneMembershipResponse{HasList: true}},
 	{0x0062, "CopyScene", mattercore.CopySceneResponse{}},
+	{0x0065, "LeaveGroup", mattercore.LeaveGroupResponse{}},
 }
 
 // dropFirstMandatory is the bridge's response writer with the first field

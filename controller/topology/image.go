@@ -59,7 +59,7 @@ type Image struct {
 // endpoint's DeviceTypeList holds the Aggregator.
 func ImageOf(n *client.Node) (Image, bool) {
 	addr, ok := n.PeerAddress()
-	if !ok {
+	if !ok || !n.IsCommissioned() {
 		return Image{}, false
 	}
 	props := n.Properties()

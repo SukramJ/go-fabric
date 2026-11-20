@@ -657,9 +657,9 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | I/3.2 | 4 | 0 | Go controller as TH, after matter.js `TC-I-3.2.test.ts` |
 | IDM/1.1 | 2 | 1 | Go controller as TH, after matter.js `TC-IDM-1.1.test.ts` |
 | IDM/1.3 | 3 | 4 | Go controller as TH, after matter.js `TC-IDM-1.3.test.ts` |
-| IDM/2.1 | 20 | 1 | Go controller as TH, after matter.js `TC-IDM-2.1.test.ts` |
-| IDM/3.1 | 10 | 5 | Go controller as TH, after matter.js `TC-IDM-3.1.test.ts` |
-| IDM/4.1 | 7 | 3 | Go controller as TH, after matter.js `TC-IDM-4.1.test.ts` |
+| IDM/2.1 | 21 | 0 | Go controller as TH, after matter.js `TC-IDM-2.1.test.ts` |
+| IDM/3.1 | 14 | 1 | Go controller as TH, after matter.js `TC-IDM-3.1.test.ts` |
+| IDM/4.1 | 8 | 2 | Go controller as TH, after matter.js `TC-IDM-4.1.test.ts` |
 | IDM/5.1 | 2 | 1 | Go controller as TH, after matter.js `TC-IDM-5.1.test.ts` |
 | IDM/6.3 | 1 | 0 | Go controller as TH, after matter.js `TC-IDM-6.3.test.ts` |
 | IDM/6.4 | 2 | 4 | Go controller as TH, after matter.js `TC-IDM-6.4.test.ts` |
@@ -700,7 +700,7 @@ expectations are what the daemon has to satisfy (`internal/chiptool` TestGoCerti
 | SU/3.3 | 4 | 2 | Go controller as TH, after matter.js `TC-SU-3.3.test.ts` |
 | SU/3.4 | 3 | 1 | Go controller as TH, after matter.js `TC-SU-3.4.test.ts` |
 | SU/4.1 | 9 | 0 | Go controller as TH, after matter.js `TC-SU-4.1.test.ts`; passes with chip-tool as TH too |
-| SWTCH/3.2 | 16 | 7 | Go controller as TH, after matter.js `TC-SWTCH-3.2.test.ts` |
+| SWTCH/3.2 | 15 | 8 | Go controller as TH, after matter.js `TC-SWTCH-3.2.test.ts` |
 | TGTNAV/8.2 | 2 | 0 | Go controller as TH, after matter.js `TC-TGTNAV-8.2.test.ts` |
 | TSTAT/3.2 | 3 | 0 | Go controller as TH, after matter.js `TC-TSTAT-3.2.test.ts` |
 | WNCV/6.1 | 4 | 0 | Go controller as TH, after matter.js `TC-WNCV-6.1.test.ts` |

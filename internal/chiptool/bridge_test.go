@@ -196,6 +196,17 @@ type bridgeOptions struct {
 	// thermostat leg; the certification families' daemons leave it off,
 	// as a host does by default (issue #273).
 	thermostatSchedules bool
+	// unitTesting serves CHIP's UnitTesting cluster on the Aggregator
+	// (--unit-testing, examples/reference-bridge/unit_testing.go): the
+	// Go-TH leg's DUT only (gocert_test.go newGoTH; owner decisions 337,
+	// 354), for the data-type steps of TC-IDM-3.1 and TC-IDM-4.1 and the
+	// manufacturer-specific cluster TC-IDM-2.1 step 21 reads. Every other
+	// daemon leaves it off: chip's TC-IDM-13.1 fails a device that serves
+	// UnitTesting, and the suite's data-model leg holds every served
+	// cluster to the matter.js schema. The PICS slices are generated from
+	// a daemon without it, and the cluster has no PICS code, so the
+	// fixtures do not move for it.
+	unitTesting bool
 	// extraArgs are further daemon flags (a second device's
 	// --discriminator, for the Go-TH leg's TC-SC-4.8).
 	extraArgs []string
@@ -203,14 +214,11 @@ type bridgeOptions struct {
 
 // harnessExtensions are the "Ahead of matter.js" register rows
 // (notes/parity/by_design.md) every daemon the harness starts enables, off
-// in the daemon by default: BD-chip-Thermostat-Suggestions serves
-// ThermostatSuggestions on the demo thermostat, which TC-TSTAT-4.3 needs
-// (PICS TSTAT.S.F0a); BD-chip-ClosureControl-RulesInServer MotionLatching,
+// in the daemon by default: BD-chip-ClosureControl-RulesInServer MotionLatching,
 // Speed and Calibration on the garage (TC-CLCTRL-3.1, 4.2: CLCTRL.S.F06,
 // F01); BD-chip-Valve-RulesInServer Level and TimeSync on the garden tap
 // (TC-VALCC-3.2, 3.3: VALCC.S.F01, A0006).
 var harnessExtensions = []string{
-	"BD-chip-Thermostat-Suggestions",
 	"BD-chip-ClosureControl-RulesInServer",
 	"BD-chip-Valve-RulesInServer",
 }
@@ -300,6 +308,10 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	// device has to be the same device in every case.
 	if flags["wifi"] {
 		args = append(args, "--wifi")
+	}
+	// --unit-testing on the Go-TH leg's DUT alone (bridgeOptions.unitTesting).
+	if opts.unitTesting {
+		args = append(args, "--unit-testing")
 	}
 	// --media adds the video player and content app the media families run
 	// against (examples/reference-bridge/media.go, ADR 0022); every daemon

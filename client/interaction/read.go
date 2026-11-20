@@ -124,17 +124,26 @@ const emptyArraySize = 3
 // in order, as fit the space left, the first that does not fit ending the
 // list.
 func encodeFitting(r readingRequest, maxPayload int) ([]byte, error) {
-	b, err := r.encode(r.filters())
+	b, _, err := encodeFittingAll(r, maxPayload)
+	return b, err
+}
+
+// encodeFittingAll is [encodeFitting] that also tells whether the request
+// carries all its DataVersionFilters, none dropped — the
+// allDataVersionFiltersSent of #encodeReadingRequest
+// (InteractionMessenger.ts:1168-1198 at b25ed960).
+func encodeFittingAll(r readingRequest, maxPayload int) (b []byte, allSent bool, err error) {
+	b, err = r.encode(r.filters())
 	if err != nil || len(b) <= maxPayload {
-		return b, err
+		return b, true, err
 	}
 	without, err := r.encode(nil)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	base := len(without) + emptyArraySize
 	if base > maxPayload {
-		return nil, fmt.Errorf("%w: %d bytes without DataVersionFilters", ErrRequestTooLarge, len(without))
+		return nil, false, fmt.Errorf("%w: %d bytes without DataVersionFilters", ErrRequestTooLarge, len(without))
 	}
 	available := maxPayload - base
 	var kept []im.DataVersionFilter
@@ -146,5 +155,6 @@ func encodeFitting(r readingRequest, maxPayload int) ([]byte, error) {
 		kept = append(kept, f)
 		available -= size
 	}
-	return r.encode(kept)
+	b, err = r.encode(kept)
+	return b, len(kept) == len(r.filters()), err
 }

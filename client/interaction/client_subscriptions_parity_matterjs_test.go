@@ -14,6 +14,7 @@ package interaction_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -51,6 +52,56 @@ func TestClientSubscriptionsResetTimer(t *testing.T) {
 			}
 			if len(timedOut) != 1 {
 				t.Fatalf("timed out %d times, want 1", len(timedOut))
+			}
+		})
+	})
+}
+
+// TestClientSubscriptionsDelete ports the "delete" group
+// (ClientSubscriptionsTest.ts:82-111 at b25ed960, #4947): the liveness
+// timer stops once the last peer subscription leaves
+// (ClientSubscriptions.ts:176-187). matter.js counts the timers named
+// "Subscription timeout"; the Go fake clock lists the armed durations, and
+// the liveness timer is the one of the full timeout while the clock stands.
+func TestClientSubscriptionsDelete(t *testing.T) {
+	t.Parallel()
+	t.Run("stops the timeout timer when the last subscription leaves", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			s := newScripted(t)
+			reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+			c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg})
+			timeout := 30*time.Second + 2*c.MaximumPeerResponseTime(interaction.SubscriptionProcessingTime, false)
+			first := subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}}, 1)
+			second := subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}}, 2)
+
+			first.Close()
+			s.clock.waitTimer(t, timeout)
+
+			second.Close()
+			synctest.Wait()
+			if slices.Contains(s.clock.pending(), timeout) {
+				t.Fatalf("the timeout timer is still armed after the last subscription left (pending %v)", s.clock.pending())
+			}
+
+			subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}}, 3).Close()
+		})
+	})
+	t.Run("stops the timeout timer when the last subscription leaves as it times out", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			s := newScripted(t)
+			reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+			c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg})
+			timeout := 30*time.Second + 2*c.MaximumPeerResponseTime(interaction.SubscriptionProcessingTime, false)
+			sub := subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}}, 1)
+			s.clock.waitTimer(t, timeout)
+
+			s.clock.Advance(timeout)
+			synctest.Wait()
+			<-sub.Done()
+			if pending := s.clock.pending(); slices.ContainsFunc(pending, func(d time.Duration) bool { return d >= timeout }) {
+				t.Fatalf("a timeout timer is still armed (pending %v)", pending)
 			}
 		})
 	})

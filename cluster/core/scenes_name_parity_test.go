@@ -15,8 +15,9 @@ import (
 // TestScenesAddSceneNameLengthParity: AddScene with a SceneName over 16
 // answers CONSTRAINT_ERROR in its response and stores nothing, as
 // connectedhomeip's ScenesManagementCluster.cpp:535-541 at 6170af84 does;
-// a name of 16 is stored whole (W3-clucore-03). It used to be cut to 16
-// and answered SUCCESS.
+// a name of 16 bytes is stored whole (W3-clucore-03). It used to be cut
+// to 16 and answered SUCCESS. The bound counts UTF-8 bytes since #4995
+// (TestScenesManagementServerParityMatterJS).
 func TestScenesAddSceneNameLengthParity(t *testing.T) {
 	t.Parallel()
 	s, _ := newScenes(t, &sceneOnOff{}, nil)
@@ -27,9 +28,9 @@ func TestScenesAddSceneNameLengthParity(t *testing.T) {
 	if v := invoke(t, s, 0x01, core.SceneRef{GroupID: 0x0101, SceneID: 1}).(core.ViewSceneResponse); v.Status != im.StatusNotFound {
 		t.Fatalf("ViewScene after the refused AddScene: %v, want NOT_FOUND", v.Status)
 	}
-	name := strings.Repeat("ä", 16) // 16 UTF-16 units, 32 bytes
+	name := strings.Repeat("ä", 8) // 8 characters, 16 bytes
 	if r := invoke(t, s, 0x00, core.AddSceneRequest{GroupID: 0x0101, SceneID: 2, SceneName: name}).(core.SceneStatusResponse); r.Status != im.StatusSuccess {
-		t.Fatalf("AddScene with 16 characters: %v", r.Status)
+		t.Fatalf("AddScene with 16 bytes: %v", r.Status)
 	}
 	if v := invoke(t, s, 0x01, core.SceneRef{GroupID: 0x0101, SceneID: 2}).(core.ViewSceneResponse); v.SceneName != name {
 		t.Fatalf("ViewScene name %q, want %q", v.SceneName, name)

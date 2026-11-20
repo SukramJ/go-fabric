@@ -47,7 +47,9 @@ type CompleteOptions struct {
 // out with the extended fail-safe response timeout (:302-314), and a
 // status or error code other than Ok is a commissioner.CommissioningError
 // (:316-340). Any failure up to an Ok deletes the node, so none is left
-// behind (:341-353).
+// behind (:341-353). On the address of a node that failed to load the
+// fabric operation is refused with its load error and nothing is erased
+// (Peers.ts:278, :282, :641 at b25ed960; [Registry.Forget] drops it).
 func (r *Registry) CompleteCommissioning(ctx context.Context, nodeID uint64, o CompleteOptions) (*Node, error) {
 	fabric := o.Fabric
 	if fabric == nil {

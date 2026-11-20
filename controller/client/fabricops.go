@@ -62,11 +62,12 @@ type fabricOp struct {
 	done chan struct{}
 }
 
-// runFabricOperation runs fn as the node's one fabric operation —
-// Peers.#runFabricOperation (Peers.ts:592-610): registered under the
-// mutex, refused for a node that is gone (:595) or has one running
-// (:596-601); fn runs outside the mutex; the entry is removed and its
-// waiters released however fn ends (:606-609).
+// runFabricOperation runs fn as the node's one fabric operation. Mirrors
+// matter.js packages/node/src/node/client/Peers.ts:638-656 at b25ed960
+// (Peers.#runFabricOperation): registered under the mutex, refused for a
+// node that is gone (:641) or has one running (:642-647); fn runs outside
+// the mutex (:651); the entry is removed and its waiters released however
+// fn ends (:652-655).
 func (r *Registry) runFabricOperation(n *Node, kind string, fn func() error) error {
 	op, err := r.registerOperation(n, kind)
 	if err != nil {
@@ -88,6 +89,16 @@ func (r *Registry) registerOperation(n *Node, kind string) (*fabricOp, error) {
 	defer r.mu.Unlock()
 	if r.closed || n.isClosing() || !slices.Contains(r.nodes, n) {
 		return nil, ErrClosed
+	}
+	// A node that failed to load is refused with its load error before
+	// anything runs, so no operation erases its stored data as a side
+	// effect of failing; Forget is the explicit way to drop it. Mirrors
+	// matter.js Peers.ts:641 at b25ed960 (assertNotGone, one gate for every
+	// fabric operation, :607-632), which throws CrashedDependencyError with
+	// the construction error as its cause for a crashed node
+	// (packages/node/src/endpoint/properties/EndpointLifecycle.ts:146-175).
+	if err := n.LoadError(); err != nil {
+		return nil, err
 	}
 	if running := r.ops[n]; running != nil {
 		return nil, fmt.Errorf("%w: cannot %s %s because a %s attempt is already in progress", ErrFabricOperationInProgress, kind, n.ID(), running.kind)
@@ -258,12 +269,15 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	return nil
 }
 
-// Decommission removes the node from its fabric and deletes it —
-// ClientNode.decommission (node/ClientNode.ts:176-186) as the node's
-// fabric operation: a commissioned node is decommissioned first
-// (CommissioningClient.decommission, CommissioningClient.ts:340-446), then
-// the node is deleted (:184). A removal the peer refused, or one that was
-// not confirmed, returns its error and keeps the node.
+// Decommission removes the node from its fabric and deletes it — matter.js
+// ClientNode.decommission (packages/node/src/node/ClientNode.ts:200-210 at
+// b25ed960) as the node's fabric operation: a commissioned node is
+// decommissioned first (CommissioningClient.decommission,
+// CommissioningClient.ts:340-446), then the node is deleted (:208). A
+// removal the peer refused, or one that was not confirmed, returns its
+// error and keeps the node. A node that failed to load is refused with its
+// load error and nothing is erased (:175-178, assertNotGone); [Registry.Forget]
+// drops it.
 func (r *Registry) Decommission(ctx context.Context, n *Node) error {
 	return r.runFabricOperation(n, opDecommission, func() error {
 		var former *PeerAddress
@@ -308,7 +322,7 @@ func (r *Registry) noteLeave(n *Node, fabricIndex uint8) {
 // sessions are given up (:422-427) and the record's commissioning fields
 // cleared — not the addresses (:429-435). It returns the former address.
 func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, error) {
-	addr, ok := n.PeerAddress()
+	addr, ok := n.commissionedAddress()
 	if !ok {
 		return addr, ErrNotCommissioned
 	}

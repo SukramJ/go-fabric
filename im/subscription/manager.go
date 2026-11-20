@@ -659,6 +659,56 @@ func (m *Manager) CloseSession(sessionID uint16) {
 	m.closeSession(sessionID, false)
 }
 
+// MoveSession moves every subscription that reports on olderID onto
+// newerID, a session of the same subscriber that supersedes it
+// (operational.Manager.SetOnSessionSuperseded), and returns the moved
+// subscriptions' ids in ascending order. A moved subscription keeps its
+// id, its request and its intervals, and reports on newerID from its next
+// report on; one still priming moves too, and reports on newerID once
+// established. Nothing is sent and nothing closes: the older session's
+// close no longer reaches the moved subscriptions. Both sessions' change
+// hook fires ([Manager.SetOnSessionSubscriptionsChanged]) when anything
+// moved, outside the manager's lock.
+//
+// Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts
+// :819-834 at b25ed960 (#follow: the subscription leaves the former
+// session's set and joins the newer one's, no new SubscribeRequest) and
+// packages/protocol/src/session/NodeSession.ts:258-268 (each subscription
+// continues on the newer session, which stays open). The failure count
+// #follow resets is the reporter's (bridge.Bridge.SessionSuperseded).
+// matter.js counts a subscription in its session's set only once
+// activated, so it announces the change for an established one only;
+// this manager counts a priming one too ([Manager.CountBySession]) and
+// announces its move.
+func (m *Manager) MoveSession(olderID, newerID uint16) []uint32 {
+	if olderID == newerID {
+		return nil
+	}
+	m.mu.Lock()
+	var moved []uint32
+	for id, sub := range m.byID {
+		if sub.SessionID == olderID {
+			sub.moveTo(newerID)
+			moved = append(moved, id)
+		}
+	}
+	changed := m.onSessionChanged
+	m.mu.Unlock()
+	if len(moved) == 0 {
+		return nil
+	}
+	slices.Sort(moved)
+	if changed != nil {
+		changed(olderID)
+		changed(newerID)
+	}
+	m.logger.Debug("im.subscription.session_moved",
+		slog.Int("from_session_id", int(olderID)),
+		slog.Int("to_session_id", int(newerID)),
+		slog.Int("subscription_count", len(moved)))
+	return moved
+}
+
 // closeSessionEstablished terminates the subscriptions of sessionID that
 // are no longer priming — the replacement [SubscribeArgs.ReplaceSessionDuplicate]
 // asks for, which leaves one still priming as [Manager.ClosePeer] does.
@@ -778,7 +828,7 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // an ongoing report can go out, and none waits for its answer.
 func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSessionID uint16) {
 	m.flush(ctx, func(sub *Subscription) bool {
-		return sub.FabricIndex == fabricIndex && sub.SessionID != exceptSessionID
+		return sub.FabricIndex == fabricIndex && sub.CurrentSessionID() != exceptSessionID
 	})
 }
 
@@ -790,7 +840,7 @@ func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSess
 // `closeSubscriptions(true)` before the session closes; NodeSession.ts
 // :312-323) (review II, R2-P2-dr-req-07).
 func (m *Manager) FlushSession(ctx context.Context, sessionID uint16) {
-	m.flush(ctx, func(sub *Subscription) bool { return sub.SessionID == sessionID })
+	m.flush(ctx, func(sub *Subscription) bool { return sub.CurrentSessionID() == sessionID })
 }
 
 // flush reports what every open, primed subscription selected by match
@@ -1234,7 +1284,7 @@ func (m *Manager) Snapshot() []Info {
 			continue
 		}
 		out = append(out, Info{
-			ID: sub.ID, FabricIndex: sub.FabricIndex, PeerNodeID: sub.PeerNodeID, SessionID: sub.SessionID,
+			ID: sub.ID, FabricIndex: sub.FabricIndex, PeerNodeID: sub.PeerNodeID, SessionID: sub.CurrentSessionID(),
 			MinIntervalFloor: sub.MinIntervalFloor, MaxIntervalCeiling: sub.MaxIntervalCeiling,
 			KeepSubscriptions: sub.KeepSubscriptions,
 			AttributePaths:    slices.Clone(sub.AttributePaths), EventPaths: slices.Clone(sub.EventPaths),

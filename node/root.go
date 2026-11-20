@@ -500,8 +500,8 @@ func buildRootOptional(ctx context.Context, st store.Settings, logger *slog.Logg
 		return nil, err
 	}
 	timeFormat, err := mattercore.NewTimeFormatLocalization(mattercore.TimeFormatLocalizationConfig{
-		HourFormat:         tfldef.HourFormatV24Hr,
-		ActiveCalendarType: tfldef.CalendarTypeGregorian,
+		HourFormat:         new(tfldef.HourFormatV24Hr),
+		ActiveCalendarType: new(tfldef.CalendarTypeGregorian),
 	})
 	if err != nil {
 		return nil, err
@@ -550,6 +550,7 @@ func buildLabels(ctx context.Context, st store.Settings, logger *slog.Logger, ke
 			labels = nil
 			logger.Warn("label.restore", slog.String("key", key), slog.Any("err", uerr))
 		}
+		labels = shortenStoredLabels(logger, key, labels)
 	}
 	userLabel, err = mattercore.NewUserLabel(mattercore.UserLabelConfig{
 		Labels: labels,

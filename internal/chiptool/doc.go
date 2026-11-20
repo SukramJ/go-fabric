@@ -111,7 +111,9 @@
 // behind WiFiNetworkDiagnostics on the root for the DGWIFI family, and
 // --media, a video player and a content app after chip's tv-app for the
 // media families: the PICS slices are generated from one daemon, so every
-// case runs against the same device.
+// case runs against the same device. The Go-TH leg's DUT alone also
+// carries --unit-testing, CHIP's UnitTesting cluster on the Aggregator,
+// for its IDM cases; a cluster without a PICS code, it moves no slice.
 //
 // # The Go-TH leg
 //

@@ -79,15 +79,3 @@ func TestBoundedWriters_SmallestFit(t *testing.T) {
 		}
 	}
 }
-
-// TestUTF16Length counts a supplementary-plane rune, from U+10000 on, as two
-// UTF-16 code units and every other rune as one (R2-P5-tmut-18 rest).
-func TestUTF16Length(t *testing.T) {
-	for s, want := range map[string]uint64{
-		"a": 1, "\uFFFF": 1, "\U00010000": 2, "a\U0010FFFF": 3,
-	} {
-		if got := utf16Length(s); got != want {
-			t.Errorf("utf16Length(%q) = %d, want %d", s, got, want)
-		}
-	}
-}

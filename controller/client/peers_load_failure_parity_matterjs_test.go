@@ -129,49 +129,78 @@ func TestPeersLoadFailureByAddressParity(t *testing.T) {
 	}
 }
 
-// TestCompleteCommissioningOnNodeThatFailedToLoad is a characterization
-// test, not a port: it pins what CompleteCommissioning does now on the
-// address of a stored node that failed to load. GetByAddress finds that
-// node, which is not commissioned, so the already-commissioned check
-// passes; ForAddress returns it instead of creating a second node; its
-// Start fails with the load error; and the failure deletes it, its stored
-// data erased. matter.js's behaviour for a ClientNode whose construction
-// failed (whether node.act / node.start throw and node.delete() succeeds
-// there) is UNVERIFIED; this test claims no parity with it.
-func TestCompleteCommissioningOnNodeThatFailedToLoad(t *testing.T) {
-	t.Parallel()
+// failedToLoad is a registry whose stored peer1, the node {1, 0x2222},
+// fails to load: its commissionedAt is not a timestamp.
+func failedToLoad(t *testing.T) (*scriptedRegistry, *client.Node) {
+	t.Helper()
 	sr := newScriptedRegistry(t, func(st *client.MemoryStore) {
 		seedCommissioned(1)(st)
-		// commissionedAt (field 5 of the record, cluster 0xFFFF_FFFE on
-		// endpoint 0) not a timestamp: peer1 loads unavailable.
-		e := tlv.NewEncoder()
-		e.PutUTF8(tlv.AnonymousTag(), "not a timestamp")
-		b, err := e.Bytes()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := st.Save("peer1", 0, 0xFFFF_FFFE, map[uint32][]byte{5: b}, nil); err != nil {
-			t.Fatal(err)
-		}
+		corruptCommissionedAt(t, st, "peer1")
 	}, nil)
 	broken := sr.reg.Get("peer1")
 	if broken == nil || !errors.Is(broken.LoadError(), client.ErrLoadFailed) {
 		t.Fatalf("peer1 %v, want a node that failed to load", broken)
 	}
-	if got := sr.reg.GetByAddress(scriptedAddr); got != broken {
-		t.Fatalf("by address: %v, want the node that failed to load", got)
+	return sr, broken
+}
+
+// expectFailedNodeKept: the node that failed to load is still held, found
+// by its stored address, and its stored data is untouched.
+func expectFailedNodeKept(t *testing.T, sr *scriptedRegistry, broken *client.Node) {
+	t.Helper()
+	if sr.reg.Get("peer1") != broken || sr.reg.GetByAddress(scriptedAddr) != broken || sr.reg.Size() != 1 {
+		t.Fatalf("after the refusal: peer1 held %v, found by address %v, %d nodes; want the failed node kept and none created",
+			sr.reg.Get("peer1") == broken, sr.reg.GetByAddress(scriptedAddr) == broken, sr.reg.Size())
 	}
+	if stored, err := sr.store.Load("peer1"); err != nil || len(stored) == 0 {
+		t.Fatalf("the node's store: %v, %d endpoints; want it kept", err, len(stored))
+	}
+}
+
+// TestCompleteCommissioningOnNodeThatFailedToLoad: CompleteCommissioning
+// on the address of a stored node that failed to load fails with its load
+// error and erases nothing. Mirrors matter.js at b25ed960, read, not a
+// ported case: the already-commissioned check passes (Peers.ts:269-272,
+// lifecycle.isCommissioned false), forAddress returns the failed node
+// through its stored peerAddress (:278, :468-470), and runCommissioning
+// rejects it before the operation runs (#runFabricOperation, :638-656,
+// assertNotGone at :641; EndpointLifecycle.ts:146-175 CrashedDependencyError
+// with the construction error), so the node.delete() of the operation's
+// catch (:348-360) is never reached.
+func TestCompleteCommissioningOnNodeThatFailedToLoad(t *testing.T) {
+	t.Parallel()
+	sr, broken := failedToLoad(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	n, err := sr.reg.CompleteCommissioning(ctx, scriptedAddr.NodeID, client.CompleteOptions{})
 	if !errors.Is(err, client.ErrLoadFailed) || n != nil {
 		t.Fatalf("CompleteCommissioning: %v, %v; want the load error of the node ForAddress returned", n, err)
 	}
-	if sr.reg.Get("peer1") != nil || sr.reg.GetByAddress(scriptedAddr) != nil || sr.reg.Size() != 0 {
-		t.Fatalf("after the failure: peer1 kept %v, found by address %v, %d nodes; want the node deleted and none created",
-			sr.reg.Get("peer1") != nil, sr.reg.GetByAddress(scriptedAddr) != nil, sr.reg.Size())
+	expectFailedNodeKept(t, sr, broken)
+}
+
+// TestDecommissionOfNodeThatFailedToLoad: Decommission of a node that
+// failed to load fails with its load error and erases nothing — matter.js
+// ClientNode.decommission (ClientNode.ts:200-210 at b25ed960) rejects in
+// its #peers getter (:175-178, assertNotGone) before runDecommissioning,
+// and runDecommissioning itself asserts the same (Peers.ts:619-621,
+// :641). Forget stays the way to drop it.
+func TestDecommissionOfNodeThatFailedToLoad(t *testing.T) {
+	t.Parallel()
+	sr, broken := failedToLoad(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := sr.reg.Decommission(ctx, broken); !errors.Is(err, client.ErrLoadFailed) {
+		t.Fatalf("Decommission: %v, want the load error", err)
+	}
+	expectFailedNodeKept(t, sr, broken)
+	if err := sr.reg.Forget(ctx, broken); err != nil {
+		t.Fatalf("Forget: %v", err)
+	}
+	if sr.reg.Size() != 0 {
+		t.Fatalf("%d nodes after Forget, want none", sr.reg.Size())
 	}
 	if stored, err := sr.store.Load("peer1"); err == nil && len(stored) != 0 {
-		t.Fatalf("the node's store kept %d endpoints, want it erased", len(stored))
+		t.Fatalf("the node's store kept %d endpoints after Forget, want it erased", len(stored))
 	}
 }

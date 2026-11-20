@@ -108,7 +108,7 @@ type flags struct {
 	camera                                         cameraOptions
 	icdIdleSeconds, icdActiveMillis                uint
 	thermostatSchedules, metricsAnyAddress         bool
-	tcRequired                                     bool
+	tcRequired, unitTesting                        bool
 	dumpSurface                                    bool
 	extensions                                     string
 	specLevel                                      string
@@ -145,6 +145,7 @@ func parseFlags() flags {
 	flag.BoolVar(&f.metricsAnyAddress, "metrics-expvar-any-address", false, "serve --metrics-expvar on an address that is not loopback (\":9090\", a LAN address), where anyone who reaches it reads the counters without authentication")
 	flag.BoolVar(&f.thermostatSchedules, "thermostat-schedules", false, "serve MatterScheduleConfiguration (week programs) on the demo thermostat — enables the extension BD-chip-Thermostat-Schedules; off by default until a live ecosystem pairing is verified (issue #273); see fleet_climate.go")
 	flag.BoolVar(&f.tcRequired, "tc-required", false, "TESTING ONLY: serve GeneralCommissioning's TermsAndConditions feature with version 1 and acknowledgement bit 1 required — what the CSA's CGEN cases expect as PIXIT.CGEN.TCRevision / RequiredTCAcknowledgements — and enable the extension "+termsAndConditionsRow+"; a commissioner then has to send SetTCAcknowledgements before CommissioningComplete (chip-tool pairing --tc-acknowledgements 1 --tc-acknowledgements-version 1); see surface.go")
+	flag.BoolVar(&f.unitTesting, "unit-testing", false, "TESTING ONLY: serve CHIP's UnitTesting cluster (0xFFF1FC05; floatSingle, octetString, structAttr, listLongOctetString) on the Aggregator, endpoint 1, as matter.js's all-clusters test app serves it, for the data-type steps of TC-IDM-3.1 and TC-IDM-4.1 and the manufacturer-specific cluster TC-IDM-2.1 looks for; see unit_testing.go")
 	flag.StringVar(&f.extensions, "extensions", "", "comma-separated \"Ahead of matter.js\" register IDs to enable (surface.Policies.Extensions, notes/parity/by_design.md), on the node and every device; an unknown ID stops the daemon with the list of known ones; see surface.go")
 	flag.StringVar(&f.otbr, "otbr", "", "add a ThreadBorderRouter endpoint over the OpenThread Border Router's REST API at this URL (\"http://[fd00::1]:8081\"); off when empty; see otbr.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
@@ -429,6 +430,15 @@ func compose(ctx context.Context, f flags, logger *slog.Logger, passcode uint32,
 		if dump == nil {
 			go devices.otbr.watch(ctx)
 		}
+	}
+	if f.unitTesting {
+		// CHIP's UnitTesting cluster on the Aggregator (unit_testing.go),
+		// TESTING ONLY.
+		ut, err := newUnitTesting()
+		if err != nil {
+			return nil, nil, fmt.Errorf("unit testing: %w", err)
+		}
+		cfg.AggregatorServers = append(cfg.AggregatorServers, ut)
 	}
 	n, err := assemble(ctx, devices, cfg, applier)
 	if err != nil {

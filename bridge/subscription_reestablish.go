@@ -279,6 +279,9 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 		fabricFiltered: rec.IsFabricFiltered,
 	}
 	b.routing.subTargets.Store(sub.ID, target)
+	// A newer session that superseded link's while the route was stored
+	// has the subscription already ([Bridge.SessionSuperseded]).
+	b.followMovedSession(m, sub.ID)
 	if b.releaseTargetOfClosed(m, sub.ID) {
 		return fmt.Errorf("bridge: former subscription %d closed while it was re-established", sub.ID)
 	}

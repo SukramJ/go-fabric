@@ -18,16 +18,25 @@ import (
 // TimeFormatLocalization server.
 type TimeFormatLocalizationConfig struct {
 	// HourFormat is the hour format the node starts with: the host's
-	// detected one, or the one it persisted.
-	HourFormat tfldef.HourFormatEnum
+	// detected one, or the one it persisted. Required: nil is refused
+	// with [ErrLocalizationConfig] — matter.js takes its detected hour
+	// format there, and detection is the host's (decision 358).
+	HourFormat *tfldef.HourFormatEnum
 	// ActiveCalendarType is the calendar the node starts with: the
-	// host's detected one, or the one it persisted. Its zero value is
-	// Buddhist, so it is always a configured value: one
-	// SupportedCalendarTypes does not hold is refused.
-	ActiveCalendarType tfldef.CalendarTypeEnum
+	// host's detected one, or the one it persisted. nil is unset: the
+	// first of SupportedCalendarTypes; nil with an empty list is refused
+	// with [ErrLocalizationConfig]. A set calendar SupportedCalendarTypes
+	// does not hold is refused.
+	ActiveCalendarType *tfldef.CalendarTypeEnum
 	// SupportedCalendarTypes lists the calendars a controller may choose;
 	// empty (nil or zero length) is [ActiveCalendarType].
 	SupportedCalendarTypes []tfldef.CalendarTypeEnum
+	// NoFeatures selects no feature: FeatureMap 0, the server without
+	// CalendarFormat, serving HourFormat alone. The zero value serves
+	// CalendarFormat. A calendar configured beside it (ActiveCalendarType
+	// or SupportedCalendarTypes) is refused with [ErrLocalizationConfig];
+	// HourFormat stays required.
+	NoFeatures bool
 	// OnWrite, when set, is handed every controller write that passed the
 	// checks — attrID is AttrHourFormat or AttrActiveCalendarType, value
 	// the new HourFormatEnum or CalendarTypeEnum — before it is stored;
@@ -44,27 +53,31 @@ type TimeFormatLocalizationConfig struct {
 
 // NewTimeFormatLocalization builds a TimeFormatLocalization (0x002C)
 // server on the generated definition (cluster/spec/
-// timeformatlocalization, ADR 0013), with the CalendarFormat feature.
+// timeformatlocalization, ADR 0013), with the CalendarFormat feature
+// unless NoFeatures.
 //
 // Mirrors matter.js packages/node/src/behaviors/time-format-localization/
 // TimeFormatLocalizationServer.ts at b25ed960: the server is the behavior
-// .with("CalendarFormat") (:16), so initialize (:17-42) always runs its
-// calendar part past the feature gate (:21-23); it takes HourFormat from
-// the detected value when unset (:18-20), seeds an empty or unset
-// SupportedCalendarTypes with [ActiveCalendarType], the detected calendar
-// when none is set (:24-28), and keeps an ActiveCalendarType that is set
-// and supported (:29-32). The detected values are the host's here —
-// matter.js's detectedHourFormat / detectedCalendarType getters are
-// override points (:44-96) — and arrive as HourFormat and
-// ActiveCalendarType, whose zero values are members of their enums
-// (12Hr, Buddhist): both are always configured, so matter.js's replacement
-// of an unsupported calendar (:34-41) has no "nothing configured" case
-// here. One rule departs, the same for the three localization servers
-// (decisions 289, 296): matter.js replaces a set calendar the list lacks,
-// with a warning (:36-40); here a configured ActiveCalendarType is the
-// host's explicit statement, and one the list lacks is refused with
-// [ErrLocalizationConfig] (notes/parity/by_design.md
-// BD-Matter-Localization-ConfiguredStartValueRefused).
+// .with("CalendarFormat") (:16) — NoFeatures is the behavior without it,
+// whose initialize (:17-42) returns after the hour format (:21-23). It
+// seeds an empty or unset SupportedCalendarTypes with [ActiveCalendarType]
+// (:24-28), keeps an ActiveCalendarType that is set and supported
+// (:29-32), and takes the list's first for an unset one (:34-35). The
+// detected values are the host's here — matter.js's detectedHourFormat /
+// detectedCalendarType getters are override points (:44-96) — and arrive
+// as HourFormat and ActiveCalendarType. These rules depart, on the
+// principle of LocalizationConfiguration's (decisions 289, 296, 358, 359;
+// notes/parity/by_design.md
+// BD-Matter-Localization-ConfiguredStartValueRefused): matter.js prefers
+// its detected calendar for an unset one when the list holds it (:34-35),
+// where the list's first is taken here; matter.js replaces a
+// set calendar the list lacks, with a warning (:36-40), where a configured
+// ActiveCalendarType is the host's explicit statement and one the list
+// lacks is refused with [ErrLocalizationConfig]; matter.js takes its
+// detected hour format for an unset one (:18-20) and its detected calendar
+// for an unset one with an empty list (:25), where both are refused here;
+// and without the feature matter.js does not look at calendar state
+// (:21-23), where a calendar configured beside NoFeatures is refused.
 //
 // A written ActiveCalendarType that SupportedCalendarTypes does not hold
 // is CONSTRAINT_ERROR: the model constraint is "in
@@ -79,21 +92,39 @@ type TimeFormatLocalizationConfig struct {
 // 6170af8461b10b1766044122ac83332c6d00ab20). HourFormat takes any value
 // of its enum (:127-131).
 func NewTimeFormatLocalization(cfg TimeFormatLocalizationConfig) (*spec.Server, error) {
-	supported := slices.Clone(cfg.SupportedCalendarTypes)
-	if len(supported) == 0 {
-		supported = []tfldef.CalendarTypeEnum{cfg.ActiveCalendarType}
+	if cfg.HourFormat == nil {
+		return nil, fmt.Errorf("%w: TimeFormatLocalization: no HourFormat", ErrLocalizationConfig)
 	}
-	if !slices.Contains(supported, cfg.ActiveCalendarType) {
-		return nil, fmt.Errorf("%w: TimeFormatLocalization: ActiveCalendarType %d not in SupportedCalendarTypes %v", ErrLocalizationConfig, cfg.ActiveCalendarType, supported)
+	initial := map[uint32]any{tfldef.AttrHourFormat: *cfg.HourFormat}
+	var features uint32
+	if cfg.NoFeatures {
+		if cfg.ActiveCalendarType != nil || len(cfg.SupportedCalendarTypes) > 0 {
+			return nil, fmt.Errorf("%w: TimeFormatLocalization: a calendar beside NoFeatures", ErrLocalizationConfig)
+		}
+	} else {
+		supported := slices.Clone(cfg.SupportedCalendarTypes)
+		var active tfldef.CalendarTypeEnum
+		switch {
+		case len(supported) == 0 && cfg.ActiveCalendarType == nil:
+			return nil, fmt.Errorf("%w: TimeFormatLocalization: neither ActiveCalendarType nor SupportedCalendarTypes", ErrLocalizationConfig)
+		case len(supported) == 0:
+			active = *cfg.ActiveCalendarType
+			supported = []tfldef.CalendarTypeEnum{active}
+		case cfg.ActiveCalendarType == nil:
+			active = supported[0]
+		case !slices.Contains(supported, *cfg.ActiveCalendarType):
+			return nil, fmt.Errorf("%w: TimeFormatLocalization: ActiveCalendarType %d not in SupportedCalendarTypes %v", ErrLocalizationConfig, *cfg.ActiveCalendarType, supported)
+		default:
+			active = *cfg.ActiveCalendarType
+		}
+		features = uint32(tfldef.FeatureCalendarFormat)
+		initial[tfldef.AttrActiveCalendarType] = active
+		initial[tfldef.AttrSupportedCalendarTypes] = enumList[tfldef.CalendarTypeEnum](supported)
 	}
-	srv, err := spec.NewServer(tfldef.Definition, spec.Options{Features: uint32(tfldef.FeatureCalendarFormat)}, spec.ServerConfig{
+	srv, err := spec.NewServer(tfldef.Definition, spec.Options{Features: features}, spec.ServerConfig{
 		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
 		Sink:        calendarSink{onWrite: cfg.OnWrite},
-		Initial: map[uint32]any{
-			tfldef.AttrHourFormat:             cfg.HourFormat,
-			tfldef.AttrActiveCalendarType:     cfg.ActiveCalendarType,
-			tfldef.AttrSupportedCalendarTypes: enumList[tfldef.CalendarTypeEnum](supported),
-		},
+		Initial:     initial,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("core: TimeFormatLocalization: %w", err)

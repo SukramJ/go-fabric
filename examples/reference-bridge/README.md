@@ -211,6 +211,15 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   without terms-and-conditions support cannot pair the daemon. Without the
   flag the composition is unchanged.
 
+- `--unit-testing` (TESTING ONLY) serves CHIP's UnitTesting cluster
+  (`0xFFF1FC05`, `unit_testing.go`) on the Aggregator, endpoint 1, as
+  matter.js's all-clusters test app serves it: the four attributes the
+  data-type steps of TC-IDM-3.1 and TC-IDM-4.1 write (`floatSingle`,
+  `octetString`, `structAttr`, `listLongOctetString`), stored as written,
+  and the manufacturer-specific cluster TC-IDM-2.1 step 21 looks for. The
+  cluster is stated by hand through `cluster/spec`; it is in no Matter
+  specification. Without the flag the composition is unchanged.
+
 - `--ota-provider` (TESTING ONLY) serves one embedded test OTA image
   (`ota_provider.go`) through the node's OTA Software Update Provider
   (ADR 0021): an OtaProvider endpoint beside the Aggregator, the image —

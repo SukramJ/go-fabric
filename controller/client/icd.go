@@ -506,7 +506,7 @@ func (c *ICDClient) litOperating() bool {
 
 // fabricContext is our side of the peer's fabric (IcdClient.ts:715-724).
 func (c *ICDClient) fabricContext() (addr PeerAddress, own uint64, table *icd.PeerTable, err error) {
-	addr, ok := c.n.PeerAddress()
+	addr, ok := c.n.commissionedAddress()
 	if !ok {
 		return addr, 0, nil, fmt.Errorf("%w: ICD registration requires a commissioned peer", ErrICDOperation)
 	}

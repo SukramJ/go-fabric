@@ -710,13 +710,15 @@ func (m *messenger) holdChunk(ctx context.Context, held *int, charge int) error 
 
 // readDataReports reads the DataReport chunks of an exchange as matter.js
 // IncomingInteractionClientMessenger.readDataReports does
-// (interaction/InteractionMessenger.ts:1012-1053 at db021da0): the next
+// (interaction/InteractionMessenger.ts:1019-1054 at b25ed960): the next
 // message must be a ReportData (a StatusResponse error in its place is a
-// *StatusError, :985-1005); the consumer takes the chunk first; then a
+// *StatusError, :992-1012); the consumer takes the chunk first; then a
 // chunk with more to come is answered with a StatusResponse Success and
 // the next one awaited, the last one with a Success unless it suppresses
 // the response — sent before the exchange closes, a failure only logged
-// (the tracked end message, :1031-1047). first, when set, is the chunk
+// (the tracked end message, :1035-1048). A status the peer never
+// acknowledged is recorded on m (#sendReportStatus, :1056-1068 at
+// b25ed960). first, when set, is the chunk
 // already received, firstPayload its bytes, held to the report bound as
 // every later chunk is. A consumer returning errStopReports ends the
 // reading with nil and no answer.
@@ -760,14 +762,14 @@ func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first 
 		}
 		m.reportAwaitsStatus = false
 		if rd.MoreChunkedMessages {
-			if err := m.sendStatus(ctx, im.StatusSuccess); err != nil {
+			if err := m.sendReportStatus(ctx, rd); err != nil {
 				return err
 			}
 			rd = nil
 			continue
 		}
 		if !rd.SuppressResponse {
-			if err := m.sendStatus(context.WithoutCancel(ctx), im.StatusSuccess); err != nil {
+			if err := m.sendReportStatus(context.WithoutCancel(ctx), rd); err != nil {
 				log.Info("matter.controller.interaction.final_status_failed", slog.Any("err", err))
 			}
 		}
