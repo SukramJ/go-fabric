@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10183,
+  "entry_points": 10184,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27877,
+    "total_exported": 27878,
     "reachable": 20885,
-    "whitelisted": 6970,
+    "whitelisted": 6971,
     "unreachable": 22
   },
   "by_package": [
@@ -31771,14 +31771,21 @@
       "identifier": "TestFailsafeExpiryAwaitsTheRearmInFlight",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
-      "line": 280
+      "line": 298
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFailsafeExpiryChecksTheResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
-      "line": 249
+      "line": 267
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFailsafeExpirySkipCancelsTheRearmInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 357
     },
     {
       "package": "controller/commissioner",
@@ -32037,7 +32044,7 @@
       "identifier": "TestPaseBleChannelClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/pase_ble_channel_close_parity_matterjs_test.go",
-      "line": 172
+      "line": 175
     },
     {
       "package": "controller/commissioner",
