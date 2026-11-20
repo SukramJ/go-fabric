@@ -26,6 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/internal/bridgeseam"
 	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -90,6 +91,15 @@ type caseIdentities struct {
 	// testAfterStake, a test seam, runs in a responder's install right
 	// after its stake was taken; nil outside tests.
 	testAfterStake func()
+	// testAfterAdmit, a test seam, runs in a responder's install right
+	// after the session was admitted, before its resumption record is
+	// stored — where an update that lands after the admit meets the
+	// record's own check.
+	testAfterAdmit func()
+	// testEstablishment, a test seam, is handed each CASE adapter's
+	// establishment bookkeeping as the adapter is built, so a test can
+	// report the handshake's completion the bridge would report.
+	testEstablishment func(*caseEstablishment)
 
 	// mu guards byIdx and latest.
 	mu     sync.RWMutex
@@ -1190,6 +1200,9 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	// stake only, which leaves a live session and another handshake's
 	// stake alone (R2-P3-dr-dev-07).
 	adapter.SetOnUnfinished(held.release)
+	// The session is installed establishing; the bridge reports its
+	// handshake's end ([caseEstablishment]).
+	establishing := newCaseEstablishment(adapter, sessions, ids, onOpened)
 	adapter.SetOnSessionEstablished(func(keys sigma.SessionKeys, peerSessionID uint16) error {
 		// Everything is read back off the responder rather than captured at
 		// factory time: the destination resolver may have landed on a
@@ -1229,7 +1242,7 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 			if ids.testAfterStake != nil {
 				ids.testAfterStake()
 			}
-			return sessions.OpenFromSigmaWithStake(stake, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
+			return openEstablishing(sessions, stake, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
 		})
 		if openErr != nil {
 			held.release(effectiveID)
@@ -1245,13 +1258,11 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 				entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 			}
 		}
+		establishing.put(entry)
 		logger.Info("case.session_established",
 			slog.Int("session_id", int(entry.SessionID)),
 			slog.Int("fabric_index", int(fabricIndex)),
 			slog.Uint64("node_id", peerNodeID))
-		if onOpened != nil {
-			onOpened(entry.SessionID)
-		}
 		// The record the peer resumes from next time: the id this
 		// handshake issued (Sigma2's, or the fresh one Sigma2_Resume
 		// carried) with the session's shared secret.
@@ -1285,6 +1296,106 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		return nil
 	})
 	return adapter, nil
+}
+
+// openEstablishing installs a CASE responder session under stake
+// establishing (internal/sessionseam OpenEstablishing): it routes, and the
+// pickers, the session listing and the per-peer cap leave it out until
+// [caseEstablishment.complete] (matter.js CaseServer.ts:314-327 at
+// b25ed960, `establishing: true`).
+func openEstablishing(sessions *operational.Manager, stake operational.Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*operational.Entry, error) {
+	opened, err := sessionseam.OpenEstablishing(sessions, stake, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys)
+	if err != nil {
+		return nil, err
+	}
+	entry, ok := opened.(*operational.Entry)
+	if !ok {
+		return nil, errors.New("node: CASE session of a foreign type")
+	}
+	return entry, nil
+}
+
+// caseEstablishment holds the sessions one CASE adapter installed
+// establishing, by id, until the bridge reports their handshake completed
+// — a new session at its Success's first transmission, a resumed one at
+// the initiator's Success — or failed ([caseEstablishment.complete]).
+// Until then no picker returns a session and the per-peer cap leaves it
+// out; the host learns of it (onOpened) once it is established, as
+// matter.js's SessionsBehavior and DeviceAdvertiser observe the
+// established set (packages/protocol/src/session/SessionManager.ts:383-385,
+// :1266-1284; case/CaseServer.ts:177-210, :314-344 at b25ed960). An entry is the installed
+// session itself, so the completion or the close reaches that session and
+// never another one that holds its id by then (decision 159).
+type caseEstablishment struct {
+	sessions *operational.Manager
+	// onOpened, when set, learns the id of every session established (the
+	// node's OnSessionOpened).
+	onOpened func(sessionID uint16)
+
+	// afterPut is ids.testAfterAdmit: a test seam run after each put.
+	afterPut func()
+
+	mu      sync.Mutex
+	entries map[uint16]*operational.Entry
+}
+
+// newCaseEstablishment is the bookkeeping of adapter, whose completion hook
+// it installs (internal/bridgeseam SetCaseEstablishmentCompletion).
+func newCaseEstablishment(adapter *bridge.CaseAdapter, sessions *operational.Manager, ids *caseIdentities, onOpened func(sessionID uint16)) *caseEstablishment {
+	e := &caseEstablishment{sessions: sessions, onOpened: onOpened, afterPut: ids.testAfterAdmit}
+	bridgeseam.SetCaseEstablishmentCompletion(adapter, e.complete)
+	if ids.testEstablishment != nil {
+		ids.testEstablishment(e)
+	}
+	return e
+}
+
+// complete is the bridge's report on the session sessionID installed
+// establishing: completed, it is established — the pickers see it, the
+// per-peer cap runs — and the host learns of it; failed, it is closed. It
+// reports whether the session is established: false also for one closed
+// while it was establishing (matter.js CaseServer.ts:204-210, :329-344,
+// :367-376 at b25ed960). A session not installed establishing here
+// reports completed.
+func (s *caseEstablishment) complete(sessionID uint16, completed bool) bool {
+	entry := s.take(sessionID)
+	if entry == nil {
+		return completed
+	}
+	if !completed {
+		sessionseam.CloseEntry(s.sessions, entry)
+		return false
+	}
+	if !sessionseam.CompleteEstablishment(s.sessions, entry) {
+		return false
+	}
+	if s.onOpened != nil {
+		s.onOpened(entry.SessionID)
+	}
+	return true
+}
+
+// put records e as establishing.
+func (s *caseEstablishment) put(e *operational.Entry) {
+	s.mu.Lock()
+	if s.entries == nil {
+		s.entries = map[uint16]*operational.Entry{}
+	}
+	s.entries[e.SessionID] = e
+	s.mu.Unlock()
+	if s.afterPut != nil {
+		s.afterPut()
+	}
+}
+
+// take returns, once, the session installed establishing under id; nil
+// when none is.
+func (s *caseEstablishment) take(id uint16) *operational.Entry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e := s.entries[id]
+	delete(s.entries, id)
+	return e
 }
 
 // resumptionLookup serves the CASE responder's resumption records from the
