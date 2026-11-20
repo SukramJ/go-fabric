@@ -96,7 +96,7 @@ type armState struct {
 	reported   bool
 	// reportedBeforeReturn are the sessions that carried a report before
 	// the return: a returning device may send its priming report before
-	// its announcing session is established (RebootResubscribeArmer.ts:34-38
+	// its announcing session is established (RebootResubscribeArmer.ts:33-37
 	// at b25ed960).
 	reportedBeforeReturn []ArmerSession
 	graceTimer           clock.Timer
@@ -180,8 +180,8 @@ func stopTimers(st *armState) {
 // registered since it are the return's, and the return counts as
 // reported when one of them carried a report before it; a later one joins
 // the return's evidence; one we opened announces nothing. Mirrors matter.js
-// packages/protocol/src/peer/RebootResubscribeArmer.ts:117-160 at b25ed960
-// (#onSessionRegistered, #onSessionAdded).
+// packages/protocol/src/peer/RebootResubscribeArmer.ts:127-131 at b25ed960
+// (#onSessionRegistered) and :133-164 (#onSessionAdded).
 func (a *RebootResubscribeArmer) SessionAdded(s ArmerSession) {
 	peer := s.Peer()
 	a.mu.Lock()
@@ -244,7 +244,7 @@ func (a *RebootResubscribeArmer) SessionAdded(s ArmerSession) {
 // registered after the announcing one is the return's as matter.js adds
 // it on registration (#onSessionRegistered), read here from
 // SessionsRegisteredSince when it reports. Mirrors matter.js
-// packages/protocol/src/peer/RebootResubscribeArmer.ts:177-190 at b25ed960
+// packages/protocol/src/peer/RebootResubscribeArmer.ts:179-193 at b25ed960
 // (#onReportStarted).
 func (a *RebootResubscribeArmer) ReportStarted(s ArmerSession) {
 	peer := s.Peer()
