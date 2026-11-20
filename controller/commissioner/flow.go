@@ -284,8 +284,8 @@ func (f *flow) now() time.Time { return f.c.ctx.Clock.Now() }
 // successful step with a failsafe armed, a total past the device's maximum
 // cumulative failsafe is a CommissioningTimeoutError (:397-407) and less
 // than half the default failsafe left re-arms (:409-423); Stop ends the
-// loop (:426-428). A recoverable error is logged and the loop continues
-// (:431-436); every other failure ends the fail-safe (expireFailsafe), a
+// loop (:425-427). A recoverable error is logged and the loop continues
+// (:430-437); every other failure ends the fail-safe (expireFailsafe), a
 // CommissioningError or an IM status error is then returned as a
 // CommissioningError, any other error as it is — mirrors matter.js
 // packages/protocol/src/peer/ControllerCommissioningFlow.ts:428-455 at
@@ -350,7 +350,7 @@ func (f *flow) execute(ctx context.Context) error {
 				f.log.Warn("matter.controller.commissioning.step_failed", slog.String("name", s.name), slog.Any("err", err))
 			}
 			f.disarmAfterFailure(ctx, err)
-			if se, ok := err.(*interaction.StatusError); ok && classed { //nolint:errorlint // the top-level instanceof of :450
+			if se, ok := err.(*interaction.StatusError); ok && classed { //nolint:errorlint // the top-level instanceof of :451
 				err = newError(ErrCommissioning, se.Error(), se)
 			}
 		}
@@ -521,12 +521,12 @@ func (f *flow) invokeWith(ctx context.Context, cluster, command uint32, fields s
 // closed and err is the closed session's: the session the channel's loss
 // force-closed (establishOverChannel) refuses a new exchange with
 // exchange.ErrSessionClosed alone, and the flow reads the cause as a
-// commissioning-channel drop (isChannelDrop). Mirrors matter.js
-// packages/protocol/src/peer/ControllerCommissioner.ts:523-558 at
-// b25ed960 (#closeOnBleLoss: the PASE session force-closed with a
-// BleChannelClosedError, "ControllerCommissioningFlow treats the
-// resulting BleDisconnectedError as a commissioning-channel drop").
-// Interactions over another manager — the CASE session after the
+// commissioning-channel drop (isChannelDrop). matter.js force-closes the
+// PASE session with a BleChannelClosedError so that its pending exchanges
+// reject with it (packages/protocol/src/peer/ControllerCommissioner.ts:523-558
+// at b25ed960, #closeOnBleLoss); an exchange that starts after the close
+// is this module's addition — what matter.js reports there was not
+// established. Interactions over another manager — the CASE session after the
 // Reconnect step — are left as they are.
 func (f *flow) channelLoss(ia *interaction.Interaction, err error) error {
 	ch := f.opts.Channel
@@ -930,12 +930,13 @@ func (f *flow) sendFailsafeExpiry(ctx context.Context) {
 	f.failsafeEnded()
 }
 
-// expireFailsafe is #expireFailsafe (ControllerCommissioningFlow.ts:1097-1130
+// expireFailsafe is #expireFailsafe (ControllerCommissioningFlow.ts:1097-1132
 // at b25ed960, #4928), the end of the fail-safe after a failed step,
-// failure the step's error: the BLE re-arm timer stopped and a re-arm
-// already sent awaited (settleArmInterval, `await this.#periodicArm`);
-// nothing sent while no fail-safe end is known (:1101) or when the device
-// stopped responding (deviceStoppedResponding, :1102-1105); else
+// failure the step's error, in matter.js's order: the BLE re-arm timer
+// stopped (:1098-1099); nothing sent while no fail-safe end is known
+// (:1101) or when the device stopped responding (deviceStoppedResponding,
+// :1102-1105) — a re-arm in flight is then cancelled, not awaited; else a
+// re-arm already sent awaited (`await this.#periodicArm`, :1107) and
 // sendFailsafeExpiry.
 //
 // Ahead of matter.js with no fail-safe end known (BD-chip-Commissioner-AbortDisarmsFailSafe):
@@ -944,21 +945,32 @@ func (f *flow) sendFailsafeExpiry(ctx context.Context) {
 // stands, the expiry is sent all the same; a device that stopped
 // responding is not asked here either.
 func (f *flow) expireFailsafe(ctx context.Context, failure error) {
-	f.settleArmInterval(ctx)
+	ai := f.detachArmInterval()
+	if !f.expiryOwed(failure) {
+		cancelArmInterval(ai)
+		return
+	}
+	awaitArmInterval(ctx, ai)
+	f.sendFailsafeExpiry(ctx)
+}
+
+// expiryOwed reports whether expireFailsafe sends: matter.js's two
+// returns (:1101, :1102-1105), with the ahead branch for no end time.
+func (f *flow) expiryOwed(failure error) bool {
 	if end, _ := f.failsafeTimes(); end.IsZero() {
 		if !f.failsafeMayBeArmed() {
-			return
+			return false
 		}
 		if s := f.interaction().Session(); s != nil && s.IsClosed() {
 			f.log.Debug("matter.controller.commissioning.abort_disarm_skipped", slog.String("reason", "session closed"))
-			return
+			return false
 		}
 	}
 	if deviceStoppedResponding(failure) {
 		f.log.Debug("matter.controller.commissioning.failsafe_left_to_expire", slog.String("reason", "device stopped responding"))
-		return
+		return false
 	}
-	f.sendFailsafeExpiry(ctx)
+	return true
 }
 
 // deviceStoppedResponding is #deviceStoppedResponding

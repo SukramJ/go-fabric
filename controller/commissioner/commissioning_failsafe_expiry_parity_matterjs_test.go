@@ -186,6 +186,24 @@ func TestCommissioningFailsafeExpiry(t *testing.T) {
 		leftArmed(t, dev)
 	})
 
+	// The inverse of "sends no expiry before the commissioner armed the
+	// failsafe" (:182-189), which is not ported: the device armed its
+	// fail-safe when the PASE session was established, and the flow ends it
+	// (BD-chip-Commissioner-AbortDisarmsFailSafe, Every exit after PASE).
+	t.Run("ahead of matter.js: ends the PASE session's fail-safe before the flow armed", func(t *testing.T) {
+		t.Parallel()
+		dev := &failsafeDevice{info: expiryInfo}
+		f, _ := newTestFlow(t, dev.handle)
+		boom := errors.New("Simulated failure before the failsafe was armed (test)")
+		f.steps = []step{failing(0, boom)}
+		if err := executeStanding(t, f); err != boom { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, want the step's error as it is", err)
+		}
+		if !slices.Equal(dev.armed(), []uint16{0}) || f.failsafeMayBeArmed() {
+			t.Fatalf("the device saw ArmFailSafe %v, want [0]: the PASE session's fail-safe ended", dev.armed())
+		}
+	})
+
 	// reconnected is the flow after the Reconnect step: the commissioning
 	// device armed over the PASE session, the operational one answers over
 	// CASE and records its own ArmFailSafe(0)s.
@@ -327,5 +345,63 @@ func TestFailsafeExpiryAwaitsTheRearmInFlight(t *testing.T) {
 		// Every goroutine of the bubble ends: the manager, then the device.
 		f.interaction().Provider().Manager().Close()
 		close(sc.inbox)
+	})
+}
+
+// TestFailsafeExpirySkipCancelsTheRearmInFlight: when the expiry is not
+// sent — the device stopped responding — a re-arm in flight is cancelled,
+// not awaited, and the failure returns at once. Mirrors matter.js
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:1098-1107 at
+// b25ed960 (#expireFailsafe: the timer stopped, the returns of :1101 and
+// :1102-1105 before `await this.#periodicArm`).
+func TestFailsafeExpirySkipCancelsTheRearmInFlight(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		// The bubble starts in 2000, before the CA's certificates may.
+		time.Sleep(time.Until(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)))
+		dev := &failsafeDevice{info: expiryInfo}
+		held, release := make(chan struct{}), make(chan struct{})
+		var arms atomic.Int32
+		f, clock := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+			// The device holds its answer to the periodic re-arm.
+			if expiry, ok := armRequest(req); ok && expiry != 0 && arms.Add(1) == 2 {
+				close(held)
+				<-release
+			}
+			return dev.handle(req)
+		})
+		sc := scriptedOf(t, f)
+		f.steps = []step{
+			{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }},
+			{15, 1, "fail", func(ctx context.Context) (stepResult, error) {
+				f.startArmInterval(ctx)
+				go clock.Advance(f.armPeriod())
+				<-held
+				return 0, &exchange.PeerUnresponsiveError{Waited: 30 * time.Second}
+			}},
+		}
+		done := make(chan error, 1)
+		go func() { done <- f.execute(context.Background()) }()
+		<-held
+		synctest.Wait()
+		var err error
+		select {
+		case err = <-done:
+		default:
+			close(release)
+			<-done
+			synctest.Wait()
+			f.interaction().Provider().Manager().Close()
+			close(sc.inbox)
+			t.Fatal("the failure waited for the re-arm in flight although no expiry is sent")
+		}
+		close(release)
+		synctest.Wait()
+		f.interaction().Provider().Manager().Close()
+		close(sc.inbox)
+		var pu *exchange.PeerUnresponsiveError
+		if !errors.As(err, &pu) || !slices.Equal(dev.armed(), []uint16{60, 60}) {
+			t.Fatalf("error %v, ArmFailSafe %v, want the unresponsive peer and [60 60]: no expiry", err, dev.armed())
+		}
 	})
 }

@@ -98,7 +98,9 @@ type CommissionedScanner interface {
 // runs on its exchange manager, whose carrier is reliable, so no MRP runs
 // (exchange.Config.Reliable).
 type Channel interface {
-	// Exchanges is the manager whose sessions run over the channel.
+	// Exchanges is the manager whose sessions run over the channel. When
+	// the channel is lost during PASE the commissioner closes it, which
+	// ends the handshake at once (establishOverChannel).
 	Exchanges() *exchange.Manager
 	// PeerAddress is the address that manager names the peer by.
 	PeerAddress() *net.UDPAddr
@@ -257,6 +259,11 @@ type Commissioner struct {
 	// R2-P6-conc-1810).
 	claimMu sync.Mutex
 	claimed map[handshake.PeerAddress]bool
+
+	// afterPASE, a test's, runs when PASE over a Channel returned and the
+	// watch during PASE ended, before the channel's close is checked
+	// (establishOverChannel); nil in production.
+	afterPASE func()
 }
 
 // New returns a commissioner over c.
@@ -495,6 +502,9 @@ func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, tim
 	})
 	close(paired)
 	<-watched
+	if c.afterPASE != nil {
+		c.afterPASE()
+	}
 	// Kept after the last wait: a session whose channel closed is not
 	// handed on (:514-520).
 	select {
@@ -505,7 +515,10 @@ func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, tim
 		if err == nil {
 			err = errors.New("commissioner: BLE transport closed while PASE completed")
 		}
-		return nil, fmt.Errorf("commissioner: commissioning channel closed during PASE: %w: %w", err, ch.ClosedCause())
+		if cause := ch.ClosedCause(); cause != nil {
+			err = fmt.Errorf("%w: %w", err, cause)
+		}
+		return nil, fmt.Errorf("commissioner: commissioning channel closed during PASE: %w", err)
 	default:
 	}
 	if err != nil {

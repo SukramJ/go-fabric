@@ -149,12 +149,15 @@ func channelCommissioner(t *testing.T) (*Commissioner, *Fabric) {
 
 // commissionOverForwarding commissions a node on loopback over a
 // forwardingChannel and reports the PASE step's outcome.
-func commissionOverForwarding(t *testing.T, onInbound func(c *forwardingChannel, b []byte)) (StepPhase, error) {
+func commissionOverForwarding(t *testing.T, onInbound func(c *forwardingChannel, b []byte), afterPASE func(c *forwardingChannel)) (StepPhase, error) {
 	t.Helper()
 	_, addr := startNode(t, nil, "127.0.0.1:0")
 	ch := newForwardingChannel(t, addr, onInbound)
 	ctl := newController(t, discovery.NewNames(newFakeMDNS(), discard()), "127.0.0.1:0")
 	c, fabric := ctl.com, ctl.fabric
+	if afterPASE != nil {
+		c.afterPASE = func() { afterPASE(ch) }
+	}
 	var pase atomic.Int32
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -200,12 +203,11 @@ func TestPaseBleChannelClose(t *testing.T) {
 
 	t.Run("does not use a PASE session whose BLE channel closed while the session was created", func(t *testing.T) {
 		t.Parallel()
-		var once sync.Once
-		phase, err := commissionOverForwarding(t, func(c *forwardingChannel, b []byte) {
-			if paseStatusReport(b) {
-				once.Do(c.loseLink)
-			}
-		})
+		// The link goes once PASE returned the session and the watch during
+		// PASE ended (Commissioner.afterPASE) — matter.js loses it in
+		// sessions.added (:229-233), as deterministic: the check after PASE
+		// must refuse the session.
+		phase, err := commissionOverForwarding(t, nil, (*forwardingChannel).loseLink)
 		if !errors.Is(err, errBLEGone) {
 			t.Fatalf("Commission: %v, want the channel's close as the cause", err)
 		}
@@ -227,7 +229,7 @@ func TestPaseBleChannelClose(t *testing.T) {
 			if pased.Load() {
 				once.Do(c.loseLink)
 			}
-		})
+		}, nil)
 		if phase != StepSucceeded {
 			t.Fatalf("PASE step %v, want succeeded", phase)
 		}
