@@ -150,7 +150,11 @@ var floors = []packageFloor{
 		min: 91,
 		why: "measured 92.9-93.0 across five guard runs on 2026-11-04; review II phase 7 (decision 269, the CASE initiator's establishing session) moved it to 91.9-92.1 across six runs on 2026-11-19, a timing-dependent tenth either side of 92, so the floor sits one point under the measurement",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/client/interaction", min: 94},
+	{
+		pkg: "github.com/SukramJ/go-fabric/client/interaction",
+		min: 93,
+		why: "measured 93.9-94.0 across three local runs and CI on 2026-11-20 (pin lift b25ed960 wave P2b, after P2b-E's subscription closes, whose new lines are covered); the tenth that moves is timing-dependent branches of the invoke batcher (invoke_batcher.go:178, :184, :448) and the abandon path's status send (subscribe.go:320), so the floor sits one point under the measurement, as client/exchange's",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/client/handshake", min: 89},
 	{
 		pkg: "github.com/SukramJ/go-fabric/client/peer",
