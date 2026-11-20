@@ -5,6 +5,7 @@ package device
 
 import (
 	"context"
+	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/camera"
 	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
@@ -53,6 +54,53 @@ func (fakeZones) CreateTrigger(context.Context, zmdef.ZoneTriggerControlStruct) 
 func (fakeZones) UpdateTrigger(context.Context, zmdef.ZoneTriggerControlStruct) error { return nil }
 
 func (fakeZones) RemoveTrigger(context.Context, uint16) error { return nil }
+
+// keptZones is a ZonePort that reports the last zone ID it was handed
+// (camera.LastZoneIDSource), as a host that persisted it would after a
+// restart.
+type keptZones struct {
+	fakeZones
+	last uint16
+}
+
+func (k keptZones) LastZoneID() (uint16, bool) { return k.last, true }
+
+// TestZonesThroughTheFacadeContinueAfterThePortsLastID: a camera built
+// through the device facade, restarted with its zones 0 and 1 and a port
+// that reports 2 as the last ID it was handed (zone 2 was removed), gives
+// the next zone 3 — matter.js "does not reuse the ID of a removed zone
+// after a restart" (ZoneManagementServerTest.ts:272-292 at b25ed960);
+// before owner decision O-7 the facade passed no last ID and the zone got 2.
+func TestZonesThroughTheFacadeContinueAfterThePortsLastID(t *testing.T) {
+	square := func(offset uint16) zmdef.TwoDCartesianZoneStruct {
+		return zmdef.TwoDCartesianZoneStruct{Name: "zone", Use: zmdef.ZoneUsePrivacy, Vertices: []zmdef.TwoDCartesianVertexStruct{
+			{X: 10 + offset, Y: 10}, {X: 20 + offset, Y: 10}, {X: 20 + offset, Y: 20}, {X: 10 + offset, Y: 20},
+		}}
+	}
+	zone := func(id uint16) zmdef.ZoneInformationStruct {
+		z := square(id)
+		return zmdef.ZoneInformationStruct{ZoneId: id, ZoneType: zmdef.ZoneTypeTwoDcartZone, ZoneSource: zmdef.ZoneSourceUser, TwoDCartesianZone: &z}
+	}
+	maxUser, maxZones, sensMax := uint8(5), uint8(6), uint8(5)
+	twoDMax := zmdef.TwoDCartesianVertexStruct{X: 1919, Y: 1079}
+	kept := []zmdef.ZoneInformationStruct{zone(0), zone(1)}
+	d, err := newWith(CameraType(), testOptions("zones"), zmdef.Declare{
+		Features: zmdef.FeatureTwoDimensionalCartesianZone | zmdef.FeatureUserDefined,
+		Initial:  zmdef.Patch{MaxUserDefinedZones: &maxUser, MaxZones: &maxZones, SensitivityMax: &sensMax, TwoDCartesianMax: &twoDMax, Zones: &kept},
+		ZonePort: keptZones{last: 2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	z, ok := d.Server(zmdef.ClusterID).(*camera.Zones)
+	if !ok {
+		t.Fatalf("ZoneManagement is %T", d.Server(zmdef.ClusterID))
+	}
+	resp, err := z.MatterInvoke(context.Background(), zmdef.CmdCreateTwoDCartesianZone, zmdef.CreateTwoDCartesianZoneRequest{Zone: square(3)})
+	if r, _ := resp.(zmdef.CreateTwoDCartesianZoneResponse); err != nil || r.ZoneId != 3 {
+		t.Fatalf("CreateTwoDCartesianZone: %+v, %v; want zone 3", resp, err)
+	}
+}
 
 // cameraCases are the camera servers of TestSelfHeldDefaults
 // (defaults_camera.go): the requestor without a port, Chime and

@@ -30,9 +30,10 @@
 //     (packages/node/src/behaviors/zone-management/ZoneManagementServer.ts
 //     and TwoDCartesianGeometry.ts at b25ed960): the zones and triggers
 //     behind the [ZonePort], the zone IDs the server assigns
-//     ([ZonesConfig].LastZoneID), the polygon rules
-//     ([ZoneSelfIntersecting]); the configuration limits and the
-//     Sensitivity write follow connectedhomeip's ZoneManagementCluster.cpp.
+//     ([ZonesConfig].LastZoneID or the port's [LastZoneIDSource]), the
+//     polygon rules ([ZoneSelfIntersecting]); the configuration limits and
+//     the Sensitivity write are the model's constraints, checked as
+//     connectedhomeip's ZoneManagementCluster.cpp does.
 //   - [Provider] serves WebRtcTransportProvider (0x0553) and [PushTransport]
 //     serves PushAvStreamTransport (0x0555), the camera's two transports, after
 //     connectedhomeip (src/app/clusters/webrtc-transport-provider-server/

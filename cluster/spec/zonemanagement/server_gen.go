@@ -322,9 +322,12 @@ func (s *Server) Host() Host {
 // before it calls the port, and keeps Zones and Triggers. The server
 // assigns a new zone's ID (matter.js ZoneManagementServer); the port's
 // CreateTwoDCartesianZone receives it, and the host persists it with
-// the zones as camera.ZonesConfig.LastZoneID. An error answers its
-// status, FAILURE without one; a refused CreateTwoDCartesianZone
-// adds no zone and keeps the last ID.
+// the zones as camera.ZonesConfig.LastZoneID (or answers it through
+// camera.LastZoneIDSource). The ID is handed over before the server
+// commits the zone, so a commit that then fails leaves the host's
+// last ID one ahead of the server's. An error answers its status,
+// FAILURE without one; a refused CreateTwoDCartesianZone adds no
+// zone and keeps the last ID.
 type ZonePort interface {
 	CreateTwoDCartesianZone(ctx context.Context, zoneID uint16, zone TwoDCartesianZoneStruct) error
 	UpdateTwoDCartesianZone(ctx context.Context, zoneID uint16, zone TwoDCartesianZoneStruct) error

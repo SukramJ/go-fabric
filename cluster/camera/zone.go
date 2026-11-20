@@ -66,15 +66,18 @@ var (
 type ZonesConfig struct {
 	Features ZoneFeature
 	// MaxUserDefinedZones (USERDEFINED) is at least 5 and at most
-	// MaxZones; MaxZones is at least 1; SensitivityMax is 2 to 10 (chip
-	// ValidateConfiguration, ZoneManagementCluster.cpp:85-106).
+	// MaxZones; MaxZones is at least 1; SensitivityMax is 2 to 10 — the
+	// model's constraints (matter.js zone-management.element.ts:32-33,
+	// :35, :54-55 at b25ed960), checked as chip's ValidateConfiguration
+	// does (ZoneManagementCluster.cpp:85-106 at 6170af84).
 	MaxUserDefinedZones uint8
 	MaxZones            uint8
 	SensitivityMax      uint8
 	// TwoDCartesianMax (TWODCART) bounds every vertex.
 	TwoDCartesianMax Vertex
-	// Sensitivity is the value the host persisted, 1 to SensitivityMax;
-	// 0 starts at chip's 1 (ZoneManagementCluster.h:135).
+	// Sensitivity is the value the host persisted, 1 to SensitivityMax
+	// (the model's constraint, zone-management.element.ts:58-59 at
+	// b25ed960); 0 starts at chip's 1 (ZoneManagementCluster.h:135).
 	Sensitivity uint8
 	// Zones and Triggers are the ones the host persisted, chip's
 	// LoadZones and LoadTriggers (:113-172). A zone ID used twice is
@@ -84,10 +87,11 @@ type ZonesConfig struct {
 	// LastZoneID is the ID the server assigned last, as the host
 	// persisted it with Zones: the server gives a new zone the ID after
 	// it, skipping IDs in use, so that the ID of a removed zone is not
-	// reused. nil continues after the highest ID in use. The host learns
-	// each ID the server assigns through [ZonePort]'s
-	// CreateTwoDCartesianZone and persists it there; matter.js keeps it as
-	// the server's nonvolatile lastZoneId
+	// reused. nil asks the port ([LastZoneIDSource]) and, without an
+	// answer, continues after the highest ID in use; a value set here wins
+	// over the port's. The host learns each ID the server assigns through
+	// [ZonePort]'s CreateTwoDCartesianZone and persists it there; matter.js
+	// keeps it as the server's nonvolatile lastZoneId
 	// (ZoneManagementServer.ts:253-260 at b25ed960).
 	LastZoneID *uint16
 	// Port is the zone and trigger store; required.
@@ -108,9 +112,11 @@ type ZonesConfig struct {
 // host's [ZonePort] stores it, the zone limits, the Sensitivity write, and
 // the ZoneTriggered and ZoneStopped events the host reports. The command
 // rules are matter.js's ZoneManagementServer.ts and
-// TwoDCartesianGeometry.ts at b25ed960; the configuration rules matter.js
-// leaves to the model and the Sensitivity write are connectedhomeip's
-// ZoneManagementCluster.cpp at 6170af84.
+// TwoDCartesianGeometry.ts at b25ed960; the configuration limits and the
+// Sensitivity write are the model's constraints
+// (zone-management.element.ts:32-33, :35, :54-55, :58-59 at b25ed960),
+// checked as connectedhomeip's ValidateConfiguration and WriteAttribute
+// do (ZoneManagementCluster.cpp at 6170af84).
 type Zones struct {
 	*spec.Instance
 	spec.SelfHeld
@@ -148,10 +154,12 @@ var (
 )
 
 // NewZones builds a ZoneManagement server on cfg.Port. The configuration
-// rules are chip's Startup (ZoneManagementCluster.cpp:60-106) and
-// matter.js's initialize (ZoneManagementServer.ts:70-78 at b25ed960):
-// MaxZones not below MaxUserDefinedZones with USERDEFINED, and no zone ID
-// used twice.
+// rules are the model's constraints, checked as chip's Startup does
+// (ZoneManagementCluster.cpp:60-106 at 6170af84), and matter.js's
+// initialize (ZoneManagementServer.ts:70-78 at b25ed960): MaxZones not
+// below MaxUserDefinedZones with USERDEFINED, and no zone ID used twice.
+// The last assigned zone ID is cfg.LastZoneID, else the port's
+// [LastZoneIDSource] answer, read once here.
 func NewZones(cfg ZonesConfig) (*Zones, error) {
 	if cfg.Port == nil {
 		return nil, ErrNoZonePort
@@ -178,9 +186,14 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 	}
 	z.zones = deepcopy.Each(cfg.Zones)
 	z.triggers = deepcopy.Each(cfg.Triggers)
-	if cfg.LastZoneID != nil {
+	switch src, ok := cfg.Port.(LastZoneIDSource); {
+	case cfg.LastZoneID != nil:
 		last := *cfg.LastZoneID
 		z.lastZoneID = &last
+	case ok:
+		if last, known := src.LastZoneID(); known {
+			z.lastZoneID = &last
+		}
 	}
 	handlers := map[uint32]spec.CommandHandler{
 		zmdef.CmdCreateTwoDCartesianZone: serial(&z.op, z.createTwoDCartesianZone),
@@ -215,6 +228,20 @@ func NewZones(cfg ZonesConfig) (*Zones, error) {
 		return nil, fmt.Errorf("%w: %w", ErrZonesConfig, err)
 	}
 	return z, nil
+}
+
+// LastZoneIDSource is the optional interface of a [ZonePort] that keeps
+// the last zone ID the server assigned — the ID its
+// CreateTwoDCartesianZone received last, persisted with the zones. The
+// server finds it on the port by type assertion and reads it once, when
+// it is built ([NewZones]), where [ZonesConfig].LastZoneID is nil: the
+// path of a server built through the device facade
+// (zonemanagement.Declare.ZonePort), which carries no LastZoneID. known
+// false continues after the highest ID in use. matter.js keeps the ID as
+// the server's nonvolatile lastZoneId (ZoneManagementServer.ts:253-260 at
+// b25ed960); here the host holds it (owner decisions O-1, O-7).
+type LastZoneIDSource interface {
+	LastZoneID() (zoneID uint16, known bool)
 }
 
 // repeatedZoneID reports the first zone ID zones use twice. Mirrors
@@ -484,9 +511,11 @@ func (z *Zones) assertFocusSupported(zone TwoDZone) error {
 // ([nextZoneID]). The port stores the zone under that ID before the
 // server keeps it: a refusal of the port leaves Zones and the last ID as
 // they were, as matter.js discards the state of a command an override
-// refuses after super (:61-63). The zone's constraints come first; matter.js
-// checks them in the interaction layer, before the command
-// (ZoneManagementServerTest.ts:756-768 at b25ed960).
+// refuses after super (:61-63). The zone's constraints come first:
+// matter.js refuses a Name over 32 bytes and fewer than 3 vertices in the
+// interaction layer, before the command (ZoneManagementServerTest.ts:756-768
+// at b25ed960); Use and Color keep chip's ValidateTwoDCartesianZone
+// (ZoneManagementCluster.cpp:445-460 at 6170af84).
 func (z *Zones) createTwoDCartesianZone(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.CreateTwoDCartesianZoneRequest](fields, "CreateTwoDCartesianZone")
 	if err != nil {

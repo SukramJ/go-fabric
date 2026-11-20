@@ -3,7 +3,7 @@
 
 // ZoneManagement: a port of matter.js
 // packages/node/test/behaviors/zone-management/ZoneManagementServerTest.ts
-// at b25ed960, by meaning. Its 46 `it` cases (66 with the polygon table,
+// at b25ed960, by meaning. Its 46 `it` cases (67 with the polygon table,
 // the refused updates, the durations and the sensitivities expanded) are
 // the subtests below, named as the `it`s. matter.js's MockEndpoint with
 // UserZoneServer.set(ATTRIBUTES) (:87-117) is camera.NewZones with the
@@ -647,4 +647,42 @@ func TestZonesRefusedCreateKeepsTheLastID(t *testing.T) {
 	if !slices.Equal(m.ids, []uint16{0, 1}) {
 		t.Fatalf("port IDs %v", m.ids)
 	}
+}
+
+// keepingZones is a port that keeps the last zone ID it received
+// ([camera.LastZoneIDSource]).
+type keepingZones struct {
+	*mockZones
+	last  uint16
+	known bool
+}
+
+func (k keepingZones) LastZoneID() (uint16, bool) { return k.last, k.known }
+
+// TestZonesLastZoneIDFromThePort: a server whose ZonesConfig carries no
+// LastZoneID takes the port's (owner decision O-7) and continues after
+// it, as matter.js after a restart ("does not reuse the ID of a removed
+// zone after a restart", ZoneManagementServerTest.ts:272-292 at
+// b25ed960); an explicit LastZoneID wins over the port's; a port that
+// knows none continues after the highest ID in use.
+func TestZonesLastZoneIDFromThePort(t *testing.T) {
+	zones := []camera.Zone{userZone(0, shiftedZone(0)), userZone(1, shiftedZone(1))}
+	build := func(t *testing.T, port camera.ZonePort, last *uint16) *camera.Zones {
+		t.Helper()
+		z, err := camera.NewZones(mjConfig(port, func(c *camera.ZonesConfig) { c.Zones, c.LastZoneID = zones, last }))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return z
+	}
+	t.Run("the port's last ID", func(t *testing.T) {
+		wantCreated(t, build(t, keepingZones{mockZones: &mockZones{}, last: 2, known: true}, nil), shiftedZone(3), 3)
+	})
+	t.Run("the explicit LastZoneID wins", func(t *testing.T) {
+		five := uint16(5)
+		wantCreated(t, build(t, keepingZones{mockZones: &mockZones{}, last: 2, known: true}, &five), shiftedZone(3), 6)
+	})
+	t.Run("a port that knows none", func(t *testing.T) {
+		wantCreated(t, build(t, keepingZones{mockZones: &mockZones{}}, nil), shiftedZone(3), 2)
+	})
 }
