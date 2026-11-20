@@ -150,7 +150,7 @@ var floors = []packageFloor{
 		min: 91,
 		why: "measured 92.9-93.0 across five guard runs on 2026-11-04; review II phase 7 (decision 269, the CASE initiator's establishing session) moved it to 91.9-92.1 across six runs on 2026-11-19, a timing-dependent tenth either side of 92, so the floor sits one point under the measurement",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/client/interaction", min: 91},
+	{pkg: "github.com/SukramJ/go-fabric/client/interaction", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/client/handshake", min: 89},
 	{
 		pkg: "github.com/SukramJ/go-fabric/client/peer",
