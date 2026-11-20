@@ -50,13 +50,16 @@ type Node struct {
 	// image: the structure, its Endpoints and Clusters all share this lock.
 	// What the structure emits is delivered after it is released.
 	//
-	// loadErr is why the stored node failed to load ([Node.LoadError]).
-	mu        sync.RWMutex
-	loadErr   error
-	settings  settings
-	record    Record
-	started   bool
-	connState ConnectionState
+	// loadErr is why the stored node failed to load ([Node.LoadError]);
+	// storedAddr is, for such a node, the peer address its stored record
+	// names, read on its own ([Node.PeerAddress]).
+	mu         sync.RWMutex
+	loadErr    error
+	storedAddr *PeerAddress
+	settings   settings
+	record     Record
+	started    bool
+	connState  ConnectionState
 	// pendingStates are the connection-state transitions whose
 	// ConnectionStateChanged hook has not run yet, in transition order;
 	// draining marks the one recompute that delivers them. In matter.js a
@@ -762,6 +765,7 @@ func (n *Node) Erase(ctx context.Context) error {
 	n.mu.Lock()
 	n.settings = settings{}
 	n.record = Record{}
+	n.storedAddr = nil
 	n.onboarding = nil
 	for _, ep := range n.s.endpoints {
 		for _, c := range ep.clusters {

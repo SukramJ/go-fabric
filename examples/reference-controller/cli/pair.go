@@ -358,6 +358,10 @@ func cmdNodes(e *env, args []string) error {
 			e.println("no paired nodes")
 		}
 		for _, n := range nodes {
+			if err := n.LoadError(); err != nil {
+				e.printf("%s: unavailable: %v\n", n.ID(), err)
+				continue
+			}
 			addr, ok := n.PeerAddress()
 			if !ok {
 				e.printf("%s: not commissioned\n", n.ID())

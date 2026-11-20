@@ -711,24 +711,57 @@ func (n *Node) Record() Record {
 	return n.record.clone()
 }
 
-// PeerAddress is the node's address on our fabric; ok is false while the
-// node is not commissioned.
+// PeerAddress is the node's address on our fabric: its record's, or, for
+// a node that failed to load ([Node.LoadError]), the address its stored
+// record names; ok is false when there is none — a node not commissioned,
+// or a failed node whose stored record names no address. An address is
+// not a commissioned node: ask [Node.IsCommissioned] for that.
+//
+// Mirrors matter.js packages/node/src/node/ClientNode.ts:388-421 at
+// b25ed960 (ClientNode.peerAddress): a loaded commissioning state is
+// authoritative, set or cleared (:397-402); a state that did not load
+// answers from storage (:408-418). Its cache (:404-406) answers a state
+// unloaded after a load, which a Node does not have: a loaded record stays
+// in memory until Erase, and a failed node never loads.
 func (n *Node) PeerAddress() (addr PeerAddress, ok bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	if n.record.PeerAddress == nil {
+	a := n.record.PeerAddress
+	if n.loadErr != nil {
+		a = n.storedAddr
+	}
+	if a == nil {
+		return PeerAddress{}, false
+	}
+	return *a, true
+}
+
+// IsCommissioned reports whether the node is commissioned: it loaded and
+// its record has a peer address. Mirrors matter.js
+// packages/node/src/node/NodeLifecycle.ts:94-96 at b25ed960
+// (lifecycle.isCommissioned): false at construction (:23), set by the
+// initialized, commissioned and decommissioned events (:38-46), which the
+// commissioning state emits at its initialization with whether it holds a
+// peerAddress and when the peerAddress changes
+// (packages/node/src/behavior/system/commissioning/CommissioningClient.ts
+// :711, :762-771 at b25ed960). A node that failed to load is not
+// commissioned, though [Node.PeerAddress] answers its stored address —
+// PeersLoadFailureTest.ts:123-125 at b25ed960 leaves such a peer out of
+// peers.commissioned (the orphaned-fabric case).
+func (n *Node) IsCommissioned() bool {
+	_, ok := n.commissionedAddress()
+	return ok
+}
+
+// commissionedAddress is the peer address of a commissioned node, false
+// for any other ([Node.IsCommissioned]).
+func (n *Node) commissionedAddress() (PeerAddress, bool) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	if n.loadErr != nil || n.record.PeerAddress == nil {
 		return PeerAddress{}, false
 	}
 	return *n.record.PeerAddress, true
-}
-
-// IsCommissioned reports whether the node has a peer address — matter.js
-// lifecycle.isCommissioned (node/NodeLifecycle.ts:94-96), which the
-// commissioning state's peerAddress sets (CommissioningClient.ts:586,
-// :637-646).
-func (n *Node) IsCommissioned() bool {
-	_, ok := n.PeerAddress()
-	return ok
 }
 
 // updateRecord changes the record under the lock and saves it; the

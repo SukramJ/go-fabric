@@ -308,7 +308,7 @@ func (r *Registry) noteLeave(n *Node, fabricIndex uint8) {
 // sessions are given up (:422-427) and the record's commissioning fields
 // cleared — not the addresses (:429-435). It returns the former address.
 func (r *Registry) decommission(ctx context.Context, n *Node) (PeerAddress, error) {
-	addr, ok := n.PeerAddress()
+	addr, ok := n.commissionedAddress()
 	if !ok {
 		return addr, ErrNotCommissioned
 	}

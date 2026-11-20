@@ -348,7 +348,7 @@ func targetOf(node *client.Node, endpoint uint16) (target, error) {
 		return target{}, invalidArguments("no node")
 	}
 	addr, ok := node.PeerAddress()
-	if !ok {
+	if !ok || !node.IsCommissioned() {
 		return target{}, invalidArguments("node %s is not commissioned", node.ID())
 	}
 	if endpoint > 0xFFFE {
