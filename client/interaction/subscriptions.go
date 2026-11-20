@@ -418,7 +418,7 @@ func (s *Subscription) nextReportNumber() int {
 // report only when its priming is compact; a subscription that is closed,
 // or on which a newer report started, is kept as it is. Mirrors matter.js
 // PeerSubscription.reportStatusUnacknowledged
-// (PeerSubscription.ts:68-120 at b25ed960, the table :76-80).
+// (PeerSubscription.ts:68-120 at b25ed960, the table :77-81).
 func (s *Subscription) reportStatusUnacknowledged(n int, status unacknowledgedReportStatus) {
 	s.mu.Lock()
 	ignore := s.isClosed || n != s.reportsStarted

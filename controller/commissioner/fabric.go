@@ -108,9 +108,9 @@ type Fabric struct {
 // encoding — the bound a device enforces, connectedhomeip's
 // kFabricLabelMaxLengthInBytes (src/credentials/FabricTable.h:48 at
 // 6170af84) and this module's device side. matter.js's Fabric.setLabel
-// counts UTF-16 code units against the same 32
-// (packages/protocol/src/fabric/Fabric.ts:193-196 at db021da0); a label
-// within 32 bytes is within both. The module's choice (review II,
+// counts the label's UTF-8 bytes against the same 32 since #4995
+// (packages/protocol/src/fabric/Fabric.ts:194, Fabric.MAX_LABEL_BYTES
+// :727 at b25ed960): both count bytes. The module's choice (review II,
 // R2-P6-par-1854, decision 155).
 const MaxLabelLength = 32
 
@@ -138,8 +138,9 @@ func (f *Fabric) CurrentLabel() string {
 
 // SetLabel sets the fabric's label and saves the fabric record when it
 // changed — after matter.js Fabric.setLabel (Fabric.ts:193-201 at
-// db021da0), which bounds the label at 32 UTF-16 code units and sets it
-// before it persists; here the bound is [MaxLabelLength] bytes and a
+// db021da0), which sets it before it persists, and bounds the label at 32
+// UTF-8 bytes since #4995 (Fabric.ts:194 at b25ed960); here the bound is
+// [MaxLabelLength] bytes, the same, and a
 // changed label is persisted before it takes effect (the module's own
 // rule, decision 155): a longer one is [ErrLabel], an unchanged one is
 // nothing. The

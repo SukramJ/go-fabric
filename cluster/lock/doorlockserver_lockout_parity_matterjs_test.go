@@ -7,7 +7,7 @@
 // UserCodeTemporaryDisableTime and the attempt count, on
 // setUpScheduledLock (doorlockserver_harness_test.go).
 //
-// "measures the lockout on the monotonic clock" (:1366-1380) is not
+// "measures the lockout on the monotonic clock" (:1457-1471 at b25ed960) is not
 // ported: it steps MockTime's wall clock alone and expects the lockout to
 // hold, but clocktest.Fake has one reading, so a step moves the lockout's
 // deadline reading as well. The server compares time.Time values, which

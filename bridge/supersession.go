@@ -78,8 +78,10 @@ func (b *Bridge) SessionSuperseded(olderID, newerID uint16) {
 	}
 }
 
-// sessionLive reports whether the session lookup still holds sessionID;
-// true without a lookup, which cannot tell.
+// sessionLive reports whether the session lookup still holds sessionID.
+// The nil branch is defensive only: AttachSessionLookup installs
+// noopSessionLookup for a nil lookup, which always misses, and a bridge
+// with that lookup has no secure session to move.
 func (b *Bridge) sessionLive(sessionID uint16) bool {
 	b.mu.RLock()
 	sessions := b.sessions

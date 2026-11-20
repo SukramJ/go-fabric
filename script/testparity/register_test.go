@@ -64,7 +64,11 @@ import (
 // P1-A): 20.
 // Pin lift b25ed960 wave P2 ports both files of unit P2-D, NocsrValidatorTest.ts
 // and CsrNonceCommissioningTest.ts: 18.
-const testparityPlannedRatchet = 18
+// Pin lift b25ed960 wave P2b ports StoredNodeLabelTest.ts (P2b-A),
+// ClientSubscriptionHandlerTest.ts and PeerSubscriptionTest.ts (P2b-E), and
+// decides ServerSubscriptionSessionTest.ts in part (P2b-B, the CASE-server
+// interception cases missing): 14.
+const testparityPlannedRatchet = 14
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -192,9 +196,19 @@ const testparityPlannedRatchet = 18
 // DoorLockServerTest.ts's local user-type refusal returns to it (decision 339
 // moved the request check to the wire path, findings F-b25ed960-36):
 // 157 ported, 1109 missing.
+// Pin lift b25ed960 wave P2b (units P2b-A, -B, -E, -I, -K) ports 70 missing
+// cases and adds 13: eleven files become ported (constraintTest.ts,
+// GroupsServerSchemaTest.ts, ScenesManagementServerTest.ts,
+// UserLabelServerTest.ts, StoredNodeLabelTest.ts, ClientSubscriptionHandlerTest.ts,
+// PeerSubscriptionTest.ts, RebootResubscribeArmerTest.ts and the three
+// localization tests); the UTF-8 byte cases (#4995), the supersession cases
+// (#4882), the compact priming and timer cases (#4943, #4947) and the stored
+// localization values leave missing, five of them to left (below);
+// ServerSubscriptionSessionTest.ts, decided in part, adds its 13
+// CASE-server interception cases: 168 ported, 1052 missing.
 const (
-	testparityPortedRatchet  = 157
-	testparityMissingRatchet = 1109
+	testparityPortedRatchet  = 168
+	testparityMissingRatchet = 1052
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -272,7 +286,13 @@ const (
 // Pin lift b25ed960 wave P2 leaves NocsrValidatorTest.ts's "passes a defect of
 // its own crypto through unchanged" (js-runtime-only: no injectable crypto,
 // no InternalError to tell from peer data): 746.
-const testparityLeftRatchet = 746
+// Pin lift b25ed960 wave P2b leaves FabricManagerTest.ts's two stored-label
+// cases (by design, BD-chip-FabricLabelBytes: the labels were bounded in
+// bytes before), two ServerSubscriptionTest.ts observer and lifetime cases
+// (js-runtime-only) and TimeFormatLocalizationServerTest.ts's stored and
+// detected calendar fallback (by design, decision 360: no node calendar
+// list): 751.
+const testparityLeftRatchet = 751
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

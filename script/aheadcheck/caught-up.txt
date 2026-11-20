@@ -6,5 +6,4 @@
 # pin; a line whose sha is not the current pin's is a finding, so a row may
 # not ride across another lift. The closing unit removes its line together
 # with the row.
-BD-chip-Thermostat-Suggestions b25ed960 P2b-F # P1-E reconciled five items, P2-G decisions 316-318 (C-9); closes with the daemon's TSUGGEST default (decision 336)
 BD-chip-EnergyReporting-FakeReadings b25ed960 P3-E

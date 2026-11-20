@@ -85,8 +85,9 @@ func (e *UnexpectedMessageError) Is(target error) bool { return target == ErrUne
 
 // PeerUnresponsiveError is a reliable message the peer never acknowledged
 // within MaxTransmissions transmissions and the final wait — matter.js
-// PeerUnresponsiveError (PeerCommunicationError.ts:40-46), raised by
-// MessageExchange.ts:763-765.
+// PeerAckMissingError, a PeerUnresponsiveError
+// (PeerCommunicationError.ts:63-67 at b25ed960), raised by
+// MessageExchange.ts:818.
 type PeerUnresponsiveError struct {
 	// Waited is how long the exchange waited for the acknowledgement.
 	Waited time.Duration
