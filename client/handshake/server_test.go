@@ -37,6 +37,9 @@ type responderRig struct {
 	serverAddr *net.UDPAddr
 	store      *handshake.MemoryResumptionStore
 	sessions   chan *exchange.Session
+	// saved is told of every record the responder saved
+	// ([responderRig.accepted]).
+	saved chan struct{}
 
 	nodeMgr    *exchange.Manager
 	nodeRec    *recorder
@@ -65,13 +68,14 @@ func newResponderRig(t *testing.T) *responderRig {
 		store:     &handshake.MemoryResumptionStore{},
 		nodeStore: &handshake.MemoryResumptionStore{},
 		sessions:  make(chan *exchange.Session, 8),
+		saved:     make(chan struct{}, 64),
 		ca:        c,
 	}
 	r.serverMgr, r.serverRec = newManager(t)
 	r.serverAddr = r.serverRec.l.LocalAddr()
 	server, err := handshake.NewCASEServer(r.serverMgr, handshake.CASEServerConfig{
 		Fabrics:    handshake.FabricList{fabricOf(t, c, controllerNodeID, 1)},
-		Resumption: r.store,
+		Resumption: savingStore{r.store, r.saved},
 		OnSession: func(s *exchange.Session, fabricIndex uint8) {
 			if fabricIndex != 1 || s.FabricIndex() != 1 {
 				t.Errorf("OnSession fabric index %d / %d", fabricIndex, s.FabricIndex())
@@ -96,15 +100,43 @@ func (r *responderRig) open(ctx context.Context, fabric handshake.Fabric) (*exch
 	return handshake.CASE(ctx, r.nodeMgr, r.serverAddr, fabric, controllerNodeID, handshake.CASEOptions{Resumption: r.nodeStore})
 }
 
+// accepted returns the next session the responder handed over, once its
+// record is saved too: the responder hands a session over as it is
+// established and saves its record after (CaseServer.ts:331, :357 at
+// b25ed960), so a test that resumes next waits for both.
 func (r *responderRig) accepted(t *testing.T) *exchange.Session {
 	t.Helper()
+	var s *exchange.Session
+	deadline := time.After(10 * time.Second)
 	select {
-	case s := <-r.sessions:
-		return s
-	case <-time.After(10 * time.Second):
+	case s = <-r.sessions:
+	case <-deadline:
 		t.Fatal("no session reached OnSession")
 		return nil
 	}
+	select {
+	case <-r.saved:
+	case <-deadline:
+		t.Fatal("the responder saved no record for the session it handed over")
+	}
+	return s
+}
+
+// savingStore is a resumption store that tells saved of every record it
+// saved.
+type savingStore struct {
+	*handshake.MemoryResumptionStore
+	saved chan<- struct{}
+}
+
+// SaveResumptionRecord implements handshake.ResumptionStore.
+func (s savingStore) SaveResumptionRecord(rec handshake.ResumptionRecord) error {
+	err := s.MemoryResumptionStore.SaveResumptionRecord(rec)
+	select {
+	case s.saved <- struct{}{}:
+	default:
+	}
+	return err
 }
 
 // ping sends one reliable IM message on s and waits for the
