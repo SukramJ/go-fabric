@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10182,
+  "entry_points": 10183,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27877,
+    "total_exported": 27878,
     "reachable": 20886,
-    "whitelisted": 6969,
+    "whitelisted": 6970,
     "unreachable": 22
   },
   "by_package": [
@@ -957,7 +957,7 @@
       "identifier": "TestAdministratorCommissioningAttemptLimitParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
-      "line": 380
+      "line": 386
     },
     {
       "package": "bridge",
@@ -2476,7 +2476,7 @@
       "identifier": "TestCommissioningAttemptLimitPASEFailureParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
-      "line": 353
+      "line": 359
     },
     {
       "package": "bridge",
@@ -42755,6 +42755,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/peer_client_internal_test.go",
       "line": 135
+    },
+    {
+      "package": "node",
+      "identifier": "TestCommissioningAttemptCapThroughFabricRemoved",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/commissioning_attempt_fabric_removed_internal_test.go",
+      "line": 21
     },
     {
       "package": "node",
