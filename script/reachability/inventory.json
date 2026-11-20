@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10115,
+  "entry_points": 10119,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27798,
-    "reachable": 20851,
-    "whitelisted": 6924,
+    "total_exported": 27816,
+    "reachable": 20866,
+    "whitelisted": 6927,
     "unreachable": 23
   },
   "by_package": [
@@ -28309,6 +28309,13 @@
     },
     {
       "package": "controller/attestation",
+      "identifier": "FuzzDecodeCertSigningRequest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/fuzz_attestation_test.go",
+      "line": 130
+    },
+    {
+      "package": "controller/attestation",
       "identifier": "FuzzParseAttCert",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/fuzz_attestation_test.go",
@@ -28369,6 +28376,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/certificates_parity_matterjs_test.go",
       "line": 54
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCertificatesGetPublicKeyFromCsr",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/csr_parity_matterjs_test.go",
+      "line": 100
     },
     {
       "package": "controller/attestation",
@@ -31207,13 +31221,6 @@
     },
     {
       "package": "controller/commissioner",
-      "identifier": "FuzzDecodeCertSigningRequest",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/commissioner/fuzz_wire_test.go",
-      "line": 102
-    },
-    {
-      "package": "controller/commissioner",
       "identifier": "FuzzDecodeCertificateChainResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fuzz_wire_test.go",
@@ -31231,7 +31238,7 @@
       "identifier": "FuzzDecodeNetworks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fuzz_wire_test.go",
-      "line": 122
+      "line": 103
     },
     {
       "package": "controller/commissioner",
@@ -31259,7 +31266,7 @@
       "identifier": "TestAttestationSignatureOfAnyLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/signature_length_test.go",
-      "line": 64
+      "line": 65
     },
     {
       "package": "controller/commissioner",
@@ -31301,21 +31308,21 @@
       "identifier": "TestCSRSignatureOfAnyLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/signature_length_test.go",
-      "line": 40
+      "line": 41
     },
     {
       "package": "controller/commissioner",
-      "identifier": "TestCertificatesCsrNonceEchoed",
+      "identifier": "TestCertificatesMissingNOCSRElements",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/commissioner/csr_nonce_chip_test.go",
-      "line": 70
+      "file": "controller/commissioner/csr_nonce_commissioning_parity_matterjs_test.go",
+      "line": 320
     },
     {
       "package": "controller/commissioner",
-      "identifier": "TestCertificatesGetPublicKeyFromCsr",
+      "identifier": "TestCertificatesRequiresTheDACKey",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/commissioner/certificates_parity_matterjs_test.go",
-      "line": 99
+      "file": "controller/commissioner/csr_nonce_commissioning_parity_matterjs_test.go",
+      "line": 228
     },
     {
       "package": "controller/commissioner",
@@ -31323,6 +31330,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/network_test.go",
       "line": 481
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestClientAttestationBasicInformationVendorIDParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/csr_nonce_commissioning_parity_matterjs_test.go",
+      "line": 245
     },
     {
       "package": "controller/commissioner",
@@ -31512,6 +31526,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
       "line": 185
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCsrNonceCommissioningParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/csr_nonce_commissioning_parity_matterjs_test.go",
+      "line": 197
     },
     {
       "package": "controller/commissioner",
