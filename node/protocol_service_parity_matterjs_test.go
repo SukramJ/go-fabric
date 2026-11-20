@@ -161,6 +161,10 @@ var testClusterDef = &spec.Cluster{
 		},
 		{
 			ID: 1, Name: "TestResponse", Direction: spec.Response, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
+			// The response's generated form is testResponse: the response
+			// check judges a payload of the definition's own type only
+			// (decision 339, A3).
+			Decode: func(spec.Node) (any, error) { return testResponse{}, nil },
 			Fields: []spec.Field{
 				{ID: 0, Name: "Result", Type: spec.Type{Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{
 					Text: "TestRequest.Enable", Op: spec.ConfDot,

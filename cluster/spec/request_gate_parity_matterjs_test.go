@@ -33,7 +33,7 @@ func collectorCluster() *spec.Cluster {
 		Features: []spec.Feature{{Name: "F", Title: "Feature", Bit: 0, Conformance: op(spec.ConfOptional)}},
 		Commands: []spec.Command{{
 			ID: 0, Name: "Request", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory),
-			Access: spec.Access{Write: spec.PrivilegeOperate},
+			Access: spec.Access{Write: spec.PrivilegeOperate}, Decode: decodesAs[collectorRequest](),
 			Fields: []spec.Field{
 				{ID: 0, Name: "Num", Type: spec.Type{Kind: spec.KindInt, Bits: 8}, Conformance: op(spec.ConfMandatory), Constraint: spec.Constraint{Text: "max 5", Max: &spec.Bound{Int: 5}}},
 				{ID: 1, Name: "Mode", Type: spec.Type{Kind: spec.KindEnum, Bits: 8, Enum: ab}, Conformance: spec.Conformance{Text: "F", Op: spec.ConfName, Name: "F"}},
@@ -125,9 +125,9 @@ func gateCluster() *spec.Cluster {
 		ID: 0xFFF1_FC0E, Name: "Gate", Revision: 1,
 		Features: []spec.Feature{{Name: "F", Title: "Feature", Bit: 0, Conformance: op(spec.ConfOptional)}},
 		Commands: []spec.Command{
-			{ID: 0, Name: "Plain", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory), Access: spec.Access{Write: spec.PrivilegeOperate}, Fields: fields},
+			{ID: 0, Name: "Plain", Direction: spec.Request, Decode: decodesAs[gateRequest](), Response: "status", Conformance: op(spec.ConfMandatory), Access: spec.Access{Write: spec.PrivilegeOperate}, Fields: fields},
 			{
-				ID: 1, Name: "Refused", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory), Access: spec.Access{Write: spec.PrivilegeOperate}, Fields: fields,
+				ID: 1, Name: "Refused", Direction: spec.Request, Decode: decodesAs[gateRequest](), Response: "status", Conformance: op(spec.ConfMandatory), Access: spec.Access{Write: spec.PrivilegeOperate}, Fields: fields,
 				Check: spec.RequestCheck{Refusal: im.StatusInvalidCommand},
 			},
 		},

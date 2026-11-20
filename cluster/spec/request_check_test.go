@@ -30,8 +30,8 @@ func handCluster() *spec.Cluster {
 	return &spec.Cluster{
 		ID: 0xFFF1_FC0B, Name: "Hand", Revision: 1,
 		Commands: []spec.Command{
-			{ID: 0, Name: "Checked", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory), Access: spec.Access{Write: spec.PrivilegeOperate}, Fields: fields, Check: spec.RequestCheck{Refusal: im.StatusConstraintError}},
-			{ID: 1, Name: "Logged", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory), Access: spec.Access{Write: spec.PrivilegeOperate}, Fields: fields},
+			{ID: 0, Name: "Checked", Direction: spec.Request, Decode: decodesAs[handReq](), Response: "status", Conformance: op(spec.ConfMandatory), Access: spec.Access{Write: spec.PrivilegeOperate}, Fields: fields, Check: spec.RequestCheck{Refusal: im.StatusConstraintError}},
+			{ID: 1, Name: "Logged", Direction: spec.Request, Decode: decodesAs[handReq](), Response: "status", Conformance: op(spec.ConfMandatory), Access: spec.Access{Write: spec.PrivilegeOperate}, Fields: fields},
 		},
 	}
 }

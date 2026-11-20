@@ -950,9 +950,9 @@ func (i *Instance) CheckConformance(attrID uint32, value any, peers Peers) error
 // a mandatory field is missing and the command answers FAILURE: matter.js
 // validates `data ?? {}` for the response too (Mirrors matter.js
 // packages/node/src/node/integration/ProtocolService.ts:624-625, :718-733
-// at b25ed960, completeResponse; F-b25ed960-30). A payload whose Go type
-// does not carry every field the definition states (a hand-written
-// decoder's) is not judged.
+// at b25ed960, completeResponse; F-b25ed960-30). A payload in neither the
+// definition's generated form nor a declared one ([payloadValue]) is not
+// judged.
 func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peers) error {
 	req := i.def.Command(cmdID, Request)
 	if req == nil {
@@ -962,7 +962,7 @@ func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peer
 	if resp == nil || len(resp.Fields) == 0 {
 		return nil
 	}
-	rv, ok := responseValue(response, resp)
+	rv, ok := payloadValue(resp, response, true)
 	if !ok {
 		return nil
 	}
@@ -976,30 +976,4 @@ func (i *Instance) checkResponse(cmdID uint32, request, response any, peers Peer
 		return Errorf(im.StatusFailure, "%s: response validation failed for %s: %w", i.def.Name, req.Name, err)
 	}
 	return nil
-}
-
-// responseValue is the response a handler returned as the struct value
-// [Instance.checkResponse] judges against resp: an empty struct for an
-// absent one (nil or a nil pointer); ok is false for a value it does not
-// judge — no struct, or one that does not carry every field resp states.
-func responseValue(response any, resp *Command) (reflect.Value, bool) {
-	if response == nil {
-		return reflect.ValueOf(struct{}{}), true
-	}
-	rv := reflect.ValueOf(response)
-	for rv.Kind() == reflect.Pointer {
-		if rv.IsNil() {
-			return reflect.ValueOf(struct{}{}), true
-		}
-		rv = rv.Elem()
-	}
-	if rv.Kind() != reflect.Struct {
-		return reflect.Value{}, false
-	}
-	for fi := range resp.Fields {
-		if !rv.FieldByName(goFieldName(resp.Fields[fi].Name)).IsValid() {
-			return reflect.Value{}, false
-		}
-	}
-	return rv, true
 }

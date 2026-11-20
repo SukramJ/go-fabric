@@ -122,7 +122,8 @@ func decodeCommandFields(t *testing.T, cluster, command uint32, raw string) any 
 	if err != nil {
 		t.Fatalf("commandFieldsReader: %v", err)
 	}
-	return got
+	_, served := spec.SplitHandForm(got) // the server's form
+	return served
 }
 
 func TestGroupCommandPayloadsMatchMatterJS(t *testing.T) {

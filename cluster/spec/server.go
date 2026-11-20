@@ -955,11 +955,9 @@ func (s *Server) MatterGeneratedCommands() []uint32 {
 // is UNSUPPORTED_COMMAND. The request's types and constraints are the
 // decoder's to refuse, before the server runs (decision 64), and its model
 // check is the endpoint dispatcher's ([AdmitRequest]), run before it calls
-// MatterInvoke; a direct call is a local one and is not validated. A
-// response that breaks its fields' conformance — a field mandatory by the
-// request's ("TestRequest.Enable") left out, or an absent response of a
-// command whose response has a mandatory field — is FAILURE
-// ([Instance.checkResponse]).
+// MatterInvoke, as is the check of the response it answers
+// ([CheckResponse]); a direct call is a local one and is validated by
+// neither.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	return s.dispatch(ctx, cmdID, fields)
 }
@@ -972,14 +970,7 @@ func (s *Server) dispatch(ctx context.Context, cmdID uint32, fields any) (any, e
 	if !s.Instance.Accepts(cmdID) || fn == nil {
 		return nil, im.UnsupportedCommandf("%s: command 0x%02X is not supported", s.def.Name, cmdID)
 	}
-	resp, err := fn(ctx, fields)
-	if err != nil {
-		return resp, err
-	}
-	if err := s.checkResponse(cmdID, fields, resp, s.peers); err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return fn(ctx, fields)
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver]; nil withdraws

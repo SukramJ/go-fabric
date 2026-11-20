@@ -94,6 +94,7 @@ func TestCommandFieldsReader_DefinitionFirst(t *testing.T) {
 	dec := tlv.NewDecoder(raw)
 	opener, _ := dec.Next()
 	got, err := commandFieldsReader(im.ConcreteCommandPath{Cluster: 0x0030, Command: 0x00}, dec, opener)
+	_, got = spec.SplitHandForm(got) // the server's form
 	if _, ok := got.(mattercore.ArmFailSafeRequest); err != nil || !ok {
 		t.Errorf("ArmFailSafe: %T, %v; want the cluster/core request of the hand-written reader", got, err)
 	}

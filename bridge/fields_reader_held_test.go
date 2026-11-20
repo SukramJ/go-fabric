@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -33,6 +34,7 @@ func readHeld(t *testing.T, cluster, cmd uint32, body func(*tlv.Encoder)) (any, 
 		t.Fatal(err)
 	}
 	fields, rerr := commandFieldsReader(cmdPath(cluster, cmd), dec, open)
+	_, fields = spec.SplitHandForm(fields) // the server's form
 	if rerr != nil {
 		var c im.FieldsContainerConsumed
 		if !errors.As(rerr, &c) || !c.FieldsContainerConsumed() {

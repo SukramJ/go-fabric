@@ -19,7 +19,6 @@ import (
 	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
@@ -59,12 +58,11 @@ func (fanState) ApplyFanSettings(context.Context, fandef.Patch) error { return n
 // cluster/core servers — refuse a value an enum does not define with
 // CONSTRAINT_ERROR, and log a misfit that only gets a warning, before
 // their handler runs. judged states whether the gate judges the payload
-// (refuses it or logs a warning): a request the bridge decodes into a
-// cluster/core hand-written form is judged where the form's Go fields
-// carry every field the definition states by name (GeneralCommissioning's
-// SetRegulatoryConfig, OperationalCredentials' CertificateChainRequest),
-// and not judged otherwise (Groups' AddGroup: GroupID, not GroupId) — its
-// decoder held it to the definition already (bridge heldByDefinition).
+// (refuses it or logs a warning): a request a cluster/core hand-written
+// reader decoded arrives as a spec.HandForm, whose generated form — the
+// definition's decoding of the same bytes — the gate judges; a bare hand
+// form is not judged, whatever its Go field names (A3 of the P2-H
+// post-read: no judgement by matching names).
 func TestRequestGateReachesEveryServer(t *testing.T) {
 	newOr := func(srv contract.ClusterServer, err error) contract.ClusterServer {
 		t.Helper()
@@ -116,11 +114,25 @@ func TestRequestGateReachesEveryServer(t *testing.T) {
 		{"Identify TriggerEffect, undefined EffectIdentifier (relaxed)", identify, identifydef.CmdTriggerEffect, identifydef.TriggerEffectRequest{EffectIdentifier: 0x42}, false, im.StatusSuccess},
 		// A request without fields is judged as {}: IdentifyTime is missing.
 		{"Identify Identify, without fields", identify, identifydef.CmdIdentify, nil, true, im.StatusSuccess},
-		// The hand forms: judged where the form's Go fields carry every
-		// field the definition states (by name), not judged otherwise.
-		{"GeneralCommissioning SetRegulatoryConfig, hand form", hand(gencommdef.ClusterID), gencommdef.CmdSetRegulatoryConfig, mattercore.SetRegulatoryConfigRequest{NewRegulatoryConfig: 9}, true, im.StatusSuccess},
-		{"OperationalCredentials CertificateChainRequest, hand form", hand(opcredsdef.ClusterID), opcredsdef.CmdCertificateChainRequest, mattercore.CertificateChainRequest{CertificateType: 9}, true, im.StatusInvalidCommand},
-		{"Groups AddGroup, hand form", hand(groupsdef.ClusterID), groupsdef.CmdAddGroup, mattercore.AddGroupRequest{GroupID: 0, GroupName: "g"}, false, im.StatusSuccess},
+		// A hand-read request arrives as a spec.HandForm: the gate judges the
+		// generated form the definition decoded from the same bytes.
+		{
+			"GeneralCommissioning SetRegulatoryConfig, hand-read", hand(gencommdef.ClusterID), gencommdef.CmdSetRegulatoryConfig,
+			spec.HandForm{Generated: gencommdef.SetRegulatoryConfigRequest{NewRegulatoryConfig: 9}, Hand: mattercore.SetRegulatoryConfigRequest{NewRegulatoryConfig: 9}},
+			true, im.StatusSuccess,
+		},
+		{
+			"OperationalCredentials CertificateChainRequest, hand-read", hand(opcredsdef.ClusterID), opcredsdef.CmdCertificateChainRequest,
+			spec.HandForm{Generated: opcredsdef.CertificateChainRequestRequest{CertificateType: 9}, Hand: mattercore.CertificateChainRequest{CertificateType: 9}},
+			true, im.StatusInvalidCommand,
+		},
+		// A hand form alone is not judged, whatever its Go field names: the
+		// gate reads the definition's own form or a declared one only.
+		{
+			"GeneralCommissioning SetRegulatoryConfig, a bare hand form", hand(gencommdef.ClusterID), gencommdef.CmdSetRegulatoryConfig,
+			mattercore.SetRegulatoryConfigRequest{NewRegulatoryConfig: 9},
+			false, im.StatusSuccess,
+		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			var logged bytes.Buffer
@@ -129,7 +141,8 @@ func TestRequestGateReachesEveryServer(t *testing.T) {
 			defer slog.SetDefault(prev)
 
 			srv := c.srv()
-			err := requestHeld(context.Background(), srv, c.cmd, c.fields)
+			judged, _ := spec.SplitHandForm(c.fields)
+			err := requestHeld(context.Background(), srv, c.cmd, judged)
 			if got := spec.StatusOf(err); got != c.status {
 				t.Errorf("gate: %v (%v), want %v", got, err, c.status)
 			}

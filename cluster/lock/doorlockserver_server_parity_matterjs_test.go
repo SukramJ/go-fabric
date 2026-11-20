@@ -273,7 +273,9 @@ func TestDoorLockServerParity(t *testing.T) {
 	t.Run("refuses to store a user type Matter does not define", func(t *testing.T) {
 		f := createLock(t, nil)
 		// matter.js calls the local agent, whose request skips the command's
-		// constraint and the state's enum validation refuses the user (:800).
+		// constraint, and refuses the user type 99
+		// (packages/node/test/behaviors/door-lock/DoorLockServerTest.ts:823-845
+		// at b25ed960, its comment :829, the message :843).
 		// The Go request gate holds a wire command only (decision 339,
 		// endpoint.TopologyDispatcher, as matter.js
 		// ProtocolService.ts:347-350 at b25ed960), so the port asks over the

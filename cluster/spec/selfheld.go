@@ -61,33 +61,24 @@ func (h *HostHandlers) Register(inst *Instance, cmdID uint32, fn CommandHandler)
 }
 
 // Invoke runs the host's handler of cmdID; handled is false when the host
-// registered none, and the server's own logic runs. A response the
-// handler returns is held to the definition as [Server.MatterInvoke]
-// holds a handler's: one that breaks its fields' conformance answers
-// FAILURE. A name the response's conformance takes from the cluster's
-// attributes is not resolved here (the handlers hold no read of the
-// server's state).
+// registered none, and the server's own logic runs. The request's and the
+// response's model checks are the endpoint dispatcher's ([AdmitRequest],
+// [CheckResponse]), run around the server; a direct call is a local one
+// and is not validated.
 func (h *HostHandlers) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
-	return h.invoke(ctx, cmdID, fields, nil)
+	return h.invoke(ctx, cmdID, fields)
 }
 
-// invoke is [HostHandlers.Invoke] with the server's attributes resolving
-// the response's conformance names.
-func (h *HostHandlers) invoke(ctx context.Context, cmdID uint32, fields any, peers Peers) (resp any, handled bool, err error) {
+// invoke is [HostHandlers.Invoke].
+func (h *HostHandlers) invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
 	h.mu.Lock()
-	fn, inst := h.m[cmdID], h.inst
+	fn := h.m[cmdID]
 	h.mu.Unlock()
 	if fn == nil {
 		return nil, false, nil
 	}
 	resp, err = fn(ctx, fields)
-	if err != nil || inst == nil {
-		return resp, true, err
-	}
-	if err := inst.checkResponse(cmdID, fields, resp, peers); err != nil {
-		return nil, true, err
-	}
-	return resp, true, nil
+	return resp, true, err
 }
 
 // Events is a self-held server's event path: the emitter the endpoint
@@ -248,7 +239,7 @@ func (h *SelfHeld) SetMatterEventEmitter(emitter contract.EventEmitter) {
 // a method so that embedding [SelfHeld] promotes no second invoke onto the
 // server.
 func InvokeHeld(ctx context.Context, h *SelfHeld, cmdID uint32, fields any) (any, error) {
-	if resp, handled, err := h.host.invoke(ctx, cmdID, fields, h.srv.peers); handled {
+	if resp, handled, err := h.host.invoke(ctx, cmdID, fields); handled {
 		return resp, err
 	}
 	return h.srv.dispatch(ctx, cmdID, fields)
