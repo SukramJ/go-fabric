@@ -1194,7 +1194,7 @@
   },
   {
     "file": "cluster/core/basic_information_test.go",
-    "line": 639,
+    "line": 651,
     "citation": "packages/model/src/standard/elements/basic-information.element.ts:165-169",
     "resolved": "packages/model/src/standard/elements/basic-information.element.ts",
     "identifier": "CapabilityMinima",
@@ -1369,7 +1369,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 626,
+    "line": 628,
     "citation": "ScenesManagementServer.ts:77-80",
     "resolved": "packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts",
     "identifier": "OnOff",
