@@ -2897,7 +2897,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 1141,
+    "line": 1151,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
