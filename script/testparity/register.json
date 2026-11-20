@@ -3409,15 +3409,15 @@
         "bridge:TestCommissioningWindow_AdminFabric_ClearedOnRevoke",
         "bridge:TestCommissioningWindow_PaseSessionCloser_CalledOnRevokeEvenWhenClosed",
         "bridge:TestCommissioningWindow_RevokeOverPaseDefersTheClose",
-        "bridge:TestCommissioningWindow_RevokeExpiresTheFailSafe"
+        "bridge:TestCommissioningWindow_RevokeExpiresTheFailSafe",
+        "bridge:TestAdministratorCommissioningAttemptLimitParity"
       ],
       "missing": [
         "advertises in enhanced commissioning mode with the requested discriminator",
         "closes the window, resets the attributes and stops advertising once the timeout expires",
-        "reports a basic window and its opener and advertises in basic commissioning mode",
-        "answers success when ending the fail-safe makes the twentieth failed commissioning attempt"
+        "reports a basic window and its opener and advertises in basic commissioning mode"
       ],
-      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the command gates in matter.js's order (#4878) — a session without fabric PAKEParameterError, Busy for an armed fail-safe or an administrator's window before the PAKE parameters, the parameter bounds by value, the discriminator above 4095 INVALID_COMMAND — are ported at cluster/wire; the window lifetime, the timeout bounds, the admin fabric's removal and RevokeCommissioning's PASE and fail-safe steps at bridge's CommissioningWindow. Missing: the three cases that read the DNS-SD advertisement (CM and discriminator) of an administrator's window, and the enhanced window's expiry with its advertisement withdrawn. Pin lift b25ed960: RevokeCommissioning answering success when the fail-safe it ends is the twentieth failed attempt (#5016) is open, unit P3-C.",
+      "reason": "Pin lift db021da0, wave P1 (2026-11-06): the command gates in matter.js's order (#4878) — a session without fabric PAKEParameterError, Busy for an armed fail-safe or an administrator's window before the PAKE parameters, the parameter bounds by value, the discriminator above 4095 INVALID_COMMAND — are ported at cluster/wire; the window lifetime, the timeout bounds, the admin fabric's removal and RevokeCommissioning's PASE and fail-safe steps at bridge's CommissioningWindow. Missing: the three cases that read the DNS-SD advertisement (CM and discriminator) of an administrator's window, and the enhanced window's expiry with its advertisement withdrawn. Pin lift b25ed960: RevokeCommissioning answering success when the fail-safe it ends is the twentieth failed attempt (#5016) is ported at bridge (unit P3-C).",
       "snapshotSha": "9cc9e3e4c99adcb84b70d5528cf3ed29e0933670"
     },
     {
@@ -4248,10 +4248,9 @@
         "cluster/thermo:TestParityMatterJS_AtomicWriteHandlerCommitTest"
       ],
       "missing": [
-        "accepts an attribute whose atomic quality is inherited from the element it overrides",
-        "rejects a Schedules write held by a different peer with INVALID_IN_STATE"
+        "accepts an attribute whose atomic quality is inherited from the element it overrides"
       ],
-      "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session). The five CommitWrite cases of more than one attribute run in the package on a thermostat serving Presets and Schedules (MatterScheduleConfiguration, served ahead of matter.js after chip, brief CO): the values are staged through the server's write, the Schedules value the write refuses (TransitionTime 1440) on the atomic-write state as matter.js's stageAs does; \"validates an attribute once the other pending attributes are staged\" is the presets precommit reading the staged Schedules (chip's in-use check), the Go server having no presets$AtomicChanged observer. Missing: the inherited-quality case, js-runtime-only: a TypeScript schema extension of a behavior class (the atomic quality is the generated definition's). Pin lift b25ed960: a Schedules write another peer holds answered INVALID_IN_STATE where Presets answers BUSY (#4467) is open, unit P3-A.",
+      "reason": "BeginWrite's command-level and per-attribute answers, the timeout and the BUSY of a write another peer holds run over the wire on fabrictest (a second peer is a second controller on its own fabric, the PASE peer a PASE session). The five CommitWrite cases of more than one attribute run in the package on a thermostat serving Presets and Schedules (MatterScheduleConfiguration, served ahead of matter.js after chip, brief CO): the values are staged through the server's write, the Schedules value the write refuses (TransitionTime 1440) on the atomic-write state as matter.js's stageAs does; Missing: the inherited-quality case, js-runtime-only: a TypeScript schema extension of a behavior class (the atomic quality is the generated definition's). Pin lift b25ed960 (P3-A): the Schedules write of another peer answers INVALID_IN_STATE, ported over the wire; \"validates an attribute once the other pending attributes are staged\" is the Presets $AtomicChanged check (atomicChanged) reading the unit's staged Schedules (AtomicWriteHandler.ts:314-320).",
       "snapshotSha": "8f76d9d476de93a37f2bfe43e6292f345faa3d75"
     },
     {
@@ -4346,20 +4345,108 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesAtomicWriteTest.ts",
-      "status": "planned",
-      "reason": "Pin lift b25ed960, unit P3-A: the atomic write of Schedules as matter.js implements MatterScheduleConfiguration behind its forward feature thermostat-msch (#4467, decision 291); 22 cases, replacing the chip-derived Go tests (cluster/thermo/schedules_write_chip_test.go).",
+      "status": "ported",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_SchedulesAtomicWriteTest"
+      ],
+      "left": [
+        {
+          "it": "refuses a commit whose settled schedules an observer stripped the handle from",
+          "class": "js-runtime-only",
+          "reason": "an application observer on persistedSchedules$Changing that rewrites the value in flight, matter.js's behavior-state observer; the Go server has no such seam"
+        }
+      ],
+      "reason": "Every other case runs over the wire on fabrictest (BeginWrite, the write as REPLACE-ALL plus ADDs, CommitWrite/RollbackWrite); the write a matter.js client rejects is the WriteStatuses entry with that status; the controller's cache is a subscription; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). Left, js-runtime-only: an application observer on persistedSchedules$Changing that rewrites the value in flight, matter.js's behavior-state observer; the Go server has no such seam. Pin lift b25ed960, unit P3-A (#4467, decision 291).",
       "snapshotSha": "d0f0bb2eb0a59fd33d8dcb130cd3d53a51209c8e"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesConfigurationTest.ts",
-      "status": "planned",
-      "reason": "Pin lift b25ed960, unit P3-A: the configured schedules and ScheduleTypes of MatterScheduleConfiguration and the refusal to start without the forward feature (#4467, decision 291); 12 cases, replacing the chip-derived Go tests (cluster/thermo/schedules_chip_test.go).",
+      "status": "partial",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_SchedulesConfigurationTest",
+        "cluster/thermo:TestParityMatterJS_SchedulesConfigurationTest_Remote"
+      ],
+      "missing": [
+        "starts with stored schedules that no longer meet the configured limits",
+        "starts with more stored schedules and transitions than the limits allow and raises the limits"
+      ],
+      "left": [
+        {
+          "it": "refuses to start",
+          "class": "by-design",
+          "reason": "the Go gate is the extension BD-chip-Thermostat-Schedules (surface.Policies.Extensions), pinned by device/surface_ahead_test.go and the reference bridge's TestDemoThermostatSchedulesAreGated"
+        },
+        {
+          "it": "serves schedules a behavior type supplies as its own default",
+          "class": "js-runtime-only",
+          "reason": "a behavior type's state defaults; a Go host's schedules are one ThermostatConfig.Schedules"
+        },
+        {
+          "it": "leaves the schedules a behavior type supplies untouched",
+          "class": "js-runtime-only",
+          "reason": "a behavior type's state defaults; a Go host's schedules are one ThermostatConfig.Schedules"
+        },
+        {
+          "it": "seeds from configuration, not from schedules a device stored before the accessor existed",
+          "class": "js-runtime-only",
+          "reason": "plants a value under the attribute's pre-accessor key of matter.js's behavior storage; the Go server never stored schedules anywhere but behind its SchedulePort"
+        }
+      ],
+      "reason": "The configured schedules and ScheduleTypes are ThermostatConfig's, held to the write rules at start; the remote case runs over the wire on a commissioned fabrictest pair; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). \"validates a local write when the application configured no schedules\" is adapted: its first refusal is a content rule (a transition SystemMode equal to the schedule's), not NOT_FOUND, because the host's SetSchedules is not held to the lifecycle rules (BD-Thermostat-HostSchedules); the NOT_FOUND-before-count order (ThermostatServer.ts:2728-2734 before :2793) has no test of its own on the Matter path (a controller's ADDs validate one by one). Missing: the two restarts on stored schedules. Pin lift b25ed960 (P3-A): the Go server keeps schedules in memory or behind the host's SchedulePort; persisting them is a unit of its own (coordinator decision C-7).",
       "snapshotSha": "5c5cf03cdf5945ded0f988e6f74c24f9f14e0314"
     },
     {
       "path": "packages/node/test/behaviors/thermostat/SchedulesLocalWriteTest.ts",
-      "status": "planned",
-      "reason": "Pin lift b25ed960, unit P3-A: the local write of Schedules with its rules (#4467, decision 291); 52 cases, replacing the chip-derived Go tests (cluster/thermo/schedules_rules_internal_test.go).",
+      "status": "partial",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_SchedulesLocalWriteTest"
+      ],
+      "missing": [
+        "keeps the generated handle across a restart"
+      ],
+      "left": [
+        {
+          "it": "rejects a schedule citing an unknown handle and keeps the stored schedules",
+          "class": "by-design",
+          "reason": "the host's replace is not held to matter.js's lifecycle rules of a Matter write (BD-Thermostat-HostSchedules, owner decision O-8); the rule itself stays covered on the Matter path (SchedulesAtomicWriteTest.ts :169); an unknown handle is a new schedule"
+        },
+        {
+          "it": "keeps a held schedule live while the schedules are the configured ones",
+          "class": "js-runtime-only",
+          "reason": "a held entry proxy of matter.js's managed schedules list; the Go schedules are value slices copied on read"
+        },
+        {
+          "it": "refuses to clear the stored schedules and keeps them",
+          "class": "js-runtime-only",
+          "reason": "the assignment of undefined to persistedSchedules in matter.js's managed state; the Go server's one local write, SetSchedules, takes a slice"
+        },
+        {
+          "it": "refuses a schedule an observer stripped the handle from, and stays writable",
+          "class": "js-runtime-only",
+          "reason": "an application observer on persistedSchedules$Changing that rewrites the value in flight, matter.js's behavior-state observer; the Go server has no such seam"
+        },
+        {
+          "it": "refuses a schedule an observer marks built-in after the thermostat issued its handle",
+          "class": "js-runtime-only",
+          "reason": "an application observer on persistedSchedules$Changing that rewrites the value in flight, matter.js's behavior-state observer; the Go server has no such seam"
+        },
+        {
+          "it": "validates a change an observer makes after the thermostat normalized",
+          "class": "js-runtime-only",
+          "reason": "an application observer on persistedSchedules$Changing that rewrites the value in flight, matter.js's behavior-state observer; the Go server has no such seam"
+        },
+        {
+          "it": "refuses to remove the active schedule",
+          "class": "by-design",
+          "reason": "the host's replace is not held to matter.js's lifecycle rules of a Matter write (BD-Thermostat-HostSchedules, owner decision O-8); the rule itself stays covered on the Matter path (SchedulesAtomicWriteTest.ts :370); the replace clears the active handle"
+        },
+        {
+          "it": "refuses to remove a schedule the application marked built-in",
+          "class": "by-design",
+          "reason": "the host's replace is not held to matter.js's lifecycle rules of a Matter write (BD-Thermostat-HostSchedules, owner decision O-8); the rule itself stays covered on the Matter path (SchedulesAtomicWriteTest.ts :385); the host may drop its built-in programs"
+        }
+      ],
+      "reason": "Local writes are the server's SetSchedules (Schedules and persistedSchedules alike), local presets writes SetPresets, a local SetActiveScheduleRequest the command without a peer; the helpers of schedule-helpers.ts are schedule_helpers_parity_matterjs_test.go (newScheduleTransition, newSchedule, schedulesConfig, heatingOnlySchedulesConfig, recordThermostatChanges). \"checks every schedule's own rules before the schedule count limits\" is adapted: the second schedule's own refusal is an unknown preset, a content rule, where matter.js uses an unknown handle (BD-Thermostat-HostSchedules); the NOT_FOUND-before-count order (ThermostatServer.ts:2728-2734 before :2793) has no test of its own on the Matter path (a controller's ADDs validate one by one). Left: five JavaScript state-layer cases and three lifecycle rules the host's replace is not held to (owner decision O-8). Missing: the restart. Pin lift b25ed960 (P3-A): the Go server keeps schedules in memory or behind the host's SchedulePort; persisting them is a unit of its own (coordinator decision C-7).",
       "snapshotSha": "91c305f9170077193576e820d519632f31b7f413"
     },
     {
@@ -4631,8 +4718,12 @@
     },
     {
       "path": "packages/node/test/behaviors/zone-management/ZoneManagementServerTest.ts",
-      "status": "planned",
-      "reason": "Pin lift b25ed960, unit P3-B: the ZoneManagement server's rules (#4840, decision 290): the zone commands with the polygon check and the server-assigned zone ID, the triggers, and the commands through the interaction layer; 46 cases, replacing cluster/camera/zone_chip_test.go.",
+      "status": "ported",
+      "go": [
+        "cluster/camera:TestParityMatterJS_ZoneManagementServerTest",
+        "cluster/camera:TestParityMatterJS_ZoneManagementServerTestInteraction"
+      ],
+      "reason": "The 46 cases (67 with the polygon table, the refused updates, the durations and the sensitivities expanded) run on camera.Zones through MatterInvoke, the four of 'through the interaction layer' over the wire on fabrictest. The server's nonvolatile lastZoneId is the host's ZonesConfig.LastZoneID or its port's LastZoneIDSource: the restart case is a new server on the zones and the last ID the port saw. Zones has no host write (ErrNotHeld), so 'refuses a write that repeats a zone ID' asserts that refusal; the override refusing after super is the port refusing the zone. Pin lift b25ed960, unit P3-B (#4840, decision 290).",
       "snapshotSha": "ca5889200efd74d72138b3a470272bb733c19799"
     },
     {
@@ -5586,14 +5677,11 @@
     },
     {
       "path": "packages/node/test/node/ClientInvokeTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "client/interaction:TestInvokeBatcherParity",
         "client/interaction:TestInvokeNetworkParity",
         "controller/client:TestClientInvokeParity"
-      ],
-      "missing": [
-        "command with requireExistingSession never joins a batch"
       ],
       "left": [
         {
@@ -5607,7 +5695,7 @@
           "reason": "beforeDispatch is `Server only` in matter.js's own words (Invoke.ts:52-55 at 862ad75f): it reaches ClientInvoke through the shared Invoke type and the client reads it nowhere but isBatchable; a Go client option nothing dispatches would copy the type-sharing artefact, not a behaviour."
         }
       ],
-      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch, a non-default InvokeOptions.InteractionModelRevision, a DelayReportData, a ClientRequest.AddressOverride whose exchange carries it — isBatchable, ClientInteraction.ts:185-213), duplicate paths in separate batches, a split by MaxPathsPerInvoke, the interaction's default network (interaction.Config.Network, `request.network ?? this.#network` :765, :1250) sharing a lane with a command naming it, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). The network of the direct, batched and split exchange (TestInvokeNetworkParity) is observed on a provider that records each exchange's network (interaction.RecordNetworks, export_test.go), matter.js's spy on NetworkProfiles.select; the request names \"unlimited\", which matter.js's ClientNodeInteraction.invoke supplies (ClientNodeInteraction.ts:213-216). Left: the maxPathsPerInvoke cache (none in Go) and beforeDispatch (a server-only field of the shared Invoke type). Missing: the requireExistingSession bypass (no request option in Go until pin-lift unit P3-D).",
+      "reason": "The batcher of single commands (client/interaction Interaction.Invoke, ClientInteraction.#invokeWithBatching at 862ad75f) on the scripted rig — one InvokeRequest per batch window and network lane, numbered by CommandRef, its bypasses (MaxPathsPerInvoke 1, endpoint 0, timed, suppressed, expected processing time, extended fail-safe timeout, MRP delay, Large Message, NoBatch, a non-default InvokeOptions.InteractionModelRevision, a DelayReportData, a ClientRequest.AddressOverride whose exchange carries it — isBatchable, ClientInteraction.ts:185-213), duplicate paths in separate batches, a split by MaxPathsPerInvoke, the interaction's default network (interaction.Config.Network, `request.network ?? this.#network` :765, :1250) sharing a lane with a command naming it, close and abort, a close while the batcher's connect is held (interaction.HoldConnect, export_test.go) — and the commands through it on fabrictest (controller/client:TestClientInvokeParity). The network of the direct, batched and split exchange (TestInvokeNetworkParity) is observed on a provider that records each exchange's network (interaction.RecordNetworks, export_test.go), matter.js's spy on NetworkProfiles.select; the request names \"unlimited\", which matter.js's ClientNodeInteraction.invoke supplies (ClientNodeInteraction.ts:213-216). Left: the maxPathsPerInvoke cache (none in Go) and beforeDispatch (a server-only field of the shared Invoke type). The requireExistingSession bypass (ClientRequest.RequireExistingSession, ClientInteraction.ts:229 at b25ed960) is TestInvokeBatcherParity's row requireExistingSession (pin-lift unit P3-D).",
       "snapshotSha": "981d5fb9dafc6ec7505f1b5c2940d1ea62ccd96d"
     },
     {
@@ -6102,8 +6190,11 @@
     },
     {
       "path": "packages/node/test/node/ClientRequireExistingSessionTest.ts",
-      "status": "planned",
-      "reason": "ClientRequest.requireExistingSession — a read over the existing session, the failure without one, the refusal for a sustained subscription: the request option does not exist in client/interaction (the provider has ExchangeOptions.RequireExistingSession); pin-lift b25ed960 unit P3-D adds it and ports the cases.",
+      "status": "ported",
+      "go": [
+        "client/interaction:TestClientRequireExistingSession"
+      ],
+      "reason": "ClientRequest.requireExistingSession over a commissioned fabrictest pair: the read over the existing session, ErrNoSession without one, ErrMalformedRequest for a sustained subscription. Pin lift b25ed960, unit P3-D (#4928).",
       "snapshotSha": "b4454fdb8218fdb5947f6c1aaae7fd63236cb5b2"
     },
     {
@@ -6189,8 +6280,13 @@
     },
     {
       "path": "packages/node/test/node/CommissioningAttemptLimitTest.ts",
-      "status": "planned",
-      "reason": "The commissioning window closing after 20 failed commissioning attempts — failed PASE pairings and fail-safes that end without commissioning, counted per window: the bridge counts PASE failures only; pin-lift b25ed960 unit P3-C adds the fail-safe half and ports the cases.",
+      "status": "ported",
+      "go": [
+        "bridge:TestCommissioningAttemptLimitParity",
+        "bridge:TestCommissioningAttemptLimitPASEFailureParity",
+        "node:TestCommissioningAttemptCapThroughFabricRemoved"
+      ],
+      "reason": "The window closing after 20 failed commissioning attempts — PASE pairings that failed before their session, and fail-safes armed in the open window that end without commissioning — counted per window (a window generation in bridge's CommissioningWindow), ported at bridge with the root's GeneralCommissioning wired as a host without the node facade wires it; an abandoned commissioning is its PASE-armed fail-safe ending. Log assertions become counter and metric assertions; the final-status-report case (:119) is ported as its outcome only — the session's 60 s fail-safe running out counts one attempt; that the pairing itself counts no PASE failure is not driven through a pairing here; the ECM case (:153) feeds the PASE entry as matter.js emits pairingFailed by hand. Beyond: no window no count (O-5), CASE arm, a fail-safe outliving its window, the lockout at the cap (O-4), the node's stop, the cap reached through FabricRemoved (node:TestCommissioningAttemptCapThroughFabricRemoved). Pin lift b25ed960, unit P3-C.",
       "snapshotSha": "f5ffae1edecf26ffec59bfd5cc5d9e2112783317"
     },
     {
@@ -6204,8 +6300,18 @@
     },
     {
       "path": "packages/node/test/node/CommissioningFailsafeExpiryTest.ts",
-      "status": "planned",
-      "reason": "The commissioner ending the device's fail-safe when a commissioning step fails, over the session it still has: pin-lift b25ed960 unit P3-D reconciles controller/commissioner (BD-chip-Commissioner-AbortDisarmsFailSafe) and ports the cases.",
+      "status": "ported",
+      "go": [
+        "controller/commissioner:TestCommissioningFailsafeExpiry"
+      ],
+      "left": [
+        {
+          "it": "sends no expiry before the commissioner armed the failsafe",
+          "class": "by-design",
+          "reason": "BD-chip-Commissioner-AbortDisarmsFailSafe (Every exit after PASE): the flow also ends the fail-safe the device armed when the PASE session was established; pinned by controller/commissioner:TestCommissioningFailsafeExpiry/ahead of matter.js: ends the PASE session's fail-safe before the flow armed."
+        }
+      ],
+      "reason": "The flow over a scripted device: which step failures send ArmFailSafe(0) and which leave the fail-safe to expire (#expireFailsafe). Left, by design: the expiry before the flow armed. Pin lift b25ed960, unit P3-D (#4928).",
       "snapshotSha": "de0fb0b540bc0dc97c8bce3416ad518867e1c335"
     },
     {
@@ -6392,8 +6498,11 @@
     },
     {
       "path": "packages/node/test/node/PaseBleChannelCloseTest.ts",
-      "status": "planned",
-      "reason": "The commissioner's PASE session ending with its BLE channel — at once, while the session is created, and during the commissioning flow: pin-lift b25ed960 unit P3-D reconciles controller/commissioner and ports the cases.",
+      "status": "ported",
+      "go": [
+        "controller/commissioner:TestPaseBleChannelClose"
+      ],
+      "reason": "A commissioning Channel's loss ends PASE at once, refuses a session whose channel closed while PASE completed, and fails the flow with the channel's close as the cause; a losing channel and a UDP channel to a loopback node stand for matter.js's BLE channels. Pin lift b25ed960, unit P3-D (#4908, #4922).",
       "snapshotSha": "34afabb9dde56c1791bc10911a35e1457c90e508"
     },
     {
