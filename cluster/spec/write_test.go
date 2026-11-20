@@ -188,7 +188,9 @@ func TestRanges(t *testing.T) {
 	// UTF-8 bytes as encoded (Bytes.utf8Length at b25ed960, #4995):
 	// "😀" is four bytes (two UTF-16 code units), "é" two, and an
 	// ill-formed byte the three of the U+FFFD the encoder writes.
-	for s, want := range map[string]int{"a😀": 5, "é": 2, "": 0, "a\xff": 4, "\xe2\x82": 3} {
+	// An ill-formed string that also holds an IS1 counts whole, not up to
+	// the IS1 the re-decode cuts at: "a", U+FFFD, IS1, "b" is six bytes.
+	for s, want := range map[string]int{"a😀": 5, "é": 2, "": 0, "a\xff": 4, "\xe2\x82": 3, "a\xff\x1fb": 6} {
 		if got := spec.StringLength(s); got != want {
 			t.Errorf("StringLength(%q) = %d, want %d", s, got, want)
 		}

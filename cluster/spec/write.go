@@ -844,6 +844,11 @@ func StringLength(s string) int {
 	if err != nil {
 		return len(s)
 	}
+	// The decoder cuts a character string at its first IS1 and keeps the
+	// whole length in RawLength (tlv/decode.go).
+	if el.RawLength != 0 {
+		return int(el.RawLength)
+	}
 	return len(el.String)
 }
 
