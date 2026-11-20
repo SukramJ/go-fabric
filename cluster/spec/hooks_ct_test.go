@@ -92,11 +92,11 @@ func TestResponseFieldPresence(t *testing.T) {
 		ID: 0xFFF1FC09, Name: "Resp", Revision: 1,
 		Commands: []spec.Command{
 			{
-				ID: 1, Name: "Req", Direction: spec.Request, Response: "Resp", Conformance: op(spec.ConfMandatory),
+				ID: 1, Name: "Req", Direction: spec.Request, Decode: decodesAs[ctReq](), Response: "Resp", Conformance: op(spec.ConfMandatory),
 				Fields: []spec.Field{{ID: 0, Name: "Enable", Type: spec.Type{Kind: spec.KindBool}, Conformance: op(spec.ConfMandatory)}},
 			},
 			{
-				ID: 1, Name: "Resp", Direction: spec.Response, Conformance: op(spec.ConfMandatory),
+				ID: 1, Name: "Resp", Direction: spec.Response, Decode: decodesAs[ctResp](), Conformance: op(spec.ConfMandatory),
 				Fields: []spec.Field{{ID: 0, Name: "Result", Type: spec.Type{Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{
 					Text: "Req.Enable", Op: spec.ConfDot, Args: []spec.Conformance{name("Req"), name("Enable")},
 				}}},
@@ -130,7 +130,7 @@ func TestResponseFieldPresence(t *testing.T) {
 		{"another type", ctReq{Enable: &yes}, ctOther{}, false},
 	} {
 		resp = c.resp
-		_, err := srv.MatterInvoke(context.Background(), 1, c.req)
+		_, err := wireInvoke(context.Background(), srv, 1, c.req)
 		var se *spec.StatusError
 		if got := errors.As(err, &se) && se.Status == im.StatusFailure; got != c.failure {
 			t.Errorf("%s: %v, want failure %v", c.name, err, c.failure)

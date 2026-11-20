@@ -21,9 +21,8 @@ import (
 // [Hooks.SetMatterEventEmitter] — promoted, or called from its own when
 // it keeps the emitter itself too.
 //
-// Deprecated: Hooks checks a response without the server's attributes,
-// so a conformance naming one is not resolved. A self-held server builds a [Server] over its own state — [ServerConfig]
-// Source answering its reads, Handlers its own commands — and routes
+// Deprecated: a self-held server builds a [Server] over its own state —
+// [ServerConfig] Source answering its reads, Handlers its own commands — and routes
 // MatterInvoke through [InvokeHeld] over [NewSelfHeld]; its events and its
 // veto are an [Events] and a [WriteVeto] (review II, decision 154).
 // Removable in v0.25.0.
@@ -44,13 +43,11 @@ func (h *Hooks) Handle(cmdID uint32, fn CommandHandler) error {
 	return h.handlers.Register(h.inst, cmdID, fn)
 }
 
-// Invoke runs the host's handler of cmdID, its response held to the
-// definition ([HostHandlers.Invoke]); handled is false when the host
-// registered none, and the server's own logic runs. The request's model
-// check is the endpoint dispatcher's ([AdmitRequest]), run before the
-// server; a direct call is a local one and is not validated. The hooks
-// hold no read of the server's state: a response conformance naming one
-// of the cluster's attributes is not resolved.
+// Invoke runs the host's handler of cmdID ([HostHandlers.Invoke]);
+// handled is false when the host registered none, and the server's own
+// logic runs. The request's and the response's model checks are the
+// endpoint dispatcher's ([AdmitRequest], [CheckResponse]), run around the
+// server; a direct call is a local one and is not validated.
 func (h *Hooks) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
 	return h.handlers.Invoke(ctx, cmdID, fields)
 }

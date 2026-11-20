@@ -18,7 +18,7 @@ func hooksAdmitDefinition() *spec.Cluster {
 	return &spec.Cluster{
 		ID: 0xFFF1FC0A, Name: "HooksAdmit", Revision: 1,
 		Commands: []spec.Command{{
-			ID: 1, Name: "Req", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory),
+			ID: 1, Name: "Req", Direction: spec.Request, Decode: decodesAs[ctReq](), Response: "status", Conformance: op(spec.ConfMandatory),
 			Fields: []spec.Field{{ID: 0, Name: "Enable", Type: spec.Type{Kind: spec.KindBool}, Conformance: op(spec.ConfMandatory)}},
 			Check:  spec.RequestCheck{Refusal: im.StatusInvalidCommand},
 		}},

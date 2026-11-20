@@ -31,7 +31,7 @@ func TestInvokeHeldResolvesSiblingAttributes(t *testing.T) {
 			ID: 0, Name: "Limit", Type: spec.Type{Kind: spec.KindUint, Bits: 8}, Conformance: op(spec.ConfMandatory),
 		}},
 		Commands: []spec.Command{{
-			ID: 0, Name: "Op", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory),
+			ID: 0, Name: "Op", Direction: spec.Request, Decode: decodesAs[peerReq](), Response: "status", Conformance: op(spec.ConfMandatory),
 			Access: spec.Access{Write: spec.PrivilegeOperate}, Check: spec.RequestCheck{Refusal: im.StatusInvalidCommand},
 			Fields: []spec.Field{{
 				ID: 0, Name: "Level", Type: spec.Type{Kind: spec.KindUint, Bits: 8}, Conformance: op(spec.ConfMandatory),

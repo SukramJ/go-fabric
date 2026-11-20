@@ -69,8 +69,8 @@ func resumingSigma1(t *testing.T, secret, rid []byte) []byte {
 // waits for the initiator's Success, fails that wait — the session is closed
 // by entry at once, never orphaned without its deadline; a copy of the
 // resuming Sigma1 leaves the wait. matter.js reads the second Sigma1 as
-// another message type in waitForSuccess and force-closes
-// (SecureChannelMessenger.ts:94-98, CaseServer.ts:204-210 at b25ed960); a
+// another message type in waitForSuccess (SecureChannelMessenger.ts:146-152,
+// rejected at :94-98) and force-closes (CaseServer.ts:204-210 at b25ed960); a
 // copy is a duplicate there and never read (ExchangeManager.ts:353-359,
 // MessageExchange.ts:514-524). Fable re-read N1.
 func TestCASEResumeSecondSigma1FailsTheFirstWait(t *testing.T) {

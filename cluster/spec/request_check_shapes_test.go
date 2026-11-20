@@ -32,7 +32,7 @@ func TestCheckRequestShapes(t *testing.T) {
 	def := &spec.Cluster{
 		ID: 0xFFF1_FC0C, Name: "Shapes", Revision: 1,
 		Commands: []spec.Command{{
-			ID: 0, Name: "Op", Direction: spec.Request, Response: "status", Conformance: op(spec.ConfMandatory),
+			ID: 0, Name: "Op", Direction: spec.Request, Decode: decodesAs[listReq](), Response: "status", Conformance: op(spec.ConfMandatory),
 			Access: spec.Access{Write: spec.PrivilegeOperate}, Check: spec.RequestCheck{Refusal: im.StatusInvalidCommand},
 			Fields: []spec.Field{
 				{

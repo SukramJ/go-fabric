@@ -67,32 +67,17 @@ func (i *Instance) requestErrors(cmdID uint32, fields any, peers Peers, all bool
 // requestOf is the request command cmdID and its payload as a struct
 // value carrying every field the command states — an empty struct for a
 // nil payload; ok is false for a payload [Instance.CheckRequest] does not
-// judge.
+// judge: a nil pointer, and a payload in neither the definition's
+// generated form nor a declared one ([payloadValue]; a hand-read request
+// reaches the gate in its generated form, [HandForm]).
 func (i *Instance) requestOf(cmdID uint32, fields any) (*Command, reflect.Value, bool) {
 	cmd := i.def.Command(cmdID, Request)
 	if cmd == nil || len(cmd.Fields) == 0 {
 		return nil, reflect.Value{}, false
 	}
-	if fields == nil {
-		return cmd, reflect.ValueOf(struct{}{}), true
-	}
-	if d, ok := fields.(DefinitionFormer); ok {
-		fields = d.DefinitionForm()
-	}
-	rv := reflect.ValueOf(fields)
-	for rv.Kind() == reflect.Pointer {
-		if rv.IsNil() {
-			return nil, reflect.Value{}, false
-		}
-		rv = rv.Elem()
-	}
-	if rv.Kind() != reflect.Struct {
+	rv, ok := payloadValue(cmd, fields, false)
+	if !ok {
 		return nil, reflect.Value{}, false
-	}
-	for fi := range cmd.Fields {
-		if fv, mapped := mappedField(rv, cmd.Fields[fi].Name); mapped && !fv.IsValid() {
-			return nil, reflect.Value{}, false
-		}
 	}
 	return cmd, rv, true
 }

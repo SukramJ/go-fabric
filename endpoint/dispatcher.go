@@ -733,11 +733,7 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 			continue
 		}
 		invokeCtx := contract.WithOrigin(im.WithCommandPath(ctx, path), contract.OriginCommand)
-		var resp any
-		err := requestHeld(invokeCtx, srv, path.Command, fields)
-		if err == nil {
-			resp, err = srv.MatterInvoke(invokeCtx, path.Command, fields)
-		}
+		resp, err := invokeHeld(invokeCtx, srv, path.Command, fields)
 		if err != nil {
 			status, cs, hasCS := classifyError(err)
 			return im.InvokeResult{Path: path, Response: resp, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
@@ -824,11 +820,7 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 		ePath := path
 		ePath.Endpoint, ePath.HasEndpoint = t.ep.ID, true
 		invokeCtx := contract.WithOrigin(im.WithCommandPath(ctx, ePath), contract.OriginCommand)
-		var resp any
-		err := requestHeld(invokeCtx, t.srv, path.Command, fields)
-		if err == nil {
-			resp, err = t.srv.MatterInvoke(invokeCtx, path.Command, fields)
-		}
+		resp, err := invokeHeld(invokeCtx, t.srv, path.Command, fields)
 		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
 		if err != nil {
 			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err)
@@ -1310,6 +1302,59 @@ func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.Con
 	res := writeOne(ctx, srv, path, value)
 	applied = res.Status == im.StatusSuccess
 	return res
+}
+
+// invokeHeld runs the wire command cmdID on srv between the definition's
+// two checks, as matter.js's invokeCommand runs a command between its
+// request and its response validation: the request held first
+// ([requestHeld]), then the server, then its response ([responseHeld]).
+// A request a hand-written reader decoded arrives as a [spec.HandForm]:
+// the definition judges its generated form, the server takes its own.
+//
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:641-797
+// at b25ed960 (invokeCommand: the request gate :671-705, the behavior's
+// method, completeResponse :717-733).
+func invokeHeld(ctx context.Context, srv contract.ClusterServer, cmdID uint32, fields any) (any, error) {
+	judged, served := spec.SplitHandForm(fields)
+	if err := requestHeld(ctx, srv, cmdID, judged); err != nil {
+		return nil, err
+	}
+	resp, err := srv.MatterInvoke(ctx, cmdID, served)
+	if err != nil {
+		return resp, err
+	}
+	if err := responseHeld(ctx, srv, cmdID, judged, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// responseHeld holds the response srv answered the request of cmdID with
+// to the definition of srv's cluster ([spec.CheckResponse]): the
+// presence of its fields against their conformance — an absent response
+// of a command whose response has a mandatory field is FAILURE — with the
+// server's FeatureMap and attributes, request (the form the definition
+// judged) resolving a conformance that names a request field. A handler
+// that answers nothing on purpose ([im.NoResponse]), a command the server
+// does not accept, and a cluster without a registered definition are not
+// judged.
+//
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:717-733
+// at b25ed960 (completeResponse; the response validated as `data ?? {}`,
+// :624-625).
+func responseHeld(ctx context.Context, srv contract.ClusterServer, cmdID uint32, request, response any) error {
+	switch response.(type) {
+	case im.NoResponse, *im.NoResponse:
+		return nil
+	}
+	def := spec.Lookup(srv.MatterClusterID())
+	if def == nil {
+		return nil
+	}
+	if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), cmdID) {
+		return nil
+	}
+	return spec.CheckResponse(ctx, def, featureMapOf(srv), cmdID, request, response, srv.MatterRead)
 }
 
 // requestHeld holds the request fields of cmdID to the definition of srv's

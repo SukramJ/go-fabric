@@ -235,7 +235,7 @@ func TestResponseCheckShapes(t *testing.T) {
 	def := &Cluster{ID: 0xFFF1FC0C, Name: "Q", Revision: 1, Commands: []Command{
 		{ID: 1, Name: "Go", Direction: Request, Response: "status"},
 		{ID: 2, Name: "Ask", Direction: Request, Response: "Answer"},
-		{ID: 3, Name: "Answer", Direction: Response, Fields: []Field{{ID: 0, Name: "Yes", Conformance: Conformance{Op: ConfMandatory}, Type: Type{Kind: KindBool}}}},
+		{ID: 3, Name: "Answer", Direction: Response, Decode: func(Node) (any, error) { return ctAnswer{}, nil }, Fields: []Field{{ID: 0, Name: "Yes", Conformance: Conformance{Op: ConfMandatory}, Type: Type{Kind: KindBool}}}},
 	}}
 	inst, err := New(def, Options{Commands: []uint32{1, 2}})
 	if err != nil {
