@@ -122,3 +122,30 @@ func FuzzParseAttCert(f *testing.F) {
 		_, _ = parseAttCert(der, kind, true)
 	})
 }
+
+// FuzzDecodeCertSigningRequest: decodeCertSigningRequest, over the
+// NOCSRElements bytes of a CSRResponse, decodes or returns an error and
+// never panics (moved from controller/commissioner with pin-lift unit
+// P2-D, as ValidateNOCSR decodes the elements now).
+func FuzzDecodeCertSigningRequest(f *testing.F) {
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutOctets(tlv.ContextTag(1), []byte{0x30, 0x00})
+	enc.PutOctets(tlv.ContextTag(2), make([]byte, 32))
+	if err := enc.EndContainer(); err != nil {
+		f.Fatal(err)
+	}
+	seed, err := enc.Bytes()
+	if err != nil {
+		f.Fatal(err)
+	}
+	f.Add(seed)
+	f.Add([]byte{0x15})
+	f.Add([]byte{})
+	f.Fuzz(func(t *testing.T, b []byte) {
+		if len(b) > 1<<16 {
+			return
+		}
+		_, _, _ = decodeCertSigningRequest(b)
+	})
+}

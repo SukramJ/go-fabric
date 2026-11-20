@@ -97,25 +97,6 @@ func FuzzDecodeNOCResponse(f *testing.F) {
 	})
 }
 
-// FuzzDecodeCertSigningRequest: decodeCertSigningRequest, over the
-// NOCSRElements bytes, decodes or returns an error and never panics.
-func FuzzDecodeCertSigningRequest(f *testing.F) {
-	f.Add(fuzzEncode(f, encodableFunc(func(enc *tlv.Encoder, tag tlv.Tag) {
-		enc.StartStruct(tag)
-		enc.PutOctets(tlv.ContextTag(1), []byte{0x30, 0x00})
-		enc.PutOctets(tlv.ContextTag(2), make([]byte, 32))
-		_ = enc.EndContainer()
-	})))
-	f.Add([]byte{0x15})
-	f.Add([]byte{})
-	f.Fuzz(func(t *testing.T, b []byte) {
-		if len(b) > 1<<16 {
-			return
-		}
-		_, _, _ = decodeCertSigningRequest(b)
-	})
-}
-
 // FuzzDecodeNetworks: decodeNetworks, over a Networks attribute value,
 // decodes or returns an error and never panics. The decoded list holds no
 // more entries than the input has bytes.

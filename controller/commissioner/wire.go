@@ -17,7 +17,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/tlv"
+	"github.com/SukramJ/go-fabric/controller/attestation"
 )
 
 // opCredsCluster is the OperationalCredentials cluster id.
@@ -56,9 +56,13 @@ func decodeCertificateChainResponse(n spec.Node) ([]byte, error) {
 }
 
 // signedElements is AttestationResponse {[0] AttestationElements, [1]
-// AttestationSignature} or CsrResponse {[0] NocsrElements, [1]
-// AttestationSignature}: elements of at most 900 bytes and a signature of
-// any length, the message size its only bound.
+// AttestationSignature}: elements and a signature of any length, the
+// message size their only bound. A command response is decoded without a
+// check against its schema; the validator judges the lengths —
+// AttestationElements over RESP_MAX is the attestation finding
+// AttestationElementsTooLong
+// (packages/protocol/src/certificate/DeviceAttestationValidator.ts:316-321
+// at b25ed960).
 type signedElements struct {
 	elements, signature []byte
 }
@@ -80,9 +84,35 @@ type signedElements struct {
 func decodeSignedElements(n spec.Node, what string) (signedElements, error) {
 	var s signedElements
 	err := spec.DecodeFields(n, what,
-		spec.Bind(0, "Elements", true, &s.elements, spec.DecodeBytesIn(0, 900)),
+		spec.Bind(0, "Elements", true, &s.elements, spec.DecodeBytesIn(0, math.MaxInt)),
 		spec.Bind(1, "AttestationSignature", true, &s.signature, spec.DecodeBytesIn(0, math.MaxInt)))
 	return s, err
+}
+
+// decodeCSRResponse decodes CsrResponse {[0] NocsrElements, [1]
+// AttestationSignature} without a check against its schema: a field the
+// device left out is marked absent and any length decodes, for
+// attestation.ValidateNOCSR to judge (FieldMissing, ResponseEmpty,
+// ElementsTooLong). Mirrors matter.js, which hands the decoded response to
+// NocsrValidator.validate as a Partial<CsrResponse>
+// (packages/protocol/src/certificate/NocsrValidator.ts:63-64, :82-98 at
+// b25ed960).
+func decodeCSRResponse(n spec.Node) (attestation.NOCSRResponse, error) {
+	var elements, signature *[]byte
+	err := spec.DecodeFields(n, "CsrResponse",
+		spec.Bind(0, "NOCSRElements", false, &elements, spec.DecodeOptional(spec.DecodeBytes)),
+		spec.Bind(1, "AttestationSignature", false, &signature, spec.DecodeOptional(spec.DecodeBytes)))
+	if err != nil {
+		return attestation.NOCSRResponse{}, err
+	}
+	r := attestation.NOCSRResponse{ElementsAbsent: elements == nil, SignatureAbsent: signature == nil}
+	if elements != nil {
+		r.Elements = *elements
+	}
+	if signature != nil {
+		r.Signature = *signature
+	}
+	return r, nil
 }
 
 // nocResponse is NocResponse {[0] StatusCode, [1] FabricIndex, [2]
@@ -99,23 +129,4 @@ func decodeNOCResponse(n spec.Node) (nocResponse, error) {
 		return nocResponse{}, err
 	}
 	return nocResponse{status: uint8(g.StatusCode), fabricIndex: g.FabricIndex, debugText: g.DebugText}, nil
-}
-
-// certSigningRequest is TlvCertSigningRequest
-// (common/OperationalCredentialsTypes.ts:18-24): [1] certSigningRequest,
-// [2] csrNonce (32 bytes), [3]-[5] vendor reserved. The nonce is returned
-// so the flow can compare it with the one it sent (connectedhomeip
-// DefaultDeviceAttestationVerifier.cpp:868-870 at 6170af84).
-func decodeCertSigningRequest(b []byte) (csr, nonce []byte, err error) {
-	n, err := spec.ReadElement(tlv.NewDecoder(b))
-	if err != nil {
-		return nil, nil, err
-	}
-	err = spec.DecodeFields(n, "CertSigningRequest",
-		spec.Bind(1, "certSigningRequest", true, &csr, spec.DecodeBytesIn(0, math.MaxInt)),
-		spec.Bind(2, "csrNonce", true, &nonce, spec.DecodeBytesIn(32, 32)))
-	if err != nil {
-		return nil, nil, err
-	}
-	return csr, nonce, nil
 }

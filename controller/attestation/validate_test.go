@@ -45,7 +45,7 @@ func TestReferenceNodeChain(t *testing.T) {
 	el := elements(t, cd, nonce)
 	res, err := attestation.Validate(
 		attestation.Context{Challenge: challenge, Store: attestation.TestStore()},
-		attestation.Data{DAC: chain.DAC, PAI: chain.PAI, Elements: el, Signature: sign(t, chain.DACKey, el, challenge), Nonce: nonce, VendorID: 0xFFF1, ProductID: 0x8000},
+		attestation.Data{DAC: chain.DAC, PAI: chain.PAI, Elements: el, Signature: sign(t, chain.DACKey, el, challenge), Nonce: nonce, VendorID: new(uint16(0xFFF1)), ProductID: new(uint16(0x8000))},
 	)
 	if err != nil {
 		t.Fatalf("Validate: %v", err)
@@ -206,8 +206,9 @@ func TestHardFailures(t *testing.T) {
 		{"undecodable CD", nil, func(c *cdSpec) { c.corruptCMS = true }, nil, attestation.CertificationDeclarationUnparseable},
 		{"undecodable CD content", nil, func(c *cdSpec) { c.corruptTLV = true }, nil, attestation.CertificationDeclarationUnparseable},
 		{"CD signature invalid", nil, func(c *cdSpec) { c.signer = otherKey }, nil, attestation.CertificationDeclarationSignatureInvalid},
-		{"CD vendor id mismatch", nil, nil, func(f *fixture) { f.data.VendorID = 0xFFF2 }, attestation.CertificationDeclarationFieldMismatch},
-		{"product id not listed", nil, nil, func(f *fixture) { f.data.ProductID = 0x8001 }, attestation.CertificationDeclarationFieldMismatch},
+		// A CD that does not match the BasicInformation VendorID or
+		// ProductID is an error finding, not a hard failure (pin lift
+		// b25ed960, #4939): TestDeviceAttestationValidatorCDFields.
 		{"only a dac origin vendor id", nil, func(c *cdSpec) { v := uint16(0xFFF1); c.originVID = &v }, nil, attestation.CertificationDeclarationFieldMismatch},
 		{"dac origin vendor mismatch", nil, func(c *cdSpec) {
 			v, p := uint16(0xFFF3), uint16(0x8000)

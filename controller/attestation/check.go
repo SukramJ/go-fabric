@@ -19,13 +19,19 @@ const (
 	AttestationSignatureInvalid              Check = "AttestationSignatureInvalid"
 	AttestationNonceMismatch                 Check = "AttestationNonceMismatch"
 	CertificationDeclarationSignatureInvalid Check = "CertificationDeclarationSignatureInvalid"
-	CertificationDeclarationFieldMismatch    Check = "CertificationDeclarationFieldMismatch"
-	CertificateRevoked                       Check = "CertificateRevoked"
-	FirmwareInfoMismatch                     Check = "FirmwareInfoMismatch"
-	CertificationTypeProvisional             Check = "CertificationTypeProvisional"
-	CertificationTypeTest                    Check = "CertificationTypeTest"
-	CertificateIDNotVerified                 Check = "CertificateIdNotVerified"
-	CertificateUnparseable                   Check = "CertificateUnparseable"
+	// CertificationDeclarationFieldMismatch: a Certification Declaration
+	// field does not match the device, Matter Core §6.2.3.1. Collected as
+	// a recoverable error finding for the BasicInformation VendorID and
+	// ProductID, which the device reports about itself, also when it did
+	// not report them; a hard failure for a mismatch with the DAC or PAI
+	// (DeviceAttestationValidator.ts:41-48 at b25ed960).
+	CertificationDeclarationFieldMismatch Check = "CertificationDeclarationFieldMismatch"
+	CertificateRevoked                    Check = "CertificateRevoked"
+	FirmwareInfoMismatch                  Check = "FirmwareInfoMismatch"
+	CertificationTypeProvisional          Check = "CertificationTypeProvisional"
+	CertificationTypeTest                 Check = "CertificationTypeTest"
+	CertificateIDNotVerified              Check = "CertificateIdNotVerified"
+	CertificateUnparseable                Check = "CertificateUnparseable"
 	// DacFormatInvalid: the DAC parses but violates the DAC certificate
 	// profile, Matter Core §6.2.2.3 (DeviceAttestationValidator.ts:49-54 at
 	// db021da0).
@@ -33,8 +39,12 @@ const (
 	// PaiFormatInvalid: the PAI parses but violates the PAI certificate
 	// profile, Matter Core §6.2.2.4 (DeviceAttestationValidator.ts:56-61 at
 	// db021da0).
-	PaiFormatInvalid                    Check = "PaiFormatInvalid"
-	AttestationElementsUnparseable      Check = "AttestationElementsUnparseable"
+	PaiFormatInvalid               Check = "PaiFormatInvalid"
+	AttestationElementsUnparseable Check = "AttestationElementsUnparseable"
+	// AttestationElementsTooLong: AttestationElements is longer than
+	// RESP_MAX, Matter Core §11.18.4.1 (DeviceAttestationValidator.ts:71-77
+	// at b25ed960).
+	AttestationElementsTooLong          Check = "AttestationElementsTooLong"
 	CertificationDeclarationUnparseable Check = "CertificationDeclarationUnparseable"
 	// CertificationDeclarationFormatInvalid: the CD breaks an encoding rule
 	// of Matter Core §6.3.1 — its CMS envelope, format_version — or has a
@@ -81,12 +91,18 @@ type Finding struct {
 }
 
 // Error is a hard failure of the validation — matter.js
-// DeviceAttestationError (DAV:108-116), a CommissioningError there.
+// DeviceAttestationError (DeviceAttestationValidator.ts:121-136 at
+// b25ed960), a CommissioningError there.
 type Error struct {
 	Check   Check
 	Message string
 	// Err is the cause, when the failure wraps one (a decoder's error).
 	Err error
+	// PrecedingFindings are the findings [Validate] collected before this
+	// failure stopped it, in the order they arose, so a policy can see
+	// them next to the failure — matter.js precedingFindings
+	// (DeviceAttestationValidator.ts:123-127 at b25ed960).
+	PrecedingFindings []Finding
 }
 
 func (e *Error) Error() string { return "attestation: " + string(e.Check) + ": " + e.Message }

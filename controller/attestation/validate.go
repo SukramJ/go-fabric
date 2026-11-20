@@ -18,6 +18,13 @@ import (
 	"github.com/SukramJ/go-fabric/clock"
 )
 
+// respMax is RESP_MAX, the maximum length in bytes of AttestationElements
+// and NOCSRElements, Matter Core §11.18.4.1 — matter.js
+// OPERATIONAL_CREDENTIALS_RESP_MAX
+// (packages/protocol/src/common/OperationalCredentialsTypes.ts:17-22 at
+// b25ed960).
+const respMax = 900
+
 // cdFormatVersion is CD_FORMAT_VERSION, Matter Core §6.3.1
 // (DeviceAttestationValidator.ts:29-30 at db021da0).
 const cdFormatVersion = 1
@@ -40,8 +47,7 @@ type Context struct {
 }
 
 // Data is the device's attestation data — matter.js DeviceAttestationData
-// (DAV:214-222 at db021da0; at b25ed960 its VendorID and ProductID are
-// optional, DAV:240-243 — pin-lift unit P2-D).
+// (DeviceAttestationValidator.ts:233-244 at b25ed960).
 type Data struct {
 	// DAC and PAI are the X.509 DER certificates of CertificateChainRequest.
 	DAC, PAI []byte
@@ -49,8 +55,12 @@ type Data struct {
 	Elements, Signature []byte
 	// Nonce is the AttestationRequest nonce we sent.
 	Nonce []byte
-	// VendorID and ProductID are the node's BasicInformation values.
-	VendorID, ProductID uint16
+	// VendorID and ProductID are the node's BasicInformation values, nil
+	// when the device did not report them (DeviceAttestationValidator.ts:
+	// 239-243 at b25ed960). An unreported value never matches the
+	// Certification Declaration: it is the error finding
+	// [CertificationDeclarationFieldMismatch].
+	VendorID, ProductID *uint16
 }
 
 // Result is a successful validation — matter.js ValidationResult
@@ -75,17 +85,31 @@ type Result struct {
 }
 
 // Validate validates the device's attestation. Mirrors matter.js
-// packages/protocol/src/certificate/DeviceAttestationValidator.ts:258-645
-// (validate) at db021da0, check for check and in its order (at b25ed960
-// validate wraps validateCollecting, :283-293 and :295-684 — pin-lift unit
-// P2-D); each step
-// cites the DAV lines it ports. A hard failure is an [*Error]; any other
-// error is the trust store's (a stored PAA that does not parse, a
-// revocation lookup that fails), which the commissioner reports as a
-// ValidationError finding.
+// packages/protocol/src/certificate/DeviceAttestationValidator.ts:283-293
+// at b25ed960 (validate): validateCollecting runs the checks, and a hard
+// failure — an [*Error] — carries the findings collected before it in
+// [Error].PrecedingFindings. Any other error is the trust store's (a
+// stored PAA that does not parse, a revocation lookup that fails), which
+// the commissioner reports as a ValidationError finding, and carries none.
 func Validate(ctx Context, data Data) (Result, error) {
 	var findings []Finding
+	res, err := validateCollecting(ctx, data, &findings)
+	if err != nil {
+		var ae *Error
+		if errors.As(err, &ae) {
+			ae.PrecedingFindings = append(ae.PrecedingFindings, findings...)
+		}
+		return Result{}, err
+	}
+	res.Findings = findings
+	return res, nil
+}
 
+// validateCollecting is matter.js validateCollecting
+// (DeviceAttestationValidator.ts:295-694 at b25ed960), check for check and
+// in its order; each step cites the DAV lines it ports. findings collects
+// the non-fatal findings, also those raised before a hard failure.
+func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, error) {
 	// Step 1: parse the PAI, then the DAC, as the CHIP SDK checks the PAI
 	// format first (DeviceAttestationValidator.ts:262-264 at db021da0).
 	pai, err := parsePeerCertificate(kindPAI, data.PAI)
@@ -110,6 +134,12 @@ func Validate(ctx Context, data Data) (Result, error) {
 		return Result{}, fail(VendorIDMismatch, fmt.Sprintf("DAC vendorId %s does not match PAI vendorId %s", idHex(dac.vendorID), idHex(pai.vendorID)))
 	}
 
+	// AttestationElements no longer than RESP_MAX, before they are decoded
+	// (DeviceAttestationValidator.ts:316-321 at b25ed960).
+	if len(data.Elements) > respMax {
+		return Result{}, fail(AttestationElementsTooLong, fmt.Sprintf("Device returned attestation elements of %d bytes, more than RESP_MAX of %d", len(data.Elements), respMax))
+	}
+
 	// Step 6: the attestation elements decode and carry our nonce
 	// (DAV:276-287).
 	elements, err := decodeAttestationElements(data.Elements)
@@ -132,7 +162,7 @@ func Validate(ctx Context, data Data) (Result, error) {
 	// hard failure, so the policy decides and the attested pair is
 	// withheld (review II, R2-P6-par-1804, R2-P6-par-1805, owner decision
 	// 193; ahead of matter.js).
-	findings = append(findings, deviceCertificateFindings(ctx.Clock, dac, pai)...)
+	*findings = append(*findings, deviceCertificateFindings(ctx.Clock, dac, pai)...)
 
 	// === DCL-dependent checks (only with a store), DAV:308 ===
 
@@ -140,13 +170,13 @@ func Validate(ctx Context, data Data) (Result, error) {
 	testPAA := false
 	if ctx.Store == nil {
 		// DAV:312-319 at db021da0.
-		findings = append(findings, Finding{
+		*findings = append(*findings, Finding{
 			Level: LevelWarning, Check: DclServiceUnavailable,
 			Message: "DclCertificateService not available; skipping PAA trust store, chain, and revocation checks. " +
 				"Register DclCertificateService in the environment for full attestation.",
 		})
 	} else {
-		if paa, testPAA, err = checkChain(ctx.Store, dac, pai, &findings); err != nil {
+		if paa, testPAA, err = checkChain(ctx.Store, dac, pai, findings); err != nil {
 			return Result{}, err
 		}
 	}
@@ -178,7 +208,7 @@ func Validate(ctx Context, data Data) (Result, error) {
 		return Result{}, fail(CertificationDeclarationSignatureInvalid, "Certification Declaration signature verification failed")
 	}
 	if signer.IsTestSigner && ctx.Store != nil && !ctx.Store.AcceptsTestCertificates() {
-		findings = append(findings, Finding{
+		*findings = append(*findings, Finding{
 			Level: LevelError, Check: TrustedAsTestCertificate,
 			Message: "CD is signed by the Matter test CD signer " + cdSignerSkidHex + "; " +
 				"the device presented a valid test attestation but production trust policy is in effect",
@@ -187,13 +217,13 @@ func Validate(ctx Context, data Data) (Result, error) {
 
 	// Step 9: the CD's fields (DeviceAttestationValidator.ts:488-634 at
 	// db021da0).
-	if err := checkDeclaration(cd.content, signer.IsTestSigner, data, dac, pai, paa, &findings); err != nil {
+	if err := checkDeclaration(cd.content, signer.IsTestSigner, data, dac, pai, paa, findings); err != nil {
 		return Result{}, err
 	}
 
 	// Step 10, firmware information: a TODO upstream (DAV:636-642), as is
 	// the certificate_id check (DAV:529-530).
-	return Result{DACPublicKey: dacPublicKey, Findings: findings, TestPAA: testPAA, TestCDSigner: signer.IsTestSigner}, nil
+	return Result{DACPublicKey: dacPublicKey, TestPAA: testPAA, TestCDSigner: signer.IsTestSigner}, nil
 }
 
 // deviceCertificateFindings are the error findings on the device's own
@@ -355,13 +385,24 @@ func checkDeclaration(cd cdContent, testSigner bool, data Data, dac, pai, paa *a
 	case CertificationOfficial:
 	}
 
-	// vendor_id SHALL match BasicInformation VendorID (DAV:532-538).
-	if cd.vendorID != data.VendorID {
-		return fail(CertificationDeclarationFieldMismatch, fmt.Sprintf("CD vendor_id %s does not match BasicInformation VendorID %s", idHex(&cd.vendorID), idHex(&data.VendorID)))
+	// vendor_id SHALL match BasicInformation VendorID, and
+	// product_id_array SHALL contain BasicInformation ProductID: an error
+	// finding each, not a hard failure, also when the device did not
+	// report the value, so the policy decides and the checks after them
+	// still run. Mirrors matter.js
+	// packages/protocol/src/certificate/DeviceAttestationValidator.ts:
+	// 579-595 at b25ed960 (validateCollecting).
+	if data.VendorID == nil || cd.vendorID != *data.VendorID {
+		*findings = append(*findings, Finding{
+			Level: LevelError, Check: CertificationDeclarationFieldMismatch,
+			Message: fmt.Sprintf("CD vendor_id %s does not match BasicInformation VendorID %s", idHex(&cd.vendorID), basicInformationValue(data.VendorID)),
+		})
 	}
-	// product_id_array SHALL contain BasicInformation ProductID (DAV:540-546).
-	if !slices.Contains(cd.productIDs, data.ProductID) {
-		return fail(CertificationDeclarationFieldMismatch, fmt.Sprintf("CD product_id_array %s does not contain BasicInformation ProductID %s", idList(cd.productIDs), idHex(&data.ProductID)))
+	if data.ProductID == nil || !slices.Contains(cd.productIDs, *data.ProductID) {
+		*findings = append(*findings, Finding{
+			Level: LevelError, Check: CertificationDeclarationFieldMismatch,
+			Message: fmt.Sprintf("CD product_id_array %s does not contain BasicInformation ProductID %s", idList(cd.productIDs), basicInformationValue(data.ProductID)),
+		})
 	}
 	// Both or neither of dac_origin_vendor_id and dac_origin_product_id
 	// (DAV:548-556).
@@ -458,6 +499,16 @@ func idHex(id *uint16) string {
 		return "undefined"
 	}
 	return fmt.Sprintf("0x%04X", *id)
+}
+
+// basicInformationValue is DeviceAttestationValidator.ts:215-217 at
+// b25ed960: a BasicInformation value the device did not report is named
+// as such.
+func basicInformationValue(id *uint16) string {
+	if id == nil {
+		return "(not reported by the device)"
+	}
+	return idHex(id)
 }
 
 func idList(ids []uint16) string {

@@ -374,7 +374,7 @@ func TestProfileParser(t *testing.T) {
 func profileValidate(t *testing.T, dac, pai []byte) *Error {
 	t.Helper()
 	_, err := Validate(Context{Challenge: make([]byte, 16)}, Data{
-		DAC: dac, PAI: pai, Signature: make([]byte, 64), Nonce: make([]byte, 32), VendorID: 0xFFF1, ProductID: 0x8000,
+		DAC: dac, PAI: pai, Signature: make([]byte, 64), Nonce: make([]byte, 32), VendorID: new(uint16(0xFFF1)), ProductID: new(uint16(0x8000)),
 	})
 	var ae *Error
 	if !errors.As(err, &ae) {

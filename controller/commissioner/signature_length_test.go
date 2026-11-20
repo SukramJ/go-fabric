@@ -34,9 +34,10 @@ func (v signedValue) EncodeTLV(e *tlv.Encoder, tag tlv.Tag) {
 }
 
 // TestCSRSignatureOfAnyLength: a CSRResponse signature that is not 64
-// bytes is decoded and fails as the CSR signature verification — not as
-// a decode error of the response (review II, R2-P6-doc-1857 (b), owner
-// decision 216).
+// bytes is decoded and fails as the NOCSR check AttestationSignatureInvalid,
+// a commissioning error — not as a decode error of the response (review
+// II, R2-P6-doc-1857 (b), owner decision 216; NocsrValidator.ts:100-109 at
+// b25ed960).
 func TestCSRSignatureOfAnyLength(t *testing.T) {
 	t.Parallel()
 	dev := func(req imRequest) (uint8, []byte, bool) {
@@ -51,9 +52,9 @@ func TestCSRSignatureOfAnyLength(t *testing.T) {
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	f.dacKey = &key.PublicKey
 	_, err := f.certificates(context.Background())
-	var ce *CommissioningError
-	if !errors.As(err, &ce) || ce.Message != "CSR signature verification failed against DAC public key" {
-		t.Fatalf("a 65-byte CSR signature: %v, want the CSR signature verification failure", err)
+	var ne *attestation.NOCSRError
+	if !errors.Is(err, ErrCommissioning) || !errors.As(err, &ne) || ne.Check != attestation.NOCSRAttestationSignatureInvalid {
+		t.Fatalf("a 65-byte CSR signature: %v, want the NOCSR check AttestationSignatureInvalid", err)
 	}
 }
 
@@ -106,7 +107,7 @@ func TestAttestationSignatureOfAnyLength(t *testing.T) {
 		return 0, nil, false
 	}
 	f, _ := newTestFlow(t, dev)
-	f.data.vendorID, f.data.productID = 0xFFF1, 0x8000
+	f.data.vendorID, f.data.productID = new(uint16(0xFFF1)), new(uint16(0x8000))
 	var judged []attestation.Finding
 	f.opts.OnAttestationFailure = attestation.Policy{Decide: func(fs []attestation.Finding) (bool, string, error) {
 		judged = fs

@@ -93,7 +93,7 @@ func davFixtureWithKey(t *testing.T) (fixture, *ecdsa.PrivateKey) {
 		ctx: attestation.Context{Challenge: challenge, Store: attestation.TestStore()},
 		data: attestation.Data{
 			DAC: dac, PAI: pai, Elements: el, Signature: sign(t, key, el, challenge), Nonce: nonce,
-			VendorID: 0xFFF1, ProductID: 0x8000,
+			VendorID: new(uint16(0xFFF1)), ProductID: new(uint16(0x8000)),
 		},
 	}, key
 }
@@ -219,6 +219,14 @@ func TestDeviceAttestationValidatorMalformedElements(t *testing.T) {
 		t.Parallel()
 		f := davFixture(t)
 		f.data.Elements, _ = hex.DecodeString("15300102") // :316
+		davReject(t, f, attestation.AttestationElementsUnparseable, `attestation elements that cannot be decoded`)
+	})
+	t.Run("refuses elements of 901 bytes before decoding them, but decodes 900 bytes", func(t *testing.T) {
+		t.Parallel()
+		f := davFixture(t)
+		f.data.Elements = make([]byte, 901) // :321-336 at b25ed960
+		davReject(t, f, attestation.AttestationElementsTooLong, `901 bytes, more than RESP_MAX of 900`)
+		f.data.Elements = make([]byte, 900)
 		davReject(t, f, attestation.AttestationElementsUnparseable, `attestation elements that cannot be decoded`)
 	})
 	t.Run("throws CertificationDeclarationUnparseable when the CD field holds something else", func(t *testing.T) {
@@ -389,21 +397,20 @@ func TestDeviceAttestationValidatorCDFields(t *testing.T) {
 		t.Parallel()
 		davPass(t, davFixture(t))
 	})
-	t.Run("throws CertificationDeclarationFieldMismatch when CD vendorId does not match BasicInformation", func(t *testing.T) {
+	// The BasicInformation cases at b25ed960 (#4939, #4940): a mismatch,
+	// or a value the device did not report, is the error finding
+	// CertificationDeclarationFieldMismatch, and validation goes on.
+	t.Run("reports CertificationDeclarationFieldMismatch when CD vendorId does not match BasicInformation", func(t *testing.T) {
 		t.Parallel()
-		f, key := davFixtureWithKey(t)
-		cd := defaultCD()
-		cd.vid = 0xFFF2 // :579
-		f = davWithCD(t, f, key, buildCD(t, cd))
-		davReject(t, f, attestation.CertificationDeclarationFieldMismatch, `CD vendor_id.*does not match BasicInformation VendorID`)
+		f := davFixture(t)
+		f.data.VendorID = new(uint16(0xFFF2)) // :597 at b25ed960
+		davOnlyFieldMismatch(t, davPass(t, f).Findings, `(?i)CD vendor_id.*does not match BasicInformation VendorID 0xfff2`)
 	})
-	t.Run("throws CertificationDeclarationFieldMismatch when productId not in CD product_id_array", func(t *testing.T) {
+	t.Run("reports CertificationDeclarationFieldMismatch when productId not in CD product_id_array", func(t *testing.T) {
 		t.Parallel()
-		f, key := davFixtureWithKey(t)
-		cd := defaultCD()
-		cd.pids = []uint16{0x9999} // :594
-		f = davWithCD(t, f, key, buildCD(t, cd))
-		davReject(t, f, attestation.CertificationDeclarationFieldMismatch, `CD product_id_array.*does not contain BasicInformation ProductID`)
+		f := davFixture(t)
+		f.data.ProductID = new(uint16(0x9999)) // :612 at b25ed960
+		davOnlyFieldMismatch(t, davPass(t, f).Findings, `(?i)CD product_id_array.*does not contain BasicInformation ProductID 0x9999`)
 	})
 	t.Run("throws CertificationDeclarationFieldMismatch when CD vendorId does not match DAC vendorId", func(t *testing.T) {
 		t.Parallel()
@@ -411,9 +418,53 @@ func TestDeviceAttestationValidatorCDFields(t *testing.T) {
 		cd := defaultCD()
 		cd.vid = 0xFFF2 // :615-616
 		f = davWithCD(t, f, key, buildCD(t, cd))
-		f.data.VendorID = 0xFFF2
+		f.data.VendorID = new(uint16(0xFFF2))
 		davReject(t, f, attestation.CertificationDeclarationFieldMismatch, `DAC vendorId.*does not match CD vendor_id`)
 	})
+	t.Run("reports CertificationDeclarationFieldMismatch when the device did not report VendorID", func(t *testing.T) {
+		t.Parallel()
+		f := davFixture(t)
+		f.data.VendorID = nil
+		davOnlyFieldMismatch(t, davPass(t, f).Findings, `BasicInformation VendorID \(not reported by the device\)`)
+	})
+	t.Run("reports CertificationDeclarationFieldMismatch when the device did not report ProductID", func(t *testing.T) {
+		t.Parallel()
+		f := davFixture(t)
+		f.data.ProductID = nil
+		davOnlyFieldMismatch(t, davPass(t, f).Findings, `BasicInformation ProductID \(not reported by the device\)`)
+	})
+	t.Run("keeps the VendorID finding when a later DAC check stops validation", func(t *testing.T) {
+		t.Parallel()
+		f, key := davFixtureWithKey(t)
+		cd := defaultCD()
+		cd.vid = 0xFFF2 // :677 at b25ed960
+		f = davWithCD(t, f, key, buildCD(t, cd))
+		f.data.VendorID = nil
+		_, err := attestation.Validate(f.ctx, f.data)
+		var ae *attestation.Error
+		if !errors.As(err, &ae) {
+			t.Fatalf("Validate = %v, want a DeviceAttestationError", err)
+		}
+		if !regexp.MustCompile(`DAC vendorId.*does not match CD vendor_id`).MatchString(ae.Message) {
+			t.Fatalf("message %q", ae.Message)
+		}
+		davOnlyFieldMismatch(t, ae.PrecedingFindings, `BasicInformation VendorID \(not reported by the device\)`)
+	})
+}
+
+// davOnlyFieldMismatch requires the error findings to be exactly one
+// CertificationDeclarationFieldMismatch whose message matches pattern.
+func davOnlyFieldMismatch(t *testing.T, findings []attestation.Finding, pattern string) {
+	t.Helper()
+	var errs []attestation.Finding
+	for _, f := range findings {
+		if f.Level == attestation.LevelError {
+			errs = append(errs, f)
+		}
+	}
+	if len(errs) != 1 || errs[0].Check != attestation.CertificationDeclarationFieldMismatch || !regexp.MustCompile(pattern).MatchString(errs[0].Message) {
+		t.Fatalf("error findings %+v, want one CertificationDeclarationFieldMismatch /%s/", errs, pattern)
+	}
 }
 
 // TestDeviceAttestationValidatorRevocation: describe "certificate revocation checks" (:629).
