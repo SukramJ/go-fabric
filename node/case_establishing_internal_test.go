@@ -4,6 +4,7 @@
 package node
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"testing"
@@ -26,10 +27,17 @@ type establishingRig struct {
 
 func newEstablishingRig(t *testing.T) *establishingRig {
 	t.Helper()
+	return newEstablishingRigLogged(t, slog.New(slog.DiscardHandler))
+}
+
+// newEstablishingRigLogged is newEstablishingRig with the responder logging
+// to logger.
+func newEstablishingRigLogged(t *testing.T, logger *slog.Logger) *establishingRig {
+	t.Helper()
 	fx := newCaseFabricFixture(t)
 	r := &establishingRig{sessions: operational.NewManager(testStore(t)), peer: fx.peer.NodeID}
 	fx.ids.testEstablishment = func(e *caseEstablishment) { r.est = e }
-	adapter, err := buildCaseAdapter(r.sessions, fx.ids, nil, slog.New(slog.DiscardHandler), func(id uint16) {
+	adapter, err := buildCaseAdapter(r.sessions, fx.ids, nil, logger, func(id uint16) {
 		r.mu.Lock()
 		r.opened = append(r.opened, id)
 		r.mu.Unlock()
@@ -135,6 +143,82 @@ func TestCASEResponderSessionEstablishingOnTheDevice(t *testing.T) {
 		}
 		if got := r.openedIDs(); len(got) != 0 {
 			t.Fatalf("the host was told of %v", got)
+		}
+	})
+}
+
+// recordedLogs keeps the message and the level of every record logged.
+type recordedLogs struct {
+	mu      sync.Mutex
+	records []slog.Record
+}
+
+func (l *recordedLogs) Enabled(context.Context, slog.Level) bool { return true }
+
+func (l *recordedLogs) Handle(_ context.Context, r slog.Record) error {
+	l.mu.Lock()
+	l.records = append(l.records, r.Clone())
+	l.mu.Unlock()
+	return nil
+}
+
+func (l *recordedLogs) WithAttrs([]slog.Attr) slog.Handler { return l }
+
+func (l *recordedLogs) WithGroup(string) slog.Handler { return l }
+
+// at returns the levels of the records logged as msg, with the session id
+// each names.
+func (l *recordedLogs) at(msg string) (levels []slog.Level, ids []int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for i := range l.records {
+		r := &l.records[i]
+		if r.Message != msg {
+			continue
+		}
+		levels = append(levels, r.Level)
+		r.Attrs(func(a slog.Attr) bool {
+			if a.Key == "session_id" {
+				ids = append(ids, a.Value.Int64())
+			}
+			return true
+		})
+	}
+	return levels, ids
+}
+
+// TestCASESessionEstablishedIsLoggedAtCompletion (owner decision 353):
+// the responder's install of a session logs case.session_establishing at
+// Debug, and case.session_established is logged once, at Info, when the
+// bridge's completion establishes the session — not before; a failed
+// handshake logs no establishment.
+func TestCASESessionEstablishedIsLoggedAtCompletion(t *testing.T) {
+	t.Parallel()
+	t.Run("established at completion", func(t *testing.T) {
+		t.Parallel()
+		logs := &recordedLogs{}
+		r := newEstablishingRigLogged(t, slog.New(logs))
+		if levels, _ := logs.at("case.session_establishing"); len(levels) != 1 || levels[0] != slog.LevelDebug {
+			t.Fatalf("install: case.session_establishing at %v, want once at DEBUG", levels)
+		}
+		if levels, _ := logs.at("case.session_established"); len(levels) != 0 {
+			t.Fatalf("case.session_established logged %d times before the completion", len(levels))
+		}
+		if !r.est.complete(r.id, true) {
+			t.Fatal("complete = false")
+		}
+		levels, ids := logs.at("case.session_established")
+		if len(levels) != 1 || levels[0] != slog.LevelInfo || len(ids) != 1 || ids[0] != int64(r.id) {
+			t.Fatalf("after the completion: case.session_established at %v for %v, want once at INFO for %#x", levels, ids, r.id)
+		}
+	})
+	t.Run("a failed handshake is not established", func(t *testing.T) {
+		t.Parallel()
+		logs := &recordedLogs{}
+		r := newEstablishingRigLogged(t, slog.New(logs))
+		r.est.complete(r.id, false)
+		if levels, _ := logs.at("case.session_established"); len(levels) != 0 {
+			t.Fatalf("case.session_established logged for a failed handshake (%v)", levels)
 		}
 	})
 }
