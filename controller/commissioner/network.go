@@ -597,8 +597,8 @@ func (f *flow) withChannelDropFallbackConnect(action func() (netcomm.ConnectNetw
 // between two re-arms; each re-arm runs on a context [flow.stopArmInterval]
 // cancels, and stopArmInterval awaits a re-arm in flight, so none
 // overlaps the disarm of an abort or a failure (disarmIfMayBeArmed stops
-// the timer first) or outlives the consent wait; and the timer that ends
-// on its own — the cumulative limit, a closed session, a failed re-arm —
+// the timer first, expireFailsafe settles it) or outlives the consent
+// wait; and the timer that ends on its own — the cumulative limit, a closed session, a failed re-arm —
 // says why on lapsed, once.
 type armInterval struct {
 	timer    exchange.Timer
@@ -625,6 +625,37 @@ func (f *flow) currentArmInterval() *armInterval {
 		return nil
 	}
 	return f.armTimer
+}
+
+// settleArmInterval stops the timer and awaits a re-arm in flight without
+// cancelling it, bounded by ctx — matter.js #expireFailsafe stopping
+// #armFailsafeInterval and awaiting #periodicArm
+// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1098-1107 at
+// b25ed960), so the re-arm cannot arm the fail-safe again behind the
+// expiry. ctx ending cancels the re-arm as stopArmInterval does.
+func (f *flow) settleArmInterval(ctx context.Context) {
+	f.mu.Lock()
+	ai := f.armTimer
+	if ai != nil {
+		ai.stopped = true
+		ai.timer.Stop()
+		f.armTimer = nil
+	}
+	f.mu.Unlock()
+	if ai == nil {
+		return
+	}
+	settled := make(chan struct{})
+	go func() {
+		ai.inflight.Wait()
+		close(settled)
+	}()
+	select {
+	case <-settled:
+	case <-ctx.Done():
+	}
+	ai.cancel()
+	<-settled
 }
 
 // stopArmInterval stops the timer, cancels a re-arm in flight and waits

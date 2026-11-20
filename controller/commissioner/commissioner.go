@@ -396,8 +396,8 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 // db021da0), and until it ends the device accepts no new PASE exchange
 // (PaseServer.ts:80-82 at db021da0). The flow's own failures disarm
 // themselves (flow.disarmAfterFailure, which says why, and
-// flow.disarmAfterAbort). It sends the flow's request (flow.expireFailsafe)
-// with the breadcrumb the flow starts with (initialBreadcrumb), bounded by
+// flow.disarmAfterAbort). It sends the request of the flow's expiry
+// (flow.sendFailsafeExpiry, without its response check) with the breadcrumb the flow starts with (initialBreadcrumb), bounded by
 // ctx and the exchange's response timeout or, ctx having ended, by
 // abortDisarmTimeout as after an abort; nothing on a closed session, a
 // failure logged. Ahead of matter.js, whose commission only force-closes
