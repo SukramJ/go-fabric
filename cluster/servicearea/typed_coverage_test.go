@@ -195,7 +195,7 @@ func TestHandleReplacesSelectAreas(t *testing.T) {
 	calls := 0
 	if err := srv.Handle(sa.CmdSelectAreas, func(context.Context, any) (any, error) {
 		calls++
-		return nil, nil
+		return sa.SelectAreasResponse{}, nil // an absent response is FAILURE (decision 340)
 	}); err != nil {
 		t.Fatalf("Handle: %v", err)
 	}
