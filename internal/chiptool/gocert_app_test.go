@@ -678,7 +678,7 @@ func caseSWTCH32() goCertCase {
 		th.dut.pipe(th.t, map[string]any{"Name": "SimulateSwitchIdle", "EndpointId": th.ep})
 		time.Sleep(swSwitchIdle)
 	}
-	// quietBoundary is quietEventBoundary (:339-360): the count once no event
+	// quietBoundary is quietEventBoundary (:348-368): the count once no event
 	// arrived for EVENT_QUIET_MS.
 	quietBoundary := func() int {
 		last := ev.count()
@@ -725,42 +725,38 @@ func caseSWTCH32() goCertCase {
 		return nil
 	}
 	return goCertCase{
-		tc: "TC-SWTCH-3.2", line: 394, pics: []string{"SWTCH.C", "MCORE.IDM.C.SubscribeEvent"}, at: "SWTCH.S",
-		// At b25ed960 step 0h is not applicable (DEVICE_EXCLUSION_RULE, TC-SWTCH-3.2.test.ts:150-152,
-		// :471-473), 0d and 0f require MSR and MSM without the AS alternative (:435-441, :453-459)
-		// and 4b gates on MS and eventing (:670); mirroring 0h moves the goCert golden (one step run -> skipped).
-		readAt: "db021da0",
+		tc: "TC-SWTCH-3.2", line: 403, pics: []string{"SWTCH.C", "MCORE.IDM.C.SubscribeEvent"}, at: "SWTCH.S",
 		steps: []goStep{
-			{n: "0a", line: 399, title: "at least one of LS and MS", run: consistency(func(th *goTH) bool { return !pics(th, "SWTCH.S.F00") && !pics(th, "SWTCH.S.F01") }, "neither a latching nor a momentary switch")},
-			{n: "0b", line: 408, title: "MSR needs MS", run: consistency(func(th *goTH) bool { return pics(th, "SWTCH.S.F02") && !pics(th, "SWTCH.S.F01") }, "momentary switch release without a momentary switch")},
-			{n: "0c", line: 417, title: "MSL needs MS", run: consistency(func(th *goTH) bool { return pics(th, "SWTCH.S.F03") && !pics(th, "SWTCH.S.F01") }, "long press without a momentary switch")},
-			{n: "0d", line: 426, title: "MSL needs MSR or AS", run: consistency(func(th *goTH) bool {
-				return pics(th, "SWTCH.S.F03") && !pics(th, "SWTCH.S.F02") && !pics(th, "SWTCH.S.F05")
-			}, "long press with neither momentary switch release nor an action switch")},
-			{n: "0e", line: 441, title: "MSM needs MS", run: consistency(func(th *goTH) bool { return pics(th, "SWTCH.S.F04") && !pics(th, "SWTCH.S.F01") }, "multi press without a momentary switch")},
-			{n: "0f", line: 450, title: "MSM needs MSR or AS", run: consistency(func(th *goTH) bool {
-				return pics(th, "SWTCH.S.F04") && !pics(th, "SWTCH.S.F02") && !pics(th, "SWTCH.S.F05")
-			}, "multi press with neither momentary switch release nor an action switch")},
-			{n: "0g", line: 464, title: "polling or eventing", run: consistency(func(th *goTH) bool {
+			{n: "0a", line: 408, title: "at least one of LS and MS", run: consistency(func(th *goTH) bool { return !pics(th, "SWTCH.S.F00") && !pics(th, "SWTCH.S.F01") }, "neither a latching nor a momentary switch")},
+			{n: "0b", line: 417, title: "MSR needs MS", run: consistency(func(th *goTH) bool { return pics(th, "SWTCH.S.F02") && !pics(th, "SWTCH.S.F01") }, "momentary switch release without a momentary switch")},
+			{n: "0c", line: 426, title: "MSL needs MS", run: consistency(func(th *goTH) bool { return pics(th, "SWTCH.S.F03") && !pics(th, "SWTCH.S.F01") }, "long press without a momentary switch")},
+			{n: "0d", line: 435, title: "MSL needs MSR", run: consistency(func(th *goTH) bool {
+				return pics(th, "SWTCH.S.F03") && !pics(th, "SWTCH.S.F02")
+			}, "long press without momentary switch release")},
+			{n: "0e", line: 444, title: "MSM needs MS", run: consistency(func(th *goTH) bool { return pics(th, "SWTCH.S.F04") && !pics(th, "SWTCH.S.F01") }, "multi press without a momentary switch")},
+			{n: "0f", line: 453, title: "MSM needs MSR", run: consistency(func(th *goTH) bool {
+				return pics(th, "SWTCH.S.F04") && !pics(th, "SWTCH.S.F02")
+			}, "multi press without momentary switch release")},
+			{n: "0g", line: 462, title: "polling or eventing", run: consistency(func(th *goTH) bool {
 				return !pics(th, mirrorPICS("SWTCH.C.M.SwitchStatePolling")) && !pics(th, mirrorPICS("SWTCH.C.M.SwitchStateEventing"))
 			}, "neither polling nor eventing of switch state")},
-			{n: "0h", line: 473, title: "not MSR and AS together", run: consistency(func(th *goTH) bool { return pics(th, "SWTCH.S.F02") && pics(th, "SWTCH.S.F05") }, "momentary switch release together with an action switch")},
-			{n: "1a", line: 482, title: "commission, latching switch observable", pics: "SWTCH.C.F00", run: func(*goTH) error {
+			{n: "0h", line: 471, title: "not MSR and AS together", na: "the rule is the conformance of MSR for a single switch device, [MS & !AS]; a client that handles switches with momentary switch release and action switches alike declares both (DEVICE_EXCLUSION_RULE, TC-SWTCH-3.2.test.ts:149-151)"},
+			{n: "1a", line: 474, title: "commission, latching switch observable", pics: "SWTCH.C.F00", run: func(*goTH) error {
 				return errors.New("the latching steps are not ported: the reference daemon has no latching switch")
 			}},
-			{n: "1b", line: 488, title: "read FeatureMap (LS)", pics: "SWTCH.C.F00", run: func(*goTH) error { return errors.New("not ported") }},
-			{n: "1c", line: 503, title: "read NumberOfPositions (LS)", pics: "SWTCH.C.F00", run: func(*goTH) error { return errors.New("not ported") }},
-			{n: "1d", line: 518, title: "subscribe SwitchLatched", pics: "SWTCH.C.F00 & SWTCH.C.M.SwitchStateEventing", run: func(*goTH) error { return errors.New("not ported") }},
-			{n: "2a", line: 524, title: "latching switch, CurrentPosition polled", pics: "SWTCH.C.F00 & SWTCH.C.M.SwitchStatePolling", run: func(*goTH) error { return errors.New("not ported") }},
-			{n: "2b", line: 551, title: "latching switch, SwitchLatched events", pics: "SWTCH.C.F00 & SWTCH.C.M.SwitchStateEventing", run: func(*goTH) error { return errors.New("not ported") }},
-			{n: "3a", line: 608, title: "commission, momentary switch observable", pics: "SWTCH.C.F01", run: func(th *goTH) error {
+			{n: "1b", line: 480, title: "read FeatureMap (LS)", pics: "SWTCH.C.F00", run: func(*goTH) error { return errors.New("not ported") }},
+			{n: "1c", line: 495, title: "read NumberOfPositions (LS)", pics: "SWTCH.C.F00", run: func(*goTH) error { return errors.New("not ported") }},
+			{n: "1d", line: 510, title: "subscribe SwitchLatched", pics: "SWTCH.C.F00 & SWTCH.C.M.SwitchStateEventing", run: func(*goTH) error { return errors.New("not ported") }},
+			{n: "2a", line: 516, title: "latching switch, CurrentPosition polled", pics: "SWTCH.C.F00 & SWTCH.C.M.SwitchStatePolling", run: func(*goTH) error { return errors.New("not ported") }},
+			{n: "2b", line: 543, title: "latching switch, SwitchLatched events", pics: "SWTCH.C.F00 & SWTCH.C.M.SwitchStateEventing", run: func(*goTH) error { return errors.New("not ported") }},
+			{n: "3a", line: 600, title: "commission, momentary switch observable", pics: "SWTCH.C.F01", run: func(th *goTH) error {
 				var err error
 				if _, n, err = th.commission("dut"); err == nil {
 					th.note("commissioned; the switch is endpoint %d", th.ep)
 				}
 				return err
 			}},
-			{n: "3b", line: 614, title: "read FeatureMap", pics: "SWTCH.C.F01", run: func(th *goTH) error {
+			{n: "3b", line: 606, title: "read FeatureMap", pics: "SWTCH.C.F01", run: func(th *goTH) error {
 				fm, err := readU(th, 0xFFFC)
 				if err != nil {
 					return err
@@ -772,7 +768,7 @@ func caseSWTCH32() goCertCase {
 				th.note("FeatureMap 0x%02X on endpoint %d", fm, th.ep)
 				return nil
 			}},
-			{n: "3c", line: 629, title: "read NumberOfPositions", pics: "SWTCH.C.F01", run: func(th *goTH) error {
+			{n: "3c", line: 621, title: "read NumberOfPositions", pics: "SWTCH.C.F01", run: func(th *goTH) error {
 				np, err := readU(th, switchcluster.AttrNumberOfPositions)
 				if err != nil {
 					return err
@@ -783,9 +779,9 @@ func caseSWTCH32() goCertCase {
 				th.note("NumberOfPositions %d", np)
 				return nil
 			}},
-			{n: "3d", line: 644, title: "subscribe to all switch events on the endpoint", pics: "SWTCH.C.F01 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
+			{n: "3d", line: 636, title: "subscribe to all switch events on the endpoint", pics: "SWTCH.C.F01 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
 				sub, err := n.Subscribe(th.ctx, client.SubscribeRequest{SubscribeRequest: client.SubscribePaths{
-					// Urgent, as the TS subscribes (`urgent: true`, :281): a
+					// Urgent, as the TS subscribes (`urgent: true`, :290): a
 					// device reports an event when it occurs only on an urgent
 					// path, otherwise with its next report.
 					Events:           []im.ConcreteEventPath{{Endpoint: th.ep, Cluster: switchcluster.ClusterID, HasEndpoint: true, HasCluster: true, IsUrgent: true}},
@@ -799,9 +795,9 @@ func caseSWTCH32() goCertCase {
 				th.note("event subscription %d on endpoint %d's Switch", sub.ID(), th.ep)
 				return nil
 			}},
-			{n: "4a", line: 650, title: "momentary switch operated while CurrentPosition is read", pics: "SWTCH.C.F01 & SWTCH.C.M.SwitchStatePolling", run: func(th *goTH) error {
+			{n: "4a", line: 642, title: "momentary switch operated while CurrentPosition is read", pics: "SWTCH.C.F01 & SWTCH.C.M.SwitchStatePolling", run: func(th *goTH) error {
 				// The TS sets the position through the backchannel's
-				// simulateLatchPosition (:657-661); the daemon's pipe has no
+				// simulateLatchPosition (:649-653); the daemon's pipe has no
 				// such command, so a long press holds the button down long
 				// enough to read it pressed, then released.
 				for op := range swOperations {
@@ -830,10 +826,12 @@ func caseSWTCH32() goCertCase {
 				th.note("CurrentPosition read 1 while pressed and 0 once released, %d times", swOperations)
 				return nil
 			}},
-			{n: "4b", line: 677, title: "short press: InitialPress and ShortRelease", pics: "SWTCH.C.F01 & SWTCH.C.F02 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
+			{n: "4b", line: 669, title: "short press: InitialPress and ShortRelease", pics: "SWTCH.C.F01 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
 				// The TS marks the step not applicable for its action-switch
-				// TH (:679-683); the daemon's switch is not one, so the step
-				// runs, a single press through SimulateMultiPress.
+				// TH: which kind of switch is under test is the TH's
+				// FeatureMap, not the client's flags (:671-674). Mirrored, the
+				// daemon's switch is the TH's and is not an action switch, so
+				// the step runs, a single press through SimulateMultiPress.
 				idle(th)
 				from := quietBoundary()
 				th.dut.pipe(th.t, map[string]any{
@@ -852,7 +850,7 @@ func caseSWTCH32() goCertCase {
 				th.note("short press reported events %v", names(es))
 				return nil
 			}},
-			{n: "4c", line: 685, title: "long press: InitialPress, LongPress and LongRelease", pics: "SWTCH.C.F01 & SWTCH.C.F03 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
+			{n: "4c", line: 676, title: "long press: InitialPress, LongPress and LongRelease", pics: "SWTCH.C.F01 & SWTCH.C.F03 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
 				idle(th)
 				from := quietBoundary()
 				th.dut.pipe(th.t, map[string]any{
@@ -870,8 +868,8 @@ func caseSWTCH32() goCertCase {
 				th.note("long press reported events %v, each naming position %d", names(es), swPressed)
 				return nil
 			}},
-			{n: "4d", line: 756, title: "multi press on a switch that is not an action switch", pics: "SWTCH.C.F01 & SWTCH.C.F04 & !SWTCH.C.F05 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
-				// Not applicable in the TS for its action-switch TH (:758);
+			{n: "4d", line: 747, title: "multi press on a switch that is not an action switch", pics: "SWTCH.C.F01 & SWTCH.C.F04 & !SWTCH.C.F05 & SWTCH.C.M.SwitchStateEventing", run: func(th *goTH) error {
+				// Not applicable in the TS for its action-switch TH (:749);
 				// the daemon's switch is not one.
 				idle(th)
 				from := quietBoundary()
@@ -899,7 +897,7 @@ func caseSWTCH32() goCertCase {
 				th.note("double press reported events %v; MultiPressComplete counted %d", names(es), swPresses)
 				return nil
 			}},
-			{n: "4f", line: 760, title: "multi press on an action switch", pics: "SWTCH.C.F01 & SWTCH.C.F04 & SWTCH.C.F05 & SWTCH.C.M.SwitchStateEventing", run: func(*goTH) error {
+			{n: "4f", line: 751, title: "multi press on an action switch", pics: "SWTCH.C.F01 & SWTCH.C.F04 & SWTCH.C.F05 & SWTCH.C.M.SwitchStateEventing", run: func(*goTH) error {
 				return errors.New("the action-switch step is not ported: the reference daemon has no action switch")
 			}},
 		},

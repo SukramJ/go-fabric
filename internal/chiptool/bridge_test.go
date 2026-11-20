@@ -298,6 +298,20 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	if flags["wifi"] {
 		args = append(args, "--wifi")
 	}
+	// --unit-testing serves CHIP's UnitTesting cluster on the Aggregator
+	// (examples/reference-bridge/unit_testing.go, owner decisions 337 and
+	// 354), as matter.js's all-clusters test app serves it, for the
+	// data-type steps of the Go-TH leg's TC-IDM-3.1 and TC-IDM-4.1 and the
+	// manufacturer-specific cluster TC-IDM-2.1 step 21 reads; every daemon
+	// carries it for the same reason it carries --wifi. chip's
+	// TC-IDM-10.1 accepts the test-vendor prefix only with PICS_SDK_CI_ONLY
+	// (TC_DeviceBasicComposition.py:687-692 at 6170af84), which the family
+	// runs keep at 1 (testdata/reference-bridge.pics); its conformance
+	// check and the device-type check skip a manufacturer cluster
+	// (matter/testing/device_conformance_tests.py:162-165, :395-398).
+	if flags["unit-testing"] {
+		args = append(args, "--unit-testing")
+	}
 	// --media adds the video player and content app the media families run
 	// against (examples/reference-bridge/media.go, ADR 0022); every daemon
 	// carries it for the same reason it carries --wifi.

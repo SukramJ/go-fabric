@@ -6,9 +6,13 @@
 package chiptool
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -251,13 +255,9 @@ func caseIDM21() goCertCase {
 	}
 	nEP := 0
 	return goCertCase{
-		tc: "TC-IDM-2.1", line: 168, pics: []string{"MCORE.IDM.C.ReadRequest"},
-		// At b25ed960 step 21 fails a TH without a cluster >= 0x10000, the
-		// non-chip acceptance removed because matter.js's all-clusters app serves
-		// Unit Testing (TC-IDM-2.1.test.ts:52-54, :794-810); the daemon serves no such cluster yet.
-		readAt: "db021da0",
+		tc: "TC-IDM-2.1", line: 167, pics: []string{"MCORE.IDM.C.ReadRequest"},
 		steps: []goStep{
-			{n: "1", line: 169, title: "read one attribute on a given cluster and endpoint", run: func(th *goTH) error {
+			{n: "1", line: 168, title: "read one attribute on a given cluster and endpoint", run: func(th *goTH) error {
 				var err error
 				if _, n, err = th.commission("dut"); err != nil {
 					return err
@@ -265,72 +265,72 @@ func caseIDM21() goCertCase {
 				nEP = len(th.pics.sorted)
 				return paths(attrPath(0, basicinfo.ClusterID, basicinfo.AttrVendorId), 1, 1)(th)
 			}},
-			{n: "2", line: 202, title: "read all attributes on a given cluster and endpoint", run: func(th *goTH) error {
+			{n: "2", line: 201, title: "read all attributes on a given cluster and endpoint", run: func(th *goTH) error {
 				return paths(wildcard(ptr(uint16(0)), ptr(basicinfo.ClusterID), nil), 10, 1)(th)
 			}},
-			{n: "3", line: 232, title: "read all attributes in all clusters and all endpoints", run: func(th *goTH) error {
+			{n: "3", line: 231, title: "read all attributes in all clusters and all endpoints", run: func(th *goTH) error {
 				return paths(wildcard(nil, nil, nil), 100, nEP)(th)
 			}},
-			{n: "4", line: 264, title: "read a specific attribute from all clusters on all endpoints", run: func(th *goTH) error {
+			{n: "4", line: 263, title: "read a specific attribute from all clusters on all endpoints", run: func(th *goTH) error {
 				return paths(wildcard(nil, nil, ptr(uint32(0xFFFD))), nEP, nEP)(th)
 			}},
-			{n: "5", line: 291, title: "read all attributes from a specific cluster on all endpoints", run: func(th *goTH) error {
+			{n: "5", line: 290, title: "read all attributes from a specific cluster on all endpoints", run: func(th *goTH) error {
 				return paths(wildcard(nil, ptr(descriptor.ClusterID), nil), nEP, nEP)(th)
 			}},
-			{n: "6", line: 319, title: "read a specific attribute from a specific cluster on all endpoints", run: func(th *goTH) error {
+			{n: "6", line: 318, title: "read a specific attribute from a specific cluster on all endpoints", run: func(th *goTH) error {
 				return paths(wildcard(nil, ptr(descriptor.ClusterID), ptr(descriptor.AttrServerList)), nEP, nEP)(th)
 			}},
-			{n: "7", line: 350, title: "read all attributes from all clusters on a given endpoint", run: func(th *goTH) error {
+			{n: "7", line: 349, title: "read all attributes from all clusters on a given endpoint", run: func(th *goTH) error {
 				return paths(wildcard(ptr(uint16(1)), nil, nil), 10, 1)(th)
 			}},
-			{n: "8", line: 378, title: "read a specific attribute from all clusters on a given endpoint", run: func(th *goTH) error {
+			{n: "8", line: 377, title: "read a specific attribute from all clusters on a given endpoint", run: func(th *goTH) error {
 				return paths(wildcard(ptr(uint16(1)), nil, ptr(uint32(0xFFFD))), 2, 1)(th)
 			}},
 			{
-				n: "9", line: 406, title: "read an attribute of data type bool", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_Bool",
+				n: "9", line: 405, title: "read an attribute of data type bool", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_Bool",
 				at: "OO.S", need: "OO.S.A0000", run: typed(onoff.ClusterID, onoff.AttrOnOff, isBool, "bool"),
 			},
 			{
-				n: "10", line: 436, title: "read an attribute of data type string", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_String",
+				n: "10", line: 435, title: "read an attribute of data type string", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_String",
 				at: "MOD.S", need: "MOD.S.A0000", run: typed(modeselect.ClusterID, modeselect.AttrDescription, isString, "string"),
 			},
 			{
-				n: "11", line: 466, title: "read an attribute of data type unsigned integer", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_UnsignedInteger",
+				n: "11", line: 465, title: "read an attribute of data type unsigned integer", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_UnsignedInteger",
 				at: "LVL.S", need: "LVL.S.A0000", run: typed(levelcontrol.ClusterID, levelcontrol.AttrCurrentLevel, isUnsigned, "unsigned integer"),
 			},
 			{
-				// The TS reads PressureMeasurement.MeasuredValue (:501-503);
+				// The TS reads PressureMeasurement.MeasuredValue (:500-502);
 				// the reference composition has no pressure sensor, and its
 				// temperature sensor's MeasuredValue is the int16 it has.
-				n: "12", line: 496, title: "read an attribute of data type signed integer", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_SignedInteger",
+				n: "12", line: 495, title: "read an attribute of data type signed integer", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_SignedInteger",
 				at: "TMP.S", need: "TMP.S.A0000", run: typed(temperaturemeasurement.ClusterID, temperaturemeasurement.AttrMeasuredValue, isSigned, "signed integer"),
 			},
 			{
-				n: "13", line: 522, title: "read an attribute of data type floating point", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_FloatingPoint",
+				n: "13", line: 521, title: "read an attribute of data type floating point", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_FloatingPoint",
 				at: "CDOCONC.S", need: "CDOCONC.S.A0000",
 				run: typed(carbondioxideconcentrationmeasurement.ClusterID, carbondioxideconcentrationmeasurement.AttrMeasuredValue, isFloat, "floating point"),
 			},
 			{
-				n: "14", line: 550, title: "read an attribute of data type octet string", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_OctetString",
+				n: "14", line: 549, title: "read an attribute of data type octet string", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_OctetString",
 				run: typed(operationalcredentials.ClusterID, operationalcredentials.AttrTrustedRootCertificates, isOctets, "a list of octet strings"),
 			},
 			{
-				n: "15", line: 581, title: "read an attribute of data type struct", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_Struct",
+				n: "15", line: 580, title: "read an attribute of data type struct", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_Struct",
 				run: typed(generalcommissioning.ClusterID, generalcommissioning.AttrBasicCommissioningInfo, isStruct, "struct"),
 			},
 			{
-				n: "16", line: 615, title: "read an attribute of data type list", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_List",
+				n: "16", line: 614, title: "read an attribute of data type list", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_List",
 				at: "MOD.S", need: "MOD.S.A0002", run: typed(modeselect.ClusterID, modeselect.AttrSupportedModes, isList, "list"),
 			},
 			{
-				n: "17", line: 645, title: "read an attribute of data type enum", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_Enum",
+				n: "17", line: 644, title: "read an attribute of data type enum", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_Enum",
 				at: "OCC.S", need: "OCC.S.A0001", run: typed(occupancysensing.ClusterID, occupancysensing.AttrOccupancySensorType, isUnsigned, "enum"),
 			},
 			{
-				n: "18", line: 675, title: "read an attribute of data type bitmap", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_Bitmap",
+				n: "18", line: 674, title: "read an attribute of data type bitmap", pics: "MCORE.IDM.C.ReadRequest.Attribute.DataType_Bitmap",
 				at: "LVL.S", need: "LVL.S.A000f", run: typed(levelcontrol.ClusterID, levelcontrol.AttrOptions, isUnsigned, "bitmap"),
 			},
-			{n: "19", line: 701, title: "read an attribute three times", at: "OO.S", run: func(th *goTH) error {
+			{n: "19", line: 700, title: "read an attribute three times", at: "OO.S", run: func(th *goTH) error {
 				var seen []string
 				for range 3 {
 					v, err := th.readValue(n, attrPath(th.ep, onoff.ClusterID, onoff.AttrOnOff))
@@ -348,23 +348,35 @@ func caseIDM21() goCertCase {
 				th.note("three reads of %d/OnOff: %v", th.ep, seen)
 				return nil
 			}},
-			{n: "20", line: 732, title: "read something larger than 1 MTU, chunked", run: func(th *goTH) error {
-				// The TS's proxy for a report over one MTU (:745-760): more than
+			{n: "20", line: 731, title: "read something larger than 1 MTU, chunked", run: func(th *goTH) error {
+				// The TS's proxy for a report over one MTU (:744-759): more than
 				// 100 attributes, which the client reassembles from its chunks.
 				return paths(wildcard(nil, nil, nil), 101, nEP)(th)
 			}},
-			{n: "21", line: 775, title: "read with manufacturer-specific clusters and attributes", run: func(th *goTH) error {
+			{n: "21", line: 774, title: "read with manufacturer-specific clusters and attributes", run: func(th *goTH) error {
+				// The wildcard read holds more than 100 attributes (:782-791)
+				// and at least one cluster at or above
+				// MANUFACTURER_SPECIFIC_CLUSTER_THRESHOLD (:792-810, :55) —
+				// the daemon's UnitTesting under --unit-testing, as
+				// matter.js's all-clusters app serves Unit Testing (:51-54).
 				as, err := readAll(th, wildcard(nil, nil, nil))
 				if err != nil {
 					return err
 				}
+				if len(as) <= 100 {
+					return fmt.Errorf("the wildcard read returned %d attributes, want more than 100", len(as))
+				}
+				var ms []uint32
 				for i := range as {
-					if as[i].Path.Cluster >= 0x10000 {
-						return fmt.Errorf("the daemon serves manufacturer-specific cluster 0x%08X: port the step's check", as[i].Path.Cluster)
+					if c := as[i].Path.Cluster; c >= manufacturerSpecificClusterThreshold && !slices.Contains(ms, c) {
+						ms = append(ms, c)
 					}
 				}
-				return goSkip("(b) not supported: the reference composition serves no manufacturer-specific cluster "+
-					"(none >= 0x10000 among %d attributes), as matter.js accepts for its own all-clusters app at db021da0 (TC-IDM-2.1.test.ts:798-807)", len(as))
+				if len(ms) == 0 {
+					return fmt.Errorf("no manufacturer-specific cluster (>= 0x%X) among the %d attributes of the wildcard read", manufacturerSpecificClusterThreshold, len(as))
+				}
+				th.note("%d attributes; manufacturer-specific clusters found: %s", len(as), hexIDs(ms))
+				return nil
 			}},
 		},
 	}
@@ -391,23 +403,18 @@ func caseIDM31() goCertCase {
 			return nil
 		}
 	}
-	unitTesting := "the reference daemon has no UnitTesting cluster, as matter.js's all-clusters app has none at db021da0 (unitTestingNotApplicable, test/cert/unit-testing-cluster.ts:16-20)"
 	labels := listOf(userlabel.LabelStruct{Label: "room", Value: "kitchen"}, userlabel.LabelStruct{Label: "floor", Value: "1"})
 	return goCertCase{
-		tc: "TC-IDM-3.1", line: 209, pics: []string{"MCORE.IDM.C.WriteRequest"},
-		// At b25ed960 matter.js's all-clusters app serves UnitTesting
-		// (AllClustersTestInstance.ts:1198) and steps 7, 8, 9 and 13 lost their
-		// unitTestingNotApplicable; the pin's version needs the daemon to serve UnitTesting (0xFFF1FC05).
-		readAt: "db021da0",
+		tc: "TC-IDM-3.1", line: 213, pics: []string{"MCORE.IDM.C.WriteRequest"},
 		steps: []goStep{
-			{n: "1", line: 210, title: "modify one attribute on a given cluster and endpoint", at: "LVL.S", need: "LVL.S.A0011", run: func(th *goTH) error {
+			{n: "1", line: 214, title: "modify one attribute on a given cluster and endpoint", at: "LVL.S", need: "LVL.S.A0011", run: func(th *goTH) error {
 				var err error
 				if _, n, err = th.commission("dut"); err != nil {
 					return err
 				}
 				return writeBack(levelcontrol.ClusterID, levelcontrol.AttrOnLevel, spec.Uint8(2), "2")(th)
 			}},
-			{n: "2", line: 232, title: "modify one attribute on all endpoints", run: func(th *goTH) error {
+			{n: "2", line: 236, title: "modify one attribute on all endpoints", run: func(th *goTH) error {
 				p := wildcard(nil, ptr(identify.ClusterID), ptr(identify.AttrIdentifyTime))
 				st, err := n.Write(th.ctx, []client.WriteRequest{{Path: p, Value: spec.Uint16(5)}}, client.WriteOptions{})
 				if err != nil {
@@ -428,7 +435,7 @@ func caseIDM31() goCertCase {
 						return err
 					}
 					if !isUnsigned(v) || v.El.Uint > 5 {
-						// IdentifyTime counts down from the written value (:270-272).
+						// IdentifyTime counts down from the written value (:278-280).
 						return fmt.Errorf("endpoint %d reports IdentifyTime %s after the write of 5", ep, describeNode(v))
 					}
 				}
@@ -436,41 +443,62 @@ func caseIDM31() goCertCase {
 				return nil
 			}},
 			{
-				n: "3", line: 286, title: "write an attribute of data type bool", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_Bool",
+				n: "3", line: 290, title: "write an attribute of data type bool", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_Bool",
 				need: "BINFO.S.A0010", run: writeBack(basicinfo.ClusterID, basicinfo.AttrLocalConfigDisabled, spec.Bool(true), "true"),
 			},
 			{
-				n: "4", line: 302, title: "write an attribute of data type string", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_String",
+				n: "4", line: 306, title: "write an attribute of data type string", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_String",
 				need: "BINFO.S.A0005", run: writeBack(basicinfo.ClusterID, basicinfo.AttrNodeLabel, spec.String("node"), `"node"`),
 			},
 			{
-				// The TS writes LevelControl.OnOffTransitionTime (:323-325),
+				// The TS writes LevelControl.OnOffTransitionTime (:327-329),
 				// which no light of the reference composition serves; its
 				// StartUpCurrentLevel is the writable unsigned integer it has.
-				n: "5", line: 318, title: "write an attribute of data type unsigned integer", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_UnsignedInteger",
+				n: "5", line: 322, title: "write an attribute of data type unsigned integer", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_UnsignedInteger",
 				at: "LVL.S.A4000", need: "LVL.S.A4000", run: writeBack(levelcontrol.ClusterID, levelcontrol.AttrStartUpCurrentLevel, spec.Uint8(1), "1"),
 			},
 			{
-				n: "6", line: 334, title: "write an attribute of data type signed integer", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_SignedInteger",
+				n: "6", line: 338, title: "write an attribute of data type signed integer", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_SignedInteger",
 				at: "TSTAT.S", need: "TSTAT.S.A0010", run: writeBack(thermostat.ClusterID, thermostat.AttrLocalTemperatureCalibration, spec.Int8(-5), "-5"),
 			},
-			{n: "7", line: 350, title: "write an attribute of data type float", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_FloatingPoint", na: unitTesting},
-			{n: "8", line: 372, title: "write an attribute of data type octet string", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_OctetString", na: unitTesting},
-			{n: "9", line: 394, title: "write an attribute of data type struct", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_Struct", na: unitTesting},
+			// Steps 7, 8, 9 and 13 write UnitTesting on endpoint 1, which the
+			// daemon serves under --unit-testing (examples/reference-bridge
+			// unit_testing.go), as matter.js's all-clusters app serves it
+			// (unitTestingPath, TC-IDM-3.1.test.ts:72-78; the values :80-85).
 			{
-				n: "10", line: 408, title: "write an attribute of data type list", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_List",
+				n: "7", line: 354, title: "write an attribute of data type float", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_FloatingPoint",
+				run: func(th *goTH) error {
+					return writeBackAt(th, n, unitTestingPath(unitTestingAttrFloatSingle), spec.Float32(1.5), "1.5")
+				},
+			},
+			{
+				n: "8", line: 375, title: "write an attribute of data type octet string", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_OctetString",
+				run: func(th *goTH) error {
+					return writeBackAt(th, n, unitTestingPath(unitTestingAttrOctetString), spec.Bytes([]byte{0x01, 0x02, 0xa5, 0x5a, 0xff}), "0102a55aff")
+				},
+			},
+			{
+				n: "9", line: 396, title: "write an attribute of data type struct", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_Struct",
+				run: func(th *goTH) error { return idm31WriteStruct(th, n) },
+			},
+			{
+				n: "10", line: 409, title: "write an attribute of data type list", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_List",
 				at: "ULABEL.S", need: "ULABEL.S.A0000", run: writeBack(userlabel.ClusterID, userlabel.AttrLabelList, labels, `[["room", "kitchen"], ["floor", "1"]]`),
 			},
 			{
-				n: "11", line: 428, title: "write an attribute of data type enum", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_Enum",
+				n: "11", line: 429, title: "write an attribute of data type enum", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_Enum",
 				at: "TSUIC.S", need: "TSUIC.S.A0000",
 				run: writeBack(thermostatuserinterfaceconfiguration.ClusterID, thermostatuserinterfaceconfiguration.AttrTemperatureDisplayMode, spec.Uint8(1), "1"),
 			},
 			{
-				n: "12", line: 447, title: "write an attribute of data type bitmap", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_Bitmap",
+				n: "12", line: 448, title: "write an attribute of data type bitmap", pics: "MCORE.IDM.C.WriteRequest.Attribute.DataType_Bitmap",
 				at: "CC.S", need: "CC.S.A000f", run: writeBack(colorcontrol.ClusterID, colorcontrol.AttrOptions, spec.Uint8(1), "1"),
 			},
-			{n: "13", line: 463, title: "write a large list larger than 1 MTU", na: unitTesting},
+			{
+				n: "13", line: 464, title: "write a large list larger than 1 MTU",
+				finding: idm31ListAppendFinding,
+				run:     func(th *goTH) error { return idm31WriteLongList(th, n) },
+			},
 			{n: "14", line: 492, title: "write one attribute three times", at: "TSUIC.S", need: "TSUIC.S.A0000", run: func(th *goTH) error {
 				for range 3 {
 					if err := writeBack(thermostatuserinterfaceconfiguration.ClusterID, thermostatuserinterfaceconfiguration.AttrTemperatureDisplayMode, spec.Uint8(1), "1")(th); err != nil {
@@ -624,18 +652,13 @@ func (th *goTH) subscribeAndModify(n *client.Node, p im.ConcreteAttributePath, v
 // every change of the subscribed attribute.
 func caseIDM41() goCertCase {
 	var n *client.Node
-	unitTesting := "the reference daemon has no UnitTesting cluster, as matter.js's all-clusters app has none at db021da0 (unitTestingNotApplicable, test/cert/unit-testing-cluster.ts:16-20)"
 	modify := func(cluster, attr uint32, values []spec.Encodable, want []string) func(th *goTH) error {
 		return func(th *goTH) error { return th.subscribeAndModify(n, attrPath(th.ep, cluster, attr), values, want) }
 	}
 	return goCertCase{
-		tc: "TC-IDM-4.1", line: 88, pics: []string{"MCORE.IDM.C.SubscribeRequest"},
-		// At b25ed960 matter.js's all-clusters app serves UnitTesting
-		// (AllClustersTestInstance.ts:1198) and step 7 lost its
-		// unitTestingNotApplicable; the pin's version needs the daemon to serve UnitTesting (0xFFF1FC05).
-		readAt: "db021da0",
+		tc: "TC-IDM-4.1", line: 87, pics: []string{"MCORE.IDM.C.SubscribeRequest"},
 		steps: []goStep{
-			{n: "1", line: 93, title: "subscription request for an attribute", pics: "MCORE.IDM.C.SubscribeRequest", at: "OO.S", run: func(th *goTH) error {
+			{n: "1", line: 92, title: "subscription request for an attribute", pics: "MCORE.IDM.C.SubscribeRequest", at: "OO.S", run: func(th *goTH) error {
 				var err error
 				if _, n, err = th.commission("dut"); err != nil {
 					return err
@@ -648,7 +671,7 @@ func caseIDM41() goCertCase {
 				sub.Close()
 				return nil
 			}},
-			{n: "2", line: 161, title: "TH sends a report data, DUT acknowledges", pics: "MCORE.IDM.C.SubscribeRequest", at: "OO.S", run: func(th *goTH) error {
+			{n: "2", line: 160, title: "TH sends a report data, DUT acknowledges", pics: "MCORE.IDM.C.SubscribeRequest", at: "OO.S", run: func(th *goTH) error {
 				sub, reports, err := th.subscribeOne(n, idm41MinFloor, idm41MaxCeiling, attrPath(th.ep, onoff.ClusterID, onoff.AttrOnOff))
 				if err != nil {
 					return err
@@ -658,29 +681,37 @@ func caseIDM41() goCertCase {
 				return nil
 			}},
 			{
-				n: "3", line: 195, title: "subscription to a bool attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_Bool", need: "BINFO.S.A0010",
+				n: "3", line: 194, title: "subscription to a bool attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_Bool", need: "BINFO.S.A0010",
 				run: modify(basicinfo.ClusterID, basicinfo.AttrLocalConfigDisabled, []spec.Encodable{spec.Bool(true), spec.Bool(false), spec.Bool(true)}, []string{"true", "false", "true"}),
 			},
 			{
-				n: "4", line: 215, title: "subscription to a string attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_String", need: "BINFO.S.A0005",
+				n: "4", line: 214, title: "subscription to a string attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_String", need: "BINFO.S.A0005",
 				run: modify(basicinfo.ClusterID, basicinfo.AttrNodeLabel, []spec.Encodable{spec.String("tc-idm-4-1-a"), spec.String("tc-idm-4-1-b"), spec.String("tc-idm-4-1-c")},
 					[]string{`"tc-idm-4-1-a"`, `"tc-idm-4-1-b"`, `"tc-idm-4-1-c"`}),
 			},
 			{
-				n: "5", line: 235, title: "subscription to an unsigned integer attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_UnsignedInteger",
-				// OnOffTransitionTime in the TS (:242-244); StartUpCurrentLevel
+				n: "5", line: 234, title: "subscription to an unsigned integer attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_UnsignedInteger",
+				// OnOffTransitionTime in the TS (:241-243); StartUpCurrentLevel
 				// here, as in TC-IDM-3.1 step 5.
 				at: "LVL.S.A4000", need: "LVL.S.A4000",
 				run: modify(levelcontrol.ClusterID, levelcontrol.AttrStartUpCurrentLevel, []spec.Encodable{spec.Uint8(1), spec.Uint8(2), spec.Uint8(3)}, []string{"1", "2", "3"}),
 			},
 			{
-				n: "6", line: 255, title: "subscription to a signed integer attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_Integer",
+				n: "6", line: 254, title: "subscription to a signed integer attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_Integer",
 				at: "TSTAT.S", need: "TSTAT.S.A0010",
 				run: modify(thermostat.ClusterID, thermostat.AttrLocalTemperatureCalibration, []spec.Encodable{spec.Int8(-7), spec.Int8(-12), spec.Int8(-15)}, []string{"-7", "-12", "-15"}),
 			},
-			{n: "7", line: 275, title: "subscription to a float attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_FloatingPoint", na: unitTesting},
 			{
-				n: "8", line: 297, title: "subscription to a list attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_List",
+				// UnitTesting.floatSingle on endpoint 1 (:279-284), each value
+				// exact in single precision (:285-286).
+				n: "7", line: 274, title: "subscription to a float attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_FloatingPoint",
+				run: func(th *goTH) error {
+					return th.subscribeAndModify(n, unitTestingPath(unitTestingAttrFloatSingle),
+						[]spec.Encodable{spec.Float32(0.5), spec.Float32(-2.25), spec.Float32(3.75)}, []string{"0.5", "-2.25", "3.75"})
+				},
+			},
+			{
+				n: "8", line: 295, title: "subscription to a list attribute, modified", pics: "MCORE.IDM.C.SubscribeRequest.Attribute.DataType_List",
 				at: "ULABEL.S", need: "ULABEL.S.A0000",
 				run: modify(userlabel.ClusterID, userlabel.AttrLabelList, []spec.Encodable{
 					listOf(userlabel.LabelStruct{Label: "a", Value: "1"}),
@@ -688,10 +719,10 @@ func caseIDM41() goCertCase {
 					listOf(userlabel.LabelStruct{Label: "c", Value: "3"}),
 				}, []string{`[["a", "1"]]`, `[["b", "2"]]`, `[["c", "3"]]`}),
 			},
-			{n: "9", line: 320, title: "TH withholds reports for the maximum interval", na: "Not verifiable/Out of scope in CHIP's certification harness: " +
-				"forcing the TH to withhold reports and replay an expired subscription id has no defined mechanism (TC-IDM-4.1.test.ts:327-330)"},
+			{n: "9", line: 318, title: "TH withholds reports for the maximum interval", na: "Not verifiable/Out of scope in CHIP's certification harness: " +
+				"forcing the TH to withhold reports and replay an expired subscription id has no defined mechanism (TC-IDM-4.1.test.ts:325-328)"},
 			{
-				n: "10", line: 332, title: "subscription to multiple attributes", pics: "MCORE.IDM.C.SubscribeRequest.MultipleAttributes",
+				n: "10", line: 330, title: "subscription to multiple attributes", pics: "MCORE.IDM.C.SubscribeRequest.MultipleAttributes",
 				at: "OO.S & LVL.S.A0001 & I.S.A0000", run: func(th *goTH) error {
 					ps := []im.ConcreteAttributePath{
 						attrPath(th.ep, onoff.ClusterID, onoff.AttrOnOff),
@@ -847,4 +878,151 @@ func caseIDM64() goCertCase {
 			{n: "6", line: 192, title: "TH sends Report Data after the max interval", na: notTestable + " (TC-IDM-6.4.test.ts:197)"},
 		},
 	}
+}
+
+// manufacturerSpecificClusterThreshold is TC-IDM-2.1's
+// MANUFACTURER_SPECIFIC_CLUSTER_THRESHOLD (TC-IDM-2.1.test.ts:55): a
+// cluster id with a nonzero vendor prefix.
+const manufacturerSpecificClusterThreshold = 0x10000
+
+// hexIDs renders cluster ids for a step's evidence.
+func hexIDs(ids []uint32) string {
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, fmt.Sprintf("0x%08X", id))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// CHIP's UnitTesting cluster as the reference daemon serves it under
+// --unit-testing (examples/reference-bridge/unit_testing.go), after
+// matter.js support/chip-testing/src/cert/unit-testing-cluster.ts at
+// b25ed960: the cluster id (:83), its endpoint UNIT_TESTING_ENDPOINT (:64,
+// the daemon's Aggregator), the attributes the data-type steps write
+// (:91-106) and LONG_OCTET_STRING_ENTRY (:70).
+const (
+	unitTestingClusterID               uint32 = 0xFFF1FC05
+	unitTestingEndpoint                uint16 = 1
+	unitTestingAttrFloatSingle         uint32 = 0x17
+	unitTestingAttrOctetString         uint32 = 0x19
+	unitTestingAttrStructAttr          uint32 = 0x25
+	unitTestingAttrListLongOctetString uint32 = 0x2A
+)
+
+var unitTestingLongOctetStringEntry = bytes.Repeat([]byte("0123456789abcdef"), 32)
+
+// unitTestingPath is TC-IDM-3.1's unitTestingPath (TC-IDM-3.1.test.ts:72-78).
+func unitTestingPath(attr uint32) im.ConcreteAttributePath {
+	return attrPath(unitTestingEndpoint, unitTestingClusterID, attr)
+}
+
+// writeBackAt writes v to p and holds the read-back to want, as
+// TC-IDM-3.1's writeAndReadBack does.
+func writeBackAt(th *goTH, n *client.Node, p im.ConcreteAttributePath, v spec.Encodable, want string) error {
+	if err := th.write(n, p, v, client.WriteOptions{}); err != nil {
+		return err
+	}
+	got, err := th.readValue(n, p)
+	if err != nil {
+		return err
+	}
+	if describeNode(got) != want {
+		return fmt.Errorf("%s reads %s after the write, want %s", describePath(p), describeNode(got), want)
+	}
+	th.note("wrote %s to %s: Success, reads back", want, describePath(p))
+	return nil
+}
+
+// idm31WriteStruct is TC-IDM-3.1 step 9: STRUCT_VALUE written to
+// UnitTesting.structAttr and read back field by field (isStructValue,
+// TC-IDM-3.1.test.ts:82, :97-105; a field is matched by its id).
+func idm31WriteStruct(th *goTH, n *client.Node) error {
+	p := unitTestingPath(unitTestingAttrStructAttr)
+	value := encodable(func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(0), 7)
+		enc.PutBool(tlv.ContextTag(1), true)
+		enc.PutUint(tlv.ContextTag(2), 2)
+		enc.PutOctets(tlv.ContextTag(3), []byte{0xde, 0xad})
+		enc.PutUTF8(tlv.ContextTag(4), "")
+		enc.PutUint(tlv.ContextTag(5), 5)
+		enc.PutFloat32(tlv.ContextTag(6), 1.5)
+		enc.PutFloat64(tlv.ContextTag(7), -0.25)
+		_ = enc.EndContainer()
+	})
+	if err := th.write(n, p, value, client.WriteOptions{}); err != nil {
+		return err
+	}
+	got, err := th.readValue(n, p)
+	if err != nil {
+		return err
+	}
+	want := []string{"7", "true", "2", "dead", `""`, "5", "1.5", "-0.25"}
+	for tag, w := range want {
+		f, ok := structField(got, uint8(tag))
+		if !ok {
+			return fmt.Errorf("%s reads %s after the write: no field %d", describePath(p), describeNode(got), tag)
+		}
+		if describeNode(f) != w {
+			return fmt.Errorf("%s field %d reads %s after the write, want %s", describePath(p), tag, describeNode(f), w)
+		}
+	}
+	th.note("wrote %s to %s: Success, reads back field by field", describeNode(got), describePath(p))
+	return nil
+}
+
+// idm31ListAppendFinding is the findings-register bullet step 13 fails
+// with: the daemon answers each list-append of an octet-string entry
+// CONSTRAINT_ERROR (bridge listItemValue decodes the entry as []any, and
+// endpoint appendListValue refuses an item whose slice type is not the
+// stored list's [][]byte), so the chunked write's ADDs fail.
+// PROVISIONAL id, assigned by the coordinator at integration (P2b-F report).
+const idm31ListAppendFinding = "F-b25ed960-39"
+
+// reClientWriteChunks is the Go client's own record of a write: the
+// number of WriteRequest messages it sent (client/interaction/write.go,
+// matter.controller.interaction.write at Debug).
+var reClientWriteChunks = regexp.MustCompile(`msg=matter\.controller\.interaction\.write .*?chunks=(\d+)`)
+
+// idm31WriteLongList is TC-IDM-3.1 step 13: LONG_LIST_VALUE, three
+// 512-byte entries, written to UnitTesting.listLongOctetString and read
+// back (isLongListValue, TC-IDM-3.1.test.ts:85, :107-113). matter.js
+// proves the chunking on its TH's log (expectChunkedWrite,
+// tc-idm-3.1-support.ts:158-162); mirrored, the TH is the Go controller
+// and the step's evidence is its own count of WriteRequest messages, at
+// least two (owner decision C-21; the leg's rule for log-proved steps,
+// gocert_test.go). The TS's n/a over a TCP session
+// (chunkedWriteNotApplicable, tc-idm-3.1-support.ts:77-93) is not
+// mirrored: the Go TH's sessions are UDP, and a write that went as one
+// message fails the step.
+func idm31WriteLongList(th *goTH, n *client.Node) error {
+	p := unitTestingPath(unitTestingAttrListLongOctetString)
+	entries := [][]byte{unitTestingLongOctetStringEntry, unitTestingLongOctetStringEntry, unitTestingLongOctetStringEntry}
+	value := encodable(func(enc *tlv.Encoder, tag tlv.Tag) { spec.PutList(spec.PutBytes)(enc, tag, entries) })
+	logFrom := len(th.logs.String())
+	if err := th.write(n, p, value, client.WriteOptions{}); err != nil {
+		return err
+	}
+	got, err := th.readValue(n, p)
+	if err != nil {
+		return err
+	}
+	if len(got.Children) != len(entries) {
+		return fmt.Errorf("%s reads %d entries after the write, want %d", describePath(p), len(got.Children), len(entries))
+	}
+	for i, c := range got.Children {
+		if !bytes.Equal(c.El.Octets, unitTestingLongOctetStringEntry) {
+			return fmt.Errorf("%s entry %d reads %d bytes that are not LONG_OCTET_STRING_ENTRY", describePath(p), i, len(c.El.Octets))
+		}
+	}
+	m := reClientWriteChunks.FindStringSubmatch(th.logs.String()[logFrom:])
+	if m == nil {
+		return errors.New("the TH logged no matter.controller.interaction.write line for the write, so its chunks cannot be counted")
+	}
+	chunks, _ := strconv.Atoi(m[1])
+	if chunks < 2 {
+		return fmt.Errorf("the TH sent the write as %d WriteRequest message, want at least 2 (chunked)", chunks)
+	}
+	th.note("wrote %d entries of %d bytes to %s in %d WriteRequest messages: Success, reads back", len(entries), len(unitTestingLongOctetStringEntry), describePath(p), chunks)
+	return nil
 }
