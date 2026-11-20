@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
-package commissioner
+package attestation
 
 // A port of matter.js packages/protocol/test/certificate/CertificatesTest.ts at
 // 862ad75f: the describe "getPublicKeyFromCsr" — Certificate.getPublicKeyFromCsr
-// is publicKeyFromCSR here. The other cases are in
+// is publicKeyFromCSR here, which attestation.ValidateNOCSR runs on the
+// CSR of a CSRResponse (moved from controller/commissioner with pin-lift
+// unit P2-D). The other cases are in
 // secure/mattercert/certificates_parity_matterjs_test.go and
-// controller/attestation/certificates_parity_matterjs_test.go.
+// certificates_parity_matterjs_test.go of this package.
 
 import (
 	"bytes"
@@ -18,7 +20,6 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/hex"
-	"errors"
 	"strings"
 	"testing"
 )
@@ -121,7 +122,7 @@ func TestCertificatesGetPublicKeyFromCsr(t *testing.T) {
 		// A constructed SET where the RDNSequence belongs (CertificatesTest.ts:739).
 		_, err := publicKeyFromCSR(certificatesSignCSR(t, key, certificatesRequest(t, key, []byte{0x31, 0x00})))
 		// The refusal is the parse of the subject, not the signature check.
-		if !errors.Is(err, errUnexpectedResponse) || strings.Contains(err.Error(), "signature") {
+		if err == nil || strings.Contains(err.Error(), "signature") {
 			t.Fatalf("publicKeyFromCSR = %v, want the CSR refused for its subject", err)
 		}
 	})

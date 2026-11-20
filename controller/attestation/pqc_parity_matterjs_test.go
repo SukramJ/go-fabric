@@ -284,7 +284,7 @@ func pqcFixture(t *testing.T, paaAlg, paiAlg attestation.KeyAlgorithm, paiSigner
 		ctx: attestation.Context{Challenge: challenge, Store: store},
 		data: attestation.Data{
 			DAC: dac.Raw, PAI: pai.Raw, Elements: el, Signature: sign(t, dacKey, el, challenge), Nonce: nonce,
-			VendorID: 0xFFF1, ProductID: 0x8000,
+			VendorID: new(uint16(0xFFF1)), ProductID: new(uint16(0x8000)),
 		},
 	}
 }

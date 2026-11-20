@@ -322,7 +322,7 @@ func newFixture(t *testing.T, s chainSpec, cd cdSpec) fixture {
 		ctx: attestation.Context{Challenge: challenge, Store: attestation.TestStore()},
 		data: attestation.Data{
 			DAC: dac, PAI: pai, Elements: el, Signature: sign(t, key, el, challenge), Nonce: nonce,
-			VendorID: 0xFFF1, ProductID: 0x8000,
+			VendorID: new(uint16(0xFFF1)), ProductID: new(uint16(0x8000)),
 		},
 	}
 }

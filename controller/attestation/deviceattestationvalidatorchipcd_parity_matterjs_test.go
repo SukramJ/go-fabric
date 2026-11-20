@@ -55,7 +55,7 @@ func chipCDValidate(t *testing.T, v chipVector, store PAAStore) (Result, error) 
 	s.FillBytes(sig[32:])
 	return Validate(Context{Challenge: challenge, Store: store}, Data{
 		DAC: unhex(t, v.DACCert), PAI: unhex(t, v.PAICert), Elements: elements, Signature: sig, Nonce: nonce,
-		VendorID: 0xFFF1, ProductID: v.BasicInfoPID,
+		VendorID: new(uint16(0xFFF1)), ProductID: new(v.BasicInfoPID),
 	})
 }
 
