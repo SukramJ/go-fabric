@@ -36972,7 +36972,7 @@
       "identifier": "TestElectricalAccuracyCoversServedTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_reporting_test.go",
-      "line": 109
+      "line": 175
     },
     {
       "package": "examples/reference-bridge",
@@ -36993,7 +36993,7 @@
       "identifier": "TestEnergyReportingFakeReadings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_reporting_test.go",
-      "line": 23
+      "line": 74
     },
     {
       "package": "examples/reference-bridge",
