@@ -26,6 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
@@ -279,49 +280,53 @@ func TestFailsafeExpiryChecksTheResponse(t *testing.T) {
 // at :922-928).
 func TestFailsafeExpiryAwaitsTheRearmInFlight(t *testing.T) {
 	t.Parallel()
-	dev := &failsafeDevice{info: expiryInfo}
-	held, release := make(chan struct{}), make(chan struct{})
-	var arms atomic.Int32
-	f, clock := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
-		// The device holds its answer to the periodic re-arm.
-		if expiry, ok := armRequest(req); ok && expiry != 0 && arms.Add(1) == 2 {
-			close(held)
-			<-release
+	// In a synctest bubble: synctest.Wait finds the flow durably blocked —
+	// on the re-arm it awaits, or on the expiry it sent too early.
+	synctest.Test(t, func(t *testing.T) {
+		// The bubble starts in 2000, before the CA's certificates may.
+		time.Sleep(time.Until(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)))
+		dev := &failsafeDevice{info: expiryInfo}
+		held, release := make(chan struct{}), make(chan struct{})
+		var arms atomic.Int32
+		f, clock := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+			// The device holds its answer to the periodic re-arm.
+			if expiry, ok := armRequest(req); ok && expiry != 0 && arms.Add(1) == 2 {
+				close(held)
+				<-release
+			}
+			return dev.handle(req)
+		})
+		sc := scriptedOf(t, f)
+		boom := errors.New("step failure")
+		var before atomic.Int32
+		f.steps = []step{
+			{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }},
+			{15, 1, "fail", func(ctx context.Context) (stepResult, error) {
+				f.startArmInterval(ctx)
+				// The timer's re-arm runs inside Advance until it is answered.
+				go clock.Advance(f.armPeriod())
+				<-held
+				before.Store(sc.received.Load())
+				return 0, boom
+			}},
 		}
-		return dev.handle(req)
-	})
-	sc := scriptedOf(t, f)
-	boom := errors.New("step failure")
-	var before atomic.Int32
-	f.steps = []step{
-		{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }},
-		{15, 1, "fail", func(ctx context.Context) (stepResult, error) {
-			f.startArmInterval(ctx)
-			// The timer's re-arm runs inside Advance until it is answered.
-			go clock.Advance(f.armPeriod())
-			<-held
-			before.Store(sc.received.Load())
-			return 0, boom
-		}},
-	}
-	done := make(chan error, 1)
-	go func() { done <- f.execute(context.Background()) }()
-	<-held
-	time.Sleep(300 * time.Millisecond)
-	if b, n := before.Load(), sc.received.Load(); b != 0 && n != b {
+		done := make(chan error, 1)
+		go func() { done <- f.execute(context.Background()) }()
+		<-held
+		synctest.Wait()
+		if b, n := before.Load(), sc.received.Load(); b == 0 || n != b {
+			close(release)
+			t.Fatalf("%d datagrams went to the device while the re-arm was unanswered: the expiry did not wait", n-b)
+		}
 		close(release)
-		t.Fatalf("%d datagrams went to the device while the re-arm was unanswered: the expiry did not wait", n-b)
-	}
-	close(release)
-	select {
-	case err := <-done:
-		if err != boom { //nolint:errorlint // returned as is
+		if err := <-done; err != boom { //nolint:errorlint // returned as is
 			t.Fatalf("error %v, want the step's error", err)
 		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("the flow did not return")
-	}
-	if !slices.Equal(dev.armed(), []uint16{60, 60, 0}) || !f.failSafeEnd.IsZero() {
-		t.Fatalf("ArmFailSafe %v, want [60 60 0] and the fail-safe ended", dev.armed())
-	}
+		if !slices.Equal(dev.armed(), []uint16{60, 60, 0}) || !f.failSafeEnd.IsZero() {
+			t.Fatalf("ArmFailSafe %v, want [60 60 0] and the fail-safe ended", dev.armed())
+		}
+		// Every goroutine of the bubble ends: the manager, then the device.
+		f.interaction().Provider().Manager().Close()
+		close(sc.inbox)
+	})
 }
