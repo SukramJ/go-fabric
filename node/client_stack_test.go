@@ -23,6 +23,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 )
 
@@ -89,12 +90,20 @@ func TestClientStackStatesTheNodesSessionParameters(t *testing.T) {
 	if _, err := cp.connect(t, peer.ConnectOptions{RequiredTransport: &udp}); err != nil {
 		t.Fatal(err)
 	}
-	var found bool
-	for _, info := range cp.b.Node().Sessions().Sessions() {
-		if info.PeerNodeID != cp.aFabric.NodeID || info.IsPASE {
-			continue
+	// b completes its side of the establishment after the status report
+	// that lets a return (Manager.Sessions lists no session still
+	// establishing): wait for it.
+	var opened []operational.SessionInfo
+	waitFor(t, site, "b holds a session a opened", func() bool {
+		opened = opened[:0]
+		for _, info := range cp.b.Node().Sessions().Sessions() {
+			if info.PeerNodeID == cp.aFabric.NodeID && !info.IsPASE {
+				opened = append(opened, info)
+			}
 		}
-		found = true
+		return len(opened) > 0
+	})
+	for _, info := range opened {
 		if info.PeerIdleIntervalMs != 900 || info.PeerActiveIntervalMs != 350 || info.PeerActiveThresholdMs != 5000 {
 			t.Errorf("b reads a's intervals %d/%d/%d, want 900/350/5000", info.PeerIdleIntervalMs, info.PeerActiveIntervalMs, info.PeerActiveThresholdMs)
 		}
@@ -105,9 +114,6 @@ func TestClientStackStatesTheNodesSessionParameters(t *testing.T) {
 		if transports, _ := e.PeerTransportParameters(); transports&sessionparams.TransportTCPClient == 0 {
 			t.Errorf("b reads a's transports %#x, want the TCP client role", transports)
 		}
-	}
-	if !found {
-		t.Fatal("b holds no session a opened")
 	}
 	// b's responder keeps a's parameters in its resumption record, the one
 	// record per peer a CASE client resumes from too (review II, Fable P-5;
