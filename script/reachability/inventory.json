@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10119,
+  "entry_points": 10120,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27805,
+    "total_exported": 27806,
     "reachable": 20852,
-    "whitelisted": 6930,
+    "whitelisted": 6931,
     "unreachable": 23
   },
   "by_package": [
@@ -1614,7 +1614,14 @@
       "identifier": "TestCASEResponderEstablishment",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_establishment_test.go",
-      "line": 46
+      "line": 47
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCASEResumeWaitsForSuccessUntilItsDeadline",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_establishment_test.go",
+      "line": 167
     },
     {
       "package": "bridge",
