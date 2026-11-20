@@ -953,19 +953,14 @@ func (s *Server) MatterGeneratedCommands() []uint32 {
 // MatterInvoke implements [contract.ClusterServer]: an accepted command
 // goes to its handler; one not accepted, or accepted without a handler,
 // is UNSUPPORTED_COMMAND. The request's types and constraints are the
-// decoder's to refuse, before the server runs (decision 64). Before the
-// handler the request is held to the definition again
-// ([Instance.admitRequest]): a misfit is refused with the command's
-// stated refusal ([RequestCheck.Refusal]), else a value an enum does not
-// define with CONSTRAINT_ERROR, else it is logged and the handler runs. A
-// response
-// that breaks its fields' types, constraints or conformance — a field
-// mandatory by the request's ("TestRequest.Enable") left out — is FAILURE
+// decoder's to refuse, before the server runs (decision 64), and its model
+// check is the endpoint dispatcher's ([AdmitRequest]), run before it calls
+// MatterInvoke; a direct call is a local one and is not validated. A
+// response that breaks its fields' conformance — a field mandatory by the
+// request's ("TestRequest.Enable") left out, or an absent response of a
+// command whose response has a mandatory field — is FAILURE
 // ([Instance.checkResponse]).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	if err := s.admitRequest(ctx, cmdID, fields, s.peers); err != nil {
-		return nil, err
-	}
 	return s.dispatch(ctx, cmdID, fields)
 }
 

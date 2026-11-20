@@ -15,14 +15,14 @@ import (
 // Emit ([Events]) and SetBeforeWrite ([WriteVeto]); the server writes
 // SetAttributes over its own setters. The server embeds it, calls
 // [Hooks.Init] with its instance when it is built, runs [Hooks.Invoke]
-// first in its MatterInvoke (the request gate, then the host's handler) and [Hooks.CheckWrite] after its own checks
+// first in its MatterInvoke (the host's handler; the request gate is the
+// endpoint dispatcher's, [AdmitRequest]) and [Hooks.CheckWrite] after its own checks
 // of a controller's write and its comparison with the held value, and hands the endpoint's emitter on with
 // [Hooks.SetMatterEventEmitter] — promoted, or called from its own when
 // it keeps the emitter itself too.
 //
-// Deprecated: Hooks admits a request and checks a response without the
-// server's attributes, so a conformance naming one is not resolved. A
-// self-held server builds a [Server] over its own state — [ServerConfig]
+// Deprecated: Hooks checks a response without the server's attributes,
+// so a conformance naming one is not resolved. A self-held server builds a [Server] over its own state — [ServerConfig]
 // Source answering its reads, Handlers its own commands — and routes
 // MatterInvoke through [InvokeHeld] over [NewSelfHeld]; its events and its
 // veto are an [Events] and a [WriteVeto] (review II, decision 154).
@@ -44,24 +44,14 @@ func (h *Hooks) Handle(cmdID uint32, fn CommandHandler) error {
 	return h.handlers.Register(h.inst, cmdID, fn)
 }
 
-// Invoke holds the request to the definition first, as [InvokeHeld] and
-// [Server.MatterInvoke] do — a request it refuses ([Instance.admitRequest]:
-// the command's [RequestCheck.Refusal], or CONSTRAINT_ERROR for a value an
-// enum does not define) is answered with handled true, so neither the
-// host's handler nor the server's own logic runs — then runs the host's handler of cmdID,
-// its response held to the definition ([HostHandlers.Invoke]); handled is
-// false when the host registered none, and the server's own logic runs.
-// The hooks hold no read of the server's state: a request or response
-// conformance naming one of the cluster's attributes is not resolved.
-// Run from a self-held server's own logic behind [InvokeHeld], for the
-// instance and command InvokeHeld admitted, the request is not held a
-// second time (decision 177).
+// Invoke runs the host's handler of cmdID, its response held to the
+// definition ([HostHandlers.Invoke]); handled is false when the host
+// registered none, and the server's own logic runs. The request's model
+// check is the endpoint dispatcher's ([AdmitRequest]), run before the
+// server; a direct call is a local one and is not validated. The hooks
+// hold no read of the server's state: a response conformance naming one
+// of the cluster's attributes is not resolved.
 func (h *Hooks) Invoke(ctx context.Context, cmdID uint32, fields any) (resp any, handled bool, err error) {
-	if h.inst != nil && !admittedBy(ctx, h.inst, cmdID) {
-		if err := h.inst.admitRequest(ctx, cmdID, fields, nil); err != nil {
-			return nil, true, err
-		}
-	}
 	return h.handlers.Invoke(ctx, cmdID, fields)
 }
 

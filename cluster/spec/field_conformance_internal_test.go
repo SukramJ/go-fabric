@@ -5,8 +5,11 @@ package spec
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // The branches of the conformance compiler, the response check and the
@@ -221,6 +224,12 @@ func TestEnumAndValidatorBranches(t *testing.T) {
 
 type ctAnswer struct{ Yes *any }
 
+// isStatus reports whether err carries the status want.
+func isStatus(err error, want im.StatusCode) bool {
+	var sce im.StatusCodeError
+	return errors.As(err, &sce) && sce.MatterStatusCode() == want
+}
+
 func TestResponseCheckShapes(t *testing.T) {
 	t.Parallel()
 	def := &Cluster{ID: 0xFFF1FC0C, Name: "Q", Revision: 1, Commands: []Command{
@@ -243,6 +252,18 @@ func TestResponseCheckShapes(t *testing.T) {
 	}
 	if err := inst.checkResponse(2, nil, ctAnswer{Yes: some(true)}, nil); err != nil {
 		t.Errorf("an answer: %v", err)
+	}
+	// An absent response is judged as {}: its mandatory Yes is missing
+	// (matter.js ProtocolService.ts:624-625, :718-733 at b25ed960;
+	// F-b25ed960-30).
+	if err := inst.checkResponse(2, nil, nil, nil); !isStatus(err, im.StatusFailure) {
+		t.Errorf("an absent answer: %v, want FAILURE", err)
+	}
+	if err := inst.checkResponse(2, nil, (*ctAnswer)(nil), nil); !isStatus(err, im.StatusFailure) {
+		t.Errorf("a nil *answer: %v, want FAILURE", err)
+	}
+	if err := inst.checkResponse(1, nil, nil, nil); err != nil {
+		t.Errorf("a status-only command without a response: %v", err)
 	}
 	if err := inst.CheckConformance(9, 1, nil); err != nil {
 		t.Error(err)

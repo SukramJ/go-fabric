@@ -28,12 +28,12 @@ var registry sync.Map // uint32 → *Cluster
 // generated ones. Its request commands' Decode turns a payload into its
 // request type, holding the types and constraints its decoder is written
 // to hold, as a generated decoder holds the ones the generator renders;
-// the server then holds the decoded request to the definition before any
-// handler ([Instance.CheckRequest], [Server.MatterInvoke], [InvokeHeld]):
+// the endpoint dispatcher then holds the decoded request to the definition
+// before the server runs ([AdmitRequest]):
 // a command whose [RequestCheck] states a Refusal answers a request that
 // does not fit with it, every other command refuses a value an enum does
 // not define with CONSTRAINT_ERROR and logs any other failure and runs
-// ([Instance.admitRequest]).
+// ([AdmitRequest]).
 func Register(defs ...*Cluster) {
 	for _, d := range defs {
 		if held, loaded := registry.LoadOrStore(d.ID, d); loaded && held != d {

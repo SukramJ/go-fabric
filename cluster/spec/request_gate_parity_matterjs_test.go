@@ -170,7 +170,7 @@ func TestRequestGateParityMatterJS(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = srv.MatterInvoke(context.Background(), c.cmd, c.req)
+			_, err = wireInvoke(context.Background(), srv, c.cmd, c.req)
 			if got := spec.StatusOf(err); got != c.status {
 				t.Errorf("status %v (%v), want %v", got, err, c.status)
 			}
