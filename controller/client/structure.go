@@ -17,7 +17,7 @@ import (
 )
 
 // errCorruptCache: loading the cache scheduled something other than an
-// installation (ClientStructure.ts:217-229).
+// installation (ClientStructure.ts:260-272 at b25ed960).
 var errCorruptCache = errors.New("client: corrupt cache")
 
 // emissionKind is what a structure emission announces.
@@ -42,11 +42,11 @@ type emission struct {
 }
 
 // pendingChange is a structural change queued until a report is applied
-// (ClientStructure.ts:1634-1649).
+// (ClientStructure.ts:1926-1941 at b25ed960).
 type pendingChange struct{ erase, install, rebuild bool }
 
 // partsList is one endpoint's PartsList as #synchronizeDescriptor reads it
-// (ClientStructure.ts:1093-1115 at b25ed960): the endpoint numbers it
+// (ClientStructure.ts:1095-1115 at b25ed960): the endpoint numbers it
 // names, in order and each once.
 type partsList struct {
 	order []uint16
@@ -109,7 +109,7 @@ type structure struct {
 	// b25ed960); [structure.cacheFabricFiltered] reads it.
 	recordedFabricFiltered *bool
 	// epoch is the epoch an interaction starting now belongs to
-	// (ClientStructure.ts:128, :335-341).
+	// (ClientStructure.ts:128, :353-355 at b25ed960).
 	epoch *epoch
 
 	events  []emission
@@ -123,7 +123,8 @@ type structure struct {
 	quotaLogged   bool
 }
 
-// newStructure is a structure with its root endpoint (ClientStructure.ts:155-164):
+// newStructure is a structure with its root endpoint (ClientStructure.ts:178-188
+// at b25ed960):
 // the node itself, installed, of the RootNode device type with an unknown
 // revision (ClientNode.ts:401-404).
 func newStructure(mu *sync.RWMutex, log *slog.Logger, p *persister) *structure {
@@ -144,8 +145,8 @@ func newStructure(mu *sync.RWMutex, log *slog.Logger, p *persister) *structure {
 	return s
 }
 
-// epoch is ClientStructure.Epoch (ClientStructure.ts:1776-1782 at
-// db021da0): an interaction records the data versions it reports only if
+// epoch is ClientStructure.Epoch (ClientStructure.ts:1853-1855 at
+// b25ed960, set at :375-404): an interaction records the data versions it reports only if
 // its epoch is still the current one and trusted when its data is
 // applied; a change of the cache's fabric filter starts a new one, and
 // while the versions are forgotten the epoch is not trusted. Not
@@ -156,7 +157,7 @@ type epoch struct{ trusted bool }
 // takes data from: only they update cached values and data versions, and
 // only they get versions injected. Fabric filtered until a filter is
 // recorded. Mirrors matter.js ClientStructure.cacheFabricFiltered
-// (packages/node/src/node/client/ClientStructure.ts:326-333 at db021da0).
+// (packages/node/src/node/client/ClientStructure.ts:345-347 at b25ed960).
 func (s *structure) cacheFabricFiltered() bool {
 	return s.recordedFabricFiltered == nil || *s.recordedFabricFiltered
 }
@@ -168,14 +169,13 @@ func (s *structure) takeEmissions() []emission {
 	return out
 }
 
-// loadCache builds the structure from the store — ClientStructure.loadCache
-// (:183-232): per endpoint the Descriptor first (:199-205), each cluster's
-// seed checked (:210) and synchronized (:211); only installations may be
-// pending (:217-229); the structure events emitted (:231). Mirrors
-// matter.js ClientStructure.ts:251-258 at b25ed960 (loadCache): the
-// stored Descriptor lists count as reported (:251), and before the
-// installations the endpoints on the node are found, the root's list
-// checked and the parts placed (:256-258).
+// loadCache builds the structure from the store. Mirrors matter.js
+// ClientStructure.ts:223-276 at b25ed960 (loadCache): per endpoint the
+// Descriptor first (:239-245), each cluster's seed checked (:250) and
+// synchronized (:252); only installations may be pending (:260-272); the
+// structure events emitted (:274). The stored Descriptor lists count as
+// reported (:251), and before the installations the endpoints on the node
+// are found, the root's list checked and the parts placed (:256-258).
 func (s *structure) loadCache(stored []StoredEndpoint) error {
 	stored = s.cutBackStored(stored)
 	for _, se := range stored {
@@ -224,10 +224,10 @@ func (s *structure) loadCache(stored []StoredEndpoint) error {
 }
 
 // injectVersionFilters is the version filters of a read or subscription —
-// ClientStructure.injectVersionFilters (:252-290): one per cluster the
+// ClientStructure.injectVersionFilters (:300-338 at b25ed960): one per cluster the
 // read covers (isRelevant) whose version is known, none with
 // refreshChangesOmitted for a cluster in which the peer has a
-// changes-omitted attribute (:269-271, :1674-1692).
+// changes-omitted attribute (:327, :1966-1984).
 func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) []DataVersionFilter {
 	var out []DataVersionFilter
 	for _, epNo := range slices.Sorted(maps.Keys(s.endpoints)) {
@@ -251,11 +251,11 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 
 // withKnownVersions is the version filters a read or subscription sends —
 // the caller's own, kept as given and first, then the injected ones.
-// Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:286-324
-// (injectVersionFilters at db021da0): a request with the other fabric
+// Mirrors matter.js packages/node/src/node/client/ClientStructure.ts:300-338
+// (injectVersionFilters at b25ed960): a request with the other fabric
 // filter than the cache's, or one sent while the epoch is not trusted,
-// gets none injected (:288), and a cluster the caller filters gets no
-// injected filter (:293-295, :312), so the peer sees exactly the
+// gets none injected (:302-304), and a cluster the caller filters gets no
+// injected filter (:307-309, :326, :332), so the peer sees exactly the
 // caller's filter for it. caller is not modified.
 func (s *structure) withKnownVersions(sc scope, caller []DataVersionFilter, refreshChangesOmitted bool) []DataVersionFilter {
 	out := slices.Clone(caller)
@@ -281,10 +281,10 @@ func (s *structure) withKnownVersions(sc scope, caller []DataVersionFilter, refr
 // hasChangesOmittedAttribute: the peer has an attribute with the
 // changes-omitted quality in the cluster — every such attribute of the
 // model without the peer's AttributeList, the listed ones with it
-// (ClientStructure.ts:1674-1692). A cluster without a built shape has none
-// (:1675-1678). The schema's tables stand for the ClusterModel: they know
-// every snapshot cluster, so a named cluster (no generated definition) is
-// judged exactly, as matter.js judges it.
+// (ClientStructure.ts:1966-1984 at b25ed960). A cluster without a built
+// shape has none (:1967-1970). The schema's tables stand for the
+// ClusterModel: they know every snapshot cluster, so a named cluster (no
+// generated definition) is judged exactly, as matter.js judges it.
 func hasChangesOmittedAttribute(c *Cluster) bool {
 	if c.current == nil {
 		return false
@@ -295,7 +295,7 @@ func hasChangesOmittedAttribute(c *Cluster) bool {
 	return slices.ContainsFunc(c.in.attributes, func(id uint32) bool { return schema.AttributeChangesOmitted(c.id, id) })
 }
 
-// batch is an AttributeUpdates (ClientStructure.ts:1601-1605): the values
+// batch is an AttributeUpdates (ClientStructure.ts:1887-1891 at b25ed960): the values
 // of one consecutive endpoint and cluster.
 type batch struct {
 	ep      uint16
@@ -304,31 +304,32 @@ type batch struct {
 	version *uint32
 }
 
-// mutateContext is the per-interaction state of mutate (:59-67).
+// mutateContext is the per-interaction state of mutate (:59-75 at b25ed960).
 type mutateContext struct {
 	endpointsWithData map[uint16]bool
 	clustersWithData  map[*Cluster]bool
 	// emitsEvents: the interaction's events reach the node's observers
-	// and its cursor — options.emitEvents (:412, default false).
+	// and its cursor — options.emitEvents (:421, :426, default false).
 	emitsEvents bool
-	// epoch is the interaction's (options.epoch, :409, :427).
+	// epoch is the interaction's (options.epoch, :423, :441).
 	epoch *epoch
 }
 
-// mutate applies a report — ClientStructure.mutate (:295-380) over a merged
-// report: the attribute values in order, batched per consecutive endpoint
-// and cluster (:462-504), the events (:506-528), the statuses logged
-// (:338-346), the last batch (:357-361), the structural changes (:375),
-// the structure events (:378) and the delayed events (:379).
+// mutate applies a report — ClientStructure.mutate (:417-513 at b25ed960)
+// over a merged report: the attribute values in order, batched per
+// consecutive endpoint and cluster (:464-466, :582-624), the events
+// (:468-470, :626-647), the statuses logged (:472-480), the last batch
+// (:492-495), the structural changes and structure events (:505,
+// :1812-1822) and the delayed events (:506-512).
 //
-// emitEvents is matter.js's options.emitEvents (:412, default false): only
+// emitEvents is matter.js's options.emitEvents (:421, :426, default false): only
 // an interaction that sets it — the default subscription while it is
 // current, its bootstrap read and the newly-commissioned read — hands its
 // events to the Event hook and raises the event cursor; every other
-// returns them in its Report only (#emitOccurrence, :1757-1770).
+// returns them in its Report only (#emitOccurrence, :1829-1845).
 //
 // in is the epoch the interaction started in, nil for the current one
-// (options.epoch, :396-397, :427).
+// (options.epoch, :423, :441).
 func (s *structure) mutate(sc scope, r *Report, emitEvents bool, in *epoch) {
 	if in == nil {
 		in = s.epoch
@@ -358,11 +359,11 @@ func (s *structure) mutate(sc scope, r *Report, emitEvents bool, in *epoch) {
 	s.emitPendingEvents()
 }
 
-// mutateAttribute is #mutateAttribute (:462-504): nothing is stored from an
-// interaction whose fabric filter differs from the cache's (:573-576 at
-// 862ad75f); the endpoint is recorded (:477); a change of endpoint or
-// cluster flushes the batch (:479-484); a new batch carries the report's
-// version only when the read covered the whole cluster (:494-497).
+// mutateAttribute is #mutateAttribute (:582-624 at b25ed960): nothing is
+// stored from an interaction whose fabric filter differs from the cache's
+// (:588-591); the endpoint is recorded (:597); a change of endpoint or
+// cluster flushes the batch (:599-604); a new batch carries the report's
+// version only when the read covered the whole cluster (:614-617).
 func (s *structure) mutateAttribute(a *AttributeData, sc scope, cur *batch, q *mutateContext) *batch {
 	if s.cacheFabricFiltered() != sc.fabricFiltered {
 		return cur
@@ -386,11 +387,12 @@ func (s *structure) mutateAttribute(a *AttributeData, sc scope, cur *batch, q *m
 	return cur
 }
 
-// emitEvent is #emitEvent (:506-528): delayed to the end of the report when
-// the endpoint is unknown or not installed, received data in this report or
-// has a structural change pending (:518-524), else delivered now (:526).
+// emitEvent is #emitEvent (:626-647 at b25ed960): delayed to the end of the
+// report when the endpoint is unknown or not installed, received data in
+// this report or has a structural change pending (:637-643), else
+// delivered now (:644-646).
 func (s *structure) emitEvent(e *EventData, q *mutateContext) {
-	// Mirrors matter.js ClientStructure.ts:1757-1758: no emit unless
+	// Mirrors matter.js ClientStructure.ts:1830-1832 at b25ed960: no emit unless
 	// q.emitsEvents() (W4-ctlim-01).
 	if !q.emitsEvents {
 		return
@@ -404,7 +406,7 @@ func (s *structure) emitEvent(e *EventData, q *mutateContext) {
 }
 
 // preserveAbsentCluster cancels a deletion of a cluster the peer still
-// sends data for — "Schrödinger's cluster" (:555-565).
+// sends data for — "Schrödinger's cluster" (:674-684 at b25ed960).
 func (s *structure) preserveAbsentCluster(ep *Endpoint, c *Cluster) {
 	if !c.pendingDelete {
 		return
@@ -415,9 +417,9 @@ func (s *structure) preserveAbsentCluster(ep *Endpoint, c *Cluster) {
 }
 
 // updateCluster applies one batch — #applyUpdates and #updateCluster
-// (:673-695 at 862ad75f): data of an interaction that began before a
+// (:686-719 at b25ed960): data of an interaction that began before a
 // fabric filter switch, or while the epoch is not trusted, is applied with
-// an unknown version (:674-678).
+// an unknown version (:688-690).
 func (s *structure) updateCluster(b *batch, q *mutateContext) {
 	ep := s.endpointFor(b.ep)
 	c := s.clusterFor(ep, b.cluster)
@@ -438,7 +440,7 @@ func (s *structure) updateCluster(b *batch, q *mutateContext) {
 }
 
 // authoritativeAttributeList is the AttributeList a value states, nil
-// unless a non-empty list (:101-108).
+// unless a non-empty list (:109-116 at b25ed960).
 func authoritativeAttributeList(v *spec.Node) []uint32 {
 	if v == nil {
 		return nil
@@ -452,7 +454,7 @@ func authoritativeAttributeList(v *spec.Node) []uint32 {
 
 // invalidateOnDefinitionChange discards a shape the peer no longer matches:
 // a changed AttributeList, ClusterRevision, FeatureMap or
-// AcceptedCommandList (:632-659).
+// AcceptedCommandList (:764-791 at b25ed960).
 func (s *structure) invalidateOnDefinitionChange(c *Cluster, values map[uint32]*spec.Node) {
 	if c.current == nil {
 		return
@@ -485,7 +487,7 @@ func (s *structure) invalidateOnDefinitionChange(c *Cluster, values map[uint32]*
 
 // pruneUnlistedAttributes deletes the stored values of attributes a
 // reported AttributeList omits; the batch's own values and global
-// attributes stay (:668-681, :690-707).
+// attributes stay (:800-813, :822-839 at b25ed960).
 func (s *structure) pruneUnlistedAttributes(c *Cluster, values map[uint32]*spec.Node) {
 	list := authoritativeAttributeList(values[spec.AttrAttributeList])
 	if list == nil {
@@ -503,8 +505,8 @@ func (s *structure) pruneUnlistedAttributes(c *Cluster, values map[uint32]*spec.
 
 // checkUnlistedSeedValues makes the peer resend a cached cluster holding
 // values its cached AttributeList omits: its version is forgotten, so the
-// next wildcard read fetches it (:721-744; values are keyed by id only, so
-// the name-keyed branch :734-737 does not apply).
+// next wildcard read fetches it (:853-876 at b25ed960; values are keyed by
+// id only, so the name-keyed branch :868-870 does not apply).
 func (s *structure) checkUnlistedSeedValues(c *Cluster) {
 	v, ok := c.cache.values[spec.AttrAttributeList]
 	if !ok {
@@ -523,10 +525,11 @@ func (s *structure) checkUnlistedSeedValues(c *Cluster) {
 }
 
 // synchronizeCluster builds the cluster's shape once something useful
-// exists (:754-837) — queued for an installed endpoint, as a rebuild when
-// the endpoint already exposes the cluster and an installation otherwise
-// (:825-831), set directly on one that is not installed (:832-835) — and
-// for the Descriptor synchronizes the endpoint (:839-848).
+// exists (:886-969 at b25ed960) — queued for an installed endpoint, as a
+// rebuild when the endpoint already exposes the cluster and an
+// installation otherwise (:957-963), set directly on one that is not
+// installed (:964-967) — and for the Descriptor synchronizes the endpoint
+// (:971-980).
 func (s *structure) synchronizeCluster(ep *Endpoint, c *Cluster, clustersWithData map[*Cluster]bool) {
 	if c.current == nil {
 		c.readInput()
@@ -571,7 +574,7 @@ func (s *structure) noteReportedLists(ep *Endpoint, c *Cluster, carries func(id 
 	}
 }
 
-// synchronizeDescriptor reads the Descriptor's lists (:851-1009).
+// synchronizeDescriptor reads the Descriptor's lists (:1001-1116 at b25ed960).
 func (s *structure) synchronizeDescriptor(ep *Endpoint, values map[uint32]spec.Node, clustersWithData map[*Cluster]bool) {
 	if v, ok := values[descriptor.AttrDeviceTypeList]; ok && isList(v) {
 		s.synchronizeDeviceTypes(ep, deviceTypeEntries(v))
@@ -585,7 +588,7 @@ func (s *structure) synchronizeDescriptor(ep *Endpoint, values map[uint32]spec.N
 }
 
 // deviceTypeEntries are a DeviceTypeList's entries; an entry without a
-// numeric device type is skipped (:866-868).
+// numeric device type is skipped (:1020-1022 at b25ed960).
 func deviceTypeEntries(v spec.Node) []descriptor.DeviceTypeStruct {
 	var out []descriptor.DeviceTypeStruct
 	for _, e := range v.Children {
@@ -615,7 +618,7 @@ func deviceTypeDefinition(devtype uint32) (*schema.DeviceTypeDefinition, bool) {
 	return schema.DeviceTypeDefinitionOf(id)
 }
 
-// #synchronizeDescriptor (:858-905).
+// #synchronizeDescriptor (:1008-1059 at b25ed960).
 func (s *structure) synchronizeDeviceTypes(ep *Endpoint, entries []descriptor.DeviceTypeStruct) {
 	s.noteComposition(ep, entries)
 	// Mirrors matter.js ClientStructure.ts:1013-1016 at b25ed960
@@ -628,13 +631,13 @@ func (s *structure) synchronizeDeviceTypes(ep *Endpoint, entries []descriptor.De
 		def, known := deviceTypeDefinition(dt.DeviceType)
 		isApp := known && isApplication(def.Classification)
 		// The root of a node whose type is not RootNode takes the revision
-		// only (:876-880).
+		// only (:1030-1034).
 		if ep.number == 0 && ep.deviceType != rootNodeDeviceType {
 			ep.deviceRevision, ep.hasRevision = dt.Revision, true
 			break
 		}
 		// A device type once found is replaced only by an application one
-		// (:882-892).
+		// (:1036-1046).
 		if ep.deviceType != UnknownDeviceType && !isApp {
 			continue
 		}
@@ -667,10 +670,10 @@ func (s *structure) noteComposition(ep *Endpoint, entries []descriptor.DeviceTyp
 	s.composition[ep] = comp
 }
 
-// synchronizeServerList is the ServerList half (:907-939): each listed
-// cluster gets its structure (:915-920); an exposed cluster the list omits
-// is deleted unless it has a pending shape or data arrived for it in this
-// interaction (:922-934).
+// synchronizeServerList is the ServerList half (:1061-1093 at b25ed960):
+// each listed cluster gets its structure (:1069-1074); an exposed cluster
+// the list omits is deleted unless it has a pending shape or data arrived
+// for it in this interaction (:1076-1092).
 func (s *structure) synchronizeServerList(ep *Endpoint, v spec.Node, clustersWithData map[*Cluster]bool) {
 	var supported []uint32
 	for _, id := range slices.Sorted(maps.Keys(ep.clusters)) {
@@ -700,7 +703,7 @@ func (s *structure) synchronizeServerList(ep *Endpoint, v spec.Node, clustersWit
 }
 
 // synchronizePartsList is the PartsList half of #synchronizeDescriptor.
-// Mirrors matter.js ClientStructure.ts:1093-1115 at b25ed960: the list's
+// Mirrors matter.js ClientStructure.ts:1095-1115 at b25ed960: the list's
 // valid endpoint numbers (EndpointNumber.isValid, 0 to 0xFFFE) other than
 // the root's, which is no endpoint's part (:1104-1107), each given its
 // endpoint; which endpoint owns a part is decided by
@@ -752,7 +755,7 @@ func (s *structure) visitBelowOnce(ep *Endpoint, f func(*Endpoint), seen map[*En
 	}
 }
 
-// endpointFor is #endpointFor (:1011-1037).
+// endpointFor is #endpointFor (:1118-1144 at b25ed960).
 func (s *structure) endpointFor(number uint16) *Endpoint {
 	if ep := s.endpoints[number]; ep != nil {
 		return ep
@@ -763,7 +766,7 @@ func (s *structure) endpointFor(number uint16) *Endpoint {
 	return ep
 }
 
-// clusterFor is #clusterFor (:1039-1057).
+// clusterFor is #clusterFor (:1146-1164 at b25ed960).
 func (s *structure) clusterFor(ep *Endpoint, id uint32) *Cluster {
 	if c := ep.clusters[id]; c != nil {
 		return c
@@ -796,7 +799,7 @@ func (s *structure) detachCache(c *Cluster) {
 	c.cache.total = nil
 }
 
-// ownerOf is #ownerOf (:1111-1125): the pending owner, else the owner; the
+// ownerOf is #ownerOf (:1218-1232 at b25ed960): the pending owner, else the owner; the
 // root has none.
 func (s *structure) ownerOf(ep *Endpoint) *Endpoint {
 	if ep.pendingOwner != nil {
@@ -852,7 +855,8 @@ func (s *structure) eraseOnce(ep *Endpoint, seen map[*Endpoint]bool) {
 	}
 }
 
-// rebuild replaces or deletes clusters of an installed endpoint (:1171-1222):
+// rebuild replaces or deletes clusters of an installed endpoint (:1272-1323
+// at b25ed960):
 // a deleted cluster's structure is discarded and its store erased, a pending
 // shape replaces or adds.
 func (s *structure) rebuild(ep *Endpoint) {
@@ -884,8 +888,8 @@ func (s *structure) rebuild(ep *Endpoint) {
 }
 
 // install installs the endpoint under its pending owner and the clusters
-// pending on it (:1227-1263); a cluster is announced on its own only when
-// the endpoint was installed before (:1252-1261).
+// pending on it (:1328-1364 at b25ed960); a cluster is announced on its own
+// only when the endpoint was installed before (:1353-1362).
 func (s *structure) install(ep *Endpoint) {
 	owner := ep.pendingOwner
 	if owner != nil {
@@ -946,10 +950,12 @@ func (s *structure) applyPendingChanges() {
 // (:1409-1424), so a part that cannot be placed yet is considered again on
 // the next apply; nothing is reparented and only a part on the node is
 // placed (:1430-1434), and only below a placed owner (:1436-1439); the
-// other claimants are warned about (:1441-1448). An endpoint naming itself
+// other claimants are warned about (:1442-1449). An endpoint naming itself
 // claims nothing there (review II, R2-P2-alloc-01): matter.js counts it
-// among its own claimants, which leaves it unplaced when it is the
-// closest.
+// among its own claimants (:1104-1113, :1409-1424) and so never places it
+// while its list names none of its other claimants — it is then the
+// chosen owner (:1607-1609, :1636-1643), and an owner must be placed
+// (:1437).
 func (s *structure) placeParts() {
 	var parts []*Endpoint
 	claimantsOf := map[*Endpoint][]*Endpoint{}
@@ -1125,9 +1131,9 @@ func (s *structure) checkRootPartsList() {
 // conflict with that choice, nil while that cannot be told. Mirrors
 // matter.js packages/node/src/node/client/ClientStructure.ts:1587-1627 at
 // b25ed960 (#ownerFor): a claimant not on the node owns nothing
-// (:1592-1596), one whose composition is unknown makes the part wait
-// (:1598-1603); an ordinary claimant is closer to the part than any
-// full-family one (:1608-1612); among the candidates the closest wins
+// (:1591-1595), one whose composition is unknown makes the part wait
+// (:1597-1602); an ordinary claimant is closer to the part than any
+// full-family one (:1607-1612); among the candidates the closest wins
 // ([structure.closestClaimant]); a full-family owner waits until every
 // endpoint it names has reported its own parts (:1614-1617). The
 // contenders are the other ordinary claimants, or the full-family ones
@@ -1246,7 +1252,7 @@ func (s *structure) checkRootDeviceTypes(entries []descriptor.DeviceTypeStruct) 
 		slog.String("reason", "the root must report at least one device type; its PartsList is read as listing every endpoint on the node"))
 }
 
-// schedule queues a structural change (:1488-1495).
+// schedule queues a structural change (:1745-1752 at b25ed960).
 func (s *structure) schedule(ep *Endpoint, kind string) {
 	ch := s.pending[ep]
 	if ch == nil {
@@ -1265,12 +1271,12 @@ func (s *structure) schedule(ep *Endpoint, kind string) {
 }
 
 // emitPendingStructureEvents closes the structure events with Changed
-// (:1503-1551); they were queued as the changes applied.
+// (:1760-1807 at b25ed960); they were queued as the changes applied.
 func (s *structure) emitPendingStructureEvents() {
 	s.events = append(s.events, emission{kind: emitChanged})
 }
 
-// emitPendingEvents delivers the delayed events (:1553-1563).
+// emitPendingEvents delivers the delayed events (:506-512 at b25ed960).
 func (s *structure) emitPendingEvents() {
 	for i := range s.delayed {
 		s.events = append(s.events, emission{kind: emitEvent, event: s.delayed[i]})

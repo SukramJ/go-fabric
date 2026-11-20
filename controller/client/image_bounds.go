@@ -161,17 +161,27 @@ func structureNames(list descriptorList) func(ep uint16, cluster uint32) bool {
 
 // admit is the attribute data of r the image takes (review II,
 // R2-P3-ctl-dev-02, owner decision 54; module's own, matter.js stores
-// every path a report names, ClientStructure.ts:568-610 at db021da0):
+// every path a report names, ClientStructure.ts:582-624 at b25ed960):
 //
 //   - a path the peer's structure names ([structureNames], judged on the
 //     report's own Descriptor lists where it carries them, else the
 //     image's, so a priming report keeps the data that precedes its
-//     Descriptor) or the request asked for ([scope].asks, and per
-//     attribute [scope].asksAttribute); any other is dropped, logged once
-//     per node;
+//     Descriptor), a path of an endpoint that describes itself — the
+//     report carries its Descriptor DeviceTypeList or PartsList, or the
+//     image holds one ([structure.reportedLists]) — or a path the request
+//     asked for ([scope].asks, and per attribute [scope].asksAttribute);
+//     any other is dropped, logged once per node;
 //   - a report whose kept values would raise the image above the node's
 //     quota, and above its present size, is refused whole: nothing of it
 //     is applied, logged once per node.
+//
+// The self-described endpoint is owner decision 342, which narrows decision
+// 54 as decision 57 did: it is the evidence matter.js takes to treat an
+// endpoint a PartsList names as existing (ClientStructure.ts:1503,
+// :1513-1515 at b25ed960, #findEndpointsOnTheNode and
+// #hasReportedDescriptorList), so an aggregator and its devices reported
+// before the root's PartsList names the aggregator are kept and placed once
+// it does (097e5a8da). The quota stays the memory bound.
 //
 // A report whose fabric filter differs from the cache's stores nothing
 // (mutateAttribute) and is returned as it is.
@@ -179,18 +189,7 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 	if len(r.Attributes) == 0 || s.cacheFabricFiltered() != sc.fabricFiltered {
 		return r.Attributes
 	}
-	reported := map[uint16]map[uint32]spec.Node{}
-	for i := range r.Attributes {
-		a := &r.Attributes[i]
-		p := a.Path
-		if p.Cluster != descriptor.ClusterID || p.Attribute != descriptor.AttrPartsList || !isList(a.Value) {
-			continue
-		}
-		if reported[p.Endpoint] == nil {
-			reported[p.Endpoint] = map[uint32]spec.Node{}
-		}
-		reported[p.Endpoint][p.Attribute] = a.Value
-	}
+	reported, described := reportedDescriptorLists(r)
 	names := structureNames(func(ep uint16, attr uint32) (spec.Node, bool) {
 		if v, ok := reported[ep][attr]; ok {
 			return v, true
@@ -217,7 +216,7 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		at := place{a.Path.Endpoint, a.Path.Cluster}
 		keep, ok := decided[at]
 		if !ok {
-			keep = sc.asks(at.ep, at.cluster) || names(at.ep, at.cluster)
+			keep = sc.asks(at.ep, at.cluster) || names(at.ep, at.cluster) || described[at.ep] || s.hasReportedDescriptorList(at.ep)
 			decided[at] = keep
 		}
 		if !keep && !sc.asksAttribute(a.Path.Attribute) {
@@ -265,6 +264,32 @@ func (s *structure) admit(sc scope, r *Report) []AttributeData {
 		return nil
 	}
 	return kept
+}
+
+// reportedDescriptorLists reads r's Descriptor data for admit: the
+// PartsLists it carries, per endpoint, and the endpoints that describe
+// themselves in it — it carries their DeviceTypeList or PartsList (owner
+// decision 342).
+func reportedDescriptorLists(r *Report) (reported map[uint16]map[uint32]spec.Node, described map[uint16]bool) {
+	reported, described = map[uint16]map[uint32]spec.Node{}, map[uint16]bool{}
+	for i := range r.Attributes {
+		a := &r.Attributes[i]
+		p := a.Path
+		if p.Cluster != descriptor.ClusterID {
+			continue
+		}
+		if p.Attribute == descriptor.AttrDeviceTypeList || p.Attribute == descriptor.AttrPartsList {
+			described[p.Endpoint] = true
+		}
+		if p.Attribute != descriptor.AttrPartsList || !isList(a.Value) {
+			continue
+		}
+		if reported[p.Endpoint] == nil {
+			reported[p.Endpoint] = map[uint32]spec.Node{}
+		}
+		reported[p.Endpoint][p.Attribute] = a.Value
+	}
+	return reported, described
 }
 
 // imagePlace is a cluster of an endpoint, as admit charges it.

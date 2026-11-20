@@ -803,9 +803,7 @@ func pairPeer(t *testing.T, st Store) (*Node, *warnRecorder) {
 // peer whose root names only its aggregator") (ClientBridgeStructureTest.ts
 // :419-662 at b25ed960). Left: "keeps an endpoint added locally that no
 // PartsList names" (endpoints.require; the Go image is built from reports
-// and its store only) and "places devices reported before the root names
-// their aggregator" (the image drops the data of an endpoint no PartsList
-// reached from the root names, [structure.admit]).
+// and its store only).
 func TestClientBridgeStructureRootNamesOnlyAggregatorParity(t *testing.T) {
 	t.Parallel()
 	const aggregatorEP = 1
@@ -893,6 +891,16 @@ func TestClientBridgeStructureRootNamesOnlyAggregatorParity(t *testing.T) {
 		r := bridgeReports([]uint16{aggregatorEP}, 10)
 		n.apply(wildcard, &oneInteraction(r[0], r[1], r[2], descriptorAttr(lights[1], spec.AttrClusterRevision, uintNode(3), 10)).r, true)
 		bridgeIs(t, n, aggregatorEP, lights[0])
+	})
+
+	t.Run("places devices reported before the root names their aggregator", func(t *testing.T) {
+		t.Parallel()
+		n, _ := pairPeer(t, &MemoryStore{})
+		n.apply(wildcard, &partsAttr(0, 10).r, true)
+		n.apply(wildcard, &oneInteraction(bridgeReports(nil, 11)[1:]...).r, true)
+		bridgeIs(t, n)
+		n.apply(wildcard, &partsAttr(0, 12, aggregatorEP).r, true)
+		bridgeIs(t, n, all...)
 	})
 
 	t.Run("does not erase an endpoint the root stops naming before it was placed", func(t *testing.T) {

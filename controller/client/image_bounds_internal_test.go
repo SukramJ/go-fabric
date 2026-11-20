@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/client/interaction"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -354,4 +355,68 @@ func TestImageQuotaBoundsMemoryAndRows(t *testing.T) { //nolint:paralleltest // 
 		}
 		runtime.KeepAlive(n)
 	}
+}
+
+// TestImageKeepsAnEndpointThatDescribesItself: under a wildcard the image
+// keeps an endpoint no PartsList names once the report carries its
+// Descriptor DeviceTypeList or PartsList, or the image already holds one
+// (owner decision 342, narrowing decision 54); an endpoint without that
+// evidence is still dropped, and the quota still bounds the image.
+func TestImageKeepsAnEndpointThatDescribesItself(t *testing.T) {
+	t.Parallel()
+	t.Run("described endpoints are kept, a stray one is dropped", func(t *testing.T) {
+		t.Parallel()
+		n, _, logs := testNode(t, &MemoryStore{})
+		n.apply(wildcard, &bridge(1).r, true)
+		b := &report{}
+		b.attr(1000, descriptor.ClusterID, descriptor.AttrDeviceTypeList, deviceTypes(dtOnOffLight), 1)
+		b.attr(1000, 0xFFF1_FC00, 0, uintNode(1), 1)
+		b.attr(1001, descriptor.ClusterID, descriptor.AttrPartsList, listNode(), 1)
+		b.attr(1002, descriptor.ClusterID, descriptor.AttrServerList, listNode(uint64(descriptor.ClusterID)), 1)
+		b.attr(1002, 0xFFF1_FC00, 0, uintNode(1), 1)
+		n.apply(wildcard, &b.r, true)
+		if ep := n.s.endpoints[1000]; ep == nil || ep.clusters[0xFFF1_FC00] == nil {
+			t.Error("an endpoint whose report carries its DeviceTypeList was dropped")
+		}
+		if n.s.endpoints[1001] == nil {
+			t.Error("an endpoint whose report carries its PartsList was dropped")
+		}
+		if n.s.endpoints[1002] != nil {
+			t.Error("an endpoint without a DeviceTypeList or PartsList was kept")
+		}
+		if got := logs.count("matter.controller.client.report_path_dropped"); got != 1 {
+			t.Errorf("the dropped paths were logged %d times; want once", got)
+		}
+		// The image now holds 1000's evidence: a later report of it alone is kept.
+		later := &report{}
+		later.attr(1000, 0xFFF1_FC00, 0, uintNode(2), 2)
+		n.apply(wildcard, &later.r, true)
+		if v := n.s.endpoints[1000].clusters[0xFFF1_FC00].cache.values[0]; v.El.Uint != 2 {
+			t.Error("a later report of a described endpoint was not applied")
+		}
+	})
+
+	t.Run("the quota still bounds described endpoints", func(t *testing.T) {
+		t.Parallel()
+		const quota = 64 << 10
+		n, _ := quotaNode(t, &MemoryStore{}, quota)
+		n.apply(wildcard, &bridge(1).r, true)
+		refused := 0
+		for i := range 40 {
+			ep := uint16(1000 + i) //nolint:gosec // test endpoint numbers
+			b := &report{}
+			b.attr(ep, descriptor.ClusterID, descriptor.AttrDeviceTypeList, deviceTypes(dtOnOffLight), 1)
+			b.attr(ep, 0xFFF1_FC00, 0, blobList(4, 1000), 1)
+			n.apply(wildcard, &b.r, true)
+			if n.s.endpoints[ep] == nil {
+				refused++
+			}
+		}
+		if refused == 0 {
+			t.Fatal("no report of a described endpoint was refused at the quota")
+		}
+		if got := n.s.imageBytes(); got > quota {
+			t.Errorf("the image holds %d bytes; want at most %d", got, quota)
+		}
+	})
 }

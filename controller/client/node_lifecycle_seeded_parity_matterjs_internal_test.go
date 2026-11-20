@@ -291,6 +291,21 @@ func TestNodeLifecycleSeededParity(t *testing.T) {
 		}
 	})
 
+	t.Run("places an aggregator's devices reported before the root's PartsList once the root names it", func(t *testing.T) {
+		t.Parallel()
+		s := newSeededNode(t, &MemoryStore{})
+		b := descriptorReports(1, []uint64{dtAggregator}, []uint16{2}, false)
+		b.r.Attributes = append(b.r.Attributes, descriptorReports(2, []uint64{dtOnOffLight}, []uint16{}, false).r.Attributes...)
+		s.apply(b)
+		if got := len(s.n.Endpoints()); got != 1 {
+			t.Fatalf("endpoints %d before the root's PartsList, want the root only (%s)", got, tree(s.n))
+		}
+		s.apply(descriptorReports(0, []uint64{dtRootNode}, []uint16{1}, true))
+		if got := tree(s.n); got != "0:0x16:- 1:0xe:0 2:0x100:1" || !s.n.Seeded() || s.count() != 1 {
+			t.Fatalf("tree %s, seeded %v ×%d", got, s.n.Seeded(), s.count())
+		}
+	})
+
 	t.Run("does not wait for a PartsList entry that is no endpoint number", func(t *testing.T) {
 		t.Parallel()
 		s := newSeededNode(t, &MemoryStore{})
