@@ -1629,7 +1629,7 @@ func (b *Bridge) settleAwaitedResume(key HandshakeKey, payload []byte) {
 	if !a.completeEstablishment(id, success) {
 		b.logger.Debug("matter.rx.sc.resume_not_established",
 			slog.Int("session_id", int(id)),
-			slog.Bool("success_report", success))
+			slog.Int("general_code", int(general)))
 	}
 }
 
