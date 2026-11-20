@@ -600,6 +600,15 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 				slog.Int("exchange_id", int(proto.ExchangeID)))
 			return nil
 		}
+		// A Sigma1 that is not a copy of the one that began a resumption
+		// fails that resumption's wait for the initiator's Success, before
+		// it is judged: matter.js's read of the Success meets it as another
+		// message type and force-closes the session
+		// (SecureChannelMessenger.ts:94-98,
+		// packages/protocol/src/session/case/CaseServer.ts:204-210 at
+		// b25ed960); a copy is a duplicate there and never read
+		// (ExchangeManager.ts:353-359, MessageExchange.ts:514-524).
+		b.endAwaitedResume(key)
 		// The handshake holds a TCP connection it runs on open until it
 		// ends (matter.js ExchangeManager.ts:634-648 counts the unsecured
 		// session on the channel). Over the record of another handshake
@@ -1554,7 +1563,11 @@ func (b *Bridge) handleCase(
 	resumer, _ := handler.(*CaseAdapter)
 	if resumer != nil && respOpcode == mrp.SCOpcodeSigma2Resume {
 		if installed, _ = resumer.takeResumeInstall(); installed != 0 {
-			resumer.awaitResumeSuccess(key, installed)
+			if prev, ok := resumer.awaitResumeSuccess(key, installed); ok {
+				// A wait the Sigma1 dispatch did not end — another
+				// exchange's on the singleton handler — is not orphaned.
+				b.failResume(resumer, prev)
+			}
 			b.armResumeDeadline(resumer, key, isConnRoute(src), true)
 		}
 	}
@@ -1641,12 +1654,12 @@ func (b *Bridge) settleAwaitedResume(key HandshakeKey, payload []byte) {
 
 // endsAwaitedResume reports whether a message of opcode on the unsecured
 // session ends the wait of a resumed session on its exchange
-// ([Bridge.endAwaitedResume]): every opcode but the StatusReport that
-// answers it, an acknowledgement, and a Sigma1 — copies of the Sigma1 that
-// began the resumption reach the router (Apple sends it over several
-// interfaces; the router answers them from its Sigma1 record,
-// [Bridge.handleSigma1]), and one of other bytes on the key of a completed
-// handshake begins nothing (errSigma1OverCompleted).
+// ([Bridge.endAwaitedResume]) here, before the opcode is routed: every
+// opcode but the StatusReport that answers it, an acknowledgement, and a
+// Sigma1, which its own case judges — a copy of the Sigma1 that began the
+// resumption (same bytes, [Bridge.markSigma1Replied]) leaves the wait, as
+// matter.js never reads a duplicate (ExchangeManager.ts:353-359,
+// MessageExchange.ts:514-524 at b25ed960), and any other Sigma1 ends it.
 func endsAwaitedResume(opcode uint8) bool {
 	switch opcode {
 	case mrp.SCOpcodeStatusReport, mrp.StandaloneAckOpcode, mrp.SCOpcodeSigma1:
@@ -1681,7 +1694,7 @@ func (b *Bridge) awaitingResumeAdapter(key HandshakeKey) *CaseAdapter {
 // returned — acknowledged over MRP, written over a connection — and on its
 // expiry force-closes the session
 // (packages/protocol/src/session/case/CaseServer.ts:204-210,
-// MessageExchange.ts:894-908 at b25ed960), the timeout the responder's
+// MessageExchange.ts:894-917 at b25ed960), the timeout the responder's
 // wait for Sigma3 has too ([Bridge.caseSigma3Wait]). Over a connection
 // (overConn) it runs from the send. Over UDP it runs from the
 // acknowledgement ([Bridge.unsecuredReplyAcknowledged]); armed at the send
@@ -1755,8 +1768,13 @@ func (b *Bridge) failResume(a *CaseAdapter, id uint16) bool {
 // and is not closed by id again here — except on the give-up of the
 // retransmit table ([tickOutboundReliable]), which names only the id: that
 // close finds the id free, as the allocator's cursor has moved past it
-// (secure/operational allocateIDLocked) — short of a table with no other
-// free id, a residual of the id-only report (Fable post-read L1). The controller's CASE
+// (secure/operational allocateIDLocked) — short of a wrapped cursor. The
+// same holds for a wait ended by entry earlier without the Sigma2_Resume's
+// acknowledgement — a failure report, another message or the deadline —
+// whose retransmit entry the give-up still closes by id up to
+// [unsecuredEntryLifetime] later: a residual of the id-only report (Fable
+// post-read L1), to go when the give-up skips the by-id close for an
+// adapter with the host hook. The controller's CASE
 // responder closes such a session too (client/handshake). It is a liveness
 // rule, not a defence: an acknowledgement authenticates nothing. An entry
 // that lost its place in the retransmit table to a newer one
