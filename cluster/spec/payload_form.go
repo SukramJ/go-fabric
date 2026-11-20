@@ -169,7 +169,9 @@ var payloadTypes sync.Map
 // payloadType is the Go type of cmd's generated payload — the type its
 // decoder returns, read from the decoder itself on an empty structure
 // (a generated decoder returns its type's value with or without an
-// error); nil for a command without a decoder.
+// error), a pointer type dereferenced as [payloadValue] dereferences the
+// payload it compares with it; nil for a command without a decoder or
+// one that returns an untyped nil there (see [Command.Decode]).
 func (c *Command) payloadType() reflect.Type {
 	if t, ok := payloadTypes.Load(c); ok {
 		rt, _ := t.(reflect.Type)
@@ -180,6 +182,9 @@ func (c *Command) payloadType() reflect.Type {
 	}
 	v, _ := c.Decode(Node{El: tlv.Element{Type: tlv.TypeStructure, IsContainer: true}})
 	t := reflect.TypeOf(v)
+	for t != nil && t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
 	payloadTypes.Store(c, t)
 	return t
 }

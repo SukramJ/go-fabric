@@ -348,7 +348,12 @@ type Command struct {
 	// server runs; the zero value holds them as matter.js's request schema
 	// does.
 	Check RequestCheck
-	// Decode decodes the payload into the generated payload type.
+	// Decode decodes the payload into the generated payload type. A
+	// hand-written one returns that type — a value or a pointer to it —
+	// also for an empty structure and with an error: the request gate and
+	// the response check learn the form they judge a payload in from that
+	// return, and a decoder that returns an untyped nil there leaves every
+	// payload of the command unjudged.
 	Decode func(Node) (any, error)
 }
 
