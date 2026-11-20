@@ -164,6 +164,12 @@ func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Sub
 	if paths == 0 {
 		return nil, fmt.Errorf("%w: when subscribing to attributes and events, at least one must be specified", ErrMalformedRequest)
 	}
+	// Mirrors matter.js packages/protocol/src/action/client/ClientInteraction.ts:1026-1030
+	// at b25ed960 (subscribe): a sustained subscription re-establishes its
+	// session, so it cannot require an existing one.
+	if req.Sustain && req.RequireExistingSession {
+		return nil, fmt.Errorf("%w: a sustained subscription re-establishes its session, so it cannot require an existing session", ErrMalformedRequest)
+	}
 	if paths > c.provider.SubscribePathsSupported() {
 		c.log.Info("matter.controller.interaction.subscribe_paths", slog.Int("paths", paths), slog.Int("supported", c.provider.SubscribePathsSupported()))
 	}

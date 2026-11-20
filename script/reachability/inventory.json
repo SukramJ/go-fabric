@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10189,
+  "entry_points": 10195,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27881,
+    "total_exported": 27886,
     "reachable": 20887,
-    "whitelisted": 6972,
+    "whitelisted": 6977,
     "unreachable": 22
   },
   "by_package": [
@@ -31565,6 +31565,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestCommissioningFailsafeExpiry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 84
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestConfigureRegulatoryInformation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
@@ -31782,6 +31789,27 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestFailsafeExpiryAwaitsTheRearmInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 298
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFailsafeExpiryChecksTheResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 267
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFailsafeExpirySkipCancelsTheRearmInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 357
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestFinalizeCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
@@ -31792,7 +31820,7 @@
       "identifier": "TestFlowCumulativeTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 189
+      "line": 190
     },
     {
       "package": "controller/commissioner",
@@ -31841,7 +31869,7 @@
       "identifier": "TestFlowRearmsBelowHalf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 158
+      "line": 159
     },
     {
       "package": "controller/commissioner",
@@ -32031,6 +32059,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_chip_test.go",
       "line": 234
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestPaseBleChannelClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/pase_ble_channel_close_parity_matterjs_test.go",
+      "line": 175
     },
     {
       "package": "controller/commissioner",

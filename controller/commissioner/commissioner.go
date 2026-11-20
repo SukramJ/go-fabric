@@ -98,7 +98,9 @@ type CommissionedScanner interface {
 // runs on its exchange manager, whose carrier is reliable, so no MRP runs
 // (exchange.Config.Reliable).
 type Channel interface {
-	// Exchanges is the manager whose sessions run over the channel.
+	// Exchanges is the manager whose sessions run over the channel. When
+	// the channel is lost during PASE the commissioner closes it, which
+	// ends the handshake at once (establishOverChannel).
 	Exchanges() *exchange.Manager
 	// PeerAddress is the address that manager names the peer by.
 	PeerAddress() *net.UDPAddr
@@ -257,6 +259,11 @@ type Commissioner struct {
 	// R2-P6-conc-1810).
 	claimMu sync.Mutex
 	claimed map[handshake.PeerAddress]bool
+
+	// afterPASE, a test's, runs when PASE over a Channel returned and the
+	// watch during PASE ended, before the channel's close is checked
+	// (establishOverChannel); nil in production.
+	afterPASE func()
 }
 
 // New returns a commissioner over c.
@@ -396,8 +403,8 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 // db021da0), and until it ends the device accepts no new PASE exchange
 // (PaseServer.ts:80-82 at db021da0). The flow's own failures disarm
 // themselves (flow.disarmAfterFailure, which says why, and
-// flow.disarmAfterAbort). It sends the flow's request (flow.expireFailsafe)
-// with the breadcrumb the flow starts with (initialBreadcrumb), bounded by
+// flow.disarmAfterAbort). It sends the request of the flow's expiry
+// (flow.sendFailsafeExpiry, without its response check) with the breadcrumb the flow starts with (initialBreadcrumb), bounded by
 // ctx and the exchange's response timeout or, ctx having ended, by
 // abortDisarmTimeout as after an abort; nothing on a closed session, a
 // failure logged. Ahead of matter.js, whose commission only force-closes
@@ -452,18 +459,68 @@ func (c *Commissioner) closePASE(s *exchange.Session, ch Channel, cause error) {
 // establishOverChannel is PASE over a commissioning channel
 // (ControllerCommissioner.ts:442-492 for a BLE address): the unsecured
 // session on the channel's manager, PASE with the passcode within
-// timeout, peer loss suppressed; a lost channel force-closes the PASE
-// session so its exchanges end at once (Ble.ts:17-22, :44-55). The
-// device's PBKDFParamResponse marks a discovery race's attempt that runs
-// with ctx as answered (discovery.AttemptAnswered, owner decision 55).
+// timeout, peer loss suppressed. The device's PBKDFParamResponse marks a
+// discovery race's attempt that runs with ctx as answered
+// (discovery.AttemptAnswered, owner decision 55).
+//
+// The channel's loss ends the PASE session for its whole lifetime.
+// Mirrors matter.js packages/protocol/src/peer/ControllerCommissioner.ts:426-558
+// at b25ed960 (#establishEphemeralNodeSession, #closeOnBleLoss; #4908, #4922):
+//   - while PASE runs, a lost channel ends the handshake at once rather
+//     than after its response timeout (:482-483): here the channel's
+//     manager is closed, which ends every exchange on it — handshake.PASE
+//     keeps its unsecured session to itself, and nothing else runs over a
+//     lost channel — and the attempt fails with the channel's close as its
+//     cause;
+//   - a channel that closed before PASE returned — also while the session
+//     was created — fails the attempt with that cause instead of handing
+//     on a session on a dead channel (:514-520), the session force-closed;
+//   - afterwards the session is force-closed with the channel's
+//     ClosedCause when the channel goes (Ble.ts:17-22), until it closes
+//     (:523-558), so its exchanges end at once.
+//
+// matter.js's other half — a BLE close as an address-local failure among
+// a device's candidates (CommissioningConnection.ts) — has no counterpart:
+// a Channel is the attempt's only address here.
 func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, timeout time.Duration, passcode uint32) (*exchange.Session, error) {
 	c.log.Info("matter.controller.commissioning.establish_pase", slog.String("peer", ch.PeerAddress().String()), slog.String("channel", "ble"))
 	pctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	paired := make(chan struct{})
+	watched := make(chan struct{})
+	go func() {
+		defer close(watched)
+		select {
+		case <-ch.Closed():
+			ch.Exchanges().Close()
+		case <-paired:
+		}
+	}()
 	s, err := handshake.PASE(pctx, ch.Exchanges(), ch.PeerAddress(), passcode, handshake.PASEOptions{
 		SuppressPeerLoss: true, Logger: c.log,
 		OnPBKDFParamResponse: func() { discovery.AttemptAnswered(pctx) },
 	})
+	close(paired)
+	<-watched
+	if c.afterPASE != nil {
+		c.afterPASE()
+	}
+	// Kept after the last wait: a session whose channel closed is not
+	// handed on (:514-520).
+	select {
+	case <-ch.Closed():
+		if s != nil {
+			s.HandlePeerLoss(ch.ClosedCause())
+		}
+		if err == nil {
+			err = errors.New("commissioner: BLE transport closed while PASE completed")
+		}
+		if cause := ch.ClosedCause(); cause != nil {
+			err = fmt.Errorf("%w: %w", err, cause)
+		}
+		return nil, fmt.Errorf("commissioner: commissioning channel closed during PASE: %w", err)
+	default:
+	}
 	if err != nil {
 		return nil, err
 	}

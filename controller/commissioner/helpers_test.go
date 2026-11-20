@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -91,6 +92,8 @@ type scriptedDevice struct {
 	mu      sync.Mutex
 	counter uint32
 	inbox   chan []byte
+	// received counts the datagrams the manager sent the device.
+	received atomic.Int32
 }
 
 // newScriptedSession registers a secure session on mgr whose peer is a
@@ -120,6 +123,7 @@ func newScriptedSession(t *testing.T, mgr *exchange.Manager, dev *scriptedDevice
 
 // receive takes one datagram of the manager, synchronously from its send.
 func (d *scriptedDevice) receive(b []byte) {
+	d.received.Add(1)
 	d.inbox <- b
 }
 

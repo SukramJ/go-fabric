@@ -116,10 +116,11 @@ func newTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool)) (*f
 
 // newLossyTestFlow is newTestFlow over a device that never receives the
 // requests lose names (scriptedDevice.lose).
-func newLossyTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool), lose func(imRequest) bool) (*flow, *fakeClock) {
+func newLossyTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool), lose func(imRequest) bool) (f *flow, clock *fakeClock) {
 	t.Helper()
-	clock := newFakeClock()
+	clock = newFakeClock()
 	dev := &scriptedDevice{session: 0x0101, inbox: make(chan []byte, 1024), handle: handle, lose: lose}
+	defer func() { flowDevices.Store(f, dev) }()
 	mgr, err := exchange.NewManager(&deviceConn{dev: dev}, exchange.Config{Clock: clock, Rand: func() float64 { return 0.5 }})
 	if err != nil {
 		t.Fatal(err)
@@ -137,7 +138,7 @@ func newLossyTestFlow(t *testing.T, handle func(imRequest) (uint8, []byte, bool)
 	}
 	c := &Commissioner{ctx: Context{Exchanges: mgr, Clock: clock, Rand: rand.Reader, Logger: discard()}, log: discard()}
 	loc := DefaultRegulatoryLocation
-	f := newFlow(c, interaction.New(mgr, s, discard()), Options{Fabric: fabric, RegulatoryLocation: &loc, RegulatoryCountryCode: "XX"},
+	f = newFlow(c, interaction.New(mgr, s, discard()), Options{Fabric: fabric, RegulatoryLocation: &loc, RegulatoryCountryCode: "XX"},
 		fabric.AddressOf(0x55), s.AttestationChallenge(),
 		func(context.Context, handshake.PeerAddress, bool) (*interaction.Interaction, error) { return nil, nil })
 	return f, clock
@@ -206,11 +207,10 @@ func TestFlowCumulativeTimeout(t *testing.T) {
 }
 
 // TestFlowErrorClasses: a CommissioningError disarms and is returned as
-// is; an IM status error disarms and is repacked as a CommissioningError
-// (:437-462); any other error is returned as is (:463-465) and, ahead of
-// matter.js, which does not reset then, disarms too (disarmAfterFailure); a
-// recoverable error is logged and the next step runs (:431-436); Stop ends
-// the loop (:426-428).
+// is; an IM status error disarms and is repacked as a CommissioningError;
+// any other error disarms and is returned as is (ControllerCommissioningFlow.ts:439-454
+// at b25ed960, #4928); a recoverable error is logged and the next step
+// runs (:430-437); Stop ends the loop (:425-427).
 func TestFlowErrorClasses(t *testing.T) {
 	t.Parallel()
 	boom := errors.New("boom")
