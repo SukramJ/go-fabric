@@ -686,8 +686,7 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		return 0, fmt.Errorf("%w: initial data: %w", errUnexpectedResponse, err)
 	}
 
-	ia := f.interaction()
-	report, err := ia.Read(ctx,
+	report, err := f.ia.Read(ctx,
 		im.ConcreteAttributePath{Cluster: netcomm.ClusterID, Attribute: spec.AttrFeatureMap, HasCluster: true, HasAttribute: true},
 		im.ConcreteAttributePath{Cluster: netcomm.ClusterID, Attribute: netcomm.AttrNetworks, HasCluster: true, HasAttribute: true},
 		im.ConcreteAttributePath{Cluster: otareq.ClusterID, Attribute: otareq.AttrDefaultOtaProviders, HasCluster: true, HasAttribute: true},
@@ -697,7 +696,7 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		rootAttr(gencomm.ClusterID, gencomm.AttrTcUpdateDeadline),
 	)
 	if err != nil {
-		return 0, f.channelLoss(ia, err)
+		return 0, f.channelLoss(f.ia, err)
 	}
 	if d.terms, err = readTerms(report); err != nil {
 		return 0, err

@@ -73,9 +73,6 @@ type forwardingChannel struct {
 	peer      *net.UDPAddr
 	closed    chan struct{}
 	closeOnce sync.Once
-	// onInbound, when set, is asked for each datagram the node sends, after
-	// the manager took it.
-	onInbound func(b []byte)
 }
 
 func (c *forwardingChannel) Exchanges() *exchange.Manager { return c.mgr }
@@ -152,7 +149,7 @@ func channelCommissioner(t *testing.T) (*Commissioner, *Fabric) {
 
 // commissionOverForwarding commissions a node on loopback over a
 // forwardingChannel and reports the PASE step's outcome.
-func commissionOverForwarding(t *testing.T, onInbound func(c *forwardingChannel, b []byte)) (error, StepPhase) {
+func commissionOverForwarding(t *testing.T, onInbound func(c *forwardingChannel, b []byte)) (StepPhase, error) {
 	t.Helper()
 	_, addr := startNode(t, nil, "127.0.0.1:0")
 	ch := newForwardingChannel(t, addr, onInbound)
@@ -169,7 +166,7 @@ func commissionOverForwarding(t *testing.T, onInbound func(c *forwardingChannel,
 			}
 		},
 	})
-	return err, StepPhase(pase.Load())
+	return StepPhase(pase.Load()), err
 }
 
 func TestPaseBleChannelClose(t *testing.T) {
@@ -209,7 +206,7 @@ func TestPaseBleChannelClose(t *testing.T) {
 	t.Run("does not use a PASE session whose BLE channel closed while the session was created", func(t *testing.T) {
 		t.Parallel()
 		var once sync.Once
-		err, phase := commissionOverForwarding(t, func(c *forwardingChannel, b []byte) {
+		phase, err := commissionOverForwarding(t, func(c *forwardingChannel, b []byte) {
 			if paseStatusReport(b) {
 				once.Do(c.loseLink)
 			}
@@ -226,7 +223,7 @@ func TestPaseBleChannelClose(t *testing.T) {
 		t.Parallel()
 		var pased atomic.Bool
 		var once sync.Once
-		err, phase := commissionOverForwarding(t, func(c *forwardingChannel, b []byte) {
+		phase, err := commissionOverForwarding(t, func(c *forwardingChannel, b []byte) {
 			if paseStatusReport(b) {
 				pased.Store(true)
 				return
