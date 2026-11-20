@@ -52,7 +52,7 @@ func TestFabricLeavingFlushesTheInvokingSession(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		flushed[sub.ID] = true
-		if sub.SessionID == invoking && !released {
+		if sub.CurrentSessionID() == invoking && !released {
 			turnReleasedFirst = false
 		}
 	})
