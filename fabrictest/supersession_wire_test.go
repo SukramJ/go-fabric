@@ -138,7 +138,8 @@ func TestServerSubscriptionSessionSupersessionOverTheWire(t *testing.T) {
 		if !ok {
 			t.Fatal("the subscription is on no device session")
 		}
-		holders := []uint16{former}
+		holders := make([]uint16, 0, 3)
+		holders = append(holders, former)
 		for range 2 {
 			dropSessionsOnController(p)
 			if _, err := fabrictest.Read(ctx, p, onOffPath(ep)); err != nil {
