@@ -74,9 +74,9 @@ type Session struct {
 	lifetime Timer
 
 	// mu guards the session's mutable state: every field below it (address,
-	// parameters, timestamps, the open exchanges, closed, peerLost and
-	// deferredClose). It is released before an exchange is aborted or the
-	// manager is told.
+	// parameters, timestamps, the open exchanges, closed, peerLost,
+	// deferredClose and released). It is released before an exchange is
+	// aborted or the manager is told.
 	mu   sync.Mutex
 	addr *net.UDPAddr
 	// channel is the connection the session is bound to (channel.go), nil
@@ -103,6 +103,11 @@ type Session struct {
 	closed        bool
 	peerLost      bool
 	deferredClose bool
+	// released marks an inbound unsecured session [Manager.releaseInbound]
+	// took out of the manager's table to close it: it takes no exchange
+	// from then on, and a message that found it before the release is
+	// received on a new one.
+	released bool
 }
 
 // ID is the local session id: [UnsecuredSessionID] for the unsecured
@@ -393,6 +398,22 @@ func (s *Session) IsClosed() bool {
 	return s.closed
 }
 
+// isReleased reports whether [Manager.releaseInbound] released the
+// session.
+func (s *Session) isReleased() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.released
+}
+
+// refusesExchanges reports whether the session takes no exchange any
+// more: closed, or released and about to close.
+func (s *Session) refusesExchanges() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.closed || s.released
+}
+
 // IsPeerLost reports whether the session was given up because the peer
 // is gone or closed it — matter.js NodeSession.isPeerLost
 // (NodeSession.ts:320-322). A lost session is closing: no CloseSession
@@ -513,11 +534,12 @@ func (s *Session) closeIfDeferred() {
 // addExchange adds x unless the session is closed: a close that took its
 // snapshot of the exchanges to abort before x arrived would never abort
 // it (review II, R2-P6-conc-1809). The check and the add are one step
-// under s.mu, the lock closeWith sets closed under.
+// under s.mu, the lock closeWith sets closed under and
+// [Manager.releaseInbound] marks a released session under.
 func (s *Session) addExchange(x *Exchange) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed {
+	if s.closed || s.released {
 		return false
 	}
 	s.exchanges[x] = struct{}{}
@@ -526,11 +548,12 @@ func (s *Session) addExchange(x *Exchange) bool {
 
 // addHandshake adds x, the exchange a Sigma1 opened, unless the session
 // holds [maxInboundUnsecuredHandshakes] such exchanges already or is
-// closed — in one step, so two Sigma1 received at once cannot both pass.
+// closed or released — in one step, so two Sigma1 received at once cannot
+// both pass.
 func (s *Session) addHandshake(x *Exchange) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || s.handshakes >= maxInboundUnsecuredHandshakes {
+	if s.closed || s.released || s.handshakes >= maxInboundUnsecuredHandshakes {
 		return false
 	}
 	x.handshake = true

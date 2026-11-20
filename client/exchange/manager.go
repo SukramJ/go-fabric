@@ -180,6 +180,11 @@ type Manager struct {
 	exchangeID     uint16
 	nextSessionID  uint16
 	sessionIDLimit uint16
+
+	// afterUnsecuredLookup, when set (tests only), runs after an
+	// unsecured message found the session it names, before the message
+	// is delivered on it.
+	afterUnsecuredLookup func(found *Session)
 }
 
 // NewManager returns a manager that sends on conn.
@@ -658,19 +663,25 @@ func (m *Manager) forget(s *Session) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if s.secure == nil {
-		if m.unsecured[s.nodeID] == s {
-			delete(m.unsecured, s.nodeID)
-		}
-		if s.inbound {
-			m.inboundOrder = slices.DeleteFunc(m.inboundOrder, func(o *Session) bool { return o == s })
-			if s.lifetime != nil {
-				s.lifetime.Stop()
-			}
-		}
+		m.forgetUnsecuredLocked(s)
 		return
 	}
 	if m.sessions[s.id] == s {
 		delete(m.sessions, s.id)
+	}
+}
+
+// forgetUnsecuredLocked removes the unsecured session s from the tables;
+// m.mu is held. A session of the same node id that replaced s stays.
+func (m *Manager) forgetUnsecuredLocked(s *Session) {
+	if m.unsecured[s.nodeID] == s {
+		delete(m.unsecured, s.nodeID)
+	}
+	if s.inbound {
+		m.inboundOrder = slices.DeleteFunc(m.inboundOrder, func(o *Session) bool { return o == s })
+		if s.lifetime != nil {
+			s.lifetime.Stop()
+		}
 	}
 }
 
@@ -900,28 +911,54 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 		return
 	}
 	body := append([]byte(nil), buf[hl:]...)
-	s, duplicate, inbound, ok := m.openSession(&hdr, &body, src)
-	if !ok {
+	if !m.receive(&hdr, body, src) {
 		return
+	}
+	// The inbound unsecured session this initiating message found was
+	// released before an exchange took the message: the message is
+	// received again, on a new session. In matter.js the lookup and the
+	// exchange admission run without an await between them, so the
+	// message lands on the session before its release or finds no
+	// session and creates one (ExchangeManager.ts:307-327 and :472-483 at
+	// b25ed960); Go's handlers run on goroutines of their own, and the
+	// release can come in between. Once only: the new session is looked
+	// up after the release took the old one out of the table.
+	m.log.Debug("matter.controller.unsecured_session_released", slog.Uint64("node_id", hdr.SourceNodeID))
+	m.receive(&hdr, body, src)
+}
+
+// receive opens the session of a received message and delivers it; it
+// reports true when the message is to be received again because it found
+// an inbound unsecured session released before an exchange took it — only
+// a message that names no destination node id, an initiating one
+// (ExchangeManager.ts:313-327 at b25ed960: a response without its session
+// is dropped).
+func (m *Manager) receive(hdr *message.Header, body []byte, src *net.UDPAddr) (again bool) {
+	s, duplicate, inbound, ok := m.openSession(hdr, &body, src)
+	if !ok {
+		return false
 	}
 	if inbound {
 		// An unsecured session created for this message does not outlive
-		// it unless a handler took an exchange on it (ExchangeManager.ts:205-217).
+		// it unless a handler took an exchange on it (ExchangeManager.ts:244-256
+		// at b25ed960).
 		defer m.releaseInbound(s)
 	}
 	counter := hdr.MessageCounter
 	if s.holdWhileEstablishing(duplicate, func() { m.deliver(s, counter, body, duplicate, src) }) {
-		return
+		return false
 	}
-	m.deliver(s, counter, body, duplicate, src)
+	released := m.deliver(s, counter, body, duplicate, src)
+	return released && hdr.SessionID == UnsecuredSessionID && hdr.DestSize != message.DestNodeID
 }
 
-// deliver routes the decoded body of a message received on s.
-func (m *Manager) deliver(s *Session, counter uint32, body []byte, duplicate bool, src *net.UDPAddr) {
+// deliver routes the decoded body of a message received on s; released
+// is [Manager.route]'s.
+func (m *Manager) deliver(s *Session, counter uint32, body []byte, duplicate bool, src *net.UDPAddr) (released bool) {
 	proto, pl, err := message.UnmarshalProtocolHeader(body)
 	if err != nil {
 		m.log.Debug("matter.controller.drop", slog.String("reason", "protocol header"), slog.Any("err", err))
-		return
+		return false
 	}
 	// Every decoded message proves the peer active, a duplicate too
 	// (ExchangeManager.ts:290-292).
@@ -942,7 +979,7 @@ func (m *Manager) deliver(s *Session, counter uint32, body []byte, duplicate boo
 	if msg.RequiresAck && !s.UsesMRP() {
 		msg.RequiresAck = false
 	}
-	m.route(s, msg, duplicate, src)
+	return m.route(s, msg, duplicate, src)
 }
 
 // openSession resolves the session of a received message and decrypts
@@ -951,7 +988,8 @@ func (m *Manager) deliver(s *Session, counter uint32, body []byte, duplicate boo
 func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAddr) (s *Session, duplicate, inbound, ok bool) {
 	if hdr.SessionID == UnsecuredSessionID {
 		// A response names our ephemeral node id as destination; a
-		// request names the peer's as source (ExchangeManager.ts:244-265).
+		// request names the peer's as source (ExchangeManager.ts:305-311
+		// at b25ed960).
 		var initiator uint64
 		hasDest := hdr.DestSize == message.DestNodeID
 		switch {
@@ -963,10 +1001,13 @@ func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAdd
 		m.mu.Lock()
 		s = m.unsecured[initiator]
 		m.mu.Unlock()
+		if s != nil && m.afterUnsecuredLookup != nil {
+			m.afterUnsecuredLookup(s)
+		}
 		if s == nil {
 			if hasDest {
 				// A late response to a session that no longer exists
-				// (ExchangeManager.ts:250-259).
+				// (ExchangeManager.ts:313-323 at b25ed960).
 				m.log.Debug("matter.controller.drop", slog.String("reason", "unsecured response for unknown session"))
 				return nil, false, false, false
 			}
@@ -1139,18 +1180,40 @@ func (m *Manager) holdAckWait(x *Exchange, p *pending) (release func()) {
 	}
 }
 
-// releaseInbound closes an inbound session no exchange holds —
-// ExchangeManager.ts:210-216.
+// releaseInbound closes an inbound session no exchange holds. The test,
+// the mark that makes the session refuse exchanges and the removal from
+// the table are one step under m.mu and s.mu — s.mu being the lock an
+// exchange is admitted under ([Session.addExchange]) — and the close
+// comes after: a message either took its exchange on the session before,
+// and the session stays, or finds no session, or found it before the
+// release and is received again on a new one ([Manager.receive]). Mirrors
+// matter.js packages/protocol/src/protocol/ExchangeManager.ts:249-254 at
+// b25ed960 (#onMessage: the test, detachChannel, initiateClose, with no
+// await before the table entry is gone; UnsecuredSession.ts:94-97
+// detachChannel deletes the entry first). matter.js releases only from the
+// message that created the session; Go after every handler on an inbound
+// session too, since a handler runs on a goroutine of its own.
 func (m *Manager) releaseInbound(s *Session) {
-	if !s.IsClosed() && len(s.liveExchanges()) == 0 {
+	m.mu.Lock()
+	s.mu.Lock()
+	release := !s.closed && !s.released && len(s.exchanges) == 0
+	if release {
+		s.released = true
+		m.forgetUnsecuredLocked(s)
+	}
+	s.mu.Unlock()
+	m.mu.Unlock()
+	if release {
 		s.Close()
 	}
 }
 
 // route hands msg to the exchange it belongs to — its index sets the
-// exchanges we initiated apart (ExchangeManager.ts:331-343) — or treats it
-// as unsolicited.
-func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAddr) {
+// exchanges we initiated apart (ExchangeManager.ts:397-400 at b25ed960) —
+// or treats it as unsolicited. released reports that msg would open an
+// exchange on an inbound unsecured session released meanwhile
+// ([Manager.releaseInbound]) and was not taken.
+func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAddr) (released bool) {
 	idx := uint32(msg.ExchangeID)
 	if !msg.Initiator {
 		idx |= initiatedExchangeFlag
@@ -1160,19 +1223,25 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 	m.mu.Unlock()
 	if x != nil {
 		if x.considerClosed() && !msg.isStandaloneAck() {
-			// ExchangeManager.ts:359-378: acknowledge, then close.
+			// ExchangeManager.ts:416-427 at b25ed960: acknowledge, then close.
 			x.sendStandaloneAckFor(msg)
 			x.Close()
-			return
+			return false
 		}
 		x.onMessageReceived(msg, duplicate)
-		return
+		return false
 	}
 	// A new exchange on a closing session is declined
-	// (ExchangeManager.ts:441-444 at db021da0).
+	// (ExchangeManager.ts:435-438 at b25ed960) — but for an inbound
+	// unsecured session released since the lookup: matter.js takes that
+	// one out of its table before it closes, so the message would have
+	// found none (ExchangeManager.ts:249-254, UnsecuredSession.ts:94-97).
 	if s.IsClosing() {
+		if s.isReleased() {
+			return true
+		}
 		m.log.Debug("matter.controller.drop", slog.String("reason", "session closing"), slog.Int("session_id", int(s.id)))
-		return
+		return false
 	}
 	// A Secure Channel message that opens an exchange on a secure session
 	// goes to the Secure Channel handler (ExchangeManager.ts:407-440); an
@@ -1180,17 +1249,17 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 	if s.secure != nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Initiator && !duplicate {
 		if msg.isStandaloneAck() && !msg.RequiresAck {
 			m.log.Debug("matter.controller.drop", slog.String("reason", "unsolicited standalone ack"), slog.Int("session_id", int(s.id)))
-			return
+			return false
 		}
 		x := m.accept(s, msg)
 		if x == nil {
 			// The session closed since the check above.
-			return
+			return false
 		}
 		s.adoptSource(src)
 		x.onMessageReceived(msg, false)
 		m.handleSecureChannel(x, msg)
-		return
+		return false
 	}
 	// A handler takes the first message of an exchange the peer opens
 	// (ExchangeManager.ts:407-440): on an unsecured session a Sigma1 or a
@@ -1200,8 +1269,7 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 			if s.secure != nil {
 				s.adoptSource(src)
 			}
-			m.dispatch(s, msg, h)
-			return
+			return m.dispatch(s, msg, h)
 		}
 	}
 	// Anything else is acknowledged when it asks for it
@@ -1212,6 +1280,7 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool, src *net.UDPAd
 	m.log.Debug("matter.controller.unsolicited",
 		slog.Int("session_id", int(s.id)), slog.Int("exchange_id", int(msg.ExchangeID)),
 		slog.Int("protocol_id", int(msg.ProtocolID)), slog.Int("opcode", int(msg.Opcode)), slog.Bool("duplicate", duplicate))
+	return false
 }
 
 // handlerFor is the handler of the exchange msg opens on s, nil for
@@ -1258,17 +1327,20 @@ func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
 
 // dispatch opens the exchange msg starts, lets it take msg — owing the
 // acknowledgement — and runs h on a goroutine of its own
-// (ExchangeManager.ts:423-437: fromInitialMessage, #addExchange,
-// onMessageReceived, then onNewExchange). Once h returns the exchange is
-// closed, and an inbound unsecured session no exchange holds any longer is
-// closed with it (:205-217). The handler runs on a goroutine of the
-// manager, which [Manager.Shutdown] waits for; a manager closed meanwhile
-// starts no handler and closes the exchange.
-func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
+// (ExchangeManager.ts:472-486 at b25ed960: fromInitialMessage,
+// #addExchange, onMessageReceived, then onNewExchange). Once h returns the
+// exchange is closed, and an inbound unsecured session no exchange holds
+// any longer is released ([Manager.releaseInbound], :244-256). The handler
+// runs on a goroutine of the manager, which [Manager.Shutdown] waits for;
+// a manager closed meanwhile starts no handler and closes the exchange.
+// released is [Manager.route]'s: the session was released since route's
+// check.
+func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) (released bool) {
 	x := m.accept(s, msg)
-	if x == nil && s.IsClosed() {
-		// The session closed since route's check: nothing to answer on.
-		return
+	if x == nil && s.refusesExchanges() {
+		// The session closed or was released since route's check:
+		// nothing to answer on.
+		return s.isReleased()
 	}
 	var running *Exchange
 	if x == nil {
@@ -1284,16 +1356,15 @@ func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 			x = m.accept(s, msg)
 		}
 	}
-	if x == nil && s.IsClosed() {
-		return
+	if x == nil && s.refusesExchanges() {
+		return s.isReleased()
 	}
 	if x == nil {
 		// The running handshake continues; this Sigma1 is answered Busy
 		// with a minimum wait time ([Manager.answerBusy]).
 		m.log.Warn("matter.controller.unsecured_handshake_refused", slog.Uint64("node_id", s.nodeID), slog.Int("exchange_id", int(msg.ExchangeID)),
 			slog.String("reason", "the session of an unauthenticated peer holds a handshake already"))
-		m.answerBusy(s, msg, running)
-		return
+		return m.answerBusy(s, msg, running)
 	}
 	x.onMessageReceived(msg, false)
 	x.takeFirst(msg)
@@ -1307,6 +1378,7 @@ func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
 	}) {
 		x.Close()
 	}
+	return false
 }
 
 // Secure Channel status codes of a Busy answer: matter.js
@@ -1358,11 +1430,12 @@ func busyWait(running *Exchange) uint16 {
 // db021da0). The report waits for its acknowledgement in one of the
 // [inboundUnsecuredAckWaitLimit] places, so sixteen refused Sigma1 end the
 // wait of an earlier message on an inbound unsecured session — which then
-// loses only its retransmissions (review II, R2-P6-par-2902).
-func (m *Manager) answerBusy(s *Session, msg *Message, running *Exchange) {
+// loses only its retransmissions (review II, R2-P6-par-2902). released
+// is [Manager.route]'s: the session was released meanwhile.
+func (m *Manager) answerBusy(s *Session, msg *Message, running *Exchange) (released bool) {
 	x := m.acceptAs(s, msg, false)
 	if x == nil {
-		return
+		return s.isReleased()
 	}
 	x.onMessageReceived(msg, false)
 	x.takeFirst(msg)
@@ -1381,6 +1454,7 @@ func (m *Manager) answerBusy(s *Session, msg *Message, running *Exchange) {
 	}) {
 		x.Close()
 	}
+	return false
 }
 
 // sendBusy sends the Busy StatusReport of [Manager.answerBusy] on x, the
