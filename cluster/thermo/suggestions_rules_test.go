@@ -300,8 +300,9 @@ func TestRefusedPresetLeavesTheActivePreset(t *testing.T) {
 
 // TestSuggestionConfiguration pins the configuration: MaxThermostatSuggestions
 // at least 5 (0 is 5), a thermostat without a Matter time refusing with
-// INVALID_IN_STATE, the suggestions' state not the host's to set, the
-// commands unsupported without the feature, and the accessors.
+// INVALID_IN_STATE, MaxThermostatSuggestions and the current suggestion
+// not the host's to set, the commands unsupported without the feature,
+// and the accessors.
 func TestSuggestionConfiguration(t *testing.T) {
 	t.Parallel()
 	clk := newSuggestClock()
@@ -312,13 +313,10 @@ func TestSuggestionConfiguration(t *testing.T) {
 	if v, _ := srv.MatterRead(tdef.AttrMaxThermostatSuggestions); v != uint8(7) {
 		t.Errorf("MaxThermostatSuggestions %v, want 7", v)
 	}
-	for _, id := range []uint32{tdef.AttrMaxThermostatSuggestions, tdef.AttrThermostatSuggestions, tdef.AttrCurrentThermostatSuggestion} {
+	for _, id := range []uint32{tdef.AttrMaxThermostatSuggestions, tdef.AttrCurrentThermostatSuggestion} {
 		var v any
-		switch id {
-		case tdef.AttrMaxThermostatSuggestions:
+		if id == tdef.AttrMaxThermostatSuggestions {
 			v = uint8(7)
-		case tdef.AttrThermostatSuggestions:
-			v = spec.List[thermo.Suggestion]{}
 		}
 		if err := srv.SetAttributes(map[uint32]any{id: v}); !errors.Is(err, spec.ErrNotHeld) {
 			t.Errorf("SetAttributes 0x%04X: %v, want ErrNotHeld", id, err)
@@ -499,5 +497,121 @@ func TestSuggestionsFollowAMovedMatterTimeBothWays(t *testing.T) {
 	}
 	if got := srv.ActivePresetHandle(); !bytes.Equal(got, handleB) {
 		t.Errorf("ActivePresetHandle %q after the jump back, want the preset it activated, %q", got, handleB)
+	}
+}
+
+// TestSuggestionsSetAttributes pins the application's write of
+// ThermostatSuggestions (decision 317): held to the attribute's own
+// constraints — at most MaxThermostatSuggestions entries, a PresetHandle
+// of at most 16 bytes — and nothing else, an entry naming no preset
+// included; an equal list is no change; a changed one is announced and
+// re-evaluated.
+func TestSuggestionsSetAttributes(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	srv := newTSUGGEST(t, tsuggestConfig(clk))
+	now := clk.epoch()
+	entry := func(id uint8, handle []byte) thermo.Suggestion {
+		return thermo.Suggestion{UniqueId: id, PresetHandle: handle, EffectiveTime: now, ExpirationTime: now + 1800}
+	}
+	six := make(spec.List[thermo.Suggestion], 0, 6)
+	for id := range uint8(6) {
+		six = append(six, entry(id, handleB))
+	}
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrThermostatSuggestions: six}); !errors.Is(err, spec.ErrInvalidValue) {
+		t.Errorf("six entries over MaxThermostatSuggestions 5: %v, want ErrInvalidValue", err)
+	}
+	long := spec.List[thermo.Suggestion]{entry(1, make([]byte, 17))}
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrThermostatSuggestions: long}); !errors.Is(err, spec.ErrInvalidValue) {
+		t.Errorf("a PresetHandle of 17 bytes: %v, want ErrInvalidValue", err)
+	}
+	if got := srv.Suggestions(); len(got) != 0 {
+		t.Fatalf("a refused write stored %v", got)
+	}
+
+	changes := recordChanges(srv)
+	unknown := spec.List[thermo.Suggestion]{entry(3, []byte{9})}
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrThermostatSuggestions: unknown}); err != nil {
+		t.Fatalf("an entry naming no preset: %v, want accepted", err)
+	}
+	clk.Advance(0)
+	if got := srv.Suggestions(); len(got) != 1 || got[0].UniqueId != 3 {
+		t.Errorf("Suggestions %v, want the entry of id 3", got)
+	}
+	if got := changes(); !slices.Contains(got, tdef.AttrThermostatSuggestions) {
+		t.Errorf("changes %v, want ThermostatSuggestions", got)
+	}
+	if err := srv.SetAttributes(map[uint32]any{tdef.AttrThermostatSuggestions: unknown}); err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(0)
+	if got := changes(); slices.Contains(got, tdef.AttrThermostatSuggestions) {
+		t.Errorf("an equal list announced %v", got)
+	}
+}
+
+// memSuggestionStore is a SuggestionStore in memory that counts its saves.
+type memSuggestionStore struct {
+	list       []byte
+	overridden *uint8
+	ok         bool
+	saves      int
+}
+
+func (m *memSuggestionStore) LoadSuggestions(context.Context) (list []byte, overridden *uint8, ok bool, err error) {
+	return bytes.Clone(m.list), m.overridden, m.ok, nil
+}
+
+func (m *memSuggestionStore) SaveSuggestions(_ context.Context, list []byte, overridden *uint8) error {
+	m.list, m.overridden, m.ok = bytes.Clone(list), overridden, true
+	m.saves++
+	return nil
+}
+
+// TestSuggestionsSurviveARestart pins decision 316: the commands' entries
+// are saved, a server started on the same store serves them again and
+// issues the next id after the largest one; a start without a stored list
+// saves nothing; a re-evaluation that changes nothing saves nothing.
+func TestSuggestionsSurviveARestart(t *testing.T) {
+	t.Parallel()
+	clk := newSuggestClock()
+	st := &memSuggestionStore{}
+	cfg := tsuggestConfig(clk, func(cfg *thermo.ThermostatConfig) { cfg.SuggestionStore = st })
+	srv := newTSUGGEST(t, cfg)
+	if st.saves != 0 {
+		t.Fatalf("a start without stored suggestions saved %d times", st.saves)
+	}
+	first, err := addSuggestion(srv, handleB, nil, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	later := clk.epoch() + 600
+	second, err := addSuggestion(srv, handleB, &later, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saves := st.saves
+	srv.MatterTimeChanged()
+	clk.Advance(0)
+	if st.saves != saves {
+		t.Errorf("a re-evaluation that changed nothing saved")
+	}
+	srv.MatterQuiesce()
+
+	again := newTSUGGEST(t, cfg)
+	clk.Advance(0)
+	got := again.Suggestions()
+	if len(got) != 2 || got[0].UniqueId != first || got[1].UniqueId != second {
+		t.Fatalf("Suggestions after the restart %v, want ids %d and %d", got, first, second)
+	}
+	if cur, ok := again.CurrentSuggestion(); !ok || cur.UniqueId != first {
+		t.Errorf("CurrentSuggestion %+v, %v, want %d", cur, ok, first)
+	}
+	id, err := addSuggestion(again, handleB, nil, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != second+1 {
+		t.Errorf("UniqueID after the restart %d, want %d", id, second+1)
 	}
 }

@@ -4,6 +4,7 @@
 package thermo
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // The typed server's optional interfaces ([spec.AttributeSetter],
@@ -84,8 +86,18 @@ var setpointKeys = map[uint32]struct {
 // own reasons for not following the current suggestion (null for none,
 // the hold's OngoingHold is the server's): the served value is them, with
 // OngoingHold while a hold is on, while there is a current suggestion, and
-// a change re-evaluates the suggestions. MaxThermostatSuggestions is the
-// configuration's, ThermostatSuggestions and CurrentThermostatSuggestion
+// a change re-evaluates the suggestions. ThermostatSuggestions is the
+// application's to replace, held to the attribute's own constraints only
+// — at most MaxThermostatSuggestions entries, a PresetHandle of at most 16
+// bytes —, not to AddThermostatSuggestion's checks: an entry naming no
+// preset is kept until the next start drops it. A changed list is saved
+// and re-evaluated, after the call's setpoints, so a setpoint of the
+// occupancy in effect the same call writes overrides the entry it makes
+// current. Mirrors matter.js ThermostatServer.ts:2290, :2296-2307 at
+// b25ed960 (#reevaluateOnSuggestionsChange: a local write re-evaluates and
+// checks nothing; the schema's constraint, thermostat-cluster.element.ts:
+// 271-272 and the struct's :674-679, is the datasource's).
+// MaxThermostatSuggestions is the configuration's, CurrentThermostatSuggestion
 // the server's own state: [spec.ErrNotHeld].
 func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 	checked, presets, err := s.checkSet(values)
@@ -99,6 +111,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		return err
 	}
 	if len(checked) == 0 {
+		s.setSuggestionsAlone(presets)
 		return nil
 	}
 	s.mu.Lock()
@@ -117,19 +130,7 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 			changed = append(changed, id)
 		}
 	}
-	for _, f := range []struct {
-		dst *int16
-		v   int
-		id  uint32
-	}{
-		{&s.absMinHeat, st.absMinHeat, thermoAttrAbsMinHeatSetpointLimit},
-		{&s.absMaxHeat, st.absMaxHeat, thermoAttrAbsMaxHeatSetpointLimit},
-		{&s.absMinCool, st.absMinCool, thermoAttrAbsMinCoolSetpointLimit},
-		{&s.absMaxCool, st.absMaxCool, thermoAttrAbsMaxCoolSetpointLimit},
-	} {
-		note(f.id, int(*f.dst) != f.v)
-		*f.dst = int16(f.v) //nolint:gosec // an int16 given
-	}
+	s.storeAbsLimitsLocked(st, note)
 	moved := s.commitSetpoints(st)
 	changed = append(changed, moved...)
 	if v, ok := checked[thermoAttrLocalTemperature]; ok {
@@ -158,7 +159,8 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		s.occupied = occupied
 	}
 	s.setOptionalLocked(checked, note)
-	reevaluate := s.setSuggestionReasonLocked(checked) || slices.Contains(changed, thermoAttrTemperatureSetpointHold)
+	listChanged := presets.hasSuggestions && s.setSuggestionsLocked(presets.suggestions, note)
+	reevaluate := s.setSuggestionReasonLocked(checked) || slices.Contains(changed, thermoAttrTemperatureSetpointHold) || listChanged
 	if reevaluate && s.features&ThermostatFeatureTSUGGEST != 0 && s.currentOccupancyWrittenLocked(direct) {
 		// The re-evaluation this change schedules belongs to the same
 		// change as the setpoint written here (suggest.setpointWritten).
@@ -179,6 +181,24 @@ func (s *ThermostatServer) SetAttributes(values map[uint32]any) error {
 		s.clearActivePresetAfterSet(direct)
 	}
 	return nil
+}
+
+// storeAbsLimitsLocked stores the absolute limits of st, noting each
+// change. The caller holds s.mu.
+func (s *ThermostatServer) storeAbsLimitsLocked(st setpointState, note func(id uint32, moved bool)) {
+	for _, f := range []struct {
+		dst *int16
+		v   int
+		id  uint32
+	}{
+		{&s.absMinHeat, st.absMinHeat, thermoAttrAbsMinHeatSetpointLimit},
+		{&s.absMaxHeat, st.absMaxHeat, thermoAttrAbsMaxHeatSetpointLimit},
+		{&s.absMinCool, st.absMinCool, thermoAttrAbsMinCoolSetpointLimit},
+		{&s.absMaxCool, st.absMaxCool, thermoAttrAbsMaxCoolSetpointLimit},
+	} {
+		note(f.id, int(*f.dst) != f.v)
+		*f.dst = int16(f.v) //nolint:gosec // an int16 given
+	}
 }
 
 // directSetpointWrites are the occupied and unoccupied setpoints a
@@ -302,6 +322,64 @@ type presetValues struct {
 	hasSchedules      bool
 	scheduleHandle    []byte
 	hasScheduleHandle bool
+
+	// suggestions is ThermostatSuggestions (TSUGGEST), when given; it is
+	// set with the call's other attributes, not through a setter.
+	suggestions    []Suggestion
+	hasSuggestions bool
+}
+
+// suggestionsValue is a ThermostatSuggestions value as CheckSet returns it
+// (spec.List), or a host's plain slice.
+func suggestionsValue(v any) ([]Suggestion, error) {
+	switch x := v.(type) {
+	case spec.List[Suggestion]:
+		return []Suggestion(x), nil
+	case []Suggestion:
+		return x, nil
+	}
+	return nil, spec.Errorf(im.StatusConstraintError, "thermo: ThermostatSuggestions value %T is not a list of ThermostatSuggestionStruct", v)
+}
+
+// setSuggestionsLocked replaces ThermostatSuggestions with a copy of list
+// and reports whether it changed, noting the change — and
+// CurrentThermostatSuggestion's, null until the re-evaluation, when the
+// current entry left the list. The caller holds s.mu and re-evaluates
+// when it changed.
+func (s *ThermostatServer) setSuggestionsLocked(list []Suggestion, note func(id uint32, moved bool)) bool {
+	if bytes.Equal(encodeSuggestions(list), encodeSuggestions(s.suggest.list)) {
+		return false
+	}
+	s.suggest.list = cloneSuggestions(list)
+	if s.suggest.has && !slices.ContainsFunc(list, func(sg Suggestion) bool { return sg.UniqueId == s.suggest.current }) {
+		s.suggest.has = false
+		note(tdef.AttrCurrentThermostatSuggestion, true)
+	}
+	note(tdef.AttrThermostatSuggestions, true)
+	return true
+}
+
+// setSuggestionsAlone is setSuggestionsLocked for a SetAttributes that
+// sets no other held attribute: it announces the change and schedules the
+// re-evaluation itself. Without ThermostatSuggestions in p it does nothing.
+func (s *ThermostatServer) setSuggestionsAlone(p presetValues) {
+	if !p.hasSuggestions {
+		return
+	}
+	var changed []uint32
+	s.mu.Lock()
+	moved := s.setSuggestionsLocked(p.suggestions, func(id uint32, moved bool) {
+		if moved {
+			changed = append(changed, id)
+		}
+	})
+	s.mu.Unlock()
+	if !moved {
+		return
+	}
+	slices.Sort(changed)
+	s.changes.NotifyFrom(contract.OriginHostSet, changed...)
+	s.scheduleSuggestionReevaluation()
 }
 
 // setPresetAttributes applies p through the preset setters, Presets first.
@@ -372,7 +450,14 @@ func (s *ThermostatServer) checkSet(values map[uint32]any) (map[uint32]any, pres
 		case tdef.AttrPresetTypes, tdef.AttrNumberOfPresets, tdef.AttrScheduleTypes, tdef.AttrNumberOfSchedules,
 			tdef.AttrNumberOfScheduleTransitions, tdef.AttrNumberOfScheduleTransitionPerDay, tdef.AttrMaxThermostatSuggestions:
 			return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is the configuration's", spec.ErrNotHeld, id)
-		case tdef.AttrThermostatSuggestions, tdef.AttrCurrentThermostatSuggestion:
+		case tdef.AttrThermostatSuggestions:
+			list, err := suggestionsValue(v)
+			if err != nil {
+				return nil, presets, err
+			}
+			presets.suggestions, presets.hasSuggestions = list, true
+			continue
+		case tdef.AttrCurrentThermostatSuggestion:
 			return nil, presets, fmt.Errorf("%w: thermostat: attribute 0x%04X is the suggestions' own state", spec.ErrNotHeld, id)
 		case thermoAttrControlSequenceOfOperation, thermoAttrMinSetpointDeadBand:
 			if cur, _ := s.MatterRead(id); v != cur {
