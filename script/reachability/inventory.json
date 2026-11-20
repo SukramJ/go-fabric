@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10149,
+  "entry_points": 10151,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -34942,7 +34942,7 @@
       "identifier": "TestAssemblyRefusesBridgedInfoBeyondItsConstraint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/bridged_info_check_test.go",
-      "line": 22
+      "line": 24
     },
     {
       "package": "endpoint",
@@ -35012,7 +35012,7 @@
       "identifier": "TestBridgedInfoCheckIsTheServingEndpoints",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/bridged_info_check_test.go",
-      "line": 70
+      "line": 75
     },
     {
       "package": "endpoint",
