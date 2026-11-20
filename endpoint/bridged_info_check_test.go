@@ -17,8 +17,10 @@ import (
 // decision 201): a raw Spec's stated BridgedDeviceBasicInformation value,
 // or its VendorName, beyond the generated definition's constraint refuses
 // the assembly, naming the attribute; a value within it — counted in
-// UTF-16 code units, as matter.js's String.length — is served as stated,
-// not cut at 32 bytes.
+// UTF-8 bytes, as matter.js's string constraint counts it since #4995
+// (packages/node/src/behavior/state/validation/constraint.ts:203-206 at
+// b25ed960) — is served as stated. 32 × "ü" (64 bytes, 32 UTF-16 code
+// units) was within it while the bound counted code units.
 func TestAssemblyRefusesBridgedInfoBeyondItsConstraint(t *testing.T) {
 	t.Parallel()
 	long := strings.Repeat("x", 33)
@@ -39,10 +41,13 @@ func TestAssemblyRefusesBridgedInfoBeyondItsConstraint(t *testing.T) {
 			t.Errorf("%s of 33 code units: %v, want a refusal naming it", name, err)
 		}
 	}
-	wide := strings.Repeat("ü", 32) // 64 bytes, 32 UTF-16 code units
+	if _, err := assemble(Spec{VendorName: strings.Repeat("ü", 32)}); err == nil || !strings.Contains(err.Error(), "VendorName") {
+		t.Errorf("VendorName of 64 bytes in 32 characters: %v, want a refusal naming it", err)
+	}
+	wide := strings.Repeat("ü", 16) // 32 bytes
 	topo, err := assemble(Spec{VendorName: wide})
 	if err != nil {
-		t.Fatalf("VendorName of 32 code units: %v", err)
+		t.Fatalf("VendorName of 32 bytes: %v", err)
 	}
 	var lamp *Endpoint
 	for _, ep := range topo.Endpoints {
@@ -55,7 +60,7 @@ func TestAssemblyRefusesBridgedInfoBeyondItsConstraint(t *testing.T) {
 			continue
 		}
 		if v, _ := srv.MatterRead(bdbidef.AttrVendorName); v != wide {
-			t.Errorf("VendorName served %q, want the 64-byte value as stated", v)
+			t.Errorf("VendorName served %q, want the 32-byte value as stated", v)
 		}
 		return
 	}
