@@ -6,6 +6,7 @@ package thermo
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log/slog"
 	"slices"
 	"time"
@@ -15,6 +16,7 @@ import (
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // ThermostatSuggestions (TSUGGEST, "[PRES]"): a controller suggests one of
@@ -51,6 +53,30 @@ const ThermostatFeatureTSUGGEST = uint32(tdef.FeatureThermostatSuggestions)
 // Suggestion is one ThermostatSuggestionStruct: its unique id, the preset
 // it suggests, and the Matter epoch seconds it takes effect and expires.
 type Suggestion = tdef.ThermostatSuggestionStruct
+
+// SuggestionStore persists one thermostat endpoint's suggestions —
+// matter.js's ThermostatSuggestions, quality N
+// (thermostat-cluster.element.ts:271-272 at b25ed960), as the TLV
+// encoding of the list — and the entry a manual override holds
+// (overridden, nil for none): matter.js's OverriddenSuggestionId, a
+// stored field of the server's own state ("Stored, so the override stays
+// in effect after a restart while its entry is still current",
+// ThermostatServer.ts:163, :3178-3183 at b25ed960). LoadSuggestions
+// reports ok=false when nothing was saved; the server then starts with no
+// suggestions. store.ThermostatSuggestionStore implements it on the
+// module's store.
+//
+// SaveSuggestions runs on the server's command queue after every change
+// of the list or the override — a command, the application's
+// SetAttributes, a re-evaluation that prunes or follows — and only when
+// one of the two changed; it must not call back into the server, and
+// should return in bounded time. A failed save is logged
+// (matter.thermostat.suggestions_not_saved) and retried with the next
+// change; the state in memory stays.
+type SuggestionStore interface {
+	LoadSuggestions(ctx context.Context) (suggestions []byte, overridden *uint8, ok bool, err error)
+	SaveSuggestions(ctx context.Context, suggestions []byte, overridden *uint8) error
+}
 
 const (
 	// defaultMaxSuggestions is MaxThermostatSuggestions when the
@@ -97,8 +123,7 @@ type suggestions struct {
 	quiesced bool
 	// lastID is the UniqueID issued last (matter.js
 	// internal.lastSuggestionUniqueId, ThermostatServer.ts:2287 at
-	// b25ed960, seeded with the largest stored id — 0 here, where the
-	// list starts empty).
+	// b25ed960, seeded with the largest stored id; 0 for none).
 	lastID uint8
 	// overridden is matter.js's overriddenSuggestionId (:3183 at
 	// b25ed960): the UniqueID of the entry a client or the application
@@ -112,20 +137,148 @@ type suggestions struct {
 	// current occupancy's pair :803-808) for the one local change that, in
 	// Go, is a transaction. The next re-evaluation reads and clears it.
 	setpointWritten bool
+	// store persists the list and the override; nil keeps them in memory.
+	// saved and savedOverride are what it holds — the last save, or the
+	// load —, so a re-evaluation that changed neither saves nothing.
+	store         SuggestionStore
+	saved         []byte
+	savedOverride *uint8
+	// restored marks stored entries or an override the start loaded: the
+	// first AttachMatterTime re-evaluates them, matter.js's re-evaluation
+	// as the node comes online (#nodeOnline, ThermostatServer.ts:401-411
+	// at b25ed960).
+	restored bool
 }
 
-// seedSuggestions takes the TSUGGEST configuration: MaxThermostatSuggestions
-// (0 is 5), held to its constraint ("min 5"), and the node's Matter time.
+// seedSuggestions takes the TSUGGEST configuration and the stored
+// suggestions. Mirrors matter.js ThermostatServer.ts:2261-2293 at
+// b25ed960 (#setupSuggestions): MaxThermostatSuggestions (0 is 5) below
+// its constraint ("min 5") refuses the start with [ErrFeatures]
+// (:2266-2271); the stored entries that name no preset are dropped with a
+// notice (:2273-2280) and the rest saved; MaxThermostatSuggestions is
+// raised to cover the stored entries (:2281-2286, #limitCoveringStored);
+// the unique ids continue after the largest stored one (:2287). The
+// stored override (OverriddenSuggestionId, :3183) is taken as stored: the
+// first re-evaluation ends it unless its entry is current (:2474-2475). A
+// store that fails to load or to save the pruned list refuses the start
+// with [ErrPresets], as the presets' does. The caller ran seedPresets.
 func (s *ThermostatServer) seedSuggestions(cfg ThermostatConfig) error {
 	limit := cfg.MaxThermostatSuggestions
 	if limit == 0 {
 		limit = defaultMaxSuggestions
 	}
 	if _, err := s.inst.CheckValue(tdef.AttrMaxThermostatSuggestions, limit, nil); err != nil {
-		return spec.Errorf(im.StatusConstraintError, "thermo: MaxThermostatSuggestions %d: %v", limit, err)
+		return fmt.Errorf("%w: %w", ErrFeatures, spec.Errorf(im.StatusConstraintError, "thermo: MaxThermostatSuggestions %d: %v", limit, err))
 	}
-	s.suggest = suggestions{max: limit}
+	s.suggest = suggestions{max: limit, store: cfg.SuggestionStore}
+	if s.suggest.store == nil {
+		return nil
+	}
+	ctx := context.Background()
+	b, overridden, ok, err := s.suggest.store.LoadSuggestions(ctx)
+	if err != nil {
+		return fmt.Errorf("%w: load thermostat suggestions: %w", ErrPresets, err)
+	}
+	if !ok {
+		return nil
+	}
+	stored, err := decodeSuggestions(b)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrPresets, err)
+	}
+	kept := slices.DeleteFunc(slices.Clone(stored), func(sg Suggestion) bool { return !s.presetFor(sg.PresetHandle) })
+	if dropped := len(stored) - len(kept); dropped > 0 {
+		s.logger().Info("matter.thermostat.suggestions_dropped",
+			slog.Int("count", dropped), slog.String("reason", "stored thermostat suggestions that name no preset"))
+	}
+	s.suggest.list = kept
+	s.suggest.max = s.limitCoveringStored("MaxThermostatSuggestions", limit, len(kept),
+		fmt.Sprintf("%d thermostat suggestions are stored", len(kept)))
+	for _, sg := range kept {
+		s.suggest.lastID = max(s.suggest.lastID, sg.UniqueId)
+	}
+	if overridden != nil {
+		s.suggest.overridden, s.suggest.overriddenSet = *overridden, true
+	}
+	s.suggest.saved, s.suggest.savedOverride = bytes.Clone(b), cloneOverride(overridden)
+	s.suggest.restored = len(kept) > 0 || overridden != nil
+	if len(kept) != len(stored) {
+		enc := encodeSuggestions(kept)
+		if err := s.suggest.store.SaveSuggestions(ctx, enc, cloneOverride(overridden)); err != nil {
+			return fmt.Errorf("%w: save thermostat suggestions: %w", ErrPresets, err)
+		}
+		s.suggest.saved = enc
+	}
 	return nil
+}
+
+// encodeSuggestions is the TLV encoding of a ThermostatSuggestions list a
+// [SuggestionStore] keeps.
+func encodeSuggestions(list []Suggestion) []byte {
+	enc := tlv.NewEncoder()
+	spec.List[Suggestion](list).EncodeTLV(enc, tlv.AnonymousTag())
+	b, _ := enc.Bytes() // an encoder of a well-formed list does not fail
+	return b
+}
+
+// decodeSuggestions decodes what encodeSuggestions encoded.
+func decodeSuggestions(b []byte) ([]Suggestion, error) {
+	n, err := spec.ReadElement(tlv.NewDecoder(b))
+	if err != nil {
+		return nil, fmt.Errorf("thermo: decode thermostat suggestions: %w", err)
+	}
+	v, err := tdef.Definition.Attribute(tdef.AttrThermostatSuggestions).Decode(n)
+	if err != nil {
+		return nil, fmt.Errorf("thermo: decode thermostat suggestions: %w", err)
+	}
+	list, _ := v.(spec.List[Suggestion])
+	return []Suggestion(list), nil
+}
+
+// cloneOverride copies a nullable override id.
+func cloneOverride(id *uint8) *uint8 {
+	if id == nil {
+		return nil
+	}
+	v := *id
+	return &v
+}
+
+// saveSuggestions saves the list and the override when either differs
+// from what the store holds; a failure is logged and the next change
+// saves again. The caller holds s.op, which orders the saves.
+func (s *ThermostatServer) saveSuggestions(ctx context.Context) {
+	s.mu.RLock()
+	st := s.suggest.store
+	if st == nil {
+		s.mu.RUnlock()
+		return
+	}
+	enc := encodeSuggestions(s.suggest.list)
+	var overridden *uint8
+	if s.suggest.overriddenSet {
+		overridden = cloneOverride(&s.suggest.overridden)
+	}
+	same := bytes.Equal(enc, s.suggest.saved) && equalOverride(overridden, s.suggest.savedOverride)
+	s.mu.RUnlock()
+	if same {
+		return
+	}
+	if err := st.SaveSuggestions(ctx, enc, cloneOverride(overridden)); err != nil {
+		s.logger().Warn("matter.thermostat.suggestions_not_saved", slog.String("reason", err.Error()))
+		return
+	}
+	s.mu.Lock()
+	s.suggest.saved, s.suggest.savedOverride = enc, overridden
+	s.mu.Unlock()
+}
+
+// equalOverride compares two nullable override ids.
+func equalOverride(a, b *uint8) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // AttachMatterTime hands the server the Matter time its suggestions
@@ -139,9 +292,24 @@ func (s *ThermostatServer) seedSuggestions(cfg ThermostatConfig) error {
 // node has no Matter time until its host attaches one: every
 // AddThermostatSuggestion answers INVALID_IN_STATE, as chip's does while
 // GetClock_MatterEpochS fails. nil leaves the time unchanged.
+//
+// The first call after a start that restored stored suggestions or an
+// override re-evaluates them, as matter.js does when the node comes online
+// (#nodeOnline, ThermostatServer.ts:401-411 at b25ed960): expired entries
+// leave, the current one is followed or stays overridden. matter.js
+// re-evaluates there unconditionally (:407-410); Go skips the evaluation
+// of an empty list without an override, which changes nothing.
 func (s *ThermostatServer) AttachMatterTime(matterTime clock.MatterTime) {
-	if matterTime != nil {
-		s.matterTime.Store(&matterTime)
+	if matterTime == nil {
+		return
+	}
+	s.matterTime.Store(&matterTime)
+	s.mu.Lock()
+	restored := s.suggest.restored
+	s.suggest.restored = false
+	s.mu.Unlock()
+	if restored {
+		s.scheduleSuggestionReevaluation()
 	}
 }
 
@@ -427,6 +595,10 @@ func (s *ThermostatServer) reevaluateSuggestions(ctx context.Context) {
 	if s.features&ThermostatFeatureTSUGGEST == 0 {
 		return
 	}
+	// Every change of the list or the override ends in a re-evaluation
+	// (the commands, the application's write, an override, a removed
+	// preset), which saves them once it is done (SuggestionStore).
+	defer s.saveSuggestions(ctx)
 	// A scheduled re-evaluation is this one from here on; one scheduled
 	// after this point re-reads the time itself.
 	s.mu.Lock()
