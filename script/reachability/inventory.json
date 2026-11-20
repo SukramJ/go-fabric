@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10172,
+  "entry_points": 10173,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27871,
+    "total_exported": 27872,
     "reachable": 20885,
-    "whitelisted": 6964,
+    "whitelisted": 6965,
     "unreachable": 22
   },
   "by_package": [
@@ -37497,7 +37497,14 @@
       "identifier": "TestUnitTestingListAppend",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/unit_testing_test.go",
-      "line": 177
+      "line": 213
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestUnitTestingServesEveryAttributeFromTheStart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/unit_testing_test.go",
+      "line": 173
     },
     {
       "package": "examples/reference-bridge",
