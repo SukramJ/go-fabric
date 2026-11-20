@@ -586,8 +586,15 @@ func (a *Administrator) icacCSRRequest(ctx context.Context, _ any) (any, error) 
 // (FAILSAFE_REQUIRED), once per fail-safe (CONSTRAINT_ERROR); an ICAC that
 // does not chain to the accessing fabric's root, or does not decode, is
 // InvalidICAC, one for another key InvalidPublicKey; an ICAC that passes
-// answers SUCCESS. Mirrors HandleAddICAC (:356-391) and its checks
-// (:393-437). connectedhomeip keeps nothing of the ICAC; neither does the
+// answers an ICACResponse with StatusCode OK. Mirrors HandleAddICAC
+// (:356-391) and its checks (:393-437), except for the passing ICAC:
+// connectedhomeip answers it with a SUCCESS status alone (:362, :383-390),
+// against its own model of the command (controller-clusters.matter:13198-13199
+// at 6170af84, "responded in the form of an ICACResponse", statusCode not
+// optional :13176-13178), and an absent response of a command whose
+// response has a mandatory field is FAILURE (matter.js
+// packages/node/src/node/integration/ProtocolService.ts:624-625, :717-733 at
+// b25ed960; decision 340, notes/parity/by_design.md). connectedhomeip keeps nothing of the ICAC; neither does the
 // server — the host's application installs it.
 func (a *Administrator) addICAC(ctx context.Context, fields any) (any, error) {
 	req, ok := spec.RequestOf[jfadef.AddIcacRequest](fields)
@@ -630,15 +637,25 @@ func (a *Administrator) addICAC(ctx context.Context, fields any) (any, error) {
 	if _, err := mattercert.Decode(req.IcacValue); err != nil { // :380, :433-437
 		return respond(jfadef.ICACResponseStatusInvalidIcac)
 	}
-	return nil, nil // :390
+	return respond(jfadef.ICACResponseStatusOk) // :390 answers a status alone; see above
 }
 
-// transferAnchorRequest answers as connectedhomeip: SUCCESS without effect
-// or response (HandleTransferAnchorRequest :439-443, an empty body).
-func (a *Administrator) transferAnchorRequest(context.Context, any) (any, error) { return nil, nil }
+// transferAnchorRequest answers a TransferAnchorResponse whose StatusCode
+// refuses the transfer with TransferAnchorStatusNoUserConsent: the server
+// performs no anchor transfer and has no path by which a user consents to
+// one. connectedhomeip's HandleTransferAnchorRequest (:439-443 at
+// 6170af84) is an empty body that adds neither a status nor a response, so
+// it gives no answer to mirror; the response is the command's own
+// (controller-clusters.matter:13203, TransferAnchorRequest():
+// TransferAnchorResponse; the enum :13154-13158; decision 341).
+func (a *Administrator) transferAnchorRequest(context.Context, any) (any, error) {
+	return jfadef.TransferAnchorResponse{StatusCode: jfadef.TransferAnchorResponseStatusTransferAnchorStatusNoUserConsent}, nil
+}
 
-// transferAnchorComplete answers SUCCESS without effect
-// (HandleTransferAnchorComplete :445-449, an empty body).
+// transferAnchorComplete answers SUCCESS without effect: a status-only
+// command (controller-clusters.matter:13205 at 6170af84, DefaultSuccess).
+// connectedhomeip's HandleTransferAnchorComplete (:445-449) is an empty
+// body that adds no status; the SUCCESS is this module's.
 func (a *Administrator) transferAnchorComplete(context.Context, any) (any, error) { return nil, nil }
 
 // SetAttributes implements [spec.AttributeSetter]: the host's

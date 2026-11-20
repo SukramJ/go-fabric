@@ -228,7 +228,7 @@ func DecodeFloat32(n Node) (float32, error) {
 // R2-P6-wire-1313) — and refused where a value is held to its type
 // ([Instance.CheckValue]); a request field is held to it by the request
 // gate, which refuses it only for a command stating a
-// [RequestCheck.Refusal] ([Instance.admitRequest]).
+// [RequestCheck.Refusal] ([AdmitRequest]).
 func DecodeFloat64(n Node) (float64, error) {
 	if n.El.Type != tlv.TypeFloat4 && n.El.Type != tlv.TypeFloat8 {
 		return 0, wrongType("value is not a float (type 0x%02X)", n.El.Type)

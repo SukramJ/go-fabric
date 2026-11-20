@@ -25,47 +25,45 @@ func hooksAdmitDefinition() *spec.Cluster {
 	}
 }
 
-// TestHooksInvokeAdmitsTheRequestFirst holds a spec.Hooks server's command
-// path to the request gate every other path runs: a request its
-// definition refuses answers the command's Refusal before the host's
-// handler runs, and — with no host handler — before the server's own
-// logic (Invoke answers handled). Before, Hooks.Invoke ran the host's
-// handler with no admitRequest, so a stated Refusal on any of the eight
-// Hooks servers' clusters would have been ignored (review II, DR5b-c2-06,
-// R2-P6-api-1307).
+// TestHooksInvokeAdmitsTheRequestFirst: a spec.Hooks server's command is
+// held by the one request gate in front of every server
+// ([spec.AdmitRequest], decision 339): a request its definition refuses
+// answers the command's Refusal there, so neither the host's handler nor
+// the server's own logic runs; Hooks.Invoke itself is a local call and
+// does not validate (matter.js validates only the commands its interaction
+// layer invokes, ProtocolService.ts:347-350 at b25ed960). Before decision
+// 339 the gate sat in Hooks.Invoke (review II, DR5b-c2-06, R2-P6-api-1307).
 func TestHooksInvokeAdmitsTheRequestFirst(t *testing.T) {
 	t.Parallel()
-	inst, err := spec.New(hooksAdmitDefinition(), spec.Options{})
+	def := hooksAdmitDefinition()
+	inst, err := spec.New(def, spec.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	var h spec.Hooks
 	h.Init(inst)
 	yes := true
+	ctx := context.Background()
 
-	// No host handler: a misfit is refused and handled; a fit request
-	// leaves the server's own logic to run.
-	resp, handled, err := h.Invoke(context.Background(), 1, ctReq{})
+	// The gate: a misfit is refused with the Refusal, a fit request passes.
 	var se *spec.StatusError
-	if !handled || !errors.As(err, &se) || se.Status != im.StatusInvalidCommand || resp != nil {
-		t.Errorf("misfit, no handler: (%v, %v, %v), want handled with INVALID_COMMAND", resp, handled, err)
+	if err := spec.AdmitRequest(ctx, def, inst.FeatureMap(), 1, ctReq{}, nil); !errors.As(err, &se) || se.Status != im.StatusInvalidCommand {
+		t.Errorf("misfit at the gate: %v, want INVALID_COMMAND", err)
 	}
-	if _, handled, err := h.Invoke(context.Background(), 1, ctReq{Enable: &yes}); handled || err != nil {
-		t.Errorf("fit, no handler: handled %v, %v; want the server's own logic", handled, err)
+	if err := spec.AdmitRequest(ctx, def, inst.FeatureMap(), 1, ctReq{Enable: &yes}, nil); err != nil {
+		t.Errorf("fit at the gate: %v", err)
 	}
 
-	// A host handler: it never sees the misfit.
+	// Hooks.Invoke on its own: no host handler leaves the server's own
+	// logic to run; a host handler runs, misfit or not (a local call).
+	if _, handled, err := h.Invoke(ctx, 1, ctReq{}); handled || err != nil {
+		t.Errorf("misfit, no handler: handled %v, %v; want the server's own logic", handled, err)
+	}
 	ran := 0
 	if err := h.Handle(1, func(context.Context, any) (any, error) { ran++; return nil, nil }); err != nil {
 		t.Fatal(err)
 	}
-	if _, handled, err := h.Invoke(context.Background(), 1, ctReq{}); !handled || !errors.As(err, &se) || se.Status != im.StatusInvalidCommand {
-		t.Errorf("misfit, host handler: handled %v, %v; want INVALID_COMMAND", handled, err)
-	}
-	if _, handled, err := h.Invoke(context.Background(), 1, ctReq{Enable: &yes}); !handled || err != nil {
-		t.Errorf("fit, host handler: handled %v, %v", handled, err)
-	}
-	if ran != 1 {
-		t.Errorf("the host handler ran %d times, want once (the fit request only)", ran)
+	if _, handled, err := h.Invoke(ctx, 1, ctReq{}); !handled || err != nil || ran != 1 {
+		t.Errorf("misfit, host handler, local call: handled %v, %v, ran %d; want the handler", handled, err, ran)
 	}
 }

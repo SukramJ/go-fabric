@@ -14,7 +14,8 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// The commands' remaining statuses, invoked on the server directly (the
+// The commands' remaining statuses, invoked on the server as a wire command
+// reaches it ([wireInvoke]: the request gate, then the server; the
 // matter.js sources each case mirrors are cited on the server's code).
 
 func newLocal(t *testing.T, edit func(*lock.DoorLockConfig)) (*lock.DoorLockServer, *fakeEventEmitter) {
@@ -37,7 +38,7 @@ func newLocal(t *testing.T, edit func(*lock.DoorLockConfig)) (*lock.DoorLockServ
 //nolint:revive // t first, as every helper of the package
 func invokeStatus(t *testing.T, srv *lock.DoorLockServer, ctx context.Context, cmd uint32, req any) (any, im.StatusCode) {
 	t.Helper()
-	res, err := srv.MatterInvoke(ctx, cmd, req)
+	res, err := wireInvoke(ctx, srv, cmd, req)
 	if err == nil {
 		return res, im.StatusSuccess
 	}

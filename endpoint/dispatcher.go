@@ -732,7 +732,12 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 		if srv.MatterClusterID() != path.Cluster {
 			continue
 		}
-		resp, err := srv.MatterInvoke(contract.WithOrigin(im.WithCommandPath(ctx, path), contract.OriginCommand), path.Command, fields)
+		invokeCtx := contract.WithOrigin(im.WithCommandPath(ctx, path), contract.OriginCommand)
+		var resp any
+		err := requestHeld(invokeCtx, srv, path.Command, fields)
+		if err == nil {
+			resp, err = srv.MatterInvoke(invokeCtx, path.Command, fields)
+		}
 		if err != nil {
 			status, cs, hasCS := classifyError(err)
 			return im.InvokeResult{Path: path, Response: resp, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
@@ -818,7 +823,12 @@ func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.Concr
 	for _, t := range d.commandTargets(path, authorize) {
 		ePath := path
 		ePath.Endpoint, ePath.HasEndpoint = t.ep.ID, true
-		resp, err := t.srv.MatterInvoke(contract.WithOrigin(im.WithCommandPath(ctx, ePath), contract.OriginCommand), path.Command, fields)
+		invokeCtx := contract.WithOrigin(im.WithCommandPath(ctx, ePath), contract.OriginCommand)
+		var resp any
+		err := requestHeld(invokeCtx, t.srv, path.Command, fields)
+		if err == nil {
+			resp, err = t.srv.MatterInvoke(invokeCtx, path.Command, fields)
+		}
 		res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
 		if err != nil {
 			res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err)
@@ -1302,6 +1312,31 @@ func persistedWrite(ctx context.Context, srv contract.ClusterServer, path im.Con
 	return res
 }
 
+// requestHeld holds the request fields of cmdID to the definition of srv's
+// cluster before srv runs ([spec.AdmitRequest]) — the module's one request
+// gate, on every command that reaches a server over the wire (a concrete,
+// wildcard-endpoint or group invoke): the server's FeatureMap selects the
+// conformance and the enum members, its attributes resolve the ones a
+// constraint names, as [writtenHeld] holds a written value. A command the
+// server does not accept is left to the server, which answers it; a
+// cluster without a registered definition is not judged.
+//
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:347-350
+// at b25ed960 (each command of the per-endpoint cluster state bound to
+// invokeCommand, whose gate is :671-705), reached only from the wire path
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:316, :358)
+// after the accepted-command check (:269-271) and the access check.
+func requestHeld(ctx context.Context, srv contract.ClusterServer, cmdID uint32, fields any) error {
+	def := spec.Lookup(srv.MatterClusterID())
+	if def == nil {
+		return nil
+	}
+	if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), cmdID) {
+		return nil
+	}
+	return spec.AdmitRequest(ctx, def, featureMapOf(srv), cmdID, fields, srv.MatterRead)
+}
+
 // writtenHeld is the status the definition of srv's cluster answers a
 // controller's written value of attrID with ([spec.CheckWritten]): the
 // server's FeatureMap selects the enum values and conformance, its
@@ -1312,12 +1347,7 @@ func writtenHeld(srv contract.ClusterServer, attrID uint32, value im.AttributeVa
 	if def == nil {
 		return im.StatusSuccess
 	}
-	var features uint32
-	if v, ok := srv.MatterRead(cluster.AttrGlobalFeatureMap); ok {
-		if fm, ok := v.(uint32); ok {
-			features = fm
-		}
-	}
+	features := featureMapOf(srv)
 	v := value.Value
 	if value.IsNull {
 		v = nil

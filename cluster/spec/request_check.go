@@ -156,9 +156,37 @@ func enumListAdmits(t Type, c Constraint, v uint64) bool {
 	return slices.Contains(members, v)
 }
 
-// admitRequest is the request gate of [Server.MatterInvoke] and
-// [InvokeHeld], run before any handler — the server's own or a host's —
-// on every error [Instance.CheckRequest] finds in the request, not only
+// AdmitRequest holds a controller's request fields of the request command
+// cmdID to the definition def under the feature selection features,
+// before any server runs — the request's twin of [CheckWritten], and the
+// one request gate of the module: the endpoint dispatcher runs it on every
+// command that reaches a server over the wire, with the FeatureMap and
+// the attributes (peers) read from that server. A direct call of a
+// server's MatterInvoke, [InvokeHeld] or [Hooks.Invoke] is a local call
+// and is not validated, as matter.js validates only the commands its
+// interaction layer invokes. The decision is [Instance]'s gate: a command
+// that states a [RequestCheck.Refusal] answers the first error with it;
+// else a value an enum does not define anywhere in the request is
+// CONSTRAINT_ERROR ([ErrUnknownEnumValue]); else the errors are logged
+// and nil is returned. A nil payload is judged as a request without
+// fields; a payload not in the definition's generated form (a hand-written
+// reader's) is not judged. nil for a nil def.
+//
+// Mirrors matter.js packages/node/src/node/integration/ProtocolService.ts:347-350
+// at b25ed960 (the gate bound to each command of the per-endpoint cluster
+// state, reached only from
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:316, :358) and
+// :671-705 (invokeCommand's gate).
+func AdmitRequest(ctx context.Context, def *Cluster, features, cmdID uint32, fields any, peers Peers) error {
+	if def == nil {
+		return nil
+	}
+	i := &Instance{def: def, features: features}
+	return i.admitRequest(ctx, cmdID, fields, peers)
+}
+
+// admitRequest is the request gate [AdmitRequest] runs on every error
+// [Instance.CheckRequest] finds in the request, not only
 // the first: a command that states a [RequestCheck.Refusal] answers the
 // first error with it; else a value an enum does not define anywhere in
 // the request is refused with CONSTRAINT_ERROR ([ErrUnknownEnumValue]);

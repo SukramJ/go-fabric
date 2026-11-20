@@ -15,7 +15,9 @@ type peerReq struct {
 	Level uint8
 }
 
-// TestInvokeHeldResolvesSiblingAttributes: InvokeHeld admits a request
+// TestInvokeHeldResolvesSiblingAttributes: the request gate in front of a
+// self-held server ([spec.AdmitRequest] with the server's attributes as
+// peers, as endpoint.TopologyDispatcher runs it) admits a request
 // whose field constraint names a sibling attribute ("max Limit") against
 // the attribute's current value — the server's peers — before the host's
 // handler and before the server's own logic. A level at the limit is
@@ -60,16 +62,16 @@ func TestInvokeHeldResolvesSiblingAttributes(t *testing.T) {
 			if err := held.SetAttributes(map[uint32]any{0: uint8(5)}); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := spec.InvokeHeld(ctx, &held, 0, peerReq{Level: 5}); err != nil || calls != 1 {
+			if _, err := wireInvokeHeld(ctx, srv, &held, 0, peerReq{Level: 5}); err != nil || calls != 1 {
 				t.Fatalf("level 5 under Limit 5: %v, %d calls; want admitted", err, calls)
 			}
-			if _, err := spec.InvokeHeld(ctx, &held, 0, peerReq{Level: 6}); statusOf(err) != im.StatusInvalidCommand || calls != 1 {
+			if _, err := wireInvokeHeld(ctx, srv, &held, 0, peerReq{Level: 6}); statusOf(err) != im.StatusInvalidCommand || calls != 1 {
 				t.Fatalf("level 6 over Limit 5: %v, %d calls; want INVALID_COMMAND before the handler", err, calls)
 			}
 			if err := held.SetAttributes(map[uint32]any{0: uint8(6)}); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := spec.InvokeHeld(ctx, &held, 0, peerReq{Level: 6}); err != nil || calls != 2 {
+			if _, err := wireInvokeHeld(ctx, srv, &held, 0, peerReq{Level: 6}); err != nil || calls != 2 {
 				t.Fatalf("level 6 under Limit 6: %v, %d calls; want admitted", err, calls)
 			}
 		})

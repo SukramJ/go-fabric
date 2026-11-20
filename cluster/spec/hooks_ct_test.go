@@ -120,8 +120,12 @@ func TestResponseFieldPresence(t *testing.T) {
 		{"missing", ctReq{Enable: &yes}, ctResp{}, true},
 		{"present", ctReq{Enable: &yes}, &ctResp{Result: &v}, false},
 		{"disallowed", ctReq{}, ctResp{Result: &v}, true},
-		{"absent payload", ctReq{Enable: &yes}, nil, false},
-		{"nil pointer", ctReq{Enable: &yes}, (*ctResp)(nil), false},
+		// An absent response is judged as {} (F-b25ed960-30, matter.js
+		// ProtocolService.ts:624-625, :717-733 at b25ed960): Result,
+		// required by Req.Enable, is missing; without Enable it is not.
+		{"absent payload", ctReq{Enable: &yes}, nil, true},
+		{"nil pointer", ctReq{Enable: &yes}, (*ctResp)(nil), true},
+		{"absent payload, nothing required", ctReq{}, nil, false},
 		{"not a struct", ctReq{Enable: &yes}, 3, false},
 		{"another type", ctReq{Enable: &yes}, ctOther{}, false},
 	} {
