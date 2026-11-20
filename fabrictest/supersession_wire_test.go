@@ -4,6 +4,7 @@
 package fabrictest_test
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"testing"
@@ -61,6 +62,31 @@ func subscriptionSession(t *testing.T, p *fabrictest.Pair, id uint32) (uint16, b
 	return 0, false
 }
 
+// awaitDeviceSessionState waits on the site's clock until the device's
+// CASE sessions satisfy cond. The device completes a new session after
+// the Success that lets the controller go on, lists it only then
+// (operational.Manager.Sessions), and moves subscriptions and evicts
+// sessions just after (Manager.completeEstablishment): a request on the
+// new session can come back before that.
+func awaitDeviceSessionState(ctx context.Context, t *testing.T, site *fabrictest.Site, p *fabrictest.Pair, what string, cond func(map[uint16][]uint32) bool) {
+	t.Helper()
+	if err := site.Eventually(ctx, what, func() bool { return cond(deviceSessions(t, p)) }); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// newestListed is the controller's newest session's id on the device,
+// once the device lists it.
+func newestListed(ctx context.Context, t *testing.T, site *fabrictest.Site, p *fabrictest.Pair) uint16 {
+	t.Helper()
+	newest := fabrictestseam.Peer(p).NewestSession().PeerSessionID()
+	awaitDeviceSessionState(ctx, t, site, p, "the newest session on the device", func(m map[uint16][]uint32) bool {
+		_, ok := m[newest]
+		return ok
+	})
+	return newest
+}
+
 // TestServerSubscriptionSessionSupersessionOverTheWire ports by meaning, over
 // the site's wire, two cases of matter.js at b25ed960 where a subscription
 // meets a newer CASE session of its subscriber: it moves onto it
@@ -98,6 +124,7 @@ func TestServerSubscriptionSessionSupersessionOverTheWire(t *testing.T) {
 		}
 		t.Cleanup(second.Close)
 
+		newestListed(ctx, t, site, p)
 		after := deviceSessions(t, p)
 		if len(after) != 2 {
 			t.Fatalf("device sessions %v; want the former session still open beside the new one", after)
@@ -145,7 +172,10 @@ func TestServerSubscriptionSessionSupersessionOverTheWire(t *testing.T) {
 			if _, err := fabrictest.Read(ctx, p, onOffPath(ep)); err != nil {
 				t.Fatalf("read on a new session: %v", err)
 			}
-			now := fabrictestseam.Peer(p).NewestSession().PeerSessionID()
+			now := newestListed(ctx, t, site, p)
+			awaitDeviceSessionState(ctx, t, site, p, "the subscription on the newest session", func(m map[uint16][]uint32) bool {
+				return slices.Contains(m[now], sub.ID())
+			})
 			on, ok := subscriptionSession(t, p, sub.ID())
 			if !ok || on != now {
 				t.Fatalf("the subscription is on session %d (%v); want the newest, %d", on, ok, now)
@@ -200,8 +230,12 @@ func TestServerSubscriptionSessionSupersessionOverTheWire(t *testing.T) {
 			if _, err := fabrictest.Read(ctx, p, onOffPath(ep)); err != nil {
 				t.Fatalf("read %d on a new session: %v", i, err)
 			}
-			newest = fabrictestseam.Peer(p).NewestSession().PeerSessionID()
+			newest = newestListed(ctx, t, site, p)
 		}
+		awaitDeviceSessionState(ctx, t, site, p, "the eviction of the session the subscription was set up on", func(m map[uint16][]uint32) bool {
+			_, still := m[setUpOn]
+			return !still
+		})
 		sessions := deviceSessions(t, p)
 		if _, still := sessions[setUpOn]; still {
 			t.Fatalf("the session the subscription was set up on (%d) was not evicted: %v", setUpOn, sessions)
