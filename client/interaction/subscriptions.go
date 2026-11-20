@@ -199,7 +199,9 @@ func (r *Subscriptions) CloseForPeer(addr exchange.PeerAddress) {
 	r.ResetTimer()
 }
 
-// Delete unregisters a subscription (:173-184).
+// Delete unregisters a subscription; the liveness timer stops once no
+// peer subscription remains. Mirrors matter.js ClientSubscriptions.delete
+// (ClientSubscriptions.ts:173-187 at b25ed960, the stop :184-186).
 func (r *Subscriptions) Delete(s *Subscription) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -210,6 +212,10 @@ func (r *Subscriptions) Delete(s *Subscription) {
 		}
 	}
 	delete(r.active, s)
+	if len(r.peers) == 0 && r.timer != nil {
+		r.timer.Stop()
+		r.timer = nil
+	}
 }
 
 // Active returns the user-facing subscriptions (the iterator of :186-191).
