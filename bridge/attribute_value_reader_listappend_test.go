@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
+	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -84,4 +86,43 @@ func TestAttributeValueReader_ListAppendOfAScalarEntry(t *testing.T) {
 			t.Fatalf("an appended 300 to a uint8 list decoded as %v, want a refusal", v.Value)
 		}
 	})
+}
+
+// TestScalarAppendedToAStructListEndsTheWrite: a scalar appended (null
+// ListIndex) to a list of structures — the ACL and a LabelList, decoded
+// from a whole WriteRequest as the bridge receives it, after the REPLACE of
+// the list — is refused by the list's decoder as the wrong type: an
+// undecodable value, which ends the write interaction with FAILURE (owner
+// decision 161; im valueGateFor). matter.js's element schema throws a
+// non-status error for another TLV type (packages/types/src/tlv/TlvObject.ts:205-207
+// at b25ed960), which writeValue rethrows
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:463-469).
+// Before P2b-F the entry reached the dispatcher as []any and answered
+// CONSTRAINT_ERROR on its path (measured over a node, P2b-F report).
+func TestScalarAppendedToAStructListEndsTheWrite(t *testing.T) {
+	t.Parallel()
+	for name, list := range map[string]im.ConcreteAttributePath{
+		"ACL":       {Endpoint: 0, Cluster: acldef.ClusterID, Attribute: acldef.AttrAcl, HasEndpoint: true, HasCluster: true, HasAttribute: true},
+		"LabelList": {Endpoint: 1, Cluster: userlabeldef.ClusterID, Attribute: userlabeldef.AttrLabelList, HasEndpoint: true, HasCluster: true, HasAttribute: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			add := list
+			add.ListAppend = true
+			b := writeRequestBytes(t, im.WriteRequest{Writes: []im.AttributeWrite{
+				{Path: list, Value: im.AttributeValue{Value: spec.Node{El: tlv.Element{Type: tlv.TypeArray, IsContainer: true}}}},
+				{Path: add, Value: im.AttributeValue{Value: spec.Node{El: tlv.Element{Type: tlv.TypeUnsignedInt1, Uint: 5}}}},
+			}})
+			req, err := im.UnmarshalWriteRequestTLV(tlv.NewDecoder(b), attributeValueReader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(req.Writes) != 2 || !req.Writes[1].Path.ListAppend {
+				t.Fatalf("decoded %d writes (%+v), want the REPLACE and the ADD", len(req.Writes), req.Writes)
+			}
+			if !im.IsUndecodable(req.Writes[1].Value) {
+				t.Fatalf("the appended scalar decoded as %T %v, want an undecodable value", req.Writes[1].Value.Value, req.Writes[1].Value.Value)
+			}
+		})
+	}
 }
