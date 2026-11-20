@@ -493,6 +493,23 @@ func (d *Device) Node() *node.Node {
 	return d.n
 }
 
+// listsCASESession reports whether the device's node lists an
+// established CASE session between peer (the controller's node id) and
+// local (the device's node id on that fabric). Sessions omits a session
+// still establishing (operational.Manager.Sessions).
+func (d *Device) listsCASESession(peer, local uint64) bool {
+	n := d.Node()
+	if n == nil {
+		return false
+	}
+	for _, s := range n.Sessions().Sessions() {
+		if !s.IsPASE && s.PeerNodeID == peer && s.LocalNodeID == local {
+			return true
+		}
+	}
+	return false
+}
+
 // Addr is the device's UDP address: its host address on the in-memory
 // network, its socket's on loopback.
 func (d *Device) Addr() *net.UDPAddr {

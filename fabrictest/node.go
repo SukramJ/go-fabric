@@ -54,7 +54,10 @@ const commissionDiscoveryTimeout = 3 * time.Minute
 // as MockSite.addCommissionedPair runs it: the device is discovered by its
 // long discriminator, the registry's node for it (client.Registry.ForDevice)
 // is commissioned (client.Registry.Commission) with d's passcode unless o
-// names one, and started. With a fake site clock it runs under [Site.Run].
+// names one, and started. As [Controller.Commission], it returns only once
+// d lists the CASE session the commissioning established, the wait bounded
+// by ctx. With a fake site clock it runs under [Site.Run] and the wait
+// under [Site.Eventually].
 func (c *Controller) CommissionNode(ctx context.Context, d *Device, o client.CommissionOptions) (*client.Node, error) {
 	found, err := c.Discover(ctx, discovery.ByLongDiscriminator(d.Discriminator()), commissionDiscoveryTimeout)
 	if err != nil {
@@ -72,6 +75,13 @@ func (c *Controller) CommissionNode(ctx context.Context, d *Device, o client.Com
 		o.Passcode = d.Passcode()
 	}
 	if err := c.site.Run(ctx, func(ctx context.Context) error { return reg.Commission(ctx, n, o) }); err != nil {
+		return n, fmt.Errorf("fabrictest: commission device %d: %w", d.index, err)
+	}
+	addr, ok := n.PeerAddress()
+	if !ok {
+		return n, fmt.Errorf("fabrictest: commission device %d: the node has no peer address", d.index)
+	}
+	if err := c.awaitDeviceSession(ctx, d, addr.NodeID); err != nil {
 		return n, fmt.Errorf("fabrictest: commission device %d: %w", d.index, err)
 	}
 	return n, nil
