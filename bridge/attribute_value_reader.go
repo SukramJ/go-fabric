@@ -471,8 +471,8 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 	case path.Cluster == thermostatdef.ClusterID && path.Attribute == thermostatdef.AttrSchedules && el.IsContainer:
 		return generatedAttributeValue(thermostatdef.Definition, path.Attribute, el, dec, true)
 	}
-	if v, ok := definedListItem(path, el, dec); ok {
-		return v, nil
+	if v, ok, err := definedListItem(path, el, dec); ok {
+		return v, err
 	}
 	v, err := primitiveAttributeValue(el, dec)
 	if err != nil {
@@ -492,36 +492,41 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 // list's entry type refuses is refused. ok is false for an attribute no
 // registered definition decodes as a list, and for a null entry, which
 // keep the primitive reader. A structured entry goes through
-// [generatedAttributeValue], as the replace of such a list does.
+// [generatedAttributeValue], as the replace of such a list does, and a
+// stream it cannot read through is its error, as the replace path returns
+// it. A scalar appended to a list of structures is refused by the
+// definition's decoder as the wrong type ([spec.ErrWrongType]): an
+// undecodable value, which ends the write interaction with FAILURE (owner
+// decision 161), as matter.js's element schema throws a non-status error
+// that writeValue rethrows (AttributeWriteResponse.ts:463-469 at b25ed960;
+// TlvObject.ts:205-207 refuses another TLV type). Before P2b-F it reached
+// the dispatcher as []any and answered CONSTRAINT_ERROR on its path.
 //
 // Mirrors matter.js packages/protocol/src/action/server/AttributeWriteResponse.ts:446-460
 // at b25ed960 (writeValue: an ADD is decoded with the list schema's
 // elementSchema, :455, and pushed onto the list, :460).
-func definedListItem(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, bool) {
+func definedListItem(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, bool, error) {
 	if el.IsNull {
-		return im.AttributeValue{}, false
+		return im.AttributeValue{}, false, nil
 	}
 	def := spec.Lookup(path.Cluster)
 	if def == nil {
-		return im.AttributeValue{}, false
+		return im.AttributeValue{}, false, nil
 	}
 	attr := def.Attribute(path.Attribute)
 	if attr == nil || attr.Decode == nil || attr.Type.Kind != spec.KindList {
-		return im.AttributeValue{}, false
+		return im.AttributeValue{}, false, nil
 	}
 	if el.IsContainer {
 		v, err := generatedAttributeValue(def, path.Attribute, el, dec, true)
-		if err != nil {
-			return im.AttributeValue{Value: im.UndecodableValue{Err: err}}, true
-		}
-		return v, true
+		return v, true, err
 	}
 	n := spec.Node{El: tlv.Element{Type: tlv.TypeArray, IsContainer: true}, Children: []spec.Node{{El: el}}}
 	v, err := attr.Decode(n)
 	if err != nil {
-		return im.AttributeValue{Value: refusedValue(def, err)}, true
+		return im.AttributeValue{Value: refusedValue(def, err)}, true, nil
 	}
-	return im.AttributeValue{Value: v}, true
+	return im.AttributeValue{Value: v}, true, nil
 }
 
 // stampFabricPlaceholder sets the FabricIndex field (context tag 254) of

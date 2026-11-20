@@ -354,9 +354,9 @@ func caseIDM21() goCertCase {
 				return paths(wildcard(nil, nil, nil), 101, nEP)(th)
 			}},
 			{n: "21", line: 774, title: "read with manufacturer-specific clusters and attributes", run: func(th *goTH) error {
-				// The wildcard read holds more than 100 attributes (:782-791)
+				// The wildcard read holds more than 100 attributes (:782-792)
 				// and at least one cluster at or above
-				// MANUFACTURER_SPECIFIC_CLUSTER_THRESHOLD (:792-810, :55) —
+				// MANUFACTURER_SPECIFIC_CLUSTER_THRESHOLD (:793-811, :55) —
 				// the daemon's UnitTesting under --unit-testing, as
 				// matter.js's all-clusters app serves Unit Testing (:51-54).
 				as, err := readAll(th, wildcard(nil, nil, nil))
