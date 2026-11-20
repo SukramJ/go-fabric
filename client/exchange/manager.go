@@ -1191,8 +1191,10 @@ func (m *Manager) holdAckWait(x *Exchange, p *pending) (release func()) {
 // b25ed960 (#onMessage: the test, detachChannel, initiateClose, with no
 // await before the table entry is gone; UnsecuredSession.ts:94-97
 // detachChannel deletes the entry first). matter.js releases only from the
-// message that created the session; Go after every handler on an inbound
-// session too, since a handler runs on a goroutine of its own.
+// message that created the session, or from the PASE/CASE handler that
+// adopted it (PaseServer.ts:112-113, CaseServer.ts:99-100 at b25ed960);
+// Go after every handler on an inbound session too, since a handler runs on
+// a goroutine of its own.
 func (m *Manager) releaseInbound(s *Session) {
 	m.mu.Lock()
 	s.mu.Lock()
