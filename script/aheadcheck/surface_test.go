@@ -174,7 +174,7 @@ func measureThermostat(t *testing.T, row string, with bool) surface.Cluster {
 		features |= thermostatdef.Feature(thermo.Ahead[row].Features)
 	}
 	if features&thermostatdef.FeatureMatterScheduleConfiguration != 0 {
-		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1}}
+		types := []thermostatdef.ScheduleTypeStruct{{SystemMode: thermostatdef.SystemModeHeat, NumberOfSchedules: 1, ScheduleTypeFeatures: thermostatdef.ScheduleTypeFeaturesSupportsSetpoints}}
 		one, transitions := uint8(1), uint8(4)
 		decl.Initial = thermostatdef.Patch{ScheduleTypes: &types, NumberOfSchedules: &one, NumberOfScheduleTransitions: &transitions}
 	}
