@@ -175,15 +175,17 @@ func (m *Manager) notifyGracefulClose(entries []*Entry, deadline time.Time) {
 	}
 }
 
-// hasSessionForPeer reports whether any live session matches the
-// (fabricIndex, peerNodeID) pair. Mirrors the guard matter.js applies
+// hasSessionForPeer reports whether any live established session matches
+// the (fabricIndex, peerNodeID) pair. Mirrors the guard matter.js applies
 // before resuming operational broadcast on session deletion
-// (DeviceAdvertiser.ts:138 `fabric.hasSessionForPeer(...)`).
+// (DeviceAdvertiser.ts:138 `fabric.hasSessionForPeer(...)`), which skips a
+// session still establishing (packages/protocol/src/fabric/Fabric.ts:422-429
+// at b25ed960).
 func (m *Manager) hasSessionForPeer(fabricIndex uint8, peerNodeID uint64) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for _, e := range m.sessions {
-		if e == nil || e.Session == nil {
+		if e == nil || e.Session == nil || e.establishing {
 			continue
 		}
 		if e.FabricIndex() == fabricIndex && e.Session.PeerNodeID() == peerNodeID {
@@ -200,10 +202,18 @@ func (m *Manager) hasSessionForPeer(fabricIndex uint8, peerNodeID uint64) bool {
 // table, so a same-peer replacement session installed by a CASE
 // re-establishment naturally suppresses the trigger. Mirrors
 // matter.js packages/protocol/src/protocol/DeviceAdvertiser.ts:131-150
-// at db021da0, which runs the check per deleted session.
+// at b25ed960, which runs the check per session deleted from the
+// established set (`sessions.sessions.deleted`, :132): a victim that was
+// still establishing never joined it and triggers nothing.
 func (m *Manager) fireReannounceIfPeerGone(victims []*Entry) {
 	m.mu.RLock()
 	hook := m.onReannounce
+	established := make([]*Entry, 0, len(victims))
+	for _, e := range victims {
+		if e != nil && e.Session != nil && !e.establishing {
+			established = append(established, e)
+		}
+	}
 	m.mu.RUnlock()
 	if hook == nil {
 		return
@@ -213,10 +223,7 @@ func (m *Manager) fireReannounceIfPeerGone(victims []*Entry) {
 		peerNodeID  uint64
 	}
 	var gone []fabricPeer
-	for _, e := range victims {
-		if e == nil || e.Session == nil {
-			continue
-		}
+	for _, e := range established {
 		p := fabricPeer{e.FabricIndex(), e.Session.PeerNodeID()}
 		if slices.Contains(gone, p) {
 			continue
@@ -410,6 +417,18 @@ type Entry struct {
 	// per-peer budget (matter.js SessionManager.ts:650-652: "ones we
 	// initiated are ours to manage").
 	isInitiator bool
+	// establishing marks a CASE responder session whose handshake has not
+	// completed: a new session until its Success StatusReport went out for
+	// the first time, a resumed one until the initiator's Success arrived
+	// ([Manager.completeEstablishment]). It receives and routes messages —
+	// the table's lookups, closes, peer loss and teardown see it — but the
+	// pickers ([Manager.NewestSessionForPeer], [Manager.SessionIDsForPeer]),
+	// the session listing ([Manager.Sessions]), the peer-presence check
+	// behind the reannounce and the per-peer cap do not. Mirrors matter.js
+	// packages/protocol/src/session/NodeSession.ts:209-231 at b25ed960 (the
+	// isEstablishing table). Guarded by the manager's mu, written only
+	// while the entry holds its id.
+	establishing bool
 	// createdAt is when the session was installed with its keys. The
 	// peer-loss sweep spares sessions created at or after the exchange
 	// that reported the loss (matter.js SessionManager.ts:688-690).
@@ -707,10 +726,11 @@ func randomInitialSessionID() uint16 {
 // [MaxSessionsPerPeer], at which point the least recently active ones
 // are force-closed (no CloseSession on the wire). Mirrors matter.js
 // packages/protocol/src/session/SessionManager.ts:204-206
-// (MAX_SESSIONS_PER_PEER) and :779-808 (#evictExcessSessionsFor), except
-// that matter.js runs the check once a session is established
-// (#sessionEstablished, :764-768) and counts established sessions only
-// (:785-796) — pin-lift unit P2-B.
+// (MAX_SESSIONS_PER_PEER) and :779-808 (#evictExcessSessionsFor) at
+// b25ed960; the session is installed established, so the check runs at
+// once, as matter.js runs it for a session created without
+// `establishing` (#sessionEstablished, :757-769, on RegisteredSessions.add,
+// :1281-1283).
 func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint64, keys sigma.SessionKeys) (*Entry, error) {
 	sess, err := channel.New(channel.Config{
 		EncryptKey:  keys.R2IKey[:], // bridge → peer
@@ -983,7 +1003,7 @@ func (m *Manager) ReleaseStake(s Stake) {
 // so the IM dispatcher's ACL gate can match CAT-bearing ACEs (Matter
 // §9.10.5.6). Pass nil when the peer NOC carried no CATs.
 func (m *Manager) OpenFromSigmaWithStake(s Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
-	return m.openFromSigma(s.ID, &s, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false)
+	return m.openFromSigma(s.ID, &s, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false, false)
 }
 
 // OpenFromSigmaAsInitiatorWithStake is [Manager.OpenFromSigmaWithStake]
@@ -993,7 +1013,7 @@ func (m *Manager) OpenFromSigmaWithStake(s Stake, fabricIndex uint8, localNodeID
 // matter.js creates the same session from CaseClient.ts:#doPair with
 // `isInitiator: true`.
 func (m *Manager) OpenFromSigmaAsInitiatorWithStake(s Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
-	return m.openFromSigma(s.ID, &s, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true)
+	return m.openFromSigma(s.ID, &s, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true, false)
 }
 
 // OpenFromSigmaWithID is [Manager.OpenFromSigmaWithStake] under a bare id
@@ -1009,7 +1029,7 @@ func (m *Manager) OpenFromSigmaAsInitiatorWithStake(s Stake, fabricIndex uint8, 
 // [Manager.OpenFromSigmaWithStake], which install under the caller's own
 // stake only; OpenFromSigmaWithID is removable in v0.25.0.
 func (m *Manager) OpenFromSigmaWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
-	return m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false)
+	return m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false, false)
 }
 
 // OpenFromSigmaAsInitiatorWithID is [Manager.OpenFromSigmaWithID] for a
@@ -1020,14 +1040,23 @@ func (m *Manager) OpenFromSigmaWithID(id uint16, fabricIndex uint8, localNodeID,
 // [Manager.OpenFromSigmaAsInitiatorWithStake];
 // OpenFromSigmaAsInitiatorWithID is removable in v0.25.0.
 func (m *Manager) OpenFromSigmaAsInitiatorWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
-	return m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true)
+	return m.openFromSigma(id, nil, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true, false)
 }
 
 // openFromSigma installs a CASE session under id. A non-nil stake must
 // still hold id when the session is installed, or nothing is and the
 // error is [ErrStakeLost]; a nil stake installs under the bare id, as
 // [Manager.OpenFromSigmaWithID] does.
-func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys, initiator bool) (*Entry, error) {
+//
+// establishing installs a responder session whose handshake has not
+// completed (see [Entry] establishing): it routes, but no picker returns it
+// and the per-peer cap neither counts nor runs for it until
+// [Manager.completeEstablishment]. Mirrors matter.js
+// packages/protocol/src/session/case/CaseServer.ts:177-190 and :314-327 at
+// b25ed960 (createSecureSession with `establishing: true`) and
+// SessionManager.ts:1266-1284 (RegisteredSessions.add: an establishing
+// session joins the established set on its established event only).
+func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys, initiator, establishing bool) (*Entry, error) {
 	encryptKey, decryptKey := keys.R2IKey[:], keys.I2RKey[:]
 	if initiator {
 		encryptKey, decryptKey = keys.I2RKey[:], keys.R2IKey[:]
@@ -1056,6 +1085,7 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 		Session:              sess,
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 		isInitiator:          initiator,
+		establishing:         establishing && !initiator,
 		createdAt:            m.clk().Now(),
 		// The peer counts active from the session's creation: matter.js
 		// NodeSession.ts:121 at db021da0 ("We always set the active timestamp for Secure
@@ -1085,7 +1115,14 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 	if occupant := m.installEntryLocked(id, entry); occupant != nil {
 		occupied = append(occupied, occupant)
 	}
-	excess := m.evictExcessPeerSessionsLocked(entry)
+	// The per-peer cap runs once the session is established: here for one
+	// installed established, at [Manager.completeEstablishment] for an
+	// establishing one (matter.js SessionManager.ts:757-769 at b25ed960,
+	// #sessionEstablished on the established set's added event, :336).
+	var excess []*Entry
+	if !entry.establishing {
+		excess = m.evictExcessPeerSessionsLocked(entry)
+	}
 	m.mu.Unlock()
 	m.notifyGracefulClose(occupied, time.Time{})
 	closeStaleEntries(occupied)
@@ -1398,6 +1435,39 @@ func (m *Manager) closeEntry(e *Entry) bool {
 	return true
 }
 
+// completeEstablishment ends the establishment of e, a responder session
+// installed establishing: from now on the pickers return it and it counts
+// for the per-peer cap, whose check runs now — the sessions it evicts are
+// force-closed (no CloseSession) outside the lock, as at an install. It reports true when e is established — also when it
+// already was and has been closed since — and false when e was closed
+// while it was establishing, which therefore never becomes established.
+// Mirrors matter.js packages/protocol/src/session/NodeSession.ts:241-251
+// at b25ed960 (completeEstablishment: true if not establishing, false if
+// closing) with the established event's consequences,
+// SessionManager.ts:1274-1280 (the established set) and :757-769
+// (#sessionEstablished, the per-peer cap); a closed entry is one no longer
+// holding its id here, as this table has no closing state.
+func (m *Manager) completeEstablishment(e *Entry) bool {
+	if e == nil {
+		return false
+	}
+	m.mu.Lock()
+	if !e.establishing {
+		m.mu.Unlock()
+		return true
+	}
+	if cur, ok := m.sessions[e.SessionID]; !ok || cur != e {
+		m.mu.Unlock()
+		return false
+	}
+	e.establishing = false
+	excess := m.evictExcessPeerSessionsLocked(e)
+	m.mu.Unlock()
+	closeStaleEntries(excess)
+	m.fireOnSessionClose(excess)
+	return true
+}
+
 // finishClose is the teardown of an entry [Manager.Close] took out of the
 // table, outside the lock.
 func (m *Manager) finishClose(entry *Entry) {
@@ -1661,14 +1731,20 @@ const MaxSessionsPerPeer = 5
 // evicts nothing, since the peer loss our own traffic reports sweeps
 // those. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:764-768
 // (#sessionEstablished runs the check only for a responder session).
+//
+// The check runs once added is established and only established sessions
+// count and are evicted: a session still establishing becomes established
+// or closes within its handshake. Mirrors matter.js
+// packages/protocol/src/session/SessionManager.ts:771-810 at b25ed960
+// (#evictExcessSessionsFor over #establishedSessions, :790, :793-796).
 func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
-	if added.isPase || added.isInitiator {
+	if added.isPase || added.isInitiator || added.establishing {
 		return nil
 	}
 	fabricIndex, peerNodeID := added.FabricIndex(), added.Session.PeerNodeID()
 	var claimants []*Entry
 	for _, entry := range m.sessions {
-		if entry == added || entry.Session == nil || entry.isInitiator {
+		if entry == added || entry.Session == nil || entry.isInitiator || entry.establishing {
 			continue
 		}
 		if entry.FabricIndex() == fabricIndex && entry.Session.PeerNodeID() == peerNodeID {
@@ -2042,9 +2118,12 @@ func (m *Manager) Occupancy() SessionTableOccupancy {
 	return occ
 }
 
-// SessionIDsForPeer returns the ids of the live sessions currently bound
-// to (fabricIndex, peerNodeID), ordered by id. Staked ids are excluded:
-// they carry no peer.
+// SessionIDsForPeer returns the ids of the live established sessions
+// currently bound to (fabricIndex, peerNodeID), ordered by id. Staked ids
+// are excluded: they carry no peer; so are sessions still establishing,
+// which a picker does not hand out (matter.js maybeSessionFor reads the
+// established set, packages/protocol/src/session/SessionManager.ts:683-700
+// at b25ed960).
 //
 // Opening a session does not close the peer's earlier ones: only a
 // session the peer establishes beyond [MaxSessionsPerPeer] closes its
@@ -2056,7 +2135,7 @@ func (m *Manager) SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint
 	m.mu.RLock()
 	var out []uint16
 	for _, e := range m.sessions {
-		if e == nil || e.Session == nil {
+		if e == nil || e.Session == nil || e.establishing {
 			continue
 		}
 		if e.FabricIndex() == fabricIndex && e.Session.PeerNodeID() == peerNodeID {
@@ -2085,7 +2164,11 @@ func (m *Manager) SessionIDsForPeer(fabricIndex uint8, peerNodeID uint64) []uint
 // part); activeTimestamp moves only when a message is received
 // (packages/protocol/src/session/Session.ts:142-147), the stamp
 // [Entry.MarkActiveRx] moves. A closed session is not in the table, so it
-// is never a candidate.
+// is never a candidate, nor is a session still establishing: matter.js's
+// pickers read the established set (maybeSessionFor,
+// packages/protocol/src/session/SessionManager.ts:683-700 at b25ed960; the
+// isEstablishing table, NodeSession.ts:214-217), so a request is not
+// routed onto a session the initiator has not been told is up.
 func (m *Manager) NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usable func(id uint16) bool) (uint16, bool) {
 	type candidate struct {
 		id   uint16
@@ -2094,7 +2177,7 @@ func (m *Manager) NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usa
 	var cands []candidate
 	m.mu.RLock()
 	for _, e := range m.sessions {
-		if e == nil || e.Session == nil {
+		if e == nil || e.Session == nil || e.establishing {
 			continue
 		}
 		if e.FabricIndex() != fabricIndex || e.Session.PeerNodeID() != peerNodeID {
@@ -2127,11 +2210,15 @@ func (m *Manager) NewestSessionForPeer(fabricIndex uint8, peerNodeID uint64, usa
 // could see: the reaper consumed it internally and no operator surface
 // could answer whether a controller was still connected. The snapshot is
 // a copy — callers cannot reach the session keys through it.
+//
+// A session still establishing is not listed: matter.js's
+// getActiveSessionInformation reads the established set
+// (packages/protocol/src/session/SessionManager.ts:1145-1149 at b25ed960).
 func (m *Manager) Sessions() []SessionInfo {
 	m.mu.RLock()
 	out := make([]SessionInfo, 0, len(m.sessions))
 	for _, e := range m.sessions {
-		if e == nil || e.Session == nil {
+		if e == nil || e.Session == nil || e.establishing {
 			continue
 		}
 		e.mu.Lock()
