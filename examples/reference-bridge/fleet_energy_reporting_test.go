@@ -66,8 +66,9 @@ func (g *fakeReadingsRig) read(t *testing.T, i int) reading {
 
 // TestEnergyReportingFakeReadings holds the grid meter's fake readings to
 // matter.js's FakeElectricalReadingsHandler (support/chip-testing/src/
-// cluster/FakeElectricalReadingsHandler.ts at b25ed960; matter.js has no
-// test of it): the readings step through the nine values, the step runs on
+// cluster/FakeElectricalReadingsHandler.ts at b25ed960; matter.js's own
+// cases, all-devices-test-instance.test.ts:226-330, are ported as
+// TestFakeElectricalReadingsHandler below): the readings step through the nine values, the step runs on
 // across a stop and a start, the cumulative energy adds each interval's,
 // and the endpoint bits select the endpoint. The values stay inside
 // TC_EPM_2_2.py's ranges and change with every reading (steps 4a-4c,
