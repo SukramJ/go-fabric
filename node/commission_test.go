@@ -317,6 +317,19 @@ func TestRemoveFabricClosesSessionsWithCloseSession(t *testing.T) {
 	first, cancelFirst := context.WithTimeout(ctx, 5*time.Second)
 	_, _ = second.Read(first, attr(0, clusterBasicInformation, attrNodeLabel))
 	cancelFirst()
+	// Both sessions listed before the removal, so the absence checked
+	// after it is theirs: Sessions lists no session still establishing,
+	// and the device completes its side of CASE after the Success that
+	// lets the commissioner go on.
+	waitLive(t, "the fabric's two CASE sessions on the device", func() bool {
+		listed := 0
+		for _, info := range n.Sessions().Sessions() {
+			if !info.IsPASE && info.FabricIndex == fabricIndex {
+				listed++
+			}
+		}
+		return listed >= 2
+	})
 
 	status, err := c.RemoveFabric(ctx, s)
 	if err != nil || status != 0 {

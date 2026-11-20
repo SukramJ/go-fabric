@@ -329,6 +329,7 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Commission: %v", err)
 	}
+	waitCASESession(t, n, c.FabricIndex())
 	var operational []uint16
 	for _, e := range n.Sessions().Sessions() {
 		if !e.IsPASE && e.FabricIndex == c.FabricIndex() {
@@ -360,6 +361,24 @@ func waitNoPASE(t *testing.T, n *node.Node) {
 			}
 		}
 		return true
+	})
+}
+
+// waitCASESession waits until n lists a CASE session on fabricIndex. The
+// device completes its side of CASE after the Success that lets the
+// bridgetest commissioner return, and Sessions lists no session still
+// establishing (operational.Manager.Sessions); the commissioner dials an
+// address and holds no device handle to wait inside Commission, as
+// fabrictest's Controller.Commission does.
+func waitCASESession(t *testing.T, n *node.Node, fabricIndex uint8) {
+	t.Helper()
+	waitLive(t, "a CASE session on the commissioned fabric", func() bool {
+		for _, e := range n.Sessions().Sessions() {
+			if !e.IsPASE && e.FabricIndex == fabricIndex {
+				return true
+			}
+		}
+		return false
 	})
 }
 

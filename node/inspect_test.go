@@ -260,6 +260,7 @@ func TestSessionDiagnostics(t *testing.T) {
 	if _, err := c.Commission(context.Background()); err != nil {
 		t.Fatalf("Commission: %v", err)
 	}
+	waitCASESession(t, n, c.FabricIndex())
 	d := n.SessionDiagnostics()
 	if len(d.Sessions) == 0 {
 		t.Fatal("no session after a commissioning")

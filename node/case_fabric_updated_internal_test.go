@@ -71,6 +71,11 @@ func TestCASEResponderRefusesASessionAcrossAnUpdate(t *testing.T) {
 			t.Fatalf("a session made under the replaced identity is open: %+v", s)
 		}
 	}
+	// Sessions lists no responder session still establishing: the table
+	// itself holds no session either.
+	if live := sessions.Occupancy().Live; live != 0 {
+		t.Fatalf("%d sessions with keys in the table, want none", live)
+	}
 	if rec, err := st.GetResumptionByPeer(context.Background(), 1, fx.peer.NodeID); err == nil {
 		t.Fatalf("a resumption record made under the replaced identity was stored: %+v", rec)
 	}
@@ -100,6 +105,11 @@ func TestCASEInitiatorRefusesASessionAcrossAnUpdate(t *testing.T) {
 		if s.FabricIndex == 1 {
 			t.Fatalf("a session made under the replaced identity is open: %+v", s)
 		}
+	}
+	// Sessions lists no responder session still establishing: the table
+	// itself holds no session either.
+	if live := sessions.Occupancy().Live; live != 0 {
+		t.Fatalf("%d sessions with keys in the table, want none", live)
 	}
 	if rec, err := st.GetResumptionByPeer(context.Background(), 1, fx.peer.NodeID); err == nil {
 		t.Fatalf("a resumption record made under the replaced identity was stored: %+v", rec)
@@ -168,6 +178,11 @@ func TestCASEResponderRefusesASessionWhoseUpdateFollowsItsStake(t *testing.T) {
 			t.Fatalf("a session made under the replaced identity is open: %+v", s)
 		}
 	}
+	// Sessions lists no responder session still establishing: the table
+	// itself holds no session either.
+	if live := sessions.Occupancy().Live; live != 0 {
+		t.Fatalf("%d sessions with keys in the table, want none", live)
+	}
 }
 
 // TestCASEResponderKeepsTheResolutionOfItsAcceptedSigma1 (review II,
@@ -234,5 +249,10 @@ func TestCASEResponderKeepsTheResolutionOfItsAcceptedSigma1(t *testing.T) {
 		if s.FabricIndex == 1 {
 			t.Fatalf("a session made under the replaced identity is open: %+v", s)
 		}
+	}
+	// Sessions lists no responder session still establishing: the table
+	// itself holds no session either.
+	if live := sessions.Occupancy().Live; live != 0 {
+		t.Fatalf("%d sessions with keys in the table, want none", live)
 	}
 }

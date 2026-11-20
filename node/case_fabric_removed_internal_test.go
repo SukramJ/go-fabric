@@ -148,6 +148,11 @@ func TestCASEResponderRefusesASessionOfARemovedFabric(t *testing.T) {
 			t.Fatalf("a session on the removed fabric's index is open: %+v", s)
 		}
 	}
+	// Sessions lists no responder session still establishing: the table
+	// itself holds no session either.
+	if live := sessions.Occupancy().Live; live != 0 {
+		t.Fatalf("%d sessions with keys in the table, want none", live)
+	}
 }
 
 // TestCASEInitiatorRefusesASessionOfARemovedFabric: the same for a
@@ -179,6 +184,11 @@ func TestCASEInitiatorRefusesASessionOfARemovedFabric(t *testing.T) {
 		if s.FabricIndex == 1 {
 			t.Fatalf("a session on the removed fabric's index is open: %+v", s)
 		}
+	}
+	// Sessions lists no responder session still establishing: the table
+	// itself holds no session either.
+	if live := sessions.Occupancy().Live; live != 0 {
+		t.Fatalf("%d sessions with keys in the table, want none", live)
 	}
 }
 
