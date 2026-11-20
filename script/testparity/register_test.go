@@ -62,7 +62,9 @@ import (
 // Pin lift b25ed960 wave P1 decides two of them in part: ThermostatSuggestionsTest.ts
 // (61 of 91 cases, P1-E) and SessionViewsTest.ts (the controller's seven rows,
 // P1-A): 20.
-const testparityPlannedRatchet = 20
+// Pin lift b25ed960 wave P2 ports both files of unit P2-D, NocsrValidatorTest.ts
+// and CsrNonceCommissioningTest.ts: 18.
+const testparityPlannedRatchet = 18
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -180,9 +182,19 @@ const testparityPlannedRatchet = 20
 // decisions 316-318, SessionViewsTest.ts's 10 device-side rows), and the
 // localization files keep five stored-value cases (a port on node) and three
 // TimeFormat starts (decision 315) missing: 152 ported, 1157 missing.
+// Pin lift b25ed960 wave P2 (units P2-C, P2-D, P2-G, P2-H, P2-J) ports 48
+// missing cases net: five files become ported (DeviceAttestationValidatorTest.ts,
+// NocsrValidatorTest.ts, CsrNonceCommissioningTest.ts, ThermostatSuggestionsTest.ts,
+// ThermostatBehaviorTest.ts); ClientBridgeStructureTest.ts 14,
+// NodeLifecycleSeededTest.ts 9, DeviceAttestationValidatorTest.ts 6,
+// ClientAttestationTest.ts 3, ThermostatSuggestionsTest.ts 13,
+// ThermostatBehaviorTest.ts 1 and SessionViewsTest.ts 3 leave missing, and
+// DoorLockServerTest.ts's local user-type refusal returns to it (decision 339
+// moved the request check to the wire path, findings F-b25ed960-36):
+// 157 ported, 1109 missing.
 const (
-	testparityPortedRatchet  = 152
-	testparityMissingRatchet = 1157
+	testparityPortedRatchet  = 157
+	testparityMissingRatchet = 1109
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -257,7 +269,10 @@ const (
 // (BD-Matter-Localization-ConfiguredStartValueRefused), four JavaScript
 // getter and log cases of the localization tests and PresetsConfigurationTest.ts's
 // pre-accessor key (js-runtime-only), moved from missing: 745.
-const testparityLeftRatchet = 745
+// Pin lift b25ed960 wave P2 leaves NocsrValidatorTest.ts's "passes a defect of
+// its own crypto through unchanged" (js-runtime-only: no injectable crypto,
+// no InternalError to tell from peer data): 746.
+const testparityLeftRatchet = 746
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by
