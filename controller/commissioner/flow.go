@@ -67,10 +67,12 @@ const (
 	csrNonceSize         = 32
 )
 
-// errUnexpectedResponse is a response the flow cannot use — matter.js
-// UnexpectedDataError (:1401-1403), or a missing response payload, which
-// matter.js's destructuring of undefined fails on. Neither is a
-// CommissioningError, so the failsafe stays armed (:463-465).
+// errUnexpectedResponse is a response the flow cannot use: one this
+// module's decoders refuse, or a missing response payload, which
+// matter.js's destructuring of undefined fails on. It is not a
+// CommissioningError (:463-465). An empty CSRResponse is not one: it is
+// the NOCSR check ResponseEmpty, a commissioning error
+// (NocsrValidator.ts:86-91 at b25ed960).
 var errUnexpectedResponse = errors.New("commissioner: unexpected response from the device")
 
 // errNoDACKey is the CSRResponse step reached without the DAC key the
@@ -1133,11 +1135,11 @@ func (f *flow) random(n int) ([]byte, error) {
 	return b, err
 }
 
-// deviceAttestation is step 10.1 (:1218-1338): the DAC and the PAI
+// deviceAttestation is step 10.1: the DAC and the PAI
 // (CertificateChainRequest), the AttestationRequest with a 32-byte nonce,
-// attestation.Validate; the policy decides (:1305-1319); the DAC key kept,
-// parsed from the DAC when the policy accepted a failed validation
-// (:1321-1331). A hard failure hands the policy the findings collected
+// attestation.Validate; the policy decides (:1347-1364 at b25ed960); the
+// DAC key kept, parsed from the DAC when the policy accepted a failed
+// validation (:1366-1380 at b25ed960). A hard failure hands the policy the findings collected
 // before it and then its own error finding, the failure last; any other
 // validation error is one ValidationError finding; a rejection without a
 // failure names every error finding. Mirrors matter.js
@@ -1198,15 +1200,18 @@ func (f *flow) deviceAttestation(ctx context.Context) (stepResult, error) {
 	} else {
 		findings = result.Findings
 		f.dacKey = result.DACPublicKey
-		// Validate returned no error: the Certification Declaration names
-		// this vendor and product (decision 105). The pair is recorded only
-		// when the chain was verified as well and no error finding stands
-		// (owner decision 119): a finding that a check could not run (no
-		// trust store, DclServiceUnavailable) or a LevelError one the
-		// policy accepts below leaves it unattested, with one log line.
-		// An unreported VendorID or ProductID is an error finding
-		// (CertificationDeclarationFieldMismatch), so a pair recorded here
-		// has both.
+		// No error from Validate no longer means the Certification
+		// Declaration names this vendor and product: a mismatch with the
+		// BasicInformation VendorID or ProductID, or a value not reported,
+		// is the LevelError finding CertificationDeclarationFieldMismatch
+		// (DeviceAttestationValidator.ts:579-595 at b25ed960). No error
+		// and no error finding is what says it does (decision 105). The
+		// pair is recorded only when the chain was verified as well and no
+		// error finding stands (owner decision 119): a finding that a check
+		// could not run (no trust store, DclServiceUnavailable) or a
+		// LevelError one the policy accepts below leaves it unattested,
+		// with one log line (attestedPairWithheld); the pair needs both
+		// values reported.
 		if why, withheld := attestedPairWithheld(result); withheld {
 			f.log.Info("matter.controller.commissioning.attested_identity_not_recorded", slog.String("reason", why))
 		} else if f.data.vendorID != nil && f.data.productID != nil {
@@ -1307,15 +1312,15 @@ func dacKeyOf(der []byte) (*ecdsa.PublicKey, error) {
 	return k, nil
 }
 
-// certificates is step 11.1 (:1388-1468): the CSRRequest with a 32-byte
-// nonce; the CSRResponse validated by attestation.ValidateNOCSR against
+// certificates is step 11.1: the CSRRequest with a 32-byte nonce; the CSRResponse validated by attestation.ValidateNOCSR against
 // the DAC key the attestation step kept, the nonce sent and the session's
 // challenge, which returns the CSR's key — every failure a commissioning
 // error, which no attestation policy accepts; AddTrustedRootCertificate,
-// its answer unused (:1421-1433); the NOC (:1435-1439); AddNOC
-// (:1441-1457) checked (:1459); the fabric index kept (:1461-1462).
-// Mirrors matter.js packages/protocol/src/peer/ControllerCommissioningFlow.ts:
-// 1436-1461 at b25ed960 (#certificates).
+// its answer unused (:1463-1475); the NOC (:1477-1481); AddNOC
+// (:1483-1499) checked (:1501); the fabric index kept (:1503-1504), lines
+// at b25ed960. Mirrors matter.js
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:1436-1510 at
+// b25ed960 (#certificates).
 func (f *flow) certificates(ctx context.Context) (stepResult, error) {
 	nonce, err := f.random(csrNonceSize)
 	if err != nil {

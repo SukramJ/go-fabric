@@ -59,10 +59,11 @@ func decodeCertificateChainResponse(n spec.Node) ([]byte, error) {
 // AttestationSignature}: elements and a signature of any length, the
 // message size their only bound. A command response is decoded without a
 // check against its schema; the validator judges the lengths —
-// AttestationElements over RESP_MAX is the attestation finding
+// AttestationElements over RESP_MAX is the hard failure
 // AttestationElementsTooLong
 // (packages/protocol/src/certificate/DeviceAttestationValidator.ts:316-321
-// at b25ed960).
+// at b25ed960), which the flow hands to the attestation policy as an error
+// finding.
 type signedElements struct {
 	elements, signature []byte
 }
