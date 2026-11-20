@@ -37,11 +37,11 @@ func (r *supersessionRegistry) FabricFor(id uint16) (uint8, bool) {
 	return 1, r.live[id]
 }
 
-func (r *supersessionRegistry) SubjectFor(id uint16) (uint64, []uint32, bool) {
+func (r *supersessionRegistry) SubjectFor(id uint16) (nodeID uint64, cats []uint32, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	n, ok := r.subjects[id]
-	return n, nil, ok && r.live[id]
+	nodeID, ok = r.subjects[id]
+	return nodeID, nil, ok && r.live[id]
 }
 
 // TestSessionSupersededGuards: Bridge.SessionSuperseded, as a host without
