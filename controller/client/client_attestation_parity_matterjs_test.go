@@ -203,14 +203,28 @@ func TestClientAttestationTrustStoreParity(t *testing.T) {
 		t.Parallel()
 		runAttestation(t, correct(), attestation.Reject()).expectRejected(t, rejectedByPolicy)
 	})
-	t.Run("emits TrustedAsTestCertificate finding, callback rejects", func(t *testing.T) {
+	t.Run("emits TrustedAsTestCertificate for the test PAA and the test CD signer, callback rejects", func(t *testing.T) {
 		t.Parallel()
 		r := runAttestation(t, testOnly(), attestation.Policy{Decide: reject})
-		// ClientAttestationTest.ts:524 at b25ed960: the message names the
-		// error finding (P2-D, #4939).
+		// ClientAttestationTest.ts:519-530 at b25ed960: the message names the
+		// error finding (P2-D, #4939, :524); two TrustedAsTestCertificate
+		// findings, both errors (:526-527), one naming the test CD signer
+		// (:528).
 		r.expectRejected(t, `Device attestation rejected by policy: PAA .* is a test/development certificate`)
-		if lvl, ok := r.has(attestation.TrustedAsTestCertificate); !ok || lvl != attestation.LevelError {
-			t.Fatalf("findings %+v: want TrustedAsTestCertificate as an error", r.findings)
+		var levels []attestation.Level
+		cdSigner := false
+		for _, f := range r.findings {
+			if f.Check != attestation.TrustedAsTestCertificate {
+				continue
+			}
+			levels = append(levels, f.Level)
+			cdSigner = cdSigner || strings.Contains(f.Message, "test CD signer")
+		}
+		if len(levels) != 2 || levels[0] != attestation.LevelError || levels[1] != attestation.LevelError {
+			t.Fatalf("findings %+v: want two TrustedAsTestCertificate errors, got levels %v", r.findings, levels)
+		}
+		if !cdSigner {
+			t.Fatalf("findings %+v: want one TrustedAsTestCertificate naming the test CD signer", r.findings)
 		}
 	})
 	t.Run("emits TrustedAsTestCertificate finding, callback accepts → commissioning proceeds", func(t *testing.T) {

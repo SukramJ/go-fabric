@@ -130,7 +130,7 @@ type Registry struct {
 	// a leave and Erase (D8).
 	op sync.Mutex
 
-	// mu guards bound, closed, nextID, nodes and storedAddress.
+	// mu guards bound, closed, nextID and nodes.
 	mu     sync.Mutex
 	nodes  []*Node
 	bound  map[*Node]func()
@@ -139,12 +139,6 @@ type Registry struct {
 	nextID int
 	timer  exchange.Timer
 	closed bool
-	// storedAddress is the peer address stored for a node that failed to
-	// load, read from its record's peer address field alone — matter.js
-	// ClientNode.peerAddress, which reads storage when the commissioning
-	// state did not load (ClientNode.ts:388-421 at b25ed960). Only
-	// GetByAddress reads it: such a node is not commissioned.
-	storedAddress map[*Node]PeerAddress
 	// removeFabric, when set, stands between a decommission and its
 	// RemoveFabric invoke: the test seam of matter.js's patchRemoveFabric
 	// (DecommissionTest.ts:48-58 at b25ed960), set only by
@@ -207,16 +201,8 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 			// cause — its id stays visible and the others load
 			// (Peers.ts:144-161 at db021da0).
 			r.log.Warn("matter.controller.client.registry.load_failed", slog.String("node", id), slog.Any("err", err))
-			if n, err = r.unavailable(id, err); err != nil {
+			if n, err = r.unavailable(id, stored, err); err != nil {
 				continue
-			}
-			if stored != nil {
-				r.mu.Lock()
-				if r.storedAddress == nil {
-					r.storedAddress = map[*Node]PeerAddress{}
-				}
-				r.storedAddress[n] = *stored
-				r.mu.Unlock()
 			}
 		}
 		r.add(n)
@@ -316,8 +302,9 @@ func storedPeerAddress(values map[uint32][]byte) *PeerAddress {
 
 // unavailable is the node of id that failed to load with cause: no image,
 // no peer, its store untouched until it is erased (Delete, Forget), its
-// Start and LoadError the cause.
-func (r *Registry) unavailable(id string, cause error) (*Node, error) {
+// Start and LoadError the cause, its PeerAddress stored, the address its
+// stored record names (nil for none).
+func (r *Registry) unavailable(id string, stored *PeerAddress, cause error) (*Node, error) {
 	cfg := r.nodeConfig(id)
 	cfg.Store = unavailableStore{r.store}
 	n, err := newNode(cfg)
@@ -325,6 +312,7 @@ func (r *Registry) unavailable(id string, cause error) (*Node, error) {
 		return nil, err
 	}
 	n.loadErr = fmt.Errorf("%w: %q: %w", ErrLoadFailed, id, cause)
+	n.storedAddr = stored
 	return n, nil
 }
 
@@ -499,7 +487,6 @@ func (r *Registry) remove(n *Node) {
 	held := len(r.nodes)
 	r.nodes = slices.DeleteFunc(r.nodes, func(x *Node) bool { return x == n })
 	removed := len(r.nodes) < held
-	delete(r.storedAddress, n)
 	r.mu.Unlock()
 	r.manageExpiration()
 	if h := n.cfg.Hooks.Deleted; removed && h != nil {
@@ -509,13 +496,15 @@ func (r *Registry) remove(n *Node) {
 
 // Forget drops n from the registry and the database without reaching it:
 // its subscriptions close, its rows and its peer go. For a node that no
-// longer exists — the controller's former own node (phase 37) — not for a
-// node still on the fabric, which [Node.Decommission] removes from both
-// sides. A store that fails to erase the rows is returned and the node,
+// longer exists — the controller's former own node (phase 37) — or a node
+// that failed to load, which no fabric operation touches; not for a node
+// still on the fabric, which [Node.Decommission] removes from both sides. A store that fails to erase the rows is returned and the node,
 // closed, stays in the registry, so a Forget again retries the erase.
 func (r *Registry) Forget(ctx context.Context, n *Node) error { return r.deleteNode(ctx, n, nil) }
 
-// deleteNode deletes a node — ClientNode.delete (node/ClientNode.ts:213-225):
+// deleteNode deletes a node — matter.js ClientNode.delete
+// (packages/node/src/node/ClientNode.ts:251-263 at b25ed960; the protocol
+// peer of the address read first, :252, deleted in the finally, :256-262):
 // it is closed and forgotten, its store erased, and the protocol peer of
 // addr (the node's peer address when nil) deleted even when the teardown
 // failed. A node whose teardown failed stays in the registry.
@@ -684,13 +673,15 @@ func (r *Registry) Nodes() []*Node {
 	return slices.Clone(r.nodes)
 }
 
-// Commissioned are the operational nodes with a peer address — a group
-// address names no commissioned node — Peers.commissioned (Peers.ts:410-413
-// at db021da0: nodeType "client" and commissioned).
+// Commissioned are the commissioned operational nodes ([Node.IsCommissioned])
+// — a group address names no commissioned node, and a node that failed to
+// load is none — Peers.commissioned (packages/node/src/node/client/
+// Peers.ts:416-419 at b25ed960: nodeType "client" and
+// lifecycle.isCommissioned).
 func (r *Registry) Commissioned() []*Node {
 	var out []*Node
 	for _, n := range r.Nodes() {
-		if a, ok := n.PeerAddress(); ok && !isGroupNodeID(a.NodeID) {
+		if a, ok := n.commissionedAddress(); ok && !isGroupNodeID(a.NodeID) {
 			out = append(out, n)
 		}
 	}
@@ -719,19 +710,14 @@ func (r *Registry) Get(id string) *Node {
 	return nil
 }
 
-// GetByAddress is the node with peer address addr, nil when there is none:
-// a commissioned node, or a node that failed to load whose stored record
-// names addr. Mirrors matter.js packages/node/src/node/client/Peers.ts:421-445
-// at b25ed960 (Peers.get by address, through ClientNode.peerAddress).
+// GetByAddress is the node with peer address addr ([Node.PeerAddress]),
+// nil when there is none: a commissioned node, or a node that failed to
+// load whose stored record names addr. Mirrors matter.js
+// packages/node/src/node/client/Peers.ts:421-445 at b25ed960 (Peers.get by
+// address, through ClientNode.peerAddress).
 func (r *Registry) GetByAddress(addr PeerAddress) *Node {
 	for _, n := range r.Nodes() {
-		a, ok := n.PeerAddress()
-		if !ok {
-			r.mu.Lock()
-			a, ok = r.storedAddress[n]
-			r.mu.Unlock()
-		}
-		if ok && a == addr {
+		if a, ok := n.PeerAddress(); ok && a == addr {
 			return n
 		}
 	}

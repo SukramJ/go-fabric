@@ -73,7 +73,7 @@ func (e *nocStatusError) Unwrap() error {
 // commissioner.ErrFabricLabelConflict (CommissioningController.ts:984-988
 // at db021da0, FabricLabelConflictError), another one a *nocStatusError.
 func (r *Registry) pushLabel(ctx context.Context, n *Node) error {
-	addr, ok := n.PeerAddress()
+	addr, ok := n.commissionedAddress()
 	oc := n.opCreds()
 	if !ok || oc == nil {
 		return nil
