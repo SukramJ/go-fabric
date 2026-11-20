@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -157,11 +158,199 @@ func TestEnergyReportingFakeReadings(t *testing.T) { //nolint:gocognit,cyclop,fu
 		}
 		fireMarket(t, g.f, triggerFakeReadingsStop)
 	})
+}
 
-	t.Run("another code is not handled", func(t *testing.T) {
-		g := newFakeReadingsRig(t)
-		if g.f.electricalMeter.testEventTrigger(0x0091_0000_0000_0003) {
-			t.Error("an unknown EnergyReporting trigger was handled")
+// mountedReadings is a started fleet node with the grid meter's sensor
+// part — the ElectricalSensor endpoint, as matter.js's test reads its
+// electrical-sensor endpoint — its endpoint number, and its timer
+// captured: pending is the next reading, interval its interval.
+type mountedReadings struct {
+	f        *fleet
+	sensor   *fakeReadings
+	number   uint16
+	pending  func()
+	interval time.Duration
+}
+
+func newMountedReadings(t *testing.T) *mountedReadings {
+	t.Helper()
+	f, _ := startFleetBridge(t)
+	m := &mountedReadings{f: f}
+	f.electricalMeter.mu.Lock()
+	readings := f.electricalMeter.readings
+	f.electricalMeter.mu.Unlock()
+	if len(readings) != 2 {
+		t.Fatalf("fake readings: %d endpoints, want the meter and its sensor part", len(readings))
+	}
+	m.sensor = readings[1]
+	n, ok := m.sensor.target.endpoint()
+	if !ok || n == 0 {
+		t.Fatalf("the sensor part has no endpoint number (%d, %v)", n, ok)
+	}
+	m.number = n
+	for _, r := range readings {
+		r.mu.Lock()
+		r.schedule = func(d time.Duration, fn func()) func() {
+			if r == m.sensor {
+				m.pending, m.interval = fn, d
+			}
+			return func() {}
+		}
+		r.mu.Unlock()
+	}
+	t.Cleanup(func() { _ = f.testEventTrigger(context.Background(), triggerFakeReadingsStop) })
+	return m
+}
+
+// trigger sends eventTrigger through the daemon's TestEventTrigger
+// dispatch, as matter.js's test sends it through GeneralDiagnostics.
+func (m *mountedReadings) trigger(eventTrigger uint64) error {
+	return m.f.testEventTrigger(context.Background(), eventTrigger)
+}
+
+// at is eventTrigger with the sensor's endpoint in its endpoint bits.
+func (m *mountedReadings) at(eventTrigger uint64) uint64 {
+	return eventTrigger | uint64(m.number)<<32
+}
+
+func (m *mountedReadings) power(t *testing.T) int64 {
+	t.Helper()
+	p := m.sensor.target.power.Get().ActivePower
+	if p == nil {
+		t.Fatal("ActivePower is null")
+	}
+	return *p
+}
+
+func (m *mountedReadings) imported(t *testing.T) int64 {
+	t.Helper()
+	e := m.sensor.target.energy.Get().CumulativeEnergyImported
+	if e == nil {
+		t.Fatal("CumulativeEnergyImported is null")
+	}
+	return e.Energy
+}
+
+func (m *mountedReadings) exported() int64 {
+	m.sensor.mu.Lock()
+	defer m.sensor.mu.Unlock()
+	return m.sensor.exported
+}
+
+// TestFakeElectricalReadingsHandler ports matter.js's "AllDevicesTestInstance
+// electrical-sensor" cases (support/chip-testing/test/cert-framework/
+// all-devices-test-instance.test.ts:226-330 at b25ed960) by meaning, through
+// the daemon's TestEventTrigger dispatch on a started fleet. The daemon's
+// meter declares ImportedEnergy and CumulativeEnergy only (decision 303),
+// so the periodic and the exported measurements matter.js's cases read are
+// checked on the handler's totals where it keeps one and left out where it
+// keeps none (the periodic energy).
+func TestFakeElectricalReadingsHandler(t *testing.T) { //nolint:gocognit,cyclop // five ported cases
+	t.Run("reads a fake 1 kW load every 2 s until the stop trigger", func(t *testing.T) {
+		m := newMountedReadings(t)
+		if err := m.trigger(m.at(triggerFakeReadingsLoadStart)); err != nil {
+			t.Fatal(err)
+		}
+		st := m.sensor.target.power.Get()
+		if *st.ActivePower != 980_000 || *st.Voltage != 229_000 || *st.ActiveCurrent != 3_848 {
+			t.Errorf("first reading %d mW, %d mV, %d mA; want 980000, 229000, 3848", *st.ActivePower, *st.Voltage, *st.ActiveCurrent)
+		}
+		if got := m.imported(t); got != 544 {
+			t.Errorf("cumulative imported %d, want 544", got)
+		}
+		if m.interval != 2*time.Second {
+			t.Fatalf("interval %v, want 2s", m.interval)
+		}
+		m.pending()
+		if got := m.power(t); got != 985_000 {
+			t.Errorf("second reading %d, want 985000", got)
+		}
+		if got := m.imported(t); got != 544+547 {
+			t.Errorf("cumulative imported %d, want %d", got, 544+547)
+		}
+		stale := m.pending
+		if err := m.trigger(m.at(triggerFakeReadingsStop)); err != nil {
+			t.Fatal(err)
+		}
+		stale() // the timer the stop cancelled, delivered anyway
+		if got := m.power(t); got != 985_000 {
+			t.Errorf("a reading after the stop: %d", got)
+		}
+	})
+
+	t.Run("reads a fake 3 kW generator on a trigger for all endpoints", func(t *testing.T) {
+		m := newMountedReadings(t)
+		if err := m.trigger(triggerFakeReadingsGenStart); err != nil {
+			t.Fatal(err)
+		}
+		if got := m.power(t); got != -3_020_000 {
+			t.Errorf("first reading %d, want -3020000", got)
+		}
+		if got, imp := m.exported(), m.imported(t); got != 4194 || imp != 0 {
+			t.Errorf("exported %d, imported %d; want 4194, 0", got, imp)
+		}
+		if m.interval != 5*time.Second {
+			t.Fatalf("interval %v, want 5s", m.interval)
+		}
+		m.pending()
+		if got := m.power(t); got != -3_015_000 {
+			t.Errorf("second reading %d, want -3015000", got)
+		}
+		if got := m.exported(); got != 4194+4187 {
+			t.Errorf("exported %d, want %d", got, 4194+4187)
+		}
+		if err := m.trigger(triggerFakeReadingsStop); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("restarts the readings with the new load", func(t *testing.T) {
+		m := newMountedReadings(t)
+		if err := m.trigger(triggerFakeReadingsLoadStart); err != nil {
+			t.Fatal(err)
+		}
+		loadTimer := m.pending
+		if err := m.trigger(triggerFakeReadingsGenStart); err != nil {
+			t.Fatal(err)
+		}
+		if got := m.power(t); got != -3_015_000 {
+			t.Errorf("reading after the restart %d, want -3015000", got)
+		}
+		if got, imp := m.exported(), m.imported(t); got != 4187 || imp != 0 {
+			t.Errorf("exported %d, imported %d; want 4187, 0", got, imp)
+		}
+		loadTimer() // the load's 2 s timer, cancelled by the restart
+		if got := m.power(t); got != -3_015_000 {
+			t.Errorf("the load's timer read %d after the restart", got)
+		}
+		if m.interval != 5*time.Second {
+			t.Fatalf("interval %v, want the generator's 5s", m.interval)
+		}
+		m.pending()
+		if got := m.power(t); got != -3_010_000 {
+			t.Errorf("next reading %d, want -3010000", got)
+		}
+	})
+
+	t.Run("refuses an unknown energy reporting trigger", func(t *testing.T) {
+		m := newMountedReadings(t)
+		if err := m.trigger(0x0091_0000_0000_0003); err == nil {
+			t.Error("trigger 0x0091000000000003 was accepted")
+		}
+	})
+
+	t.Run("refuses a trigger for another endpoint", func(t *testing.T) {
+		m := newMountedReadings(t)
+		meter, _ := m.f.electricalMeter.readings[0].target.endpoint()
+		other := uint16(0xfffe)
+		if other == meter || other == m.number {
+			t.Fatalf("endpoint 0x%04X is the meter's", other)
+		}
+		if err := m.trigger(triggerFakeReadingsLoadStart | uint64(other)<<32); err == nil {
+			t.Error("a trigger for another endpoint was accepted")
+		}
+		if m.pending != nil {
+			t.Error("a trigger for another endpoint started the readings")
 		}
 	})
 }
