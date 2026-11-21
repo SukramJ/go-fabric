@@ -1261,7 +1261,7 @@ func TestManagerChangeEmitsItsOwnEvents(t *testing.T) {
 }
 
 // TestManagerProductCheckQueuesParity ports #checkProductForUpdates
-// (SoftwareUpdateManager.ts:902-935 at b25ed960; C-22): a node removed
+// (SoftwareUpdateManager.ts:876-938 at b25ed960; C-22): a node removed
 // during the check is skipped; a consent for the product queues its
 // version, and updateAvailable is asked when there is none or it is below
 // the version found.
@@ -1309,8 +1309,9 @@ func TestManagerProductCheckQueuesParity(t *testing.T) {
 }
 
 // TestManagerForceRunsTheQueueFirstParity (F2; C-23): forceUpdate's
-// #storeConsent runs the queue (#queueUpdate, SoftwareUpdateManager.ts:1291
-// at b25ed960) before the forced #startAnnouncement (:1521), so a waiting
+// #storeConsent runs the queue (#queueUpdate,
+// SoftwareUpdateManager.ts:1266-1293 at b25ed960) before the forced
+// announcement (SoftwareUpdateManager.ts:1521 at b25ed960), so a waiting
 // update of another node is announced too.
 func TestManagerForceRunsTheQueueFirstParity(t *testing.T) {
 	t.Parallel()

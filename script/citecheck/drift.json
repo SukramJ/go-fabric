@@ -2666,7 +2666,7 @@
   },
   {
     "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-    "line": 138,
+    "line": 140,
     "citation": "OtaTest.ts:1660-1691",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "queuedUpdates",
@@ -2675,7 +2675,7 @@
   },
   {
     "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-    "line": 165,
+    "line": 167,
     "citation": "OtaTest.ts:1693-1752",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "#onSoftwareVersionChanged",
@@ -2684,7 +2684,7 @@
   },
   {
     "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-    "line": 262,
+    "line": 264,
     "citation": "OtaTest.ts:2772-2817",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "#cleanupObsoleteUpdates",

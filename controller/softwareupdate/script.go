@@ -16,7 +16,7 @@ import (
 // answer a command as a certification case needs, and reads back what it
 // answered. matter.js keeps both in its cert harness, as the provider
 // behavior it installs on the controller's node
-// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:612-814 at
+// (support/chip-testing/src/cert/InProcessControllerAdapter.ts:628-814 at
 // b25ed960, RecordingOtaProviderServer); a Go controller cannot subclass
 // its provider, so the seam is [Config]'s ScriptQueryImage,
 // ScriptApplyUpdate and OnProviderExchange, which [Manager.ProviderConfig]

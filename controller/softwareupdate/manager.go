@@ -2009,8 +2009,8 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 	}
 	peers := make([]Peer, 0, len(targets))
 	for _, t := range targets {
-		// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:902-935 at b25ed960
-		// (#checkProductForUpdates: a node removed during the check is
+		// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:876-938 at b25ed960
+		// (#checkProductForUpdates, its loop :902-935: a node removed during the check is
 		// skipped; a consent for the product queues its version; consent is
 		// asked when there is none or it is below the version found).
 		if !m.presence()(t.peer) {
@@ -2314,7 +2314,7 @@ func (m *Manager) ForceUpdate(_ context.Context, p Peer, t Target) error {
 		e.phase = &updatePhase{state: phaseQueued, resetAt: m.clock.Now()}
 	}
 	// #storeConsent runs the queue (#queueUpdate,
-	// SoftwareUpdateManager.ts:1291 at b25ed960) before the forced
+	// SoftwareUpdateManager.ts:1266-1293 at b25ed960) before the forced
 	// announcement (SoftwareUpdateManager.ts:1521 at b25ed960), so a waiting
 	// update of another node is announced too.
 	if e := m.storeConsentLocked(p, t, endpoint, true, running, known); e != nil {
