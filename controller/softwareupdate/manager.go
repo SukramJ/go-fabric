@@ -340,6 +340,27 @@ type Manager struct {
 	// disablePeerForScope (OtaTest.ts:5455-5465 at b25ed960).
 	admitTransfer   func(p Peer) admissionTransfer
 	disableTransfer func(p Peer) error
+	// node, when set, stands in for the registry's node of a peer — a
+	// test seam, as OtaTest's peers are the controller's ClientNodes
+	// (#peerOf, #basicInformationOf, #otaEndpointFor,
+	// SoftwareUpdateManager.ts:599-612, :1574-1588 at b25ed960): false is
+	// no node with the address. Set before the manager runs, nil in
+	// production.
+	node func(p Peer) (nodeView, bool)
+	// announce, when set, stands in for the AnnounceOTAProvider invoke of
+	// a queued update — a test seam, as OtaTest's interceptAnnouncements
+	// replaces announceOtaProvider (OtaTest.ts:3482-3499 at b25ed960);
+	// ctx is the announcement's abort. Set before the manager runs, nil in
+	// production.
+	announce func(ctx context.Context, p Peer, endpoint uint16) error
+}
+
+// nodeView is what the node test seam says of a peer's node: its cached
+// Basic Information (nil without) and the endpoint of its OTA requestor
+// while the node is applicable for updates (nil while it is not).
+type nodeView struct {
+	basic    *basicinfo.State
+	endpoint *uint16
 }
 
 // admissionTransfer is what the admission of a query reads of a node's
@@ -485,6 +506,100 @@ func (m *Manager) goWork(fn func()) {
 
 // nodeAt is the registry's node of p, nil for none.
 func (m *Manager) nodeAt(p Peer) *client.Node { return m.cfg.Registry.GetByAddress(p) }
+
+// presence reports, for a peer, whether a node has its address now — the
+// question of #peerOf (SoftwareUpdateManager.ts:599-602 at b25ed960),
+// answered from one read of the registry, so the queue run asks it with
+// m.mu held without reaching into the registry. Called without m.mu.
+func (m *Manager) presence() func(Peer) bool {
+	if m.node != nil {
+		return func(p Peer) bool { _, ok := m.node(p); return ok }
+	}
+	present := map[Peer]bool{}
+	for _, n := range m.cfg.Registry.Nodes() {
+		if p, ok := n.PeerAddress(); ok {
+			present[p] = true
+		}
+	}
+	return func(p Peer) bool { return present[p] }
+}
+
+// basicInformationOf is the node's cached Basic Information, false while
+// no node has the address or its cache holds none (#basicInformationOf,
+// SoftwareUpdateManager.ts:604-607 at b25ed960). Called without m.mu.
+func (m *Manager) basicInformationOf(p Peer) (basicinfo.State, bool) {
+	if m.node != nil {
+		v, ok := m.node(p)
+		if !ok || v.basic == nil {
+			return basicinfo.State{}, false
+		}
+		return *v.basic, true
+	}
+	n := m.nodeAt(p)
+	if n == nil {
+		return basicinfo.State{}, false
+	}
+	return basicInformation(n)
+}
+
+// softwareVersionOf is the software version of the node's cached Basic
+// Information (#softwareVersionOf, SoftwareUpdateManager.ts:609-612 at
+// b25ed960). Called without m.mu.
+func (m *Manager) softwareVersionOf(p Peer) (uint32, bool) {
+	st, ok := m.basicInformationOf(p)
+	return st.SoftwareVersion, ok
+}
+
+// errNoNode is a peer address no node has.
+var errNoNode = errors.New("softwareupdate: no node has the peer address")
+
+// otaEndpointFor is the OTA requestor endpoint of the node while it is
+// applicable for updates: errNoNode while no node has the address,
+// [ErrMismatch] for an applicable node whose vendor or product differ from
+// t's. Called without m.mu.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1569-1588 at b25ed960
+// (#otaEndpointFor).
+func (m *Manager) otaEndpointFor(p Peer, t Target) (endpoint uint16, applicable bool, err error) {
+	var vid, pid uint16
+	if m.node != nil {
+		v, ok := m.node(p)
+		if !ok {
+			return 0, false, fmt.Errorf("%w: %s", errNoNode, peerString(p))
+		}
+		if v.endpoint == nil || v.basic == nil {
+			return 0, false, nil
+		}
+		endpoint, vid, pid = *v.endpoint, v.basic.VendorId, v.basic.ProductId
+	} else {
+		n := m.nodeAt(p)
+		if n == nil {
+			return 0, false, fmt.Errorf("%w: %s", errNoNode, peerString(p))
+		}
+		d, ok := m.preparePeerForUpdate(n)
+		if !ok {
+			return 0, false, nil
+		}
+		endpoint, vid, pid = d.endpoint, d.vendorID, d.productID
+	}
+	if vid != t.VendorID || pid != t.ProductID {
+		return 0, false, fmt.Errorf("%w: %s", ErrMismatch, peerString(p))
+	}
+	return endpoint, true, nil
+}
+
+// announceTo sends AnnounceOTAProvider with reason UpdateAvailable to the
+// node's requestor endpoint under ctx, the announcement's abort.
+func (m *Manager) announceTo(ctx context.Context, a *announcements, p Peer, endpoint uint16) error {
+	if m.announce != nil {
+		return m.announce(ctx, p, endpoint)
+	}
+	n := m.nodeAt(p)
+	if n == nil {
+		return fmt.Errorf("%w: %s", errNoNode, peerString(p))
+	}
+	return a.announceOtaProvider(ctx, n, endpoint, announceUpdateAvailable)
+}
 
 // basicInformation is the node's BasicInformation from its image, false
 // without one.
@@ -1030,12 +1145,10 @@ func (m *Manager) QueuedUpdates() []PendingUpdate {
 // query whose ids are not the node's attested ones is logged
 // ([Manager.noteAttestedIdentity]); the answer does not depend on it.
 func (m *Manager) validatePeerDetails(p Peer, version uint32, vid, pid uint16) bool {
-	n := m.nodeAt(p)
-	if n == nil {
-		return false
+	if n := m.nodeAt(p); n != nil {
+		m.noteAttestedIdentity(p, n.Record(), vid, pid)
 	}
-	m.noteAttestedIdentity(p, n.Record(), vid, pid)
-	st, ok := basicInformation(n)
+	st, ok := m.basicInformationOf(p)
 	return ok && st.SoftwareVersion == version && st.VendorId == vid && st.ProductId == pid
 }
 
@@ -1527,12 +1640,11 @@ func (m *Manager) triggerUpdateOnNode(e *queueEntry) {
 		m.log.Info("ota.manager.bdx_active_skip", slog.String("node", peerString(e.peer)))
 		return
 	}
-	n := m.nodeAt(e.peer)
-	if n == nil {
+	if !m.presence()(e.peer) {
 		return
 	}
 	m.log.Info("ota.manager.announcing", slog.String("node", peerString(e.peer)))
-	if err := a.announceOtaProvider(context.Background(), n, endpoint, announceUpdateAvailable); err != nil {
+	if err := m.announceTo(context.Background(), a, e.peer, endpoint); err != nil {
 		m.log.Warn("ota.manager.announce_failed", slog.String("node", peerString(e.peer)), slog.Any("err", err))
 		m.mu.Lock()
 		e.reset()
@@ -1698,13 +1810,9 @@ func (m *Manager) AddUpdateConsent(_ context.Context, p Peer, t Target) (bool, e
 	if err := t.assert(); err != nil {
 		return false, err
 	}
-	var d prepared
-	ok := false
-	if n := m.nodeAt(p); n != nil {
-		d, ok = m.preparePeerForUpdate(n)
-	}
-	if ok && (d.vendorID != t.VendorID || d.productID != t.ProductID) {
-		return false, fmt.Errorf("%w: %s", ErrMismatch, peerString(p))
+	endpoint, ok, err := m.otaEndpointFor(p, t)
+	if err != nil && !errors.Is(err, errNoNode) {
+		return false, err
 	}
 	m.mu.Lock()
 	m.consents = append(slices.DeleteFunc(m.consents, func(c consent) bool { return c.peer == p }), consent{Target: t, peer: p})
@@ -1714,7 +1822,7 @@ func (m *Manager) AddUpdateConsent(_ context.Context, p Peer, t Target) (bool, e
 		m.log.Info("ota.manager.not_applicable_yet", slog.String("node", peerString(p)))
 		return false, nil
 	}
-	m.queueUpdate(&queueEntry{consent: consent{Target: t, peer: p}, endpoint: d.endpoint}) //nolint:contextcheck // the queue's work runs on the manager's lifetime
+	m.queueUpdate(&queueEntry{consent: consent{Target: t, peer: p}, endpoint: endpoint}) //nolint:contextcheck // the queue's work runs on the manager's lifetime
 	return true, nil
 }
 
