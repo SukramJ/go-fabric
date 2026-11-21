@@ -18,8 +18,8 @@ import (
 // moved from the facade's hook into the bridge.
 
 // TestPASEClosedOnFailSafeExpiryParity pins the fail-safe rollback's step
-// 1, matter.js packages/protocol/src/common/FailsafeContext.ts:277-279 at
-// db021da0 (closePaseSession), through the facade's own root clusters: when
+// 1, matter.js packages/protocol/src/common/FailsafeContext.ts:281-283 at
+// b25ed960 (closePaseSession), through the facade's own root clusters: when
 // the root's fail-safe expires, the node holds no PASE session — the one
 // AddNOC adopted onto a fabric included — at once outside an interaction,
 // after the response inside one on the PASE session (ArmFailSafe with

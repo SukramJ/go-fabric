@@ -212,11 +212,13 @@ func (b *Bridge) closePASESessionsOnCommissioningComplete(_ context.Context, res
 // The deferral is matter.js's force close with the current exchange:
 // packages/protocol/src/common/FailsafeContext.ts:283 at b25ed960
 // (rollback → closePaseSession with currentExchange) reaches
-// packages/protocol/src/session/Session.ts:336-339 at b25ed960
+// packages/protocol/src/session/Session.ts:336-342 at b25ed960
 // (initiateForceClose: deferredClose only for the current exchange among
 // the PASE session's own exchanges, the others closed), and
-// Session.ts:315-317 at b25ed960 holds the close only then. The exchange's
-// identity is the interaction's session id here — exact, not "is PASE":
+// Session.ts:315-317 at b25ed960 holds the close only then. matter.js tests whether
+// the command's exchange is one of the PASE session's own; here that is
+// whether the interaction's session id is one of the named ids — exact,
+// not "is PASE":
 // two PASE sessions coexist while a closing one admits a new handshake
 // ([Bridge.paseSessionExists]). Before, the close waited for the response
 // of a command over CASE as well, and a request on the PASE session in

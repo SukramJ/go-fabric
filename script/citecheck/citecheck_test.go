@@ -204,7 +204,7 @@ const citecheckDriftRatchet = 432
 // D 3). Wave P3c relabelled 27 more (units A, E, F and the register pass).
 // Wave P4 unit D2 relabelled 3 more (RevokeCommissioning's step 1 in
 // bridge/pase_close.go, bridge/commissioning_window.go and its test).
-const citecheckOffPinRatchet = 2750
+const citecheckOffPinRatchet = 2749
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
