@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27894,
-    "reachable": 20889,
-    "whitelisted": 6983,
+    "total_exported": 27896,
+    "reachable": 20890,
+    "whitelisted": 6984,
     "unreachable": 22
   },
   "by_package": [
@@ -27764,6 +27764,13 @@
     },
     {
       "package": "cluster/thermo",
+      "identifier": "LocalTemperatureChangeThresholdOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/export_test.go",
+      "line": 9
+    },
+    {
+      "package": "cluster/thermo",
       "identifier": "Preset",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
@@ -27823,7 +27830,7 @@
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 345
+      "line": 353
     },
     {
       "package": "cluster/thermo",
