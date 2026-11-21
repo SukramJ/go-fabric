@@ -13256,7 +13256,7 @@
       "identifier": "TestParityMatterJS_OTAProviderUpdateApplied",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_parity_matterjs_test.go",
-      "line": 441
+      "line": 442
     },
     {
       "package": "cluster/core",
