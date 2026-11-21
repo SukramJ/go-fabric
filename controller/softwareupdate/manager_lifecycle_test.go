@@ -130,7 +130,6 @@ func TestManagerForgetsNodesThatLeft(t *testing.T) {
 	r.m.mu.Lock()
 	for _, p := range []Peer{gone, testPeer} {
 		r.m.observed[p] = 1
-		r.m.applyDelays[p] = time.Minute
 		r.m.known[p] = SoftwareUpdateInfo{}
 		r.m.startUpSuppress[p] = 7
 	}
@@ -142,7 +141,6 @@ func TestManagerForgetsNodesThatLeft(t *testing.T) {
 	r.m.mu.Lock()
 	defer r.m.mu.Unlock()
 	_, o := r.m.observed[gone]
-	_, a := r.m.applyDelays[gone]
 	_, k := r.m.known[gone]
 	_, s := r.m.startUpSuppress[gone]
 	for _, c := range r.m.consents {
@@ -150,8 +148,8 @@ func TestManagerForgetsNodesThatLeft(t *testing.T) {
 			t.Fatal("a consent of a node that left stays")
 		}
 	}
-	if o || a || k || s {
-		t.Fatalf("kept for a node that left: observed %v, applyDelays %v, known %v, startUpSuppress %v", o, a, k, s)
+	if o || k || s {
+		t.Fatalf("kept for a node that left: observed %v, known %v, startUpSuppress %v", o, k, s)
 	}
 	if _, ok := r.m.observed[testPeer]; !ok {
 		t.Fatal("dropped the state of a node with a queued update")
@@ -160,13 +158,16 @@ func TestManagerForgetsNodesThatLeft(t *testing.T) {
 
 // TestManagerSettersReadUnderTheLock (review II, R2-P6-conc-1913) is the
 // standing guard of the fields SetProvider and SetBDX write after New: no
-// function of the package but the setters and their two accessors reads
+// function of the package but the setters, their two accessors and the
+// queue run's locked read (bdxSessionForLocked) reads
 // them from the manager's Config, and nothing copies the whole Config
 // (which reads them too). A new reader goes through provider() or
 // bdxResponder().
 func TestManagerSettersReadUnderTheLock(t *testing.T) {
 	t.Parallel()
-	allowed := map[string]bool{"SetProvider": true, "SetBDX": true, "provider": true, "bdxResponder": true}
+	// bdxSessionForLocked reads the responder with m.mu held: the queue
+	// run calls it under the lock it would otherwise take again.
+	allowed := map[string]bool{"SetProvider": true, "SetBDX": true, "provider": true, "bdxResponder": true, "bdxSessionForLocked": true}
 	fields := map[string]bool{"ProviderNodeID": true, "ProviderEndpoint": true, "BDX": true}
 	files, err := filepath.Glob("*.go")
 	if err != nil {
@@ -260,7 +261,6 @@ func TestManagerNodeDeleted(t *testing.T) {
 	r.m.mu.Lock()
 	for _, p := range []Peer{testPeer, other} {
 		r.m.observed[p] = 1
-		r.m.applyDelays[p] = time.Minute
 		r.m.known[p] = SoftwareUpdateInfo{}
 		r.m.startUpSuppress[p] = 7
 	}
@@ -276,13 +276,12 @@ func TestManagerNodeDeleted(t *testing.T) {
 	}
 	r.m.mu.Lock()
 	_, o := r.m.observed[testPeer]
-	_, a := r.m.applyDelays[testPeer]
 	_, k := r.m.known[testPeer]
 	_, s := r.m.startUpSuppress[testPeer]
 	_, otherKept := r.m.observed[other]
 	r.m.mu.Unlock()
-	if o || a || k || s {
-		t.Fatalf("kept for the deleted node: observed %v, applyDelays %v, known %v, startUpSuppress %v", o, a, k, s)
+	if o || k || s {
+		t.Fatalf("kept for the deleted node: observed %v, known %v, startUpSuppress %v", o, k, s)
 	}
 	if !otherKept || !r.m.HasConsent(other, 3) {
 		t.Fatal("another node's state went with it")

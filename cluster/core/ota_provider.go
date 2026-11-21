@@ -4,7 +4,6 @@
 package core
 
 import (
-	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -14,7 +13,6 @@ import (
 	"log/slog"
 	"math"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -29,36 +27,26 @@ import (
 // OTAProvider is the OTA Software Update Provider (0x0029): it answers an
 // OTA requestor's QueryImage with an image its host's [OTAImageSource]
 // names, serves the image over BDX as the following sender of the
-// requestor's receiver-driven download, allows the update in
-// ApplyUpdateRequest and closes it on NotifyUpdateApplied.
+// requestor's receiver-driven download, decides ApplyUpdateRequest and
+// records NotifyUpdateApplied.
 //
 // Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/
-// OtaSoftwareUpdateProviderServer.ts at 0ceb202d (OP below). What matter.js
-// decides in its SoftwareUpdateManager — which image a peer gets, whether
-// the user consented, how long an allowed apply waits — are the host's
-// ports here: [OTAImageSource] (checkUpdateAvailable, OP:497-502),
-// [OTAConsent] (requestUserConsentForUpdate, OP:483-489) and
-// [OTAApplyPolicy] (State.applyDelay, OP:623-631). The DCL lookups and the
+// OtaSoftwareUpdateProviderServer.ts at b25ed960 (OP below). What matter.js
+// decides in its SoftwareUpdateManager — which query is admitted, whether
+// an apply proceeds, what a status moves — is the [OTAUpdateManager]'s
+// ([OTAProviderConfig].Manager, by default [NewOTAStandaloneManager]); the
+// host's ports are the image catalogue ([OTAImageSource],
+// checkUpdateAvailable, OP:395-414) and the user's consent ([OTAConsent],
+// requestUserConsentForUpdate, OP:382-393). The DCL lookups and the
 // peer's BasicInformation validation of SoftwareUpdateManager.updateExistsFor
 // are the image source's to do, or not.
 type OTAProvider struct {
 	*spec.Server
 
 	cfg     OTAProviderConfig
+	mgr     OTAUpdateManager
 	storage *otaImageStorage
 	logger  *slog.Logger
-
-	// mu guards inProgress and consents; it is released before a listener
-	// is unregistered or an entry's cleanup runs.
-	mu sync.Mutex
-	// inProgress is internal.inProgressDetails (OP:633-636), keyed by the
-	// requestor and the update token.
-	inProgress map[string]*otaInProgress
-	// consents are the versions the image source offered a peer without
-	// asking for consent: SoftwareUpdateManager reports consentRequired
-	// false only for a peer it holds a consent for (SoftwareUpdateManager.ts:
-	// 417-446), which hasConsent then finds (:1150-1157, read at OP:504-509).
-	consents map[OTAPeer]uint32
 }
 
 // OTAPeer is the requestor a provider talks to: matter.js PeerAddress, its
@@ -72,7 +60,7 @@ type OTAPeer struct {
 // OtaUpdateAvailableDetails (SoftwareUpdateManager.ts:95-102).
 type OTAImage struct {
 	// FileDesignator names the image in the provider's "ota" storage scope
-	// — matter.js names it `ota/${filename}` (SoftwareUpdateManager.ts:454)
+	// — matter.js names it `ota/${filename}` (SoftwareUpdateManager.ts:711)
 	// — and is what [OTAImageSource.Open] is asked for. It is a plain name:
 	// the characters A-Z a-z 0-9 . - _, no "/".
 	FileDesignator bdx.FileDesignator
@@ -80,22 +68,23 @@ type OTAImage struct {
 	SoftwareVersion       uint32
 	SoftwareVersionString string
 	// HTTPSURI is offered to a requestor that does not support BDX
-	// synchronous download but HTTPS (OP:382-386); empty offers none.
+	// synchronous download but HTTPS (OP:233-244); empty offers none.
 	HTTPSURI string
 	// ConsentRequired asks the user's consent before the update: the
 	// provider asks [OTAConsent] when the requestor cannot consent itself
-	// (OP:245-284), and tells the requestor it is needed (OP:399).
+	// (OP:199-231), and tells the requestor it is needed only when it
+	// delegates the consent to it (OP:312).
 	// false states that the consent exists, as SoftwareUpdateManager does
 	// for a peer it holds one for.
 	ConsentRequired bool
 	// MetadataForRequestor is passed back in the QueryImageResponse
-	// (OP:400); at most 512 bytes.
+	// (OP:313); at most 512 bytes.
 	MetadataForRequestor []byte
 }
 
 // OTAImageSource is the host's image catalogue: matter.js's
-// checkUpdateAvailable extension point (OP:491-502) and the blob storage
-// behind the "ota" scope (SoftwareUpdateManager.storage, OP:109-114).
+// checkUpdateAvailable extension point (OP:395-414) and the blob storage
+// behind the "ota" scope (SoftwareUpdateManager.storage, OP:92-97).
 type OTAImageSource interface {
 	// QueryImage returns the image for the requestor's vendor, product and
 	// version — false when there is none (NotAvailable, OP:173-178).
@@ -107,7 +96,7 @@ type OTAImageSource interface {
 	Open(ctx context.Context, file string) (bdx.Blob, error)
 }
 
-// OTAConsentState is matter.js OtaSoftwareUpdateConsentState (OP:66-71).
+// OTAConsentState is matter.js OtaSoftwareUpdateConsentState (OP:43-48).
 type OTAConsentState uint8
 
 // The consent states.
@@ -120,25 +109,33 @@ const (
 
 // OTAConsent asks the user's consent for an update the requestor cannot
 // consent to itself: matter.js's requestUserConsentForUpdate extension
-// point (OP:479-489, :640-656). The delay is how long a requestor told
+// point (OP:382-393). The delay is how long a requestor told
 // Obtaining waits before it asks again; zero is matter.js's 120 s
-// (OP:248). A nil OTAConsent answers Unknown, which declines (OP:488).
+// (OP:205). A nil OTAConsent answers Unknown, which declines (OP:392).
 type OTAConsent interface {
 	RequestConsent(ctx context.Context, peer OTAPeer, req provdef.QueryImageRequest, img OTAImage) (OTAConsentState, time.Duration, error)
 }
 
-// OTAApplyPolicy decides an ApplyUpdateRequest the provider allows — after
-// the consent check of OP:430-437 passed: Proceed and how long the
-// requestor waits before it applies (matter.js State.applyDelay,
-// OP:623-631), or AwaitNextAction or Discontinue with the delay before it
-// asks again (Matter Core §11.20.6.5.4). A nil policy is matter.js's
-// default: Proceed at once.
+// OTAApplyPolicy decides an ApplyUpdateRequest before the
+// [OTAUpdateManager]'s apply table: Proceed and how long the requestor
+// waits before it applies (matter.js State.applyDelay, OP:426-435), or
+// AwaitNextAction or Discontinue with the delay before it asks again
+// (Matter Core §11.20.6.5.4). Proceed leaves the decision to the table,
+// which may still refuse, and its delay replaces [OTAProviderConfig].ApplyDelay;
+// any other action answers at once, and Discontinue cancels the update the
+// token names. A nil policy is matter.js's default: the table decides,
+// after ApplyDelay.
+//
+// Deprecated: matter.js decides an apply in its SoftwareUpdateManager
+// only, after the provider's State.applyDelay: set
+// [OTAProviderConfig].ApplyDelay for the delay, and decide the apply
+// through [OTAProviderConfig].Manager. Removable in v0.26.0.
 type OTAApplyPolicy interface {
 	ApplyUpdate(ctx context.Context, peer OTAPeer, req provdef.ApplyUpdateRequestRequest) (provdef.ApplyUpdateActionEnum, time.Duration, error)
 }
 
-// OTAUpdateStatus is matter.js OtaUpdateStatus (SoftwareUpdateManager.ts:
-// 104-113): where a requestor's update stands.
+// OTAUpdateStatus is matter.js OtaUpdateStatus (OtaProgress.ts:16-25 at
+// b25ed960): where a requestor's update stands.
 type OTAUpdateStatus uint8
 
 // The update states.
@@ -180,46 +177,99 @@ type OTAProviderConfig struct {
 	ImageSource OTAImageSource
 	// Consent asks the user; nil declines what needs a consent.
 	Consent OTAConsent
-	// ApplyPolicy decides an allowed apply; nil proceeds at once.
+	// Manager owns the requestors' update attempts and decides the queries
+	// and applies the provider takes ([OTAUpdateManager]); nil is
+	// [NewOTAStandaloneManager] over this configuration. A Manager is
+	// exclusive with the deprecated hooks only the default manager runs
+	// (OnStatusChange, RebootQuery, TransferBlockSize, SessionActivity):
+	// [NewOTAProvider] refuses the two together.
+	Manager OTAUpdateManager
+	// ApplyDelay is how long a requestor allowed to apply an update waits
+	// before it applies: the DelayedActionTime of the Proceed answer and
+	// the apply delay the manager records with Applying, in whole seconds
+	// rounded up and at most a day. Zero applies at once.
+	//
+	// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:426-435 at b25ed960
+	// (State.applyDelay, default 0; rounded at :346-351).
+	ApplyDelay time.Duration
+	// ApplyPolicy decides an apply before the manager's apply table; nil
+	// leaves it to the table.
+	//
+	// Deprecated: the delay is ApplyDelay and the apply is the Manager's
+	// to decide (matter.js's SoftwareUpdateManager.applyUpdate); removable
+	// in v0.26.0.
 	ApplyPolicy OTAApplyPolicy
+	// DelegateConsentToRequestor lets the default manager delegate the
+	// consent of an image that needs one to a requestor whose QueryImage
+	// says it can consent (RequestorCanConsent): it gets the offer without
+	// the [OTAConsent] port being asked, with UserConsentNeeded, and may
+	// apply it. Off — matter.js's default — the port is asked. A [Manager]
+	// decides the delegation itself: [NewOTAProvider] refuses the two
+	// together.
+	//
+	// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:2158-2171 at b25ed960
+	// (State.delegateConsentToRequestor, default false).
+	DelegateConsentToRequestor bool
 	// BDX is the node's BDX responder the images are served through
-	// (matter.js BdxProtocol, OP:291-306); nil offers no BDX download.
+	// (matter.js BdxProtocol, OP:254-296); nil offers no BDX download.
 	BDX *bdx.Responder
 	// BDXMaxBlockSize, when set, caps the block size of the image
-	// transfers (SoftwareUpdateManager.bdxTransferOptionsFor maxBlockSize,
-	// OP:297).
+	// transfers the default manager offers (bdxTransferOptionsFor
+	// maxBlockSize, SoftwareUpdateManager.ts:1530-1536 at b25ed960).
 	BDXMaxBlockSize uint16
 	// NodeID returns this node's id on a fabric, which the BDX URI names
-	// (OP:381: the session's associatedFabric.rootNodeId); mandatory with
+	// (OP:300: the session's associatedFabric.rootNodeId); mandatory with
 	// BDX.
 	NodeID func(fabricIndex uint8) (uint64, bool)
-	// OnStatusChange is told every change of a requestor's update state —
-	// matter.js SoftwareUpdateManager.onOtaStatusChange (OP:608-612) — with
-	// the version the update brings; nil observes nothing. It runs with no
-	// lock of the provider held, and the WaitForApply of a transfer runs on
-	// the receive path — the final BlockAckEof finishes the download at its
-	// arrival — so it must not block.
+	// OnAttemptStatus observes the requestors' update statuses, whichever
+	// manager runs: each status the provider reports and its manager
+	// records ([OTAUpdateManager].ReportAttemptStatus), the outcome of an
+	// ApplyUpdateRequest — Applying, or Cancelled for a refused apply of a
+	// known attempt — and Done with the reported version at every
+	// NotifyUpdateApplied; each with the version the attempt concerns. A
+	// status the manager moves on its own (a failed queued update) is the
+	// manager's to report. nil observes nothing. It runs with no lock held,
+	// and the WaitForApply of a transfer runs on the receive path — the
+	// final BlockAckEof finishes the download at its arrival — so it must
+	// not block. matter.js's provider has no observer: its
+	// SoftwareUpdateManager emits the queue's events.
+	OnAttemptStatus func(peer OTAPeer, status OTAUpdateStatus, version uint32)
+	// OnStatusChange is told, by the default manager, every status a
+	// requestor's update attempt takes, with the version it offers, and
+	// Done with the reported version at every NotifyUpdateApplied; nil
+	// observes nothing. It runs with no lock held, and the WaitForApply of
+	// a transfer runs on the receive path — the final BlockAckEof finishes
+	// the download at its arrival — so it must not block.
+	//
+	// Deprecated: OnAttemptStatus observes the same statuses for every
+	// manager; removable in v0.26.0.
 	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
-	// RebootQuery, when set, learns a QueryImage the provider took for the
-	// requestor's restart — another session than the transfer's, which
-	// it cancelled — with the query's session: matter.js hands it to
-	// SoftwareUpdateManager.suppressNextStartUp, so the StartUp event that
-	// follows on that session is not taken for a failed apply
-	// (OtaSoftwareUpdateProviderServer.ts:221-224 at db021da0).
+	// RebootQuery, when set, learns from the default manager a QueryImage
+	// it admitted for the requestor's restart — another session than the
+	// transfer's, which it cancelled — with the query's session: a queue
+	// suppresses the StartUp event that follows on that session
+	// (SoftwareUpdateManager.ts:1873-1879 at b25ed960, which suppresses it
+	// only while the peer has a queued update).
+	//
+	// Deprecated: the restart is the Manager's to judge (AdmitQuery);
+	// removable in v0.26.0.
 	RebootQuery func(peer OTAPeer, sessionID uint16)
 	// TransferBlockSize, when set, caps the block size of one peer's
-	// transfer in place of BDXMaxBlockSize; 0 falls back to it. matter.js
-	// takes the peer's options from its SoftwareUpdateManager
-	// (bdxTransferOptionsFor, OtaSoftwareUpdateProviderServer.ts:293-298).
+	// transfer in place of BDXMaxBlockSize; 0 falls back to it.
+	//
+	// Deprecated: the Manager's BDXTransferOptionsFor names a peer's
+	// transfer options; removable in v0.26.0.
 	TransferBlockSize func(peer OTAPeer) uint16
 	// SessionActivity, when set, reports when the peer last sent on the
-	// secure session of the id, false for a session it does not know. A
-	// QueryImage on another session than a running transfer's cancels the
-	// transfer when the transfer's session was last active before the
-	// query's (OtaSoftwareUpdateProviderServer.ts:197-201 at db021da0
-	// compares the two sessions' activeTimestamp). Without it, or when it
-	// knows either session not, the transfer's last block stands in for
-	// its session's activity and the query's session is active now.
+	// secure session of the id, false for a session it does not know. The
+	// default manager's admission compares a running transfer's session
+	// with the query's by it (SoftwareUpdateManager.ts:1852 at b25ed960
+	// compares their activeTimestamp); without it, or when it knows either
+	// session not, the transfer's last block stands in for its session's
+	// activity and the query's session is active now.
+	//
+	// Deprecated: the admission is the Manager's (AdmitQuery); removable
+	// in v0.26.0.
 	SessionActivity func(sessionID uint16) (time.Time, bool)
 	// Clock is the provider's clock. Nil is [clock.System].
 	Clock clock.Clock
@@ -229,38 +279,28 @@ type OTAProviderConfig struct {
 	Logger *slog.Logger
 }
 
-// otaInProgress is OtaUpdateInProgressDetails (OP:55-64).
-type otaInProgress struct {
-	peer                  OTAPeer
-	lastState             OTAUpdateStatus
-	timestamp             time.Time
-	versionToApply        *uint32
-	directConsentObtained bool
-	cleanup               func()
-}
-
 // The constants of the provider.
 const (
-	// otaMaxDelayedActionTime caps DelayedActionTime (OP:46-51,
+	// otaMaxDelayedActionTime caps DelayedActionTime (OP:34-39,
 	// MAX_DELAYED_ACTION_TIME = 86_400 s).
 	otaMaxDelayedActionTime = 86_400
-	// otaUpdateTokenLength is OTA_UPDATE_TOKEN_LENGTH_BYTES (OP:53).
+	// otaUpdateTokenLength is OTA_UPDATE_TOKEN_LENGTH_BYTES (OP:41).
 	otaUpdateTokenLength = 32
-	// otaBusyRetry is the Busy answer's DelayedActionTime while an update
-	// is in flight (OP:218, :235: Seconds.of(Minutes(2))) and the
-	// Discontinue answer's (OP:435).
+	// otaBusyRetry is the Busy answer's DelayedActionTime of a query the
+	// manager does not admit (OP:192: Seconds.of(Minutes(2))) and the
+	// Discontinue answer's (OP:356).
 	otaBusyRetry = 2 * time.Minute
 	// otaBdxBusyRetry is the Busy answer when BDX could not be enabled
-	// (OP:302-305: Minutes(5)).
+	// (OP:267: Minutes(5)).
 	otaBdxBusyRetry = 5 * time.Minute
 	// otaConsentRetry is the default delay of an Obtaining consent
-	// (OP:248: Seconds(120)).
+	// (OP:205: Seconds(120)).
 	otaConsentRetry = 120 * time.Second
-	// otaProgressTimeout makes an in-progress entry stale: matter.js
-	// OTA_PROGRESS_TIMEOUT (OtaProgress.ts:15, Minutes(15), read at
-	// OP:537).
+	// otaProgressTimeout makes an update attempt stale: matter.js
+	// OTA_PROGRESS_TIMEOUT (OtaProgress.ts:14 at b25ed960, Minutes(15),
+	// read at OtaUpdateAttempts.ts:109).
 	otaProgressTimeout = 15 * time.Minute
-	// otaBdxMessageTimeout is the image transfer's idle timeout (OP:296:
+	// otaBdxMessageTimeout is the image transfer's idle timeout (OP:259:
 	// Minutes(5)).
 	otaBdxMessageTimeout = 5 * time.Minute
 	// otaScope is the storage scope the images are served under
@@ -274,9 +314,14 @@ var (
 	ErrNoNodeID      = errors.New("core: OTA provider with BDX needs the node id lookup")
 )
 
-// The provider's in-progress entries and consents are fabric-scoped state
-// (owner decision 167).
+// The provider's update attempts are fabric-scoped state (owner decision
+// 167), held by its manager.
 var _ contract.FabricScopedState = (*OTAProvider)(nil)
+
+// errOTAManagerHooks refuses a Manager beside the hooks only the default
+// manager runs.
+var errOTAManagerHooks = errors.New("core: OTA provider with a Manager takes none of OnStatusChange, RebootQuery, " +
+	"TransferBlockSize, SessionActivity and DelegateConsentToRequestor: they configure the default manager")
 
 // otaProviderInst is the definition the provider serves: no attribute but
 // the globals, the three commands and their responses.
@@ -290,6 +335,10 @@ func NewOTAProvider(cfg OTAProviderConfig) (*OTAProvider, error) {
 	if cfg.BDX != nil && cfg.NodeID == nil {
 		return nil, ErrNoNodeID
 	}
+	if cfg.Manager != nil && (cfg.OnStatusChange != nil || cfg.RebootQuery != nil || cfg.TransferBlockSize != nil || cfg.SessionActivity != nil ||
+		cfg.DelegateConsentToRequestor) {
+		return nil, errOTAManagerHooks
+	}
 	cfg.Clock = clock.Or(cfg.Clock)
 	if cfg.Rand == nil {
 		cfg.Rand = rand.Reader
@@ -298,12 +347,11 @@ func NewOTAProvider(cfg OTAProviderConfig) (*OTAProvider, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	p := &OTAProvider{
-		cfg: cfg, logger: logger,
-		storage:    &otaImageStorage{source: cfg.ImageSource},
-		inProgress: map[string]*otaInProgress{},
-		consents:   map[OTAPeer]uint32{},
+	mgr := cfg.Manager
+	if mgr == nil {
+		mgr = NewOTAStandaloneManager(cfg)
 	}
+	p := &OTAProvider{cfg: cfg, mgr: mgr, logger: logger, storage: &otaImageStorage{source: cfg.ImageSource}}
 	srv, err := spec.NewServer(provdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: map[uint32]spec.CommandHandler{
 		provdef.CmdQueryImage: func(ctx context.Context, fields any) (any, error) {
 			req, err := fieldsAs[provdef.QueryImageRequest](fields)
@@ -372,96 +420,87 @@ func remotePeer(ctx context.Context) (OTAPeer, uint16, error) {
 
 func (p OTAPeer) bdx() bdx.Peer { return bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID} }
 
-func otaKey(peer OTAPeer, token []byte) string {
-	return fmt.Sprintf("%d-%d-%s", peer.NodeID, peer.FabricIndex, hex.EncodeToString(token))
-}
-
 func seconds(d time.Duration) *uint32 {
 	s := uint32(min(max(math.Ceil(d.Seconds()), 0), math.MaxUint32))
 	return &s
 }
 
-// QueryImage mirrors OP:160-402.
+// QueryImage answers a requestor's QueryImage: the manager holds an
+// attempt for the query, which ends with it unless the provider answers
+// with an offer.
+//
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:143-159 at b25ed960
+// (queryImage).
 func (p *OTAProvider) QueryImage(ctx context.Context, req provdef.QueryImageRequest) (provdef.QueryImageResponse, error) {
 	peer, sessionID, err := remotePeer(ctx)
 	if err != nil {
 		return provdef.QueryImageResponse{}, err
 	}
+	attempt := p.mgr.BeginQuery(peer)
+	defer p.mgr.EndQuery(attempt)
+	return p.answerQuery(ctx, req, peer, sessionID, attempt)
+}
+
+// answerQuery answers the query; the offer is recorded after the last wait
+// on a host port, so nothing changes the decision before the answer goes.
+//
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:161-315 at b25ed960
+// (#answerQuery).
+func (p *OTAProvider) answerQuery(ctx context.Context, req provdef.QueryImageRequest, peer OTAPeer, sessionID uint16, attempt *OTAUpdateAttempt) (provdef.QueryImageResponse, error) {
 	img, ok, err := p.cfg.ImageSource.QueryImage(ctx, peer, req)
 	if err != nil {
 		return provdef.QueryImageResponse{}, err
 	}
 	if !ok {
-		// OP:173-178.
-		return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, nil
+		return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, nil // OP:173-178
 	}
 	if fd := img.FileDesignator; len(fd) == 0 || fd.Text() != string(fd) || slices.Contains(fd, '/') {
 		return provdef.QueryImageResponse{}, fmt.Errorf("core: OTA image designator %q is not a plain file name", fd.Text())
 	}
-
-	// OP:188-238: an update already in progress for this peer.
-	if p.detailsForPeer(peer, nil) != nil {
-		if resp, busy := p.inProgressAnswer(peer, sessionID); busy {
-			return resp, nil
-		}
+	if !p.mgr.AdmitQuery(ctx, peer, sessionID, req.SoftwareVersion) { // OP:188-194
+		return provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: seconds(otaBusyRetry)}, nil
 	}
-
-	token := make([]byte, otaUpdateTokenLength) // OP:240-241
+	token := make([]byte, otaUpdateTokenLength) // OP:196-197
 	if _, err := io.ReadFull(p.cfg.Rand, token); err != nil {
 		return provdef.QueryImageResponse{}, err
 	}
-	canConsent := req.RequestorCanConsent != nil && *req.RequestorCanConsent
-	if !img.ConsentRequired {
-		p.mu.Lock()
-		p.consents[peer] = img.SoftwareVersion
-		p.mu.Unlock()
+
+	// OP:199-231: a requestor that may obtain the consent itself gets the
+	// update without asking; else a required consent is asked for.
+	delegated := img.ConsentRequired && p.mgr.MayDelegateConsentTo(peer, req)
+	if img.ConsentRequired && !delegated {
+		if resp, answered, err := p.askConsent(ctx, req, peer, img, token, attempt); answered || err != nil {
+			return resp, err
+		}
 	}
 
-	// OP:243-284: the requestor that can consent gets the update without
-	// asking; else a required consent is asked for.
-	if img.ConsentRequired && !canConsent {
-		p.updateInProgress(peer, token, OTAUpdateWaitForConsent, &img.SoftwareVersion, false)
-		state, delay := OTAConsentUnknown, time.Duration(0)
-		if p.cfg.Consent != nil {
-			if state, delay, err = p.cfg.Consent.RequestConsent(ctx, peer, req, img); err != nil {
-				p.removeInProgress(peer)
-				return provdef.QueryImageResponse{}, err
-			}
-		}
-		if delay == 0 {
-			delay = otaConsentRetry
-		}
-		p.logger.Info("ota.provider.consent", slog.Uint64("node_id", peer.NodeID), slog.String("token", hex.EncodeToString(token)), slog.Int("state", int(state)))
-		switch state {
-		case OTAConsentGranted:
-			p.updateInProgress(peer, token, OTAUpdateQuerying, &img.SoftwareVersion, true)
-		case OTAConsentObtaining:
-			return provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: seconds(delay)}, nil
-		default:
-			p.removeInProgress(peer)
-			return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, nil
-		}
-	} else {
-		p.updateInProgress(peer, token, OTAUpdateQuerying, &img.SoftwareVersion, false)
-	}
-
-	// OP:286-391: BDX synchronous preferred, HTTPS when that is all the
+	// OP:233-244: BDX synchronous preferred, HTTPS when that is all the
 	// requestor supports and the image has a URI.
-	var imageURI string
-	switch {
-	case p.cfg.BDX != nil && slices.Contains(req.ProtocolsSupported, provdef.DownloadProtocolBdxSynchronous):
-		uri, resp, busy := p.offerBDX(peer, token, img)
-		if busy {
-			return resp, nil
-		}
-		imageURI = uri
-	case img.HTTPSURI != "" && slices.Contains(req.ProtocolsSupported, provdef.DownloadProtocolHttps):
-		imageURI = img.HTTPSURI
-	default:
+	viaBDX := p.cfg.BDX != nil && slices.Contains(req.ProtocolsSupported, provdef.DownloadProtocolBdxSynchronous)
+	httpsURI := ""
+	if !viaBDX && slices.Contains(req.ProtocolsSupported, provdef.DownloadProtocolHttps) {
+		httpsURI = img.HTTPSURI
+	}
+	if !viaBDX && httpsURI == "" {
 		return provdef.QueryImageResponse{Status: provdef.StatusDownloadProtocolNotSupported}, nil
 	}
 
-	// OP:393-401.
+	if !p.mgr.OfferUpdate(attempt, token, img.SoftwareVersion) { // OP:246-248
+		return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, nil
+	}
+	p.reportStatus(attempt, OTAUpdateQuerying) // OP:249
+
+	imageURI := httpsURI
+	if viaBDX {
+		uri, busy := p.offerBDX(peer, img, attempt)
+		if busy {
+			return provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: seconds(otaBdxBusyRetry)}, nil
+		}
+		imageURI = uri
+	}
+
+	// OP:305-314.
+	p.mgr.OfferAnswered(attempt)
 	version, versionString := img.SoftwareVersion, img.SoftwareVersionString
 	resp := provdef.QueryImageResponse{
 		Status:                provdef.StatusUpdateAvailable,
@@ -470,9 +509,9 @@ func (p *OTAProvider) QueryImage(ctx context.Context, req provdef.QueryImageRequ
 		SoftwareVersionString: &versionString,
 		UpdateToken:           &token,
 	}
-	if img.ConsentRequired {
+	if delegated {
 		yes := true
-		resp.UserConsentNeeded = &yes
+		resp.UserConsentNeeded = &yes // OP:312: only a delegated consent is the requestor's to obtain
 	}
 	if len(img.MetadataForRequestor) > 0 {
 		md := slices.Clone(img.MetadataForRequestor)
@@ -481,511 +520,206 @@ func (p *OTAProvider) QueryImage(ctx context.Context, req provdef.QueryImageRequ
 	return resp, nil
 }
 
-// inProgressAnswer is OP:189-237 for a peer with an update in progress: a
-// stale entry without a running transfer is dropped, a transfer on another
-// session older than this query is taken for the requestor's reboot and
-// cancelled, and anything else is Busy for two minutes. It reports whether
-// the query is answered.
-func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.QueryImageResponse, bool) {
-	busy := provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: seconds(otaBusyRetry)}
-	var running *bdx.ServerSession
-	if p.cfg.BDX != nil {
-		running = p.cfg.BDX.SessionFor(peer.bdx(), otaScope)
-	}
-	switch {
-	case running == nil:
-		// OP:194-196: no transfer runs, the entry is stale.
-		p.removeInProgress(peer)
-		return provdef.QueryImageResponse{}, false
-	case running.Peer().SessionID != sessionID && p.transferSessionOlder(running, sessionID):
-		// OP:197-225: another session, last active before this query's
-		// (transferSessionOlder). The old transfer is cancelled and the
-		// query proceeds.
-		if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, true); err != nil {
-			p.logger.Warn("ota.provider.reboot_cancel_failed", slog.Any("err", err))
-			return busy, true
+// askConsent asks the host for the consent the requestor cannot give: it
+// reports whether the query is answered — Busy while the consent is being
+// obtained, NotAvailable when it is not granted — and nothing when it is
+// granted, which lets the offer go on.
+//
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:202-231 at b25ed960
+// (the consent of the query's answer).
+func (p *OTAProvider) askConsent(ctx context.Context, req provdef.QueryImageRequest, peer OTAPeer, img OTAImage, token []byte, attempt *OTAUpdateAttempt) (provdef.QueryImageResponse, bool, error) {
+	p.reportStatus(attempt, OTAUpdateWaitForConsent)
+	state, delay := OTAConsentUnknown, time.Duration(0)
+	if p.cfg.Consent != nil {
+		var err error
+		if state, delay, err = p.cfg.Consent.RequestConsent(ctx, peer, req, img); err != nil {
+			return provdef.QueryImageResponse{}, true, err
 		}
-		p.removeInProgress(peer)
-		if fn := p.cfg.RebootQuery; fn != nil {
-			fn(peer, sessionID) // OtaSoftwareUpdateProviderServer.ts:221-224 at db021da0
-		}
-		return provdef.QueryImageResponse{}, false
 	}
-	p.logger.Info("ota.provider.busy", slog.Uint64("node_id", peer.NodeID))
-	return busy, true
+	if delay == 0 {
+		delay = otaConsentRetry
+	}
+	p.logger.Info("ota.provider.consent", slog.Uint64("node_id", peer.NodeID), slog.String("token", hex.EncodeToString(token)), slog.Int("state", int(state)))
+	switch state {
+	case OTAConsentGranted:
+		return provdef.QueryImageResponse{}, false, nil
+	case OTAConsentObtaining:
+		return provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: seconds(delay)}, true, nil
+	default:
+		p.reportStatus(attempt, OTAUpdateCancelled)
+		return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, true, nil
+	}
 }
 
-// transferSessionOlder reports whether the running transfer's session was
-// last active before the query's session: matter.js compares the two
-// secure sessions' activeTimestamp (OtaSoftwareUpdateProviderServer.ts:197-201
-// at db021da0), read here through [OTAProviderConfig].SessionActivity
-// (review II, F-db021da0-27). Without it, or for a session it does not
-// know, the transfer's last block stands in for its session's activity
-// and the query's session is active now.
-func (p *OTAProvider) transferSessionOlder(running *bdx.ServerSession, querySessionID uint16) bool {
-	if fn := p.cfg.SessionActivity; fn != nil {
-		transfer, okT := fn(running.Peer().SessionID)
-		query, okQ := fn(querySessionID)
-		if okT && okQ {
-			return transfer.Before(query)
-		}
-	}
-	return running.LastActivity().Before(p.cfg.Clock.Now())
-}
-
-// offerBDX is OP:290-381: the requestor is enabled for the "ota" scope as
-// the following sender of a receiver-driven transfer with a five-minute
-// idle timeout, and its transfer sessions move the update's state.
-func (p *OTAProvider) offerBDX(peer OTAPeer, token []byte, img OTAImage) (string, provdef.QueryImageResponse, bool) {
+// offerBDX enables the requestor for the "ota" scope as the following
+// sender of a receiver-driven transfer with a five-minute idle timeout and
+// the manager's transfer options, and reports the transfers of the scope
+// as the attempt's statuses until the attempt ends. It reports busy when
+// the scope is held with other details.
+//
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:251-300 at b25ed960
+// (the BDX offer of the query's answer).
+func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAttempt) (string, bool) {
 	responder := p.cfg.BDX
-	blockSize := p.cfg.BDXMaxBlockSize
-	if fn := p.cfg.TransferBlockSize; fn != nil {
-		if b := fn(peer); b != 0 {
-			blockSize = b
-		}
-	}
-	if !responder.EnablePeerForScope(peer.bdx(), otaScope, p.storage, bdx.ScopeConfig{
-		PreferredDriverModes: []bdx.DriverMode{bdx.ReceiverDrive},
-		MessageTimeout:       otaBdxMessageTimeout,
-		MaxBlockSize:         blockSize,
-	}) {
-		// OP:299-305.
+	opts := p.mgr.BDXTransferOptionsFor(peer)
+	opts.PreferredDriverModes = []bdx.DriverMode{bdx.ReceiverDrive}
+	opts.MessageTimeout = otaBdxMessageTimeout
+	if !responder.EnablePeerForScope(peer.bdx(), otaScope, p.storage, opts) {
 		p.logger.Info("ota.provider.bdx_not_enabled", slog.Uint64("node_id", peer.NodeID))
-		return "", provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: seconds(otaBdxBusyRetry)}, true
+		return "", true
 	}
-	version := img.SoftwareVersion
 	off := responder.OnSessionStarted(func(s *bdx.ServerSession, scope string) {
 		sp := s.Peer()
 		if scope != otaScope || sp.FabricIndex != peer.FabricIndex || sp.NodeID != peer.NodeID {
 			return
 		}
-		// OP:314-320: a failed download is retried on a fresh session, so
-		// the listener stays for the whole update.
-		entry, _ := p.inProgressForPeer(peer, token)
-		if entry == nil {
-			return
-		}
-		p.updateInProgress(peer, token, OTAUpdateDownloading, &version, false)
-		s.OnProgress(func(uint64, *uint64) { // OP:329-331
-			p.mu.Lock()
-			entry.timestamp = p.cfg.Clock.Now()
-			p.mu.Unlock()
+		// A failed download is retried on a fresh session, so the listener
+		// stays until the attempt ends (OP:277-283); a transfer in flight
+		// keeps the attempt alive.
+		p.reportStatus(attempt, OTAUpdateDownloading)
+		s.OnProgress(func(uint64, *uint64) { attempt.Touch() })
+		s.OnFinished(func(uint64) { p.reportStatus(attempt, OTAUpdateWaitForApply) })
+		s.OnCancelled(func() { p.reportStatus(attempt, OTAUpdateCancelled) })
+		// OP:284-293: the closed transfer cancels an attempt not yet
+		// settled; the check and the report are one step of the manager.
+		s.OnClosed(func() {
+			p.reportStatus(attempt, OTAUpdateCancelled,
+				OTAUpdateWaitForApply, OTAUpdateApplying, OTAUpdateDone, OTAUpdateCancelled)
 		})
-		s.OnFinished(func(uint64) { p.updateInProgress(peer, token, OTAUpdateWaitForApply, &version, false) })
-		s.OnCancelled(func() { p.updateInProgress(peer, token, OTAUpdateCancelled, &version, false) })
-		s.OnClosed(func() { p.cancelUnlessSettled(peer, token, version) }) // OP:348-364
 	})
-	// OP:368-377: the entry's cleanup unregisters the listener. off takes
-	// the responder's listener lock: it runs after p.mu is released, as
-	// the entry's cleanup does (detailsForPeer), so the two locks are
-	// never held together (ADR 0026 P6).
-	p.mu.Lock()
-	d := p.inProgress[otaKey(peer, token)]
-	if d != nil {
-		d.cleanup = off
-	}
-	p.mu.Unlock()
-	if d == nil {
-		off()
-	}
+	attempt.OnEnd(off) // OP:296
 
 	nodeID, ok := p.cfg.NodeID(peer.FabricIndex)
 	if !ok {
 		nodeID = 0
 	}
-	// OP:381; the image is `ota/<file>` (SoftwareUpdateManager.ts:454).
-	return bdx.FileDesignator(otaScope + "/" + string(img.FileDesignator)).BdxURI(nodeID), provdef.QueryImageResponse{}, false
+	// OP:300; the image is `ota/<file>` (SoftwareUpdateManager.ts:711).
+	return bdx.FileDesignator(otaScope + "/" + string(img.FileDesignator)).BdxURI(nodeID), false
 }
 
-// ApplyUpdateRequest mirrors OP:404-460.
+// ApplyUpdateRequest decides a requestor's ApplyUpdateRequest: the
+// transfer of the scope is closed — forced unless the attempt of the token
+// waits for its apply — and the manager's apply table decides, Proceed
+// after the apply delay or Discontinue for two minutes.
+//
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:317-363 at b25ed960
+// (applyUpdateRequest).
 func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyUpdateRequestRequest) (provdef.ApplyUpdateResponse, error) {
 	peer, _, err := remotePeer(ctx)
 	if err != nil {
 		return provdef.ApplyUpdateResponse{}, err
 	}
-	details := p.detailsForPeer(peer, req.UpdateToken)
-	// A known token names the version offered under it, so only that
-	// version is applied under it; an offered version is above the
-	// requestor's current one, so 0 names no image provided and stands for
-	// the token's. Mirrors matter.js
-	// packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:417-430
-	// at db021da0 (tokenVersion, the adjustment of newVersion 0).
-	var tokenVersion *uint32
-	if details != nil && details.versionToApply != nil {
-		v := *details.versionToApply
-		tokenVersion = &v
-	}
-	newVersion := req.NewVersion
-	if newVersion == 0 && tokenVersion != nil {
-		p.logger.Info("ota.provider.apply_version_adjusted", slog.Uint64("node_id", peer.NodeID),
-			slog.String("token", hex.EncodeToString(req.UpdateToken)), slog.Uint64("version", uint64(*tokenVersion)))
-		newVersion = *tokenVersion
-	}
+	attempt := p.mgr.AttemptFor(peer, req.UpdateToken)
 	if p.cfg.BDX != nil {
-		// OP:418-428: the transfer is closed — forced when it is not known
-		// to have completed. A completed transfer is known: its final
-		// BlockAckEof finished it — WaitForApply — at its arrival, before
-		// the receive path took the ApplyUpdateRequest sent after it, so
-		// the force is left for a transfer that did not complete.
-		force := details == nil || details.lastState != OTAUpdateWaitForApply
+		// OP:334-344: a transfer not known as completed is forced closed. A
+		// completed transfer is known: its final BlockAckEof finished it —
+		// WaitForApply — at its arrival, before the receive path took the
+		// ApplyUpdateRequest sent after it.
+		force := attempt == nil || attempt.Status() != OTAUpdateWaitForApply
 		if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, force); err != nil {
 			p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
 		}
 	}
-	// A version other than the token's is refused, consent or not, and so
-	// is one without consent; the cancelled update keeps the token's
-	// version (OtaSoftwareUpdateProviderServer.ts:444-464).
-	matchesToken := tokenVersion == nil || newVersion == *tokenVersion
-	if !matchesToken {
-		p.logger.Info("ota.provider.apply_version_mismatch", slog.Uint64("node_id", peer.NodeID),
-			slog.String("token", hex.EncodeToString(req.UpdateToken)), slog.Uint64("requested", uint64(newVersion)),
-			slog.Uint64("token_version", uint64(*tokenVersion)))
-	}
-	if !matchesToken || !p.hasUpdateConsent(peer, newVersion) {
-		cancelled := newVersion
-		if tokenVersion != nil {
-			cancelled = *tokenVersion
+	delay := p.cfg.ApplyDelay
+	if p.cfg.ApplyPolicy != nil {
+		resp, answered, d, err := p.applyPolicy(ctx, peer, req, attempt)
+		if answered || err != nil {
+			return resp, err
 		}
-		p.updateInProgress(peer, req.UpdateToken, OTAUpdateCancelled, &cancelled, false)
+		delay = d
+	}
+	// OP:346-351: whole seconds rounded up, at most a day.
+	delayed := min(*seconds(delay), otaMaxDelayedActionTime)
+	version := req.NewVersion
+	if version == 0 && attempt != nil {
+		version, _ = attempt.Version()
+	}
+	if !p.mgr.ApplyUpdate(ctx, peer, req.UpdateToken, req.NewVersion, time.Duration(delayed)*time.Second) { // OP:352-358
+		if attempt != nil {
+			p.observe(peer, OTAUpdateCancelled, version)
+		}
 		return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionDiscontinue, DelayedActionTime: *seconds(otaBusyRetry)}, nil
 	}
-	// The policy decides the version the provider allows.
-	req.NewVersion = newVersion
-	action, delay := provdef.ApplyUpdateActionProceed, time.Duration(0)
-	if p.cfg.ApplyPolicy != nil {
-		if action, delay, err = p.cfg.ApplyPolicy.ApplyUpdate(ctx, peer, req); err != nil {
-			return provdef.ApplyUpdateResponse{}, err
-		}
-	}
-	// OP:441-446: whole seconds rounded up, at most a day.
-	delayed := min(*seconds(delay), otaMaxDelayedActionTime)
-	switch action {
-	case provdef.ApplyUpdateActionProceed:
-		p.updateInProgress(peer, req.UpdateToken, OTAUpdateApplying, &newVersion, false)
-	case provdef.ApplyUpdateActionDiscontinue:
-		p.updateInProgress(peer, req.UpdateToken, OTAUpdateCancelled, &newVersion, false)
-	case provdef.ApplyUpdateActionAwaitNextAction:
-		// The update stays where it is; the requestor asks again.
-	}
-	return provdef.ApplyUpdateResponse{Action: action, DelayedActionTime: delayed}, nil
+	p.observe(peer, OTAUpdateApplying, version)
+	return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: delayed}, nil
 }
 
-// NotifyUpdateApplied mirrors OP:462-477: the update is done, its entry
-// and the consent it used are gone (SoftwareUpdateManager.ts:1219-1232).
+// applyPolicy asks the deprecated [OTAApplyPolicy] before the manager's
+// table: Proceed hands the decision to the table with the policy's delay,
+// in place of ApplyDelay;
+// any other action answers at once — Discontinue cancels the update the
+// token names, as the table's own refusal does — so the policy only adds
+// a refusal. The policy sees version 0 as the token's version.
+func (p *OTAProvider) applyPolicy(ctx context.Context, peer OTAPeer, req provdef.ApplyUpdateRequestRequest, attempt *OTAUpdateAttempt) (provdef.ApplyUpdateResponse, bool, time.Duration, error) {
+	if req.NewVersion == 0 && attempt != nil {
+		if v, ok := attempt.Version(); ok {
+			req.NewVersion = v
+		}
+	}
+	action, delay, err := p.cfg.ApplyPolicy.ApplyUpdate(ctx, peer, req)
+	if err != nil {
+		return provdef.ApplyUpdateResponse{}, true, 0, err
+	}
+	if action == provdef.ApplyUpdateActionProceed {
+		return provdef.ApplyUpdateResponse{}, false, delay, nil
+	}
+	if action == provdef.ApplyUpdateActionDiscontinue && attempt != nil {
+		p.reportStatus(attempt, OTAUpdateCancelled)
+	}
+	return provdef.ApplyUpdateResponse{Action: action, DelayedActionTime: min(*seconds(delay), otaMaxDelayedActionTime)}, true, 0, nil
+}
+
+// NotifyUpdateApplied hands the requestor's NotifyUpdateApplied to the
+// manager.
+//
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:365-380 at b25ed960
+// (notifyUpdateApplied).
 func (p *OTAProvider) NotifyUpdateApplied(ctx context.Context, req provdef.NotifyUpdateAppliedRequest) error {
 	peer, _, err := remotePeer(ctx)
 	if err != nil {
 		return err
 	}
-	version := req.SoftwareVersion
-	p.updateInProgress(peer, req.UpdateToken, OTAUpdateDone, &version, false)
-	p.mu.Lock()
-	if v, ok := p.consents[peer]; ok && v <= version {
-		delete(p.consents, peer)
-	}
-	p.mu.Unlock()
+	p.mgr.UpdateApplied(peer, req.UpdateToken, req.SoftwareVersion)
+	p.observe(peer, OTAUpdateDone, req.SoftwareVersion)
 	return nil
 }
 
-// hasUpdateConsent is OP:504-509: a consent obtained for the update in
-// progress, or the one the image source stated for the version.
-func (p *OTAProvider) hasUpdateConsent(peer OTAPeer, version uint32) bool {
-	if d := p.detailsForPeer(peer, nil); d != nil && d.directConsentObtained {
-		return true
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	v, ok := p.consents[peer]
-	return ok && v == version
-}
-
-// detailsForPeer is #inProgressDetailsForPeer (OP:511-534): the entry of
-// the token, or the peer's first; a stale one is removed and not returned.
-// The result is a copy taken under p.mu, without the entry's cleanup: its
-// readers — the invoke path, the transfer sessions' listeners on the
-// responder's goroutines — decide on it while updateInProgress writes the
-// entry. matter.js reads the live object because its provider runs on one
-// thread; here the entry's fields are p.mu's, and a reader that held the
-// pointer past the lock raced ApplyUpdateRequest's write.
-func (p *OTAProvider) detailsForPeer(peer OTAPeer, token []byte) *otaInProgress {
-	_, snapshot := p.inProgressForPeer(peer, token)
-	return snapshot
-}
-
-// inProgressForPeer is detailsForPeer with the live entry beside the copy,
-// for the one caller that writes the entry it looked up (the transfer's
-// progress listener, OP:329-331, which matter.js gives the object itself).
-// The live entry's fields are read and written only under p.mu.
-func (p *OTAProvider) inProgressForPeer(peer OTAPeer, token []byte) (live, snapshot *otaInProgress) {
-	p.mu.Lock()
-	var cleanup func()
-	var out *otaInProgress
-	now := p.cfg.Clock.Now()
-	check := func(key string, d *otaInProgress) {
-		if d.timestamp.Add(otaProgressTimeout).Before(now) {
-			// OP:536-548.
-			p.logger.Info("ota.provider.stale_entry", slog.Uint64("node_id", peer.NodeID), slog.Duration("age", now.Sub(d.timestamp)))
-			cleanup = d.cleanup
-			delete(p.inProgress, key)
-			return
-		}
-		out = d
-	}
-	if token != nil {
-		key := otaKey(peer, token)
-		if d := p.inProgress[key]; d != nil {
-			check(key, d)
-		}
-	} else {
-		for _, key := range p.sortedKeysLocked() {
-			if d := p.inProgress[key]; d.peer == peer {
-				check(key, d)
-				break
-			}
-		}
-	}
-	if out != nil {
-		c := *out // versionToApply is replaced, never written through
-		c.cleanup = nil
-		snapshot = &c
-	}
-	p.mu.Unlock()
-	if cleanup != nil {
-		cleanup()
-	}
-	return out, snapshot
-}
-
-// sortedKeysLocked returns the entry keys in a stable order (a JavaScript
-// Map iterates in insertion order; one peer has one entry at a time).
-func (p *OTAProvider) sortedKeysLocked() []string {
-	keys := make([]string, 0, len(p.inProgress))
-	for k := range p.inProgress {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
-}
-
-// removeInProgress is #removeInProgressDetails (OP:550-561).
-func (p *OTAProvider) removeInProgress(peer OTAPeer) {
-	p.mu.Lock()
-	var cleanups []func()
-	for key, d := range p.inProgress {
-		if d.peer == peer {
-			if d.cleanup != nil {
-				cleanups = append(cleanups, d.cleanup)
-			}
-			delete(p.inProgress, key)
-		}
-	}
-	p.mu.Unlock()
-	for _, fn := range cleanups {
-		fn()
+// reportStatus reports a status of the attempt to the manager and, when
+// the manager recorded it, to [OTAProviderConfig].OnAttemptStatus.
+func (p *OTAProvider) reportStatus(a *OTAUpdateAttempt, status OTAUpdateStatus, unless ...OTAUpdateStatus) {
+	if p.mgr.ReportAttemptStatus(a, status, unless...) {
+		v, _ := a.Version()
+		p.observe(a.Peer(), status, v)
 	}
 }
 
-// updateInProgress is #updateInProgressDetails (OP:563-619). Every call
-// sets directConsentObtained to its argument, false by default (:572,
-// :598), as matter.js does.
-func (p *OTAProvider) updateInProgress(peer OTAPeer, token []byte, state OTAUpdateStatus, version *uint32, directConsent bool) {
-	p.mu.Lock()
-	u := p.updateInProgressLocked(peer, token, state, version, directConsent)
-	p.mu.Unlock()
-	p.announce(u)
-}
-
-// cancelUnlessSettled is the transfer session's closed listener
-// (OP:348-364): the update of the token, unless it already waits for its
-// apply, applies, is done or cancelled, is cancelled. The decision and the
-// write take one hold of p.mu — matter.js runs both in one turn of its
-// thread — so an ApplyUpdateRequest moving the update to Applying between
-// them is never overwritten with Cancelled. A stale entry is removed and
-// not cancelled, as #inProgressDetailsForPeer does (OP:511-548).
-func (p *OTAProvider) cancelUnlessSettled(peer OTAPeer, token []byte, version uint32) {
-	key := otaKey(peer, token)
-	now := p.cfg.Clock.Now()
-	p.mu.Lock()
-	d := p.inProgress[key]
-	if d == nil {
-		p.mu.Unlock()
-		return
-	}
-	if d.timestamp.Add(otaProgressTimeout).Before(now) {
-		p.logger.Info("ota.provider.stale_entry", slog.Uint64("node_id", peer.NodeID), slog.Duration("age", now.Sub(d.timestamp)))
-		cleanup := d.cleanup
-		delete(p.inProgress, key)
-		p.mu.Unlock()
-		if cleanup != nil {
-			cleanup()
-		}
-		return
-	}
-	switch d.lastState {
-	case OTAUpdateWaitForApply, OTAUpdateApplying, OTAUpdateDone, OTAUpdateCancelled:
-		p.mu.Unlock()
-	default:
-		u := p.updateInProgressLocked(peer, token, OTAUpdateCancelled, &version, false)
-		p.mu.Unlock()
-		p.announce(u)
+// observe tells [OTAProviderConfig].OnAttemptStatus of a status.
+func (p *OTAProvider) observe(peer OTAPeer, status OTAUpdateStatus, version uint32) {
+	if fn := p.cfg.OnAttemptStatus; fn != nil {
+		fn(peer, status, version)
 	}
 }
 
-// MatterDropFabric implements [contract.FabricScopedState]: a removed
-// fabric's in-progress entries leave (their cleanup run, outside p.mu),
-// its consents with them, and each of its peers loses the BDX scope its
-// query enabled — a transfer of it that still runs is closed — so a later
-// fabric that receives the index inherits none of it (review II,
-// R2-P6-bound-1206, owner decision 167). matter.js removes only stale
-// entries, on the peer's next lookup (OtaSoftwareUpdateProviderServer.ts:566-568
-// at db021da0), and nothing at a fabric's removal.
-func (p *OTAProvider) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
-	p.mu.Lock()
-	var cleanups []func()
-	var peers []OTAPeer
-	for key, d := range p.inProgress {
-		if d.peer.FabricIndex == fabricIndex {
-			if d.cleanup != nil {
-				cleanups = append(cleanups, d.cleanup)
-			}
-			peers = append(peers, d.peer)
-			delete(p.inProgress, key)
-		}
-	}
-	for peer := range p.consents {
-		if peer.FabricIndex == fabricIndex {
-			peers = append(peers, peer)
-			delete(p.consents, peer)
-		}
-	}
-	p.mu.Unlock()
-	for _, fn := range cleanups {
-		fn()
-	}
-	if p.cfg.BDX != nil {
-		slices.SortFunc(peers, func(a, b OTAPeer) int { return cmp.Compare(a.NodeID, b.NodeID) })
-		for _, peer := range slices.Compact(peers) {
-			if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, true); err != nil {
-				p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
-			}
-		}
+// MatterDropFabric implements [contract.FabricScopedState]: the manager,
+// when it holds fabric-scoped state ([NewOTAStandaloneManager] does),
+// forgets the removed fabric's update attempts and withdraws its
+// requestors' transfer scope, so a later fabric that receives the index
+// inherits none of it (review II, R2-P6-bound-1206, owner decision 167).
+// matter.js ends nothing at a fabric's removal.
+func (p *OTAProvider) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	if fs, ok := p.mgr.(contract.FabricScopedState); ok {
+		return fs.MatterDropFabric(ctx, fabricIndex)
 	}
 	return nil
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
-// of the in-progress entries and of the consents, ascending.
+// the manager holds update attempts of, when it reports them.
 func (p *OTAProvider) MatterHeldFabrics() []uint8 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	out := make([]uint8, 0, len(p.inProgress)+len(p.consents))
-	for _, d := range p.inProgress {
-		out = append(out, d.peer.FabricIndex)
+	if fs, ok := p.mgr.(contract.FabricScopedState); ok {
+		return fs.MatterHeldFabrics()
 	}
-	for peer := range p.consents {
-		out = append(out, peer.FabricIndex)
-	}
-	slices.Sort(out)
-	return slices.Compact(out)
-}
-
-// otaStatusUpdate is what updateInProgressLocked leaves to do once p.mu is
-// released: the log, the status hook and the terminal entry's cleanup.
-type otaStatusUpdate struct {
-	peer            OTAPeer
-	state, previous OTAUpdateStatus
-	applied         uint32
-	cleanup         func()
-	// evicted is the cleanup of the entry a new one displaced
-	// (otaInProgressPerFabric).
-	evicted func()
-}
-
-// evictForLocked makes room for a new entry of fabric when the fabric holds
-// its otaInProgressPerFabric share: the entry touched longest ago leaves,
-// and its cleanup is returned to run once p.mu is released. p.mu is held.
-func (p *OTAProvider) evictForLocked(fabric uint8) func() {
-	held, victim := 0, ""
-	for _, key := range p.sortedKeysLocked() {
-		d := p.inProgress[key]
-		if d.peer.FabricIndex != fabric {
-			continue
-		}
-		held++
-		if victim == "" || d.timestamp.Before(p.inProgress[victim].timestamp) {
-			victim = key
-		}
-	}
-	if held < otaInProgressPerFabric {
-		return nil
-	}
-	d := p.inProgress[victim]
-	delete(p.inProgress, victim)
-	p.logger.Info("ota.provider.entry_evicted", slog.Uint64("node_id", d.peer.NodeID), slog.Int("fabric_index", int(fabric)))
-	return d.cleanup
-}
-
-// otaInProgressPerFabric is the share of in-progress entries one fabric's
-// requestors hold. matter.js keeps an entry for a token it never issued
-// when the peer holds a consent for the version
-// (OtaSoftwareUpdateProviderServer.ts:417-420, :444, :474-481, created
-// :605-614, stored :635 at db021da0); without one the entry is created and
-// deleted in the same call (:452-458, :644-647). It drops a peer's stale
-// entries on that peer's next lookup (:556-557, :565-577) and none at a
-// fabric's removal. The number is the module's: room for that many
-// concurrent updates on one fabric (review II, R2-P6-bound-1206, decision
-// 134).
-const otaInProgressPerFabric = 16
-
-// updateInProgressLocked is updateInProgress's write; p.mu is held.
-func (p *OTAProvider) updateInProgressLocked(peer OTAPeer, token []byte, state OTAUpdateStatus, version *uint32, directConsent bool) otaStatusUpdate {
-	key := otaKey(peer, token)
-	d := p.inProgress[key]
-	u := otaStatusUpdate{peer: peer, state: state, previous: OTAUpdateUnknown}
-	if d == nil {
-		if state != OTAUpdateDone && state != OTAUpdateCancelled {
-			// A terminal state's entry goes at once and displaces none.
-			u.evicted = p.evictForLocked(peer.FabricIndex)
-		}
-		d = &otaInProgress{peer: peer}
-	} else {
-		u.previous = d.lastState
-	}
-	d.lastState = state
-	d.timestamp = p.cfg.Clock.Now()
-	if version != nil {
-		if d.versionToApply != nil && *d.versionToApply != *version {
-			p.logger.Warn("ota.provider.version_changed", slog.Uint64("from", uint64(*d.versionToApply)), slog.Uint64("to", uint64(*version)))
-		}
-		v := *version
-		d.versionToApply = &v
-	}
-	d.directConsentObtained = directConsent
-	p.inProgress[key] = d
-	if state == OTAUpdateDone || state == OTAUpdateCancelled {
-		// OP:614-618: a terminal state does not block future updates.
-		u.cleanup = d.cleanup
-		d.cleanup = nil
-		delete(p.inProgress, key)
-	}
-	if d.versionToApply != nil {
-		u.applied = *d.versionToApply
-	}
-	return u
-}
-
-// announce is an update's log, status hook and cleanup, after p.mu.
-func (p *OTAProvider) announce(u otaStatusUpdate) {
-	p.logger.Info("ota.provider.status", slog.Uint64("node_id", u.peer.NodeID), slog.String("state", u.state.String()), slog.String("previous", u.previous.String()))
-	if fn := p.cfg.OnStatusChange; fn != nil {
-		fn(u.peer, u.state, u.applied)
-	}
-	if u.cleanup != nil {
-		u.cleanup()
-	}
-	if u.evicted != nil {
-		u.evicted()
-	}
+	return nil
 }
 
 // MatterAcceptedCommands implements contract.ClusterCommandLister.

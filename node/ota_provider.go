@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -27,17 +28,46 @@ type OTAProviderConfig struct {
 	// Consent asks the user; nil declines an image that needs a consent
 	// the requestor cannot give.
 	Consent OTAConsent
-	// ApplyPolicy decides an allowed apply; nil proceeds at once.
+	// Manager owns the requestors' update attempts and decides the
+	// queries and applies the provider takes
+	// (mattercore.OTAProviderConfig.Manager); nil is the provider's
+	// default manager, which queues no update. [Node.OnOTAProviderStatus]
+	// learns the statuses with either; with a Manager, RebootQuery,
+	// TransferBlockSize and DelegateConsentToRequestor are refused at Start.
+	Manager OTAUpdateManager
+	// DelegateConsentToRequestor lets the default manager offer a
+	// requestor that says it can consent an image that needs a consent
+	// without asking Consent, with UserConsentNeeded
+	// (mattercore.OTAProviderConfig.DelegateConsentToRequestor); off, as
+	// matter.js's default, Consent is asked. With a Manager it is refused
+	// at Start: the manager decides the delegation.
+	DelegateConsentToRequestor bool
+	// ApplyDelay is how long a requestor allowed to apply an update waits
+	// before it applies, in whole seconds rounded up and at most a day
+	// (mattercore.OTAProviderConfig.ApplyDelay, matter.js
+	// State.applyDelay); zero applies at once.
+	ApplyDelay time.Duration
+	// ApplyPolicy decides an apply before the manager's apply table; nil
+	// leaves it to the table.
+	//
+	// Deprecated: the delay is ApplyDelay and the apply is the Manager's
+	// to decide; removable in v0.26.0.
 	ApplyPolicy OTAApplyPolicy
 	// BDXMaxBlockSize, when set, caps the block size of the image
 	// transfers.
 	BDXMaxBlockSize uint16
 	// RebootQuery learns a QueryImage taken for the requestor's restart
 	// (mattercore.OTAProviderConfig.RebootQuery); nil ignores it.
+	//
+	// Deprecated: the restart is the Manager's to judge; removable in
+	// v0.26.0.
 	RebootQuery func(peer OTAPeer, sessionID uint16)
 	// TransferBlockSize caps one peer's transfer block size in place of
 	// BDXMaxBlockSize (mattercore.OTAProviderConfig.TransferBlockSize);
 	// nil uses BDXMaxBlockSize.
+	//
+	// Deprecated: the Manager's BDXTransferOptionsFor names a peer's
+	// transfer options; removable in v0.26.0.
 	TransferBlockSize func(peer OTAPeer) uint16
 	// GrantFabric decides, per fabric of the node, whether the provider
 	// writes its ACL entry into that fabric's ACL: Operate for CASE, no
@@ -94,24 +124,36 @@ func (n *Node) buildOTAProvider() error {
 	if d := n.cfg.Limits.BDXAdditionalMrpDelay; d > 0 {
 		n.bdx.SetAdditionalMrpDelay(d)
 	}
-	p, err := mattercore.NewOTAProvider(mattercore.OTAProviderConfig{
-		ImageSource: cfg.ImageSource, Consent: cfg.Consent, ApplyPolicy: cfg.ApplyPolicy,
-		BDX: n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize,
-		OnStatusChange: func(peer OTAPeer, status OTAUpdateStatus, version uint32) {
-			n.otaStatusListeners.emit(n.logger, "ota_provider_status", otaProviderStatus{peer, status, version})
-		},
-		RebootQuery: cfg.RebootQuery, TransferBlockSize: cfg.TransferBlockSize,
-		// A transfer's session against a query's, by the peer's last
-		// activity on each (review II, F-db021da0-27).
-		SessionActivity: n.peerActivity,
-		// The URI names this node on the requestor's fabric (OP:381).
+	pcfg := mattercore.OTAProviderConfig{
+		ImageSource: cfg.ImageSource, Consent: cfg.Consent, Manager: cfg.Manager, ApplyDelay: cfg.ApplyDelay,
+		ApplyPolicy: cfg.ApplyPolicy, //nolint:staticcheck // the deprecated policy is honoured for its window
+		BDX:         n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize,
+		DelegateConsentToRequestor: cfg.DelegateConsentToRequestor,
+		// The host's deprecated hooks go to the provider as given: beside a
+		// Manager it refuses them rather than drop them.
+		RebootQuery:       cfg.RebootQuery,       //nolint:staticcheck // honoured for the deprecation window
+		TransferBlockSize: cfg.TransferBlockSize, //nolint:staticcheck // honoured for the deprecation window
+		// The URI names this node on the requestor's fabric
+		// (OtaSoftwareUpdateProviderServer.ts:300 at b25ed960).
 		NodeID: func(fabricIndex uint8) (uint64, bool) {
 			_, nodeID, ok := n.caseIDs.announceIdentity(fabricIndex)
 			return nodeID, ok
 		},
 		Logger: n.logger,
 		Clock:  n.cfg.Clock,
-	})
+		// The provider reports the statuses to the node's listeners,
+		// whichever manager runs.
+		OnAttemptStatus: func(peer OTAPeer, status OTAUpdateStatus, version uint32) {
+			n.otaStatusListeners.emit(n.logger, "ota_provider_status", otaProviderStatus{peer, status, version})
+		},
+	}
+	if cfg.Manager == nil {
+		// The default manager compares a transfer's session with a
+		// query's by the peer's last activity on each (review II,
+		// F-db021da0-27).
+		pcfg.SessionActivity = n.peerActivity //nolint:staticcheck // the default manager's admission input, until the node has its own port
+	}
+	p, err := mattercore.NewOTAProvider(pcfg)
 	if err != nil {
 		return fmt.Errorf("node: ota provider: %w", err)
 	}
@@ -130,7 +172,9 @@ type otaProviderStatus struct {
 
 // OnOTAProviderStatus registers fn for every update state a requestor of
 // the node's OTA provider ([Config].OTAProvider) reports: the peer, its
-// status and the version it concerns. fn runs inline on the provider's
+// status and the version it concerns — the statuses the provider reports
+// to its manager, whichever manager runs ([OTAProviderConfig].Manager or
+// the default; mattercore.OTAProviderConfig.OnAttemptStatus). fn runs inline on the provider's
 // goroutine and must not block — a download's WaitForApply is reported on
 // the receive path, when the requestor's final BlockAckEof arrives, so a
 // blocking fn stalls that session's datagrams; [Node.OnOTAProviderStatusAsync]
