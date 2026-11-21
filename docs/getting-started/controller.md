@@ -407,6 +407,28 @@ to the node and then deletes it. If the node refused the removal, or the
 removal was not confirmed, `Decommission` returns that error and keeps the
 node.
 
+`Registry.UpdateOperationalCertificate` replaces a commissioned node's
+operational certificate (NOC) with one for a new key pair, as matter.js's
+`ClientNode.updateOperationalCertificate`: under a fail-safe
+(`CertificateUpdateOptions.Failsafe`, 30 s to 0xFFFF s, one minute by
+default) the controller verifies the NOC the node reports, has it generate
+a CSR, issues the new NOC from the fabric's CA with the node's CASE
+Authenticated Tags, sends UpdateNOC and completes the fail-safe on a new
+CASE session. It is a fabric operation like `Commission` and
+`Decommission`: one at a time per node, the others answer
+`ErrFabricOperationInProgress`. A failure is a
+`*commissioner.CertificateUpdateError`: `Outcome` says whether the node
+kept its previous certificate, reverted to it, has the new one in place,
+or whether that is unknown (the node then reverts when its fail-safe
+expires, unless the fail-safe was completed), and `FabricIndexOnPeer` the
+fabric index the node reported; `errors.Is` matches
+`ErrCertificateUpdateBusy` (the node's fail-safe may be in use: retry
+later) and `ErrCertificateUpdateRefused`. `ctx` bounds the waits for a
+CASE session and the decision to recover; the commands themselves run to
+their response timeouts.
+
+*Source: `controller/client/fabricops.go` (`Registry.UpdateOperationalCertificate`), `controller/commissioner/noc_update.go` (`Commissioner.UpdateOperationalCertificate`, `CertificateUpdateError`).*
+
 A Wi-Fi or Thread device out of the box is found over BLE instead
 ([ADR 0024](../adr/0024-ble-commissioning-in-the-controller.md)):
 `ble.NewScanner(central).Find` matches its advertisement by the same
@@ -904,8 +926,8 @@ judges a node on current data only.
 `softwareupdate.UpdateEvent` with the peer, the target and, where it
 applies, an error. `UpdateAvailable`, `UpdateApplying`, `UpdateDone` and
 `UpdateFailed` are matter.js's `updateAvailable`, `updateApplying`,
-`updateDone` and `updateFailed`. `UpdateConsentChanged` (a consent added
-or removed), `UpdateCheckFinished` (a check's end, with the nodes it
+`updateDone` and `updateFailed`. `UpdateConsentChanged` (a consent added,
+removed or expired, or dropped with its node), `UpdateCheckFinished` (a check's end, with the nodes it
 found an update for), `UpdateQueued` (an update entered the queue) and
 `UpdateTransferStarted` (the node began downloading it, once per update,
 not again for a retry) are this module's own. One update reports queued,
@@ -914,6 +936,19 @@ transfer started, applying, then done or failed. A failed update carries
 goroutine of the manager's that holds none of its locks, so `fn` may call
 back into the manager. The returned function unsubscribes and is
 idempotent. The `OTAConfig.OnUpdate…` callbacks remain.
+
+The queue follows matter.js's phases: an update is queued, announcing, in
+progress or failed. An announcement the node does not answer is aborted
+after 15 minutes, and a failed one is retried by the queue run every five
+minutes. A failed update keeps its consent and its queue entry for 24
+hours and is not announced again; `QueuedUpdates` does not list it, and
+`UpdateFailed` is reported once per consent. After the 24 hours, or when
+the node is deleted, the update ends without an event. `AddUpdateConsent`
+and `ForceUpdate` answer `ErrNoNode` (an `ErrNotApplicable`) for an
+address no node has. With `AllowTestImages` off the update check reports
+and QueryImage offers stored production images only.
+
+*Source: `controller/softwareupdate/manager.go` (`updatePhase`, `unlock`, `runAnnouncement`), `controller/softwareupdate/images.go` (`applicable`).*
 
 ```go
 images := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
