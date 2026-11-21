@@ -63,7 +63,8 @@ under the attribute names, holds:
   `NumberOfScheduleTransitionPerDay`. A nil per-day count means no limit.
 - `Schedules`: the device's own week programs, held to the content rules
   a controller's write is held to. A null handle gets a generated one. A
-  null `BuiltIn` is false: set `BuiltIn: true` on a program a controller
+  null `BuiltIn` takes the stored schedule's value for that handle, else
+  false: set `BuiltIn: true` on a program a controller
   may not remove.
 - `ActiveScheduleHandle`: the schedule the device follows now.
 
