@@ -793,8 +793,8 @@ func wantZone(t *testing.T, rec *simEvents, event uint32, zone uint16, reason ui
 	t.Fatalf("event %+v, want zone %d with reason %d", e.data, zone, reason)
 }
 
-// TestCameraSimZoneTriggers: the zone manager's ids and its trigger
-// timing through the app pipe's ZoneTriggered.
+// TestCameraSimZoneTriggers: the zone IDs the port keeps and the zone
+// manager's trigger timing through the app pipe's ZoneTriggered.
 func TestCameraSimZoneTriggers(t *testing.T) {
 	t.Parallel()
 	c, fake, rec := simCamera(t, cameraOptions{})
@@ -802,17 +802,24 @@ func TestCameraSimZoneTriggers(t *testing.T) {
 	f := &fleet{camera: c}
 	ctx := context.Background()
 
-	// Mirrors chip examples/camera-app/linux/include/clusters/zone-mgmt/zone-manager.h:105-125 at 6170af84:
-	// a new zone takes the lowest free id from 1.
-	one, two := simZone(t, c, 0), simZone(t, c, 100)
-	if one != 1 || two != 2 {
-		t.Fatalf("the first zones = %d, %d; want 1, 2", one, two)
+	// The server assigns the zone IDs (camera.Zones, decision 290), from 0
+	// and without reusing a removed zone's (matter.js
+	// ZoneManagementServer.ts:243-250 at b25ed960); the port keeps them.
+	zero, one := simZone(t, c, 0), simZone(t, c, 100)
+	if zero != 0 || one != 1 {
+		t.Fatalf("the first zones = %d, %d; want 0, 1", zero, one)
 	}
-	if _, status := simInvoke(zones, zmdef.CmdRemoveZone, zmdef.RemoveZoneRequest{ZoneId: 1}); status != im.StatusSuccess {
+	if _, status := simInvoke(zones, zmdef.CmdRemoveZone, zmdef.RemoveZoneRequest{ZoneId: 0}); status != im.StatusSuccess {
 		t.Fatalf("RemoveZone: %v", status)
 	}
-	if again := simZone(t, c, 200); again != 1 {
-		t.Fatalf("the zone after removing 1 = %d, want 1 again", again)
+	if two := simZone(t, c, 200); two != 2 {
+		t.Fatalf("the zone after removing 0 = %d, want 2", two)
+	}
+	c.mu.Lock()
+	kept := slices.Clone(c.zones)
+	c.mu.Unlock()
+	if !slices.Equal(kept, []uint16{1, 2}) {
+		t.Fatalf("the port keeps zones %v, want [1 2]", kept)
 	}
 	// Mirrors chip examples/camera-app/linux/src/clusters/zone-mgmt/zone-manager.cpp:56-72 at 6170af84.
 	wantStatus(t, "UpdateTwoDCartesianZone of zone 9", camZonePort{c}.UpdateTwoDCartesianZone(ctx, 9, zmdef.TwoDCartesianZoneStruct{}), im.StatusNotFound)

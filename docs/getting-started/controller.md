@@ -385,8 +385,13 @@ ends the disarm too, or, when that context has already ended, by the
 same 10 s as after an abort: the device ends its PASE
 session with the fail-safe, and while that session exists it accepts no
 new PASE, so without the disarm the next `Pair` would be refused until
-the fail-safe ran out. matter.js disarms only after an ArmFailSafe of
-its own was answered and only for a commissioning or status error;
+the fail-safe ran out. Nothing is sent when the commissioning channel
+dropped or the device stopped responding; a re-arm already sent is
+awaited first, and the ArmFailSafeResponse is checked. matter.js ends the
+fail-safe the same way after every step failure, once it knows a
+fail-safe end, that is once an ArmFailSafe of its own was answered
+(`#expireFailsafe`, mirrored since pin lift b25ed960, P3-D); the disarm
+before that answer is this module's;
 connectedhomeip disarms after any failure before its network setup.
 A PASE session the commissioner does not keep is disarmed before it is
 closed as well: one established on a candidate after another candidate

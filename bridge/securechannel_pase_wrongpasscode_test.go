@@ -10,12 +10,12 @@ package bridge
 // PASE_COMMISSIONING_MAX_ERRORS (packages/protocol/src/session/pase/
 // PaseServer.ts:94-95,178-181). Previously the PaseAdapter swallowed
 // the confirmation error into its own StatusReport and returned a nil
-// Go error, so handlePase's recordPaseFailure path never ran — leaving
+// Go error, so handlePase's recordFailedAttempt path never ran — leaving
 // an open commissioning window open to unlimited passcode guessing.
 //
 // Lives in package bridge (not bridge_test) so it can reach the
 // unexported PaseAdapter internals, dispatchSecureChannel, and the
-// paseFailures counter directly. Reuses helpers from handlers_test.go
+// failedAttempts counter directly. Reuses helpers from handlers_test.go
 // (newVerifierFactory, buildTestPBKDFParamRequest, paseRoundTrip),
 // securechannel_bruteforce_test.go (openedWindow), securechannel_test.go
 // (scProto, scHdr), and receive_test.go (newStartedBridge, loopbackSrc).
@@ -110,10 +110,10 @@ func TestPaseAdapter_Pake3ConfirmationMismatch_SurfacesErrorForBruteForceCount(t
 // TestDispatchSecureChannel_WrongPasscodePake3_CountsAndRevokesWindowAtCap
 // drives paseMaxErrors full wrong-passcode PASE handshakes through the
 // production router (dispatchSecureChannel → handlePase → real
-// PaseAdapter) and asserts that every mismatch reaches recordPaseFailure
+// PaseAdapter) and asserts that every mismatch reaches recordFailedAttempt
 // and that the cap revokes the open commissioning window. This is the
 // end-to-end failing reproducer: with the pre-fix adapter swallowing the
-// confirmation error, paseFailures never increments and the window stays
+// confirmation error, failedAttempts never increments and the window stays
 // open to unlimited guessing.
 func TestDispatchSecureChannel_WrongPasscodePake3_CountsAndRevokesWindowAtCap(t *testing.T) {
 	t.Parallel()
@@ -154,8 +154,8 @@ func TestDispatchSecureChannel_WrongPasscodePake3_CountsAndRevokesWindowAtCap(t 
 	for range paseMaxErrors - 1 {
 		drive()
 	}
-	if got := b.paseFailures.Load(); got != int32(paseMaxErrors-1) {
-		t.Fatalf("paseFailures = %d after %d wrong-passcode attempts, want %d — each wrong-passcode Pake3 must reach recordPaseFailure", got, paseMaxErrors-1, paseMaxErrors-1)
+	if got := b.failedAttempts.Load(); got != int32(paseMaxErrors-1) {
+		t.Fatalf("failedAttempts = %d after %d wrong-passcode attempts, want %d — each wrong-passcode Pake3 must reach recordFailedAttempt", got, paseMaxErrors-1, paseMaxErrors-1)
 	}
 	if got := w.CurrentWindow().Status; got != wire.WindowStatusEnhanced {
 		t.Fatalf("window after %d wrong-passcode attempts = %v, want still Enhanced (open)", paseMaxErrors-1, got)

@@ -15,7 +15,7 @@ Thermostat's `SchedulePort` does.
 | Chime (`0x0556`) | `camera.Chime` | connectedhomeip `ChimeCluster.cpp` (ahead of matter.js) | `ChimePort` |
 | CameraAvSettingsUserLevelManagement (`0x0552`) | `camera.AvSettings` | connectedhomeip `CameraAvSettingsUserLevelManagementLogic.cpp` (ahead of matter.js) | `MechanicalPTZ`, `MechanicalPresets`, `DigitalPTZ` |
 | CameraAvStreamManagement (`0x0551`) | `camera.AvStream` | connectedhomeip `CameraAVStreamManagementCluster.cpp` (ahead of matter.js) | `VideoStreamPort`, `AudioStreamPort`, `SnapshotStreamPort`, `SnapshotCapturePort` |
-| ZoneManagement (`0x0550`) | `camera.Zones` | connectedhomeip `ZoneManagementCluster.cpp`, `zone-geometry.h` (ahead of matter.js) | `ZonePort` |
+| ZoneManagement (`0x0550`) | `camera.Zones` | matter.js `ZoneManagementServer.ts`, `TwoDCartesianGeometry.ts`; the limits and the Sensitivity write are the model's constraints, checked as connectedhomeip's `ZoneManagementCluster.cpp` does | `ZonePort` (optional `LastZoneIDSource`) |
 | WebRtcTransportProvider (`0x0553`) | `camera.Provider` | connectedhomeip `WebRTCTransportProviderCluster.cpp` (ahead of matter.js) | `ProviderPort` |
 | PushAvStreamTransport (`0x0555`) | `camera.PushTransport` | connectedhomeip `PushAVStreamTransportLogic.cpp` (ahead of matter.js) | `PushTransportPort`, `TLSEndpoints`, `TLSCertificates` |
 | TlsCertificateManagement (`0x0801`) | `tls.CertificateManagement` | connectedhomeip `TLSCertificateManagementCluster.cpp` (ahead of matter.js) | `CertificatePort`, `CertificateStore` |
@@ -316,21 +316,29 @@ motion detection runs on them and reports what it sees.
 MaxUserDefinedZones of at least 5 and at most MaxZones with USERDEFINED,
 SensitivityMax of 2 to 10, and TwoDCartesianMax, the largest vertex. The
 zones and triggers the host persisted arrive in `Zones` and `Triggers`.
+`LastZoneID` is the ID the server assigned last, as the host persisted it
+with the zones (nil: continue after the highest ID in use); a camera built
+through the device facade, which cannot set it, has its `ZonePort` answer
+it through the optional `camera.LastZoneIDSource`, read once when the
+server is built. Zones repeating an ID are refused.
 
 **A zone** has a name of at most 32 characters, a known use, 3 to 12
 vertices and an optional colour of 7 or 9 characters; otherwise
 `CONSTRAINT_ERROR`. A Focus zone needs FOCUSZONES (`CONSTRAINT_ERROR`).
-A new zone needs room among the user-defined zones
+A new zone needs room among the user-defined zones and among all zones
 (`RESOURCE_EXHAUSTED`). Each vertex lies within TwoDCartesianMax
 (`DYNAMIC_CONSTRAINT_ERROR`). A zone of the same use and vertices exists
 already (`ALREADY_EXISTS`). The polygon must be simple: no repeated
 vertex, no triangle of collinear vertices, no two crossing edges
 (`DYNAMIC_CONSTRAINT_ERROR`; `camera.ZoneSelfIntersecting`). Then the
-port stores it; `CreateTwoDCartesianZone` returns the id.
+server assigns the zone's ID — the one after the last it assigned,
+skipping IDs in use, 0 after 0xFFFE — and the port stores the zone under
+it; a refusal of the port adds no zone and keeps the last ID.
 
-An update needs a known zone (`NOT_FOUND`), not the manufacturer's
+An update needs a known zone (`NOT_FOUND`), a user-defined one
 (`CONSTRAINT_ERROR`), of the 2D Cartesian type
-(`DYNAMIC_CONSTRAINT_ERROR`). A removal needs a known user-defined zone
+(`DYNAMIC_CONSTRAINT_ERROR`), and a Focus zone needs FOCUSZONES
+(`CONSTRAINT_ERROR`). A removal needs a known user-defined zone
 without a trigger (`NOT_FOUND`, `CONSTRAINT_ERROR`, `INVALID_IN_STATE`).
 
 **A trigger** has an InitialDuration of at least 1, an

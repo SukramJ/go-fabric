@@ -157,7 +157,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1892,
+    "line": 1908,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -167,7 +167,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1899,
+    "line": 1915,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -176,7 +176,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1931,
+    "line": 1947,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -186,7 +186,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2820,
+    "line": 2837,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
@@ -206,7 +206,7 @@
   },
   {
     "file": "bridge/commissioning_window.go",
-    "line": 1125,
+    "line": 1142,
     "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:524",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "randomBytes",
@@ -860,7 +860,7 @@
   },
   {
     "file": "client/interaction/invoke_batcher_parity_matterjs_test.go",
-    "line": 384,
+    "line": 387,
     "citation": "ClientInteraction.ts:186",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "isBatchable",
@@ -923,7 +923,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 163,
+    "line": 178,
     "citation": "ExchangeManager.ts:533-545",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "localAdditionalMrpDelay",
@@ -932,7 +932,7 @@
   },
   {
     "file": "client/interaction/provider.go",
-    "line": 283,
+    "line": 298,
     "citation": "ClientInteraction.ts:1112",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "verifyReachability",
@@ -1043,7 +1043,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 318,
+    "line": 324,
     "citation": "InteractionMessenger.ts:1129",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ackWaitAbort",
@@ -1052,7 +1052,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 355,
+    "line": 361,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
@@ -1731,16 +1731,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 350,
-    "citation": "ThermostatServer.ts:1300-1320",
-    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
-    "identifier": "#handlePersistedPresetsChanging",
-    "nearest": 1753,
-    "occurrences": 2
-  },
-  {
-    "file": "cluster/thermo/presets.go",
-    "line": 375,
+    "line": 385,
     "citation": "ThermostatServer.ts:1508-1510",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#handlePersistedPresetsChanged",
@@ -1749,7 +1740,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 382,
+    "line": 392,
     "citation": "ThermostatServer.ts:1289-1291",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "AtomicChanging",
@@ -1758,7 +1749,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 393,
+    "line": 403,
     "citation": "ThermostatServer.ts:1687-1690",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "hasLocalActor",
@@ -1767,7 +1758,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 554,
+    "line": 564,
     "citation": "ThermostatServer.ts:281-316",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "setActivePresetRequest",
@@ -1848,7 +1839,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 171,
+    "line": 172,
     "citation": "ThermostatServer.ts:927-931",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#userLimit",
@@ -1857,7 +1848,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 186,
+    "line": 187,
     "citation": "ThermostatServer.ts:560-570",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "externallyMeasuredOccupancy",
@@ -1866,7 +1857,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 268,
+    "line": 273,
     "citation": "packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-603",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "db021da0",
@@ -1876,7 +1867,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 319,
+    "line": 324,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "SetpointRaiseLower",
@@ -1885,7 +1876,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1224,
+    "line": 1228,
     "citation": "ThermostatServer.ts:1104",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "b25ed960",
@@ -1895,7 +1886,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1508,
+    "line": 1512,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1904,7 +1895,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1650,
+    "line": 1654,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "db021da0",
@@ -1914,7 +1905,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1826,
+    "line": 1830,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -2548,7 +2539,7 @@
   },
   {
     "file": "controller/commissioner/commissioner.go",
-    "line": 206,
+    "line": 208,
     "citation": "ControllerCommissioner.ts:740-746",
     "resolved": "packages/protocol/src/peer/ControllerCommissioner.ts",
     "identifier": "CommissionResult",
@@ -2557,7 +2548,7 @@
   },
   {
     "file": "controller/commissioner/commissioner.go",
-    "line": 435,
+    "line": 442,
     "citation": "NodeSession.ts:349-352",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",

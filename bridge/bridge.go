@@ -702,12 +702,28 @@ type Bridge struct {
 	// Wired via [AttachCommissioningWindow].
 	commissioningWindow *CommissioningWindow
 
-	// paseFailures counts consecutive real PASE pairing errors so the
-	// bridge can abort the commissioning window after too many, mirroring
-	// matter.js PaseServer's PASE_COMMISSIONING_MAX_ERRORS brute-force cap.
-	// Reset when a new PASE acceptor is installed (a window boundary) and
-	// when the cap fires. See [Bridge.recordPaseFailure].
-	paseFailures atomic.Int32
+	// failedAttempts counts the failed commissioning attempts — PASE
+	// pairings that failed, fail-safes that ended without commissioning in
+	// the window they were armed in — so the bridge closes the window at
+	// [paseMaxErrors], as matter.js counts a window's failedAttempts
+	// (packages/protocol/src/protocol/DeviceCommissioner.ts:181-199 at
+	// b25ed960). Reset when a window opens (failedAttemptsWindow), when a
+	// new PASE acceptor is installed and when the cap fires. See
+	// [Bridge.recordFailedAttempt].
+	failedAttempts atomic.Int32
+	// failedAttemptsMu guards failedAttemptsWindow: the generation of the
+	// window the count belongs to ([CommissioningWindow.windowGeneration]).
+	failedAttemptsMu     sync.Mutex
+	failedAttemptsWindow uint64
+	// attemptWindow is commissioningWindow for the attempt count, read
+	// without b.mu: the fail-safe's start is recorded under the
+	// GeneralCommissioning server's lock (core.GeneralCommissioning.SetFailSafeAttemptTracker).
+	attemptWindow atomic.Pointer[CommissioningWindow]
+	// failSafeWindow is the generation of the window open when the fail-safe
+	// in force started, 0 when none was open (or the server closed); its end
+	// counts as a failed attempt iff that window is still open
+	// ([Bridge.failSafeSessionsClosed]).
+	failSafeWindow atomic.Uint64
 
 	// paseLockoutUntil / paseLockoutStreak implement the timed half of
 	// the brute-force cap: reaching [paseMaxErrors] refuses PASE until
@@ -718,13 +734,13 @@ type Bridge struct {
 	// with no window open, so a permanent latch would let any LAN host
 	// disable pairing for the daemon's lifetime. Guarded by b.mu; a zero
 	// paseLockoutUntil means "never locked out". See
-	// [Bridge.recordPaseFailure] and [Bridge.paseLockedOut].
+	// [Bridge.recordFailedAttempt] and [Bridge.paseLockedOut].
 	paseLockoutUntil  time.Time
 	paseLockoutStreak int
 
 	// preserveLockoutOnReset makes [Bridge.resetPaseFailures] keep an
 	// in-force lockout instead of clearing it. It is raised only while
-	// [Bridge.recordPaseFailure] drives the cap's own RevokeWindow — that
+	// [Bridge.recordFailedAttempt] drives the cap's own RevokeWindow — that
 	// revoke runs the window's restore closure synchronously, which
 	// re-attaches the configured PASE acceptor and would otherwise clear
 	// the lockout microseconds after it was engaged (the guessing then
@@ -2176,6 +2192,7 @@ func (b *Bridge) AttachCommissioningWindow(w *CommissioningWindow) {
 	b.mu.Lock()
 	previous := b.commissioningWindow
 	b.commissioningWindow = w
+	b.attemptWindow.Store(w)
 	roots := b.rootClusters
 	b.mu.Unlock()
 	if previous != nil && previous != w {

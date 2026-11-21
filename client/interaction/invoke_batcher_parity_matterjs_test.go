@@ -328,6 +328,9 @@ func TestInvokeBatcherParity(t *testing.T) {
 			{"batchDuration false", interaction.InvokeOptions{NoBatch: true, ExpectedProcessingTime: 90 * time.Second}},
 			{"interactionModelRevision", interaction.InvokeOptions{InteractionModelRevision: im.MatterInteractionModelRevision - 1}},
 			{"delayReportData", interaction.InvokeOptions{DelayReportData: &im.DelayReportData{}}},
+			// ClientInvokeTest.ts:558 at b25ed960 (#4928); the rig's provider is
+			// bound to its session, which the option does not change.
+			{"requireExistingSession", interaction.InvokeOptions{ClientRequest: interaction.ClientRequest{RequireExistingSession: true}}},
 			// Go only: ResponseArrived has no matter.js counterpart (issue 464).
 			{"responseArrived", interaction.InvokeOptions{ResponseArrived: func(interaction.Result) {}}},
 		}

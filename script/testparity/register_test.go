@@ -68,7 +68,13 @@ import (
 // ClientSubscriptionHandlerTest.ts and PeerSubscriptionTest.ts (P2b-E), and
 // decides ServerSubscriptionSessionTest.ts in part (P2b-B, the CASE-server
 // interception cases missing): 14.
-const testparityPlannedRatchet = 14
+// Pin lift b25ed960 wave P3 decides its eight planned files: ported
+// ZoneManagementServerTest.ts (P3-B), SchedulesAtomicWriteTest.ts (P3-A),
+// CommissioningAttemptLimitTest.ts (P3-C), ClientRequireExistingSessionTest.ts,
+// CommissioningFailsafeExpiryTest.ts and PaseBleChannelCloseTest.ts (P3-D);
+// SchedulesConfigurationTest.ts and SchedulesLocalWriteTest.ts in part, their
+// restarts on stored schedules missing (P3-A, coordinator decision C-7): 6.
+const testparityPlannedRatchet = 6
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -206,8 +212,17 @@ const testparityPlannedRatchet = 14
 // localization values leave missing, five of them to left (below);
 // ServerSubscriptionSessionTest.ts, decided in part, adds its 13
 // CASE-server interception cases: 168 ported, 1052 missing.
+// Pin lift b25ed960 wave P3 (units P3-A … P3-D) ports three missing cases and
+// adds three: seven files become ported (the six planned files of the
+// previous ratchet's comment that it ports whole, and ClientInvokeTest.ts,
+// whose requireExistingSession bypass P3-D ports);
+// AtomicWriteHandlerTest.ts's Schedules write of another peer (P3-A) and
+// AdministratorCommissioningServerTest.ts's twentieth attempt through a
+// revoke (P3-C) leave missing; SchedulesConfigurationTest.ts's two and
+// SchedulesLocalWriteTest.ts's one restart on stored schedules join it
+// (coordinator decision C-7): 175 ported, 1052 missing.
 const (
-	testparityPortedRatchet  = 168
+	testparityPortedRatchet  = 175
 	testparityMissingRatchet = 1052
 )
 
@@ -292,7 +307,16 @@ const (
 // (js-runtime-only) and TimeFormatLocalizationServerTest.ts's stored and
 // detected calendar fallback (by design, decision 360: no node calendar
 // list): 751.
-const testparityLeftRatchet = 751
+// Pin lift b25ed960 wave P3 leaves 14 cases, each with class and reason:
+// SchedulesAtomicWriteTest.ts's observer case and five
+// SchedulesLocalWriteTest.ts and three SchedulesConfigurationTest.ts
+// state-layer cases (js-runtime-only), SchedulesConfigurationTest.ts's start
+// without the forward feature (by design, the extension gate) and
+// SchedulesLocalWriteTest.ts's three lifecycle rules the host's replace is
+// not held to (by design, BD-Thermostat-HostSchedules, owner decision O-8),
+// and CommissioningFailsafeExpiryTest.ts's expiry before the flow armed (by
+// design, BD-chip-Commissioner-AbortDisarmsFailSafe): 765.
+const testparityLeftRatchet = 765
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

@@ -3,49 +3,51 @@
 
 package camera
 
-// The zone polygon rules of connectedhomeip's ZoneGeometry
-// (src/app/clusters/zone-management-server/zone-geometry.h at 6170af84):
-// a zone is a simple polygon, so a repeated vertex, three collinear
-// vertices of a triangle, or two intersecting non-adjacent edges make it
-// self-intersecting. The rules are ported, not the file.
+// The zone polygon rules of matter.js's TwoDCartesianGeometry
+// (packages/node/src/behaviors/zone-management/TwoDCartesianGeometry.ts
+// at b25ed960): a zone is a simple polygon, so a repeated vertex, three
+// collinear vertices of a triangle, or two non-adjacent edges that share
+// a point make it self-intersecting. connectedhomeip's ZoneGeometry
+// (zone-geometry.h at 6170af84) states the same rules.
 
-// orientation is the side of ray pq that r lies on: 0 collinear, 1 left
-// (counter-clockwise), 2 right, from the cross product of pq and pr
-// (zone-geometry.h:237-249).
+// orientation is the sign of the cross product of pq and pr: 1 or -1 for
+// the two sides of the line through p and q, 0 when r is on that line.
+// Mirrors matter.js TwoDCartesianGeometry.ts:63-69 at b25ed960.
 func orientation(p, q, r Vertex) int {
 	v := (int64(q.X)-int64(p.X))*(int64(r.Y)-int64(p.Y)) - (int64(q.Y)-int64(p.Y))*(int64(r.X)-int64(p.X))
 	switch {
-	case v == 0:
-		return 0
 	case v > 0:
 		return 1
+	case v < 0:
+		return -1
 	}
-	return 2
+	return 0
 }
 
-// onSegment reports whether q lies within the bounding box of p and r,
-// for collinear p, q, r (zone-geometry.h:216-220).
+// onSegment reports whether r, collinear with pq, lies within the
+// bounding box of pq and therefore on the segment. Mirrors matter.js
+// TwoDCartesianGeometry.ts:71-78 at b25ed960.
 func onSegment(p, q, r Vertex) bool {
-	return q.X <= max(p.X, r.X) && q.X >= min(p.X, r.X) && q.Y <= max(p.Y, r.Y) && q.Y >= min(p.Y, r.Y)
+	return r.X >= min(p.X, q.X) && r.X <= max(p.X, q.X) && r.Y >= min(p.Y, q.Y) && r.Y <= max(p.Y, q.Y)
 }
 
-// segmentsIntersect reports whether p1q1 and p2q2 share a point
-// (zone-geometry.h:252-290).
+// segmentsIntersect reports whether p1q1 and p2q2 share a point. Mirrors
+// matter.js TwoDCartesianGeometry.ts:80-96 at b25ed960.
 func segmentsIntersect(p1, q1, p2, q2 Vertex) bool {
 	o1, o2 := orientation(p1, q1, p2), orientation(p1, q1, q2)
 	o3, o4 := orientation(p2, q2, p1), orientation(p2, q2, q1)
-	if o1 != 0 && o2 != 0 && o3 != 0 && o4 != 0 && o1 != o2 && o3 != o4 {
+	if o1 != o2 && o3 != o4 {
 		return true
 	}
-	return o1 == 0 && onSegment(p1, p2, q1) || o2 == 0 && onSegment(p1, q2, q1) ||
-		o3 == 0 && onSegment(p2, p1, q2) || o4 == 0 && onSegment(p2, q1, q2)
+	return o1 == 0 && onSegment(p1, q1, p2) || o2 == 0 && onSegment(p1, q1, q2) ||
+		o3 == 0 && onSegment(p2, q2, p1) || o4 == 0 && onSegment(p2, q2, q1)
 }
 
 // ZoneSelfIntersecting reports whether the closed polygon of vertices is
-// not simple: a repeated vertex, a triangle of collinear vertices, or two
-// intersecting non-adjacent edges. Mirrors chip
-// ZoneGeometry::IsZoneSelfIntersecting (zone-geometry.h:158-209) and
-// ZoneHasDuplicates (:304-317).
+// not simple: a repeated vertex, a triangle of collinear vertices, or,
+// with more vertices, two non-adjacent edges that share a point — every
+// self-intersection includes such a pair. Mirrors matter.js
+// TwoDCartesianGeometry.ts:24-60 at b25ed960 (isSelfIntersecting).
 func ZoneSelfIntersecting(vertices []Vertex) bool {
 	seen := make(map[Vertex]bool, len(vertices))
 	for _, v := range vertices {
@@ -58,13 +60,14 @@ func ZoneSelfIntersecting(vertices []Vertex) bool {
 	if n == 3 {
 		return orientation(vertices[0], vertices[1], vertices[2]) == 0
 	}
-	for i := range n {
-		p1, q1 := vertices[i], vertices[(i+1)%n]
-		for j := i + 2; j < n; j++ {
-			if (j+1)%n == i { // the edge adjacent to edge i
-				continue
-			}
-			if segmentsIntersect(p1, q1, vertices[j], vertices[(j+1)%n]) {
+	for first := 0; first+1 < n; first++ {
+		// The edge that closes the loop is adjacent to the first edge.
+		end := n
+		if first == 0 {
+			end = n - 1
+		}
+		for second := first + 2; second < end; second++ {
+			if segmentsIntersect(vertices[first], vertices[first+1], vertices[second], vertices[(second+1)%n]) {
 				return true
 			}
 		}

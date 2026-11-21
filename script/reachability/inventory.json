@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10177,
+  "entry_points": 10203,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27873,
-    "reachable": 20885,
-    "whitelisted": 6966,
+    "total_exported": 27888,
+    "reachable": 20887,
+    "whitelisted": 6979,
     "unreachable": 22
   },
   "by_package": [
@@ -387,7 +387,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3278,
+      "line": 3295,
       "kind": "method"
     },
     {
@@ -951,6 +951,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_removed_sessions_test.go",
       "line": 81
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAdministratorCommissioningAttemptLimitParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
+      "line": 386
     },
     {
       "package": "bridge",
@@ -2463,6 +2470,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/invoke_dataversion_once_test.go",
       "line": 160
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCommissioningAttemptLimitPASEFailureParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
+      "line": 359
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCommissioningAttemptLimitParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
+      "line": 123
     },
     {
       "package": "bridge",
@@ -27739,14 +27760,14 @@
       "identifier": "Schedule",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 33
+      "line": 34
     },
     {
       "package": "cluster/thermo",
       "identifier": "SchedulePort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 55
+      "line": 56
     },
     {
       "package": "cluster/thermo",
@@ -27760,21 +27781,21 @@
       "identifier": "ScheduleTransition",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 37
+      "line": 38
     },
     {
       "package": "cluster/thermo",
       "identifier": "ScheduleType",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/schedules.go",
-      "line": 40
+      "line": 41
     },
     {
       "package": "cluster/thermo",
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 340
+      "line": 345
     },
     {
       "package": "cluster/thermo",
@@ -27820,10 +27841,24 @@
     },
     {
       "package": "cluster/thermo",
+      "identifier": "TestCheckScheduleSizes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/schedules_internal_test.go",
+      "line": 23
+    },
+    {
+      "package": "cluster/thermo",
       "identifier": "TestCompanionsMovedNamesTheWrittenSetpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/thermo/setpoints_internal_test.go",
       "line": 21
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestDanglingActiveHandleDoesNotBlockCommits",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/schedules_commit_internal_test.go",
+      "line": 71
     },
     {
       "package": "cluster/thermo",
@@ -27844,21 +27879,21 @@
       "identifier": "TestParityMatterJS_AtomicWriteHandlerCommitTest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/thermo/atomic_commit_parity_matterjs_test.go",
-      "line": 134
+      "line": 153
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestScheduleCommitCheckRunsAfterStaging",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/schedules_commit_internal_test.go",
+      "line": 34
     },
     {
       "package": "cluster/thermo",
       "identifier": "TestScheduleHelpersInternal",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "cluster/thermo/schedules_rules_internal_test.go",
-      "line": 152
-    },
-    {
-      "package": "cluster/thermo",
-      "identifier": "TestScheduleRulesAppendPending",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "cluster/thermo/schedules_rules_internal_test.go",
-      "line": 58
+      "file": "cluster/thermo/schedules_internal_test.go",
+      "line": 49
     },
     {
       "package": "cluster/thermo",
@@ -31544,6 +31579,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestCommissioningFailsafeExpiry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 84
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestConfigureRegulatoryInformation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
@@ -31761,6 +31803,27 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestFailsafeExpiryAwaitsTheRearmInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 298
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFailsafeExpiryChecksTheResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 267
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFailsafeExpirySkipCancelsTheRearmInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/commissioning_failsafe_expiry_parity_matterjs_test.go",
+      "line": 357
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestFinalizeCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
@@ -31771,7 +31834,7 @@
       "identifier": "TestFlowCumulativeTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 189
+      "line": 190
     },
     {
       "package": "controller/commissioner",
@@ -31820,7 +31883,7 @@
       "identifier": "TestFlowRearmsBelowHalf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 158
+      "line": 159
     },
     {
       "package": "controller/commissioner",
@@ -32010,6 +32073,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/jcm_chip_test.go",
       "line": 234
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestPaseBleChannelClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/pase_ble_channel_close_parity_matterjs_test.go",
+      "line": 175
     },
     {
       "package": "controller/commissioner",
@@ -34812,6 +34882,13 @@
       "line": 83
     },
     {
+      "package": "device",
+      "identifier": "TestZonesThroughTheFacadeContinueAfterThePortsLastID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/defaults_camera_test.go",
+      "line": 74
+    },
+    {
       "package": "diag",
       "identifier": "Event",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -36734,7 +36811,7 @@
       "identifier": "TestCameraSimAppPipeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 933
+      "line": 940
     },
     {
       "package": "examples/reference-bridge",
@@ -36748,7 +36825,7 @@
       "identifier": "TestCameraSimChime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 906
+      "line": 913
     },
     {
       "package": "examples/reference-bridge",
@@ -36776,7 +36853,7 @@
       "identifier": "TestCameraSimPushEventsKeepTheirOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 998
+      "line": 1005
     },
     {
       "package": "examples/reference-bridge",
@@ -36797,7 +36874,7 @@
       "identifier": "TestCameraSimStaleRecordingEndLeavesTheNewRecording",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
-      "line": 968
+      "line": 975
     },
     {
       "package": "examples/reference-bridge",
@@ -36972,7 +37049,7 @@
       "identifier": "TestElectricalAccuracyCoversServedTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_reporting_test.go",
-      "line": 109
+      "line": 365
     },
     {
       "package": "examples/reference-bridge",
@@ -36993,7 +37070,7 @@
       "identifier": "TestEnergyReportingFakeReadings",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_reporting_test.go",
-      "line": 23
+      "line": 76
     },
     {
       "package": "examples/reference-bridge",
@@ -37022,6 +37099,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_evse_test.go",
       "line": 95
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestFakeElectricalReadingsHandler",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_energy_reporting_test.go",
+      "line": 249
     },
     {
       "package": "examples/reference-bridge",
@@ -42530,7 +42614,7 @@
       "identifier": "TestAdmitSessionClosesASessionWhoseFabricWentWhileItOpened",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_removed_internal_test.go",
-      "line": 190
+      "line": 200
     },
     {
       "package": "node",
@@ -42614,7 +42698,7 @@
       "identifier": "TestCASEHandshakeWithinOneIdentityIsAdmitted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
-      "line": 111
+      "line": 121
     },
     {
       "package": "node",
@@ -42628,14 +42712,14 @@
       "identifier": "TestCASEInitiatorRefusesASessionAcrossAnUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
-      "line": 81
+      "line": 86
     },
     {
       "package": "node",
       "identifier": "TestCASEInitiatorRefusesASessionOfARemovedFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_removed_internal_test.go",
-      "line": 157
+      "line": 162
     },
     {
       "package": "node",
@@ -42649,7 +42733,7 @@
       "identifier": "TestCASEResponderKeepsTheResolutionOfItsAcceptedSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
-      "line": 180
+      "line": 195
     },
     {
       "package": "node",
@@ -42670,7 +42754,7 @@
       "identifier": "TestCASEResponderRefusesASessionWhoseUpdateFollowsItsStake",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
-      "line": 134
+      "line": 144
     },
     {
       "package": "node",
@@ -42734,6 +42818,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/peer_client_internal_test.go",
       "line": 135
+    },
+    {
+      "package": "node",
+      "identifier": "TestCommissioningAttemptCapThroughFabricRemoved",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/commissioning_attempt_fabric_removed_internal_test.go",
+      "line": 21
     },
     {
       "package": "node",

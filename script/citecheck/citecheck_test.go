@@ -145,7 +145,9 @@ import (
 // LocalizationConfigurationServer of its test file; none is a moved line.
 // 435 after P2b-F's follow-up: two rows naming writeValue
 // (AttributeWriteResponse.ts:419) around its catch block :463-470, read.
-const citecheckDriftRatchet = 435
+// 434 after wave P3: one row fewer after P3-A's citation corrections in
+// cluster/thermo (measured by make cite-report).
+const citecheckDriftRatchet = 434
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -194,8 +196,10 @@ const citecheckDriftRatchet = 435
 // files it rewrote (2728 at db021da0 remain). Wave P2b relabelled 10
 // more at b25ed960 in the files its units touched (E, A, B); P2b-L2 one
 // more (client/exchange/manager.go). The P2b register commit relabelled
-// one more (controller/commissioner/fabric.go's MaxLabelLength).
-const citecheckOffPinRatchet = 2795
+// one more (controller/commissioner/fabric.go's MaxLabelLength). Wave P3
+// relabelled 15 more at b25ed960 in the files its units touched (A 10, C 2,
+// D 3).
+const citecheckOffPinRatchet = 2780
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

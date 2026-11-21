@@ -45,7 +45,7 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 			if f&thermo.ThermostatFeatureHEAT == 0 {
 				mode = tdef.SystemModeCool
 			}
-			cfg.ScheduleTypes = []thermo.ScheduleType{{SystemMode: mode, NumberOfSchedules: 1}}
+			cfg.ScheduleTypes = []thermo.ScheduleType{{SystemMode: mode, NumberOfSchedules: 1, ScheduleTypeFeatures: tdef.ScheduleTypeFeaturesSupportsSetpoints}}
 			cfg.NumberOfSchedules, cfg.NumberOfScheduleTransitions = 1, 1
 			srv, err := thermo.New(cfg)
 			if err != nil {
@@ -61,10 +61,10 @@ func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 // matter.js refuses — and of the suggestions without Presets ("[PRES]",
 // connectedhomeip's ThermostatCluster.h:80 static_assert at 6170af84) —
 // New with ErrFeatures, NewThermostatServer with a panic.
-// MatterScheduleConfiguration ("not yet implemented" in matter.js), the
-// events (which matter.js does not emit) and the suggestions (which it
-// does not implement) are served ahead of it (schedules.go, events.go,
-// suggestions.go).
+// MatterScheduleConfiguration (behind matter.js's forward feature
+// thermostat-msch, ThermostatServer.ts:267-271 at b25ed960), the events
+// (which matter.js does not emit) and the suggestions (which it does not
+// implement) are served (schedules.go, events.go, suggestions.go).
 func TestFeaturesTheServerDoesNotServeAreRefused(t *testing.T) {
 	t.Parallel()
 	for _, f := range []tdef.Feature{tdef.FeatureSetback, tdef.FeatureThermostatSuggestions} {

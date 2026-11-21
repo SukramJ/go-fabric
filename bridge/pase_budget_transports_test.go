@@ -104,7 +104,7 @@ func TestPASEFailuresShareOneBudgetAcrossTransports(t *testing.T) {
 	}
 	// The StatusReport goes out before the failure is counted
 	// (handlePase), so the count is awaited.
-	waitFor(t, "failure 1 counted after UDP", func() bool { return b.paseFailures.Load() == 1 })
+	waitFor(t, "failure 1 counted after UDP", func() bool { return b.failedAttempts.Load() == 1 })
 
 	tcpConn, tcpReplies := h.dial()
 	if err := tcpConn.Send(pbkdfParamRequest(0xA002, 0x102)); err != nil {
@@ -113,7 +113,7 @@ func TestPASEFailuresShareOneBudgetAcrossTransports(t *testing.T) {
 	if proto := unsecuredOpcode(t, waitReply(t, tcpReplies)); proto.Opcode != mrp.SCOpcodeStatusReport || proto.ExchangeID != 0x102 {
 		t.Fatalf("TCP reply opcode 0x%02X on exchange 0x%X, want the StatusReport of 0x102", proto.Opcode, proto.ExchangeID)
 	}
-	waitFor(t, "failure 2 counted after TCP", func() bool { return b.paseFailures.Load() == 2 })
+	waitFor(t, "failure 2 counted after TCP", func() bool { return b.failedAttempts.Load() == 2 })
 
 	central := dialRadio(t, p)
 	if err := central.s.Send(pbkdfParamRequest(0xA003, 0x103)); err != nil {
@@ -122,12 +122,12 @@ func TestPASEFailuresShareOneBudgetAcrossTransports(t *testing.T) {
 	if proto := unsecuredOpcode(t, waitReply(t, central.replies)); proto.Opcode != mrp.SCOpcodeStatusReport || proto.ExchangeID != 0x103 {
 		t.Fatalf("BLE reply opcode 0x%02X on exchange 0x%X, want the StatusReport of 0x103", proto.Opcode, proto.ExchangeID)
 	}
-	waitFor(t, "failure 3 counted after BLE", func() bool { return b.paseFailures.Load() == 3 })
+	waitFor(t, "failure 3 counted after BLE", func() bool { return b.failedAttempts.Load() == 3 })
 
 	// The last failure of the budget arrives over UDP and engages the
 	// lockout, which starts the counter over (engagePaseLockout).
-	for b.paseFailures.Load() < paseMaxErrors-1 {
-		b.recordPaseFailure()
+	for b.failedAttempts.Load() < paseMaxErrors-1 {
+		b.recordFailedAttempt(attemptPASEPairing)
 	}
 	if _, err := udp.Write(pbkdfParamRequest(0xA001, 0x104)); err != nil {
 		t.Fatal(err)
@@ -167,7 +167,7 @@ func TestPASEFailuresShareOneBudgetAcrossTransports(t *testing.T) {
 		if got := calls.Load(); got != before {
 			t.Fatalf("%s: the PASE handler ran %d times under the lockout", leg.name, got-before)
 		}
-		if got := b.paseFailures.Load(); got != 0 {
+		if got := b.failedAttempts.Load(); got != 0 {
 			t.Fatalf("%s: failures = %d under the lockout, want 0", leg.name, got)
 		}
 	}

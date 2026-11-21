@@ -84,7 +84,7 @@ func TestPaseClaimRunsFromItsFirstRequest(t *testing.T) {
 	if r.b.paseHandshakeOfAnother(other) {
 		t.Fatal("the claim still holds the slot past pasePairingTimeout from its first request")
 	}
-	if got := r.b.paseFailures.Load(); got != 0 {
+	if got := r.b.failedAttempts.Load(); got != 0 {
 		t.Fatalf("PASE failures before the slot was taken over: %d", got)
 	}
 	commissioner := newPipelinePeer(t, r.b, other.InitiatorNodeID)
@@ -92,7 +92,7 @@ func TestPaseClaimRunsFromItsFirstRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	commissioner.recv(mrp.SCOpcodePBKDFParamResponse, "another commissioner after the claim ran out")
-	if got := r.b.paseFailures.Load(); got != 1 {
+	if got := r.b.failedAttempts.Load(); got != 1 {
 		t.Fatalf("PASE failures after the abandoned claim was taken over: %d, want 1", got)
 	}
 }
@@ -130,7 +130,7 @@ func TestRepeatedPBKDFParamRequestEndsThePairing(t *testing.T) {
 					t.Fatalf("a repeated PBKDFParamRequest that does not acknowledge the response: dispatch %v, want errPreviousAckMissing", err)
 				}
 				holder.none(300*time.Millisecond, "a repeated PBKDFParamRequest while the response waits for its acknowledgement")
-				if got := r.b.paseFailures.Load(); got != 0 {
+				if got := r.b.failedAttempts.Load(); got != 0 {
 					t.Fatalf("PASE failures after a refused PBKDFParamRequest: %d, want 0", got)
 				}
 				if !r.b.paseHandshakeOfAnother(HandshakeKey{InitiatorNodeID: 0x600D, ExchangeID: 0x0202}) {
@@ -145,7 +145,7 @@ func TestRepeatedPBKDFParamRequestEndsThePairing(t *testing.T) {
 			if general, _, code, ok := decodeStatusReport(report); !ok || general != mrp.SCStatusGeneralFailure || code != mrp.SCStatusProtocolInvalidParameter {
 				t.Fatalf("report general %#x code %#x, want failure / InvalidParameter", general, code)
 			}
-			if got := r.b.paseFailures.Load(); got != 1 {
+			if got := r.b.failedAttempts.Load(); got != 1 {
 				t.Fatalf("PASE failures after a repeated PBKDFParamRequest: %d, want 1", got)
 			}
 			other := HandshakeKey{InitiatorNodeID: 0x600D, ExchangeID: 0x0202}

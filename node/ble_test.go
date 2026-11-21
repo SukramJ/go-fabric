@@ -325,8 +325,10 @@ func TestNodeBLEFailSafeExpiryAfterWindowClose(t *testing.T) {
 	// The rollback decommissions nothing (CommissioningServer.ts:148-152 at
 	// b25ed960): no reopen follows once the node is idle. Time moves well
 	// past the node's idle poll before the state is read.
+	// Occupancy counts a session still establishing too, which
+	// SessionDiagnostics does not list.
 	if err := site.Eventually(bleCtx(t), "no session left", func() bool {
-		return len(dev.Node().SessionDiagnostics().Sessions) == 0
+		return len(dev.Node().SessionDiagnostics().Sessions) == 0 && dev.Node().Sessions().Occupancy().Live == 0
 	}); err != nil {
 		t.Fatal(err)
 	}

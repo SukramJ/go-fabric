@@ -104,9 +104,10 @@ func jcmReadPaths() []im.ConcreteAttributePath {
 // trust verification (StartJCMTrustVerification :45-61,
 // OnTrustVerificationComplete :503-520).
 func (f *flow) jointFabricTrustVerification(ctx context.Context) (stepResult, error) {
-	report, err := f.interaction().ReadWith(ctx, interaction.ReadRequest{Attributes: jcmReadPaths(), NoFabricFilter: true})
+	ia := f.interaction()
+	report, err := ia.ReadWith(ctx, interaction.ReadRequest{Attributes: jcmReadPaths(), NoFabricFilter: true})
 	if err != nil {
-		return 0, err
+		return 0, f.channelLoss(ia, err)
 	}
 	t := &jcmTrust{opts: f.opts.JointFabric, info: jcm.NewInfo(), challenge: f.challenge, signer: flowSigner{f}, keepArmed: f.keepFailsafeArmed, log: f.log}
 	if err := t.parse(report); err != nil {

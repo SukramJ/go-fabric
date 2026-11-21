@@ -1258,17 +1258,14 @@ func (p camPTZ) DptzRelativeMove(_ context.Context, req avdef.DptzRelativeMoveRe
 
 type camZonePort struct{ c *demoCamera }
 
-// CreateTwoDCartesianZone gives the lowest free id from 1 (zone-manager.h
-// GetNewZoneId).
-func (p camZonePort) CreateTwoDCartesianZone(context.Context, zmdef.TwoDCartesianZoneStruct) (uint16, error) {
+// CreateTwoDCartesianZone keeps the zone under the ID the server assigned
+// (camera.Zones, decision 290); the camera-app's zone manager chose its
+// own (zone-manager.h GetNewZoneId).
+func (p camZonePort) CreateTwoDCartesianZone(_ context.Context, id uint16, _ zmdef.TwoDCartesianZoneStruct) error {
 	p.c.mu.Lock()
 	defer p.c.mu.Unlock()
-	id := uint16(1)
-	for slices.Contains(p.c.zones, id) {
-		id++
-	}
 	p.c.zones = append(p.c.zones, id)
-	return id, nil
+	return nil
 }
 
 func (p camZonePort) UpdateTwoDCartesianZone(_ context.Context, id uint16, _ zmdef.TwoDCartesianZoneStruct) error {

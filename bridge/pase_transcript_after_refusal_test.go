@@ -76,8 +76,8 @@ func TestPaseRefusalEndsTheTranscript(t *testing.T) {
 			for _, s := range tc.refusal {
 				_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(s.opcode, exchangeID, false, 0), s.payload)
 			}
-			if got := b.paseFailures.Load(); got != 1 {
-				t.Fatalf("paseFailures = %d after the refusal, want 1", got)
+			if got := b.failedAttempts.Load(); got != 1 {
+				t.Fatalf("failedAttempts = %d after the refusal, want 1", got)
 			}
 			_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodePake1, exchangeID, false, 0), goodPake1)
 			if got := built.Load(); got != tc.wantPake {

@@ -132,13 +132,13 @@ type gatedZones struct {
 	entered, gate chan struct{}
 }
 
-func (g gatedZones) CreateTwoDCartesianZone(ctx context.Context, zone camera.TwoDZone) (uint16, error) {
+func (g gatedZones) CreateTwoDCartesianZone(ctx context.Context, id uint16, zone camera.TwoDZone) error {
 	select {
 	case g.entered <- struct{}{}:
 	default:
 	}
 	<-g.gate
-	return g.mockZones.CreateTwoDCartesianZone(ctx, zone)
+	return g.mockZones.CreateTwoDCartesianZone(ctx, id, zone)
 }
 
 // TestZonesCreateRunsOneAtATime holds MaxUserDefinedZones across the port
@@ -148,7 +148,7 @@ func (g gatedZones) CreateTwoDCartesianZone(ctx context.Context, zone camera.Two
 // either was counted (review II, R2-P6-conc-1609).
 func TestZonesCreateRunsOneAtATime(t *testing.T) {
 	t.Parallel()
-	g := gatedZones{mockZones: &mockZones{nextID: 100}, entered: make(chan struct{}, 1), gate: make(chan struct{})}
+	g := gatedZones{mockZones: &mockZones{}, entered: make(chan struct{}, 1), gate: make(chan struct{})}
 	held := make([]camera.Zone, 0, zoneMaxUserDefined-1)
 	for i := range uint16(zoneMaxUserDefined - 1) {
 		zone := camera.TwoDZone{Name: "held", Use: zmdef.ZoneUseMotion, Vertices: triangle(100 * (i + 1))}

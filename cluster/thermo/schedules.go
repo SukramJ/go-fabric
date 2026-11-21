@@ -21,13 +21,14 @@ import (
 
 // The MatterScheduleConfiguration feature (MSCH): the device's stored week
 // programs, the active one, SetActiveScheduleRequest and the atomic write
-// of Schedules. matter.js does not implement it ("MatterScheduleConfiguration:
-// This feature is not implemented yet", packages/node/src/behaviors/
-// thermostat/ThermostatServer.ts:82 at db021da0); the behaviour follows
-// connectedhomeip's ThermostatSchedules
-// (src/app/clusters/thermostat-server/ThermostatClusterSchedules.cpp at
-// 645b267a — the harness image's CHIP commit 6170af84 has no schedules
-// server). Every rule below cites its chip line.
+// of Schedules. matter.js implements it behind its forward feature
+// thermostat-msch, not released ("MatterScheduleConfiguration feature is
+// not released yet", packages/node/src/behaviors/thermostat/ThermostatServer.ts:267-271
+// at b25ed960); the server mirrors that implementation and is offered
+// behind the extension BD-chip-Thermostat-Schedules (ahead.go, owner
+// decision 291). The SchedulePort, the device's own storage of its
+// programs, has no matter.js counterpart; it follows connectedhomeip's
+// ThermostatSchedules::Delegate.
 
 // Schedule is the ScheduleStruct of the generated definition.
 type Schedule = tdef.ScheduleStruct
@@ -44,19 +45,19 @@ type ScheduleType = tdef.ScheduleTypeStruct
 // at 645b267a): SetActiveSchedule is called after a SetActiveScheduleRequest
 // passed the server's checks and before the handle is stored;
 // CommitSchedules is called with the list an atomic write committed —
-// validated, precommitted and with a handle issued to every new schedule —
-// before it is stored. An error refuses the change: the command or the
-// commit answers with the error's status when it carries one (an
-// [im.StatusCodeError]), FAILURE otherwise, and nothing is stored. Both run
-// in the server's command queue with no lock the inbound setters take:
-// the port may confirm through [ThermostatServer.SetSchedules] and
+// validated and with a handle issued to every new schedule — before it is
+// stored. An error refuses the change: the command or the commit answers
+// with the error's status when it carries one (an [im.StatusCodeError]),
+// FAILURE otherwise, and nothing is stored. Both run in the server's
+// command queue with no lock the inbound setters take: the port may
+// confirm through [ThermostatServer.SetSchedules] (the host's replace) and
 // [ThermostatServer.SetActiveScheduleHandle]. A nil port keeps the
 // schedules in memory.
 type SchedulePort = tdef.SchedulePort
 
 // ErrSchedules reports a ThermostatConfig whose schedule configuration the
 // server refuses: ScheduleTypes or a count outside its constraints, or
-// configured schedules without a unique handle.
+// configured schedules the write rules refuse.
 var ErrSchedules = errors.New("thermo: schedule configuration refused")
 
 // schedulesValue is a Schedules value as the server handles it: the
@@ -81,13 +82,20 @@ func scheduleWithHandle(list []Schedule, h []byte) (Schedule, bool) {
 	return Schedule{}, false
 }
 
-// seedSchedules takes the MSCH configuration: the schedule types and
-// counts (each checked against its attribute), the device's schedules and
-// the active handle ([ThermostatServer.SetSchedules]'s rules; an active
-// handle that names no schedule is cleared with a warning), and the port.
+// seedSchedules takes the MSCH configuration as matter.js's initialize
+// does (ThermostatServer.ts:321-366 at b25ed960): the schedule types
+// (#assertScheduleTypes) and counts (each checked against its attribute),
+// the configured schedules held to the content rules (:322-334, the
+// host's list as in [ThermostatServer.SetSchedules]) and normalised — a
+// handle issued where null, a null BuiltIn false — the active handle
+// (one that names no schedule is cleared with a warning, :353-366), and
+// the port.
 func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 	if _, err := s.inst.CheckValue(tdef.AttrScheduleTypes, spec.List[ScheduleType](cfg.ScheduleTypes), nil); err != nil {
 		return fmt.Errorf("%w: ScheduleTypes: %w", ErrSchedules, err)
+	}
+	if err := assertScheduleTypes(cfg.ScheduleTypes); err != nil {
+		return fmt.Errorf("%w: %w", ErrSchedules, err)
 	}
 	s.scheduleTypes = slices.Clone(cfg.ScheduleTypes)
 	s.numberOfSchedules = cfg.NumberOfSchedules
@@ -103,82 +111,112 @@ func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 		}
 	}
 	s.schedulePort = cfg.SchedulePort
-	schedules, err := s.hostSchedules(cfg.Schedules)
+	configured := cfg.Schedules
+	if configured == nil {
+		configured = []Schedule{}
+	}
+	schedules, err := s.validateHostSchedules(configured, configured)
 	if err != nil {
+		return fmt.Errorf("%w: configured schedules are invalid: %w", ErrSchedules, err)
+	}
+	if err := issueScheduleHandles(schedules); err != nil {
 		return fmt.Errorf("%w: %w", ErrSchedules, err)
 	}
 	s.schedules = schedules
 	active := bytes.Clone(cfg.ActiveScheduleHandle)
-	if active != nil {
-		if _, ok := scheduleWithHandle(schedules, active); !ok {
-			s.logger().Warn("matter.thermostat.active_schedule_cleared",
-				slog.String("schedule_handle", handleKey(active)), slog.String("reason", "matches no schedule"))
-			active = nil
-		}
+	if active != nil && !scheduleHandleIn(schedules, active) {
+		s.logger().Warn("matter.thermostat.active_schedule_cleared",
+			slog.String("schedule_handle", handleKey(active)), slog.String("reason", "matches no schedule"))
+		active = nil
 	}
 	s.activeScheduleHandle = active
 	return nil
 }
 
-// hostSchedules checks and normalises the device's own schedules: the
-// list held to the Schedules attribute's type and constraints, every
-// schedule with a handle of its own (a SetActiveScheduleRequest names it),
-// a null BuiltIn taken as built in — a schedule the device supplies is
-// one a controller cannot remove. chip takes the delegate's list as it is
-// (ThermostatClusterSchedules.h:74-83); the handle rule is what its
-// SetActiveSchedule and PrecommitSchedules need of it.
-func (s *ThermostatServer) hostSchedules(list []Schedule) ([]Schedule, error) {
-	out := deepcopy.Each(list)
-	if out == nil {
-		out = []Schedule{}
-	}
-	if _, err := s.inst.CheckValue(tdef.AttrSchedules, spec.List[Schedule](out), s.MatterRead); err != nil {
-		return nil, err
-	}
-	seen := map[string]bool{}
-	for i := range out {
-		sc := &out[i]
-		if sc.ScheduleHandle.Null || len(sc.ScheduleHandle.Value) == 0 {
-			return nil, fmt.Errorf("%w: schedule %d has no handle", spec.ErrInvalidValue, i)
+// assertScheduleTypes is matter.js #assertScheduleTypes
+// (ThermostatServer.ts:2666-2687 at b25ed960): every schedule type names
+// Auto, Heat or Cool, no mode twice, and supports presets or setpoints.
+func assertScheduleTypes(types []ScheduleType) error {
+	seen := map[tdef.SystemModeEnum]bool{}
+	for _, t := range types {
+		switch t.SystemMode {
+		case tdef.SystemModeAuto, tdef.SystemModeHeat, tdef.SystemModeCool:
+		default:
+			return fmt.Errorf("thermo: ScheduleTypes may only name Auto, Heat or Cool, not SystemMode %d", t.SystemMode)
 		}
-		k := handleKey(sc.ScheduleHandle.Value)
-		if seen[k] {
-			return nil, fmt.Errorf("%w: schedule handle %s appears twice", spec.ErrInvalidValue, k)
+		if seen[t.SystemMode] {
+			return fmt.Errorf("thermo: ScheduleTypes names SystemMode %d more than once", t.SystemMode)
 		}
-		seen[k] = true
-		if sc.BuiltIn.Null {
-			sc.BuiltIn = spec.ValueOf(true)
+		seen[t.SystemMode] = true
+		if t.ScheduleTypeFeatures&(tdef.ScheduleTypeFeaturesSupportsPresets|tdef.ScheduleTypeFeaturesSupportsSetpoints) == 0 {
+			return fmt.Errorf("thermo: ScheduleTypes entry for SystemMode %d supports neither presets nor setpoints", t.SystemMode)
 		}
 	}
-	return out, nil
+	return nil
 }
 
-// SetSchedules records the device's own schedules — a program edited on
-// the device, or the list a [SchedulePort] stored: held to the Schedules
-// attribute's type and constraints, each schedule with a unique handle, a
-// null BuiltIn taken as built in; stored and reported through the change
-// notifier, without the port. An active schedule the list drops is
-// cleared and reported. The error is the refusal ([spec.ErrInvalidValue],
-// or UNSUPPORTED_ATTRIBUTE without MSCH); schedules is not modified.
+// validateHostSchedules holds the host's schedules to the Schedules
+// attribute's schema — its literal bounds; "max numberOfSchedules" is the
+// write rules' count, which answers RESOURCE_EXHAUSTED after every
+// schedule's own rules, as on the wire (MatterWriteChanged) — and to the
+// content rules against stored, with the stored presets, and returns them
+// normalised. The caller holds s.mu or owns s.
+func (s *ThermostatServer) validateHostSchedules(stored, list []Schedule) ([]Schedule, error) {
+	if _, err := s.inst.CheckValue(tdef.AttrSchedules, spec.List[Schedule](list), nil); err != nil {
+		return nil, spec.Errorf(im.StatusConstraintError, "thermo: Schedules: %w", err)
+	}
+	rules := s.scheduleRules(s.presets)
+	rules.host = true
+	return rules.validateSchedules(stored, list)
+}
+
+// SetSchedules is the host's authoritative replace of the schedules — the
+// device's own programs, the host being their source of truth (owner
+// decision O-8, by_design BD-Thermostat-HostSchedules). The list is held
+// to the content rules matter.js's write holds a controller to
+// (#validateScheduleWriteRequest, #validateScheduleTransitions,
+// ThermostatServer.ts:2693-3003 at b25ed960: the schedule types and
+// counts, names, presets, transitions, limits and deadband, each handle
+// once) and normalised (:3028-3049: a null handle gets one, a null BuiltIn
+// takes the stored schedule's or false). matter.js's lifecycle rules of a
+// Matter write do not apply: a handle the device never issued is a new
+// schedule, a schedule may arrive built in or change its BuiltIn, and a
+// built-in schedule may be dropped. An active schedule the list drops is
+// cleared, as a start clears an active handle that names no schedule
+// (:353-366): the host's list says the program is gone, and the
+// ActiveScheduleHandle never names a missing schedule. The list is stored
+// and reported through the change notifier, without the port. The error
+// is the refusal, with its IM status (UNSUPPORTED_ATTRIBUTE without MSCH);
+// schedules is not modified.
 func (s *ThermostatServer) SetSchedules(schedules []Schedule) error {
 	if s.features&ThermostatFeatureMSCH == 0 {
 		return spec.Errorf(im.StatusUnsupportedAttribute, "thermo: Schedules needs the MatterScheduleConfiguration feature")
 	}
-	list, err := s.hostSchedules(schedules)
-	if err != nil {
-		return err
+	if schedules == nil {
+		schedules = []Schedule{}
 	}
 	s.mu.Lock()
+	list, err := s.validateHostSchedules(s.schedules, schedules)
+	if err == nil {
+		err = issueScheduleHandles(list)
+	}
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	var changed []uint32
+	if !schedulesTLVEqual(s.schedules, list) {
+		changed = append(changed, tdef.AttrSchedules)
+	}
 	s.schedules = list
-	changed := []uint32{tdef.AttrSchedules}
-	if s.activeScheduleHandle != nil {
-		if _, ok := scheduleWithHandle(list, s.activeScheduleHandle); !ok {
-			s.activeScheduleHandle = nil
-			changed = append(changed, tdef.AttrActiveScheduleHandle)
-		}
+	if s.activeScheduleHandle != nil && !scheduleHandleIn(list, s.activeScheduleHandle) {
+		s.activeScheduleHandle = nil
+		changed = append(changed, tdef.AttrActiveScheduleHandle)
 	}
 	s.mu.Unlock()
-	s.changes.NotifyFrom(contract.OriginHostSet, changed...)
+	if len(changed) > 0 {
+		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
+	}
 	return nil
 }
 
@@ -234,11 +272,12 @@ func scheduleRequest(fields any) (tdef.SetActiveScheduleRequestRequest, error) {
 	return tdef.SetActiveScheduleRequestRequest{}, spec.Errorf(im.StatusInvalidCommand, "thermo: SetActiveScheduleRequest carried %T", fields)
 }
 
-// handleSetActiveScheduleRequest is chip ThermostatSchedules::SetActiveSchedule
-// (ThermostatClusterSchedules.cpp:741-793 at 645b267a): a handle that names
-// no stored schedule is INVALID_COMMAND; then the [SchedulePort] switches
-// the device (its refusal answers the command and stores nothing), the
-// handle is stored and reported, and with the Events feature the
+// handleSetActiveScheduleRequest is matter.js handleSetActiveScheduleRequest
+// (ThermostatServer.ts:582-591 at b25ed960): a handle that names no stored
+// schedule is INVALID_COMMAND, else the handle is stored. Before it is
+// stored the [SchedulePort] switches the device (its refusal answers the
+// command and stores nothing; chip's delegate, matter.js has no port); the
+// handle is reported, and with the Events feature the
 // ActiveScheduleChange event carries the previous and the new handle
 // (ThermostatClusterEvents.cpp:189-213 at 6170af84: emitted only with
 // TEVT; without it the event is outside the EventList and

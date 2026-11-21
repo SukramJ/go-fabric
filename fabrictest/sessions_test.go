@@ -4,7 +4,6 @@
 package fabrictest_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -20,20 +19,15 @@ func TestControllerOptionsSessionsAreReported(t *testing.T) {
 	site := fabrictest.NewSite(t, fabrictest.Options{})
 	want := &controller.SessionIntervals{Idle: 2345 * time.Millisecond, Active: 234 * time.Millisecond, ActiveThreshold: 5 * time.Second}
 	p := site.CommissionedPair(fabrictest.PairOptions{Controller: fabrictest.ControllerOptions{Sessions: want}})
-	// The device completes its side of CASE after the Success that lets
-	// the controller return, and lists no session still establishing:
-	// wait for it.
+	// CommissionedPair returns once the device lists the CASE session.
 	var cases []diag.SessionInfo
-	if err := site.Eventually(context.Background(), "a CASE session on the device", func() bool {
-		cases = cases[:0]
-		for _, s := range p.Device.Node().SessionDiagnostics().Sessions {
-			if !s.PASE {
-				cases = append(cases, s)
-			}
+	for _, s := range p.Device.Node().SessionDiagnostics().Sessions {
+		if !s.PASE {
+			cases = append(cases, s)
 		}
-		return len(cases) > 0
-	}); err != nil {
-		t.Fatal(err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("no CASE session on the device")
 	}
 	for _, s := range cases {
 		if s.PeerIdleInterval != want.Idle || s.PeerActiveInterval != want.Active || s.PeerActiveThreshold != want.ActiveThreshold {

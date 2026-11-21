@@ -43,7 +43,7 @@ func TestPBKDFParamRequestOnAClosedWindowIsAnsweredInvalidParam(t *testing.T) {
 		if general != mrp.SCStatusGeneralFailure || protocol != mrp.SCStatusProtocolInvalidParameter {
 			t.Fatalf("StatusReport general %#x protocol %#x, want GeneralFailure / InvalidParameter", general, protocol)
 		}
-		if got := r.b.paseFailures.Load(); got != 0 {
+		if got := r.b.failedAttempts.Load(); got != 0 {
 			t.Fatalf("PASE failures = %d, want 0", got)
 		}
 		if r.b.paseHandshakeOfAnother(HandshakeKey{}) {

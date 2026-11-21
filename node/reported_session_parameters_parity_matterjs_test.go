@@ -123,17 +123,33 @@ func TestReportedSessionParametersResumedParityMatterJS(t *testing.T) {
 		t.Fatalf("read after the drop: %v", err)
 	}
 	resumed := false
+	var resumedID uint16
 	for _, s := range fabrictestseam.Peer(p).Sessions() {
 		if !s.Resumed() {
 			continue
 		}
 		resumed = true
+		resumedID = s.PeerSessionID()
 		if rp := s.ReportedParameters(); rp == nil || time.Duration(rp.SessionIdleInterval)*time.Millisecond != rspDeviceIdle {
 			t.Errorf("controller resumed CASE: reported %+v, want idle %v", rp, rspDeviceIdle)
 		}
 	}
 	if !resumed {
 		t.Fatal("no resumed CASE session on the controller")
+	}
+	// The device establishes a resumed session on the controller's
+	// Success, which its read can overtake, and lists none still
+	// establishing: wait for it, so the check below covers it and not only
+	// the session the controller dropped.
+	if err := site.Eventually(ctx, "the resumed session on the device", func() bool {
+		for _, s := range p.Device.Node().SessionDiagnostics().Sessions {
+			if s.ID == resumedID {
+				return true
+			}
+		}
+		return false
+	}); err != nil {
+		t.Fatal(err)
 	}
 	wantAll(t, "device resumed CASE", deviceReportedIdle(p.Device.Node(), false), rspControllerIdle)
 }

@@ -6,4 +6,3 @@
 # pin; a line whose sha is not the current pin's is a finding, so a row may
 # not ride across another lift. The closing unit removes its line together
 # with the row.
-BD-chip-EnergyReporting-FakeReadings b25ed960 P3-E

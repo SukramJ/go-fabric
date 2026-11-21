@@ -16,7 +16,7 @@ programs (MatterScheduleConfiguration) add a second port, the
 | LocalTemperatureNotExposed (LTNE) | yes | |
 | Occupancy (OCC) | yes | the host reports occupancy with `SetOccupied` |
 | Presets (PRES) | yes | presets and the atomic write, persisted through a `PresetStore` |
-| MatterScheduleConfiguration (MSCH) | yes | ahead of matter.js ("not implemented yet"), after connectedhomeip; see [Week programs](#week-programs-msch) |
+| MatterScheduleConfiguration (MSCH) | yes | matter.js's, behind its forward feature; here behind the extension `BD-chip-Thermostat-Schedules`; see [Week programs](#week-programs-msch) |
 | ScheduleConfiguration, Setback | no | deprecated; matter.js refuses them |
 | Events (TEVT) | yes | ahead of matter.js, after connectedhomeip; see [Events](#events-tevt) |
 | ThermostatSuggestions | no | |
@@ -44,21 +44,28 @@ it.
 
 ## Week programs (MSCH)
 
-matter.js does not implement MatterScheduleConfiguration. This server
-implements it after connectedhomeip's `ThermostatClusterSchedules.cpp` at
-`645b267a`, which is the behavioural authority for this feature; the
-harness commit `6170af84` has no schedules server yet.
+matter.js implements MatterScheduleConfiguration behind its forward
+feature `thermostat-msch` (`ThermostatServer.ts:267-271` at `b25ed960`).
+This server mirrors it — the write rules, the normalisation, the commit
+checks and the ScheduleTypes start checks — and serves it behind the
+extension `BD-chip-Thermostat-Schedules`, off by default
+(`surface.Policies.Extensions`; the reference bridge's
+`--thermostat-schedules`).
 
 **Configuration.** `ThermostatConfig`, or the declaration's `Initial`
 under the attribute names, holds:
 
 - `ScheduleTypes`: one to three types, each a SystemMode with its number
-  of schedules and its features (presets, setpoints, names, Off).
+  of schedules and its features (presets, setpoints, names, Off). They
+  may name only Auto, Heat or Cool, none twice, each supporting presets
+  or setpoints (`thermo.ErrSchedules`).
 - `NumberOfSchedules`, `NumberOfScheduleTransitions` and
   `NumberOfScheduleTransitionPerDay`. A nil per-day count means no limit.
-- `Schedules`: the device's own week programs. Each one needs a handle of
-  its own. A null `BuiltIn` is taken as built in, so a controller cannot
-  remove that schedule.
+- `Schedules`: the device's own week programs, held to the content rules
+  a controller's write is held to. A null handle gets a generated one. A
+  null `BuiltIn` takes the stored schedule's value for that handle, else
+  false: set `BuiltIn: true` on a program a controller
+  may not remove.
 - `ActiveScheduleHandle`: the schedule the device follows now.
 
 The types and counts are configuration. The typed `Set` refuses them.
@@ -69,37 +76,40 @@ The types and counts are configuration. The typed `Set` refuses them.
 | Method | Called for |
 | --- | --- |
 | `SetActiveSchedule(ctx, handle)` | a `SetActiveScheduleRequest` whose handle names a stored schedule. The server answers an unknown handle INVALID_COMMAND without calling the port. |
-| `CommitSchedules(ctx, schedules)` | the `Schedules` list a controller committed in an atomic write. The list is validated and precommitted, and every new schedule already has a 16-byte handle the server issued. |
+| `CommitSchedules(ctx, schedules)` | the `Schedules` list a controller committed in an atomic write. The list is validated, and every new schedule already has a 16-byte handle the server issued. |
 
 An error refuses the change, as for the `Sink`. Without a port the server
 keeps the schedules in memory. The device's own changes come back through
 `SetSchedules` and `SetActiveScheduleHandle`, or through the typed `Set`.
-These calls do not use the port. A schedule list that drops the active
-schedule clears the active handle.
+These calls do not use the port. `SetSchedules` is the host's
+authoritative replace: it is held to the content rules (types and counts,
+names, presets, transitions, limits, deadband, unique handles) but not to
+the lifecycle rules of a controller's write — a new handle, a changed or
+dropped built-in schedule and a dropped active schedule are accepted, and
+a dropped active schedule clears the active handle
+(`BD-Thermostat-HostSchedules`). Its errors are IM statuses.
 
 **The write.** A controller writes `Schedules` only inside an
 `AtomicRequest` BeginWrite … CommitWrite.
 
 - Any other write answers INVALID_IN_STATE. A write from another peer
-  during an atomic write also answers INVALID_IN_STATE, as chip does.
-  Presets answers that case BUSY.
-- BeginWrite starts the pending list as the stored one.
-- Each write is validated entry by entry, with chip's
-  `AppendPendingSchedule` rules:
-  - handle, name and preset-handle sizes;
-  - a SystemMode of Auto, Cool or Heat that a schedule type supports;
-  - BuiltIn kept for an existing handle;
-  - names and presets only where the type supports them;
-  - the transition rules: weekdays, a time up to 1439, no repeated time on
-    a shared day, the setpoints the effective SystemMode needs within the
-    limits and the deadband, presets resolved under PRES;
-  - the per-day, total and per-type counts.
-- The peer that holds the write reads the pending list.
-- CommitWrite first checks every staged attribute. A built-in schedule the
-  list drops is CONSTRAINT_ERROR, and an active schedule it drops is
-  INVALID_IN_STATE.
-- With MSCH, a Presets commit that drops a preset a schedule names is
-  INVALID_IN_STATE.
+  during an atomic write also answers INVALID_IN_STATE; Presets answers
+  that case BUSY.
+- BeginWrite stages nothing: until its first write the holder reads the
+  stored list.
+- Each write is validated with matter.js's write rules: the handle rules
+  (a handle the device never issued is NOT_FOUND, a new schedule is not
+  built in, BuiltIn does not change), the schedule type, the transitions
+  per schedule, names and presets only where the type supports them, the
+  transition rules (a SystemMode other than the schedule's, the setpoints
+  within the limits and the deadband, the presets among the writing
+  peer's pending or the stored ones), then the count limits.
+- The peer that holds the write reads its pending list.
+- CommitWrite validates the staged Schedules again against the Presets of
+  the same atomic write. A built-in schedule the list drops is
+  CONSTRAINT_ERROR, and an active schedule it drops is INVALID_IN_STATE.
+- A Presets commit, or a local `SetPresets`, that drops a preset a
+  schedule names is INVALID_IN_STATE.
 - Only when every check passes does the commit hand the list to the port.
 
 With the Events feature (TEVT), `SetActiveScheduleRequest` emits

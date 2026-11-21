@@ -88,21 +88,26 @@ func TestZoneCommandRules(t *testing.T) { //nolint:funlen // one rule per block
 		wantCode(t, "update unknown", update(1, camera.TwoDZone{Vertices: triangle(0)}), im.StatusNotFound)
 		wantCode(t, "update Mfg", update(9, camera.TwoDZone{Vertices: triangle(0)}), im.StatusConstraintError)
 		wantCode(t, "update invalid", update(9, camera.TwoDZone{Vertices: triangle(0)[:1]}), im.StatusConstraintError)
-		_, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("a", triangle(0)))
+		// The server continues after the manufacturer's zone 9
+		// (ZoneManagementServer.ts:243-250 at b25ed960).
+		resp, st := invokeZones(z, zmdef.CmdCreateTwoDCartesianZone, createZoneRequest("a", triangle(0)))
 		wantCode(t, "create", st, im.StatusSuccess)
-		wantCode(t, "update onto Mfg's", update(1, camera.TwoDZone{Use: zmdef.ZoneUseMotion, Vertices: triangle(200)}), im.StatusAlreadyExists)
-		wantCode(t, "update onto itself", update(1, camera.TwoDZone{Name: "b", Use: zmdef.ZoneUseMotion, Vertices: triangle(0)}), im.StatusSuccess)
-		wantCode(t, "update beyond the max", update(1, camera.TwoDZone{Vertices: []camera.Vertex{{X: 0, Y: 481}, {X: 1, Y: 0}, {X: 0, Y: 1}}}), im.StatusDynamicConstraintError)
-		wantCode(t, "update hourglass", update(1, camera.TwoDZone{Vertices: []camera.Vertex{{X: 10, Y: 10}, {X: 20, Y: 20}, {X: 20, Y: 10}, {X: 10, Y: 20}}}), im.StatusDynamicConstraintError)
+		if r, _ := resp.(zmdef.CreateTwoDCartesianZoneResponse); r.ZoneId != 10 {
+			t.Fatalf("zone ID %d, want 10", r.ZoneId)
+		}
+		wantCode(t, "update onto Mfg's", update(10, camera.TwoDZone{Use: zmdef.ZoneUseMotion, Vertices: triangle(200)}), im.StatusAlreadyExists)
+		wantCode(t, "update onto itself", update(10, camera.TwoDZone{Name: "b", Use: zmdef.ZoneUseMotion, Vertices: triangle(0)}), im.StatusSuccess)
+		wantCode(t, "update beyond the max", update(10, camera.TwoDZone{Vertices: []camera.Vertex{{X: 0, Y: 481}, {X: 1, Y: 0}, {X: 0, Y: 1}}}), im.StatusDynamicConstraintError)
+		wantCode(t, "update hourglass", update(10, camera.TwoDZone{Vertices: []camera.Vertex{{X: 10, Y: 10}, {X: 20, Y: 20}, {X: 20, Y: 10}, {X: 10, Y: 20}}}), im.StatusDynamicConstraintError)
 		remove := func(id uint16) im.StatusCode {
 			_, st := invokeZones(z, zmdef.CmdRemoveZone, zmdef.RemoveZoneRequest{ZoneId: id})
 			return st
 		}
 		wantCode(t, "remove unknown", remove(5), im.StatusNotFound)
 		wantCode(t, "remove Mfg", remove(9), im.StatusConstraintError)
-		_, st = invokeZones(z, zmdef.CmdCreateOrUpdateTrigger, zmdef.CreateOrUpdateTriggerRequest{Trigger: camera.ZoneTrigger{ZoneId: 1, InitialDuration: 5, MaxDuration: 5}})
+		_, st = invokeZones(z, zmdef.CmdCreateOrUpdateTrigger, zmdef.CreateOrUpdateTriggerRequest{Trigger: camera.ZoneTrigger{ZoneId: 10, InitialDuration: 5, MaxDuration: 5}})
 		wantCode(t, "trigger", st, im.StatusSuccess)
-		wantCode(t, "remove with a trigger", remove(1), im.StatusInvalidInState)
+		wantCode(t, "remove with a trigger", remove(10), im.StatusInvalidInState)
 	})
 	t.Run("the trigger's checks :612-659", func(t *testing.T) {
 		privacy := camera.Zone{

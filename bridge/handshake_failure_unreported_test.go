@@ -131,12 +131,12 @@ func paseFailsAtPake3(t *testing.T, r *unsecuredRig, x uint16, acked bool) {
 	if acked {
 		r.ackLastReply(t, x, mrp.SCOpcodePake2)
 	}
-	before := r.b.paseFailures.Load()
+	before := r.b.failedAttempts.Load()
 	hdr, proto = r.request(mrp.SCOpcodePake3, x)
 	if err := r.b.dispatchPase(r.peer.LocalAddr(), hdr, proto, []byte{0x15, 0x18}); err == nil {
 		t.Fatal("dispatchPase accepted a refused Pake3")
 	}
-	if got := r.b.paseFailures.Load() - before; got != 1 {
+	if got := r.b.failedAttempts.Load() - before; got != 1 {
 		t.Errorf("PASE failures counted for the refused Pake3 = %d, want 1", got)
 	}
 	if _, begun := r.b.resolvePaseContinuation(handshakeKeyOf(hdr, x)); begun {

@@ -489,7 +489,13 @@ type CommissionOptions struct {
 // Commission commissions d onto the controller's fabric — the commissioner's
 // on-network flow over d's address, PASE through CommissioningComplete
 // over CASE — and returns the pair, whose peer holds the CASE session.
-// With a fake site clock it runs under [Site.Run].
+// It returns only once d lists that CASE session as established
+// (node.Node.Sessions): the device completes its side of CASE after the
+// Success that lets the controller go on, and lists no session still
+// establishing, so without the wait a test reading the device's sessions
+// right after the call could find none. The wait is bounded by ctx. With
+// a fake site clock it runs under [Site.Run] and the wait under
+// [Site.Eventually].
 func (c *Controller) Commission(ctx context.Context, d *Device, opts CommissionOptions) (*Pair, error) {
 	// One stack for the whole call, read under the lock a Restart takes
 	// (R2-P6-conc-2509).
@@ -515,7 +521,26 @@ func (c *Controller) Commission(ctx context.Context, d *Device, opts CommissionO
 	if p == nil {
 		return nil, errors.New("fabrictest: the commissioned device has no peer")
 	}
+	if err := c.awaitDeviceSession(ctx, d, res.Address.NodeID); err != nil {
+		return nil, fmt.Errorf("fabrictest: commission device %d: %w", d.index, err)
+	}
 	return &Pair{Controller: c, Device: d, Address: res.Address, peer: p, interaction: com.Interaction(p)}, nil
+}
+
+// awaitDeviceSession waits, bounded by ctx and on the site's clock
+// ([Site.Eventually]), until d lists an established CASE session between
+// the controller and d's node deviceNodeID on the controller's fabric.
+// The device completes its side of CASE after the Success that lets the
+// controller go on (bridge/securechannel.go, completeEstablishment after
+// the send), and lists no session still establishing
+// (operational.Manager.Sessions).
+func (c *Controller) awaitDeviceSession(ctx context.Context, d *Device, deviceNodeID uint64) error {
+	c.mu.RLock()
+	controllerNodeID := c.opts.NodeID
+	c.mu.RUnlock()
+	return c.site.Eventually(ctx, "the device's CASE session with the controller", func() bool {
+		return d.listsCASESession(controllerNodeID, deviceNodeID)
+	})
 }
 
 // Pair is a controller and a device of one site: commissioned

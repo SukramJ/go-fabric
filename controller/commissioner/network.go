@@ -597,8 +597,8 @@ func (f *flow) withChannelDropFallbackConnect(action func() (netcomm.ConnectNetw
 // between two re-arms; each re-arm runs on a context [flow.stopArmInterval]
 // cancels, and stopArmInterval awaits a re-arm in flight, so none
 // overlaps the disarm of an abort or a failure (disarmIfMayBeArmed stops
-// the timer first) or outlives the consent wait; and the timer that ends
-// on its own — the cumulative limit, a closed session, a failed re-arm —
+// the timer first, expireFailsafe detaches it) or outlives the consent
+// wait; and the timer that ends on its own — the cumulative limit, a closed session, a failed re-arm —
 // says why on lapsed, once.
 type armInterval struct {
 	timer    exchange.Timer
@@ -625,6 +625,54 @@ func (f *flow) currentArmInterval() *armInterval {
 		return nil
 	}
 	return f.armTimer
+}
+
+// detachArmInterval stops the timer — no further period — and returns
+// it with a re-arm that may be in flight, nil for none: matter.js
+// #expireFailsafe stopping #armFailsafeInterval
+// (packages/protocol/src/peer/ControllerCommissioningFlow.ts:1098-1099 at
+// b25ed960). The caller awaits the re-arm (awaitArmInterval) or cancels
+// it (cancelArmInterval).
+func (f *flow) detachArmInterval() *armInterval {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ai := f.armTimer
+	if ai != nil {
+		ai.stopped = true
+		ai.timer.Stop()
+		f.armTimer = nil
+	}
+	return ai
+}
+
+// awaitArmInterval awaits a re-arm of ai in flight without cancelling it,
+// bounded by ctx — `await this.#periodicArm` (:1107), so the re-arm cannot
+// arm the fail-safe again behind the expiry. ctx ending cancels it.
+func awaitArmInterval(ctx context.Context, ai *armInterval) {
+	if ai == nil {
+		return
+	}
+	settled := make(chan struct{})
+	go func() {
+		ai.inflight.Wait()
+		close(settled)
+	}()
+	select {
+	case <-settled:
+	case <-ctx.Done():
+	}
+	ai.cancel()
+	<-settled
+}
+
+// cancelArmInterval cancels a re-arm of ai in flight and waits for it to
+// return: nothing is sent after it, so nothing waits for its answer.
+func cancelArmInterval(ai *armInterval) {
+	if ai == nil {
+		return
+	}
+	ai.cancel()
+	ai.inflight.Wait()
 }
 
 // stopArmInterval stops the timer, cancels a re-arm in flight and waits
