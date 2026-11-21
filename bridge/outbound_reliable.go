@@ -201,6 +201,28 @@ type exchangeKick struct {
 	ended      func() bool
 }
 
+// bdxMaxRetransmissionInterval is the retransmission interval that still
+// fits every transmission of a BDX message inside the 30 s a BDX peer waits
+// for the next message before it abandons the transfer: the budget over
+// the four waits between five transmissions, less 100 ms for the last one
+// to arrive — 7.4 s.
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:62-78 at b25ed960
+// (BDX_PEER_RESPONSE_BUDGET, BDX_RESPONSE_BUDGET_MARGIN, BDX_MAX_RETRANSMISSION_INTERVAL).
+const bdxMaxRetransmissionInterval = 30*time.Second/mrp.MaxRetransmissions - 100*time.Millisecond
+
+// capBDXWait caps d, the wait armed after a transmission, at
+// [bdxMaxRetransmissionInterval] for a message of a BDX exchange — every
+// wait, the first and each retransmission's, in either role, below the
+// peer's idle interval too; any other message's wait is d.
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:1296-1319 at b25ed960
+// (#backOffFor: the BDX cap is taken after the fixed backoff is added).
+func capBDXWait(kick *exchangeKick, d time.Duration) time.Duration {
+	if kick != nil && kick.bdx {
+		return min(d, bdxMaxRetransmissionInterval)
+	}
+	return d
+}
+
 // newOutboundReliableTracker returns a fresh, empty tracker.
 // baseIntervalFor may be nil — every send then uses the spec idle
 // default as its base interval.
@@ -396,7 +418,7 @@ func (t *outboundReliableTracker) kickForLiveness(sessionID, exchangeID uint16, 
 		return false
 	}
 	p.retries++
-	delay := mrp.BackoffDuration(t.entryBase(p.sessionID, p.peer, now)+p.margin, p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+	delay := capBDXWait(p.kick, mrp.BackoffDuration(t.entryBase(p.sessionID, p.peer, now)+p.margin, p.retries, rand.Float64)+time.Duration(t.fixedBackoff.Load()))
 	p.nextSendAt, p.interval, p.sentAt, p.inFlight = now.Add(delay), delay, now, true
 	dest, datagram := p.dest, p.datagram
 	t.mu.Unlock()
@@ -656,7 +678,7 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 	// formula at transmission 0 — matter.js MRP.ts:181 (at b25ed960)
 	// evaluates the peer-appropriate base interval for every
 	// transmission including the first.
-	delay := mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+	delay := capBDXWait(kick, mrp.BackoffDuration(t.entryBase(sessionID, peer, now)+margin, 0, rand.Float64)+time.Duration(t.fixedBackoff.Load()))
 	key := outboundKey{sessionID, counter}
 	var (
 		oldest     *outboundEntry
@@ -1176,7 +1198,7 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// may have gone idle since the last attempt), margin,
 		// exponential growth past the threshold, and jitter. Mirrors
 		// matter.js MRP.ts:125-146 retransmissionIntervalOf.
-		delay := mrp.BackoffDuration(t.entryBase(p.sessionID, p.peer, now)+p.margin, p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+		delay := capBDXWait(p.kick, mrp.BackoffDuration(t.entryBase(p.sessionID, p.peer, now)+p.margin, p.retries, rand.Float64)+time.Duration(t.fixedBackoff.Load()))
 		p.nextSendAt = now.Add(delay)
 		// The liveness kick's view: stamped before the send, the
 		// transmission under way until it returned (MessageExchange.ts:1012,

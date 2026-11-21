@@ -475,7 +475,7 @@ func (e *initiatedSecureExchange) enqueue(msg bdx.Message) bool {
 // SetPeerAdditionalMrpDelay sets the margin every later message of the
 // exchange adds to the peer's MRP base interval before the backoff
 // amplifies it. Mirrors matter.js MessageExchange.peerAdditionalMrpDelay
-// (MessageExchange.ts:377-379 at db021da0), the setter for an exchange the
+// (MessageExchange.ts:390-392 at b25ed960), the setter for an exchange the
 // peer initiated, which the BDX responder calls on an inbound init
 // (BdxProtocol.ts:139-142). It implements [bdx.MrpDelayExchange].
 func (e *initiatedSecureExchange) SetPeerAdditionalMrpDelay(d time.Duration) {
@@ -589,8 +589,9 @@ type peerLossOrder interface {
 // peerLossCloser is the optional [SessionRegistry] capability that
 // force-closes every session of a peer created before a monotonic
 // reading of the registry's clock (secure/operational.Manager.ClosePeerLostSince,
-// deprecated). A registry without [peerLossOrder] that has it is still
-// honoured through the deprecation window, removable in v0.26.0 with it.
+// which gives way to the registration order). A registry without
+// [peerLossOrder] that has it is still honoured until v0.26.0, when that
+// method goes.
 type peerLossCloser interface {
 	ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, sinceMono time.Duration) int
 }
@@ -925,7 +926,13 @@ func (e *initiatedSecureExchange) isBDX() bool {
 // deadline is the caller's: the response time of a command
 // ([PeerSession.Invoke]), the BDX idle timeout (bdx.Messenger.Next). A
 // cancelled ctx is no evidence of the peer and reports nothing, nor does an
-// exchange the peer opened (responder).
+// exchange the peer opened (responder). A deadline the caller's context
+// inherits from further up is not told apart from the receive's own, where
+// matter.js reports only its own timer; and [initiatedSecureExchange.Send]
+// returns before the acknowledgement, where matter.js's send awaits it
+// (MessageExchange.ts:852 at b25ed960), so an inherited deadline shorter
+// than the MRP schedule would report a peer MRP has not given up on. No
+// caller in the module passes one: the deadlines are the receive's own.
 // Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:882-892 at b25ed960
 // (nextMessage: peerLost on a TransientPeerCommunicationError under #reportsPeerLoss),
 // packages/protocol/src/protocol/MessageExchange.ts:670-681 at b25ed960

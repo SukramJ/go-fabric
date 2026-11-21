@@ -20,7 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
-// slowPeerKick is sendThenDuplicate's state (MessageExchangeTest.ts:209-285)
+// slowPeerKick is sendThenDuplicate's state (MessageExchangeTest.ts:225-301)
 // at the duplicate, gap after the send.
 func slowPeerKick(gap time.Duration) mrp.LivenessKick {
 	return mrp.LivenessKick{

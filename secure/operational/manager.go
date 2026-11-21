@@ -74,7 +74,7 @@ type Manager struct {
 	// one's registration position ([Entry].registration). Incremented
 	// under mu at the install, read without it by
 	// [Manager.RegistrationCount]. Mirrors matter.js
-	// packages/protocol/src/session/SessionManager.ts:1267-1285 at b25ed960
+	// packages/protocol/src/session/SessionManager.ts:1266-1284 at b25ed960
 	// (RegisteredSessions.add: #positions.set(session, this.#count++)).
 	registrations atomic.Uint64
 
@@ -589,8 +589,9 @@ type Entry struct {
 	// b25ed960 (#positions, a WeakMap nothing deletes from).
 	registration uint64
 	// createdAt is when the session was installed with its keys. The
-	// peer-loss sweep spares sessions created at or after the exchange
-	// that reported the loss (matter.js SessionManager.ts:688-690).
+	// deprecated time form of the peer-loss sweep ([Manager.ClosePeerLost])
+	// spares sessions created at or after its instant (matter.js
+	// packages/protocol/src/session/SessionManager.ts:832-834 at b25ed960).
 	createdAt time.Time
 	// lastActivityMono, lastPeerActivityMono and createdAtMono are the
 	// same stamps on the clock's monotonic reading (clock.MonotonicOf): the
@@ -1505,7 +1506,7 @@ func (m *Manager) installEntryLocked(id uint16, entry *Entry) *Entry {
 // session registers at its install, as it routes from then on), not the
 // placeholder [Manager.AllocateStake] stakes (it has no keys). The
 // caller must hold m.mu in write mode.
-// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:1267-1285 at b25ed960
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:1266-1284 at b25ed960
 // (RegisteredSessions.add: the position is set before the establishing check),
 // called from packages/protocol/src/session/NodeSession.ts:163-165 at b25ed960
 // (the NodeSession constructor, once the keys are derived).

@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/sessionseam"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -231,6 +232,22 @@ func TestInitiatedExchangeReceivePeerLoss(t *testing.T) {
 		}
 		if lost(reg) {
 			t.Fatal("peer declared lost")
+		}
+	})
+	t.Run("a deadline on the injected clock declares peer lost", func(t *testing.T) {
+		t.Parallel()
+		// PeerSession.Invoke's wait: clock.WithTimeout on the bridge's
+		// clock, here a fake one, expires with DeadlineExceeded.
+		reg, ex := open(t)
+		fake := clocktest.New(time.UnixMilli(1_700_000_000_000))
+		ctx, cancel := clock.WithTimeout(context.Background(), fake, 3*time.Second)
+		defer cancel()
+		fake.Advance(3 * time.Second)
+		if _, err := ex.Receive(ctx); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Receive = %v, want DeadlineExceeded", err)
+		}
+		if !lost(reg) {
+			t.Fatal("peer not declared lost")
 		}
 	})
 	t.Run("a cancelled receive declares nothing", func(t *testing.T) {

@@ -17,7 +17,7 @@ import (
 )
 
 // kickLookup is a session lookup stating SLOW_PEER's schedule for its
-// session (matter.js MessageExchangeTest.ts:203 at b25ed960): both
+// session (matter.js MessageExchangeTest.ts:219 at b25ed960): both
 // intervals 7 s, the active threshold its own.
 type kickLookup struct {
 	sid       uint16
@@ -108,10 +108,9 @@ func (r *kickRig) duplicate(t *testing.T, gap time.Duration, dup uint32) bool {
 // packages/protocol/test/protocol/MessageExchangeTest.ts:207-355 at
 // b25ed960 (describe "liveness kick on duplicate") onto the bridge's
 // reliable tracker: the duplicate's verdict, the retransmission of the
-// outstanding message through the listener, its schedule restarted. Where
-// matter.js arms the BDX cap of 7.4 s, the tracker arms its own backoff of
-// the 7 s base (no BDX cap on the device side); the case "can stay awake"
-// sets the threshold above that wait's remainder.
+// outstanding message through the listener, its schedule restarted. As in
+// matter.js, the 7 s base puts the backoff above the BDX cap, so the armed
+// wait is exactly 7.4 s (capBDXWait).
 func TestBDXLivenessKickOnDuplicate(t *testing.T) {
 	t.Parallel()
 	const gap = 7100 * time.Millisecond
@@ -145,11 +144,10 @@ func TestBDXLivenessKickOnDuplicate(t *testing.T) {
 	})
 	t.Run("does not retransmit when the peer can stay awake for the remaining wait", func(t *testing.T) {
 		t.Parallel()
-		r := newKickRig(t, 0, true)
-		if r.entry.interval <= gap {
-			t.Fatalf("armed interval %v not above the gap", r.entry.interval)
+		r := newKickRig(t, 500*time.Millisecond, true)
+		if r.entry.interval != bdxMaxRetransmissionInterval {
+			t.Fatalf("armed interval %v, want the BDX cap %v", r.entry.interval, bdxMaxRetransmissionInterval)
 		}
-		r.b.sessions = kickLookup{sid: r.sessID, threshold: r.entry.interval - gap + 100*time.Millisecond}
 		if r.duplicate(t, gap, 10) {
 			t.Fatal("kicked")
 		}
