@@ -1868,7 +1868,7 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 // (isRegisteredBefore: own position < registeredBefore),
 // packages/protocol/src/session/NodeSession.ts:412-415 at b25ed960
 // (handlePeerLoss: #isPeerLost, then initiateForceClose).
-func (m *Manager) ClosePeerLostBefore(fabricIndex uint8, peerNodeID uint64, registeredBefore uint64) int {
+func (m *Manager) ClosePeerLostBefore(fabricIndex uint8, peerNodeID, registeredBefore uint64) int {
 	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
 		return entry.registration >= registeredBefore
 	})

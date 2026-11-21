@@ -309,7 +309,7 @@ func TestGivenUpInitiatedMessageLeavesTheRespondedExchange(t *testing.T) {
 	r := newExchangeSessionRig(t)
 	now := time.Now()
 	tr := newOutboundReliableTracker(nil, nil)
-	_ = tr.trackExchangeMessage(7, r.sid, r.peerXID, true, []byte{0x00}, r.peer.addr, now, 0)
+	_ = tr.trackKickable(7, r.sid, r.peerXID, true, []byte{0x00}, r.peer.addr, now, 0, nil)
 	tr.mu.Lock()
 	for _, e := range tr.pending {
 		e.retries = mrp.MaxRetransmissions

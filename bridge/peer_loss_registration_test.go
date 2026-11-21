@@ -100,7 +100,7 @@ type orderedRegistry struct {
 
 func (r *orderedRegistry) RegistrationCount() uint64 { return r.count }
 
-func (r *orderedRegistry) ClosePeerLostBefore(_ uint8, _ uint64, registeredBefore uint64) int {
+func (r *orderedRegistry) ClosePeerLostBefore(_ uint8, _, registeredBefore uint64) int {
 	r.before = append(r.before, registeredBefore)
 	return 1
 }

@@ -150,7 +150,7 @@ type outboundEntry struct {
 	trackedAt time.Time
 	// role is this node's role in the exchange, when the tracker call
 	// named it ([outboundReliableTracker.TrackOnExchange],
-	// [outboundReliableTracker.trackExchangeMessage]). A named role makes
+	// [outboundReliableTracker.trackKickable]). A named role makes
 	// the entry its exchange's one outstanding message: the exchange takes
 	// no further message until it is acknowledged, and the receive path
 	// refuses a message that does not acknowledge it
@@ -318,24 +318,19 @@ func (t *outboundReliableTracker) TrackOnExchange(counter uint32, sessionID, exc
 	return t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, 0, nil, role, nil)
 }
 
-// trackExchangeMessage is [outboundReliableTracker.TrackOnExchange] with
-// margin added to the base interval of every (re)transmission
-// ([outboundReliableTracker.TrackWithMargin]) — a BDX exchange's message:
-// the role keeps it out of the other role's slot of the same id, and its
-// give-up is reported with it, so only the exchange it belongs to ends. It
-// refuses with [errExchangeAwaitsAck], tracking nothing, while the
-// exchange's earlier message waits for its acknowledgement; the BDX send
-// waits for that acknowledgement first
+// trackKickable is [outboundReliableTracker.TrackOnExchange] for a message
+// of an exchange ([initiatedSecureExchange.Send]), with margin added to the
+// base interval of every (re)transmission
+// ([outboundReliableTracker.TrackWithMargin]) and with what the liveness
+// kick reads of the exchange (a nil kick tracks a message that is never
+// kicked): the role keeps it out of the other role's slot of the same id,
+// and its give-up is reported with it, so only the exchange it belongs to
+// ends. It refuses with [errExchangeAwaitsAck], tracking nothing, while the
+// exchange's earlier message waits for its acknowledgement; the send waits
+// for that acknowledgement first
 // ([outboundReliableTracker.waitExchangeFree]), so the refusal is left for
-// a concurrent send.
-func (t *outboundReliableTracker) trackExchangeMessage(counter uint32, sessionID, exchangeID uint16, initiator bool, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) error {
-	return t.trackKickable(counter, sessionID, exchangeID, initiator, datagram, dest, now, margin, nil)
-}
-
-// trackKickable is [outboundReliableTracker.trackExchangeMessage] with what
-// the liveness kick reads of the exchange; a nil kick tracks a message that
-// is never kicked. The entry counts its first transmission under way until
-// [outboundReliableTracker.markSent].
+// a concurrent send. The entry counts its first transmission under way
+// until [outboundReliableTracker.markSent].
 func (t *outboundReliableTracker) trackKickable(counter uint32, sessionID, exchangeID uint16, initiator bool, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, kick *exchangeKick) error {
 	return t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil, roleOf(initiator), kick)
 }
@@ -430,7 +425,7 @@ func roleOf(initiator bool) exchangeRole {
 
 // exchangeRole is this node's role in the exchange of a tracked secure
 // message, when its tracker call named it ([TrackOnExchange],
-// [outboundReliableTracker.trackExchangeMessage]).
+// [outboundReliableTracker.trackKickable]).
 type exchangeRole uint8
 
 const (
@@ -578,7 +573,7 @@ const unsecuredEntryLifetime = 60 * time.Second
 // db021da0). The bridge's interaction replies and reports are tracked
 // through [outboundReliableTracker.TrackOnExchange], which refuses as
 // matter.js does (hs 4b), and a BDX transfer's messages through
-// [outboundReliableTracker.trackExchangeMessage], whose send first waits
+// [outboundReliableTracker.trackKickable], whose send first waits
 // for the acknowledgement (review II, phase 7, decision 276); only a
 // message tracked through [Track] or [TrackWithMargin] — a test's — still
 // takes the older message's place of its unnamed slot, which then loses
@@ -812,7 +807,7 @@ func (b *Bridge) outstandingOn(hdr *message.Header, proto message.ProtocolHeader
 // on the secure session's exchange that still waits for its
 // acknowledgement — one tracked with its role named
 // ([outboundReliableTracker.TrackOnExchange],
-// [outboundReliableTracker.trackExchangeMessage]).
+// [outboundReliableTracker.trackKickable]).
 func (t *outboundReliableTracker) pendingOnExchange(sessionID, exchangeID uint16, role exchangeRole) (uint32, bool) {
 	if t == nil || sessionID == 0 || role == exchangeRoleUnnamed {
 		return 0, false

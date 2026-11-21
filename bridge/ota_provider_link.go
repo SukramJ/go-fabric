@@ -583,7 +583,7 @@ func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange,
 // Manager.ClosePeerLostBefore). [Bridge.closeLostPeer] prefers it.
 type peerLossOrder interface {
 	RegistrationCount() uint64
-	ClosePeerLostBefore(fabricIndex uint8, peerNodeID uint64, registeredBefore uint64) int
+	ClosePeerLostBefore(fabricIndex uint8, peerNodeID, registeredBefore uint64) int
 }
 
 // peerLossCloser is the optional [SessionRegistry] capability that
@@ -785,7 +785,7 @@ func (e *initiatedSecureExchange) Reliable() bool {
 // db021da0 (send sets #sentMessageToAck and does not return before its
 // acknowledgement; a send while one is set throws, :701-705, which the
 // tracker's refusal keeps for a concurrent send —
-// [outboundReliableTracker.trackExchangeMessage]; the give-up rejects the
+// [outboundReliableTracker.trackKickable]; the give-up rejects the
 // ack wait and leaves #sentMessageToAck set, :973-978); review II, phase 7,
 // decisions 276, 283. While it waits, the responder counts as waiting for the
 // peer ([responderTurn]), so the session's next message — the
@@ -863,21 +863,8 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
 	sentAt := e.b.clk().Now()
 	if tracker != nil {
-		kick := &exchangeKick{bdx: e.isBDX(), hasAck: proto.HasAck, ackCounter: proto.AckCounter, ended: e.ended}
-		if err := tracker.trackKickable(hdr.MessageCounter, e.sessionID, e.exchangeID, !e.responder, datagram, dest, sentAt, time.Duration(e.peerMargin.Load()), kick); err != nil {
-			// A concurrent send on the exchange took its place since the
-			// wait: this message is not sent.
+		if err := e.track(tracker, proto, hdr.MessageCounter, datagram, dest, sentAt); err != nil {
 			return err
-		}
-		e.lastTracked.Store(uint64(hdr.MessageCounter) + 1)
-		// The session may have closed since the check above, its entries
-		// dropped by the purge before this one was tracked: the entry is
-		// taken back and the exchange ends, so none of a closed session
-		// stays under its bare id (R2-P6-sec-0302).
-		if now, live := b.sessionNow(e.sessionID); e.session != nil && (!live || now != e.session) {
-			tracker.Untrack(e.sessionID, hdr.MessageCounter)
-			e.fail(errExchangeSessionGone)
-			return e.closedErr()
 		}
 	}
 	if err := e.b.sendRouted(listener, dest, e.sessionID, datagram); err != nil {
@@ -897,6 +884,29 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 	}
 	if tracker != nil {
 		tracker.markSent(e.sessionID, hdr.MessageCounter, sentAt)
+	}
+	return nil
+}
+
+// track records the reliable message counter of the exchange, sent with
+// proto, for retransmission ([initiatedSecureExchange.Send]), with what the
+// liveness kick reads of the exchange ([exchangeKick]).
+func (e *initiatedSecureExchange) track(tracker *outboundReliableTracker, proto message.ProtocolHeader, counter uint32, datagram []byte, dest net.Addr, at time.Time) error {
+	kick := &exchangeKick{bdx: e.isBDX(), hasAck: proto.HasAck, ackCounter: proto.AckCounter, ended: e.ended}
+	if err := tracker.trackKickable(counter, e.sessionID, e.exchangeID, !e.responder, datagram, dest, at, time.Duration(e.peerMargin.Load()), kick); err != nil {
+		// A concurrent send on the exchange took its place since the
+		// wait: this message is not sent.
+		return err
+	}
+	e.lastTracked.Store(uint64(counter) + 1)
+	// The session may have closed since the check above, its entries
+	// dropped by the purge before this one was tracked: the entry is
+	// taken back and the exchange ends, so none of a closed session
+	// stays under its bare id (R2-P6-sec-0302).
+	if now, live := e.b.sessionNow(e.sessionID); e.session != nil && (!live || now != e.session) {
+		tracker.Untrack(e.sessionID, counter)
+		e.fail(errExchangeSessionGone)
+		return e.closedErr()
 	}
 	return nil
 }
