@@ -166,7 +166,7 @@ func TestManagerBDXLivenessParity(t *testing.T) {
 		}
 		// Blocks between two queue checks count for the reported status.
 		r.m.mu.Lock()
-		r.m.queue[0].started = r.clock.Now().Add(-20 * time.Minute)
+		r.m.queue[0].phase.legacy.since = r.clock.Now().Add(-20 * time.Minute)
 		r.m.mu.Unlock()
 		f.add(200_000)
 		wantStatus(t, r.only(t), PendingInProgress, mattercore.OTAUpdateDownloading)

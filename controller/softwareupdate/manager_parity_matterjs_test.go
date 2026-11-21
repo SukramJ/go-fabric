@@ -92,17 +92,17 @@ func (r *managerRig) setNode(gone bool, edit func(*basicinfo.State)) {
 }
 
 // queue adds the consent and the queued entry addUpdateConsent leaves for
-// an applicable node (:1153-1196), in status at the current time.
+// an applicable node (SoftwareUpdateManager.ts:1590-1625 at b25ed960),
+// without the queue run; with status, the entry is in progress with that
+// status at the current time, as the deprecated OnStatusChange leaves it.
 func (r *managerRig) queue(target uint32, status *Status) *queueEntry {
 	t := Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: target}
-	e := &queueEntry{consent: consent{Target: t, peer: testPeer}, endpoint: 0}
+	e := &queueEntry{Target: t, peer: testPeer, phase: &updatePhase{state: phaseQueued}}
 	if status != nil {
-		s := *status
-		e.status = &s
-		e.started = r.clock.Now()
+		e.phase = &updatePhase{state: phaseProgress, legacy: &legacyProgress{status: *status, since: r.clock.Now()}}
 	}
 	r.m.mu.Lock()
-	r.m.consents = append(r.m.consents, consent{Target: t, peer: testPeer})
+	r.m.consents[testPeer] = &consent{Target: t, peer: testPeer}
 	r.m.queue = append(r.m.queue, e)
 	r.m.mu.Unlock()
 	return e

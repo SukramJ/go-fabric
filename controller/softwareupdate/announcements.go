@@ -5,15 +5,12 @@ package softwareupdate
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"math"
 	"slices"
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/peer"
 	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	otareq "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
@@ -211,23 +208,20 @@ func (a *announcements) announceDefaultProvider(ctx context.Context, p Peer) err
 }
 
 // announceOtaProvider sends AnnounceOTAProvider to the node's requestor
-// endpoint (:266-292). A closed connection is logged and retried later;
-// any other failure is only logged, as matter.js's.
-func (a *announcements) announceOtaProvider(ctx context.Context, n *client.Node, endpoint uint16, reason otareq.AnnouncementReasonEnum) error { //nolint:unparam // the caller keeps matter.js's catch (SoftwareUpdateManager.ts:991-1025)
+// endpoint under ctx, the caller's abort. It returns the failure when the
+// node cannot be reached, rejects the command, or ctx ends; the caller
+// decides what a failed announcement means for its update
+// (SoftwareUpdateManager's #announce).
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaAnnouncements.ts:252-272 at b25ed960
+// (announceOtaProvider).
+func (a *announcements) announceOtaProvider(ctx context.Context, n *client.Node, endpoint uint16, reason otareq.AnnouncementReasonEnum) error {
 	providerNodeID, providerEndpoint := a.m.provider()
 	req := otareq.AnnounceOtaProviderRequest{
 		ProviderNodeId: providerNodeID, VendorId: a.m.cfg.VendorID, AnnouncementReason: reason, Endpoint: providerEndpoint,
 	}
 	_, err := n.Invoke(ctx, client.CommandAt(endpoint, otareq.ClusterID, otareq.CmdAnnounceOtaProvider), req, client.InvokeOptions{})
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, exchange.ErrSessionClosed) || errors.Is(err, peer.ErrClosed) {
-		a.log.Debug("ota.announcements.closed_retry_later", slog.Int("endpoint", int(endpoint)), slog.Any("err", err))
-		return nil
-	}
-	a.log.Info("ota.announcements.notify_failed", slog.Int("endpoint", int(endpoint)), slog.Any("err", err))
-	return nil
+	return err
 }
 
 func (a *announcements) close() {

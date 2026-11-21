@@ -107,11 +107,17 @@ var (
 )
 
 // QueryImage implements mattercore.OTAImageSource: checkUpdateAvailable
-// (OtaSoftwareUpdateProviderServer.ts:402-414 at b25ed960) over
-// [Manager.UpdateExistsFor].
+// over [Manager.UpdateExistsFor]; when that offers nothing, the update
+// queued for the node fails if it cannot be delivered
+// (dropUndeliverableUpdate, C-5). A host's own image source decides itself
+// whether to call the latter.
+//
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:395-414 at b25ed960
+// (checkUpdateAvailable).
 func (s providerPorts) QueryImage(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest) (mattercore.OTAImage, bool, error) {
 	d, ok := s.m.UpdateExistsFor(ctx, peerOf(p), req)
 	if !ok {
+		s.m.dropUndeliverableUpdate(peerOf(p), req.SoftwareVersion)
 		return mattercore.OTAImage{}, false, nil
 	}
 	return mattercore.OTAImage{
@@ -229,8 +235,8 @@ func (m *Manager) cancelTransferForRestart(p Peer) error {
 
 // MayDelegateConsentTo implements mattercore.OTAUpdateManager
 // ([Manager.mayDelegateConsentTo]).
-func (s providerPorts) MayDelegateConsentTo(_ mattercore.OTAPeer, req provdef.QueryImageRequest) bool {
-	return s.m.mayDelegateConsentTo(req)
+func (s providerPorts) MayDelegateConsentTo(p mattercore.OTAPeer, req provdef.QueryImageRequest) bool {
+	return s.m.mayDelegateConsentTo(peerOf(p), req)
 }
 
 // ReportAttemptStatus implements mattercore.OTAUpdateManager
@@ -282,10 +288,8 @@ func (s providerPorts) AttemptFor(p mattercore.OTAPeer, token []byte) *mattercor
 
 // ApplyUpdate implements mattercore.OTAUpdateManager: the apply table, and
 // the status it records — Applying with the delay, or Cancelled — moves
-// the queued update linked to the attempt. A scripted ApplyUpdateRequest
-// (script.go) arrives in ctx: a scripted Discontinue refuses as the table
-// refuses an update without its apply right, the attempt of the token
-// Cancelled; a scripted Proceed's delay replaces the provider's.
+// the queued update linked to the attempt. A scripted Proceed's delay
+// (script.go) arrives in ctx and replaces the provider's.
 //
 // Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1921-1943 at b25ed960
 // (applyUpdate).
@@ -293,16 +297,8 @@ func (s providerPorts) ApplyUpdate(ctx context.Context, p mattercore.OTAPeer, to
 	m := s.m
 	m.mu.Lock()
 	defer m.unlock()
-	if o, ok := applyOverrideFrom(ctx); ok {
-		if o.refuse {
-			if a := m.attempts.Find(p, token); a != nil {
-				m.reportAttemptStatusLocked(a, mattercore.OTAUpdateCancelled, 0) //nolint:contextcheck // the queue's work runs on the manager's lifetime
-			}
-			return false
-		}
-		if o.set {
-			applyDelay = wholeSeconds(o.delay)
-		}
+	if o, ok := applyOverrideFrom(ctx); ok && o.set {
+		applyDelay = wholeSeconds(o.delay)
 	}
 	a, allowed := m.attempts.ApplyUpdate(p, token, newVersion)
 	switch {

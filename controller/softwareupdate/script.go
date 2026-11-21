@@ -47,9 +47,12 @@ type QueryImageScript struct {
 //   - AwaitNextAction is stated directly, with DelayedActionTime (0 when
 //     nil); the provider is not asked, so the requestor's next request
 //     finds the transfer and the image it already downloaded.
-//   - Discontinue withdraws the update's consent ([Manager.RemoveConsent])
-//     and lets the provider refuse for itself, so the state it is left in
-//     agrees with the answer; DelayedActionTime is not laid over it.
+//   - Discontinue withdraws the consent of the version the update token
+//     applies ([Manager.RemoveConsent]), when the token names one, and the
+//     provider answers by its apply table: a known token whose attempt does
+//     not apply yet is refused, an applying one proceeds, an unknown token
+//     with a version above 0 proceeds as a new attempt, version 0 under an
+//     unknown token is refused; DelayedActionTime is not laid over it.
 //   - Proceed runs the provider's own path with DelayedActionTime in place
 //     of [Config].ApplyDelay; the provider still refuses an update it holds
 //     no consent for, and the delay is not laid over that refusal.
@@ -157,9 +160,19 @@ func (m *Manager) scriptedApplyUpdate(ctx context.Context, op mattercore.OTAPeer
 			resp.DelayedActionTime = *script.DelayedActionTime
 		}
 	default:
+		// A scripted Discontinue removes the consent of the version the
+		// token applies, when it names one, and the provider answers by its
+		// apply table (F-b25ed960-C3).
+		//
+		// Mirrors matter.js support/chip-testing/src/cert/InProcessControllerAdapter.ts:765-772 at b25ed960
+		// (applyUpdateRequest, the scripted Discontinue).
 		if scripted && script.Action == provdef.ApplyUpdateActionDiscontinue {
-			m.RemoveConsent(p, req.NewVersion) //nolint:contextcheck // as matter.js, the consent change is not bound to the command
-			ctx = context.WithValue(ctx, applyOverrideKey{}, applyOverride{refuse: true})
+			m.mu.Lock()
+			version, ok := m.attempts.AppliedVersionOf(op, req.UpdateToken, req.NewVersion)
+			m.mu.Unlock()
+			if ok {
+				m.RemoveConsent(p, version) //nolint:contextcheck // as matter.js, the consent change is not bound to the command
+			}
 		}
 		if scripted && script.Action == provdef.ApplyUpdateActionProceed && script.DelayedActionTime != nil {
 			ctx = context.WithValue(ctx, applyOverrideKey{}, applyOverride{delay: time.Duration(*script.DelayedActionTime) * time.Second, set: true})
@@ -194,15 +207,12 @@ func (m *Manager) observedNotifyApplied(ctx context.Context, op mattercore.OTAPe
 }
 
 // applyOverride is what a scripted ApplyUpdateRequest asks of the
-// manager's apply ([providerPorts.ApplyUpdate]): a delay in
-// place of [Config].ApplyDelay (the scripted Proceed's state.applyDelay,
-// InProcessControllerAdapter.ts:775-789 at b25ed960), or the refusal of a
-// scripted Discontinue (:765-772, where matter.js removes the consent of
-// the token's version and lets the provider answer; F-b25ed960-C3).
+// manager's apply ([providerPorts.ApplyUpdate]): a delay in place of
+// [Config].ApplyDelay (the scripted Proceed's state.applyDelay,
+// InProcessControllerAdapter.ts:775-789 at b25ed960).
 type applyOverride struct {
-	delay  time.Duration
-	set    bool
-	refuse bool
+	delay time.Duration
+	set   bool
 }
 
 type applyOverrideKey struct{}

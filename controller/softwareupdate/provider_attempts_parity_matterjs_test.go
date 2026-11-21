@@ -197,7 +197,10 @@ func TestManagerConsentRemovalEndsTheApplyRightParity(t *testing.T) {
 // linked to its queued update, is Applying, reporting a version below the
 // update's target, fails the update (SoftwareUpdateManager.ts:1836-1850
 // at b25ed960); a stale Applying attempt — past its apply delay and the
-// progress timeout — only ends and resets it (row 0, :1823-1829).
+// progress timeout — only ends and resets it (row 0, :1823-1829). Either
+// way the admitted query's offer of the target is answered and links the
+// update again: a failed update keeps its consent and entry, and is listed
+// again while the node retries it on its own (:388-391, :2083-2087).
 func TestManagerAdmissionFailsAnAppliedUpdateParity(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -206,7 +209,7 @@ func TestManagerAdmissionFailsAnAppliedUpdateParity(t *testing.T) {
 		failed int
 		queued bool
 	}{
-		{"fails an update whose node queries again below its target after applying it", 20 * time.Minute, 1, false},
+		{"fails an update whose node queries again below its target after applying it", 20 * time.Minute, 1, true},
 		{"ends a stale attempt and resets its update, without a failure", 80 * time.Minute, 0, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -553,8 +556,9 @@ func TestManagerDelegatesConsentOnlyWhenOnParity(t *testing.T) {
 		t.Parallel()
 		for _, on := range []bool{false, true} {
 			r := newManagerRig(t, func(c *Config) { c.DelegateConsentToRequestor = on })
+			delegate := r.m.mayDelegateConsentTo(testPeer, req)
 			r.m.mu.Lock()
-			chosen, required := r.m.offerOfLocked(testPeer, candidates, req)
+			chosen, required := r.m.offerOfLocked(testPeer, candidates, 0xFFF1, 0x8001, delegate)
 			r.m.mu.Unlock()
 			if delegated := (providerPorts{r.m}).MayDelegateConsentTo(otaPeerOfTest(), req); delegated != on {
 				t.Errorf("delegation %v: MayDelegateConsentTo %v", on, delegated)
@@ -571,8 +575,9 @@ func TestManagerDelegatesConsentOnlyWhenOnParity(t *testing.T) {
 		t.Parallel()
 		r := newManagerRig(t, func(c *Config) { c.DelegateConsentToRequestor = true })
 		r.queue(2, nil)
+		delegate := r.m.mayDelegateConsentTo(testPeer, req)
 		r.m.mu.Lock()
-		chosen, required := r.m.offerOfLocked(testPeer, candidates, req)
+		chosen, required := r.m.offerOfLocked(testPeer, candidates, 0xFFF1, 0x8001, delegate)
 		r.m.mu.Unlock()
 		if chosen == nil || chosen.SoftwareVersion != 2 || required {
 			t.Errorf("offered %v required %v, want the consented 2", chosen, required)

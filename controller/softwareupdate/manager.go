@@ -54,6 +54,12 @@ const maxApplyDelay = 24 * time.Hour
 // (SoftwareUpdateManager.ts:1074-1077).
 var ErrNotApplicable = errors.New("softwareupdate: node is not currently applicable for OTA updates")
 
+// ErrNoNode is a peer address no node has: [Manager.AddUpdateConsent] and
+// [Manager.ForceUpdate] change nothing for it — matter.js's OtaUpdateError
+// of #otaEndpointFor (SoftwareUpdateManager.ts:1574-1578 at b25ed960), as
+// for a node removed after the caller looked it up.
+var ErrNoNode = errors.New("softwareupdate: no node has the peer address")
+
 // ErrMismatch is a consent whose vendor or product does not match the
 // node — ImplementationError (SoftwareUpdateManager.ts:1166-1168).
 var ErrMismatch = errors.New("softwareupdate: node does not match the given vendorId/productId")
@@ -252,35 +258,197 @@ type Config struct {
 	Logger *slog.Logger
 }
 
+// consent is the consent the application gave for a peer, one per peer —
+// UpdateConsent (SoftwareUpdateManager.ts:78-85 at b25ed960).
 type consent struct {
 	Target
 	peer Peer
+	// failedAt is when the update to the consent's version failed since
+	// the consent was given; zero while it did not.
+	failedAt time.Time
 }
 
-// queueEntry is UpdateQueueEntry (SoftwareUpdateManager.ts:114-118,
-// :133-140 at b25ed960).
-type queueEntry struct {
-	consent
-	endpoint uint16
-	// started is when the entry left the queue for the node — announced
-	// or linked to an attempt; zero while queued.
-	started time.Time
-	// attempt is the update attempt the entry follows — UpdatePhase
-	// "progress" (:118), linked by identity (#linkAttempt :2074-2089,
-	// #linkedEntry :2059-2065); nil while the entry follows none. Its
-	// status, activity and apply delay are the entry's.
+// failedUpdateRetention is how long a failed update keeps its consent and
+// queue entry: meanwhile the node may query and apply the update on its
+// own, but it is not announced again — FAILED_UPDATE_RETENTION
+// (SoftwareUpdateManager.ts:120-124 at b25ed960).
+const failedUpdateRetention = 24 * time.Hour
+
+// phaseState is where a queued update stands — UpdatePhase's state
+// (SoftwareUpdateManager.ts:87-118 at b25ed960).
+type phaseState uint8
+
+const (
+	// phaseQueued waits for an announcement; resetAt when it was reset.
+	// Not announced while its consent failed.
+	phaseQueued phaseState = iota
+	// phaseAnnouncing: the announcement runs.
+	phaseAnnouncing
+	// phaseAnnounced: the node was announced and made no answered attempt
+	// since since.
+	phaseAnnounced
+	// phaseProgress: the node follows attempt (or, without one, the
+	// deprecated OnStatusChange moved the entry: legacy).
+	phaseProgress
+)
+
+func (s phaseState) String() string {
+	switch s {
+	case phaseQueued:
+		return "queued"
+	case phaseAnnouncing:
+		return "announcing"
+	case phaseAnnounced:
+		return "announced"
+	case phaseProgress:
+		return "progress"
+	}
+	return "unknown"
+}
+
+// updatePhase is UpdatePhase (SoftwareUpdateManager.ts:87-118 at
+// b25ed960). A phase is replaced, never changed in place, except for the
+// liveness of progress: an announcement compares the phase it started with
+// by identity (#runAnnouncement :1399-1415).
+type updatePhase struct {
+	state phaseState
+	// resetAt is when a queued entry was reset; zero while it never was.
+	resetAt time.Time
+	// since is when an announced entry was announced.
+	since time.Time
+	// attempt is the update attempt an entry in progress follows.
 	attempt *mattercore.OTAUpdateAttempt
-	// status is the entry's own status while it follows no attempt:
-	// Unknown once reset, or a status the deprecated
-	// [Manager.OnStatusChange] reported; nil while undefined.
-	status *Status
-	// transferred is lastBdxTransferredBytes.
-	transferred *uint64
-	// applyDelay is the delay of an Applying update the deprecated
-	// [Manager.OnStatusChange] reported.
+	// bdxTransferred is the transfer counter last seen in progress.
+	bdxTransferred *uint64
+	// legacy is the status of an entry in progress without an attempt,
+	// which the deprecated [Manager.OnStatusChange] moved there. Go-only
+	// (C-16): matter.js has no update without an attempt any more.
+	legacy *legacyProgress
+}
+
+// legacyProgress is the status the deprecated [Manager.OnStatusChange]
+// reported for an entry that follows no attempt, with its apply delay and
+// time.
+type legacyProgress struct {
+	status     Status
 	applyDelay time.Duration
+	since      time.Time
+}
+
+// underway reports an entry the node was announced for or follows an
+// attempt for; an announcing entry is not underway yet, so its target may
+// still be replaced (isUnderway, SoftwareUpdateManager.ts:126-132 at
+// b25ed960).
+func (p *updatePhase) underway() bool {
+	return p.state == phaseAnnounced || p.state == phaseProgress
+}
+
+// status is the status of an entry in progress: its attempt's, or the
+// legacy one; nil in any other phase.
+func (p *updatePhase) status() *Status {
+	if p.state != phaseProgress {
+		return nil
+	}
+	if p.attempt != nil {
+		s := p.attempt.Status()
+		return &s
+	}
+	if p.legacy != nil {
+		s := p.legacy.status
+		return &s
+	}
+	return nil
+}
+
+// applying reports an entry in progress whose status is Applying.
+func (p *updatePhase) applying() bool {
+	s := p.status()
+	return s != nil && *s == mattercore.OTAUpdateApplying
+}
+
+// stalled reports an announced or progressing update that shows no
+// activity for its timeout: since plus [ProgressTimeout] for an announced
+// one, the attempt's staleness for one in progress, and for a legacy one
+// its time plus its apply delay and the timeout.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:464-473 at b25ed960
+// (#isStalled).
+func (p *updatePhase) stalled(now time.Time) bool {
+	switch p.state {
+	case phaseAnnounced:
+		return p.since.Add(ProgressTimeout).Before(now)
+	case phaseProgress:
+		if p.attempt != nil {
+			return p.attempt.IsStale(now)
+		}
+		if p.legacy != nil {
+			return p.legacy.since.Add(p.legacy.applyDelay + ProgressTimeout).Before(now)
+		}
+	default:
+	}
+	return false
+}
+
+// announcement is the abort of a running announcement (the entry's
+// announcement, SoftwareUpdateManager.ts:142-143 at b25ed960): it aborts
+// on its own after [ProgressTimeout]. An abort before the announcement's
+// goroutine bound its context ends that context as soon as it is bound.
+type announcement struct {
+	timer clock.Timer
+
+	mu     sync.Mutex
+	cause  error
+	cancel context.CancelCauseFunc
+}
+
+// abort ends the announcement with cause; the first cause holds.
+func (a *announcement) abort(cause error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.cause != nil {
+		return
+	}
+	a.cause = cause
+	if a.cancel != nil {
+		a.cancel(cause)
+	}
+}
+
+// bind gives the announcement the cancel of its context.
+func (a *announcement) bind(cancel context.CancelCauseFunc) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cancel = cancel
+	if a.cause != nil {
+		cancel(a.cause)
+	}
+}
+
+var (
+	// errAnnouncementTimeout aborts an announcement the node did not
+	// answer within [ProgressTimeout].
+	errAnnouncementTimeout = errors.New("softwareupdate: the announcement got no answer within the progress timeout")
+	// errAnnouncementAborted aborts an announcement whose entry moved on
+	// or whose manager went offline.
+	errAnnouncementAborted = errors.New("softwareupdate: the announcement was aborted")
+)
+
+// queueEntry is UpdateQueueEntry (SoftwareUpdateManager.ts:134-144 at
+// b25ed960).
+type queueEntry struct {
+	// Target is the update: vendor, product and target version are the
+	// entry's; outside progress the version is the consent's (#retarget).
+	// The transfer options are the consent's when the entry took it, for
+	// the events only: a transfer takes the consent's ([TransferOptionsFor]).
+	Target
+	peer     Peer
+	endpoint uint16
+	phase    *updatePhase
+	// announcement aborts the announcement still running for the entry,
+	// also after an attempt moved it past announcing.
+	announcement *announcement
 	// transferStarted is whether [UpdateTransferStarted] was emitted for
-	// the entry; reset leaves it, so a retry does not emit it again.
+	// the entry; a reset leaves it, so a retry does not emit it again.
 	// Go-only: matter.js keeps no such mark.
 	transferStarted bool
 }
@@ -296,7 +464,8 @@ type Manager struct {
 	// suppress is internal.suppressUpdates (:1438-1439): set until Start
 	// and again from Close.
 	suppress bool
-	consents []consent
+	// consents are internal.consents, one per peer.
+	consents map[Peer]*consent
 	queue    []*queueEntry
 	known    map[Peer]SoftwareUpdateInfo
 	// startUpSuppress is internal.pendingStartUpSuppress (:1421-1431).
@@ -314,9 +483,22 @@ type Manager struct {
 	post []func()
 
 	checkTimer, queueTimer clock.Timer
-	announcements          *announcements
-	closed                 bool
-	work                   sync.WaitGroup
+	// queueGen tells the queue timer's tick apart from a stopped one's.
+	queueGen uint64
+	// expiryTimer is internal.expiryTimer (#scheduleExpiry), expiryGen
+	// tells its tick apart from a stopped one's.
+	expiryTimer clock.Timer
+	expiryGen   uint64
+	// queueRunPending asks the end of the running change (unlock) for a
+	// queue run (#triggerQueuedUpdate): the run reads the registry, which
+	// the manager does not read with m.mu held.
+	queueRunPending bool
+	// running are internal.runningAnnouncements: the aborts of the
+	// announcements that run; Close aborts them and waits for them.
+	running       map[*announcement]struct{}
+	announcements *announcements
+	closed        bool
+	work          sync.WaitGroup
 	// life is the context of the update checks the timers run, cancelled
 	// by Close, which also waits for them (review II, R2-P6-conc-1907).
 	life     context.Context
@@ -387,7 +569,7 @@ func New(cfg Config) (*Manager, error) {
 	m := &Manager{
 		cfg: cfg, clock: clock.Or(cfg.Clock), rand: cfg.Rand, log: cfg.Logger,
 		suppress: true, known: map[Peer]SoftwareUpdateInfo{}, startUpSuppress: map[Peer]uint16{},
-		observed: map[Peer]uint32{},
+		observed: map[Peer]uint32{}, consents: map[Peer]*consent{}, running: map[*announcement]struct{}{},
 		attempts: mattercore.NewOTAUpdateAttempts(cfg.Clock),
 	}
 	m.life, m.stopLife = context.WithCancel(context.Background())
@@ -465,23 +647,31 @@ func (m *Manager) scheduleCheck() {
 }
 
 // Close takes the manager offline — #nodeGoingOffline and the disposal
-// (:232-244, :1323-1329): no update work starts any more, the timers and
-// the announcements stop. A running update check a timer started is
+// (SoftwareUpdateManager.ts:296-310, :2127-2138 at b25ed960): no update
+// work starts any more; the timers stop; every running announcement is
+// aborted and waited for (#stopAnnouncements :1446-1453), so an entry
+// whose announcement it ended waits as queued; the announcements stop and
+// the attempts end, an entry that followed one keeps following it
+// (#endAllAttempts :1229-1237). A running update check a timer started is
 // cancelled — its download included — and waited for, so nothing is
 // stored after Close returns (review II, R2-P6-conc-1907).
 func (m *Manager) Close() {
 	m.mu.Lock()
 	m.suppress = true
 	m.closed = true
-	for _, t := range []clock.Timer{m.checkTimer, m.queueTimer} {
+	for _, t := range []clock.Timer{m.checkTimer, m.queueTimer, m.expiryTimer} {
 		if t != nil {
 			t.Stop()
 		}
 	}
+	m.queueTimer, m.expiryTimer = nil, nil
+	m.queueGen++
+	m.expiryGen++
+	for run := range m.running {
+		run.abort(errAnnouncementAborted)
+	}
 	a := m.announcements
 	m.announcements = nil
-	// #endAllAttempts (:1229-1237, :309 at b25ed960): the attempts end;
-	// an entry that followed one keeps following it.
 	for _, at := range m.attempts.All() {
 		m.attempts.End(at)
 	}
@@ -550,11 +740,8 @@ func (m *Manager) softwareVersionOf(p Peer) (uint32, bool) {
 	return st.SoftwareVersion, ok
 }
 
-// errNoNode is a peer address no node has.
-var errNoNode = errors.New("softwareupdate: no node has the peer address")
-
 // otaEndpointFor is the OTA requestor endpoint of the node while it is
-// applicable for updates: errNoNode while no node has the address,
+// applicable for updates: ErrNoNode while no node has the address,
 // [ErrMismatch] for an applicable node whose vendor or product differ from
 // t's. Called without m.mu.
 //
@@ -565,7 +752,7 @@ func (m *Manager) otaEndpointFor(p Peer, t Target) (endpoint uint16, applicable 
 	if m.node != nil {
 		v, ok := m.node(p)
 		if !ok {
-			return 0, false, fmt.Errorf("%w: %s", errNoNode, peerString(p))
+			return 0, false, fmt.Errorf("%w: %s", ErrNoNode, peerString(p))
 		}
 		if v.endpoint == nil || v.basic == nil {
 			return 0, false, nil
@@ -574,7 +761,7 @@ func (m *Manager) otaEndpointFor(p Peer, t Target) (endpoint uint16, applicable 
 	} else {
 		n := m.nodeAt(p)
 		if n == nil {
-			return 0, false, fmt.Errorf("%w: %s", errNoNode, peerString(p))
+			return 0, false, fmt.Errorf("%w: %s", ErrNoNode, peerString(p))
 		}
 		d, ok := m.preparePeerForUpdate(n)
 		if !ok {
@@ -596,7 +783,7 @@ func (m *Manager) announceTo(ctx context.Context, a *announcements, p Peer, endp
 	}
 	n := m.nodeAt(p)
 	if n == nil {
-		return fmt.Errorf("%w: %s", errNoNode, peerString(p))
+		return fmt.Errorf("%w: %s", ErrNoNode, peerString(p))
 	}
 	return a.announceOtaProvider(ctx, n, endpoint, announceUpdateAvailable)
 }
@@ -740,12 +927,23 @@ func (m *Manager) indexOfLocked(p Peer) int {
 	return slices.IndexFunc(m.queue, func(e *queueEntry) bool { return e.peer == p })
 }
 
-// onSoftwareVersionChanged is #onSoftwareVersionChanged (:769-842): a
-// startUp of the reboot the provider already handled is suppressed; a
-// version below the target after a startUp of an Applying update fails
-// it; one that waits for its apply is reset and stays queued; a version at
-// or above the target completes it and
-// drops the consents it covers.
+// entryOfLocked is the node's queue entry, nil for none (#entryFor,
+// SoftwareUpdateManager.ts:595-597 at b25ed960).
+func (m *Manager) entryOfLocked(p Peer) *queueEntry {
+	if i := m.indexOfLocked(p); i >= 0 {
+		return m.queue[i]
+	}
+	return nil
+}
+
+// onSoftwareVersionChanged is #onSoftwareVersionChanged: a startUp of the
+// reboot the provider already handled is suppressed; a version below the
+// target after a startUp of an applying update fails it; a version at or
+// above the target completes it; a version below resets an update that is
+// underway, and the queue runs.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1035-1089 at b25ed960
+// (#onSoftwareVersionChanged).
 func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp bool) {
 	m.mu.Lock()
 	if isStartUp {
@@ -764,38 +962,34 @@ func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp 
 			}
 		}
 	}
-	i := m.indexOfLocked(p)
-	if i < 0 {
+	e := m.entryOfLocked(p)
+	if e == nil {
 		m.mu.Unlock()
 		return
 	}
-	e := m.queue[i]
-	// The failed apply is judged before anything resets the entry, so
-	// #failUpdate still reaches the attempt the entry follows
-	// (SoftwareUpdateManager.ts:1061-1069 at b25ed960; the reset comes only
-	// on the path that neither fails nor completes, :1082-1087). Only an
-	// update that applies fails; one that waits for its apply takes the
-	// reset below (C-31).
-	//
-	// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1063 at b25ed960
-	// (the failed-apply condition: below the target, StartUp, Applying).
-	previous := e.statusOf()
-	if newVersion < e.TargetSoftwareVersion && isStartUp && previous != nil && *previous == mattercore.OTAUpdateApplying {
+	previous, target := e.phase.status(), e.TargetSoftwareVersion
+	if newVersion < target && isStartUp && previous != nil && *previous == mattercore.OTAUpdateApplying {
 		m.log.Warn("ota.manager.apply_failed_reboot", slog.String("node", peerString(p)),
-			slog.Uint64("version", uint64(newVersion)), slog.Uint64("target", uint64(e.TargetSoftwareVersion)))
-		m.failAppliedLocked(i)
+			slog.Uint64("version", uint64(newVersion)), slog.Uint64("target", uint64(target)))
+		m.failUpdateLocked(e)
+		m.unlock()
 		return
 	}
-	if !e.started.IsZero() {
+	if newVersion >= target {
+		m.log.Info("ota.manager.updated", slog.String("node", peerString(p)), slog.Uint64("version", uint64(newVersion)))
+		m.completeUpdateLocked(e, newVersion)
+		m.unlock()
+		return
+	}
+	m.log.Info("ota.manager.below_target", slog.String("node", peerString(p)),
+		slog.Uint64("version", uint64(newVersion)), slog.Uint64("target", uint64(target)))
+	// An announcing entry was already restarted, as by the other event of
+	// the same reboot (:1081).
+	if e.phase.underway() {
 		m.log.Info("ota.manager.version_change_clears_progress", slog.String("node", peerString(p)))
-		e.reset()
+		m.resetEntryProgressLocked(e)
 	}
-	if newVersion < e.TargetSoftwareVersion {
-		m.mu.Unlock()
-		return
-	}
-	m.log.Info("ota.manager.updated", slog.String("node", peerString(p)), slog.Uint64("version", uint64(newVersion)))
-	m.completeUpdateLocked(i, newVersion)
+	m.requestQueueRunLocked()
 	m.unlock()
 }
 
@@ -809,137 +1003,299 @@ func (m *Manager) onSubscribedAfterApply(p Peer, n *client.Node) {
 }
 
 // subscribedAfterApply is onSubscribedAfterApply over the version the
-// node reports.
+// node reports: an update in progress whose attempt applies, resubscribed
+// after its restart deadline below the target, failed.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1091-1118 at b25ed960
+// (#onSubscribedAfterApply).
 func (m *Manager) subscribedAfterApply(p Peer, version uint32) {
 	m.mu.Lock()
-	i := m.indexOfLocked(p)
-	if i < 0 {
+	e := m.entryOfLocked(p)
+	if e == nil || e.phase.state != phaseProgress {
 		m.mu.Unlock()
 		return
 	}
-	e := m.queue[i]
-	// :1104-1112 at b25ed960: the linked attempt's status, activity and
-	// apply delay; an entry the deprecated OnStatusChange moved, its own.
-	since, delay := e.started, e.applyDelay
-	if e.attempt != nil {
-		since, delay = e.attempt.LastActivity(), e.attempt.ApplyDelay()
+	ph := e.phase
+	var since time.Time
+	var delay time.Duration
+	switch {
+	case ph.attempt != nil:
+		since, delay = ph.attempt.LastActivity(), ph.attempt.ApplyDelay()
+	case ph.legacy != nil:
+		since, delay = ph.legacy.since, ph.legacy.applyDelay
+	default:
 	}
-	if s := e.statusOf(); s == nil || *s != mattercore.OTAUpdateApplying || e.started.IsZero() ||
+	if s := ph.status(); s == nil || *s != mattercore.OTAUpdateApplying ||
 		m.clock.Now().Before(since.Add(peer.RebootReturnTimeout(delay))) || version >= e.TargetSoftwareVersion {
 		m.mu.Unlock()
 		return
 	}
 	m.log.Warn("ota.manager.apply_failed_resubscribed", slog.String("node", peerString(p)), slog.Uint64("version", uint64(version)))
-	m.failAppliedLocked(i)
-}
-
-// failAppliedLocked is #failUpdate (:1148-1174 at b25ed960) of the entry
-// at i; it unlocks m.mu.
-func (m *Manager) failAppliedLocked(i int) {
-	m.failUpdateLocked(m.queue[i])
+	m.failUpdateLocked(e)
 	m.unlock()
 }
 
-// failUpdateLocked fails the entry's update: the attempt it follows is
-// Cancelled when it applies and ends (:1152-1157 at b25ed960), and the
-// entry leaves the queue with updateFailed. matter.js keeps the entry
-// queued as failed while its consent lasts (failedAt, #retarget,
-// :1158-1173); the module's queue drops it, as before the attempts.
-// m.mu is held.
+// failUpdateLocked marks the entry's update failed and runs the queue on:
+// the announcement is aborted, the startUp suppression dropped, the attempt
+// the entry follows Cancelled when it applies and ended, and the entry
+// waits as queued. Without a consent the entry leaves with updateFailed;
+// else the first failure of the consent's version sets failedAt and
+// reports updateFailed, a later one of that version is not reported again,
+// a failure of another version is, and the entry takes the consent's
+// version. m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1142-1174 at b25ed960
+// (#failUpdate).
 func (m *Manager) failUpdateLocked(e *queueEntry) {
-	if a := e.attempt; a != nil {
-		if a.Status() == mattercore.OTAUpdateApplying {
-			m.attempts.SetStatus(a, mattercore.OTAUpdateCancelled, 0)
-		}
-		m.attempts.End(a)
-	}
-	i := slices.Index(m.queue, e)
-	if i < 0 {
-		return
-	}
-	p, target := e.peer, e.Target
-	m.queue = slices.Delete(m.queue, i, i+1)
+	p, failed, ph := e.peer, e.Target, e.phase
+	m.abortAnnouncementLocked(e)
 	delete(m.startUpSuppress, p)
-	failed := m.cfg.OnUpdateFailed
-	m.post = append(m.post, func() {
-		if failed != nil {
-			failed(p)
+	if ph.state == phaseProgress && ph.attempt != nil {
+		if ph.attempt.Status() == mattercore.OTAUpdateApplying {
+			m.attempts.SetStatus(ph.attempt, mattercore.OTAUpdateCancelled, 0)
 		}
-		m.emit(UpdateEvent{Kind: UpdateFailed, Peer: p, Target: target, Err: ErrNotApplied})
-		m.triggerQueuedUpdate()
-	})
+		m.attempts.End(ph.attempt)
+	}
+	e.phase = &updatePhase{state: phaseQueued}
+	if c := m.consents[p]; c == nil {
+		m.dequeueLocked(e, UpdateFailed, ErrNotApplied)
+	} else {
+		if c.TargetSoftwareVersion != failed.TargetSoftwareVersion || c.failedAt.IsZero() {
+			m.postOutcomeLocked(UpdateFailed, p, failed, ErrNotApplied)
+		}
+		if c.TargetSoftwareVersion == failed.TargetSoftwareVersion && c.failedAt.IsZero() {
+			c.failedAt = m.clock.Now()
+			m.scheduleExpiryLocked()
+		}
+		m.retargetLocked(e)
+	}
+	m.requestQueueRunLocked()
 }
 
-// completeUpdateLocked removes the entry at i as done, with the consents
-// at or below completed, and ends the node's attempts up to that version
-// (#completeUpdate, SoftwareUpdateManager.ts:1120-1140 at b25ed960). m.mu
-// is held.
-func (m *Manager) completeUpdateLocked(i int, completed uint32) {
-	e := m.queue[i]
+// scheduleExpiryLocked starts the timer for the next failed consent to
+// expire, or stops it when no consent failed. m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1176-1190 at b25ed960
+// (#scheduleExpiry).
+func (m *Manager) scheduleExpiryLocked() {
+	if m.expiryTimer != nil {
+		m.expiryTimer.Stop()
+		m.expiryTimer = nil
+	}
+	m.expiryGen++
+	if m.closed {
+		return
+	}
+	var next time.Time
+	for _, c := range m.consents {
+		if !c.failedAt.IsZero() && (next.IsZero() || c.failedAt.Before(next)) {
+			next = c.failedAt
+		}
+	}
+	if next.IsZero() {
+		return
+	}
+	gen := m.expiryGen
+	delay := max(0, next.Add(failedUpdateRetention).Sub(m.clock.Now()))
+	m.expiryTimer = m.clock.AfterFunc(delay, func() { m.expireFailedUpdates(gen) })
+}
+
+// expireFailedUpdates removes the consents whose update failed
+// [failedUpdateRetention] ago; their entries leave the queue without an
+// event, as updateFailed reported the failure. An attempt keeps the apply
+// right its offer gave. Each removed consent is reported as
+// [UpdateConsentChanged] (Go-only).
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1192-1214 at b25ed960
+// (#expireFailedUpdates).
+func (m *Manager) expireFailedUpdates(gen uint64) {
+	m.mu.Lock()
+	if gen != m.expiryGen || m.closed {
+		m.mu.Unlock()
+		return
+	}
+	m.expiryTimer = nil
+	now := m.clock.Now()
+	for p, c := range m.consents {
+		if c.failedAt.IsZero() || c.failedAt.Add(failedUpdateRetention).After(now) {
+			continue
+		}
+		m.log.Info("ota.manager.failed_update_expired", slog.String("node", peerString(p)))
+		delete(m.consents, p)
+		m.postConsentChangedLocked(p, c.Target, false)
+		if e := m.entryOfLocked(p); e != nil {
+			m.dequeueLocked(e, 0, nil)
+		}
+	}
+	m.scheduleExpiryLocked()
+	m.requestQueueRunLocked()
+	m.unlock()
+}
+
+// completeUpdateLocked removes the entry as done, with the consent when
+// its version is at or below completed, ends the node's attempts up to that
+// version, and queues the consent's version when it is higher. m.mu is
+// held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1120-1140 at b25ed960
+// (#completeUpdate).
+func (m *Manager) completeUpdateLocked(e *queueEntry, completed uint32) {
 	p := e.peer
-	m.queue = slices.Delete(m.queue, i, i+1)
 	delete(m.known, p)
-	delete(m.startUpSuppress, p)
-	m.consents = slices.DeleteFunc(m.consents, func(c consent) bool { return c.peer == p && c.TargetSoftwareVersion <= completed })
+	m.dequeueLocked(e, UpdateDone, nil)
+	if c := m.consents[p]; c != nil && c.TargetSoftwareVersion <= completed {
+		delete(m.consents, p)
+		m.scheduleExpiryLocked()
+	}
 	for _, a := range m.attempts.Of(mattercore.OTAPeer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}) {
 		if v, ok := a.Version(); ok && v <= completed {
 			m.attempts.EndAttempt(a)
 		}
 	}
-	done := m.cfg.OnUpdateDone
+	m.queueUpdateLocked(p, e.endpoint, e.VendorID, e.ProductID)
+}
+
+// resetEntryProgressLocked unlinks the entry from its attempt and lets it
+// wait for the next one as queued, reset now, and take the consent's
+// version (#retarget). m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:475-480 at b25ed960
+// (#resetEntryProgress).
+func (m *Manager) resetEntryProgressLocked(e *queueEntry) {
+	m.abortAnnouncementLocked(e)
+	e.phase = &updatePhase{state: phaseQueued, resetAt: m.clock.Now()}
+	m.retargetLocked(e)
+}
+
+// retargetLocked lets an entry that follows no attempt take the version of
+// the peer's consent: one whose version changes waits as queued again, its
+// announcement aborted. Without a consent the entry leaves the queue with
+// updateFailed. A changed target reports [UpdateQueued] (Go-only). m.mu is
+// held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:482-507 at b25ed960
+// (#retarget).
+func (m *Manager) retargetLocked(e *queueEntry) {
+	if e.phase.state == phaseProgress {
+		return
+	}
+	c := m.consents[e.peer]
+	if c == nil {
+		m.dequeueLocked(e, UpdateFailed, ErrUpdateCancelled)
+		return
+	}
+	e.VendorID, e.ProductID = c.VendorID, c.ProductID
+	e.MaxBDXBlockSize, e.BDXAdditionalMrpDelay = c.MaxBDXBlockSize, c.BDXAdditionalMrpDelay
+	if c.TargetSoftwareVersion == e.TargetSoftwareVersion {
+		return
+	}
+	m.log.Info("ota.manager.retarget", slog.String("node", peerString(e.peer)),
+		slog.Uint64("from", uint64(e.TargetSoftwareVersion)), slog.Uint64("to", uint64(c.TargetSoftwareVersion)))
+	e.TargetSoftwareVersion = c.TargetSoftwareVersion
+	m.abortAnnouncementLocked(e)
+	e.phase = &updatePhase{state: phaseQueued}
+	p, t := e.peer, e.Target
+	m.post = append(m.post, func() { m.emit(UpdateEvent{Kind: UpdateQueued, Peer: p, Target: t}) })
+}
+
+// isFailedLocked reports an entry that waits as failed: the update to the
+// version of the peer's consent failed since the consent was given. It is
+// not announced and not listed; an entry in progress is never failed.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:509-515 at b25ed960
+// (#isFailed).
+func (m *Manager) isFailedLocked(e *queueEntry) bool {
+	c := m.consents[e.peer]
+	return e.phase.state != phaseProgress && c != nil && !c.failedAt.IsZero()
+}
+
+// targetOfLocked is the version of the peer's consent for the product, also
+// while the update to it counts as failed.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:517-523 at b25ed960
+// (#targetOf).
+func (m *Manager) targetOfLocked(p Peer, vid, pid uint16) (uint32, bool) {
+	if c := m.consents[p]; c != nil && c.VendorID == vid && c.ProductID == pid {
+		return c.TargetSoftwareVersion, true
+	}
+	return 0, false
+}
+
+// dequeueLocked removes the entry from the queue, with its announcement and
+// its startUp suppression, and reports kind for it — [UpdateDone],
+// [UpdateFailed] with err, or nothing for 0. It is the only way an entry
+// leaves the queue. m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:525-537 at b25ed960
+// (#dequeue).
+func (m *Manager) dequeueLocked(e *queueEntry, kind UpdateEventKind, err error) {
+	m.abortAnnouncementLocked(e)
+	delete(m.startUpSuppress, e.peer)
+	m.queue = slices.DeleteFunc(m.queue, func(x *queueEntry) bool { return x == e })
+	if kind != 0 {
+		m.postOutcomeLocked(kind, e.peer, e.Target, err)
+	}
+}
+
+// abortAnnouncementLocked ends a running announcement of the entry early;
+// its result is ignored anyway (#abortAnnouncement,
+// SoftwareUpdateManager.ts:590-593 at b25ed960).
+func (m *Manager) abortAnnouncementLocked(e *queueEntry) {
+	if e.announcement != nil {
+		e.announcement.abort(errAnnouncementAborted)
+	}
+}
+
+// postOutcomeLocked queues [UpdateDone] or [UpdateFailed] of the peer with
+// its hook, emitted once the change ends (#queueEvent,
+// SoftwareUpdateManager.ts:563-569 at b25ed960).
+func (m *Manager) postOutcomeLocked(kind UpdateEventKind, p Peer, t Target, err error) {
+	hook := m.cfg.OnUpdateFailed
+	if kind == UpdateDone {
+		hook = m.cfg.OnUpdateDone
+	}
 	m.post = append(m.post, func() {
-		if done != nil {
-			done(p)
+		if hook != nil {
+			hook(p)
 		}
-		m.emit(UpdateEvent{Kind: UpdateDone, Peer: p, Target: e.Target})
-		m.triggerQueuedUpdate()
+		m.emit(UpdateEvent{Kind: kind, Peer: p, Target: t, Err: err})
 	})
 }
 
-// reset returns the entry to the queue: it follows no attempt any more
-// (#resetEntryProgress, :475-480 at b25ed960).
-func (e *queueEntry) reset() {
-	e.started = time.Time{}
-	e.attempt = nil
-	unknown := mattercore.OTAUpdateUnknown
-	e.status = &unknown
-	e.transferred = nil
-	e.applyDelay = 0
+// postConsentChangedLocked queues [UpdateConsentChanged] (Go-only).
+func (m *Manager) postConsentChangedLocked(p Peer, t Target, consented bool) {
+	m.post = append(m.post, func() { m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: t, Consented: consented}) })
 }
 
-// statusOf is the entry's status: its attempt's while it follows one.
-func (e *queueEntry) statusOf() *Status {
-	if e.attempt != nil {
-		s := e.attempt.Status()
-		return &s
-	}
-	return e.status
-}
+// requestQueueRunLocked has the running change end with a queue run
+// (#triggerQueuedUpdate).
+func (m *Manager) requestQueueRunLocked() { m.queueRunPending = true }
 
-// stalled reports whether the entry shows no activity for the progress
-// timeout: its attempt's staleness (#isStalled, :464-473 at b25ed960), or
-// the entry's own time plus the apply delay the deprecated OnStatusChange
-// reported.
-func (e *queueEntry) stalled(now time.Time) bool {
-	if e.attempt != nil {
-		return e.attempt.IsStale(now)
-	}
-	return e.started.Add(e.applyDelay + ProgressTimeout).Before(now)
-}
-
-// unlock ends a change of the manager's state: the attempts the rules
-// ended reset the entries that followed them (#endAttempt, :1216-1227 at
-// b25ed960), m.mu is released, and what the change left to run — its
-// events, the next queue run — runs (#mutate, :543-560).
+// unlock ends a change of the manager's state (#mutate,
+// SoftwareUpdateManager.ts:539-561 at b25ed960): the attempts the rules
+// ended reset the entries that followed them (#endAttempt :1216-1227), a
+// queue run the change asked for runs — it reads the registry outside
+// m.mu, so m.mu is released for that read — and once m.mu is released
+// what the change left to run, its events, runs.
 func (m *Manager) unlock() {
-	for _, a := range m.attempts.TakeEnded() {
-		if m.suppress {
-			continue
+	for {
+		for _, a := range m.attempts.TakeEnded() {
+			if m.suppress {
+				continue
+			}
+			if e := m.linkedEntryLocked(a); e != nil {
+				m.log.Info("ota.manager.attempt_ended_reset", slog.String("node", peerString(e.peer)), slog.String("attempt", a.String()))
+				m.resetEntryProgressLocked(e)
+			}
 		}
-		if e := m.linkedEntryLocked(a); e != nil {
-			m.log.Info("ota.manager.attempt_ended_reset", slog.String("node", peerString(e.peer)), slog.String("attempt", a.String()))
-			e.reset()
+		if !m.queueRunPending {
+			break
 		}
+		m.queueRunPending = false
+		m.mu.Unlock()
+		present := m.presence()
+		m.mu.Lock()
+		m.runQueueLocked(present)
 	}
 	post := m.post
 	m.post = nil
@@ -951,27 +1307,16 @@ func (m *Manager) unlock() {
 
 // entryForLocked is the node's queue entry, nil for none.
 func (m *Manager) entryForLocked(p mattercore.OTAPeer) *queueEntry {
-	if i := m.indexOfLocked(peerOf(p)); i >= 0 {
-		return m.queue[i]
-	}
-	return nil
+	return m.entryOfLocked(peerOf(p))
 }
 
-// linkedEntryLocked is the node's queue entry while it follows the
-// attempt (#linkedEntry, SoftwareUpdateManager.ts:2059-2065 at b25ed960).
 func (m *Manager) linkedEntryLocked(a *mattercore.OTAUpdateAttempt) *queueEntry {
-	if e := m.entryForLocked(a.Peer()); e != nil && e.attempt == a {
+	if e := m.entryForLocked(a.Peer()); e != nil && e.phase.state == phaseProgress && e.phase.attempt == a {
 		return e
 	}
 	return nil
 }
 
-// linkAttemptLocked links the node's queue entry to the attempt and
-// returns it: only an answered attempt that offers the entry's target is
-// linked, and a newly linked attempt replaces the one before.
-//
-// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:2067-2089 at b25ed960
-// (#linkAttempt).
 func (m *Manager) linkAttemptLocked(a *mattercore.OTAUpdateAttempt) *queueEntry {
 	e := m.entryForLocked(a.Peer())
 	if e == nil || !a.Answered() {
@@ -980,14 +1325,14 @@ func (m *Manager) linkAttemptLocked(a *mattercore.OTAUpdateAttempt) *queueEntry 
 	if v, ok := a.Version(); !ok || v != e.TargetSoftwareVersion {
 		return nil
 	}
-	if e.attempt == a {
+	if e.phase.state == phaseProgress && e.phase.attempt == a {
 		return e
 	}
-	e.attempt = a
-	e.status = nil
-	e.transferred = nil
-	e.applyDelay = 0
-	e.started = m.clock.Now()
+	wasFailed := m.isFailedLocked(e)
+	e.phase = &updatePhase{state: phaseProgress, attempt: a}
+	if wasFailed {
+		m.requestQueueRunLocked()
+	}
 	return e
 }
 
@@ -1022,13 +1367,13 @@ func (m *Manager) reportAttemptStatusLocked(a *mattercore.OTAUpdateAttempt, stat
 	switch status {
 	case mattercore.OTAUpdateCancelled:
 		m.log.Info("ota.manager.bdx_cancelled_retry", slog.String("node", peerString(p)))
-		e.reset() // #retryUpdate (:585-588)
+		m.resetEntryProgressLocked(e) // #retryUpdate (:585-588)
+		m.requestQueueRunLocked()
 		armer := m.cfg.Armer
 		m.post = append(m.post, func() {
 			if armer != nil {
 				armer.Disarm(p)
 			}
-			m.triggerQueuedUpdate()
 		})
 	case mattercore.OTAUpdateApplying:
 		// Armed under m.mu with the entry still queued, so a NodeDeleted
@@ -1037,13 +1382,7 @@ func (m *Manager) reportAttemptStatusLocked(a *mattercore.OTAUpdateAttempt, stat
 			m.cfg.Armer.Arm(p, applyDelay)
 		}
 		if !wasApplying {
-			applying := m.cfg.OnUpdateApplying
-			m.post = append(m.post, func() {
-				if applying != nil {
-					applying(p)
-				}
-				m.emit(UpdateEvent{Kind: UpdateApplying, Peer: p, Target: target})
-			})
+			m.postApplyingLocked(p, target)
 		}
 	case mattercore.OTAUpdateDownloading:
 		// Go-only: the entry's first transfer reports [UpdateTransferStarted].
@@ -1080,17 +1419,40 @@ func (m *Manager) bdxSessionWith(p Peer, r *bdx.Responder) bdxTransfer {
 	return s
 }
 
-// isTransferring is #isTransferring (:334-336): any change of the
-// counter is liveness.
-func isTransferring(e *queueEntry, transferred *uint64) bool {
+// isTransferring is #isTransferring (SoftwareUpdateManager.ts:440-447 at
+// b25ed960): a retried download restarts its counter below the one
+// recorded, so any change of the counter is liveness.
+func isTransferring(ph *updatePhase, transferred *uint64) bool {
 	if transferred == nil {
 		return false
 	}
-	var last uint64
-	if e.transferred != nil {
-		last = *e.transferred
+	var recorded uint64
+	if ph.state == phaseProgress && ph.bdxTransferred != nil {
+		recorded = *ph.bdxTransferred
 	}
-	return *transferred != last
+	return *transferred != recorded
+}
+
+// refreshBdxProgressLocked records a moving transfer of an entry in
+// progress as the attempt's activity (a legacy entry's time). m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:449-462 at b25ed960
+// (#refreshBdxProgress).
+func (m *Manager) refreshBdxProgressLocked(e *queueEntry) bool {
+	ph := e.phase
+	t := transferredOf(m.bdxSessionForLocked(e.peer))
+	if ph.state != phaseProgress || !isTransferring(ph, t) {
+		return false
+	}
+	ph.bdxTransferred = t
+	switch {
+	case ph.attempt != nil:
+		ph.attempt.Touch()
+	case ph.legacy != nil:
+		ph.legacy.since = m.clock.Now()
+	default:
+	}
+	return true
 }
 
 func transferredOf(s bdxTransfer) *uint64 {
@@ -1101,35 +1463,60 @@ func transferredOf(s bdxTransfer) *uint64 {
 	return &v
 }
 
-// QueuedUpdates is a snapshot of the update queue — queuedUpdates (:293-320).
+// QueuedUpdates is a snapshot of the update queue. A failed update is not
+// listed — updateFailed reported it — until the node retries it on its
+// own; the status is the phase's, stalled for an update underway without
+// activity or a moving transfer.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:388-430 at b25ed960
+// (queuedUpdates).
 func (m *Manager) QueuedUpdates() []PendingUpdate {
+	type listed struct {
+		u  PendingUpdate
+		ph updatePhase
+	}
 	m.mu.Lock()
-	entries := make([]queueEntry, len(m.queue))
-	for i, e := range m.queue {
-		entries[i] = *e
+	entries := make([]listed, 0, len(m.queue))
+	for _, e := range m.queue {
+		if m.isFailedLocked(e) {
+			continue
+		}
+		ph := *e.phase
+		u := PendingUpdate{Peer: e.peer, VendorID: e.VendorID, ProductID: e.ProductID, TargetSoftwareVersion: e.TargetSoftwareVersion}
+		switch ph.state {
+		case phaseProgress:
+			u.LastProgressStatus = ph.status()
+			if ph.attempt != nil {
+				u.LastProgressUpdateTime = ph.attempt.LastActivity()
+			} else if ph.legacy != nil {
+				u.LastProgressUpdateTime = ph.legacy.since
+			}
+		case phaseAnnounced:
+			u.LastProgressUpdateTime = ph.since
+		case phaseQueued:
+			if !ph.resetAt.IsZero() {
+				unknown := mattercore.OTAUpdateUnknown
+				u.LastProgressStatus = &unknown
+			}
+		default:
+		}
+		entries = append(entries, listed{u: u, ph: ph})
 	}
 	m.mu.Unlock()
 	now := m.clock.Now()
 	out := make([]PendingUpdate, 0, len(entries))
-	for _, e := range entries {
-		s := m.bdxSessionFor(e.peer)
-		var status PendingStatus
+	for i := range entries {
+		u, ph := entries[i].u, entries[i].ph
+		s := m.bdxSessionFor(u.Peer)
 		switch {
-		case e.started.IsZero():
-			status = PendingQueued
-		case e.stalled(now) && !isTransferring(&e, transferredOf(s)):
-			status = PendingStalled
+		case ph.state == phaseQueued:
+			u.Status = PendingQueued
+		case ph.stalled(now) && !isTransferring(&ph, transferredOf(s)):
+			u.Status = PendingStalled
 		default:
-			status = PendingInProgress
+			u.Status = PendingInProgress
 		}
-		u := PendingUpdate{
-			Peer: e.peer, VendorID: e.VendorID, ProductID: e.ProductID, TargetSoftwareVersion: e.TargetSoftwareVersion,
-			Status: status, LastProgressStatus: e.statusOf(), LastProgressUpdateTime: e.started,
-		}
-		if e.attempt != nil {
-			u.LastProgressUpdateTime = e.attempt.LastActivity()
-		}
-		if status == PendingInProgress && s != nil {
+		if u.Status == PendingInProgress && s != nil {
 			u.BDXTransferred = transferredOf(s)
 			if res, ok := s.Negotiated(); ok && res.Length != nil {
 				l := *res.Length
@@ -1174,18 +1561,19 @@ func (m *Manager) noteAttestedIdentity(p Peer, rec client.Record, vid, pid uint1
 		slog.Int("vendor_id", int(vid)), slog.Int("product_id", int(pid)))
 }
 
-// UpdateExistsFor is the stored update the querying node gets —
-// updateExistsFor (SoftwareUpdateManager.ts:673-715 at b25ed960): the
-// node's details must match the query; the applicable stored images over
-// its version (prod ones, the others only with AllowTestImages), highest
-// first; the candidate the manager holds a consent for comes first, else
-// the newest, flagged consent-required, only when the consent may be
-// delegated to the node ([Config].DelegateConsentToRequestor); else
-// nothing. The consented match is Go's at-or-below rule, not matter.js's
-// exact version (F-b25ed960-21). A stored image the store would not
-// serve ([Images.Open]: a prod or test image not bound to a ledger
-// checksum, unless [ImagesConfig].AllowUnverifiedLedgerImages) is no
-// candidate.
+// UpdateExistsFor is the stored update the querying node gets: the
+// node's details must match the query; the candidates are the applicable
+// stored images over its version (prod ones, the others only with
+// AllowTestImages), newest first; the one whose version is the consent's
+// comes first — also for 24 hours after its update failed — else the
+// newest, flagged consent-required, when the consent may be delegated to
+// the node ([Config].DelegateConsentToRequestor, mayDelegateConsentTo);
+// else nothing. A stored image the store would not serve ([Images.Open]:
+// a prod or test image not bound to a ledger checksum, unless
+// [ImagesConfig].AllowUnverifiedLedgerImages) is no candidate.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:657-715 at b25ed960
+// (updateExistsFor).
 func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.QueryImageRequest) (AvailableDetails, bool) {
 	if !m.validatePeerDetails(p, req.SoftwareVersion, req.VendorId, req.ProductId) {
 		m.log.Info("ota.manager.peer_details_mismatch", slog.String("node", peerString(p)))
@@ -1195,8 +1583,9 @@ func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.Query
 	if len(candidates) == 0 {
 		return AvailableDetails{}, false
 	}
+	delegate := m.mayDelegateConsentTo(p, req)
 	m.mu.Lock()
-	chosen, required := m.offerOfLocked(p, candidates, req)
+	chosen, required := m.offerOfLocked(p, candidates, req.VendorId, req.ProductId, delegate)
 	m.mu.Unlock()
 	if chosen == nil {
 		m.log.Info("ota.manager.no_candidate", slog.String("node", peerString(p)))
@@ -1208,45 +1597,48 @@ func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.Query
 	}, true
 }
 
-// offerOfLocked is the candidate UpdateExistsFor offers: the highest one
-// the manager holds a consent for, else — when the node may obtain the
-// consent itself — the newest one, flagged consent-required; nil for
-// none. m.mu is held.
+// offerOfLocked is the candidate UpdateExistsFor offers: the one whose
+// version is the peer's consent for the product, else — when delegate —
+// the newest one, flagged consent-required; nil for none. m.mu is held.
 //
-// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:699-701 at b25ed960
-// (the order: the consented candidate, else the delegated one). The
-// consented match is Go's at-or-below rule; matter.js's is the consent's
-// exact version (F-b25ed960-21).
-func (m *Manager) offerOfLocked(p Peer, candidates []StoredImage, req provdef.QueryImageRequest) (*StoredImage, bool) {
-	for i := range candidates {
-		c := candidates[i]
-		if slices.ContainsFunc(m.consents, func(k consent) bool {
-			return k.VendorID == c.VendorID && k.ProductID == c.ProductID && k.TargetSoftwareVersion >= c.SoftwareVersion && k.peer == p
-		}) {
-			return &candidates[i], false
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:698-701 at b25ed960
+// (the consented candidate, else the delegated one).
+func (m *Manager) offerOfLocked(p Peer, candidates []StoredImage, vid, pid uint16, delegate bool) (*StoredImage, bool) {
+	if v, ok := m.targetOfLocked(p, vid, pid); ok {
+		for i := range candidates {
+			if candidates[i].SoftwareVersion == v {
+				return &candidates[i], false
+			}
 		}
 	}
-	if len(candidates) > 0 && m.mayDelegateConsentTo(req) {
+	if delegate && len(candidates) > 0 {
 		return &candidates[0], true
 	}
 	return nil, false
 }
 
 // mayDelegateConsentTo reports whether a node whose QueryImage is req may
-// obtain the user's consent itself: it says it can, and the delegation is
-// on ([Config].DelegateConsentToRequestor). matter.js also refuses a node
-// with LocalConfigDisabled or without cached Basic Information, which the
-// manager does not read here (F-b25ed960-21).
+// obtain the user's consent itself: it says it can, the delegation is on
+// ([Config].DelegateConsentToRequestor), and its cached Basic Information
+// exists and does not have LocalConfigDisabled set. Called without m.mu.
 //
 // Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:638-647 at b25ed960
 // (mayDelegateConsentTo).
-func (m *Manager) mayDelegateConsentTo(req provdef.QueryImageRequest) bool {
-	return m.cfg.DelegateConsentToRequestor && req.RequestorCanConsent != nil && *req.RequestorCanConsent
+func (m *Manager) mayDelegateConsentTo(p Peer, req provdef.QueryImageRequest) bool {
+	if req.RequestorCanConsent == nil || !*req.RequestorCanConsent || !m.cfg.DelegateConsentToRequestor {
+		return false
+	}
+	st, ok := m.basicInformationOf(p)
+	return ok && !st.LocalConfigDisabled
 }
 
 // storedCandidates are UpdateExistsFor's candidates: the stored images
 // of vid/pid applicable over version, prod ones and test ones only with
-// AllowTestImages, that the store serves, highest version first.
+// AllowTestImages, that the store serves, highest version first and, on
+// equal versions, local before test before prod.
+//
+// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:394-407 at b25ed960
+// (findApplicable; STORED_MODE_PRECEDENCE :59).
 func (m *Manager) storedCandidates(ctx context.Context, vid, pid uint16, version uint32) []StoredImage {
 	var candidates []StoredImage
 	for _, st := range m.cfg.Images.Find(ctx, FindOptions{VendorID: &vid, ProductID: &pid}) {
@@ -1262,8 +1654,26 @@ func (m *Manager) storedCandidates(ctx context.Context, vid, pid uint16, version
 			candidates = append(candidates, st)
 		}
 	}
-	slices.SortStableFunc(candidates, func(a, b StoredImage) int { return cmp.Compare(b.SoftwareVersion, a.SoftwareVersion) })
+	slices.SortStableFunc(candidates, func(a, b StoredImage) int {
+		if c := cmp.Compare(b.SoftwareVersion, a.SoftwareVersion); c != 0 {
+			return c
+		}
+		return cmp.Compare(storedModePrecedence(a.Mode), storedModePrecedence(b.Mode))
+	})
 	return candidates
+}
+
+// storedModePrecedence is STORED_MODE_PRECEDENCE: local 0, test 1, prod 2
+// (DclOtaUpdateService.ts:59 at b25ed960).
+func storedModePrecedence(mode Mode) int {
+	switch mode {
+	case ModeLocal:
+		return 0
+	case ModeTest:
+		return 1
+	default:
+		return 2
+	}
 }
 
 // CheckForUpdates checks every node for updates, stored images included,
@@ -1376,7 +1786,7 @@ func (m *Manager) queryUpdates(ctx context.Context, only *client.Node, includeSt
 	groups := map[string]*group{}
 	nodes := m.cfg.Registry.Nodes()
 	if only == nil {
-		m.forgetGone(nodes)
+		m.forgetGone(m.presence())
 	}
 	for _, n := range nodes {
 		if m.suppressed() {
@@ -1425,33 +1835,31 @@ func (m *Manager) queryUpdates(ctx context.Context, only *client.Node, includeSt
 	return out, true, failed
 }
 
-// forgetGone drops what the manager keeps per node for every node that
-// is no longer one of nodes, the registry's, and has no queued update: the
-// version it observed, the apply delay, the update it found, a startUp to
-// suppress, its consents. A check of every node runs it, so what a node
-// that left the registry leaves behind lasts until the next check (review
-// II, R2-P6-bound-1914).
-func (m *Manager) forgetGone(nodes []*client.Node) {
-	keep := make(map[Peer]bool, len(nodes))
-	for _, n := range nodes {
-		if p, ok := n.PeerAddress(); ok {
-			keep[p] = true
-		}
-	}
+// forgetGone drops what the manager keeps for every peer no node has the
+// address of — present says which have: the version it observed, the
+// update it found, a startUp to suppress, its attempts (#forgetPeer
+// :333-334), its consent, and its queued update, without an event
+// (#dequeueIfGone, SoftwareUpdateManager.ts:1342-1353 at b25ed960). A check
+// of every node runs it, so what a node that left the registry leaves
+// behind lasts until the next check or queue run (review II,
+// R2-P6-bound-1914).
+func (m *Manager) forgetGone(present func(Peer) bool) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, e := range m.queue {
-		keep[e.peer] = true
-	}
-	maps.DeleteFunc(m.observed, func(p Peer, _ uint32) bool { return !keep[p] })
+	gone := func(p Peer) bool { return !present(p) }
+	maps.DeleteFunc(m.observed, func(p Peer, _ uint32) bool { return gone(p) })
 	for _, a := range m.attempts.All() {
-		if !keep[peerOf(a.Peer())] {
+		if gone(peerOf(a.Peer())) {
 			m.attempts.End(a) // #forgetPeer (:333-334 at b25ed960)
 		}
 	}
-	maps.DeleteFunc(m.known, func(p Peer, _ SoftwareUpdateInfo) bool { return !keep[p] })
-	maps.DeleteFunc(m.startUpSuppress, func(p Peer, _ uint16) bool { return !keep[p] })
-	m.consents = slices.DeleteFunc(m.consents, func(c consent) bool { return !keep[c.peer] })
+	maps.DeleteFunc(m.known, func(p Peer, _ SoftwareUpdateInfo) bool { return gone(p) })
+	maps.DeleteFunc(m.startUpSuppress, func(p Peer, _ uint16) bool { return gone(p) })
+	maps.DeleteFunc(m.consents, func(p Peer, _ *consent) bool { return gone(p) })
+	for _, e := range slices.Clone(m.queue) {
+		m.dequeueIfGoneLocked(e, present)
+	}
+	m.scheduleExpiryLocked()
+	m.unlock()
 }
 
 func (m *Manager) suppressed() bool {
@@ -1487,25 +1895,17 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 		peers = append(peers, t.peer)
 		m.mu.Lock()
 		m.known[t.peer] = details
-		var held *consent
-		for i := range m.consents {
-			c := m.consents[i]
-			if c.VendorID == vid && c.ProductID == pid && c.TargetSoftwareVersion == info.SoftwareVersion && c.peer == t.peer {
-				held = &c
-				break
-			}
-		}
+		c := m.consents[t.peer]
+		held := c != nil && c.VendorID == vid && c.ProductID == pid && c.TargetSoftwareVersion == info.SoftwareVersion
 		suppressed := m.suppress
 		m.mu.Unlock()
 		if suppressed {
 			break
 		}
-		if held != nil {
-			e := &queueEntry{consent: consent{Target: Target{
-				VendorID: vid, ProductID: pid, TargetSoftwareVersion: info.SoftwareVersion,
-				MaxBDXBlockSize: held.MaxBDXBlockSize, BDXAdditionalMrpDelay: held.BDXAdditionalMrpDelay,
-			}, peer: t.peer}, endpoint: t.endpoint}
-			m.queueUpdate(e) //nolint:contextcheck // the queue's work runs on the manager's lifetime
+		if held {
+			m.mu.Lock()
+			m.queueUpdateLocked(t.peer, t.endpoint, vid, pid)
+			m.unlock()
 		} else {
 			if fn := m.cfg.OnUpdateAvailable; fn != nil {
 				fn(t.peer, details) // requestConsentForUpdate (:885-887)
@@ -1516,249 +1916,285 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 	return peers, nil
 }
 
-// queueUpdate is #queueUpdate (:892-920): an entry of a node already
-// queued replaces it unless it is in progress. A new entry, and a
-// replacement that changes the queued target, report [UpdateQueued]
-// (Go-only, matter.js emits nothing here); a periodic re-check that
-// queues the same target again does not.
-func (m *Manager) queueUpdate(e *queueEntry) {
-	m.mu.Lock()
-	queued := true
-	if i := m.indexOfLocked(e.peer); i >= 0 {
-		existing := m.queue[i]
-		if !existing.started.IsZero() {
-			m.mu.Unlock()
-			m.log.Info("ota.manager.in_progress_skip", slog.String("node", peerString(e.peer)))
-			return
-		}
-		queued = existing.Target != e.Target
-		existing.Target = e.Target
-		existing.endpoint = e.endpoint
-	} else {
+// queueUpdateLocked queues an update of the peer to the version of its
+// consent for the product, or lets its entry take that version
+// (#retarget), and has the queue run, which does not announce a failed
+// update. It returns the peer's entry, if any. A new entry reports
+// [UpdateQueued] (Go-only, matter.js emits nothing here). m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1261-1293 at b25ed960
+// (#queueUpdate).
+func (m *Manager) queueUpdateLocked(p Peer, endpoint, vid, pid uint16) *queueEntry {
+	if e := m.entryOfLocked(p); e != nil {
+		e.endpoint = endpoint
+		m.retargetLocked(e)
+	} else if _, ok := m.targetOfLocked(p, vid, pid); ok {
+		m.log.Info("ota.manager.queued", slog.String("node", peerString(p)))
+		e := &queueEntry{Target: m.consents[p].Target, peer: p, endpoint: endpoint, phase: &updatePhase{state: phaseQueued}}
 		m.queue = append(m.queue, e)
+		t := e.Target
+		m.post = append(m.post, func() { m.emit(UpdateEvent{Kind: UpdateQueued, Peer: p, Target: t}) })
 	}
-	m.mu.Unlock()
-	if queued {
-		m.emit(UpdateEvent{Kind: UpdateQueued, Peer: e.peer, Target: e.Target})
-	}
-	m.triggerQueuedUpdate()
+	m.requestQueueRunLocked()
+	return m.entryOfLocked(p)
 }
 
-// triggerQueuedUpdate is #triggerQueuedUpdate (:931-983): in-progress
-// entries are refreshed by their transfer's liveness and reset when
-// stalled; with none in progress the queue — fresh entries first, reset
-// ones last — announces its first entry, and a periodic check watches for
-// stalls.
+// triggerQueuedUpdate runs the update queue as a change of its own.
 func (m *Manager) triggerQueuedUpdate() {
 	m.mu.Lock()
+	m.requestQueueRunLocked()
+	m.unlock()
+}
+
+// runQueueLocked runs the update queue: an entry whose node is gone leaves
+// it without an event, a stalled entry is reset, and with no entry active
+// the first queued entry that is not failed is announced — entries reset
+// for a retry go after fresh ones, the longest-waiting first. While an
+// entry waits or is active a periodic timer runs the queue every 5
+// minutes. present says which peers a node has the address of. m.mu is
+// held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1295-1340 at b25ed960
+// (#triggerQueuedUpdate).
+func (m *Manager) runQueueLocked(present func(Peer) bool) {
 	if m.suppress {
-		m.mu.Unlock()
 		return
 	}
 	now := m.clock.Now()
-	inProgress := 0
-	for _, e := range m.queue {
-		if e.started.IsZero() {
+	active := 0
+	for _, e := range slices.Clone(m.queue) {
+		if !slices.Contains(m.queue, e) || m.dequeueIfGoneLocked(e, present) || e.phase.state == phaseQueued {
 			continue
 		}
-		inProgress++
-		// #refreshBdxProgress (:453-462 at b25ed960): a moving transfer
-		// touches the attempt the entry follows.
-		if t := transferredOf(m.bdxSessionForLocked(e.peer)); isTransferring(e, t) {
-			e.transferred = t
-			if e.attempt != nil {
-				e.attempt.Touch()
-			} else {
-				e.started = now
-			}
-			continue
-		}
-		if e.stalled(now) {
+		if !m.refreshBdxProgressLocked(e) && e.phase.stalled(now) {
 			m.log.Info("ota.manager.stalled_reset", slog.String("node", peerString(e.peer)))
-			e.reset()
-			inProgress--
+			m.resetEntryProgressLocked(e)
+			continue
 		}
+		active++
 	}
-	if inProgress == 0 && m.queueTimer != nil {
+	if active > 0 {
+		if m.queueTimer == nil {
+			m.restartQueueTimerLocked()
+		}
+		return
+	}
+	m.stopQueueTimerLocked()
+	resetAt := func(e *queueEntry) int64 {
+		if e.phase.state == phaseQueued && !e.phase.resetAt.IsZero() {
+			return e.phase.resetAt.UnixNano()
+		}
+		return 0
+	}
+	slices.SortStableFunc(m.queue, func(a, b *queueEntry) int { return cmp.Compare(resetAt(a), resetAt(b)) })
+	i := slices.IndexFunc(m.queue, func(e *queueEntry) bool { return e.phase.state == phaseQueued && !m.isFailedLocked(e) })
+	if i < 0 {
+		return
+	}
+	m.startAnnouncementLocked(m.queue[i], present)
+	m.restartQueueTimerLocked()
+}
+
+// dequeueIfGoneLocked removes the entry without an event when no node has
+// its peer address any more, as when the node was removed while updates
+// were suppressed. m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1342-1353 at b25ed960
+// (#dequeueIfGone).
+func (m *Manager) dequeueIfGoneLocked(e *queueEntry, present func(Peer) bool) bool {
+	if present(e.peer) {
+		return false
+	}
+	m.log.Debug("ota.manager.node_gone_dequeued", slog.String("node", peerString(e.peer)))
+	m.dequeueLocked(e, 0, nil)
+	return true
+}
+
+// restartQueueTimerLocked starts the periodic queue run anew (#restartQueueTimer,
+// SoftwareUpdateManager.ts:1355-1362 at b25ed960, every 5 minutes).
+func (m *Manager) restartQueueTimerLocked() {
+	m.stopQueueTimerLocked()
+	if m.closed {
+		return
+	}
+	gen := m.queueGen
+	m.queueTimer = m.clock.AfterFunc(queueCheckInterval, func() { m.queueTick(gen) })
+}
+
+func (m *Manager) stopQueueTimerLocked() {
+	if m.queueTimer != nil {
 		m.queueTimer.Stop()
 		m.queueTimer = nil
 	}
-	if inProgress > 0 {
+	m.queueGen++
+}
+
+// queueTick is a tick of the periodic queue run (#runQueue,
+// SoftwareUpdateManager.ts:1364-1366 at b25ed960): the timer runs on until
+// a run stops it.
+func (m *Manager) queueTick(gen uint64) {
+	m.mu.Lock()
+	if gen != m.queueGen || m.closed {
 		m.mu.Unlock()
 		return
 	}
-	slices.SortStableFunc(m.queue, func(a, b *queueEntry) int { return cmp.Compare(unknownLast(a), unknownLast(b)) })
-	if len(m.queue) == 0 {
-		m.mu.Unlock()
+	m.queueTimer = m.clock.AfterFunc(queueCheckInterval, func() { m.queueTick(gen) })
+	m.requestQueueRunLocked()
+	m.unlock()
+}
+
+// startAnnouncementLocked starts announcing the provider to the node of a
+// queued entry, which usually answers with a QueryImage. It starts nothing
+// while updates are suppressed, before the announcements run, while a BDX
+// transfer of the node runs, or when the entry is not queued; the entry of
+// a node that is gone leaves the queue. The entry is announcing at once,
+// its announcement aborts after [ProgressTimeout] and runs on a goroutine
+// Close aborts and waits for. m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1368-1397 at b25ed960
+// (#startAnnouncement).
+func (m *Manager) startAnnouncementLocked(e *queueEntry, present func(Peer) bool) {
+	if m.suppress || e.phase.state != phaseQueued || m.dequeueIfGoneLocked(e, present) {
 		return
 	}
-	next := m.queue[0]
-	if m.queueTimer == nil {
-		m.queueTimer = m.clock.AfterFunc(queueCheckInterval, m.periodicQueueCheck)
-	}
-	m.mu.Unlock()
-	m.goWork(func() { m.triggerUpdateOnNode(next) })
-}
-
-func (m *Manager) periodicQueueCheck() {
-	m.mu.Lock()
-	m.queueTimer = nil
-	m.mu.Unlock()
-	m.triggerQueuedUpdate()
-	m.mu.Lock()
-	if m.queueTimer == nil && !m.closed && slices.ContainsFunc(m.queue, func(e *queueEntry) bool { return !e.started.IsZero() }) {
-		m.queueTimer = m.clock.AfterFunc(queueCheckInterval, m.periodicQueueCheck)
-	}
-	m.mu.Unlock()
-}
-
-func unknownLast(e *queueEntry) int {
-	if s := e.statusOf(); s != nil && *s == mattercore.OTAUpdateUnknown {
-		return 1
-	}
-	return 0
-}
-
-// triggerUpdateOnNode is #triggerUpdateOnNode (:991-1025): unless a BDX
-// transfer of the node runs, the provider is announced with reason
-// UpdateAvailable; the entry is in progress once the announcement went
-// out, reset when it failed.
-func (m *Manager) triggerUpdateOnNode(e *queueEntry) {
-	// The entry's endpoint is read under the lock that queueUpdate writes
-	// it under: a later consent for the same node replaces Target and
-	// endpoint of a queued entry (#queueUpdate :892-920) while this
-	// goroutine, started by triggerQueuedUpdate, announces the earlier one.
-	m.mu.Lock()
 	a := m.announcements
-	endpoint := e.endpoint
-	m.mu.Unlock()
 	if a == nil {
 		m.log.Info("ota.manager.not_initialized", slog.String("node", peerString(e.peer)))
 		return
 	}
-	if m.bdxSessionFor(e.peer) != nil {
+	if m.bdxSessionForLocked(e.peer) != nil {
 		m.log.Info("ota.manager.bdx_active_skip", slog.String("node", peerString(e.peer)))
 		return
 	}
-	if !m.presence()(e.peer) {
-		return
-	}
-	m.log.Info("ota.manager.announcing", slog.String("node", peerString(e.peer)))
-	if err := m.announceTo(context.Background(), a, e.peer, endpoint); err != nil {
-		m.log.Warn("ota.manager.announce_failed", slog.String("node", peerString(e.peer)), slog.Any("err", err))
-		m.mu.Lock()
-		e.reset()
-		m.mu.Unlock()
-		m.triggerQueuedUpdate()
-		return
-	}
-	m.mu.Lock()
-	if slices.Contains(m.queue, e) {
-		e.started = m.clock.Now()
-	}
-	m.mu.Unlock()
+	phase := &updatePhase{state: phaseAnnouncing}
+	run := &announcement{}
+	run.timer = m.clock.AfterFunc(ProgressTimeout, func() { run.abort(errAnnouncementTimeout) })
+	e.phase, e.announcement = phase, run
+	m.running[run] = struct{}{}
+	p, endpoint := e.peer, e.endpoint
+	m.log.Info("ota.manager.announcing", slog.String("node", peerString(p)))
+	m.work.Go(func() { m.runAnnouncement(a, e, phase, run, p, endpoint) })
 }
 
-// ForceUpdate updates the node now: a stale in-progress entry without a
-// running transfer is dropped, the consent added and the update announced
-// at once — forceUpdate (:1031-1086). A node with a transfer running is
-// left alone; one not applicable is [ErrNotApplicable].
-func (m *Manager) ForceUpdate(ctx context.Context, p Peer, t Target) error {
+// runAnnouncement announces and then moves the entry on: to announced, or
+// back to queued, reset now, when the announcement failed or was aborted.
+// Once the entry left phase the result is ignored, as an attempt or a
+// reset already decided how the update goes on; on a removed entry it
+// changes nothing.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1399-1415 at b25ed960
+// (#runAnnouncement).
+//
+//nolint:contextcheck // the announcement runs on the manager's lifetime (m.life), as matter.js's on its own abort, not on a caller's context
+func (m *Manager) runAnnouncement(a *announcements, e *queueEntry, phase *updatePhase, run *announcement, p Peer, endpoint uint16) {
+	ctx, cancel := context.WithCancelCause(m.life)
+	run.bind(cancel)
+	err := m.announceTo(ctx, a, p, endpoint)
+	m.logAnnouncement(ctx, p, err)
+	run.timer.Stop()
+	cancel(nil)
+	m.mu.Lock()
+	delete(m.running, run)
+	if e.announcement == run {
+		e.announcement = nil
+	}
+	if e.phase == phase {
+		if err == nil {
+			e.phase = &updatePhase{state: phaseAnnounced, since: m.clock.Now()}
+		} else {
+			e.phase = &updatePhase{state: phaseQueued, resetAt: m.clock.Now()}
+		}
+	}
+	m.unlock()
+}
+
+// logAnnouncement classifies a failed announcement: one aborted after
+// [ProgressTimeout] got no answer; any other abort logs nothing; a closed
+// connection is a debug line; any other failure an info line.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1417-1444 at b25ed960
+// (#announce).
+func (m *Manager) logAnnouncement(ctx context.Context, p Peer, err error) {
+	switch {
+	case err == nil:
+	case ctx.Err() != nil:
+		if errors.Is(context.Cause(ctx), errAnnouncementTimeout) {
+			m.log.Info("ota.manager.announce_unanswered", slog.String("node", peerString(p)), slog.Duration("within", ProgressTimeout))
+		}
+	case errors.Is(err, exchange.ErrSessionClosed) || errors.Is(err, peer.ErrClosed):
+		m.log.Debug("ota.manager.announce_closed", slog.String("node", peerString(p)), slog.Any("err", err))
+	default:
+		m.log.Info("ota.manager.announce_failed", slog.String("node", peerString(p)), slog.Any("err", err))
+	}
+}
+
+// ForceUpdate replaces the node's consent as [Manager.AddUpdateConsent]
+// does and announces the update at once, also while updates of other
+// nodes are in progress:
+//
+//   - no node has the address: [ErrNoNode]; not applicable for updates:
+//     [ErrNotApplicable]; vendor or product differ: [ErrMismatch] —
+//     nothing changes;
+//   - the node runs the target or a higher version: [ErrNotApplicable];
+//   - a BDX transfer of the node runs for the target: the consent is
+//     replaced, the transfer continues and no announcement starts; one
+//     runs for another or an unknown version: [ErrNotApplicable];
+//   - otherwise the consent is replaced, an update the node was announced
+//     for or follows is reset, and the announcement starts unless one runs.
+//
+// A BDX registration of the node is not cancelled; the next transfer
+// replaces it. That an announcement started is not promised.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1455-1524 at b25ed960
+// (forceUpdate).
+func (m *Manager) ForceUpdate(_ context.Context, p Peer, t Target) error {
 	if err := t.assert(); err != nil {
 		return err
 	}
-	m.mu.Lock()
-	i := slices.IndexFunc(m.queue, func(e *queueEntry) bool { return e.peer == p && !e.started.IsZero() })
-	m.mu.Unlock()
-	if i >= 0 {
-		if m.bdxSessionFor(p) != nil {
-			m.log.Info("ota.manager.force_skipped_active", slog.String("node", peerString(p)))
-			return nil
-		}
-		m.mu.Lock()
-		if j := slices.IndexFunc(m.queue, func(e *queueEntry) bool { return e.peer == p && !e.started.IsZero() }); j >= 0 {
-			m.queue = slices.Delete(m.queue, j, j+1)
-			delete(m.startUpSuppress, p)
-		}
-		m.mu.Unlock()
-		if r := m.bdxResponder(); r != nil {
-			_ = r.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
-		}
-	}
-	added, err := m.AddUpdateConsent(ctx, p, t)
+	endpoint, applicable, err := m.otaEndpointFor(p, t)
 	if err != nil {
 		return err
 	}
-	if !added {
+	if !applicable {
 		return fmt.Errorf("%w: %s", ErrNotApplicable, peerString(p))
 	}
+	running, known := m.softwareVersionOf(p)
+	if known && running >= t.TargetSoftwareVersion {
+		return fmt.Errorf("%w: %s runs version %d, not below the target %d", ErrNotApplicable, peerString(p), running, t.TargetSoftwareVersion)
+	}
+	transfers := m.bdxSessionFor(p) != nil
+	present := m.presence()
 	m.mu.Lock()
-	var entry *queueEntry
-	for _, e := range m.queue {
-		if e.peer == p && e.VendorID == t.VendorID && e.ProductID == t.ProductID && e.TargetSoftwareVersion == t.TargetSoftwareVersion {
-			entry = e
+	if transfers {
+		var transferred *uint32
+		for _, a := range m.attempts.Offered(mattercore.OTAPeer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}) {
+			if a.Answered() {
+				if v, ok := a.Version(); ok {
+					transferred = &v
+				}
+				break
+			}
 		}
-	}
-	only := len(m.queue) == 1
-	m.mu.Unlock()
-	if entry == nil {
-		return errors.New("softwareupdate: failed to find queued update after adding consent")
-	}
-	if only {
-		return nil // only entry, already being processed
-	}
-	m.triggerUpdateOnNode(entry) //nolint:contextcheck // as matter.js, the announcement is not bound to the caller
-	return nil
-}
-
-// cancelUpdate cancels the node's queued update to version, or to any
-// version when version is 0, after its consent went: an update already
-// applying can no longer be cancelled; any other leaves the queue with
-// updateFailed, its reboot arming lifted. The node's BDX transfer is
-// closed when every consent went (version 0) or the update was underway —
-// announced or following an attempt — but not while it applies.
-//
-// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1670-1718 at b25ed960
-// (removeConsent, the queue): the dequeue decision reads the status of
-// the attempt the entry follows (:1700).
-func (m *Manager) cancelUpdate(p Peer, version uint32) {
-	removesAll := version == 0
-	m.mu.Lock()
-	i := m.indexOfLocked(p)
-	if i < 0 || (!removesAll && m.queue[i].TargetSoftwareVersion != version) {
-		m.unlock()
-		m.log.Info("ota.manager.cancel_none", slog.String("node", peerString(p)))
-		if removesAll {
-			m.closeTransfer(p)
+		if transferred == nil || *transferred != t.TargetSoftwareVersion {
+			m.mu.Unlock()
+			what := "an update of unknown version"
+			if transferred != nil {
+				what = "version " + strconv.FormatUint(uint64(*transferred), 10)
+			}
+			return fmt.Errorf("%w: %s transfers %s right now, cannot force version %d", ErrNotApplicable, peerString(p), what, t.TargetSoftwareVersion)
 		}
-		return
+		m.log.Info("ota.manager.force_transfers_target", slog.String("node", peerString(p)))
 	}
-	e := m.queue[i]
-	// :1700 reads the attempt's status; statusOf is the attempt's while the
-	// entry follows one, and the deprecated OnStatusChange's otherwise.
-	if s := e.statusOf(); s != nil && *s == mattercore.OTAUpdateApplying {
-		m.unlock()
-		m.log.Info("ota.manager.cancel_too_late", slog.String("node", peerString(p)))
-		return
+	if e := m.entryOfLocked(p); !transfers && e != nil && e.phase.underway() {
+		m.log.Info("ota.manager.force_resets", slog.String("node", peerString(p)))
+		m.abortAnnouncementLocked(e)
+		e.phase = &updatePhase{state: phaseQueued, resetAt: m.clock.Now()}
 	}
-	underway := !e.started.IsZero()
-	target := e.Target
-	m.queue = slices.Delete(m.queue, i, i+1)
-	delete(m.startUpSuppress, p)
-	failed := m.cfg.OnUpdateFailed
+	if e := m.storeConsentLocked(p, t, endpoint, true, running, known); e != nil {
+		m.startAnnouncementLocked(e, present)
+	}
 	m.unlock()
-	if m.cfg.Armer != nil {
-		m.cfg.Armer.Disarm(p)
-	}
-	m.log.Info("ota.manager.cancelled", slog.String("node", peerString(p)))
-	if failed != nil {
-		failed(p)
-	}
-	m.emit(UpdateEvent{Kind: UpdateFailed, Peer: p, Target: target, Err: ErrUpdateCancelled})
-	m.triggerQueuedUpdate()
-	if removesAll || underway {
-		m.closeTransfer(p)
-	}
+	return nil
 }
 
 // closeTransfer disables the node for the "ota" scope and closes its
@@ -1774,149 +2210,212 @@ func (m *Manager) closeTransfer(p Peer) {
 	}
 }
 
-// TransferOptionsFor is how BDX carries the node's pending update: its
-// queued entry's or consent's options, else the defaults —
-// bdxTransferOptionsFor (:1133-1144).
+// TransferOptionsFor is how BDX carries the node's update: the options
+// given with its consent, else the defaults.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1526-1536 at b25ed960
+// (bdxTransferOptionsFor).
 func (m *Manager) TransferOptionsFor(p Peer) TransferOptions {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	var pending *Target
-	if i := m.indexOfLocked(p); i >= 0 {
-		pending = &m.queue[i].Target
-	} else if j := slices.IndexFunc(m.consents, func(c consent) bool { return c.peer == p }); j >= 0 {
-		pending = &m.consents[j].Target
-	}
 	out := TransferOptions{AdditionalMrpDelay: m.cfg.BDXAdditionalMrpDelay}
 	if m.cfg.MaxBDXBlockSize != 0 {
 		b := m.cfg.MaxBDXBlockSize
 		out.MaxBlockSize = &b
 	}
-	if pending != nil {
-		if pending.MaxBDXBlockSize != nil {
-			out.MaxBlockSize = pending.MaxBDXBlockSize
+	if c := m.consents[p]; c != nil {
+		if c.MaxBDXBlockSize != nil {
+			out.MaxBlockSize = c.MaxBDXBlockSize
 		}
-		if pending.BDXAdditionalMrpDelay != nil {
-			out.AdditionalMrpDelay = pending.BDXAdditionalMrpDelay
+		if c.BDXAdditionalMrpDelay != nil {
+			out.AdditionalMrpDelay = c.BDXAdditionalMrpDelay
 		}
 	}
 	return out
 }
 
-// AddUpdateConsent adds (or replaces) the node's consent and, when the
-// node is applicable now, queues its update — addUpdateConsent
-// (:1153-1196). It reports whether the update was queued; a node whose
-// vendor or product differs from t is [ErrMismatch].
+// AddUpdateConsent gives the consent to update the node to t's version; a
+// node has one consent:
+//
+//   - no node has the address: [ErrNoNode]; vendor or product of an
+//     applicable node differ: [ErrMismatch] — nothing changes;
+//   - the node runs the target or a higher version: false, nothing stored;
+//   - the node is not applicable for updates: the consent is stored, false;
+//   - otherwise it replaces the node's consent, also a failed one; a queued
+//     update the node does not follow yet takes the version; true when the
+//     node has a queued update afterwards.
+//
+// The update is announced with the next queue slot. A consent given while
+// the node follows an update to another version takes effect when that
+// update ends. The consents are not persisted.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1538-1567 at b25ed960
+// (addUpdateConsent).
 func (m *Manager) AddUpdateConsent(_ context.Context, p Peer, t Target) (bool, error) {
 	if err := t.assert(); err != nil {
 		return false, err
 	}
-	endpoint, ok, err := m.otaEndpointFor(p, t)
-	if err != nil && !errors.Is(err, errNoNode) {
+	endpoint, applicable, err := m.otaEndpointFor(p, t)
+	if err != nil {
 		return false, err
 	}
+	running, known := m.softwareVersionOf(p)
 	m.mu.Lock()
-	m.consents = append(slices.DeleteFunc(m.consents, func(c consent) bool { return c.peer == p }), consent{Target: t, peer: p})
-	m.mu.Unlock()
-	m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: t, Consented: true})
-	if !ok {
-		m.log.Info("ota.manager.not_applicable_yet", slog.String("node", peerString(p)))
-		return false, nil
-	}
-	m.queueUpdate(&queueEntry{consent: consent{Target: t, peer: p}, endpoint: endpoint}) //nolint:contextcheck // the queue's work runs on the manager's lifetime
-	return true, nil
+	e := m.storeConsentLocked(p, t, endpoint, applicable, running, known)
+	m.unlock()
+	return e != nil, nil
 }
 
-// HasConsent reports a consent of the node, for version when it is not 0
-// — hasConsent (:1204-1211).
+// storeConsentLocked replaces the peer's consent, lets its queue entry take
+// the version, and queues the update when the node is applicable; a
+// consent for a version at or below the one the node runs (running, when
+// known) is not stored. It returns the peer's queue entry, nil when nothing
+// was queued. A stored consent reports [UpdateConsentChanged] (Go-only).
+// m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1590-1625 at b25ed960
+// (#storeConsent).
+func (m *Manager) storeConsentLocked(p Peer, t Target, endpoint uint16, applicable bool, running uint32, known bool) *queueEntry {
+	if known && t.TargetSoftwareVersion <= running {
+		m.log.Info("ota.manager.consent_not_above_running", slog.String("node", peerString(p)),
+			slog.Uint64("running", uint64(running)), slog.Uint64("target", uint64(t.TargetSoftwareVersion)))
+		return nil
+	}
+	m.consents[p] = &consent{Target: t, peer: p}
+	m.postConsentChangedLocked(p, t, true)
+	m.scheduleExpiryLocked()
+	if e := m.entryOfLocked(p); e != nil {
+		m.retargetLocked(e)
+	}
+	if !applicable {
+		m.log.Info("ota.manager.not_applicable_yet", slog.String("node", peerString(p)))
+		return nil
+	}
+	return m.queueUpdateLocked(p, endpoint, t.VendorID, t.ProductID)
+}
+
+// HasConsent reports a consent of the node, for version when it is not 0;
+// a failed update keeps its consent for 24 hours.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1627-1637 at b25ed960
+// (hasConsent).
 func (m *Manager) HasConsent(p Peer, version uint32) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return slices.ContainsFunc(m.consents, func(c consent) bool {
-		return c.peer == p && (version == 0 || c.TargetSoftwareVersion == version)
-	})
+	c := m.consents[p]
+	return c != nil && (version == 0 || c.TargetSoftwareVersion == version)
 }
 
-// RemoveConsent removes the node's consent (for version when it is not 0)
-// and cancels its update to that version — removeConsent
-// (SoftwareUpdateManager.ts:1639-1723 at b25ed960). The node's offers of
-// the version (of any, for 0) lose their apply right, so an
-// ApplyUpdateRequest under their token is refused unless the update
-// already applies, and its queries that made no offer yet end, answered
-// NotAvailable (:1686-1692).
+// RemoveConsent removes the node's consent for version, or for any
+// version when it is 0. The node's offers of the version (of any, for 0)
+// lose their apply right, so an ApplyUpdateRequest under their token is
+// refused unless the update already applies, and its queries that made no
+// offer yet end, answered NotAvailable. The queued update to a removed
+// version:
+//
+//   - applies: continues, it can no longer be stopped;
+//   - was announced or is followed by the node: leaves the queue with
+//     updateFailed ([ErrUpdateCancelled]), its BDX transfer cancelled;
+//   - is queued or announcing: leaves with updateFailed, its announcement
+//     aborted.
+//
+// updateFailed is not reported again for an update whose failure it
+// reported. For 0, a transfer of the node is cancelled in every case but an
+// applying update. A consent left after an update was cancelled with its
+// transfer is queued again.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1639-1723 at b25ed960
+// (removeConsent).
 func (m *Manager) RemoveConsent(p Peer, version uint32) {
+	removesAll := version == 0
 	m.mu.Lock()
-	m.attempts.RemoveConsent(mattercore.OTAPeer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, version, version == 0)
-	var removed *Target
-	if i := slices.IndexFunc(m.consents, func(c consent) bool {
-		return c.peer == p && (version == 0 || c.TargetSoftwareVersion == version)
-	}); i >= 0 {
-		t := m.consents[i].Target
-		removed = &t
-		m.consents = slices.Delete(m.consents, i, i+1)
+	c := m.consents[p]
+	if c != nil && (removesAll || c.TargetSoftwareVersion == version) {
+		delete(m.consents, p)
+		m.scheduleExpiryLocked()
+		m.postConsentChangedLocked(p, c.Target, false)
 	} else {
 		m.log.Info("ota.manager.no_consent", slog.String("node", peerString(p)))
 	}
-	m.unlock()
-	if removed != nil {
-		m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: *removed})
+	m.attempts.RemoveConsent(mattercore.OTAPeer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, version, removesAll)
+	cancelTransfer := false
+	var cancelled *queueEntry
+	e := m.entryOfLocked(p)
+	switch {
+	case e == nil || (!removesAll && version != e.TargetSoftwareVersion):
+		m.log.Info("ota.manager.cancel_none", slog.String("node", peerString(p)))
+		cancelTransfer = removesAll
+	case e.phase.applying():
+		m.log.Info("ota.manager.cancel_too_late", slog.String("node", peerString(p)))
+	default:
+		m.log.Info("ota.manager.cancelled", slog.String("node", peerString(p)))
+		if armer := m.cfg.Armer; armer != nil {
+			m.post = append(m.post, func() { armer.Disarm(p) })
+		}
+		reportedFailed := c != nil && c.TargetSoftwareVersion == e.TargetSoftwareVersion && !c.failedAt.IsZero()
+		underway := e.phase.underway()
+		if reportedFailed {
+			m.dequeueLocked(e, 0, nil)
+		} else {
+			m.dequeueLocked(e, UpdateFailed, ErrUpdateCancelled)
+		}
+		m.requestQueueRunLocked()
+		cancelTransfer = removesAll || underway
+		if underway {
+			cancelled = e
+		}
 	}
-	m.cancelUpdate(p, version)
+	m.unlock()
+	if !cancelTransfer {
+		return
+	}
+	m.closeTransfer(p)
+	if cancelled != nil {
+		m.mu.Lock()
+		m.queueUpdateLocked(cancelled.peer, cancelled.endpoint, cancelled.VendorID, cancelled.ProductID)
+		m.unlock()
+	}
 }
 
 // NodeDeleted forgets the node at p at once, when it left the registry
-// (client.Hooks.Deleted): its consents (each reported as
-// [UpdateConsentChanged]), its queued update whatever its state (reported
-// as [UpdateFailed] with [ErrUpdateCancelled]), its BDX scope (a transfer
-// that runs is closed), its reboot arming, and what the manager observed
-// of it — the scope and the arming whether or not an update was queued. A later
-// node at the same address starts with nothing of it. A node the manager
-// never saw is no error. The next full check drops the same for a node
-// whose deletion was not reported (review II, R2-P6-bound-1914).
+// (client.Hooks.Deleted): its consent (reported as [UpdateConsentChanged],
+// Go-only), a startUp suppression, the update found for it, what the
+// manager observed of it, its reboot arming, its attempts and its BDX
+// scope (a transfer that runs is closed). Its queued update leaves the
+// queue without an event when the queue runs, as no node has the address
+// any more, and the queue runs on for the other nodes. A node the manager
+// never saw is no error. Nothing happens while updates are suppressed —
+// before [Manager.Start] and after [Manager.Close]; the next full check
+// drops the same for a node whose deletion was not reported (review II,
+// R2-P6-bound-1914).
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:312-341 at b25ed960
+// (#forgetPeer).
 func (m *Manager) NodeDeleted(p Peer) {
 	m.mu.Lock()
-	var removed []Target
-	m.consents = slices.DeleteFunc(m.consents, func(c consent) bool {
-		if c.peer != p {
-			return false
-		}
-		removed = append(removed, c.Target)
-		return true
-	})
-	var cancelled *Target
-	if i := m.indexOfLocked(p); i >= 0 {
-		t := m.queue[i].Target
-		cancelled = &t
-		m.queue = slices.Delete(m.queue, i, i+1)
-	}
-	delete(m.observed, p)
-	delete(m.known, p)
-	delete(m.startUpSuppress, p)
-	// #forgetPeer (:333-334 at b25ed960): the node's attempts end.
-	for _, a := range m.attempts.Of(mattercore.OTAPeer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}) {
-		m.attempts.End(a)
-	}
-	failed := m.cfg.OnUpdateFailed
-	m.unlock()
-	// The scope and the arming go whether or not an update is queued: the
-	// provider enables the scope and a status arms the peer on their own.
-	if r := m.bdxResponder(); r != nil {
-		_ = r.DisablePeerForScope(bdx.Peer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}, "ota", true)
-	}
-	if m.cfg.Armer != nil {
-		m.cfg.Armer.Disarm(p)
-	}
-	for _, t := range removed {
-		m.emit(UpdateEvent{Kind: UpdateConsentChanged, Peer: p, Target: t})
-	}
-	if cancelled == nil {
+	if m.suppress {
+		m.mu.Unlock()
 		return
 	}
 	m.log.Info("ota.manager.node_deleted", slog.String("node", peerString(p)))
-	if failed != nil {
-		failed(p)
+	if c := m.consents[p]; c != nil {
+		delete(m.consents, p)
+		m.postConsentChangedLocked(p, c.Target, false)
 	}
-	m.emit(UpdateEvent{Kind: UpdateFailed, Peer: p, Target: *cancelled, Err: ErrUpdateCancelled})
-	m.triggerQueuedUpdate()
+	delete(m.startUpSuppress, p)
+	delete(m.known, p)
+	delete(m.observed, p)
+	for _, a := range m.attempts.Of(mattercore.OTAPeer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}) {
+		m.attempts.End(a)
+	}
+	m.scheduleExpiryLocked()
+	m.requestQueueRunLocked()
+	armer := m.cfg.Armer
+	m.unlock()
+	if armer != nil {
+		armer.Disarm(p)
+	}
+	m.closeTransfer(p)
 }
 
 // SuppressNextStartUp suppresses the node's next StartUp event on session
@@ -1949,10 +2448,10 @@ func (m *Manager) SuppressNextStartUp(p Peer, sessionID uint16) {
 // v0.26.0.
 func (m *Manager) OnStatusChange(p Peer, status Status, version *uint32, applyDelay time.Duration) {
 	m.mu.Lock()
-	if i := m.indexOfLocked(p); !m.suppress && i >= 0 {
-		if a := m.queue[i].attempt; a != nil && !a.Ended() {
+	if e := m.entryOfLocked(p); !m.suppress && e != nil {
+		if a := e.phase.attempt; e.phase.state == phaseProgress && a != nil && !a.Ended() {
 			if status == mattercore.OTAUpdateDone {
-				v := m.queue[i].TargetSoftwareVersion
+				v := e.TargetSoftwareVersion
 				if version != nil {
 					v = *version
 				}
@@ -1968,8 +2467,6 @@ func (m *Manager) OnStatusChange(p Peer, status Status, version *uint32, applyDe
 	m.legacyStatus(p, status, version, applyDelay)
 }
 
-// legacyStatus is [Manager.OnStatusChange] for an update that follows no
-// attempt.
 func (m *Manager) legacyStatus(p Peer, status Status, version *uint32, applyDelay time.Duration) {
 	if fn := m.cfg.OnStatus; fn != nil {
 		var v uint32
@@ -1983,15 +2480,14 @@ func (m *Manager) legacyStatus(p Peer, status Status, version *uint32, applyDela
 		m.mu.Unlock()
 		return
 	}
-	i := m.indexOfLocked(p)
-	if i < 0 {
+	e := m.entryOfLocked(p)
+	if e == nil {
 		m.mu.Unlock()
 		if status != mattercore.OTAUpdateCancelled {
 			m.log.Warn("ota.manager.status_unknown_node", slog.String("node", peerString(p)), slog.String("status", status.String()))
 		}
 		return
 	}
-	e := m.queue[i]
 	switch status {
 	case mattercore.OTAUpdateDone:
 		completed := e.TargetSoftwareVersion
@@ -1999,19 +2495,18 @@ func (m *Manager) legacyStatus(p Peer, status Status, version *uint32, applyDela
 			completed = *version
 		}
 		m.log.Info("ota.manager.done", slog.String("node", peerString(p)))
-		m.completeUpdateLocked(i, completed)
-		m.unlock()
+		m.completeUpdateLocked(e, completed)
 	case mattercore.OTAUpdateCancelled:
-		e.reset()
-		m.mu.Unlock()
-		if m.cfg.Armer != nil {
-			m.cfg.Armer.Disarm(p)
-		}
 		m.log.Info("ota.manager.bdx_cancelled_retry", slog.String("node", peerString(p)))
-		m.triggerQueuedUpdate()
+		m.resetEntryProgressLocked(e)
+		m.requestQueueRunLocked()
+		if armer := m.cfg.Armer; armer != nil {
+			m.post = append(m.post, func() { armer.Disarm(p) })
+		}
 	default:
 		m.progressLocked(p, e, status, applyDelay)
 	}
+	m.unlock()
 }
 
 // updateAppliedLocked records the node's NotifyUpdateApplied under token:
@@ -2036,64 +2531,92 @@ func (m *Manager) updateAppliedLocked(op mattercore.OTAPeer, token []byte, softw
 	if m.suppress {
 		return
 	}
-	i := m.indexOfLocked(p)
-	if i < 0 {
+	e := m.entryOfLocked(p)
+	if e == nil {
 		return
 	}
-	e := m.queue[i]
 	switch {
 	case softwareVersion >= e.TargetSoftwareVersion:
 		m.log.Info("ota.manager.done", slog.String("node", peerString(p)))
-		m.completeUpdateLocked(i, softwareVersion)
+		m.completeUpdateLocked(e, softwareVersion)
 	case linked == e:
 		m.log.Info("ota.manager.applied_below_target_retry", slog.String("node", peerString(p)), slog.Uint64("version", uint64(softwareVersion)))
-		e.reset() // #retryUpdate (:585-588)
-		m.post = append(m.post, m.triggerQueuedUpdate)
+		m.resetEntryProgressLocked(e) // #retryUpdate (:585-588)
+		m.requestQueueRunLocked()
 	default:
 		m.log.Debug("ota.manager.applied_below_target_ignored", slog.String("node", peerString(p)), slog.Uint64("version", uint64(softwareVersion)))
 	}
 }
 
-// progressLocked is onOtaStatusChange's last branch (:1296-1320): the
-// entry takes the status and its time; the first Downloading reports the
-// transfer started, Applying arms the reboot re-subscription and, the
-// first time, reports the update applying. It is called with m.mu held
-// and releases it.
+// progressLocked is onOtaStatusChange's last branch for an entry the
+// deprecated OnStatusChange moves: the entry is in progress with the
+// status and its time; the first Downloading reports the transfer started,
+// Applying arms the reboot re-subscription and, the first time, reports
+// the update applying. m.mu is held.
 func (m *Manager) progressLocked(p Peer, e *queueEntry, status Status, applyDelay time.Duration) {
-	wasApplying := e.status != nil && *e.status == mattercore.OTAUpdateApplying
-	e.started = m.clock.Now()
-	s := status
-	e.status = &s
-	e.applyDelay = 0
+	wasApplying := e.phase.applying()
+	lp := &legacyProgress{status: status, since: m.clock.Now()}
 	if status == mattercore.OTAUpdateApplying {
-		e.applyDelay = applyDelay
+		lp.applyDelay = applyDelay
 	}
-	applying := m.cfg.OnUpdateApplying
+	var transferred *uint64
+	if e.phase.state == phaseProgress {
+		transferred = e.phase.bdxTransferred
+	}
+	e.phase = &updatePhase{state: phaseProgress, legacy: lp, bdxTransferred: transferred}
 	target := e.Target
-	transferStarted := status == mattercore.OTAUpdateDownloading && !e.transferStarted
-	if transferStarted {
+	if status == mattercore.OTAUpdateDownloading && !e.transferStarted {
 		e.transferStarted = true
+		m.post = append(m.post, func() { m.emit(UpdateEvent{Kind: UpdateTransferStarted, Peer: p, Target: target}) })
+	}
+	if status != mattercore.OTAUpdateApplying {
+		return
 	}
 	// The arming happens under m.mu, with the entry it is for still queued:
 	// a NodeDeleted that removes the entry disarms after it, so a deleted
 	// peer is never left armed (review II, R2-P6-bound-1914). The armer runs
 	// no callback under its own lock.
-	if status == mattercore.OTAUpdateApplying && m.cfg.Armer != nil {
+	if m.cfg.Armer != nil {
 		m.cfg.Armer.Arm(p, applyDelay)
 	}
-	m.mu.Unlock()
-	if transferStarted {
-		m.emit(UpdateEvent{Kind: UpdateTransferStarted, Peer: p, Target: target})
-	}
-	if status != mattercore.OTAUpdateApplying {
-		return
-	}
 	if !wasApplying {
+		m.postApplyingLocked(p, target)
+	}
+}
+
+// postApplyingLocked queues [UpdateApplying] of the peer with its hook.
+func (m *Manager) postApplyingLocked(p Peer, t Target) {
+	applying := m.cfg.OnUpdateApplying
+	m.post = append(m.post, func() {
 		if applying != nil {
 			applying(p)
 		}
-		m.emit(UpdateEvent{Kind: UpdateApplying, Peer: p, Target: target})
+		m.emit(UpdateEvent{Kind: UpdateApplying, Peer: p, Target: t})
+	})
+}
+
+// dropUndeliverableUpdate fails the peer's queued update when the peer's
+// QueryImage found no image for it: only while the peer is being or was
+// announced for it — so it reported no status since — and still runs a
+// version below the target, by its QueryImage (reported) and by its cached
+// Basic Information. A peer that already runs the target keeps its entry,
+// so the update ends as done. The provider's image lookup calls it when
+// [Manager.UpdateExistsFor] offers nothing (C-5).
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:2091-2125 at b25ed960
+// (dropUndeliverableUpdate).
+func (m *Manager) dropUndeliverableUpdate(p Peer, reported uint32) {
+	cached, known := m.softwareVersionOf(p)
+	m.mu.Lock()
+	e := m.entryOfLocked(p)
+	if e == nil || (e.phase.state != phaseAnnouncing && e.phase.state != phaseAnnounced) ||
+		reported >= e.TargetSoftwareVersion || !known || cached != reported {
+		m.mu.Unlock()
+		return
 	}
+	m.log.Info("ota.manager.undeliverable", slog.String("node", peerString(p)), slog.Uint64("target", uint64(e.TargetSoftwareVersion)))
+	m.failUpdateLocked(e)
+	m.unlock()
 }
 
 func peerString(p Peer) string {
