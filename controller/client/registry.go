@@ -73,10 +73,11 @@ type RegistryConfig struct {
 
 // Errors of a [Registry].
 var (
-	// ErrFabricOperationInProgress: a commission or decommission of the
-	// node is already running — matter.js FabricOperationInProgressError
-	// (node/client/Peers.ts:81, :597-601).
-	ErrFabricOperationInProgress = errors.New("client: a commission or decommission of the node is already in progress")
+	// ErrFabricOperationInProgress: a commission, decommission or
+	// certificate update of the node is already running — matter.js
+	// FabricOperationInProgressError (packages/node/src/node/client/Peers.ts:88-92,
+	// :642-647 at b25ed960).
+	ErrFabricOperationInProgress = errors.New("client: a commission, decommission or certificate update of the node is already in progress")
 	// ErrNotCommissioned: the node has no peer address
 	// (CommissioningClient.ts:343-345); an unbound node's interactions
 	// fail with it too.

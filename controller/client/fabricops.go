@@ -49,11 +49,21 @@ func (peerShutdownError) Error() string { return "client: peer reports shutdown"
 // Is makes the error match exchange.ErrTransient.
 func (peerShutdownError) Is(target error) bool { return target == exchange.ErrTransient }
 
-// Operation kinds — matter.js FabricOperation (Peers.ts:76).
+// Operation kinds — matter.js FabricOperation
+// (packages/node/src/node/client/Peers.ts:80 at b25ed960).
 const (
-	opCommission   = "commission"
-	opDecommission = "decommission"
+	opCommission        = "commission"
+	opDecommission      = "decommission"
+	opCertificateUpdate = "certificate update"
 )
+
+// fabricOperationVerbs are the verbs of the in-progress refusal — matter.js
+// FABRIC_OPERATION_VERBS (Peers.ts:82-86 at b25ed960).
+var fabricOperationVerbs = map[string]string{
+	opCommission:        "commission",
+	opDecommission:      "decommission",
+	opCertificateUpdate: "update the operational certificate of",
+}
 
 // fabricOp is a commission or decommission in flight — an entry of
 // Peers.#fabricOperations (Peers.ts:93).
@@ -101,7 +111,7 @@ func (r *Registry) registerOperation(n *Node, kind string) (*fabricOp, error) {
 		return nil, err
 	}
 	if running := r.ops[n]; running != nil {
-		return nil, fmt.Errorf("%w: cannot %s %s because a %s attempt is already in progress", ErrFabricOperationInProgress, kind, n.ID(), running.kind)
+		return nil, fmt.Errorf("%w: cannot %s %s because a %s attempt is already in progress", ErrFabricOperationInProgress, fabricOperationVerbs[kind], n.ID(), running.kind)
 	}
 	op := &fabricOp{kind: kind, done: make(chan struct{})}
 	r.ops[n] = op
@@ -290,6 +300,84 @@ func (r *Registry) Decommission(ctx context.Context, n *Node) error {
 		}
 		return r.deleteNode(ctx, n, former)
 	})
+}
+
+// CertificateUpdateOptions configure [Registry.UpdateOperationalCertificate]
+// — matter.js CommissioningClient.OperationalCertificateUpdateOptions
+// (packages/node/src/behavior/system/commissioning/CommissioningClient.ts:931-941
+// at b25ed960); the abort is the call's context.
+type CertificateUpdateOptions struct {
+	// Failsafe is the fail-safe armed for the whole update, including the
+	// CASE reconnect with the new certificate: 0 is one minute
+	// ([commissioner.DefaultCertificateUpdateFailsafe]); it must lie
+	// between 30 s and 65535 s. The node ends the fail-safe early at its
+	// MaxCumulativeFailsafeSeconds.
+	Failsafe time.Duration
+}
+
+// UpdateOperationalCertificate replaces the node operational certificate
+// of the commissioned node with one for a freshly generated key pair, as
+// the node's fabric operation: its node id, fabric, CASE Authenticated
+// Tags and fabric-scoped data stay. Mirrors matter.js ClientNode
+// .updateOperationalCertificate (packages/node/src/node/ClientNode.ts:218-224
+// at b25ed960) under Peers.runOperationalCertificateUpdate
+// (Peers.ts:630-632), over CommissioningClient.updateOperationalCertificate
+// (CommissioningClient.ts:519-570), which hands the update to
+// [commissioner.Commissioner.UpdateOperationalCertificate] (the sequence,
+// the failure table and what ctx ends are documented there).
+//
+// A node without a peer address is [ErrNotCommissioned] (:520-525). The
+// update reads the node's CurrentFabricIndex first; once that read
+// succeeded, the read index replaces [Record].FabricIndexOnPeer — with a
+// warning when another one was stored (:562-570) — also when the update
+// fails afterwards: a [*commissioner.CertificateUpdateError] that carries
+// an index stores it and is returned unchanged; a failing record save is
+// logged and does not replace the update's error (:533-537, :544-555).
+// While the update runs, a commission, decommission or second update of
+// the node is [ErrFabricOperationInProgress].
+func (r *Registry) UpdateOperationalCertificate(ctx context.Context, n *Node, o CertificateUpdateOptions) error {
+	return r.runFabricOperation(n, opCertificateUpdate, func() error {
+		addr, ok := n.commissionedAddress()
+		if !ok {
+			return fmt.Errorf("%w: cannot update the operational certificate of %s because it is not commissioned", ErrNotCommissioned, n.ID())
+		}
+		var fabric *commissioner.Fabric
+		for _, f := range r.cfg.Fabrics {
+			if f.FabricIndex == addr.FabricIndex {
+				fabric = f
+				break
+			}
+		}
+		if fabric == nil {
+			return fmt.Errorf("%w: cannot update the operational certificate of %s in fabric %d because we do not control it", ErrForeignFabric, n.ID(), addr.FabricIndex)
+		}
+		res, err := r.cfg.Commissioner.UpdateOperationalCertificate(ctx, commissioner.CertificateUpdateOptions{Address: addr, Fabric: fabric, Failsafe: o.Failsafe})
+		if err != nil {
+			var ue *commissioner.CertificateUpdateError
+			if errors.As(err, &ue) && ue.FabricIndexOnPeer != 0 {
+				r.storeReportedFabricIndex(n, ue.FabricIndexOnPeer)
+			}
+			return err
+		}
+		r.storeReportedFabricIndex(n, res.FabricIndexOnPeer)
+		return nil
+	})
+}
+
+// storeReportedFabricIndex makes fabricIndex the node's FabricIndexOnPeer,
+// with a warning when another one was stored; a save failure is logged by
+// the record's save. Mirrors matter.js CommissioningClient
+// .#storeReportedFabricIndex (CommissioningClient.ts:557-571 at b25ed960).
+func (r *Registry) storeReportedFabricIndex(n *Node, fabricIndex uint8) {
+	var known uint8
+	n.updateRecord(func(rec *Record) {
+		known = rec.FabricIndexOnPeer
+		rec.FabricIndexOnPeer = fabricIndex
+	})
+	if known != 0 && known != fabricIndex {
+		r.log.Warn("matter.controller.client.registry.fabric_index_replaced", slog.String("node", n.ID()),
+			slog.Int("reported", int(fabricIndex)), slog.Int("stored", int(known)))
+	}
 }
 
 // leaveLatch is the decommission's watch for the peer's leave event
