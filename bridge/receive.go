@@ -199,6 +199,10 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	if !duplicate {
 		b.bindUnsecuredWindow(&hdr, proto.ExchangeID)
 	}
+	// A message on an exchange this node opened is the peer heard on it,
+	// before any rule below refuses or drops it: its give-up then reports
+	// no peer loss ([Bridge.noteInitiatedReceived]).
+	b.noteInitiatedReceived(&hdr, proto)
 
 	// A new message on an exchange whose earlier reliable message from this
 	// node still waits for its acknowledgement must acknowledge it, or it
