@@ -220,7 +220,7 @@ func TestParityMatterJS_OTAProviderApplyTable(t *testing.T) {
 
 // TestParityMatterJS_OTAProviderApplyDelay ports the wire half of OtaTest.ts
 // :2007-2027 at b25ed960: what a Proceed sends under the provider's apply
-// delay (OTAProviderConfig.ApplyDelay, State.applyDelay). The
+// delay, set by OTAProviderConfig's ApplyDelay field. The
 // RebootResubscribeArmer half is SoftwareUpdateManager's (the register
 // names it).
 func TestParityMatterJS_OTAProviderApplyDelay(t *testing.T) {

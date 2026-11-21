@@ -1362,15 +1362,6 @@
     "occurrences": 2
   },
   {
-    "file": "cluster/core/ota_provider.go",
-    "line": 63,
-    "citation": "SoftwareUpdateManager.ts:454",
-    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
-    "identifier": "FileDesignator",
-    "nearest": 711,
-    "occurrences": 3
-  },
-  {
     "file": "cluster/core/scenes_management.go",
     "line": 628,
     "citation": "ScenesManagementServer.ts:77-80",
@@ -2702,7 +2693,7 @@
   },
   {
     "file": "controller/softwareupdate/manager.go",
-    "line": 253,
+    "line": 260,
     "citation": "SoftwareUpdateManager.ts:114-118",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "at": "b25ed960",
@@ -2748,7 +2739,7 @@
   },
   {
     "file": "controller/softwareupdate/script.go",
-    "line": 191,
+    "line": 198,
     "citation": "InProcessControllerAdapter.ts:596-614",
     "resolved": "support/chip-testing/src/cert/InProcessControllerAdapter.ts",
     "identifier": "applyDelay",

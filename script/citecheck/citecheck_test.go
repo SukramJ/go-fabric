@@ -153,7 +153,7 @@ import (
 // 426 after wave P4-S: the DAV: lines of controller/attestation
 // renumbered to DeviceAttestationValidator.ts at b25ed960 leave six rows
 // (measured by make cite-report).
-const citecheckDriftRatchet = 424
+const citecheckDriftRatchet = 423
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit

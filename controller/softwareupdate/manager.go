@@ -1093,7 +1093,7 @@ func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.Query
 // none. m.mu is held.
 //
 // Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:698-713 at b25ed960
-// (updateExistsFor, the choice).
+// (the consented or the delegated candidate).
 func (m *Manager) offerOfLocked(p Peer, candidates []StoredImage, req provdef.QueryImageRequest) (*StoredImage, bool) {
 	for i := range candidates {
 		c := candidates[i]
