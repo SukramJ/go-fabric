@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicdef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
 	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -133,6 +134,19 @@ type Config struct {
 	// neither (LocalizationConfigurationServer.ts:14-21 initialize); a host
 	// states its own, as the reference daemon does (en-US, de-DE).
 	Locales []string
+	// TimeFormat is the root TimeFormatLocalization's start: its hour
+	// format, its calendar and the calendars a controller may choose, or
+	// the server without the CalendarFormat feature ([TimeFormatConfig]).
+	// nil starts at 24-hour and Gregorian, Gregorian the only calendar
+	// listed. matter.js detects the hour format and the calendar when the
+	// host states neither (TimeFormatLocalizationServer.ts:17-42 at
+	// b25ed960, initialize); detection is the host's here, so a host that
+	// knows its user's formats states them. A configuration the server
+	// refuses fails [New] with [mattercore.ErrLocalizationConfig]. A value
+	// a controller wrote and the node stored is restored over the start,
+	// as for Locales; a stored calendar the list no longer holds is not,
+	// and the start stands, with a warning.
+	TimeFormat *TimeFormatConfig
 	// Groups, when set, is the group state the node runs on, for a host
 	// whose own assembler ([Config].Snapshotter) mounts the stack's Groups and
 	// ScenesManagement servers over it (endpoint.Config.Groups): one
@@ -606,6 +620,43 @@ func (t *TermsAndConditions) core() *mattercore.TermsAndConditionsConfig {
 	}
 	return &mattercore.TermsAndConditionsConfig{
 		RequiredVersion: t.Version, RequiredAcknowledgements: t.Acknowledgements, UpdateDeadline: t.UpdateDeadline,
+	}
+}
+
+// TimeFormatConfig is the start of the root's TimeFormatLocalization
+// ([Config].TimeFormat). The node passes every field to the server
+// unchanged and adds no default of its own: the rules are the server's
+// ([mattercore.NewTimeFormatLocalization]).
+type TimeFormatConfig struct {
+	// HourFormat is the hour format the node starts with. Required: nil
+	// is refused with [mattercore.ErrLocalizationConfig].
+	HourFormat *tfldef.HourFormatEnum
+	// ActiveCalendarType is the calendar the node starts with; nil is the
+	// first of SupportedCalendarTypes. nil with an empty list is refused,
+	// and so is a set calendar the list does not hold.
+	ActiveCalendarType *tfldef.CalendarTypeEnum
+	// SupportedCalendarTypes lists the calendars a controller may choose;
+	// empty is ActiveCalendarType alone.
+	SupportedCalendarTypes []tfldef.CalendarTypeEnum
+	// NoFeatures serves the server without the CalendarFormat feature
+	// (FeatureMap 0, HourFormat alone). A calendar beside it is refused.
+	NoFeatures bool
+}
+
+// core converts the start to the server's configuration; nil is
+// 24-hour and Gregorian, the node's start before [Config].TimeFormat.
+func (t *TimeFormatConfig) core() mattercore.TimeFormatLocalizationConfig {
+	if t == nil {
+		return mattercore.TimeFormatLocalizationConfig{
+			HourFormat:         new(tfldef.HourFormatV24Hr),
+			ActiveCalendarType: new(tfldef.CalendarTypeGregorian),
+		}
+	}
+	return mattercore.TimeFormatLocalizationConfig{
+		HourFormat:             t.HourFormat,
+		ActiveCalendarType:     t.ActiveCalendarType,
+		SupportedCalendarTypes: slices.Clone(t.SupportedCalendarTypes),
+		NoFeatures:             t.NoFeatures,
 	}
 }
 

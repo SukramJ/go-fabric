@@ -19,7 +19,6 @@ import (
 	ethdiagdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/cluster/tls"
 	"github.com/SukramJ/go-fabric/cluster/wire"
@@ -354,7 +353,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	if r.WiFiNetworkDiagnostics, err = buildWiFiDiagnostics(cfg.Network.WiFi); err != nil {
 		return nil, err
 	}
-	optional, err := buildRootOptional(ctx, d.st, d.logger, cfg.FixedLabels, cfg.Locales, r.WiFiNetworkDiagnostics)
+	optional, err := buildRootOptional(ctx, d.st, d.logger, cfg.FixedLabels, cfg.Locales, cfg.TimeFormat, r.WiFiNetworkDiagnostics)
 	if err != nil {
 		return nil, fmt.Errorf("root labels and diagnostics: %w", err)
 	}
@@ -479,11 +478,12 @@ func attestationMaterialOf(cfg *Config, chain *attestation.Chain, cd []byte) (ma
 // and diagnostics clusters as the daemon does (root_optional.go:28-91 at b4ea1f96^):
 // FixedLabel, UserLabel (persisted), LocalizationConfiguration (locales,
 // nil is en-US alone),
-// TimeFormatLocalization (24-hour, Gregorian), UnitLocalization,
+// TimeFormatLocalization (the host's [Config].TimeFormat, nil is 24-hour
+// and Gregorian), UnitLocalization,
 // SoftwareDiagnostics (the Go heap), the host's WiFiNetworkDiagnostics when
 // it has one, and EthernetNetworkDiagnostics (every value null).
 func buildRootOptional(ctx context.Context, st store.Settings, logger *slog.Logger, fixed []fixedlabeldef.LabelStruct, locales []string,
-	wifi *mattercore.WiFiNetworkDiagnostics,
+	timeFormatCfg *TimeFormatConfig, wifi *mattercore.WiFiNetworkDiagnostics,
 ) ([]contract.ClusterServer, error) {
 	fixedLabel, userLabel, err := buildLabels(ctx, st, logger, rootUserLabelsKey, fixed)
 	if err != nil {
@@ -499,10 +499,7 @@ func buildRootOptional(ctx context.Context, st store.Settings, logger *slog.Logg
 	if err != nil {
 		return nil, err
 	}
-	timeFormat, err := mattercore.NewTimeFormatLocalization(mattercore.TimeFormatLocalizationConfig{
-		HourFormat:         new(tfldef.HourFormatV24Hr),
-		ActiveCalendarType: new(tfldef.CalendarTypeGregorian),
-	})
+	timeFormat, err := mattercore.NewTimeFormatLocalization(timeFormatCfg.core())
 	if err != nil {
 		return nil, err
 	}
