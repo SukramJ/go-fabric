@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10228,
+  "entry_points": 10229,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -34326,7 +34326,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 387
+      "line": 382
     },
     {
       "package": "device",
@@ -34417,7 +34417,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 422
+      "line": 417
     },
     {
       "package": "device",
