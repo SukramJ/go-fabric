@@ -249,7 +249,7 @@ func (v ICEServerStruct) Clone() ICEServerStruct {
 var ICEServerStructDef = &spec.Struct{Name: "ICEServerStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Urls", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "string", Kind: spec.KindString}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10[max 2000]", Max: &spec.Bound{Int: 10}, Entry: &spec.Constraint{Text: "max 2000", Max: &spec.Bound{Int: 2000}}}},
 	{ID: 1, Name: "Username", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 508", Max: &spec.Bound{Int: 508}}},
-	{ID: 2, Name: "Credential", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 512", Max: &spec.Bound{Int: 512}}},
+	{ID: 2, Name: "Credential", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 512", Max: &spec.Bound{Int: 512}}, Secret: true},
 	{ID: 3, Name: "Caid", Type: spec.Type{Name: "TlsCertificateManagement.TLSCAID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "0 to 65534", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 65534}}},
 }}
 

@@ -2564,6 +2564,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Quality:     spec.Quality{Nullable: true},
 			Constraint:  spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}},
+			Secret:      true,
 		},
 		{
 			ID: AttrAliroSupportedBleuwbProtocolVersions, Name: "AliroSupportedBleuwbProtocolVersions",
@@ -2602,7 +2603,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeOperate, Write: spec.PrivilegeOperate, Timed: true},
 			Fields: []spec.Field{
-				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}},
+				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}, Secret: true},
 			},
 			Decode: decodeLockDoorRequest,
 		},
@@ -2612,7 +2613,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeOperate, Write: spec.PrivilegeOperate, Timed: true},
 			Fields: []spec.Field{
-				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}},
+				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}, Secret: true},
 			},
 			Decode: decodeUnlockDoorRequest,
 		},
@@ -2630,7 +2631,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeOperate, Write: spec.PrivilegeOperate, Timed: true},
 			Fields: []spec.Field{
 				{ID: 0, Name: "Timeout", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}},
+				{ID: 1, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}, Secret: true},
 			},
 			Decode: decodeUnlockWithTimeoutRequest,
 		},
@@ -2856,7 +2857,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "OperationType", Type: spec.Type{Name: "DataOperationTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: DataOperationTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "add, modify", Parts: []spec.Constraint{{Text: "add", Value: &spec.Bound{Ref: "add"}}, {Text: "modify", Value: &spec.Bound{Ref: "modify"}}}}},
 				{ID: 1, Name: "Credential", Type: spec.Type{Name: "CredentialStruct", Kind: spec.KindStruct, Struct: CredentialStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "CredentialData", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
+				{ID: 2, Name: "CredentialData", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Secret: true},
 				{ID: 3, Name: "UserIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "1 to numberOfTotalUsersSupported", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "numberOfTotalUsersSupported"}}},
 				{ID: 4, Name: "UserStatus", Type: spec.Type{Name: "UserStatusEnum", Kind: spec.KindEnum, Bits: 8, Enum: UserStatusEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "occupiedEnabled, occupiedDisabled", Parts: []spec.Constraint{{Text: "occupiedEnabled", Value: &spec.Bound{Ref: "occupiedEnabled"}}, {Text: "occupiedDisabled", Value: &spec.Bound{Ref: "occupiedDisabled"}}}}},
 				{ID: 5, Name: "UserType", Type: spec.Type{Name: "UserTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: UserTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "unrestrictedUser, programmingUser, nonAccessUser, forcedUser, disposableUser, expiringUser, remoteOnlyUser", Parts: []spec.Constraint{{Text: "unrestrictedUser", Value: &spec.Bound{Ref: "unrestrictedUser"}}, {Text: "programmingUser", Value: &spec.Bound{Ref: "programmingUser"}}, {Text: "nonAccessUser", Value: &spec.Bound{Ref: "nonAccessUser"}}, {Text: "forcedUser", Value: &spec.Bound{Ref: "forcedUser"}}, {Text: "disposableUser", Value: &spec.Bound{Ref: "disposableUser"}}, {Text: "expiringUser", Value: &spec.Bound{Ref: "expiringUser"}}, {Text: "remoteOnlyUser", Value: &spec.Bound{Ref: "remoteOnlyUser"}}}}},
@@ -2917,7 +2918,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "UBOLT", Op: spec.ConfName, Name: "UBOLT"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeOperate, Write: spec.PrivilegeOperate, Timed: true},
 			Fields: []spec.Field{
-				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}},
+				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "[COTA & PIN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COTA"}, {Op: spec.ConfName, Name: "PIN"}}}}}, Secret: true},
 			},
 			Decode: decodeUnboltDoorRequest,
 		},
@@ -2927,10 +2928,10 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "ALIRO", Op: spec.ConfName, Name: "ALIRO"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister, Timed: true},
 			Fields: []spec.Field{
-				{ID: 0, Name: "SigningKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "32", Value: &spec.Bound{Int: 32}}},
+				{ID: 0, Name: "SigningKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "32", Value: &spec.Bound{Int: 32}}, Secret: true},
 				{ID: 1, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "65", Value: &spec.Bound{Int: 65}}},
 				{ID: 2, Name: "GroupIdentifier", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
-				{ID: 3, Name: "GroupResolvingKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "ALBU", Op: spec.ConfName, Name: "ALBU"}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
+				{ID: 3, Name: "GroupResolvingKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "ALBU", Op: spec.ConfName, Name: "ALBU"}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Secret: true},
 			},
 			Decode: decodeSetAliroReaderConfigRequest,
 		},

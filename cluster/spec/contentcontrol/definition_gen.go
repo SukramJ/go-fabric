@@ -990,8 +990,8 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PM", Op: spec.ConfName, Name: "PM"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Timed: true},
 			Fields: []spec.Field{
-				{ID: 0, Name: "OldPin", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 6", Max: &spec.Bound{Int: 6}}},
-				{ID: 1, Name: "NewPin", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 6", Max: &spec.Bound{Int: 6}}},
+				{ID: 0, Name: "OldPin", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 6", Max: &spec.Bound{Int: 6}}, Secret: true},
+				{ID: 1, Name: "NewPin", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 6", Max: &spec.Bound{Int: 6}}, Secret: true},
 			},
 			Decode: decodeUpdatePinRequest,
 		},
@@ -1007,7 +1007,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PM", Op: spec.ConfName, Name: "PM"},
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Fields: []spec.Field{
-				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 6", Max: &spec.Bound{Int: 6}}},
+				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 6", Max: &spec.Bound{Int: 6}}, Secret: true},
 			},
 			Decode: decodeResetPinResponse,
 		},
@@ -1031,7 +1031,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "ST", Op: spec.ConfName, Name: "ST"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeOperate, Write: spec.PrivilegeOperate},
 			Fields: []spec.Field{
-				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 6", Max: &spec.Bound{Int: 6}}},
+				{ID: 0, Name: "PinCode", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 6", Max: &spec.Bound{Int: 6}}, Secret: true},
 				{ID: 1, Name: "BonusTime", Type: spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Default: float64(300)},
 			},
 			Decode: decodeAddBonusTimeRequest,

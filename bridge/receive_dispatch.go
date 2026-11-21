@@ -403,7 +403,8 @@ func (b *Bridge) sendReadChunk(ctx context.Context, src net.Addr, requestHdr *me
 }
 
 // logReadAttributeReport is the read's diagnostic: what it returns per
-// path, as each report is generated.
+// path, as each report is generated, a secret the model marks redacted
+// ([loggedAttributeValue]).
 func (b *Bridge) logReadAttributeReport(i int, r im.AttributeReport) {
 	b.logger.Debug("matter.tx.im.read_report",
 		slog.Int("path_index", i),
@@ -413,7 +414,7 @@ func (b *Bridge) logReadAttributeReport(i int, r im.AttributeReport) {
 		slog.Bool("status", r.IsStatus),
 		slog.Any("status_code", r.Status.Status),
 		slog.String("value_type", fmt.Sprintf("%T", r.Value.Value)),
-		slog.Any("value", r.Value.Value))
+		slog.Any("value", loggedAttributeValue{cluster: r.Path.Cluster, attribute: r.Path.Attribute, v: r.Value}))
 }
 
 // readWaitsForChunks reports whether the chunk loop of a read waits for

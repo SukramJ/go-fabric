@@ -70,7 +70,7 @@ func jsonErr(path, format string, args ...any) error {
 
 // AttributeField is the [Field] an attribute's value is encoded as.
 func AttributeField(a *Attribute) *Field {
-	return &Field{ID: a.ID, Name: a.Name, Type: a.Type, Conformance: a.Conformance, Quality: a.Quality, Constraint: a.Constraint}
+	return &Field{ID: a.ID, Name: a.Name, Type: a.Type, Conformance: a.Conformance, Quality: a.Quality, Constraint: a.Constraint, Secret: a.Secret}
 }
 
 // CommandField is the [Field] of a command's payload: a struct of its

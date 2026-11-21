@@ -267,13 +267,14 @@ func (p *primingSource) next() (im.AttributeReport, bool) {
 // attribute without re-hexing the wire bytes. Apple's `<private>` log
 // mask hides the offending path on its side; this emit is the only
 // bridge-side window into what the Subscribe-Initial actually carried for
-// a given cluster.
+// a given cluster. A secret the model marks is redacted
+// ([loggedAttributeValue]).
 func (p *primingSource) log(r im.AttributeReport) {
 	valueType := "<status>"
 	var valuePreview any
 	if !r.IsStatus {
 		valueType = fmt.Sprintf("%T", r.Value.Value)
-		valuePreview = r.Value.Value
+		valuePreview = loggedAttributeValue{cluster: r.Path.Cluster, attribute: r.Path.Attribute, v: r.Value}
 	}
 	p.b.logger.Debug("matter.tx.subscribe.initial_report",
 		slog.Int("path_index", p.reports),

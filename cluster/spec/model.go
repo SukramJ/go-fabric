@@ -170,6 +170,10 @@ type Field struct {
 	// FabricSensitive is access "S": the field is withheld from other
 	// fabrics.
 	FabricSensitive bool
+	// Secret is matter.js's isSecret mark: the field's value is a key,
+	// passcode or credential the module's logs never carry ([Redact]).
+	// Written by script/clustergen from the snapshot's isSecret.
+	Secret bool
 	// Default is the default value matter.js states: a float64, bool or
 	// string (a temperature or percentage in its type's encoding units),
 	// [NullDefault] for a stated null, [EmptyListDefault] for a stated
@@ -302,6 +306,9 @@ type Attribute struct {
 	Quality     Quality
 	Constraint  Constraint
 	Default     any
+	// Secret is matter.js's isSecret mark on the attribute itself, as
+	// [Field.Secret]: its whole value is redacted in the module's logs.
+	Secret bool
 	// Relaxed is the reference line of a relaxation of the attribute's
 	// written value, as [Field.Relaxed] for a field: the server judges it,
 	// the definition holds it to its type's width only.

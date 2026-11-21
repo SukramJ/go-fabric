@@ -320,7 +320,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 644,
+    "line": 645,
     "citation": "InteractionMessenger.ts:431-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -330,7 +330,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 726,
+    "line": 727,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "at": "db021da0",
