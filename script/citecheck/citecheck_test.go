@@ -152,8 +152,10 @@ import (
 // (:415/:433) leave the drift list (measured by make cite-report).
 // 426 after wave P4-S: the DAV: lines of controller/attestation
 // renumbered to DeviceAttestationValidator.ts at b25ed960 leave six rows
-// (measured by make cite-report).
-const citecheckDriftRatchet = 423
+// (measured by make cite-report). 423 after P4b-C. 422 after P4b-REG:
+// script.go's scripted applyDelay re-cited to InProcessControllerAdapter.ts
+// :775-789 at b25ed960 leaves the list (measured by make cite-report).
+const citecheckDriftRatchet = 422
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
