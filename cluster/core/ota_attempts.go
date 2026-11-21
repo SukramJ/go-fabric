@@ -243,8 +243,9 @@ func (a *OTAUpdateAttempt) stringLocked() string {
 // these calls, and the owner without one is [NewOTAStandaloneManager].
 //
 // It has no lock: every method is called with its owner's lock held, so a
-// rule and the owner's queue change in one step, as matter.js's #mutate
-// runs them in one synchronous turn. A requestor has at most one answered
+// rule and the owner's queue change in one step, as matter.js changes both
+// in one #mutate (SoftwareUpdateManager.ts:539-561 at b25ed960). A
+// requestor has at most one answered
 // attempt (OtaUpdateAttempts.ts:139-143 at b25ed960).
 //
 // Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:139-181 at b25ed960

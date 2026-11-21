@@ -367,27 +367,36 @@ func TestManagerAttemptsUnderTheManagerLock(t *testing.T) {
 	wg.Wait()
 }
 
-// TestManagerQueueRunWithAResponderInProgress: the queue run reads the
-// transfer of an entry in progress with m.mu held, so it reads the BDX
-// responder SetBDX set without taking m.mu again — before, it called
-// bdxResponder, which locks m.mu, and the run deadlocked on the first
-// entry in progress once the controller had set its responder.
-func TestManagerQueueRunWithAResponderInProgress(t *testing.T) {
+// TestManagerQueueRunWithAnUpdateInProgress (F-b25ed960-C1): the queue run
+// reads the transfer of an entry in progress with m.mu held, so it reads
+// the BDX responder without taking m.mu again. Before, it called
+// bdxResponder, which locks m.mu whether or not SetBDX ran (5aaabb82
+// manager.go:543-547), and the run deadlocked on the first entry in
+// progress whenever the bdxSession test seam was unset — every production
+// run.
+func TestManagerQueueRunWithAnUpdateInProgress(t *testing.T) {
 	t.Parallel()
-	r := newManagerRig(t, nil)
-	r.m.SetBDX(bdx.NewResponder(nil))
-	r.queue(2, statusPtr(mattercore.OTAUpdateDownloading))
-	ran := make(chan struct{})
-	go func() {
-		defer close(ran)
-		r.m.triggerQueuedUpdate()
-	}()
-	limit, stop := context.WithTimeout(context.Background(), 5*time.Second)
-	defer stop()
-	select {
-	case <-ran:
-	case <-limit.Done():
-		t.Fatal("the queue run with an entry in progress and a BDX responder did not return")
+	for name, responder := range map[string]*bdx.Responder{"without a responder": nil, "with a responder": bdx.NewResponder(nil)} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			r := newManagerRig(t, nil)
+			if responder != nil {
+				r.m.SetBDX(responder)
+			}
+			r.queue(2, statusPtr(mattercore.OTAUpdateDownloading))
+			ran := make(chan struct{})
+			go func() {
+				defer close(ran)
+				r.m.triggerQueuedUpdate()
+			}()
+			limit, stop := context.WithTimeout(context.Background(), 5*time.Second)
+			defer stop()
+			select {
+			case <-ran:
+			case <-limit.Done():
+				t.Fatal("the queue run with an entry in progress did not return")
+			}
+		})
 	}
 }
 

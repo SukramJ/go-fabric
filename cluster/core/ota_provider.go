@@ -60,7 +60,7 @@ type OTAPeer struct {
 // OtaUpdateAvailableDetails (SoftwareUpdateManager.ts:95-102).
 type OTAImage struct {
 	// FileDesignator names the image in the provider's "ota" storage scope
-	// — matter.js names it `ota/${filename}` (SoftwareUpdateManager.ts:454)
+	// — matter.js names it `ota/${filename}` (SoftwareUpdateManager.ts:711)
 	// — and is what [OTAImageSource.Open] is asked for. It is a plain name:
 	// the characters A-Z a-z 0-9 . - _, no "/".
 	FileDesignator bdx.FileDesignator
@@ -68,22 +68,23 @@ type OTAImage struct {
 	SoftwareVersion       uint32
 	SoftwareVersionString string
 	// HTTPSURI is offered to a requestor that does not support BDX
-	// synchronous download but HTTPS (OP:382-386); empty offers none.
+	// synchronous download but HTTPS (OP:233-244); empty offers none.
 	HTTPSURI string
 	// ConsentRequired asks the user's consent before the update: the
 	// provider asks [OTAConsent] when the requestor cannot consent itself
-	// (OP:245-284), and tells the requestor it is needed (OP:399).
+	// (OP:199-231), and tells the requestor it is needed only when it
+	// delegates the consent to it (OP:312).
 	// false states that the consent exists, as SoftwareUpdateManager does
 	// for a peer it holds one for.
 	ConsentRequired bool
 	// MetadataForRequestor is passed back in the QueryImageResponse
-	// (OP:400); at most 512 bytes.
+	// (OP:313); at most 512 bytes.
 	MetadataForRequestor []byte
 }
 
 // OTAImageSource is the host's image catalogue: matter.js's
-// checkUpdateAvailable extension point (OP:491-502) and the blob storage
-// behind the "ota" scope (SoftwareUpdateManager.storage, OP:109-114).
+// checkUpdateAvailable extension point (OP:395-414) and the blob storage
+// behind the "ota" scope (SoftwareUpdateManager.storage, OP:92-97).
 type OTAImageSource interface {
 	// QueryImage returns the image for the requestor's vendor, product and
 	// version — false when there is none (NotAvailable, OP:173-178).
@@ -95,7 +96,7 @@ type OTAImageSource interface {
 	Open(ctx context.Context, file string) (bdx.Blob, error)
 }
 
-// OTAConsentState is matter.js OtaSoftwareUpdateConsentState (OP:66-71).
+// OTAConsentState is matter.js OtaSoftwareUpdateConsentState (OP:43-48).
 type OTAConsentState uint8
 
 // The consent states.
@@ -108,9 +109,9 @@ const (
 
 // OTAConsent asks the user's consent for an update the requestor cannot
 // consent to itself: matter.js's requestUserConsentForUpdate extension
-// point (OP:479-489, :640-656). The delay is how long a requestor told
+// point (OP:382-393). The delay is how long a requestor told
 // Obtaining waits before it asks again; zero is matter.js's 120 s
-// (OP:248). A nil OTAConsent answers Unknown, which declines (OP:488).
+// (OP:205). A nil OTAConsent answers Unknown, which declines (OP:392).
 type OTAConsent interface {
 	RequestConsent(ctx context.Context, peer OTAPeer, req provdef.QueryImageRequest, img OTAImage) (OTAConsentState, time.Duration, error)
 }
@@ -133,8 +134,8 @@ type OTAApplyPolicy interface {
 	ApplyUpdate(ctx context.Context, peer OTAPeer, req provdef.ApplyUpdateRequestRequest) (provdef.ApplyUpdateActionEnum, time.Duration, error)
 }
 
-// OTAUpdateStatus is matter.js OtaUpdateStatus (SoftwareUpdateManager.ts:
-// 104-113): where a requestor's update stands.
+// OTAUpdateStatus is matter.js OtaUpdateStatus (OtaProgress.ts:16-25 at
+// b25ed960): where a requestor's update stands.
 type OTAUpdateStatus uint8
 
 // The update states.
@@ -592,7 +593,7 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAtt
 	if !ok {
 		nodeID = 0
 	}
-	// OP:300; the image is `ota/<file>` (SoftwareUpdateManager.ts:454).
+	// OP:300; the image is `ota/<file>` (SoftwareUpdateManager.ts:711).
 	return bdx.FileDesignator(otaScope + "/" + string(img.FileDesignator)).BdxURI(nodeID), false
 }
 
