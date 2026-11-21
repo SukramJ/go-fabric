@@ -139,7 +139,7 @@ func (c *Central) isScanning() bool {
 }
 
 // Connect implements ble.Central.
-func (c *Central) Connect(_ context.Context, p ble.Peripheral) (ble.Connection, error) {
+func (c *Central) Connect(ctx context.Context, p ble.Peripheral) (ble.Connection, error) {
 	c.mu.Lock()
 	per := c.peripherals[p.Address]
 	c.mu.Unlock()
@@ -147,7 +147,7 @@ func (c *Central) Connect(_ context.Context, p ble.Peripheral) (ble.Connection, 
 		return nil, ErrUnknownPeripheral
 	}
 	if r := per.currentRadio(); r != nil {
-		return r.connect()
+		return r.connect(ctx)
 	}
 	return per.accept(), nil
 }

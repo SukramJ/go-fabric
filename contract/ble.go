@@ -83,7 +83,10 @@ type GATTService interface {
 	// accept do not overlap. Serve blocks: when ctx ends it drops every
 	// connection, unregisters the service and returns nil. An error is a
 	// service the platform withdrew; the service is unregistered then too.
-	// Serve is called once.
+	// Serve is called once. The node advertises once RegisterService
+	// returned and calls Serve on another goroutine, so a central that
+	// connects after RegisterService returned and before Serve runs is
+	// held, and accepted once Serve runs.
 	Serve(ctx context.Context, accept func(BLEConnection)) error
 }
 
