@@ -436,3 +436,53 @@ func TestManagerAdmissionCancelFailsParity(t *testing.T) {
 func otaPeerOfTest() mattercore.OTAPeer {
 	return mattercore.OTAPeer{FabricIndex: testPeer.FabricIndex, NodeID: testPeer.NodeID}
 }
+
+// TestManagerStartUpBelowTargetFailsTheAppliedAttemptParity ports "Apply
+// failure detected when startUp fires after Applying state" (OtaTest.ts:2147
+// at b25ed960) on the attempt: the startUp below the target fails the
+// update before anything resets it, so #failUpdate reaches the attempt it
+// follows — Cancelled, as it applied, and ended (SoftwareUpdateManager.ts:1063-1069,
+// :1152-1157 at b25ed960).
+func TestManagerStartUpBelowTargetFailsTheAppliedAttemptParity(t *testing.T) {
+	t.Parallel()
+	t.Run("Apply failure detected when startUp fires after Applying state", func(t *testing.T) {
+		t.Parallel()
+		r := newAttemptRig(t)
+		r.queue(2, nil)
+		q := r.query(t, 7, 1)
+		if got := r.apply(t, *q.UpdateToken, 2); got != provdef.ApplyUpdateActionProceed {
+			t.Fatalf("apply: action %d", got)
+		}
+		a := providerPorts{r.m}.AttemptFor(otaPeerOfTest(), *q.UpdateToken)
+		if a == nil || a.Status() != mattercore.OTAUpdateApplying {
+			t.Fatalf("attempt %v, want Applying", a)
+		}
+		r.m.onSoftwareVersionChanged(testPeer, 1, true)
+		if failed, _ := r.counts(); failed != 1 {
+			t.Errorf("%d updateFailed, want 1", failed)
+		}
+		if a.Status() != mattercore.OTAUpdateCancelled || !a.Ended() {
+			t.Errorf("attempt %s ended %v, want Cancelled and ended", a.Status(), a.Ended())
+		}
+	})
+}
+
+// TestManagerConsentRemovalKeepsALegacyApplyingUpdate (C-23, review M2):
+// an update the deprecated [Manager.OnStatusChange] moved to Applying, which
+// follows no attempt, is as far as an attempt that applies — the removal
+// of its consent no longer cancels it (SoftwareUpdateManager.ts:1700 at
+// b25ed960 reads the status the entry shows).
+func TestManagerConsentRemovalKeepsALegacyApplyingUpdate(t *testing.T) {
+	t.Parallel()
+	r := newManagerRig(t, nil)
+	r.queue(2, nil)
+	v := uint32(2)
+	r.m.OnStatusChange(testPeer, mattercore.OTAUpdateApplying, &v, 0) //nolint:staticcheck // the deprecated path under test
+	r.m.RemoveConsent(testPeer, 2)
+	if failed, _ := r.counts(); failed != 0 {
+		t.Errorf("%d updateFailed, want the applying update kept", failed)
+	}
+	if len(r.m.QueuedUpdates()) != 1 {
+		t.Error("the applying update left the queue")
+	}
+}

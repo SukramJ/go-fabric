@@ -649,18 +649,23 @@ func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp 
 		return
 	}
 	e := m.queue[i]
+	// The failed apply is judged before anything resets the entry, so
+	// #failUpdate still reaches the attempt the entry follows
+	// (SoftwareUpdateManager.ts:1061-1069 at b25ed960; the reset comes only
+	// on the path that neither fails nor completes, :1082-1087).
 	previous := e.statusOf()
+	if newVersion < e.TargetSoftwareVersion && isStartUp && previous != nil &&
+		(*previous == mattercore.OTAUpdateApplying || *previous == mattercore.OTAUpdateWaitForApply) {
+		m.log.Warn("ota.manager.apply_failed_reboot", slog.String("node", peerString(p)),
+			slog.Uint64("version", uint64(newVersion)), slog.Uint64("target", uint64(e.TargetSoftwareVersion)))
+		m.failAppliedLocked(i)
+		return
+	}
 	if !e.started.IsZero() {
 		m.log.Info("ota.manager.version_change_clears_progress", slog.String("node", peerString(p)))
 		e.reset()
 	}
 	if newVersion < e.TargetSoftwareVersion {
-		if isStartUp && previous != nil && (*previous == mattercore.OTAUpdateApplying || *previous == mattercore.OTAUpdateWaitForApply) {
-			m.log.Warn("ota.manager.apply_failed_reboot", slog.String("node", peerString(p)),
-				slog.Uint64("version", uint64(newVersion)), slog.Uint64("target", uint64(e.TargetSoftwareVersion)))
-			m.failAppliedLocked(i)
-			return
-		}
 		m.mu.Unlock()
 		return
 	}
@@ -1587,7 +1592,9 @@ func (m *Manager) cancelUpdate(p Peer, version uint32) {
 		return
 	}
 	e := m.queue[i]
-	if a := e.attempt; a != nil && a.Status() == mattercore.OTAUpdateApplying {
+	// :1700 reads the attempt's status; statusOf is the attempt's while the
+	// entry follows one, and the deprecated OnStatusChange's otherwise.
+	if s := e.statusOf(); s != nil && *s == mattercore.OTAUpdateApplying {
 		m.unlock()
 		m.log.Info("ota.manager.cancel_too_late", slog.String("node", peerString(p)))
 		return
