@@ -1279,15 +1279,7 @@ func (m *Manager) requestQueueRunLocked() { m.queueRunPending = true }
 // what the change left to run, its events, runs.
 func (m *Manager) unlock() {
 	for {
-		for _, a := range m.attempts.TakeEnded() {
-			if m.suppress {
-				continue
-			}
-			if e := m.linkedEntryLocked(a); e != nil {
-				m.log.Info("ota.manager.attempt_ended_reset", slog.String("node", peerString(e.peer)), slog.String("attempt", a.String()))
-				m.resetEntryProgressLocked(e)
-			}
-		}
+		m.resetEndedLocked()
 		if !m.queueRunPending {
 			break
 		}
@@ -1305,6 +1297,21 @@ func (m *Manager) unlock() {
 	}
 }
 
+// resetEndedLocked resets the entries linked to the attempts the rules
+// ended since the last call (#endAttempt, SoftwareUpdateManager.ts:1216-1227
+// at b25ed960), except while updates are suppressed. m.mu is held.
+func (m *Manager) resetEndedLocked() {
+	for _, a := range m.attempts.TakeEnded() {
+		if m.suppress {
+			continue
+		}
+		if e := m.linkedEntryLocked(a); e != nil {
+			m.log.Info("ota.manager.attempt_ended_reset", slog.String("node", peerString(e.peer)), slog.String("attempt", a.String()))
+			m.resetEntryProgressLocked(e)
+		}
+	}
+}
+
 // entryForLocked is the node's queue entry, nil for none.
 func (m *Manager) entryForLocked(p mattercore.OTAPeer) *queueEntry {
 	return m.entryOfLocked(peerOf(p))
@@ -1318,6 +1325,10 @@ func (m *Manager) linkedEntryLocked(a *mattercore.OTAUpdateAttempt) *queueEntry 
 }
 
 func (m *Manager) linkAttemptLocked(a *mattercore.OTAUpdateAttempt) *queueEntry {
+	// The attempts the answer replaced ended first and reset the entry they
+	// held, so it may take a new target before it is linked (#answerAttempt
+	// runs before #linkAttempt, :1774-1778).
+	m.resetEndedLocked()
 	e := m.entryForLocked(a.Peer())
 	if e == nil || !a.Answered() {
 		return nil

@@ -6,7 +6,6 @@ package softwareupdate
 import (
 	"bytes"
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -421,40 +420,6 @@ func (f restartedTransfer) Peer() bdx.Peer {
 	return bdx.Peer{FabricIndex: testPeer.FabricIndex, NodeID: testPeer.NodeID, SessionID: f.id}
 }
 func (f restartedTransfer) LastActivity() time.Time { return f.at }
-
-// TestManagerAdmissionCancelFailsParity ports "answers busy and keeps the
-// attempt when the transfer of a node that restarted cannot be cancelled"
-// (OtaTest.ts:5425-5545 at b25ed960, the admission table): the cancel of
-// the restarted node's transfer fails, so the query is Busy and the
-// attempt runs on, linked (SoftwareUpdateManager.ts:1863-1872).
-func TestManagerAdmissionCancelFailsParity(t *testing.T) {
-	t.Parallel()
-	t.Run("answers busy and keeps the attempt when the transfer of a node that restarted cannot be cancelled", func(t *testing.T) {
-		t.Parallel()
-		r := newAttemptRig(t)
-		r.queue(2, nil)
-		q := r.query(t, 7, 1)
-		cancels := 0
-		started := r.clock.Now()
-		r.m.admitTransfer = func(Peer) admissionTransfer { return restartedTransfer{id: 7, at: started} }
-		r.m.disableTransfer = func(Peer) error { cancels++; return errors.New("simulated BDX cancel failure") }
-		r.clock.Advance(time.Second)
-		if got := r.query(t, 8, 1); got.Status != provdef.StatusBusy {
-			t.Fatalf("query %+v, want Busy", got)
-		}
-		a := providerPorts{r.m}.AttemptFor(otaPeerOfTest(), *q.UpdateToken)
-		if cancels != 1 || a == nil || a.Ended() {
-			t.Fatalf("cancels %d, attempt kept %v", cancels, a != nil)
-		}
-		r.m.mu.Lock()
-		linked := r.m.linkedEntryLocked(a) != nil
-		_, suppressed := r.m.startUpSuppress[testPeer]
-		r.m.mu.Unlock()
-		if !linked || suppressed {
-			t.Errorf("still linked %v, startUp suppressed %v", linked, suppressed)
-		}
-	})
-}
 
 func otaPeerOfTest() mattercore.OTAPeer {
 	return mattercore.OTAPeer{FabricIndex: testPeer.FabricIndex, NodeID: testPeer.NodeID}

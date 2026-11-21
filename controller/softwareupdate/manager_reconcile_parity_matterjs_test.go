@@ -7,10 +7,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"runtime"
+	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/SukramJ/go-fabric/bdx"
+	"github.com/SukramJ/go-fabric/client/peer"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -350,4 +358,789 @@ func TestManagerCloseAbortsTheAnnouncement(t *testing.T) {
 		<-closed
 		t.Fatal("Close waited for an announcement the node never answers")
 	}
+}
+
+// announceLog records the announcements of the queue, as OtaTest's
+// interceptAnnouncements (OtaTest.ts:3478-3501 at b25ed960): reply answers
+// call n (counted from 1) in place of the node — at once with err, or, with
+// hang, never: the call waits for its abort.
+type announceLog struct {
+	mu       sync.Mutex
+	ctxs     []context.Context
+	returned []bool
+	hangs    []bool
+	aborted  []bool // at return
+}
+
+// interceptAnnouncements starts the rig's announcements with reply as the
+// node's answer; call it before the first consent.
+func (r *managerRig) interceptAnnouncements(reply func(n int) (hang bool, err error)) *announceLog {
+	l := &announceLog{}
+	r.m.announce = func(ctx context.Context, _ Peer, _ uint16) error {
+		l.mu.Lock()
+		n := len(l.ctxs) + 1
+		hang, err := reply(n)
+		l.ctxs = append(l.ctxs, ctx)
+		l.returned = append(l.returned, false)
+		l.hangs = append(l.hangs, hang)
+		l.aborted = append(l.aborted, false)
+		l.mu.Unlock()
+		if hang {
+			<-ctx.Done()
+			err = ctx.Err()
+		}
+		l.mu.Lock()
+		l.returned[n-1], l.aborted[n-1] = true, ctx.Err() != nil
+		l.mu.Unlock()
+		return err
+	}
+	r.m.mu.Lock()
+	r.m.announcements = newAnnouncements(r.m)
+	r.m.mu.Unlock()
+	return l
+}
+
+// answered succeeds every announcement; hanging never answers one.
+func answered(int) (bool, error) { return false, nil }
+
+func hanging(int) (bool, error) { return true, nil }
+
+// count is the number of announcements sent.
+func (l *announceLog) count() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.ctxs)
+}
+
+// abortedAll is, per announcement, whether its abort fired: at its return,
+// or by now for one still running.
+func (l *announceLog) abortedAll() []bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]bool, len(l.ctxs))
+	for i, ctx := range l.ctxs {
+		out[i] = l.aborted[i] || (!l.returned[i] && ctx.Err() != nil)
+	}
+	return out
+}
+
+// settle waits until every announcement that returned moved its entry on,
+// so only the announcements still running are left (MockTime.macrotasks).
+func (r *managerRig) settle(t *testing.T, l *announceLog) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		l.mu.Lock()
+		running, inFlight := 0, false
+		for i, done := range l.returned {
+			switch {
+			case done:
+			case l.hangs[i]:
+				running++
+			default:
+				inFlight = true
+			}
+		}
+		l.mu.Unlock()
+		r.m.mu.Lock()
+		left := len(r.m.running)
+		r.m.mu.Unlock()
+		if left == running && !inFlight {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d announcements left running, want %d", left, running)
+		}
+		runtime.Gosched()
+	}
+}
+
+// consentTo gives testPeer's node the consent for version (OtaTest.ts:4229-4243).
+func (r *managerRig) consentTo(t *testing.T, version uint32) bool {
+	t.Helper()
+	added, err := r.m.AddUpdateConsent(context.Background(), testPeer, testTarget(version))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return added
+}
+
+// phase is an entry's phase state, failed for a queued entry whose consent
+// failed, with its target and the token of the attempt it follows
+// (phaseStateOf, linkedUpdates; OtaTest.ts:159-168, :5301-5308).
+type phase struct {
+	target uint32
+	state  string
+	token  string
+}
+
+func (r *managerRig) phases() []phase {
+	r.m.mu.Lock()
+	defer r.m.mu.Unlock()
+	out := make([]phase, 0, len(r.m.queue))
+	for _, e := range r.m.queue {
+		p := phase{target: e.TargetSoftwareVersion, state: e.phase.state.String()}
+		if r.m.isFailedLocked(e) {
+			p.state = "failed"
+		}
+		if e.phase.attempt != nil {
+			p.token = hex.EncodeToString(e.phase.attempt.Token())
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+// consentsAndTargets are the versions testPeer has a consent for and the
+// targets of the queued updates (OtaTest.ts:4245-4258).
+func (r *managerRig) consentsAndTargets() (consents, targets []uint32) {
+	r.m.mu.Lock()
+	defer r.m.mu.Unlock()
+	consents, targets = []uint32{}, make([]uint32, 0, len(r.m.queue))
+	if c := r.m.consents[testPeer]; c != nil {
+		consents = append(consents, c.TargetSoftwareVersion)
+	}
+	for _, e := range r.m.queue {
+		targets = append(targets, e.TargetSoftwareVersion)
+	}
+	return consents, targets
+}
+
+func tokenHex(a *mattercore.OTAUpdateAttempt) string { return hex.EncodeToString(a.Token()) }
+
+func (r *managerRig) applyUpdate(token []byte, version uint32) bool {
+	return providerPorts{r.m}.ApplyUpdate(context.Background(), testOTAPeer, token, version, 0)
+}
+
+func wantPhases(t *testing.T, r *managerRig, want ...phase) {
+	t.Helper()
+	if got := r.phases(); !slices.Equal(got, want) {
+		t.Fatalf("phases %+v, want %+v", got, want)
+	}
+}
+
+func wantConsentsAndTargets(t *testing.T, r *managerRig, consents, targets []uint32) {
+	t.Helper()
+	c, tg := r.consentsAndTargets()
+	if !slices.Equal(c, consents) || !slices.Equal(tg, targets) {
+		t.Fatalf("consents %v targets %v, want %v and %v", c, tg, consents, targets)
+	}
+}
+
+var unknownToken = []byte{1, 2, 3, 4, 5, 6, 7, 8}
+
+// TestManagerApplyOfTheTokenParity ports the apply rows of OtaTest's
+// applyRewritten cases (OtaTest.ts:1766-1949 at b25ed960) on the manager:
+// the apply table (applyUpdate, SoftwareUpdateManager.ts:1897-1956) and the
+// attempt an apply under an unknown token becomes.
+func TestManagerApplyOfTheTokenParity(t *testing.T) {
+	t.Parallel()
+	// OtaTest.ts:1873
+	t.Run("applies the version of its update token once its consent is gone without removeConsent(), as the offer allowed it", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		r.consentTo(t, 1)
+		a := deliverOffer(t, r, 1)
+		r.m.mu.Lock()
+		delete(r.m.consents, testPeer) // as when it was completed meanwhile
+		r.m.mu.Unlock()
+		if !r.applyUpdate(a.Token(), 1) {
+			t.Fatal("apply refused, want Proceed")
+		}
+	})
+	// OtaTest.ts:1865
+	t.Run("refuses a version other than 0 that differs from its update token, even with consent for it", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		r.consentTo(t, 1)
+		a := deliverOffer(t, r, 1)
+		r.consentTo(t, 2)
+		if r.applyUpdate(a.Token(), 2) {
+			t.Fatal("apply allowed, want Discontinue")
+		}
+	})
+	// OtaTest.ts:1885
+	t.Run("applies the version of its update token when a consent for a higher version is added meanwhile", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		r.consentTo(t, 1)
+		a := deliverOffer(t, r, 1)
+		r.consentTo(t, 2)
+		if !r.applyUpdate(a.Token(), 1) {
+			t.Fatal("apply refused, want Proceed")
+		}
+	})
+	// OtaTest.ts:1897
+	t.Run("tracks an allowed apply under an update token it did not hand out as an applying update", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		r.consentTo(t, 1)
+		deliverOffer(t, r, 1)
+		if !r.applyUpdate(unknownToken, 1) {
+			t.Fatal("apply refused, want Proceed")
+		}
+		a := providerPorts{r.m}.AttemptFor(testOTAPeer, unknownToken)
+		if a == nil || a.Status() != mattercore.OTAUpdateApplying {
+			t.Fatalf("attempt %v, want Applying", a)
+		}
+		r.m.mu.Lock()
+		linked := r.m.linkedEntryLocked(a) != nil
+		r.m.mu.Unlock()
+		if !linked {
+			t.Fatal("the queued update does not follow the adopted attempt")
+		}
+	})
+}
+
+// TestManagerQueuePhasesParity ports OtaTest's cases of the queue's phases
+// (OtaTest.ts at b25ed960; SoftwareUpdateManager.ts:87-145, :1295-1415).
+func TestManagerQueuePhasesParity(t *testing.T) {
+	t.Parallel()
+	// OtaTest.ts:1610
+	t.Run("reports Cancelled and resets the queued update when it refuses the apply of its linked attempt", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		r.interceptAnnouncements(hanging)
+		r.consentTo(t, 2)
+		a := reportStatus(t, r, 2, mattercore.OTAUpdateDownloading)
+		if q := r.m.QueuedUpdates(); len(q) != 1 || q[0].LastProgressStatus == nil || *q[0].LastProgressStatus != mattercore.OTAUpdateDownloading {
+			t.Fatalf("before: %+v, want Downloading", q)
+		}
+		if r.applyUpdate(a.Token(), 3) {
+			t.Fatal("apply of another version allowed")
+		}
+		q := r.m.QueuedUpdates()
+		if a.Status() != mattercore.OTAUpdateCancelled || len(q) != 1 || q[0].LastProgressStatus != nil {
+			t.Fatalf("attempt %s, queue %+v; want Cancelled and the one entry announced again", a.Status(), q)
+		}
+	})
+	// OtaTest.ts:4307
+	t.Run("keeps an update underway when the consent for another version is removed", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(answered)
+		r.consentTo(t, 1)
+		r.consentTo(t, 2)
+		r.settle(t, l)
+		reportStatus(t, r, 2, mattercore.OTAUpdateDownloading)
+		r.m.RemoveConsent(testPeer, 1)
+		if got := r.phases(); len(got) != 1 || got[0].state != "progress" {
+			t.Fatalf("phases %+v, want progress", got)
+		}
+		wantConsentsAndTargets(t, r, []uint32{2}, []uint32{2})
+	})
+	// OtaTest.ts:4326
+	t.Run("cancels an update underway when the consent for its version is removed, and queues the version of the consent left", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(answered)
+		r.consentTo(t, 1)
+		r.settle(t, l)
+		cancels := 0
+		r.m.disableTransfer = func(Peer) error { cancels++; return nil }
+		a := reportStatus(t, r, 1, mattercore.OTAUpdateDownloading)
+		r.consentTo(t, 2) // the update underway keeps its version
+		r.m.RemoveConsent(testPeer, 1)
+		providerPorts{r.m}.ReportAttemptStatus(a, mattercore.OTAUpdateCancelled) // as the closed transfer reports
+		r.settle(t, l)
+		if failed, _ := r.counts(); failed != 1 || cancels != 1 {
+			t.Fatalf("failures %d, cancels %d; want 1 and 1", failed, cancels)
+		}
+		wantConsentsAndTargets(t, r, []uint32{2}, []uint32{2})
+	})
+	// OtaTest.ts:4948
+	t.Run("keeps the apply right of an offer when the consent for another version is removed, and ends the right of an offer of that version", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		r.interceptAnnouncements(hanging)
+		r.consentTo(t, 2)
+		offered := deliverOffer(t, r, 1) // as offered by an override that obtained the consent for 1
+		pp := providerPorts{r.m}
+		ofRemoved := pp.BeginQuery(testOTAPeer) // an offer of 2 whose query still runs
+		if !pp.OfferUpdate(ofRemoved, []byte{0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x01, 0x02}, 2) {
+			t.Fatal("offer of 2 not made")
+		}
+		r.m.RemoveConsent(testPeer, 2)
+		if !r.applyUpdate(offered.Token(), 1) || r.applyUpdate(ofRemoved.Token(), 2) {
+			t.Fatal("want the offer of 1 applied and the offer of 2 refused")
+		}
+	})
+	// OtaTest.ts:5276
+	t.Run("does not link an attempt that ended before its offer was delivered", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		r.interceptAnnouncements(hanging)
+		r.consentTo(t, 1)
+		delivered := deliverOffer(t, r, 1)
+		pp := providerPorts{r.m}
+		ended := pp.BeginQuery(testOTAPeer)
+		pp.OfferUpdate(ended, []byte{0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x01, 0x07}, 1)
+		r.m.mu.Lock()
+		r.m.attempts.End(ended) // as the provider ends an attempt while its query still runs
+		r.m.mu.Unlock()
+		pp.OfferAnswered(ended)
+		r.m.mu.Lock()
+		linked := r.m.linkedEntryLocked(delivered) != nil
+		r.m.mu.Unlock()
+		if !linked || delivered.Ended() || ended.Answered() {
+			t.Fatalf("linked %v, delivered ended %v, ended answered %v; want true, false, false", linked, delivered.Ended(), ended.Answered())
+		}
+	})
+	// OtaTest.ts:5316
+	t.Run("resets an update whose attempt a newer answered offer of another version replaces, so the old status no longer counts", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(answered)
+		r.consentTo(t, 2)
+		r.settle(t, l)
+		replaced := reportStatus(t, r, 2, mattercore.OTAUpdateWaitForApply)
+		r.consentTo(t, 3)
+		wantPhases(t, r, phase{2, "progress", tokenHex(replaced)})
+		replacing := deliverOffer(t, r, 3)
+		providerPorts{r.m}.ReportAttemptStatus(replacing, mattercore.OTAUpdateDownloading)
+		if !replaced.Ended() {
+			t.Fatal("the replaced attempt runs on")
+		}
+		wantPhases(t, r, phase{3, "progress", tokenHex(replacing)})
+		r.m.onSoftwareVersionChanged(testPeer, 0, true) // restarts below its target while it downloads
+		r.settle(t, l)
+		r.m.mu.Lock()
+		c := r.m.consents[testPeer]
+		r.m.mu.Unlock()
+		if c == nil || c.TargetSoftwareVersion != 3 || !c.failedAt.IsZero() {
+			t.Fatalf("consent %+v, want 3 not failed", c)
+		}
+	})
+	// OtaTest.ts:5366
+	t.Run("ignores a late Cancelled of an attempt whose update was reset as stalled while the update is announced again", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(func(n int) (bool, error) { return n != 1, nil })
+		r.consentTo(t, 1)
+		r.settle(t, l)
+		a := reportStatus(t, r, 1, mattercore.OTAUpdateDownloading)
+		r.advance(25 * time.Minute)
+		r.settle(t, l)
+		if n := l.count(); n != 2 {
+			t.Fatalf("%d announcements, want 2", n)
+		}
+		wantPhases(t, r, phase{1, "announcing", ""})
+		providerPorts{r.m}.ReportAttemptStatus(a, mattercore.OTAUpdateCancelled)
+		r.clock.Advance(time.Second)
+		if a.Ended() {
+			t.Fatal("the late Cancelled ended the attempt")
+		}
+		wantPhases(t, r, phase{1, "announcing", ""})
+		if got := l.abortedAll(); !slices.Equal(got, []bool{false, false}) {
+			t.Fatalf("aborted %v, want neither", got)
+		}
+	})
+	// OtaTest.ts:5402
+	t.Run("ends the attempt of a queued update when an apply under an unknown update token replaces it", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(answered)
+		r.consentTo(t, 1)
+		r.settle(t, l)
+		replaced := reportStatus(t, r, 1, mattercore.OTAUpdateDownloading)
+		if !r.applyUpdate(unknownToken, 1) || !replaced.Ended() {
+			t.Fatalf("applied under the unknown token: replaced ended %v", replaced.Ended())
+		}
+		wantPhases(t, r, phase{1, "progress", hex.EncodeToString(unknownToken)})
+	})
+	// Go-titled (OtaTest.ts:5122 is not portable: Go's Manager is terminal
+	// after Close): the offline half — the attempts end, the entry keeps
+	// following its ended attempt, no event (#endAllAttempts,
+	// SoftwareUpdateManager.ts:1229-1237 at b25ed960).
+	t.Run("keeps an update in progress with its ended attempt when the manager goes offline", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(answered)
+		r.consentTo(t, 1)
+		r.settle(t, l)
+		a := reportStatus(t, r, 1, mattercore.OTAUpdateDownloading)
+		r.m.Close()
+		if !a.Ended() {
+			t.Fatal("the attempt runs on after Close")
+		}
+		wantPhases(t, r, phase{1, "progress", tokenHex(a)})
+		if failed, done := r.counts(); failed != 0 || done != 0 {
+			t.Fatalf("failed %d, done %d; want no event", failed, done)
+		}
+	})
+	// Go-titled: a version below the target resets an update underway and
+	// the queue runs, so it is announced again (#onSoftwareVersionChanged,
+	// SoftwareUpdateManager.ts:1081-1088 at b25ed960).
+	t.Run("announces an update again when the node restarts below its target before it applies", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(answered)
+		r.consentTo(t, 2)
+		r.settle(t, l)
+		wantPhases(t, r, phase{2, "announced", ""})
+		r.m.onSoftwareVersionChanged(testPeer, 1, true)
+		r.settle(t, l)
+		if n := l.count(); n != 2 {
+			t.Fatalf("%d announcements, want the reset update announced again", n)
+		}
+		if failed, _ := r.counts(); failed != 0 {
+			t.Fatalf("%d updateFailed, want none", failed)
+		}
+	})
+	// Go-titled: a failed update is not announced again (#failUpdate,
+	// #triggerQueuedUpdate; SoftwareUpdateManager.ts:1142-1174, :1332-1334 at
+	// b25ed960), and an announcement that fails waits as queued and is
+	// announced again by the periodic queue run (:1404-1414, :1296-1300).
+	t.Run("does not announce a failed update again", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(answered)
+		r.consentTo(t, 2)
+		r.settle(t, l)
+		r.m.dropUndeliverableUpdate(testPeer, 0)
+		wantPhases(t, r, phase{2, "failed", ""})
+		r.advance(20 * time.Minute)
+		r.settle(t, l)
+		if n := l.count(); n != 1 {
+			t.Fatalf("%d announcements, want the failed update not announced again", n)
+		}
+		if failed, _ := r.counts(); failed != 1 {
+			t.Fatalf("%d updateFailed, want 1", failed)
+		}
+	})
+	t.Run("announces again after a failed announcement with the periodic queue run", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(func(n int) (bool, error) {
+			if n == 1 {
+				return false, errors.New("simulated unreachable node")
+			}
+			return false, nil
+		})
+		r.consentTo(t, 2)
+		r.settle(t, l)
+		if got := r.phases(); len(got) != 1 || got[0].state != "queued" {
+			t.Fatalf("phases %+v, want queued after the failed announcement", got)
+		}
+		r.advance(5 * time.Minute)
+		r.settle(t, l)
+		wantPhases(t, r, phase{2, "announced", ""})
+	})
+	// Go-titled: an announcement the node does not answer is aborted after
+	// OTA_PROGRESS_TIMEOUT and the entry waits as queued
+	// (SoftwareUpdateManager.ts:1389-1391, :1404-1414 at b25ed960).
+	t.Run("aborts an announcement the node does not answer within the progress timeout", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, nil)
+		l := r.interceptAnnouncements(hanging)
+		r.consentTo(t, 2)
+		r.clock.Advance(ProgressTimeout + time.Second)
+		r.settle(t, l)
+		if got := l.abortedAll(); len(got) < 1 || !got[0] {
+			t.Fatalf("aborted %v, want the first announcement aborted", got)
+		}
+	})
+}
+
+// TestManagerAdmitsANewQueryOfANodeWithARunningAttemptParity ports the
+// table of "admits a new query of a node with a running attempt"
+// (OtaTest.ts:5425-5545 at b25ed960; admitQuery,
+// SoftwareUpdateManager.ts:1802-1881): per row, whether the query is
+// admitted, the attempt ended, the queued update still linked to it, the
+// startUp suppressed on the query's session, and how often the transfer
+// was cancelled.
+func TestManagerAdmitsANewQueryOfANodeWithARunningAttemptParity(t *testing.T) {
+	t.Parallel()
+	const query = 8
+	type outcome struct {
+		admitted, ended, stillLinked, suppressedStartUp bool
+		cancels                                         int
+	}
+	running := outcome{stillLinked: true}
+	for _, tc := range []struct {
+		what       string
+		stale      bool
+		transfer   func(now time.Time) *restartedTransfer
+		cancelFail bool
+		want       outcome
+	}{
+		{
+			what: "ends a stale attempt and resets its update, also while its BDX transfer looks newer", stale: true,
+			transfer: func(now time.Time) *restartedTransfer {
+				return &restartedTransfer{id: query + 1, at: now.Add(time.Second)}
+			},
+			want: outcome{admitted: true, ended: true},
+		},
+		{what: "ends an attempt without a BDX transfer and resets its update", want: outcome{admitted: true, ended: true}},
+		{
+			what: "cancels the transfer of a node that restarted, ends its attempt, resets its update and suppresses the startUp",
+			transfer: func(now time.Time) *restartedTransfer {
+				return &restartedTransfer{id: query + 1, at: now.Add(-time.Second)}
+			},
+			want: outcome{admitted: true, ended: true, suppressedStartUp: true, cancels: 1},
+		},
+		{
+			what: "answers busy and keeps the attempt when the transfer of a node that restarted cannot be cancelled",
+			transfer: func(now time.Time) *restartedTransfer {
+				return &restartedTransfer{id: query + 1, at: now.Add(-time.Second)}
+			},
+			cancelFail: true, want: outcome{stillLinked: true, cancels: 1},
+		},
+		{
+			what: "answers busy while the transfer runs on the session of the query",
+			transfer: func(now time.Time) *restartedTransfer {
+				return &restartedTransfer{id: query, at: now.Add(-time.Second)}
+			},
+			want: running,
+		},
+		{
+			what:     "answers busy while the transfer on another session is as recent as the session of the query",
+			transfer: func(now time.Time) *restartedTransfer { return &restartedTransfer{id: query + 1, at: now} },
+			want:     running,
+		},
+		{
+			what: "answers busy while the transfer is newer than the session of the query",
+			transfer: func(now time.Time) *restartedTransfer {
+				return &restartedTransfer{id: query + 1, at: now.Add(time.Second)}
+			},
+			want: running,
+		},
+	} {
+		t.Run(tc.what, func(t *testing.T) {
+			t.Parallel()
+			r := newManagerRig(t, nil)
+			r.interceptAnnouncements(hanging)
+			r.consentTo(t, 1)
+			r.clock.Advance(time.Second)
+			a := reportStatus(t, r, 1, mattercore.OTAUpdateDownloading)
+			r.m.mu.Lock()
+			linked := r.m.linkedEntryLocked(a) != nil
+			r.m.mu.Unlock()
+			if !linked {
+				t.Fatal("the update does not follow the attempt")
+			}
+			if tc.stale {
+				r.clock.Advance(16 * time.Minute)
+			}
+			var transfer *restartedTransfer
+			if tc.transfer != nil {
+				transfer = tc.transfer(r.clock.Now())
+			}
+			r.m.admitTransfer = func(Peer) admissionTransfer {
+				if transfer == nil {
+					return nil
+				}
+				return *transfer
+			}
+			var got outcome
+			r.m.disableTransfer = func(Peer) error {
+				got.cancels++
+				if tc.cancelFail {
+					return errors.New("simulated BDX cancel failure")
+				}
+				return nil
+			}
+			got.admitted = providerPorts{r.m}.AdmitQuery(context.Background(), testOTAPeer, query, 0)
+			got.ended = a.Ended()
+			r.m.mu.Lock()
+			got.stillLinked = r.m.linkedEntryLocked(a) != nil
+			id, ok := r.m.startUpSuppress[testPeer]
+			r.m.mu.Unlock()
+			got.suppressedStartUp = ok && id == query
+			if got != tc.want {
+				t.Fatalf("got %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestManagerBDXCancelOfRemovedConsentsParity ports "cancels / keeps the
+// BDX transfer of a node when all its consents are removed while its
+// update is announcing / failed / applying" (OtaTest.ts:6047-6080 at
+// b25ed960; removeConsent, SoftwareUpdateManager.ts:1694-1718).
+func TestManagerBDXCancelOfRemovedConsentsParity(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		state   string
+		cancels bool
+	}{{"announcing", true}, {"failed", true}, {"applying", false}} {
+		verb := "keeps"
+		if tc.cancels {
+			verb = "cancels"
+		}
+		t.Run(verb+" the BDX transfer of a node when all its consents are removed while its update is "+tc.state, func(t *testing.T) {
+			t.Parallel()
+			r := newManagerRig(t, nil)
+			r.interceptAnnouncements(hanging)
+			r.consentTo(t, 1)
+			switch tc.state {
+			case "failed":
+				r.m.dropUndeliverableUpdate(testPeer, 0)
+			case "applying":
+				reportStatus(t, r, 1, mattercore.OTAUpdateApplying)
+			}
+			var disabled []Peer
+			r.m.disableTransfer = func(p Peer) error { disabled = append(disabled, p); return nil }
+			r.m.RemoveConsent(testPeer, 0)
+			if got := len(disabled) == 1 && disabled[0] == testPeer; got != tc.cancels || (!tc.cancels && len(disabled) != 0) {
+				t.Fatalf("disabled %v, want cancelled %v", disabled, tc.cancels)
+			}
+		})
+	}
+}
+
+// TestManagerRemovedConsentDisarmsParity ports "stops the fast
+// resubscription of a node whose update underway is cancelled by removing
+// its consent" (OtaTest.ts:6187 at b25ed960; removeConsent :1707): the
+// node's reboot arming is lifted, so its return deadline gives nothing up.
+func TestManagerRemovedConsentDisarmsParity(t *testing.T) {
+	t.Parallel()
+	t.Run("stops the fast resubscription of a node whose update underway is cancelled by removing its consent", func(t *testing.T) {
+		t.Parallel()
+		calls := &armerCalls{}
+		var armer *peer.RebootResubscribeArmer
+		r := newManagerRig(t, func(c *Config) {
+			armer = peer.NewRebootResubscribeArmer(calls.context(c))
+			c.Armer = armer
+		})
+		t.Cleanup(armer.Close)
+		l := r.interceptAnnouncements(answered)
+		r.consentTo(t, 1)
+		r.settle(t, l)
+		reportStatus(t, r, 1, mattercore.OTAUpdateDownloading)
+		armer.Arm(testPeer, 0)
+		r.m.RemoveConsent(testPeer, 1)
+		r.clock.Advance(peer.RebootReturnTimeout(0) + time.Second)
+		if lost, _ := calls.counts(); lost != 0 {
+			t.Fatalf("the return deadline gave the node up %d times: it was not disarmed", lost)
+		}
+	})
+}
+
+// TestManagerDelegatedOfferParity ports the delegated offers through the
+// provider (OtaTest.ts:5216-5274 at b25ed960): the consent for the
+// offered version removed before the apply refuses it, although none was
+// stored; removed while the query runs, the query is answered NotAvailable.
+func TestManagerDelegatedOfferParity(t *testing.T) {
+	t.Parallel()
+	delegatedQuery := func(t *testing.T, r *managerRig, p *mattercore.OTAProvider) provdef.QueryImageResponse {
+		t.Helper()
+		yes := true
+		resp, err := p.MatterInvoke(attemptCtx(7), provdef.CmdQueryImage, provdef.QueryImageRequest{
+			VendorId: 0xFFF1, ProductId: 0x8001, SoftwareVersion: 0, RequestorCanConsent: &yes,
+			ProtocolsSupported: []provdef.DownloadProtocolEnum{provdef.DownloadProtocolBdxSynchronous},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.(provdef.QueryImageResponse)
+	}
+	rig := func(t *testing.T) *managerRig {
+		t.Helper()
+		r := servingRig(t, func(c *Config) { c.DelegateConsentToRequestor = true })
+		r.storeImage(t, 1, ModeProd)
+		return r
+	}
+	// OtaTest.ts:5257
+	t.Run("refuses the apply of a delegated offer once the consent for its version is removed, although none was stored", func(t *testing.T) {
+		t.Parallel()
+		r := rig(t)
+		responder := bdx.NewResponder(nil)
+		responder.SetClock(r.clock)
+		p := providerOf(t, r, providerPorts{r.m}, responder)
+		q := delegatedQuery(t, r, p)
+		if q.Status != provdef.StatusUpdateAvailable || q.UpdateToken == nil {
+			t.Fatalf("query %+v, want the delegated offer", q)
+		}
+		r.m.RemoveConsent(testPeer, 1)
+		resp, err := p.MatterInvoke(attemptCtx(7), provdef.CmdApplyUpdateRequest, provdef.ApplyUpdateRequestRequest{UpdateToken: *q.UpdateToken, NewVersion: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := resp.(provdef.ApplyUpdateResponse).Action; got != provdef.ApplyUpdateActionDiscontinue {
+			t.Fatalf("action %v, want Discontinue", got)
+		}
+	})
+	// OtaTest.ts:5266 (×2)
+	for _, tc := range []struct {
+		title   string
+		version uint32
+	}{{"for the node", 0}, {"for the version the node would be offered", 1}} {
+		t.Run("answers NotAvailable to a delegated query when its consent is removed "+tc.title+" while it runs", func(t *testing.T) {
+			t.Parallel()
+			r := rig(t)
+			responder := bdx.NewResponder(nil)
+			responder.SetClock(r.clock)
+			p := providerOf(t, r, removingSource{providerPorts{r.m}, r.m, tc.version}, responder)
+			if q := delegatedQuery(t, r, p); q.Status != provdef.StatusNotAvailable || q.ImageUri != nil {
+				t.Fatalf("query %+v, want NotAvailable", q)
+			}
+			r.m.mu.Lock()
+			attempts := len(r.m.attempts.Of(testOTAPeer))
+			r.m.mu.Unlock()
+			if attempts != 0 {
+				t.Fatalf("%d attempts run, want none", attempts)
+			}
+		})
+	}
+}
+
+// removingSource is the manager's image lookup that removes the node's
+// consent (for version, all for 0) once it found the image, as OtaTest's
+// RemovingOtaProviderServer (OtaTest.ts:3378-3392 at b25ed960).
+type removingSource struct {
+	providerPorts
+	m       *Manager
+	version uint32
+}
+
+func (s removingSource) QueryImage(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest) (mattercore.OTAImage, bool, error) {
+	img, ok, err := s.providerPorts.QueryImage(ctx, p, req)
+	s.m.RemoveConsent(peerOf(p), s.version)
+	return img, ok, err
+}
+
+// consentAskingSource offers the manager's image with consent required, as
+// OtaTest's ConsentRequiringOtaProviderServer override (OtaTest.ts:3338-3346
+// at b25ed960).
+type consentAskingSource struct{ providerPorts }
+
+func (s consentAskingSource) QueryImage(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest) (mattercore.OTAImage, bool, error) {
+	img, ok, err := s.providerPorts.QueryImage(ctx, p, req)
+	img.ConsentRequired = true
+	return img, ok, err
+}
+
+// TestManagerConsentRequiredOverrideParity ports "asks for consent instead
+// of delegating it when an override requires consent while delegation is
+// off" (OtaTest.ts:4696 at b25ed960): a requestor that can consent is not
+// delegated the consent while the delegation is off, so the provider asks
+// its consent hook.
+func TestManagerConsentRequiredOverrideParity(t *testing.T) {
+	t.Parallel()
+	t.Run("asks for consent instead of delegating it when an override requires consent while delegation is off", func(t *testing.T) {
+		t.Parallel()
+		asked := 0
+		r := servingRig(t, func(c *Config) {
+			c.RequestConsent = func(context.Context, Peer, QueryImageRequest, AvailableDetails) (ConsentState, time.Duration) {
+				asked++
+				return mattercore.OTAConsentGranted, 0
+			}
+		})
+		r.storeImage(t, 1, ModeProd)
+		r.consentTo(t, 1)
+		responder := bdx.NewResponder(nil)
+		responder.SetClock(r.clock)
+		p := providerOf(t, r, consentAskingSource{providerPorts{r.m}}, responder)
+		yes := true
+		if _, err := p.MatterInvoke(attemptCtx(7), provdef.CmdQueryImage, provdef.QueryImageRequest{
+			VendorId: 0xFFF1, ProductId: 0x8001, SoftwareVersion: 0, RequestorCanConsent: &yes,
+			ProtocolsSupported: []provdef.DownloadProtocolEnum{provdef.DownloadProtocolBdxSynchronous},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if asked != 1 {
+			t.Fatalf("consent hook asked %d times, want 1", asked)
+		}
+	})
 }
