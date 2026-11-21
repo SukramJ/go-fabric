@@ -155,7 +155,7 @@ import (
 // (measured by make cite-report). 423 after P4b-C. 422 after P4b-REG:
 // script.go's scripted applyDelay re-cited to InProcessControllerAdapter.ts
 // :775-789 at b25ed960 leaves the list (measured by make cite-report).
-const citecheckDriftRatchet = 422
+const citecheckDriftRatchet = 417
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -210,7 +210,7 @@ const citecheckDriftRatchet = 422
 // Wave P4-S relabelled 12 more at b25ed960: bridge/conn.go's eight
 // ExchangeManager.ts citations and four in controller/attestation
 // (validate.go 3, policy.go 1).
-const citecheckOffPinRatchet = 2712
+const citecheckOffPinRatchet = 2704
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

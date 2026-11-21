@@ -2630,7 +2630,7 @@
   },
   {
     "file": "controller/ota_parity_matterjs_test.go",
-    "line": 146,
+    "line": 149,
     "citation": "OtaTest.ts:1216-1291",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "addUpdateConsent",
@@ -2639,7 +2639,7 @@
   },
   {
     "file": "controller/ota_parity_matterjs_test.go",
-    "line": 177,
+    "line": 180,
     "citation": "SoftwareUpdateManager.ts:703-776",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "#preparePeerForUpdate",
@@ -2648,21 +2648,12 @@
   },
   {
     "file": "controller/ota_parity_matterjs_test.go",
-    "line": 201,
+    "line": 204,
     "citation": "OtaTest.ts:1049-1124",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "removeConsent",
     "nearest": 1272,
     "occurrences": 31
-  },
-  {
-    "file": "controller/softwareupdate/announcements.go",
-    "line": 216,
-    "citation": "SoftwareUpdateManager.ts:991-1025",
-    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
-    "identifier": "announceOtaProvider",
-    "nearest": 1421,
-    "occurrences": 1
   },
   {
     "file": "controller/softwareupdate/images_parity_matterjs_test.go",
@@ -2674,36 +2665,8 @@
     "occurrences": 3
   },
   {
-    "file": "controller/softwareupdate/manager.go",
-    "line": 54,
-    "citation": "SoftwareUpdateManager.ts:1074-1077",
-    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
-    "identifier": "forceUpdate",
-    "nearest": 1482,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/softwareupdate/manager.go",
-    "line": 58,
-    "citation": "SoftwareUpdateManager.ts:1166-1168",
-    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
-    "identifier": "ImplementationError",
-    "nearest": 1464,
-    "occurrences": 7
-  },
-  {
-    "file": "controller/softwareupdate/manager.go",
-    "line": 260,
-    "citation": "SoftwareUpdateManager.ts:114-118",
-    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
-    "at": "b25ed960",
-    "identifier": "UpdateQueueEntry",
-    "nearest": 134,
-    "occurrences": 21
-  },
-  {
     "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-    "line": 109,
+    "line": 138,
     "citation": "OtaTest.ts:1660-1691",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "queuedUpdates",
@@ -2712,7 +2675,7 @@
   },
   {
     "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-    "line": 136,
+    "line": 165,
     "citation": "OtaTest.ts:1693-1752",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "#onSoftwareVersionChanged",
@@ -2721,21 +2684,12 @@
   },
   {
     "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-    "line": 233,
+    "line": 262,
     "citation": "OtaTest.ts:2772-2817",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "#cleanupObsoleteUpdates",
     "nearest": 3230,
     "occurrences": 1
-  },
-  {
-    "file": "controller/softwareupdate/script.go",
-    "line": 116,
-    "citation": "InProcessControllerAdapter.ts:504-549",
-    "resolved": "support/chip-testing/src/cert/InProcessControllerAdapter.ts",
-    "identifier": "queryImage",
-    "nearest": 661,
-    "occurrences": 9
   },
   {
     "file": "device/device.go",

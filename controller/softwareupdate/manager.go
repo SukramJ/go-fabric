@@ -31,27 +31,29 @@ import (
 type Peer = exchange.PeerAddress
 
 // Status is an update's status as the provider reports it — matter.js
-// OtaUpdateStatus (SoftwareUpdateManager.ts:105-114 at db021da0),
+// OtaUpdateStatus (OtaProgress.ts:16-25 at b25ed960),
 // cluster/core's OTAUpdateStatus.
 type Status = mattercore.OTAUpdateStatus
 
 // ProgressTimeout is how long an update may go without a status change or
 // BDX activity before it counts as stalled — OTA_PROGRESS_TIMEOUT
-// (OtaProgress.ts:15, Minutes(15)), the provider's too.
+// (OtaProgress.ts:14 at b25ed960, Minutes(15)), the provider's too.
 const ProgressTimeout = 15 * time.Minute
 
 // queueCheckInterval is the period of the stalled-update check
-// (SoftwareUpdateManager.ts:961-967, Minutes(5)).
+// (#restartQueueTimer, SoftwareUpdateManager.ts:1355-1362 at b25ed960,
+// Minutes(5)).
 const queueCheckInterval = 5 * time.Minute
 
 // maxApplyDelay is the longest delay an apply is allowed with, a day
-// (OtaSoftwareUpdateProviderServer.ts:39, MAX_DELAYED_ACTION_TIME = 86_400
-// seconds, clamped at :346-351).
+// (OtaSoftwareUpdateProviderServer.ts:39 at b25ed960, MAX_DELAYED_ACTION_TIME
+// = 86_400 seconds, clamped at OtaSoftwareUpdateProviderServer.ts:346-351 at
+// b25ed960).
 const maxApplyDelay = 24 * time.Hour
 
 // ErrNotApplicable is a node that is not currently applicable for OTA
 // updates — matter.js's OtaUpdateError of forceUpdate
-// (SoftwareUpdateManager.ts:1074-1077).
+// (SoftwareUpdateManager.ts:1486-1489 at b25ed960).
 var ErrNotApplicable = errors.New("softwareupdate: node is not currently applicable for OTA updates")
 
 // ErrNoNode is a peer address no node has: [Manager.AddUpdateConsent] and
@@ -61,15 +63,17 @@ var ErrNotApplicable = errors.New("softwareupdate: node is not currently applica
 var ErrNoNode = errors.New("softwareupdate: no node has the peer address")
 
 // ErrMismatch is a consent whose vendor or product does not match the
-// node — ImplementationError (SoftwareUpdateManager.ts:1166-1168).
+// node — ImplementationError (SoftwareUpdateManager.ts:1584-1586 at
+// b25ed960).
 var ErrMismatch = errors.New("softwareupdate: node does not match the given vendorId/productId")
 
 // ErrTransferOptions is an invalid transfer option — assertTransferOptions
-// (SoftwareUpdateManager.ts:59-69).
+// (SoftwareUpdateManager.ts:66-76 at b25ed960).
 var ErrTransferOptions = errors.New("softwareupdate: invalid transfer options")
 
 // Target names the update a consent applies to and how to transfer it —
-// SoftwareUpdateManager.UpdateTarget (:1393-1413).
+// SoftwareUpdateManager.UpdateTarget (SoftwareUpdateManager.ts:2191-2208 at
+// b25ed960).
 type Target struct {
 	VendorID              uint16
 	ProductID             uint16
@@ -94,14 +98,15 @@ func (t Target) assert() error {
 }
 
 // TransferOptions are a peer's BDX options — bdxTransferOptionsFor
-// (:1133-1144): 0 and nil leave the decision to the peer and its medium.
+// (SoftwareUpdateManager.ts:1526-1536 at b25ed960): 0 and nil leave the
+// decision to the peer and its medium.
 type TransferOptions struct {
 	MaxBlockSize       *uint16
 	AdditionalMrpDelay *time.Duration
 }
 
 // SoftwareUpdateInfo is an update found for a node — matter.js
-// SoftwareUpdateInfo (:116-137).
+// SoftwareUpdateInfo (SoftwareUpdateManager.ts:170-191 at b25ed960).
 type SoftwareUpdateInfo struct { //nolint:revive // matter.js's name (SoftwareUpdateInfo); UpdateInfo is the store's
 	VendorID              uint16
 	ProductID             uint16
@@ -120,7 +125,7 @@ type PeerUpdate struct {
 }
 
 // PendingStatus is a queued update's state — PendingUpdateInfo.status
-// (:139-162).
+// (SoftwareUpdateManager.ts:193-216 at b25ed960).
 type PendingStatus string
 
 // The pending statuses.
@@ -135,7 +140,7 @@ const (
 )
 
 // PendingUpdate is one entry of [Manager.QueuedUpdates] — PendingUpdateInfo
-// (:139-162).
+// (SoftwareUpdateManager.ts:193-216 at b25ed960).
 type PendingUpdate struct {
 	Peer                  Peer
 	VendorID              uint16
@@ -154,7 +159,8 @@ type PendingUpdate struct {
 }
 
 // AvailableDetails is what [Manager.UpdateExistsFor] offers a querying
-// node — OtaUpdateAvailableDetails (:96-103).
+// node — OtaUpdateAvailableDetails (SoftwareUpdateManager.ts:161-168 at
+// b25ed960).
 type AvailableDetails struct {
 	NewSoftwareVersion       uint32
 	NewSoftwareVersionString string
@@ -174,21 +180,27 @@ type Config struct {
 	Images *Images
 	// FabricIndex, ProviderNodeID and ProviderEndpoint name the provider
 	// on our fabric: the DefaultOTAProviders record and the announcement
-	// carry them (OtaAnnouncements.ts:47-58, :170-174, :272-278).
+	// carry them (OtaAnnouncements.ts:34-39 at b25ed960, the record
+	// OtaAnnouncements.ts:157-161 at b25ed960, the command
+	// OtaAnnouncements.ts:263-270 at b25ed960).
 	FabricIndex      uint8
 	ProviderNodeID   uint64
 	ProviderEndpoint uint16
-	// VendorID is our fabric's vendor, the announcement's (:272-278).
+	// VendorID is our fabric's vendor, the announcement's
+	// (OtaAnnouncements.ts:263-270 at b25ed960).
 	VendorID uint16
 	// BDX is the provider's BDX responder: the manager reads a transfer's
-	// liveness and closes a stale one (#bdxSessionFor, :322-328); nil
+	// liveness and closes a stale one (#bdxSessionFor,
+	// SoftwareUpdateManager.ts:432-438 at b25ed960); nil
 	// knows no transfer.
 	BDX *bdx.Responder
 	// Armer re-subscribes a node that restarts after it applied
-	// (#rebootResubscribeArmer, :280-288); nil arms nothing.
+	// (#rebootResubscribeArmer, SoftwareUpdateManager.ts:378-386 at
+	// b25ed960); nil arms nothing.
 	Armer *peer.RebootResubscribeArmer
 	// SessionID is the id of the newest session with a peer — the
-	// fallback of the startUp suppression's session (:779-782); nil knows
+	// fallback of the startUp suppression's session
+	// (SoftwareUpdateManager.ts:1045-1047 at b25ed960); nil knows
 	// none.
 	SessionID func(p Peer) (uint16, bool)
 
@@ -212,25 +224,30 @@ type Config struct {
 	// (State.announcementInterval); 0 is 24 h.
 	AnnouncementInterval time.Duration
 	// MaxBDXBlockSize and BDXAdditionalMrpDelay are the default transfer
-	// options (State.maxBdxBlockSize, bdxAdditionalMrpDelay, :1383-1391).
+	// options (State.maxBdxBlockSize, bdxAdditionalMrpDelay,
+	// SoftwareUpdateManager.ts:2173-2188 at b25ed960).
 	MaxBDXBlockSize       uint16
 	BDXAdditionalMrpDelay *time.Duration
 	// ApplyDelay is how long an allowed apply waits, rounded up to whole
 	// seconds and at most a day (the provider's State.applyDelay,
-	// OtaSoftwareUpdateProviderServer.ts:427-435, default 0).
+	// OtaSoftwareUpdateProviderServer.ts:427-435 at b25ed960, default 0).
 	ApplyDelay time.Duration
 	// RequestConsent asks the user for an update a requestor that cannot
 	// consent needs consent for (requestUserConsentForUpdate,
-	// OtaSoftwareUpdateProviderServer.ts:382-393); nil answers Unknown,
+	// OtaSoftwareUpdateProviderServer.ts:382-393 at b25ed960); nil answers
+	// Unknown,
 	// which declines.
 	RequestConsent func(ctx context.Context, p Peer, req QueryImageRequest, d AvailableDetails) (ConsentState, time.Duration)
 
 	// OnUpdateAvailable learns an update a node has no consent for
-	// (events.updateAvailable, :1421-1422); the host grants it with
+	// (events.updateAvailable, SoftwareUpdateManager.ts:2281-2285 at
+	// b25ed960); the host grants it with
 	// AddUpdateConsent.
 	OnUpdateAvailable func(p Peer, info SoftwareUpdateInfo)
 	// OnUpdateApplying, OnUpdateDone and OnUpdateFailed are
-	// events.updateApplying, updateDone and updateFailed (:1424-1438); [Manager.Observe] reports them too.
+	// events.updateApplying, updateDone and updateFailed
+	// (SoftwareUpdateManager.ts:2287-2309 at b25ed960); [Manager.Observe]
+	// reports them too.
 	OnUpdateApplying, OnUpdateDone, OnUpdateFailed func(p Peer)
 	// OnStatus observes each status the provider reports for a node. A
 	// download's WaitForApply is reported on the receive path, when the
@@ -245,7 +262,7 @@ type Config struct {
 	// answer to the provider. OnProviderExchange is told each command the
 	// provider answered, with its answer. A test harness's seam: matter.js
 	// keeps all three in its cert harness (support/chip-testing/src/cert/
-	// InProcessControllerAdapter.ts:610-792 at db021da0).
+	// InProcessControllerAdapter.ts:628-814 at b25ed960).
 	ScriptQueryImage   func(p Peer, req QueryImageRequest) (QueryImageScript, bool)
 	ScriptApplyUpdate  func(p Peer, req provdef.ApplyUpdateRequestRequest) (ApplyUpdateScript, bool)
 	OnProviderExchange func(x ProviderExchange)
@@ -309,7 +326,8 @@ func (s phaseState) String() string {
 // updatePhase is UpdatePhase (SoftwareUpdateManager.ts:87-118 at
 // b25ed960). A phase is replaced, never changed in place, except for the
 // liveness of progress: an announcement compares the phase it started with
-// by identity (#runAnnouncement :1399-1415).
+// by identity (#runAnnouncement, SoftwareUpdateManager.ts:1399-1415 at
+// b25ed960).
 type updatePhase struct {
 	state phaseState
 	// resetAt is when a queued entry was reset; zero while it never was.
@@ -461,25 +479,29 @@ type Manager struct {
 	log   *slog.Logger
 
 	mu sync.Mutex
-	// suppress is internal.suppressUpdates (:1438-1439): set until Start
+	// suppress is internal.suppressUpdates (SoftwareUpdateManager.ts:2270-2271
+	// at b25ed960): set until Start
 	// and again from Close.
 	suppress bool
 	// consents are internal.consents, one per peer.
 	consents map[Peer]*consent
 	queue    []*queueEntry
 	known    map[Peer]SoftwareUpdateInfo
-	// startUpSuppress is internal.pendingStartUpSuppress (:1421-1431).
+	// startUpSuppress is internal.pendingStartUpSuppress
+	// (SoftwareUpdateManager.ts:2266 at b25ed960).
 	startUpSuppress map[Peer]uint16
 	// observed are the nodes preparePeerForUpdate registered on, with the
-	// software version last seen (the versionUpdateObservers, :733-772).
+	// software version last seen (the versionUpdateObservers,
+	// SoftwareUpdateManager.ts:2253-2254 at b25ed960).
 	observed map[Peer]uint32
 	// attempts are the nodes' update attempts — internal.attempts
-	// (SoftwareUpdateManager.ts:1739-1741 at b25ed960) — under m.mu with
+	// (SoftwareUpdateManager.ts:2273-2274 at b25ed960) — under m.mu with
 	// the queue, as matter.js changes both in one synchronous change
-	// (:536-560).
+	// (#mutate, SoftwareUpdateManager.ts:539-561 at b25ed960).
 	attempts *mattercore.OTAUpdateAttempts
 	// post is what a change under m.mu leaves to run once m.mu is
-	// released — #mutate's queued events (:543-560); unlock runs it.
+	// released — #mutate's queued events (SoftwareUpdateManager.ts:563-583
+	// at b25ed960); unlock runs it.
 	post []func()
 
 	checkTimer, queueTimer clock.Timer
@@ -555,7 +577,7 @@ type admissionTransfer interface {
 // bdxTransfer is what the manager reads of a node's running BDX transfer,
 // a *bdx.ServerSession: matter.js reads the session's transferredBytes
 // and dataLength (#isTransferring, queuedUpdates,
-// SoftwareUpdateManager.ts:293-336 at db021da0).
+// SoftwareUpdateManager.ts:392-447 at b25ed960).
 type bdxTransfer interface {
 	Transferred() uint64
 	Negotiated() (bdx.Result, bool)
@@ -588,7 +610,8 @@ func New(cfg Config) (*Manager, error) {
 	return m, nil
 }
 
-// Start brings the manager online — #nodeOnline (:200-230): the
+// Start brings the manager online — #nodeOnline
+// (SoftwareUpdateManager.ts:264-294 at b25ed960): the
 // announcements start per [Config].AnnounceAsDefaultProvider and the first
 // update check is scheduled 5 to 10 minutes later, then every
 // UpdateCheckInterval.
@@ -611,7 +634,8 @@ func (m *Manager) Start() {
 	m.checkTimer = m.clock.AfterFunc(delay, func() { m.goWork(m.initializeUpdateCheck) })
 }
 
-// initializeUpdateCheck is #initializeUpdateCheck (:261-271). It runs, as
+// initializeUpdateCheck is #initializeUpdateCheck
+// (SoftwareUpdateManager.ts:359-372 at b25ed960). It runs, as
 // every timer's check, on a goroutine Close cancels and waits for.
 func (m *Manager) initializeUpdateCheck() {
 	if err := m.runCheck(); err != nil {
@@ -649,10 +673,12 @@ func (m *Manager) scheduleCheck() {
 // Close takes the manager offline — #nodeGoingOffline and the disposal
 // (SoftwareUpdateManager.ts:296-310, :2127-2138 at b25ed960): no update
 // work starts any more; the timers stop; every running announcement is
-// aborted and waited for (#stopAnnouncements :1446-1453), so an entry
+// aborted and waited for (#stopAnnouncements,
+// SoftwareUpdateManager.ts:1446-1453 at b25ed960), so an entry
 // whose announcement it ended waits as queued; the announcements stop and
 // the attempts end, an entry that followed one keeps following it
-// (#endAllAttempts :1229-1237). A running update check a timer started is
+// (#endAllAttempts, SoftwareUpdateManager.ts:1229-1237 at b25ed960). A
+// running update check a timer started is
 // cancelled — its download included — and waited for, so nothing is
 // stored after Close returns (review II, R2-P6-conc-1907).
 func (m *Manager) Close() {
@@ -812,7 +838,8 @@ type prepared struct {
 	softwareVersionString string
 }
 
-// preparePeerForUpdate is #preparePeerForUpdate (:703-776): an applicable
+// preparePeerForUpdate is #preparePeerForUpdate
+// (SoftwareUpdateManager.ts:946-992 at b25ed960): an applicable
 // node's identity, and the node observed for its software version, its
 // StartUp event and its subscription from now on.
 func (m *Manager) preparePeerForUpdate(n *client.Node) (prepared, bool) {
@@ -836,7 +863,7 @@ func (m *Manager) preparePeerForUpdate(n *client.Node) (prepared, bool) {
 // NodeChanged, NodeEvent and NodeSubscription are the node events the
 // manager observes a node through once it prepared it for an update —
 // softwareVersion$Changed, startUp and subscriptionStatusChanged
-// (SoftwareUpdateManager.ts:714-760 at db021da0). The controller feeds
+// (SoftwareUpdateManager.ts:964-990 at b25ed960). The controller feeds
 // them from every node's hooks (client.RegistryConfig.HooksFor).
 
 // NodeChanged takes a change of the node's image.
@@ -901,7 +928,8 @@ func (m *Manager) isObserved(p Peer) bool {
 }
 
 // versionMaybeChanged feeds a changed software version to
-// onSoftwareVersionChanged — softwareVersion$Changed (:736-746).
+// onSoftwareVersionChanged — softwareVersion$Changed
+// (SoftwareUpdateManager.ts:964-969 at b25ed960).
 func (m *Manager) versionMaybeChanged(n *client.Node) {
 	p, ok := n.PeerAddress()
 	if !ok {
@@ -984,7 +1012,7 @@ func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp 
 	m.log.Info("ota.manager.below_target", slog.String("node", peerString(p)),
 		slog.Uint64("version", uint64(newVersion)), slog.Uint64("target", uint64(target)))
 	// An announcing entry was already restarted, as by the other event of
-	// the same reboot (:1081).
+	// the same reboot (SoftwareUpdateManager.ts:1081 at b25ed960).
 	if e.phase.underway() {
 		m.log.Info("ota.manager.version_change_clears_progress", slog.String("node", peerString(p)))
 		m.resetEntryProgressLocked(e)
@@ -993,7 +1021,8 @@ func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp 
 	m.unlock()
 }
 
-// onSubscribedAfterApply is #onSubscribedAfterApply (:848-870): an
+// onSubscribedAfterApply is #onSubscribedAfterApply
+// (SoftwareUpdateManager.ts:1091-1118 at b25ed960): an
 // Applying update whose node reports a version below the target over a
 // subscription established after its restart deadline did not apply.
 func (m *Manager) onSubscribedAfterApply(p Peer, n *client.Node) {
@@ -1273,7 +1302,8 @@ func (m *Manager) requestQueueRunLocked() { m.queueRunPending = true }
 
 // unlock ends a change of the manager's state (#mutate,
 // SoftwareUpdateManager.ts:539-561 at b25ed960): the attempts the rules
-// ended reset the entries that followed them (#endAttempt :1216-1227), a
+// ended reset the entries that followed them (#endAttempt,
+// SoftwareUpdateManager.ts:1216-1227 at b25ed960), a
 // queue run the change asked for runs — it reads the registry outside
 // m.mu, so m.mu is released for that read — and once m.mu is released
 // what the change left to run, its events, runs.
@@ -1327,7 +1357,8 @@ func (m *Manager) linkedEntryLocked(a *mattercore.OTAUpdateAttempt) *queueEntry 
 func (m *Manager) linkAttemptLocked(a *mattercore.OTAUpdateAttempt) *queueEntry {
 	// The attempts the answer replaced ended first and reset the entry they
 	// held, so it may take a new target before it is linked (#answerAttempt
-	// runs before #linkAttempt, :1774-1778).
+	// runs before #linkAttempt, SoftwareUpdateManager.ts:1774-1778 at
+	// b25ed960).
 	m.resetEndedLocked()
 	e := m.entryForLocked(a.Peer())
 	if e == nil || !a.Answered() {
@@ -1378,7 +1409,7 @@ func (m *Manager) reportAttemptStatusLocked(a *mattercore.OTAUpdateAttempt, stat
 	switch status {
 	case mattercore.OTAUpdateCancelled:
 		m.log.Info("ota.manager.bdx_cancelled_retry", slog.String("node", peerString(p)))
-		m.resetEntryProgressLocked(e) // #retryUpdate (:585-588)
+		m.resetEntryProgressLocked(e) // #retryUpdate (SoftwareUpdateManager.ts:585-588 at b25ed960)
 		m.requestQueueRunLocked()
 		armer := m.cfg.Armer
 		m.post = append(m.post, func() {
@@ -1406,7 +1437,8 @@ func (m *Manager) reportAttemptStatusLocked(a *mattercore.OTAUpdateAttempt, stat
 	}
 }
 
-// bdxSessionFor is #bdxSessionFor (:322-328); nil when no transfer runs.
+// bdxSessionFor is #bdxSessionFor (SoftwareUpdateManager.ts:432-438 at
+// b25ed960); nil when no transfer runs.
 func (m *Manager) bdxSessionFor(p Peer) bdxTransfer {
 	return m.bdxSessionWith(p, m.bdxResponder())
 }
@@ -1539,7 +1571,8 @@ func (m *Manager) QueuedUpdates() []PendingUpdate {
 	return out
 }
 
-// validatePeerDetails is #validatePeerDetails (:360-379). Beside it, a
+// validatePeerDetails is #matchingBasicInformation
+// (SoftwareUpdateManager.ts:615-629 at b25ed960). Beside it, a
 // query whose ids are not the node's attested ones is logged
 // ([Manager.noteAttestedIdentity]); the answer does not depend on it.
 func (m *Manager) validatePeerDetails(p Peer, version uint32, vid, pid uint16) bool {
@@ -1688,7 +1721,8 @@ func storedModePrecedence(mode Mode) int {
 }
 
 // CheckForUpdates checks every node for updates, stored images included,
-// and purges the stored images no node needs — checkForUpdates (:471-474).
+// and purges the stored images no node needs — checkForUpdates
+// (SoftwareUpdateManager.ts:722-725 at b25ed960).
 // A product whose check failed is logged and passed over, the others are
 // still checked and the purge still runs; the error joins the failures of
 // those products (errors.Join), as [Manager.QueryUpdates] returns them,
@@ -1705,7 +1739,8 @@ func (m *Manager) checkForUpdates(ctx context.Context) error {
 	return failed
 }
 
-// cleanupObsoleteUpdates is #cleanupObsoleteUpdates (:483-556): a stored
+// cleanupObsoleteUpdates is #cleanupObsoleteUpdates
+// (SoftwareUpdateManager.ts:734-799 at b25ed960): a stored
 // prod or test image every node of its product runs at or above goes, and
 // so does every test image while test images are not allowed; local
 // images stay.
@@ -1754,7 +1789,8 @@ func (m *Manager) cleanupObsoleteUpdates(ctx context.Context) {
 
 // QueryUpdates checks every node, or only, for updates over the ledgers
 // and — with includeStored — the stored images, and returns the nodes it
-// found one for — queryUpdates (:559-623). A check the manager ran (it
+// found one for — queryUpdates (SoftwareUpdateManager.ts:810-870 at
+// b25ed960). A check the manager ran (it
 // was not suppressed) ends with an [UpdateCheckFinished] event. A product
 // whose check failed is logged and passed over and the others are still
 // checked: the nodes returned are those of the products that succeeded,
@@ -1848,8 +1884,8 @@ func (m *Manager) queryUpdates(ctx context.Context, only *client.Node, includeSt
 
 // forgetGone drops what the manager keeps for every peer no node has the
 // address of — present says which have: the version it observed, the
-// update it found, a startUp to suppress, its attempts (#forgetPeer
-// :333-334), its consent, and its queued update, without an event
+// update it found, a startUp to suppress, its attempts (#forgetPeer,
+// SoftwareUpdateManager.ts:333-335 at b25ed960), its consent, and its queued update, without an event
 // (#dequeueIfGone, SoftwareUpdateManager.ts:1342-1353 at b25ed960). A check
 // of every node runs it, so what a node that left the registry leaves
 // behind lasts until the next check or queue run (review II,
@@ -1879,7 +1915,8 @@ func (m *Manager) suppressed() bool {
 	return m.suppress
 }
 
-// checkProductForUpdates is #checkProductForUpdates (:625-701): the
+// checkProductForUpdates is #checkProductForUpdates
+// (SoftwareUpdateManager.ts:876-938 at b25ed960): the
 // product's update is found and made available in the store; a node the
 // manager holds a consent for exactly that version is queued, every other
 // one reported as needing consent.
@@ -1919,7 +1956,7 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 			m.unlock()
 		} else {
 			if fn := m.cfg.OnUpdateAvailable; fn != nil {
-				fn(t.peer, details) // requestConsentForUpdate (:885-887)
+				fn(t.peer, details) // requestConsentForUpdate (SoftwareUpdateManager.ts:1257-1259 at b25ed960)
 			}
 			m.emit(UpdateEvent{Kind: UpdateAvailable, Peer: t.peer, Target: Target{VendorID: vid, ProductID: pid, TargetSoftwareVersion: info.SoftwareVersion}, Info: details})
 		}
@@ -2435,7 +2472,8 @@ func (m *Manager) NodeDeleted(p Peer) {
 //
 // Deprecated: the manager suppresses the startUp itself when it admits a
 // query for the node's restart while an update of the node is queued
-// (admitQuery, :1873-1879); removable in v0.26.0.
+// (admitQuery, SoftwareUpdateManager.ts:1802-1881 at b25ed960); removable
+// in v0.26.0.
 func (m *Manager) SuppressNextStartUp(p Peer, sessionID uint16) {
 	m.mu.Lock()
 	m.startUpSuppress[p] = sessionID
@@ -2552,7 +2590,7 @@ func (m *Manager) updateAppliedLocked(op mattercore.OTAPeer, token []byte, softw
 		m.completeUpdateLocked(e, softwareVersion)
 	case linked == e:
 		m.log.Info("ota.manager.applied_below_target_retry", slog.String("node", peerString(p)), slog.Uint64("version", uint64(softwareVersion)))
-		m.resetEntryProgressLocked(e) // #retryUpdate (:585-588)
+		m.resetEntryProgressLocked(e) // #retryUpdate (SoftwareUpdateManager.ts:585-588 at b25ed960)
 		m.requestQueueRunLocked()
 	default:
 		m.log.Debug("ota.manager.applied_below_target_ignored", slog.String("node", peerString(p)), slog.Uint64("version", uint64(softwareVersion)))

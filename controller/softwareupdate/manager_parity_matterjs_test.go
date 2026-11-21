@@ -91,7 +91,7 @@ func (r *managerRig) setNode(gone bool, edit func(*basicinfo.State)) {
 	}
 }
 
-// queue adds the consent and the queued entry addUpdateConsent leaves for
+// queue adds the consent and the queued entry #storeConsent leaves for
 // an applicable node (SoftwareUpdateManager.ts:1590-1625 at b25ed960),
 // without the queue run; with status, the entry is in progress with that
 // status at the current time, as the deprecated OnStatusChange leaves it.

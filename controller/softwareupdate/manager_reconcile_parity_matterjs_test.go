@@ -212,8 +212,10 @@ func TestManagerConsentParity(t *testing.T) {
 }
 
 // TestManagerFailedUpdateParity ports the failed update: its consent and
-// entry stay for 24 hours, without a second updateFailed, and leave
-// without an event (SoftwareUpdateManager.ts:120-124, :1142-1214, :2303-2308
+// entry stay for 24 hours, without a second report, and leave without an
+// event — FAILED_UPDATE_RETENTION (SoftwareUpdateManager.ts:120-124 at
+// b25ed960), the failure and its expiry (SoftwareUpdateManager.ts:1142-1214
+// at b25ed960), the contract of the event (SoftwareUpdateManager.ts:2303-2309
 // at b25ed960).
 func TestManagerFailedUpdateParity(t *testing.T) {
 	t.Parallel()
@@ -770,7 +772,7 @@ func TestManagerQueuePhasesParity(t *testing.T) {
 	})
 	// Go-titled: a version below the target resets an update underway and
 	// the queue runs, so it is announced again (#onSoftwareVersionChanged,
-	// SoftwareUpdateManager.ts:1081-1088 at b25ed960).
+	// SoftwareUpdateManager.ts:1035-1089 at b25ed960).
 	t.Run("announces an update again when the node restarts below its target before it applies", func(t *testing.T) {
 		t.Parallel()
 		r := newManagerRig(t, nil)
@@ -957,7 +959,8 @@ func TestManagerAdmitsANewQueryOfANodeWithARunningAttemptParity(t *testing.T) {
 // TestManagerBDXCancelOfRemovedConsentsParity ports "cancels / keeps the
 // BDX transfer of a node when all its consents are removed while its
 // update is announcing / failed / applying" (OtaTest.ts:6047-6080 at
-// b25ed960; removeConsent, SoftwareUpdateManager.ts:1694-1718).
+// b25ed960; removeConsent, SoftwareUpdateManager.ts:1670-1723 at
+// b25ed960).
 func TestManagerBDXCancelOfRemovedConsentsParity(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

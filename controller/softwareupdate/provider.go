@@ -19,10 +19,13 @@ import (
 // (cluster/core.OTAProvider) — what matter.js's
 // OtaSoftwareUpdateProviderServer asks its SoftwareUpdateManager
 // (packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts
-// at b25ed960): checkUpdateAvailable → updateExistsFor (:395-414), the
-// consent hook (:382-393) and the update attempts (beginQuery …
-// updateApplied, :152-379), which the manager owns under its lock with
-// its queue (SoftwareUpdateManager.ts:1739-2089 at b25ed960).
+// at b25ed960): checkUpdateAvailable → updateExistsFor
+// (OtaSoftwareUpdateProviderServer.ts:395-414 at b25ed960), the consent
+// hook (OtaSoftwareUpdateProviderServer.ts:383-393 at b25ed960) and the
+// update attempts (beginQuery … updateApplied,
+// OtaSoftwareUpdateProviderServer.ts:152-379 at b25ed960), which the
+// manager owns under its lock with its queue
+// (SoftwareUpdateManager.ts:1733-2089 at b25ed960).
 
 // ProviderConfig is what the OTA provider that serves the manager's
 // updates runs with: the ports and hooks of node/'s provider
@@ -132,7 +135,8 @@ func (s providerPorts) Open(ctx context.Context, file string) (bdx.Blob, error) 
 }
 
 // RequestConsent implements mattercore.OTAConsent:
-// requestUserConsentForUpdate (:382-393), Unknown without a hook.
+// requestUserConsentForUpdate (OtaSoftwareUpdateProviderServer.ts:383-393
+// at b25ed960), Unknown without a hook.
 func (s providerPorts) RequestConsent(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest, img mattercore.OTAImage) (mattercore.OTAConsentState, time.Duration, error) {
 	if s.m.cfg.RequestConsent == nil {
 		return mattercore.OTAConsentUnknown, 0, nil
@@ -153,7 +157,8 @@ func (s providerPorts) BeginQuery(p mattercore.OTAPeer) *mattercore.OTAUpdateAtt
 	return s.m.attempts.Begin(p)
 }
 
-// EndQuery implements mattercore.OTAUpdateManager (endQuery, :1782-1791).
+// EndQuery implements mattercore.OTAUpdateManager (endQuery,
+// SoftwareUpdateManager.ts:1782-1791 at b25ed960).
 func (s providerPorts) EndQuery(a *mattercore.OTAUpdateAttempt) {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -196,7 +201,7 @@ func (s providerPorts) AdmitQuery(_ context.Context, op mattercore.OTAPeer, sess
 	m.mu.Lock()
 	m.attempts.EndAttempt(running)
 	// The node may have lost its queued update while the transfer was
-	// cancelled (:1875-1878).
+	// cancelled (SoftwareUpdateManager.ts:1875-1878 at b25ed960).
 	if m.indexOfLocked(p) >= 0 {
 		m.startUpSuppress[p] = sessionID
 	}
@@ -222,7 +227,7 @@ func (m *Manager) admissionTransferOf(p Peer) admissionTransfer {
 }
 
 // cancelTransferForRestart cancels the node's transfer for its restart
-// (:1863-1872), outside m.mu.
+// (SoftwareUpdateManager.ts:1863-1872 at b25ed960), outside m.mu.
 func (m *Manager) cancelTransferForRestart(p Peer) error {
 	if m.disableTransfer != nil {
 		return m.disableTransfer(p)
