@@ -90,9 +90,9 @@ func (l caseOnFabricLookup) IsPASE(id uint16) (pase, ok bool) { return false, id
 
 // TestCommissioningCompleteThroughTheBridgeClosesThePASESessions: a host
 // that wires the bridge and the root clusters itself — no node facade —
-// has the PASE sessions cleared after a successful CommissioningComplete,
-// Matter §11.10.6.6 step 4. Mirrors matter.js
-// packages/protocol/src/common/FailsafeContext.ts:152-153 at db021da0
+// has the PASE sessions cleared by a successful CommissioningComplete,
+// before its response goes out, Matter §11.10.6.6 step 4. Mirrors matter.js
+// packages/protocol/src/common/FailsafeContext.ts:156-157 at b25ed960
 // (completeCommission: "The Secure Session Context of any PASE session
 // still established at the Server SHALL be cleared" → closePaseSession).
 // The CASE session the command arrived on stays, and the close is logged
@@ -159,7 +159,7 @@ func TestCommissioningCompleteThroughTheBridgeClosesThePASESessions(t *testing.T
 	if gc.FailSafeArmed() {
 		t.Fatal("the fail-safe is still armed: CommissioningComplete did not succeed, the test checks nothing")
 	}
-	reg.awaitClose(t) // the close follows the response by paseCloseGrace
+	// The close precedes the response: it is done once the reply is here.
 	if got := reg.closedIDs(); !slices.Equal(got, []uint16{paseSession}) {
 		t.Fatalf("sessions closed after CommissioningComplete = %v, want the PASE session [%d] alone", got, paseSession)
 	}

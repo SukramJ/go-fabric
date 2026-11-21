@@ -8,20 +8,12 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/operational"
 )
-
-// paseCloseGrace is how long the PASE sessions outlive the
-// CommissioningComplete response: a commissioner may send the command over
-// the fabric-adopted PASE session, and the peer's ack of the response
-// arrives on it (the delayed teardown RemoveFabric uses too).
-const paseCloseGrace = 100 * time.Millisecond
 
 // generalCommissioningClusterID is the GeneralCommissioning cluster.
 const generalCommissioningClusterID uint32 = 0x0030
@@ -50,12 +42,12 @@ type sessionLister interface {
 // [SessionRegistry] that lists its sessions (the operational manager
 // does); without one it does nothing.
 //
-// Mirrors matter.js packages/protocol/src/common/FailsafeContext.ts:277-279
-// at db021da0 (rollback, step 1: "Terminate any open PASE secure session by
+// Mirrors matter.js packages/protocol/src/common/FailsafeContext.ts:281-283
+// at b25ed960 (rollback, step 1: "Terminate any open PASE secure session by
 // clearing any associated Secure Session Context at the Server" →
 // closePaseSession with the current exchange).
 func (b *Bridge) FailSafeExpired(ctx context.Context) {
-	b.closePASESessions(ctx, 0, nil)
+	b.closePASESessions(ctx, nil)
 }
 
 // failSafeSessionsClosed is [Bridge.FailSafeExpired] that names the PASE
@@ -78,7 +70,7 @@ func (b *Bridge) FailSafeExpired(ctx context.Context) {
 // window, before :159 closes the context); here the closer does not run on
 // that path at all.
 func (b *Bridge) failSafeSessionsClosed(ctx context.Context) []uint16 {
-	closed := b.closePASESessions(ctx, 0, nil)
+	closed := b.closePASESessions(ctx, nil)
 	if armedIn := b.failSafeWindow.Swap(0); armedIn != 0 {
 		if w := b.attemptWindow.Load(); w != nil {
 			if generation, open := w.windowGeneration(); open && generation == armedIn {
@@ -145,17 +137,32 @@ func (b *Bridge) closePASESessionsOnRevoke() {
 	}
 }
 
-// closePASESessionsOnCommissioningComplete clears the PASE sessions after
-// a CommissioningComplete the root's GeneralCommissioning answered OK —
-// Matter §11.10.6.6 step 4 — once the response is out and
-// [paseCloseGrace] has elapsed. It reads the command's own response, as
-// adoptPASESessionOnAddNOC does, so it runs for every host that mounts
-// core.GeneralCommissioning, with or without the node facade.
+// closePASESessionsOnCommissioningComplete clears the PASE sessions open
+// now — the one AddNOC adopted onto the fabric included — when the root's
+// GeneralCommissioning answered a CommissioningComplete OK (Matter
+// §11.10.6.6 step 4): at once, inside the command's handling and before
+// its response goes out, silently (no CloseSession). It reads the
+// command's own response, as adoptPASESessionOnAddNOC does, so it runs for
+// every host that mounts core.GeneralCommissioning, with or without the
+// node facade. ctx is not consulted: nothing waits for the response.
 //
-// Mirrors matter.js packages/protocol/src/common/FailsafeContext.ts:152-153
-// at db021da0 (completeCommission, step 4: "The Secure Session Context of
-// any PASE session still established at the Server SHALL be cleared" →
-// closePaseSession).
+// Mirrors matter.js
+// packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:255
+// at b25ed960 (commissioningComplete awaits completeCommission before :268
+// builds the response) and packages/protocol/src/common/FailsafeContext.ts
+// :156-157 (completeCommission, step 4: "The Secure Session Context of any
+// PASE session still established at the Server SHALL be cleared" →
+// closePaseSession) and :191-196 (closePaseSession →
+// initiateForceClose, no current exchange): the session is marked peer
+// lost (packages/protocol/src/session/NodeSession.ts:450-453), its
+// exchanges close with no deferral (Session.ts:331-344) and it closes
+// without gracefulClose (NodeSession.ts:485-504) — no timer on the path.
+// The response cannot need the PASE session: the command is CASE-only
+// (GeneralCommissioningServer.ts:222-227; here
+// cluster/core/general_commissioning.go refuses it over PASE and closes
+// nothing). Before, the bridge closed after the response plus a 100 ms
+// grace, inside which a request on the PASE session was still served
+// with the commissioning channel's implicit Administer grant.
 //
 // It logs the ids it closes (matter.session.pase_close,
 // reason=commissioning_complete) as they close: the line a test harness
@@ -163,7 +170,7 @@ func (b *Bridge) closePASESessionsOnRevoke() {
 // where matter.js logs "Session ended" for the PASE session and chip
 // "Released - Type:1 LSID" (matter.js
 // support/chip-testing/test/cert/TC-DD-3.5.test.ts:71-74 at db021da0).
-func (b *Bridge) closePASESessionsOnCommissioningComplete(ctx context.Context, resp im.InvokeResponse) {
+func (b *Bridge) closePASESessionsOnCommissioningComplete(_ context.Context, resp im.InvokeResponse) {
 	for _, e := range resp.Responses {
 		if e.Path.Cluster != generalCommissioningClusterID || !e.HasResponse {
 			continue
@@ -172,15 +179,18 @@ func (b *Bridge) closePASESessionsOnCommissioningComplete(ctx context.Context, r
 		if !ok || done.ErrorCode != core.CommissioningErrorOK {
 			continue
 		}
-		b.closePASESessions(ctx, paseCloseGrace, func(ids []uint16) {
-			named := make([]string, len(ids))
-			for i, id := range ids {
-				named[i] = strconv.Itoa(int(id))
-			}
-			b.logger.Info("matter.session.pase_close",
-				slog.String("reason", "commissioning_complete"),
-				slog.String("ids", strings.Join(named, ",")))
-		})
+		closeNow, ids := b.paseSessionsCloser()
+		if closeNow == nil {
+			return
+		}
+		named := make([]string, len(ids))
+		for i, id := range ids {
+			named[i] = strconv.Itoa(int(id))
+		}
+		b.logger.Info("matter.session.pase_close",
+			slog.String("reason", "commissioning_complete"),
+			slog.String("ids", strings.Join(named, ",")))
+		closeNow()
 		return
 	}
 }
@@ -188,14 +198,14 @@ func (b *Bridge) closePASESessionsOnCommissioningComplete(ctx context.Context, r
 // closePASESessions clears the PASE sessions open now, including the ones
 // AddNOC adopted onto a fabric (they stay PASE sessions,
 // operational.Manager.AdoptFabricIndex), once the response of the
-// interaction ctx belongs to has been sent (at once without one) and grace
-// has elapsed after it. The sessions are named when this is called and
-// closed by id: a PASE session a new commissioning establishes within the
-// grace is not this fail-safe context's and stays (matter.js closes the
-// PASE session it finds when the hook runs, FailsafeContext.ts:187-192 at
-// db021da0, closePaseSession). closing, when set, runs with the named ids
-// just before they close. It returns the named ids.
-func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration, closing func(ids []uint16)) []uint16 {
+// interaction ctx belongs to has been sent (at once without one). The
+// sessions are named when this is called and closed by id: a PASE session
+// a new commissioning establishes before the response is out is not this
+// fail-safe context's and stays (matter.js closes the PASE session it
+// finds when the hook runs, FailsafeContext.ts:191-196 at b25ed960,
+// closePaseSession). closing, when set, runs with the named ids just
+// before they close. It returns the named ids.
+func (b *Bridge) closePASESessions(ctx context.Context, closing func(ids []uint16)) []uint16 {
 	closeNow, ids := b.paseSessionsCloser()
 	if closeNow == nil {
 		return nil
@@ -207,58 +217,10 @@ func (b *Bridge) closePASESessions(ctx context.Context, grace time.Duration, clo
 			closeIDs()
 		}
 	}
-	run := closeNow
-	if grace > 0 {
-		run = func() { b.armPASEClose(grace, closeNow) }
-	}
-	if !im.DeferAfterResponse(ctx, run) {
-		run()
+	if !im.DeferAfterResponse(ctx, closeNow) {
+		closeNow()
 	}
 	return ids
-}
-
-// armPASEClose runs closeNow after grace, unless [Bridge.Stop] stops it
-// first ([Bridge.stopPASECloseTimers]); after Stop nothing is armed. The
-// sessions it names close with the others at Stop
-// (closeSecureSessionsForShutdown), so the timer has nothing left to do
-// then, and no timer of the bridge stays armed on its clock after Stop
-// (review II, R2-P6-fsm-0615).
-func (b *Bridge) armPASEClose(grace time.Duration, closeNow func()) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.paseCloseOver {
-		return
-	}
-	b.paseCloseSeq++
-	seq := b.paseCloseSeq
-	if b.paseCloseTimers == nil {
-		b.paseCloseTimers = make(map[uint64]clock.Timer)
-	}
-	// The callback takes b.mu, so it finds its entry installed even when
-	// the timer fires before AfterFunc returned.
-	b.paseCloseTimers[seq] = b.clk().AfterFunc(grace, func() {
-		b.mu.Lock()
-		_, armed := b.paseCloseTimers[seq]
-		delete(b.paseCloseTimers, seq)
-		b.mu.Unlock()
-		if armed {
-			closeNow()
-		}
-	})
-}
-
-// stopPASECloseTimers stops every PASE close [Bridge.armPASEClose] armed
-// and arms none from then on. The timers stop outside b.mu: a clock may
-// hold its own lock while it runs a callback, which takes b.mu.
-func (b *Bridge) stopPASECloseTimers() {
-	b.mu.Lock()
-	b.paseCloseOver = true
-	timers := b.paseCloseTimers
-	b.paseCloseTimers = nil
-	b.mu.Unlock()
-	for _, t := range timers {
-		t.Stop()
-	}
 }
 
 // paseSessionsCloser names the PASE sessions open now and returns what
@@ -281,7 +243,7 @@ func (b *Bridge) paseSessionsCloser() (closeNow func(), ids []uint16) {
 		return nil, nil
 	}
 	// Named for closing, the sessions are closing: no new PASE exchange
-	// waits for their grace ([Bridge.paseSessionExists]).
+	// waits for the response their close follows ([Bridge.paseSessionExists]).
 	b.mu.Lock()
 	if b.paseClosing == nil {
 		b.paseClosing = make(map[uint16]struct{})
