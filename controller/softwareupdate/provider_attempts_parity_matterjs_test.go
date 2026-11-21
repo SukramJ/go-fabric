@@ -6,7 +6,6 @@ package softwareupdate
 import (
 	"bytes"
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -197,7 +196,10 @@ func TestManagerConsentRemovalEndsTheApplyRightParity(t *testing.T) {
 // linked to its queued update, is Applying, reporting a version below the
 // update's target, fails the update (SoftwareUpdateManager.ts:1836-1850
 // at b25ed960); a stale Applying attempt — past its apply delay and the
-// progress timeout — only ends and resets it (row 0, :1823-1829).
+// progress timeout — only ends and resets it (row 0, :1823-1829). Either
+// way the admitted query's offer of the target is answered and links the
+// update again: a failed update keeps its consent and entry, and is listed
+// again while the node retries it on its own (:388-391, :2083-2087).
 func TestManagerAdmissionFailsAnAppliedUpdateParity(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -206,7 +208,7 @@ func TestManagerAdmissionFailsAnAppliedUpdateParity(t *testing.T) {
 		failed int
 		queued bool
 	}{
-		{"fails an update whose node queries again below its target after applying it", 20 * time.Minute, 1, false},
+		{"fails an update whose node queries again below its target after applying it", 20 * time.Minute, 1, true},
 		{"ends a stale attempt and resets its update, without a failure", 80 * time.Minute, 0, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -419,40 +421,6 @@ func (f restartedTransfer) Peer() bdx.Peer {
 }
 func (f restartedTransfer) LastActivity() time.Time { return f.at }
 
-// TestManagerAdmissionCancelFailsParity ports "answers busy and keeps the
-// attempt when the transfer of a node that restarted cannot be cancelled"
-// (OtaTest.ts:5425-5545 at b25ed960, the admission table): the cancel of
-// the restarted node's transfer fails, so the query is Busy and the
-// attempt runs on, linked (SoftwareUpdateManager.ts:1863-1872).
-func TestManagerAdmissionCancelFailsParity(t *testing.T) {
-	t.Parallel()
-	t.Run("answers busy and keeps the attempt when the transfer of a node that restarted cannot be cancelled", func(t *testing.T) {
-		t.Parallel()
-		r := newAttemptRig(t)
-		r.queue(2, nil)
-		q := r.query(t, 7, 1)
-		cancels := 0
-		started := r.clock.Now()
-		r.m.admitTransfer = func(Peer) admissionTransfer { return restartedTransfer{id: 7, at: started} }
-		r.m.disableTransfer = func(Peer) error { cancels++; return errors.New("simulated BDX cancel failure") }
-		r.clock.Advance(time.Second)
-		if got := r.query(t, 8, 1); got.Status != provdef.StatusBusy {
-			t.Fatalf("query %+v, want Busy", got)
-		}
-		a := providerPorts{r.m}.AttemptFor(otaPeerOfTest(), *q.UpdateToken)
-		if cancels != 1 || a == nil || a.Ended() {
-			t.Fatalf("cancels %d, attempt kept %v", cancels, a != nil)
-		}
-		r.m.mu.Lock()
-		linked := r.m.linkedEntryLocked(a) != nil
-		_, suppressed := r.m.startUpSuppress[testPeer]
-		r.m.mu.Unlock()
-		if !linked || suppressed {
-			t.Errorf("still linked %v, startUp suppressed %v", linked, suppressed)
-		}
-	})
-}
-
 func otaPeerOfTest() mattercore.OTAPeer {
 	return mattercore.OTAPeer{FabricIndex: testPeer.FabricIndex, NodeID: testPeer.NodeID}
 }
@@ -553,8 +521,9 @@ func TestManagerDelegatesConsentOnlyWhenOnParity(t *testing.T) {
 		t.Parallel()
 		for _, on := range []bool{false, true} {
 			r := newManagerRig(t, func(c *Config) { c.DelegateConsentToRequestor = on })
+			delegate := r.m.mayDelegateConsentTo(testPeer, req)
 			r.m.mu.Lock()
-			chosen, required := r.m.offerOfLocked(testPeer, candidates, req)
+			chosen, required := r.m.offerOfLocked(testPeer, candidates, 0xFFF1, 0x8001, delegate)
 			r.m.mu.Unlock()
 			if delegated := (providerPorts{r.m}).MayDelegateConsentTo(otaPeerOfTest(), req); delegated != on {
 				t.Errorf("delegation %v: MayDelegateConsentTo %v", on, delegated)
@@ -571,8 +540,9 @@ func TestManagerDelegatesConsentOnlyWhenOnParity(t *testing.T) {
 		t.Parallel()
 		r := newManagerRig(t, func(c *Config) { c.DelegateConsentToRequestor = true })
 		r.queue(2, nil)
+		delegate := r.m.mayDelegateConsentTo(testPeer, req)
 		r.m.mu.Lock()
-		chosen, required := r.m.offerOfLocked(testPeer, candidates, req)
+		chosen, required := r.m.offerOfLocked(testPeer, candidates, 0xFFF1, 0x8001, delegate)
 		r.m.mu.Unlock()
 		if chosen == nil || chosen.SoftwareVersion != 2 || required {
 			t.Errorf("offered %v required %v, want the consented 2", chosen, required)

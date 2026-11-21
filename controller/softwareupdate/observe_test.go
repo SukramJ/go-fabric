@@ -4,7 +4,9 @@
 package softwareupdate
 
 import (
+	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -58,6 +60,27 @@ func observe(t *testing.T, m *Manager) *eventLog {
 	return l
 }
 
+// observeExcept is observe without the events of the kinds skip.
+func observeExcept(t *testing.T, m *Manager, skip ...UpdateEventKind) *eventLog {
+	t.Helper()
+	l := &eventLog{}
+	t.Cleanup(m.Observe(func(ev UpdateEvent) {
+		if !slices.Contains(skip, ev.Kind) {
+			l.add(ev)
+		}
+	}))
+	return l
+}
+
+// consentTo gives testPeer's applicable node the consent for tg, which
+// queues its update (addUpdateConsent).
+func consentTo(t *testing.T, m *Manager, tg Target) {
+	t.Helper()
+	if _, err := m.AddUpdateConsent(context.Background(), testPeer, tg); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestObserveAppliedUpdate: an update the provider reports Applying and
 // then Done is reported applying once — a retransmitted ApplyUpdateRequest
 // reports Applying again (SoftwareUpdateManager.ts:1312-1318 at db021da0)
@@ -94,10 +117,10 @@ func TestObserveQueuedUpdateSequence(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		r := newManagerRig(t, nil)
-		l := observe(t, r.m)
+		l := observeExcept(t, r.m, UpdateConsentChanged)
 		tg := Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2}
-		r.m.queueUpdate(&queueEntry{consent: consent{Target: tg, peer: testPeer}})
-		r.m.queueUpdate(&queueEntry{consent: consent{Target: tg, peer: testPeer}})
+		consentTo(t, r.m, tg)
+		consentTo(t, r.m, tg)
 		v := uint32(2)
 		r.m.OnStatusChange(testPeer, mattercore.OTAUpdateQuerying, &v, 0)
 		r.m.OnStatusChange(testPeer, mattercore.OTAUpdateDownloading, &v, 0)
@@ -129,15 +152,15 @@ func TestObserveQueuedTargetReplaced(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		r := newManagerRig(t, nil)
-		l := observe(t, r.m)
+		l := observeExcept(t, r.m, UpdateConsentChanged)
 		t2 := Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2}
 		t3 := t2
 		t3.TargetSoftwareVersion = 3
-		r.m.queueUpdate(&queueEntry{consent: consent{Target: t2, peer: testPeer}})
-		r.m.queueUpdate(&queueEntry{consent: consent{Target: t3, peer: testPeer}})
+		consentTo(t, r.m, t2)
+		consentTo(t, r.m, t3)
 		v := uint32(3)
 		r.m.OnStatusChange(testPeer, mattercore.OTAUpdateDownloading, &v, 0)
-		r.m.queueUpdate(&queueEntry{consent: consent{Target: t2, peer: testPeer}})
+		consentTo(t, r.m, t2)
 		l.await(t, 3)
 		synctest.Wait() // nothing more is emitted once the bubble settles
 		evs := l.await(t, 3)

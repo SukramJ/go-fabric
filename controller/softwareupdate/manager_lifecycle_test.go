@@ -133,7 +133,7 @@ func TestManagerForgetsNodesThatLeft(t *testing.T) {
 		r.m.known[p] = SoftwareUpdateInfo{}
 		r.m.startUpSuppress[p] = 7
 	}
-	r.m.consents = append(r.m.consents, consent{Target: Target{TargetSoftwareVersion: 2}, peer: gone})
+	r.m.consents[gone] = &consent{Target: Target{TargetSoftwareVersion: 2}, peer: gone}
 	r.m.mu.Unlock()
 	if err := r.m.CheckForUpdates(context.Background()); err != nil {
 		t.Fatal(err)
@@ -143,10 +143,8 @@ func TestManagerForgetsNodesThatLeft(t *testing.T) {
 	_, o := r.m.observed[gone]
 	_, k := r.m.known[gone]
 	_, s := r.m.startUpSuppress[gone]
-	for _, c := range r.m.consents {
-		if c.peer == gone {
-			t.Fatal("a consent of a node that left stays")
-		}
+	if _, ok := r.m.consents[gone]; ok {
+		t.Fatal("a consent of a node that left stays")
 	}
 	if o || k || s {
 		t.Fatalf("kept for a node that left: observed %v, known %v, startUpSuppress %v", o, k, s)
@@ -250,9 +248,11 @@ func TestQueryUpdatesReturnsTheProductFailures(t *testing.T) {
 }
 
 // TestManagerNodeDeleted (review II, R2-P6-bound-1914, decision 219): a
-// node that left the registry is forgotten at once — its consents and its
-// queued update go (the update reported failed), and nothing of it stays
-// for a later node at the same address; another node keeps its state.
+// node that left the registry is forgotten at once — its consent and its
+// queued update go, the update without an event (#forgetPeer,
+// SoftwareUpdateManager.ts:312-342 at b25ed960; the contract :2303-2308),
+// and nothing of it stays for a later node at the same address; another
+// node keeps its state.
 func TestManagerNodeDeleted(t *testing.T) {
 	t.Parallel()
 	r := newManagerRig(t, nil)
@@ -264,15 +264,16 @@ func TestManagerNodeDeleted(t *testing.T) {
 		r.m.known[p] = SoftwareUpdateInfo{}
 		r.m.startUpSuppress[p] = 7
 	}
-	r.m.consents = append(r.m.consents, consent{Target: Target{TargetSoftwareVersion: 3}, peer: other})
+	r.m.consents[other] = &consent{Target: Target{TargetSoftwareVersion: 3}, peer: other}
 	r.m.mu.Unlock()
 
+	r.setNode(true, nil) // the registry removed it before its Deleted hook
 	r.m.NodeDeleted(testPeer)
 	if r.m.HasConsent(testPeer, 0) || len(r.m.QueuedUpdates()) != 0 {
 		t.Fatal("the deleted node keeps a consent or its queued update")
 	}
-	if failed, _ := r.counts(); failed != 1 {
-		t.Fatalf("%d updates reported failed, want the deleted node's", failed)
+	if failed, _ := r.counts(); failed != 0 {
+		t.Fatalf("%d updates reported failed, want none (the update ends without an event)", failed)
 	}
 	r.m.mu.Lock()
 	_, o := r.m.observed[testPeer]
@@ -307,6 +308,9 @@ func TestManagerNodeDeletedDisarmsWithoutAQueuedUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(m.Close)
+	m.mu.Lock()
+	m.suppress = false // online: NodeDeleted does nothing while updates are suppressed (C-15)
+	m.mu.Unlock()
 	armer.Arm(testPeer, 0)
 	m.NodeDeleted(testPeer)
 	clk.Advance(peer.RebootReturnTimeout(0) + time.Minute)

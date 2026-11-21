@@ -152,8 +152,8 @@ func (c *Controller) BDX() *bdx.Responder {
 }
 
 // otaNodeDeleted hands the update manager's NodeDeleted for p to a
-// goroutine Close waits for until it reaches the host's callback
-// (otaHandoffs); nothing once Close began to close the manager.
+// goroutine Close waits for, within its ctx (otaHandoffs); nothing once
+// Close began to close the manager.
 func (c *Controller) otaNodeDeleted(p softwareupdate.Peer) {
 	m := c.ota.Load()
 	if m == nil {
@@ -305,14 +305,14 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 			}
 		}
 		// The manager forgets a node that left the registry at once — its
-		// consents and its queued update (review II, R2-P6-bound-1914,
-		// decision 219). Deleted can run inside the registry's fabric
-		// operation (Erase, a peer's leave), and NodeDeleted calls the
-		// host's OnUpdateFailed for a queued update: it runs on its own
-		// goroutine, after the hook returned, so a host callback that
-		// starts a fabric operation does not wait for the one running.
-		// Close waits for it, within its ctx, until it reaches the host's
-		// callback (otaHandoffs).
+		// consent and its queued update, the update without an event (review
+		// II, R2-P6-bound-1914, decision 219; C-17). Deleted can run inside
+		// the registry's fabric operation (Erase, a peer's leave), and
+		// NodeDeleted's queue run may call the host's OnUpdateFailed for
+		// another node: it runs on its own goroutine, after the hook
+		// returned, so a host callback that starts a fabric operation does
+		// not wait for the one running. Close waits for it within its ctx
+		// (otaHandoffs).
 		h.Deleted = func() {
 			if p := lastPeer.Load(); p != nil {
 				c.otaNodeDeleted(*p)

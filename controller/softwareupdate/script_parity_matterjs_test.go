@@ -139,9 +139,11 @@ func TestScriptedQueryImage(t *testing.T) {
 
 // AwaitNextAction is stated directly; Proceed runs the provider's path
 // with the scripted delay in place of the configured one; Discontinue
-// withdraws the consent and lets the provider refuse, two minutes, as it
-// refuses an update without consent (InProcessControllerAdapter.ts:
-// 575-623; OtaSoftwareUpdateProviderServer.ts:459-463).
+// withdraws the consent of the token's version and lets the provider
+// answer by its apply table — refused, two minutes, for an offer whose
+// apply right went with the consent, Proceed for an update that applies
+// already (InProcessControllerAdapter.ts:752-790 at b25ed960;
+// OtaSoftwareUpdateProviderServer.ts:459-463).
 func TestScriptedApplyUpdate(t *testing.T) {
 	t.Parallel()
 	s := newScriptRig(t)
@@ -169,7 +171,13 @@ func TestScriptedApplyUpdate(t *testing.T) {
 	if !s.r.m.HasConsent(testPeer, 2) {
 		t.Fatal("the consent is gone before the Discontinue")
 	}
-	got, err = c.ApplyUpdate(ctx, testOTAPeer, req, s.ownApply(req))
+	// A scripted Discontinue under the token of an offer the node does not
+	// apply yet removes the consent of the token's version, and the
+	// provider refuses as its apply table does (row 6,
+	// InProcessControllerAdapter.ts:765-772 at b25ed960, F-b25ed960-C3).
+	offered := deliverOffer(t, s.r, 2)
+	known := provdef.ApplyUpdateRequestRequest{UpdateToken: offered.Token(), NewVersion: 2}
+	got, err = c.ApplyUpdate(ctx, testOTAPeer, known, s.ownApply(known))
 	if err != nil || got != (provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionDiscontinue, DelayedActionTime: 120}) || s.ownCalls != 2 {
 		t.Fatalf("Discontinue: %+v %v, provider asked %d times", got, err, s.ownCalls)
 	}
@@ -185,6 +193,13 @@ func TestScriptedApplyUpdate(t *testing.T) {
 	}
 	if len(s.exchanges) != 4 || s.exchanges[2].ApplyUpdate == nil || s.exchanges[2].ApplyUpdate.Response.Action != provdef.ApplyUpdateActionDiscontinue {
 		t.Fatalf("exchanges %+v", s.exchanges)
+	}
+	// A scripted Discontinue under the token of an update that applies
+	// already proceeds, as a resent ApplyUpdateRequest (row 4).
+	s.applies = []ApplyUpdateScript{{Action: provdef.ApplyUpdateActionDiscontinue}}
+	got, err = c.ApplyUpdate(ctx, testOTAPeer, req, s.ownApply(req))
+	if err != nil || got.Action != provdef.ApplyUpdateActionProceed {
+		t.Fatalf("Discontinue of an applying update: %+v %v, want Proceed", got, err)
 	}
 	if err := c.NotifyUpdateApplied(ctx, testOTAPeer, provdef.NotifyUpdateAppliedRequest{UpdateToken: req.UpdateToken, SoftwareVersion: 2}, func(context.Context) error { return nil }); err != nil {
 		t.Fatal(err)
