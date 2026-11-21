@@ -81,7 +81,7 @@ func (s *scriptRig) ownQuery(context.Context) (provdef.QueryImageResponse, error
 func (s *scriptRig) ownApply(req provdef.ApplyUpdateRequestRequest) func(ctx context.Context) (provdef.ApplyUpdateResponse, error) {
 	return func(ctx context.Context) (provdef.ApplyUpdateResponse, error) {
 		s.ownCalls++
-		action, delay, err := providerPorts{s.r.m}.ApplyUpdate(ctx, testOTAPeer, req)
+		action, delay, err := applyPolicyPort{s.r.m}.ApplyUpdate(ctx, testOTAPeer, req)
 		return provdef.ApplyUpdateResponse{Action: action, DelayedActionTime: uint32(delay / time.Second)}, err
 	}
 }
