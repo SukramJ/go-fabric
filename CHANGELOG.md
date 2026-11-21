@@ -41,7 +41,7 @@ pseudo-version of `main`.
 - `cluster/thermo`: `ThermostatConfig.LocalTemperatureChangeThreshold` and `ThermostatServer.SetLocalTemperatureChangeThreshold` — the smallest LocalTemperature change (0.01 °C, default 50) the LocalTemperatureChange event reports; 0 or below is refused with the event (decision 426; pin lift b25ed960, P4-A).
 - `secure/operational`: `Manager.RegistrationCount` and `Manager.ClosePeerLostBefore` — peer loss cuts a peer's sessions by registration order, as matter.js's `registeredBefore` (decisions 413, 428; pin lift b25ed960, P4-D1).
 - `transport/mrp`: `LivenessKick` and `ShouldKickForLiveness`, the BDX liveness-kick rule shared by the controller's exchanges and the bridge (decision 415; pin lift b25ed960, P4-D1).
-- `cluster/spec/thermostat`: `Host.SetLocalTemperatureChangeThreshold` — the device facade's path to the kit's LocalTemperatureChange threshold: `d.Thermostat().Host().SetLocalTemperatureChangeThreshold(t)`; 0 or below refused with TEVT (owner decision 2026-11-21; pin lift b25ed960, P4-A2).
+- `cluster/spec/thermostat`: `Host.SetLocalTemperatureChangeThreshold` — the device facade's path to the kit's LocalTemperatureChange threshold: `d.Thermostat().Host().SetLocalTemperatureChangeThreshold(t)`; 0 or below refused with the event (TEVT without LTNE) (owner decision 2026-11-21; pin lift b25ed960, P4-A2).
 
 ### Deprecated
 
