@@ -170,7 +170,8 @@ func (m *Manager) scriptedApplyUpdate(ctx context.Context, op mattercore.OTAPeer
 		}
 		// The provider answers with its own apply delay; a scripted
 		// Proceed's delay, which the manager recorded with Applying,
-		// replaces it (the scripted state.applyDelay, :596-614).
+		// replaces it (the scripted state.applyDelay,
+		// InProcessControllerAdapter.ts:775-789 at b25ed960).
 		if scripted && script.Action == provdef.ApplyUpdateActionProceed && script.DelayedActionTime != nil &&
 			resp.Action == provdef.ApplyUpdateActionProceed {
 			resp.DelayedActionTime = min(*script.DelayedActionTime, uint32(maxApplyDelay/time.Second))
@@ -195,7 +196,7 @@ func (m *Manager) observedNotifyApplied(ctx context.Context, op mattercore.OTAPe
 // applyOverride is what a scripted ApplyUpdateRequest asks of the
 // manager's apply ([providerPorts.ApplyUpdate]): a delay in
 // place of [Config].ApplyDelay (the scripted Proceed's state.applyDelay,
-// InProcessControllerAdapter.ts:596-614), or the refusal the provider
+// InProcessControllerAdapter.ts:775-789 at b25ed960), or the refusal the provider
 // gives an update without consent (the scripted Discontinue, :590-594).
 type applyOverride struct {
 	delay  time.Duration

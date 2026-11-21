@@ -1062,14 +1062,17 @@ func (m *Manager) noteAttestedIdentity(p Peer, rec client.Record, vid, pid uint1
 }
 
 // UpdateExistsFor is the stored update the querying node gets —
-// updateExistsFor (:385-468): the node's details must match the query;
-// the applicable stored images over its version (prod ones, the others
-// only with AllowTestImages), highest first; a requestor that can consent
-// gets the first, flagged consent-required unless the manager holds its
-// consent; one that cannot only a version the manager holds a consent
-// for. A stored image the store would not serve ([Images.Open]: a prod or
-// test image not bound to a ledger checksum, unless
-// [ImagesConfig].AllowUnverifiedLedgerImages) is no candidate.
+// updateExistsFor (SoftwareUpdateManager.ts:673-715 at b25ed960): the
+// node's details must match the query; the applicable stored images over
+// its version (prod ones, the others only with AllowTestImages), highest
+// first; the candidate the manager holds a consent for comes first, else
+// the newest, flagged consent-required, only when the consent may be
+// delegated to the node ([Config].DelegateConsentToRequestor); else
+// nothing. The consented match is Go's at-or-below rule, not matter.js's
+// exact version (F-b25ed960-21). A stored image the store would not
+// serve ([Images.Open]: a prod or test image not bound to a ledger
+// checksum, unless [ImagesConfig].AllowUnverifiedLedgerImages) is no
+// candidate.
 func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.QueryImageRequest) (AvailableDetails, bool) {
 	if !m.validatePeerDetails(p, req.SoftwareVersion, req.VendorId, req.ProductId) {
 		m.log.Info("ota.manager.peer_details_mismatch", slog.String("node", peerString(p)))
@@ -1097,8 +1100,10 @@ func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.Query
 // consent itself — the newest one, flagged consent-required; nil for
 // none. m.mu is held.
 //
-// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:698-713 at b25ed960
-// (the consented or the delegated candidate).
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:699-701 at b25ed960
+// (the order: the consented candidate, else the delegated one). The
+// consented match is Go's at-or-below rule; matter.js's is the consent's
+// exact version (F-b25ed960-21).
 func (m *Manager) offerOfLocked(p Peer, candidates []StoredImage, req provdef.QueryImageRequest) (*StoredImage, bool) {
 	for i := range candidates {
 		c := candidates[i]
