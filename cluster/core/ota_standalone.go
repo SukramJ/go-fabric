@@ -105,8 +105,8 @@ var (
 // matter.js has no provider without its SoftwareUpdateManager
 // (OtaSoftwareUpdateProviderServer.ts:81-82 at b25ed960).
 //
-// It reads cfg's BDX, BDXMaxBlockSize, Clock and Logger, and honours the
-// deprecated hooks of a manager-less provider: OnStatusChange learns each
+// It reads cfg's BDX, BDXMaxBlockSize, Clock and Logger, and honours a
+// manager-less provider's hooks (all four deprecated): OnStatusChange learns each
 // status an attempt takes (and Done at each NotifyUpdateApplied),
 // RebootQuery each query admitted for the requestor's restart (the host's
 // queue decides what it suppresses), TransferBlockSize the block size per
