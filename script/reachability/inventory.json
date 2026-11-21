@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10212,
+  "entry_points": 10213,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27893,
+    "total_exported": 27894,
     "reachable": 20889,
-    "whitelisted": 6982,
+    "whitelisted": 6983,
     "unreachable": 22
   },
   "by_package": [
@@ -387,7 +387,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3295,
+      "line": 3284,
       "kind": "method"
     },
     {
@@ -2487,6 +2487,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCommissioningCompleteClearsThePASESessionAtOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_close_at_once_test.go",
+      "line": 103
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCommissioningCompleteEndsTheWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioned_window_test.go",
@@ -4261,7 +4268,7 @@
       "identifier": "TestFailSafeExpiredClosesThePASESessionsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "bridge",
@@ -5577,7 +5584,7 @@
       "identifier": "TestPASEClosedOnCommissioningCompleteParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 64
+      "line": 66
     },
     {
       "package": "bridge",
@@ -5626,7 +5633,7 @@
       "identifier": "TestPASEStaysOpenDuringCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 93
+      "line": 95
     },
     {
       "package": "bridge",
@@ -6466,7 +6473,7 @@
       "identifier": "TestReassembleQueuedAcrossStopTakesNoSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_teardown_test.go",
-      "line": 403
+      "line": 410
     },
     {
       "package": "bridge",
@@ -7800,6 +7807,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestStopLeavesNoPASECloseTimer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/lifecycle_teardown_test.go",
+      "line": 334
+    },
+    {
+      "package": "bridge",
       "identifier": "TestStopOfAnUnstartedBridgeClosesWhatItHolds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_teardown_test.go",
@@ -7811,13 +7825,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_stop_handlers_test.go",
       "line": 83
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestStopStopsThePASECloseTimer",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/lifecycle_teardown_test.go",
-      "line": 332
     },
     {
       "package": "bridge",
@@ -7901,7 +7908,7 @@
       "identifier": "TestStrictValidationSetAfterStartJudgesEveryEndpointAsAdded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_teardown_test.go",
-      "line": 376
+      "line": 383
     },
     {
       "package": "bridge",
