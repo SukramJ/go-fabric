@@ -1060,9 +1060,10 @@ type Host interface {
 	// limits; nil clears the handle and moves no setpoint. The moved
 	// setpoints reach the Sink before they are stored, so the Sink must
 	// not call back into the server. Set of ActivePresetHandle sets the
-	// handle alone. As matter.js's setActivePresetRequest called by the
-	// application, ThermostatServer.ts:551-553 with :523-538 and
-	// :556-567 at b25ed960.
+	// handle alone. The activation is matter.js's setActivePresetRequest
+	// called by the application, ThermostatServer.ts:551-553 with :523-538
+	// and :556-567 at b25ed960; the refusal without the feature and the
+	// Sink order are this module's.
 	ActivatePreset(ctx context.Context, handle []byte) error
 }
 
