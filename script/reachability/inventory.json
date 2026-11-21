@@ -1,7 +1,7 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10247,
-  "initializers": 368,
+  "entry_points": 10251,
+  "initializers": 369,
   "entry_packages": [
     ".",
     "bdx",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27971,
-    "reachable": 20938,
-    "whitelisted": 7011,
+    "total_exported": 27992,
+    "reachable": 20957,
+    "whitelisted": 7013,
     "unreachable": 22
   },
   "by_package": [
@@ -31527,6 +31527,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fuzz_wire_test.go",
       "line": 103
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "NOCUpdateSeam",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/export_test.go",
+      "line": 22
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "PatchNOCUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/export_test.go",
+      "line": 33
     },
     {
       "package": "controller/commissioner",
