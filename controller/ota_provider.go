@@ -61,11 +61,11 @@ func (c *Controller) newOTAProvider(ctx context.Context, mgr *softwareupdate.Man
 	srv, err := mattercore.NewOTAProvider(mattercore.OTAProviderConfig{
 		ImageSource: p.ImageSource, Consent: p.Consent,
 		// The manager owns the update attempts with its queue (decision
-		// 292 (b)); the apply delay and a scripted refusal still come
-		// through the apply policy, which has no successor yet.
-		Manager:     p.Manager,
-		ApplyPolicy: p.ApplyPolicy, //nolint:staticcheck // the apply delay's only port for the deprecation window
-		BDX:         responder,
+		// 292 (b)) and decides a scripted refusal; the apply delay is the
+		// provider's (State.applyDelay).
+		Manager:    p.Manager,
+		ApplyDelay: p.ApplyDelay,
+		BDX:        responder,
 		NodeID: func(fabricIndex uint8) (uint64, bool) {
 			if fabricIndex != ours {
 				return 0, false

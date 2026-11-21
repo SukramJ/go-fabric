@@ -76,13 +76,18 @@ func (s *scriptRig) ownQuery(context.Context) (provdef.QueryImageResponse, error
 	return provdef.QueryImageResponse{Status: provdef.StatusUpdateAvailable, SoftwareVersion: ptrTo[uint32](2)}, nil
 }
 
-// ownApply is the provider's own path as far as the policy port: the
-// provider asks providerPorts.ApplyUpdate, as cluster/core's provider does.
+// ownApply is the provider's own answer as cluster/core's provider builds
+// it: its apply delay (ProviderConfig.ApplyDelay, whole seconds), and the
+// manager's apply table (providerPorts.ApplyUpdate) — Proceed after the
+// delay, or Discontinue for two minutes.
 func (s *scriptRig) ownApply(req provdef.ApplyUpdateRequestRequest) func(ctx context.Context) (provdef.ApplyUpdateResponse, error) {
 	return func(ctx context.Context) (provdef.ApplyUpdateResponse, error) {
 		s.ownCalls++
-		action, delay, err := applyPolicyPort{s.r.m}.ApplyUpdate(ctx, testOTAPeer, req)
-		return provdef.ApplyUpdateResponse{Action: action, DelayedActionTime: uint32(delay / time.Second)}, err
+		delay := wholeSeconds(s.r.m.ProviderConfig().ApplyDelay)
+		if !(providerPorts{s.r.m}).ApplyUpdate(ctx, testOTAPeer, req.UpdateToken, req.NewVersion, delay) {
+			return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionDiscontinue, DelayedActionTime: 120}, nil
+		}
+		return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: uint32(delay / time.Second)}, nil
 	}
 }
 
@@ -158,6 +163,9 @@ func TestScriptedApplyUpdate(t *testing.T) {
 	if err != nil || got != (provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: 180}) || s.ownCalls != 1 {
 		t.Fatalf("Proceed: %+v %v, provider asked %d times", got, err, s.ownCalls)
 	}
+	if a := (providerPorts{s.r.m}).AttemptFor(testOTAPeer, req.UpdateToken); a == nil || a.ApplyDelay() != 180*time.Second {
+		t.Fatalf("the scripted Proceed's attempt applies with %v, want 180 s", a)
+	}
 	if !s.r.m.HasConsent(testPeer, 2) {
 		t.Fatal("the consent is gone before the Discontinue")
 	}
@@ -168,7 +176,10 @@ func TestScriptedApplyUpdate(t *testing.T) {
 	if s.r.m.HasConsent(testPeer, 2) {
 		t.Fatal("a scripted Discontinue left the update's consent")
 	}
-	got, err = c.ApplyUpdate(ctx, testOTAPeer, req, s.ownApply(req))
+	// The refused token lost its apply right with the consent; a fresh
+	// token (an apply after a restart) proceeds after the configured delay.
+	fresh := provdef.ApplyUpdateRequestRequest{UpdateToken: []byte{1, 2, 3, 4, 5, 6, 7, 8}, NewVersion: 2}
+	got, err = c.ApplyUpdate(ctx, testOTAPeer, fresh, s.ownApply(fresh))
 	if err != nil || got != (provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: 5}) {
 		t.Fatalf("spent script: %+v %v, want the configured apply delay", got, err)
 	}

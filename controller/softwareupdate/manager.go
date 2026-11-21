@@ -304,8 +304,6 @@ type Manager struct {
 	// observed are the nodes preparePeerForUpdate registered on, with the
 	// software version last seen (the versionUpdateObservers, :733-772).
 	observed map[Peer]uint32
-	// applyDelays are the delays the apply policy allowed, per peer.
-	applyDelays map[Peer]time.Duration
 	// attempts are the nodes' update attempts — internal.attempts
 	// (SoftwareUpdateManager.ts:1739-1741 at b25ed960) — under m.mu with
 	// the queue, as matter.js changes both in one synchronous change
@@ -368,7 +366,7 @@ func New(cfg Config) (*Manager, error) {
 	m := &Manager{
 		cfg: cfg, clock: clock.Or(cfg.Clock), rand: cfg.Rand, log: cfg.Logger,
 		suppress: true, known: map[Peer]SoftwareUpdateInfo{}, startUpSuppress: map[Peer]uint16{},
-		observed: map[Peer]uint32{}, applyDelays: map[Peer]time.Duration{},
+		observed: map[Peer]uint32{},
 		attempts: mattercore.NewOTAUpdateAttempts(cfg.Clock),
 	}
 	m.life, m.stopLife = context.WithCancel(context.Background())
@@ -1328,7 +1326,6 @@ func (m *Manager) forgetGone(nodes []*client.Node) {
 			m.attempts.End(a) // #forgetPeer (:333-334 at b25ed960)
 		}
 	}
-	maps.DeleteFunc(m.applyDelays, func(p Peer, _ time.Duration) bool { return !keep[p] })
 	maps.DeleteFunc(m.known, func(p Peer, _ SoftwareUpdateInfo) bool { return !keep[p] })
 	maps.DeleteFunc(m.startUpSuppress, func(p Peer, _ uint16) bool { return !keep[p] })
 	m.consents = slices.DeleteFunc(m.consents, func(c consent) bool { return !keep[c.peer] })
@@ -1774,7 +1771,6 @@ func (m *Manager) NodeDeleted(p Peer) {
 		m.queue = slices.Delete(m.queue, i, i+1)
 	}
 	delete(m.observed, p)
-	delete(m.applyDelays, p)
 	delete(m.known, p)
 	delete(m.startUpSuppress, p)
 	// #forgetPeer (:333-334 at b25ed960): the node's attempts end.

@@ -35,27 +35,30 @@ type ProviderConfig struct {
 	// the update attempts, the admission of a query, the apply table and
 	// the transfer options of a node.
 	Manager mattercore.OTAUpdateManager
-	// ApplyPolicy names the apply delay ([Config].ApplyDelay) and a
-	// scripted refusal (script.go) before the manager's apply table.
+	// ApplyDelay is [Config].ApplyDelay, the provider's apply delay
+	// (mattercore.OTAProviderConfig.ApplyDelay).
+	ApplyDelay time.Duration
+	// ApplyPolicy is no longer filled: the delay is ApplyDelay, and the
+	// Manager decides the apply, a scripted refusal included.
 	//
-	// Deprecated: the apply is the Manager's to decide; removable in
-	// v0.26.0.
+	// Deprecated: the delay is ApplyDelay and the apply is the Manager's
+	// to decide; removable in v0.26.0.
 	ApplyPolicy     mattercore.OTAApplyPolicy //nolint:staticcheck // the deprecated field keeps its type for its window
 	BDXMaxBlockSize uint16
-	// OnStatusChange reports a provider's status to the manager's
-	// deprecated [Manager.OnStatusChange].
+	// OnStatusChange is no longer filled: the provider reports to the
+	// Manager's attempts, and beside a Manager the provider refuses it.
 	//
 	// Deprecated: the provider reports to the Manager's attempts;
 	// removable in v0.26.0.
 	OnStatusChange func(peer mattercore.OTAPeer, status mattercore.OTAUpdateStatus, version uint32)
-	// RebootQuery hands a restart query to the deprecated
-	// [Manager.SuppressNextStartUp].
+	// RebootQuery is no longer filled: the Manager judges a restart query
+	// itself, and beside a Manager the provider refuses it.
 	//
 	// Deprecated: the Manager judges the restart in its AdmitQuery;
 	// removable in v0.26.0.
 	RebootQuery func(peer mattercore.OTAPeer, sessionID uint16)
-	// TransferBlockSize is the block size [Manager.TransferOptionsFor]
-	// names.
+	// TransferBlockSize is no longer filled: the Manager names a node's
+	// transfer options, and beside a Manager the provider refuses it.
 	//
 	// Deprecated: the Manager's BDXTransferOptionsFor names a node's
 	// transfer options; removable in v0.26.0.
@@ -67,23 +70,18 @@ type ProviderConfig struct {
 
 // ProviderConfig is the provider configuration that serves the manager's
 // updates. The controller builds its provider from it
-// (controller/ota_provider.go newOTAProvider).
+// (controller/ota_provider.go newOTAProvider). It fills Manager and none
+// of the deprecated hooks, which the provider refuses beside a Manager:
+// the manager takes the statuses, judges a restart query and names the
+// transfer options through it.
 func (m *Manager) ProviderConfig() ProviderConfig {
 	return ProviderConfig{
 		ImageSource:     providerPorts{m},
 		Consent:         providerPorts{m},
 		Manager:         providerPorts{m},
-		ApplyPolicy:     applyPolicyPort{m},
+		ApplyDelay:      m.cfg.ApplyDelay,
 		BDXMaxBlockSize: m.cfg.MaxBDXBlockSize,
-		OnStatusChange:  m.providerStatus,
-		RebootQuery:     func(p mattercore.OTAPeer, sessionID uint16) { m.SuppressNextStartUp(peerOf(p), sessionID) },
-		TransferBlockSize: func(p mattercore.OTAPeer) uint16 {
-			if b := m.TransferOptionsFor(peerOf(p)).MaxBlockSize; b != nil {
-				return *b
-			}
-			return 0
-		},
-		Commands: m.providerCommands(),
+		Commands:        m.providerCommands(),
 	}
 }
 
@@ -283,14 +281,28 @@ func (s providerPorts) AttemptFor(p mattercore.OTAPeer, token []byte) *mattercor
 
 // ApplyUpdate implements mattercore.OTAUpdateManager: the apply table, and
 // the status it records — Applying with the delay, or Cancelled — moves
-// the queued update linked to the attempt.
+// the queued update linked to the attempt. A scripted ApplyUpdateRequest
+// (script.go) arrives in ctx: a scripted Discontinue refuses as the table
+// refuses an update without its apply right, the attempt of the token
+// Cancelled; a scripted Proceed's delay replaces the provider's.
 //
 // Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1921-1943 at b25ed960
 // (applyUpdate).
-func (s providerPorts) ApplyUpdate(_ context.Context, p mattercore.OTAPeer, token []byte, newVersion uint32, applyDelay time.Duration) bool {
+func (s providerPorts) ApplyUpdate(ctx context.Context, p mattercore.OTAPeer, token []byte, newVersion uint32, applyDelay time.Duration) bool {
 	m := s.m
 	m.mu.Lock()
 	defer m.unlock()
+	if o, ok := applyOverrideFrom(ctx); ok {
+		if o.refuse {
+			if a := m.attempts.Find(p, token); a != nil {
+				m.reportAttemptStatusLocked(a, mattercore.OTAUpdateCancelled, 0) //nolint:contextcheck // the queue's work runs on the manager's lifetime
+			}
+			return false
+		}
+		if o.set {
+			applyDelay = wholeSeconds(o.delay)
+		}
+	}
 	a, allowed := m.attempts.ApplyUpdate(p, token, newVersion)
 	switch {
 	case allowed:
@@ -343,48 +355,4 @@ func (s providerPorts) MatterHeldFabrics() []uint8 {
 	s.m.mu.Lock()
 	defer s.m.unlock()
 	return s.m.attempts.Fabrics()
-}
-
-// applyPolicyPort is the manager as the provider's deprecated
-// mattercore.OTAApplyPolicy: the apply delay and the scripted refusal.
-type applyPolicyPort struct{ m *Manager }
-
-// ApplyUpdate implements mattercore.OTAApplyPolicy: Proceed after the
-// apply delay, in whole seconds rounded up and at most a day
-// (OtaSoftwareUpdateProviderServer.ts:346-351 at b25ed960), which the
-// manager's apply table then decides; a scripted ApplyUpdateRequest
-// (script.go) replaces the delay, or refuses as the table refuses an
-// update without its apply right.
-func (s applyPolicyPort) ApplyUpdate(ctx context.Context, p mattercore.OTAPeer, _ provdef.ApplyUpdateRequestRequest) (provdef.ApplyUpdateActionEnum, time.Duration, error) {
-	configured := s.m.cfg.ApplyDelay
-	if o, ok := applyOverrideFrom(ctx); ok {
-		if o.refuse {
-			return provdef.ApplyUpdateActionDiscontinue, applyRefusalDelay, nil
-		}
-		if o.set {
-			configured = o.delay
-		}
-	}
-	delay := wholeSeconds(configured)
-	s.m.mu.Lock()
-	s.m.applyDelays[peerOf(p)] = delay
-	s.m.mu.Unlock()
-	return provdef.ApplyUpdateActionProceed, delay, nil
-}
-
-// providerStatus takes a status of the deprecated
-// [ProviderConfig].OnStatusChange.
-func (m *Manager) providerStatus(p mattercore.OTAPeer, status mattercore.OTAUpdateStatus, version uint32) {
-	peer := peerOf(p)
-	var delay time.Duration
-	if status == mattercore.OTAUpdateApplying {
-		m.mu.Lock()
-		delay = m.applyDelays[peer]
-		m.mu.Unlock()
-	}
-	var v *uint32
-	if version != 0 {
-		v = &version
-	}
-	m.OnStatusChange(peer, status, v, delay)
 }

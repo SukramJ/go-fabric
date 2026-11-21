@@ -168,6 +168,13 @@ func (m *Manager) scriptedApplyUpdate(ctx context.Context, op mattercore.OTAPeer
 		if resp, err = own(ctx); err != nil {
 			return resp, err
 		}
+		// The provider answers with its own apply delay; a scripted
+		// Proceed's delay, which the manager recorded with Applying,
+		// replaces it (the scripted state.applyDelay, :596-614).
+		if scripted && script.Action == provdef.ApplyUpdateActionProceed && script.DelayedActionTime != nil &&
+			resp.Action == provdef.ApplyUpdateActionProceed {
+			resp.DelayedActionTime = min(*script.DelayedActionTime, uint32(maxApplyDelay/time.Second))
+		}
 	}
 	m.record(ProviderExchange{Peer: p, At: at, ApplyUpdate: &ApplyUpdateExchange{Request: req, Response: resp}})
 	return resp, nil
@@ -185,8 +192,8 @@ func (m *Manager) observedNotifyApplied(ctx context.Context, op mattercore.OTAPe
 	return nil
 }
 
-// applyOverride is what a scripted ApplyUpdateRequest asks of the apply
-// policy the provider consults ([providerPorts.ApplyUpdate]): a delay in
+// applyOverride is what a scripted ApplyUpdateRequest asks of the
+// manager's apply ([providerPorts.ApplyUpdate]): a delay in
 // place of [Config].ApplyDelay (the scripted Proceed's state.applyDelay,
 // InProcessControllerAdapter.ts:596-614), or the refusal the provider
 // gives an update without consent (the scripted Discontinue, :590-594).
@@ -202,10 +209,6 @@ func applyOverrideFrom(ctx context.Context) (applyOverride, bool) {
 	o, ok := ctx.Value(applyOverrideKey{}).(applyOverride)
 	return o, ok
 }
-
-// applyRefusalDelay is the delay the provider's own refusal names: two
-// minutes (OtaSoftwareUpdateProviderServer.ts:354-357).
-const applyRefusalDelay = 2 * time.Minute
 
 // wholeSeconds is a delay as the response carries it: whole seconds rounded
 // up, at most a day (OtaSoftwareUpdateProviderServer.ts:348-351).

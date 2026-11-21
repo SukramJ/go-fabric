@@ -377,10 +377,19 @@ func TestOTAProvider_DelayedActionTime(t *testing.T) {
 		delay time.Duration
 		want  uint32
 	}{{0, 0}, {1200 * time.Millisecond, 2}, {90 * time.Second, 90}, {48 * time.Hour, 86_400}} {
-		f := newOTAFixture(t, func(c *OTAProviderConfig) { c.ApplyPolicy = fixedPolicy{provdef.ApplyUpdateActionProceed, tc.delay} })
-		r := f.query(t, 7, bdxQuery())
-		if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed || a.DelayedActionTime != tc.want {
-			t.Errorf("delay %v: %+v, want %d", tc.delay, a, tc.want)
+		for via, set := range map[string]func(*OTAProviderConfig){
+			"ApplyDelay": func(c *OTAProviderConfig) { c.ApplyDelay = tc.delay },
+			// The deprecated policy's Proceed delay replaces ApplyDelay.
+			"ApplyPolicy": func(c *OTAProviderConfig) {
+				c.ApplyDelay = time.Minute
+				c.ApplyPolicy = fixedPolicy{provdef.ApplyUpdateActionProceed, tc.delay}
+			},
+		} {
+			f := newOTAFixture(t, set)
+			r := f.query(t, 7, bdxQuery())
+			if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed || a.DelayedActionTime != tc.want {
+				t.Errorf("%s %v: %+v, want %d", via, tc.delay, a, tc.want)
+			}
 		}
 	}
 }

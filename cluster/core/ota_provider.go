@@ -120,13 +120,15 @@ type OTAConsent interface {
 // waits before it applies (matter.js State.applyDelay, OP:426-435), or
 // AwaitNextAction or Discontinue with the delay before it asks again
 // (Matter Core §11.20.6.5.4). Proceed leaves the decision to the table,
-// which may still refuse; any other action answers at once, and
-// Discontinue cancels the update the token names. A nil policy is matter.js's
-// default: the table decides, and an allowed apply proceeds at once.
+// which may still refuse, and its delay replaces [OTAProviderConfig].ApplyDelay;
+// any other action answers at once, and Discontinue cancels the update the
+// token names. A nil policy is matter.js's default: the table decides,
+// after ApplyDelay.
 //
 // Deprecated: matter.js decides an apply in its SoftwareUpdateManager
-// only; a host decides it through [OTAProviderConfig].Manager. Removable
-// in v0.26.0.
+// only, after the provider's State.applyDelay: set
+// [OTAProviderConfig].ApplyDelay for the delay, and decide the apply
+// through [OTAProviderConfig].Manager. Removable in v0.26.0.
 type OTAApplyPolicy interface {
 	ApplyUpdate(ctx context.Context, peer OTAPeer, req provdef.ApplyUpdateRequestRequest) (provdef.ApplyUpdateActionEnum, time.Duration, error)
 }
@@ -181,11 +183,20 @@ type OTAProviderConfig struct {
 	// (OnStatusChange, RebootQuery, TransferBlockSize, SessionActivity):
 	// [NewOTAProvider] refuses the two together.
 	Manager OTAUpdateManager
+	// ApplyDelay is how long a requestor allowed to apply an update waits
+	// before it applies: the DelayedActionTime of the Proceed answer and
+	// the apply delay the manager records with Applying, in whole seconds
+	// rounded up and at most a day. Zero applies at once.
+	//
+	// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:426-435 at b25ed960
+	// (State.applyDelay, default 0; rounded at :346-351).
+	ApplyDelay time.Duration
 	// ApplyPolicy decides an apply before the manager's apply table; nil
 	// leaves it to the table.
 	//
-	// Deprecated: the apply is the Manager's to decide (matter.js's
-	// SoftwareUpdateManager.applyUpdate); removable in v0.26.0.
+	// Deprecated: the delay is ApplyDelay and the apply is the Manager's
+	// to decide (matter.js's SoftwareUpdateManager.applyUpdate); removable
+	// in v0.26.0.
 	ApplyPolicy OTAApplyPolicy
 	// DelegateConsentToRequestor lets the default manager delegate the
 	// consent of an image that needs one to a requestor whose QueryImage
@@ -595,7 +606,7 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 			p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
 		}
 	}
-	delay := time.Duration(0)
+	delay := p.cfg.ApplyDelay
 	if p.cfg.ApplyPolicy != nil {
 		resp, answered, d, err := p.applyPolicy(ctx, peer, req, attempt)
 		if answered || err != nil {
@@ -612,7 +623,8 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 }
 
 // applyPolicy asks the deprecated [OTAApplyPolicy] before the manager's
-// table: Proceed hands the decision to the table with the policy's delay;
+// table: Proceed hands the decision to the table with the policy's delay,
+// in place of ApplyDelay;
 // any other action answers at once — Discontinue cancels the update the
 // token names, as the table's own refusal does — so the policy only adds
 // a refusal. The policy sees version 0 as the token's version.

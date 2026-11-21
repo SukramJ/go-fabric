@@ -219,7 +219,7 @@ func TestParityMatterJS_OTAProviderApplyTable(t *testing.T) {
 
 // TestParityMatterJS_OTAProviderApplyDelay ports the wire half of OtaTest.ts
 // :2007-2027 at b25ed960: what a Proceed sends under the provider's apply
-// delay (here the ApplyPolicy's, a deprecated port). The
+// delay (OTAProviderConfig.ApplyDelay, State.applyDelay). The
 // RebootResubscribeArmer half is SoftwareUpdateManager's (the register
 // names it).
 func TestParityMatterJS_OTAProviderApplyDelay(t *testing.T) {
@@ -235,7 +235,7 @@ func TestParityMatterJS_OTAProviderApplyDelay(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f := newOTAFixture(t, func(c *OTAProviderConfig) { c.ApplyPolicy = fixedPolicy{provdef.ApplyUpdateActionProceed, tc.delay} })
+			f := newOTAFixture(t, func(c *OTAProviderConfig) { c.ApplyDelay = tc.delay })
 			r := f.query(t, 7, bdxQuery())
 			if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed || a.DelayedActionTime != tc.want {
 				t.Errorf("ApplyUpdateResponse %+v, want Proceed %d", a, tc.want)
@@ -250,7 +250,7 @@ func TestParityMatterJS_OTAProviderApplyDelay(t *testing.T) {
 	// waits it out (:2028, OtaUpdateAttempts.ts:107-110).
 	t.Run("does not count an update as stalled while the device waits out its apply delay", func(t *testing.T) {
 		t.Parallel()
-		f := newOTAFixture(t, func(c *OTAProviderConfig) { c.ApplyPolicy = fixedPolicy{provdef.ApplyUpdateActionProceed, time.Hour} })
+		f := newOTAFixture(t, func(c *OTAProviderConfig) { c.ApplyDelay = time.Hour })
 		r := f.query(t, 7, bdxQuery())
 		f.apply(t, *r.UpdateToken, 2)
 		a := f.p.mgr.AttemptFor(otaTestPeer, *r.UpdateToken)

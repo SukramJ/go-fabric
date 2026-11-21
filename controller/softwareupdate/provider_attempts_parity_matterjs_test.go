@@ -50,9 +50,13 @@ type attemptRig struct {
 	bdx *bdx.Responder
 }
 
-func newAttemptRig(t *testing.T) *attemptRig {
+func newAttemptRig(t *testing.T, edit ...func(*Config)) *attemptRig {
 	t.Helper()
-	r := &attemptRig{managerRig: newManagerRig(t, nil), bdx: bdx.NewResponder(nil)}
+	r := &attemptRig{managerRig: newManagerRig(t, func(c *Config) {
+		for _, e := range edit {
+			e(c)
+		}
+	}), bdx: bdx.NewResponder(nil)}
 	r.bdx.SetClock(r.clock)
 	r.p = providerOf(t, r.managerRig, attemptSource{img: bytes.Repeat([]byte{0x42}, 3000)}, r.bdx)
 	return r
@@ -207,8 +211,7 @@ func TestManagerAdmissionFailsAnAppliedUpdateParity(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			r := newAttemptRig(t)
-			r.m.cfg.ApplyDelay = time.Hour
+			r := newAttemptRig(t, func(c *Config) { c.ApplyDelay = time.Hour })
 			r.queue(2, nil)
 			q := r.query(t, 7, 1)
 			if got := r.apply(t, *q.UpdateToken, 2); got != provdef.ApplyUpdateActionProceed {

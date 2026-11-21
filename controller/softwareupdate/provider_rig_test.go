@@ -17,7 +17,7 @@ func providerOf(t *testing.T, r *managerRig, src mattercore.OTAImageSource, resp
 	t.Helper()
 	pc := r.m.ProviderConfig()
 	p, err := mattercore.NewOTAProvider(mattercore.OTAProviderConfig{
-		ImageSource: src, Consent: pc.Consent, Manager: pc.Manager, ApplyPolicy: pc.ApplyPolicy, //nolint:staticcheck // the controller's apply delay, as newOTAProvider passes it
+		ImageSource: src, Consent: pc.Consent, Manager: pc.Manager, ApplyDelay: pc.ApplyDelay,
 		BDX: responder, NodeID: func(uint8) (uint64, bool) { return 1, true },
 		Clock: r.clock,
 	})

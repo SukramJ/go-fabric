@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -41,11 +42,16 @@ type OTAProviderConfig struct {
 	// matter.js's default, Consent is asked. With a Manager it is refused
 	// at Start: the manager decides the delegation.
 	DelegateConsentToRequestor bool
+	// ApplyDelay is how long a requestor allowed to apply an update waits
+	// before it applies, in whole seconds rounded up and at most a day
+	// (mattercore.OTAProviderConfig.ApplyDelay, matter.js
+	// State.applyDelay); zero applies at once.
+	ApplyDelay time.Duration
 	// ApplyPolicy decides an apply before the manager's apply table; nil
 	// leaves it to the table.
 	//
-	// Deprecated: the apply is the Manager's to decide; removable in
-	// v0.26.0.
+	// Deprecated: the delay is ApplyDelay and the apply is the Manager's
+	// to decide; removable in v0.26.0.
 	ApplyPolicy OTAApplyPolicy
 	// BDXMaxBlockSize, when set, caps the block size of the image
 	// transfers.
@@ -119,7 +125,7 @@ func (n *Node) buildOTAProvider() error {
 		n.bdx.SetAdditionalMrpDelay(d)
 	}
 	pcfg := mattercore.OTAProviderConfig{
-		ImageSource: cfg.ImageSource, Consent: cfg.Consent, Manager: cfg.Manager,
+		ImageSource: cfg.ImageSource, Consent: cfg.Consent, Manager: cfg.Manager, ApplyDelay: cfg.ApplyDelay,
 		ApplyPolicy: cfg.ApplyPolicy, //nolint:staticcheck // the deprecated policy is honoured for its window
 		BDX:         n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize,
 		DelegateConsentToRequestor: cfg.DelegateConsentToRequestor,
