@@ -144,7 +144,8 @@ type Config struct {
 	// knows its user's formats states them. A configuration the server
 	// refuses fails [New] with [mattercore.ErrLocalizationConfig]. A value
 	// a controller wrote and the node stored is restored over the start,
-	// as for Locales.
+	// as for Locales; a stored calendar the list no longer holds is not,
+	// and the start stands, with a warning.
 	TimeFormat *TimeFormatConfig
 	// Groups, when set, is the group state the node runs on, for a host
 	// whose own assembler ([Config].Snapshotter) mounts the stack's Groups and

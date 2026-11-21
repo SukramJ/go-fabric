@@ -156,8 +156,9 @@ func TestTimeFormatConfig(t *testing.T) {
 // :262-279 at b25ed960), which needs a configured calendar list: the
 // first run lists [Gregorian, Buddhist] and a controller writes Buddhist;
 // the second lists [Chinese, Coptic] and starts at Chinese. matter.js
-// takes the list's first because neither the stored nor its detected
-// Gregorian is listed (TimeFormatLocalizationServer.ts:34-41); here an
+// takes the list's first because neither the stored nor the detected
+// calendar — Gregorian, fixed by the test's DetectingServer (:21-29) — is
+// listed (TimeFormatLocalizationServer.ts:34-41); here an
 // unset ActiveCalendarType starts at the list's first and the node's
 // restore refuses the stored Buddhist the list lacks (node/nonvolatile.go
 // restore), with one warning.

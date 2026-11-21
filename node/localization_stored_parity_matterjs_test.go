@@ -242,13 +242,14 @@ func TestUnitLocalizationStoredParityMatterJS(t *testing.T) {
 // (packages/node/test/behaviors/time-format-localization/TimeFormatLocalizationServerTest.ts
 // :241-260 at b25ed960): Buddhist stored, the list [Gregorian, Chinese],
 // the start the detected Gregorian (TimeFormatLocalizationServer.ts:34-35).
-// The node's list is [Gregorian] always (node/root.go buildRootOptional),
-// so Buddhist is put into the store under the calendar's key: the slot of
+// The case runs on the node's start without Config.TimeFormat, whose
+// list is [Gregorian] (node/config.go TimeFormatConfig.core), so
+// Buddhist is put into the store under the calendar's key: the slot of
 // the first run's HourFormat write with the attribute id
 // ActiveCalendarType, in nonVolatileKey's form ("%s.%04x",
-// node/nonvolatile.go). Not ported: :262-279, the list's first when
-// neither the stored nor the detected calendar is listed — the node's
-// list always holds its start calendar.
+// node/nonvolatile.go). :262-279, the list's first when neither the
+// stored nor the detected calendar is listed, is
+// TestTimeFormatConfigStoredParityMatterJS (node/time_format_config_test.go).
 func TestTimeFormatLocalizationStoredParityMatterJS(t *testing.T) {
 	t.Parallel()
 
