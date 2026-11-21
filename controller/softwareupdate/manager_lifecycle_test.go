@@ -160,13 +160,16 @@ func TestManagerForgetsNodesThatLeft(t *testing.T) {
 
 // TestManagerSettersReadUnderTheLock (review II, R2-P6-conc-1913) is the
 // standing guard of the fields SetProvider and SetBDX write after New: no
-// function of the package but the setters and their two accessors reads
+// function of the package but the setters, their two accessors and the
+// queue run's locked read (bdxSessionForLocked) reads
 // them from the manager's Config, and nothing copies the whole Config
 // (which reads them too). A new reader goes through provider() or
 // bdxResponder().
 func TestManagerSettersReadUnderTheLock(t *testing.T) {
 	t.Parallel()
-	allowed := map[string]bool{"SetProvider": true, "SetBDX": true, "provider": true, "bdxResponder": true}
+	// bdxSessionForLocked reads the responder with m.mu held: the queue
+	// run calls it under the lock it would otherwise take again.
+	allowed := map[string]bool{"SetProvider": true, "SetBDX": true, "provider": true, "bdxResponder": true, "bdxSessionForLocked": true}
 	fields := map[string]bool{"ProviderNodeID": true, "ProviderEndpoint": true, "BDX": true}
 	files, err := filepath.Glob("*.go")
 	if err != nil {
