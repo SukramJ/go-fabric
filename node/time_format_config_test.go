@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -21,7 +22,7 @@ import (
 
 // tflRead reads one attribute of the root's TimeFormatLocalization as a
 // controller does: its status and, on success, the value formatted.
-func tflRead(t *testing.T, n *node.Node, attr uint32) (im.StatusCode, string) {
+func tflRead(t *testing.T, n *node.Node, attr uint32) (status im.StatusCode, value string) {
 	t.Helper()
 	res := endpoint.NewTopologyDispatcher(n.Bridge().Topology()).Read(t.Context(), attrPath(0, tfldef.ClusterID, attr))
 	if len(res) != 1 {
@@ -36,7 +37,7 @@ func tflRead(t *testing.T, n *node.Node, attr uint32) (im.StatusCode, string) {
 // enumString formats enum values as a read of them is formatted.
 func enumString[T ~uint8](v ...T) string {
 	if len(v) == 1 {
-		return fmt.Sprint(uint64(v[0]))
+		return strconv.FormatUint(uint64(v[0]), 10)
 	}
 	out := make([]uint64, len(v))
 	for i, e := range v {
@@ -101,7 +102,7 @@ func TestTimeFormatConfig(t *testing.T) {
 			if _, got := tflRead(t, n, tfldef.AttrHourFormat); got != enumString(tc.hour) {
 				t.Errorf("HourFormat %s, want %s", got, enumString(tc.hour))
 			}
-			if _, got := tflRead(t, n, 0xFFFC); got != fmt.Sprint(tc.features) {
+			if _, got := tflRead(t, n, 0xFFFC); got != strconv.FormatUint(uint64(tc.features), 10) {
 				t.Errorf("FeatureMap %s, want %d", got, tc.features)
 			}
 			if tc.noCalendarAttribute {
