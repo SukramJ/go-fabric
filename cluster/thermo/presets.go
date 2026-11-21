@@ -561,7 +561,7 @@ func presetRequest(fields any) (tdef.SetActivePresetRequestRequest, error) {
 }
 
 // handleSetActivePresetRequest is matter.js setActivePresetRequest
-// (ThermostatServer.ts:281-316): a handle that names no stored preset is
+// (ThermostatServer.ts:551-553 at b25ed960): a handle that names no stored preset is
 // INVALID_COMMAND; otherwise the handle becomes the active one (null
 // clears it) and — beyond the specification, as matter.js does — the
 // setpoints in effect take the preset's, each clamped to its limits. The

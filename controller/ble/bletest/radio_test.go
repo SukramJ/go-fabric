@@ -245,7 +245,7 @@ func TestRadioAcceptsOneAtATime(t *testing.T) {
 
 // TestRadioHoldsAConnectUntilServed: a central that connects after
 // RegisterService returned and before Serve runs is held — bounded by its
-// context — and accepted once Serve runs, as contract.GATTPeripheral
+// context — and accepted once Serve runs, as contract.GATTService.Serve
 // obliges (the node registers, advertises and serves on another
 // goroutine, bridge/ble.go); a radio with no registration, or whose
 // service's Serve returned, refuses at once (review II P3b-R, candidate 4).

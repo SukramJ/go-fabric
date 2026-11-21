@@ -782,7 +782,9 @@ func (b *Bridge) gattPeripheral() contract.GATTPeripheral {
 // legacyGATT adapts a deprecated [contract.BLEPeripheral] to
 // [contract.GATTPeripheral]: its Serve registers the service and serves it
 // in one call, so the registration is reported by Serve, on its own
-// goroutine, as before — RegisterService answers nil at once.
+// goroutine, as before — RegisterService answers nil at once. A central
+// that connects before that Serve registered the service is therefore not
+// held ([contract.GATTService.Serve]); the deprecated port cannot.
 type legacyGATT struct{ p contract.BLEPeripheral } //nolint:staticcheck // the adapter of the deprecated port
 
 func (l legacyGATT) Advertise(ctx context.Context, adv contract.BLEAdvertisement) error {

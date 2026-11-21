@@ -244,7 +244,7 @@ func (r *Radio) wakeLocked() {
 
 // awaitServing returns once the node serves the Matter GATT service: at
 // once while it serves, and — while a registered service's Serve has not
-// run yet — when Serve runs, bounded by ctx (contract.GATTPeripheral: a
+// run yet — when Serve runs, bounded by ctx (contract.GATTService.Serve: a
 // central connecting after RegisterService returned and before Serve runs
 // is held and accepted once Serve runs). A radio with no registration
 // returns [ErrNoService].
