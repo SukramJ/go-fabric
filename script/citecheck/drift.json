@@ -206,7 +206,7 @@
   },
   {
     "file": "bridge/commissioning_window.go",
-    "line": 1142,
+    "line": 1150,
     "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:524",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "randomBytes",

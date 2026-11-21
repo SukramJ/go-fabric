@@ -209,8 +209,9 @@ const citecheckDriftRatchet = 422
 // D 3). Wave P3c relabelled 27 more (units A, E, F and the register pass).
 // Wave P4-S relabelled 12 more at b25ed960: bridge/conn.go's eight
 // ExchangeManager.ts citations and four in controller/attestation
-// (validate.go 3, policy.go 1).
-const citecheckOffPinRatchet = 2712
+// (validate.go 3, policy.go 1). Wave P5-C relabelled 3 more at b25ed960
+// (bridge/securechannel.go's CloseSession sender).
+const citecheckOffPinRatchet = 2709
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

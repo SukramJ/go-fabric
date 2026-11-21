@@ -145,12 +145,12 @@ func (b *Bridge) wireFailSafeExpiry(servers []contract.ClusterServer) {
 // packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
 // at b25ed960 (revokeCommissioning, "Step 1: Regardless of window state —
 // terminate PASE sessions and expire PASE-held fail-safe":
-// `SessionManager.getPaseSession()` → `paseSession.initiateClose()`), whose
-// graceful close is observed by
-// packages/protocol/src/protocol/ExchangeManager.ts:757-768 at b25ed960
+// `SessionManager.getPaseSession()` → `paseSession.initiateClose()`).
+// The graceful close's event is observed by
+// packages/protocol/src/protocol/ExchangeManager.ts:757-768 at b25ed960 (gracefulClose)
 // and answered with a CloseSession on the closing session by
-// packages/protocol/src/protocol/ExchangeManager.ts:790-800 at b25ed960
-// (#sendCloseSession) (F-b25ed960-56 (ii)).
+// packages/protocol/src/protocol/ExchangeManager.ts:790-800 at b25ed960 (#sendCloseSession)
+// (F-b25ed960-56 (ii)).
 func (b *Bridge) closePASESessionsOnRevoke(hostClose func()) {
 	closeNow, ids := b.paseSessionsCloser()
 	b.notifySessionsClosing(ids)

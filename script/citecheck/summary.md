@@ -6,16 +6,16 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 
 | Metric | Count |
 |---|---|
-| Citations | 11364 |
-| Go files citing | 1851 |
-| Resolved: exact path from a tree root (packages/, support/, examples/) | 3255 |
+| Citations | 11370 |
+| Go files citing | 1852 |
+| Resolved: exact path from a tree root (packages/, support/, examples/) | 3260 |
 | Resolved: unique suffix | 249 |
-| Resolved: unique basename | 7860 |
-| Checked at their own `at <sha>`, the pin | 2070 |
-| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 2712 |
+| Resolved: unique basename | 7861 |
+| Checked at their own `at <sha>`, the pin | 2080 |
+| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 2709 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 678 |
-| Drift-checked (the sentence names a name the file contains) | 5049 |
-| Hard-checked only | 6315 |
+| Drift-checked (the sentence names a name the file contains) | 5054 |
+| Hard-checked only | 6316 |
 | **Hard errors** | 0 |
 | **Drift** | 422 |
 
@@ -29,7 +29,7 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 | `862ad75f` | 3 | 121 |
 | `9892fa39` | 2 | 0 |
 | `d87d1de4` | 2 | 0 |
-| `db021da0` | 2590 | 181 |
+| `db021da0` | 2587 | 181 |
 | `e812bd07` | 1 | 0 |
 
 ## Counted, not ratcheted
