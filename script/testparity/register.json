@@ -2217,7 +2217,7 @@
       "path": "packages/node/test/behavior/cluster/BehaviorAccessorsTypingTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "TypeScript type-level checks of the commandsOf/stateOf/setStateOf accessors; nothing runs on the wire. The one command a Go host reaches this way, SetActivePresetRequest, is thermostatdef.Host.ActivatePreset, held by device's TestThermostatHostActivatePreset.",
+      "reason": "TypeScript type-level checks of the commandsOf/stateOf/setStateOf accessors; nothing runs on the wire. Go's host-side counterpart of the setActivePresetRequest call it type-checks (:112-113 at b25ed960) is thermostatdef.Host.ActivatePreset, held by device's TestThermostatHostActivatePreset.",
       "snapshotSha": "e0f228c7dde5266e922d75eabbc72766d958aae4"
     },
     {
