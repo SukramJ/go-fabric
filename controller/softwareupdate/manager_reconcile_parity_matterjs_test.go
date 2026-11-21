@@ -165,8 +165,11 @@ func TestManagerConsentParity(t *testing.T) {
 		t.Parallel()
 		r := newManagerRig(t, nil)
 		r.setNode(true, nil)
-		if _, err := r.m.AddUpdateConsent(context.Background(), testPeer, testTarget(2)); err == nil {
-			t.Fatal("AddUpdateConsent for a gone node: nil error")
+		if _, err := r.m.AddUpdateConsent(context.Background(), testPeer, testTarget(2)); !errors.Is(err, ErrNoNode) {
+			t.Fatalf("AddUpdateConsent for a gone node: %v, want ErrNoNode", err)
+		}
+		if err := r.m.ForceUpdate(context.Background(), testPeer, testTarget(2)); !errors.Is(err, ErrNoNode) {
+			t.Fatalf("ForceUpdate for a gone node: %v, want ErrNoNode", err)
 		}
 		if r.m.HasConsent(testPeer, 0) {
 			t.Fatal("a consent for a gone node was stored")
@@ -185,8 +188,8 @@ func TestManagerConsentParity(t *testing.T) {
 		t.Parallel()
 		r := newManagerRig(t, nil)
 		r.setNode(false, func(s *basicinfo.State) { s.SoftwareVersion = 2 })
-		if err := r.m.ForceUpdate(context.Background(), testPeer, testTarget(2)); err == nil {
-			t.Fatal("ForceUpdate below the running version: nil error")
+		if err := r.m.ForceUpdate(context.Background(), testPeer, testTarget(2)); !errors.Is(err, ErrNotApplicable) {
+			t.Fatalf("ForceUpdate below the running version: %v, want ErrNotApplicable", err)
 		}
 		if r.m.HasConsent(testPeer, 0) {
 			t.Fatal("ForceUpdate stored a consent")
