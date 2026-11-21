@@ -216,8 +216,9 @@ const citecheckDriftRatchet = 420
 // (bridge/securechannel.go's CloseSession sender), its fix round 8 more
 // (securechannel.go #deleteSession, bridge.go's two ExchangeManager.ts
 // cites, the CloseSession tests, commissioning_window.go's
-// PaseSessionCloser).
-const citecheckOffPinRatchet = 2701
+// PaseSessionCloser). Wave P5-B relabelled 3 more (controller/client
+// fabricops.go, client/interaction/interaction.go, controller/client/node.go).
+const citecheckOffPinRatchet = 2698
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

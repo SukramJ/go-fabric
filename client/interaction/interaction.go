@@ -117,6 +117,14 @@ type Interaction struct {
 	nextCommandRef uint16
 	// flushing counts the lane flushes running (a test seam's reading).
 	flushing atomic.Int32
+
+	// estMu guards established: #established, the subscriptions this
+	// interaction established — each inner peer subscription and each
+	// returned one — removed again once it closed
+	// (packages/protocol/src/action/client/ClientInteraction.ts:248, :1121,
+	// :1129, :1169, :1190 at b25ed960).
+	estMu       sync.Mutex
+	established map[*Subscription]struct{}
 }
 
 // ErrClosed is the reason of [Interaction.Close] without one — matter.js
@@ -199,12 +207,14 @@ func (c *Interaction) MaximumPeerResponseTime(ept time.Duration, includeSending 
 	return c.provider.MaximumPeerResponseTime(ept, includeSending)
 }
 
-// Close closes the interaction — ClientInteraction.close
-// (ClientInteraction.ts:264-297 at db021da0): the subscriptions of its
-// peer close so none outlives it (a sustained one would retry forever),
-// every running exchange is aborted with reason, and Close returns once
-// they have ended. Later interactions fail with reason; nil is
-// [ErrClosed]. Idempotent; the first reason stays.
+// Close closes the interaction: the subscriptions it established close,
+// so none outlives it (a sustained one would retry forever) — those other
+// interactions established to the same peer stay open —, every running
+// exchange is aborted with reason, and Close returns once they have
+// ended. Later interactions fail with reason; nil is [ErrClosed].
+// Idempotent; the first reason stays. Mirrors matter.js
+// packages/protocol/src/action/client/ClientInteraction.ts:285-315 at
+// b25ed960 (ClientInteraction.close).
 func (c *Interaction) Close(reason error) {
 	if reason == nil {
 		reason = ErrClosed
@@ -215,7 +225,7 @@ func (c *Interaction) Close(reason error) {
 	}
 	reason = c.closed
 	c.closeMu.Unlock()
-	c.CloseSubscriptions()
+	c.closeEstablished()
 	// The queued commands are rejected before the abort, so an in-flight
 	// batch cancels instead of running to completion (ClientInteraction.ts:284-295).
 	c.closeBatches(reason)
@@ -223,9 +233,63 @@ func (c *Interaction) Close(reason error) {
 	c.inflight.Wait()
 }
 
-// CloseSubscriptions closes every subscription of the interaction's peer
-// — the first step of Close (ClientInteraction.ts:270-282), which a
-// disabled node runs alone (ClientNode.disable, ClientNode.ts:239-253).
+// register adds s to the subscriptions the interaction established and
+// then registers it with add; s leaves the set when it closes. The check
+// of the close and the addition run under closeMu, so a subscription
+// either is in the set Close snapshots or sees the interaction closed:
+// then it is closed once registered and register returns the close
+// reason, so no subscription outlives the interaction
+// (ClientInteraction.ts:1121, :1129, :1169, :1190 at b25ed960). s is not
+// yet registered, so no other goroutine closes it before add.
+func (c *Interaction) register(s *Subscription, add func(*Subscription)) error {
+	registered := s.closed
+	s.closed = func() {
+		if registered != nil {
+			registered()
+		}
+		c.estMu.Lock()
+		delete(c.established, s)
+		c.estMu.Unlock()
+	}
+	c.closeMu.Lock()
+	closed := c.closed
+	if closed == nil {
+		c.estMu.Lock()
+		if c.established == nil {
+			c.established = map[*Subscription]struct{}{}
+		}
+		c.established[s] = struct{}{}
+		c.estMu.Unlock()
+	}
+	c.closeMu.Unlock()
+	add(s)
+	if closed != nil {
+		s.Close()
+		return closed
+	}
+	return nil
+}
+
+// closeEstablished closes the subscriptions the interaction established —
+// the first step of Close (ClientInteraction.ts:293-298 at b25ed960).
+func (c *Interaction) closeEstablished() {
+	c.estMu.Lock()
+	subs := make([]*Subscription, 0, len(c.established))
+	for s := range c.established {
+		subs = append(subs, s)
+	}
+	c.estMu.Unlock()
+	for _, s := range subs {
+		s.Close()
+	}
+}
+
+// CloseSubscriptions closes every active subscription of the
+// interaction's peer in the registry, whichever interaction established
+// it — what a disabled node runs for its subscriptions (ClientNode.disable
+// closes its node interaction, packages/node/src/node/ClientNode.ts:274-288,
+// :326-340 at b25ed960). Close closes only those the interaction
+// established.
 func (c *Interaction) CloseSubscriptions() {
 	if c.subs == nil || c.provider == nil {
 		return
