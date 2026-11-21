@@ -64,10 +64,11 @@ func TestInitiatedExchangeIgnoresPeerInitiatedCollision(t *testing.T) {
 			t.Errorf("node-opened exchange, %s: the hook took the message", c.name)
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	if msg, err := r.nodeEx.Receive(ctx); err == nil {
-		t.Errorf("the node-opened exchange received protocol %#x opcode %#x", msg.ProtocolID, msg.Opcode)
+	// The hooks deliver before they return: the queue is read directly. A
+	// Receive with a deadline would report the silent peer lost
+	// (initiatedSecureExchange.Receive) and end the control below.
+	if n := len(nodeEx.in); n != 0 {
+		t.Errorf("the node-opened exchange received %d messages", n)
 	}
 
 	// The control: each exchange takes the message of its own direction.

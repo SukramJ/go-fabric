@@ -408,6 +408,41 @@ func (b *Bridge) expediteDuplicateAck(sessionID, exchangeID uint16, initiator bo
 	tracker.ExpediteDue(sessionID, exchangeID, initiator)
 }
 
+// kickForLiveness runs the liveness kick for a duplicate the peer sent on
+// a secure exchange ([outboundReliableTracker.kickForLiveness]) and
+// reports whether it retransmitted the exchange's outstanding message. The
+// peer's active interval and threshold are the session's
+// ([Bridge.peerSchedule]), the defaults where it states none — as
+// matter.js reads session.parameters
+// (packages/protocol/src/protocol/MessageExchange.ts:615 at b25ed960).
+// MRP runs over UDP only, so the retransmission goes out through the
+// listener as the tracker's own do ([Bridge.tickOutboundReliable]).
+func (b *Bridge) kickForLiveness(hdr *message.Header, proto message.ProtocolHeader) bool {
+	if hdr.SessionID == 0 {
+		return false
+	}
+	b.mu.RLock()
+	listener := b.listener
+	tracker := b.outboundReliable
+	b.mu.RUnlock()
+	if listener == nil || tracker == nil {
+		return false
+	}
+	_, active, threshold, _, ok := b.peerSchedule(hdr.SessionID)
+	if !ok {
+		active = mrp.SessionActiveIntervalDefault
+	}
+	if !ok || threshold <= 0 {
+		threshold = mrp.SessionActiveThresholdDefault
+	}
+	kicked := tracker.kickForLiveness(hdr.SessionID, proto.ExchangeID, !proto.Initiator, hdr.MessageCounter, b.clk().Now(), active, threshold,
+		func(dest net.Addr, datagram []byte) error { return sendVia(listener, dest, datagram) })
+	if kicked {
+		b.count(contract.MetricMRPRetransmits)
+	}
+	return kicked
+}
+
 // armStatusResponseWait registers a per-exchange rendezvous channel
 // the caller can <-receive on to block until the peer's next
 // IM:StatusResponse arrives on this exchange (Matter §8.6.2). Used by
