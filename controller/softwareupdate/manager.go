@@ -762,6 +762,17 @@ func (m *Manager) presence() func(Peer) bool {
 	return func(p Peer) bool { return present[p] }
 }
 
+// peerPresent reports whether a node has p's address now, by one lookup
+// (#peerOf, SoftwareUpdateManager.ts:599-602 at b25ed960). Called without
+// m.mu.
+func (m *Manager) peerPresent(p Peer) bool {
+	if m.node != nil {
+		_, ok := m.node(p)
+		return ok
+	}
+	return m.nodeAt(p) != nil
+}
+
 // basicInformationOf is the node's cached Basic Information, false while
 // no node has the address or its cache holds none (#basicInformationOf,
 // SoftwareUpdateManager.ts:604-607 at b25ed960). Called without m.mu.
@@ -1343,7 +1354,7 @@ func (m *Manager) touchLocked(p Peer) {
 	m.touched[p] = m.seq
 }
 
-// readPresence reads the registry with m.mu released and returns, with
+// readPresenceLocked reads the registry with m.mu released and returns, with
 // m.mu held again, which peers are gone as of that read: no node has the
 // address, and no change gave the peer state after the read began. m.mu
 // is held on entry and on return.
@@ -2013,7 +2024,7 @@ func (m *Manager) checkProductForUpdates(ctx context.Context, vid, pid uint16, v
 		// (#checkProductForUpdates, its loop :902-935: a node removed during the check is
 		// skipped; a consent for the product queues its version; consent is
 		// asked when there is none or it is below the version found).
-		if !m.presence()(t.peer) {
+		if !m.peerPresent(t.peer) {
 			m.log.Debug("ota.manager.removed_during_check", slog.String("node", peerString(t.peer)))
 			continue
 		}
