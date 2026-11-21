@@ -202,7 +202,7 @@ const citecheckDriftRatchet = 432
 // one more (controller/commissioner/fabric.go's MaxLabelLength). Wave P3
 // relabelled 15 more at b25ed960 in the files its units touched (A 10, C 2,
 // D 3).
-const citecheckOffPinRatchet = 2780
+const citecheckOffPinRatchet = 2775
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

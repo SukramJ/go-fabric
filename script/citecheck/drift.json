@@ -3103,7 +3103,7 @@
   },
   {
     "file": "im/read.go",
-    "line": 541,
+    "line": 546,
     "citation": "packages/protocol/src/action/server/AttributeReadResponse.ts:238-274",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "identifier": "addConcrete",

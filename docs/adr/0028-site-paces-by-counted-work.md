@@ -99,10 +99,10 @@ work it has accepted and not finished.
   quiet by the process's goroutines, so two in parallel read each other's
   work as their own. `fabrictest` therefore runs such sites one test tree
   at a time across the process — the loopback slot
-  (`fabrictest/loopback_slot.go:12-24`), taken by `NewSite`
-  (`fabrictest/site.go:184`): a site of a test outside the holder's tree
-  waits until the holding test ends (`loopback_slot.go:49-51`, released in
-  its cleanup, `:56-61`). The node package's `holdSite` does the same for
+  (`fabrictest/loopback_slot.go`, `loopbackSlot`), taken by `NewSite`
+  (`fabrictest/site.go`): a site of a test outside the holder's tree
+  waits until the holding test ends (`holdLoopbackSlot`, which releases
+  the slot in the holder's cleanup). The node package's `holdSite` does the same for
   that package's sites. A test that opens a loopback site and then calls
   `t.Parallel` keeps the slot while it is paused, so a serial test waiting
   for the slot would block it (inferred from the code, not run).
