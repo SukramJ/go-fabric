@@ -627,8 +627,9 @@ func (m *Manager) indexOfLocked(p Peer) int {
 
 // onSoftwareVersionChanged is #onSoftwareVersionChanged (:769-842): a
 // startUp of the reboot the provider already handled is suppressed; a
-// version below the target after a startUp of an Applying or WaitForApply
-// update fails it; a version at or above the target completes it and
+// version below the target after a startUp of an Applying update fails
+// it; one that waits for its apply is reset and stays queued; a version at
+// or above the target completes it and
 // drops the consents it covers.
 func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp bool) {
 	m.mu.Lock()
@@ -657,10 +658,14 @@ func (m *Manager) onSoftwareVersionChanged(p Peer, newVersion uint32, isStartUp 
 	// The failed apply is judged before anything resets the entry, so
 	// #failUpdate still reaches the attempt the entry follows
 	// (SoftwareUpdateManager.ts:1061-1069 at b25ed960; the reset comes only
-	// on the path that neither fails nor completes, :1082-1087).
+	// on the path that neither fails nor completes, :1082-1087). Only an
+	// update that applies fails; one that waits for its apply takes the
+	// reset below (C-31).
+	//
+	// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1063 at b25ed960
+	// (the failed-apply condition: below the target, StartUp, Applying).
 	previous := e.statusOf()
-	if newVersion < e.TargetSoftwareVersion && isStartUp && previous != nil &&
-		(*previous == mattercore.OTAUpdateApplying || *previous == mattercore.OTAUpdateWaitForApply) {
+	if newVersion < e.TargetSoftwareVersion && isStartUp && previous != nil && *previous == mattercore.OTAUpdateApplying {
 		m.log.Warn("ota.manager.apply_failed_reboot", slog.String("node", peerString(p)),
 			slog.Uint64("version", uint64(newVersion)), slog.Uint64("target", uint64(e.TargetSoftwareVersion)))
 		m.failAppliedLocked(i)

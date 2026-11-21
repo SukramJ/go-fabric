@@ -485,6 +485,36 @@ func TestManagerStartUpBelowTargetFailsTheAppliedAttemptParity(t *testing.T) {
 			t.Errorf("attempt %s ended %v, want Cancelled and ended", a.Status(), a.Ended())
 		}
 	})
+	// C-31: only an attempt that applies fails at a startUp below the
+	// target (SoftwareUpdateManager.ts:1063 at b25ed960); one that waits for
+	// its apply takes the reset path — the entry unlinked and kept queued,
+	// the attempt left running, no updateFailed (:1082-1087).
+	t.Run("keeps an update whose attempt waits for its apply at a startUp below the target", func(t *testing.T) {
+		t.Parallel()
+		r := newAttemptRig(t)
+		r.queue(2, nil)
+		q := r.query(t, 7, 1)
+		a := providerPorts{r.m}.AttemptFor(otaPeerOfTest(), *q.UpdateToken)
+		if a == nil || !(providerPorts{r.m}).ReportAttemptStatus(a, mattercore.OTAUpdateWaitForApply) {
+			t.Fatalf("attempt %v: WaitForApply not recorded", a)
+		}
+		r.m.onSoftwareVersionChanged(testPeer, 1, true)
+		if failed, _ := r.counts(); failed != 0 {
+			t.Errorf("%d updateFailed, want 0", failed)
+		}
+		if len(r.m.QueuedUpdates()) != 1 {
+			t.Error("the update left the queue")
+		}
+		if a.Ended() || a.Status() != mattercore.OTAUpdateWaitForApply {
+			t.Errorf("attempt %s ended %v, want WaitForApply and running", a.Status(), a.Ended())
+		}
+		r.m.mu.Lock()
+		linked := r.m.linkedEntryLocked(a) != nil
+		r.m.mu.Unlock()
+		if linked {
+			t.Error("the entry still follows the attempt")
+		}
+	})
 }
 
 // TestManagerConsentRemovalKeepsALegacyApplyingUpdate (C-23, review M2):
