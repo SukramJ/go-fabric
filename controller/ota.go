@@ -50,6 +50,13 @@ type OTAConfig struct {
 	MaxBDXBlockSize           uint16
 	BDXAdditionalMrpDelay     *time.Duration
 	ApplyDelay                time.Duration
+	// DelegateConsentToRequestor is the manager's
+	// ([softwareupdate.Config].DelegateConsentToRequestor, default off):
+	// on, a node whose QueryImage says it can obtain the user's consent
+	// itself is offered the newest applicable stored image without a
+	// consent given to the manager, with UserConsentNeeded, and may apply
+	// it.
+	DelegateConsentToRequestor bool
 	// RequestConsent, OnUpdateAvailable, OnUpdateApplying, OnUpdateDone,
 	// OnUpdateFailed and OnStatus are the manager's hooks. OnStatus may run
 	// on the receive path: a download's WaitForApply is reported when the
@@ -95,7 +102,8 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 		AllowTestImages: o.AllowTestImages, UpdateCheckInterval: o.UpdateCheckInterval,
 		AnnounceAsDefaultProvider: o.AnnounceAsDefaultProvider, AnnouncementInterval: o.AnnouncementInterval,
 		MaxBDXBlockSize: o.MaxBDXBlockSize, BDXAdditionalMrpDelay: o.BDXAdditionalMrpDelay, ApplyDelay: o.ApplyDelay,
-		RequestConsent: o.RequestConsent, OnUpdateAvailable: o.OnUpdateAvailable, OnUpdateApplying: o.OnUpdateApplying,
+		DelegateConsentToRequestor: o.DelegateConsentToRequestor,
+		RequestConsent:             o.RequestConsent, OnUpdateAvailable: o.OnUpdateAvailable, OnUpdateApplying: o.OnUpdateApplying,
 		OnUpdateDone: o.OnUpdateDone, OnUpdateFailed: c.otaFailed(o.OnUpdateFailed), OnStatus: c.traceOTAStatus(o.OnStatus),
 		ScriptQueryImage: o.ScriptQueryImage, ScriptApplyUpdate: o.ScriptApplyUpdate, OnProviderExchange: o.OnProviderExchange,
 		Clock: c.clock, Logger: c.log,
