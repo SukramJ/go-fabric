@@ -89,6 +89,7 @@ red-then-green test confirmed.
 | --- | --- | --- | --- |
 | R2-P7-fl-cam-1 | flake | closed before: `f2527f32` (in `3fb8649f`, `v0.23.0`); 0 recurrences in 9 race jobs since | `controller/serve_camera_test.go:164`, `service_fabrictest_test.go:305` "expected message missing after 35s": the responder registered a resumed session after Sigma2_Resume and dropped the camera's first request; reproduced 5/5 with the old order and a delay, 0/5 with the fixed order. The 35 s is the invoke's response wait over TCP (`client/exchange/mrp.go:97-102`), not a CASE timeout |
 | R2-P7-fl-cam-2 | flake | fixed `f72adf06` (fabrictest only) | `service_fabrictest_test.go:77` "bind: address already in use": a loopback site handed the controller a UDP socket, so New could not rebind when its port was taken for TCP; the site leaves the port pair to `controller.New` |
+| R2-P7-fl-cam-3 | flake | closed by P3c-F (`a4964f83`, pin lift b25ed960; decisions 406, 410) | `TestControllerServesTheCameraRequestor`'s one `matter.controller.drop reason="unknown session"` per run (the test passed): the device's shutdown CloseSession for its PASE session at `dev.Restart` (`controller/serve_camera_test.go:163`). The commissioner had ended its PASE half silently after Commission (`controller/commissioner/commissioner.go:393`, `:445-447`); the device's CommissioningComplete clear waited `paseCloseGrace` (100 ms) on the site's `clocktest.Fake` (`fabrictest/site.go:162-166`), which the test never advanced that far, so Stop's farewell (`BD-Matter-Shutdown-CloseSessionKept`) reached a session the controller no longer had — 1 drop in 7 of 7 runs at `c8348b35`, the timer pending at Stop with 100 ms and with 1 ms (P3c diagnosis). P3c-F clears the PASE sessions inside the CommissioningComplete, as matter.js (F-b25ed960-53): 0 drops in 3 of 3 runs after, 1 in each of 2 base runs |
 | R2-P7-fl-cli-1 | flake | closed before: `3fb8649f`; the step uses `AdvanceToNext` since `b02e2a6c` | `controller/client/network_test.go:294`: one `Advance(time.Minute)` fired the retry and the replacement exchange's timeout (3 of 400 with the minute step; 0 of 2000 after) |
 | R2-P7-fl-cli-2 | flake | fixed `d0be9858` (test only) | `client/exchange` `TestPeerOpenedExchangeOnClosingSessionDeclined`: the test set `peerLost` without closing the session, so its own handler acknowledged (20 of 20 with a wait); no production defect; 0 of 3000 after |
 | R2-P7-fl-cli-3 | flake | fixed `7cee1514`, `b02e2a6c`, `7dd3f043` | the fixed minute steps: `clocktest.Fake.AdvanceToNext` added and used at 2 of the 4 sites (the other two arm no timer, measured); `Fake.Resolve` stepped zero after `StepWall` and steps through the helper |
@@ -137,7 +138,7 @@ Priorities 4 to 6 and the full-cut run 2 stay as the plan states them (owner,
 - From fl-cam: one unknown-session drop per run of
   `TestControllerServesTheCameraRequestor` remains (the test passes; not
   traced). The hand-over's "mode B, 35 s CASE timeout" is wrong (row
-  R2-P7-fl-cam-1).
+  R2-P7-fl-cam-1). Traced and closed in P3c (row R2-P7-fl-cam-3).
 
 ## Backlog round `review2/p7c` (2026-11-19)
 
@@ -182,5 +183,34 @@ re-cited at `b25ed960`. Struck: CodeQL 57–59 (no open code-scanning alert,
 `1b0b693a`, phase-6b register). Moved to P4-D: the peer-loss cutoff
 (F-b25ed960-49, decision 405) and the BDX liveness kick (F-b25ed960-50,
 N6b-cite-4, decision 407). The DAV alias (N6b-cite-8) stays labelled
-db021da0 for the cite sweep. The other units' rows of this round are added
-at integration.
+db021da0 for the cite sweep.
+
+The other units of the round (integration, 2026-11-21):
+
+- P3c-A: the bridge's peer loss on a give-up of an exchange it opened now
+  needs an exchange that heard nothing (F-b25ed960-51, closed, `b324e5ee`);
+  `dropHandshakeNotBegun`'s "nothing is sent" corrected — the standalone
+  ack follows from the exchange's ack timer — and closed as matching
+  (`a423f8fb`, the Fable note of `review2/p7e`). New open row
+  F-b25ed960-52 (peer loss on a failed receive), P4-D.
+- P3c-B: R2-P6-conc-0306's TCP half fixed (`61e30f40`, phase-6a register).
+  SO_RCVBUF (`transport/udp/listener.go`) closed as matching (decision
+  402): matter.js sets no receive buffer
+  (`packages/nodejs/src/net/NodeJsUdpSocket.ts:41-42`, `:119-126` at
+  `b25ed960`; a `recvBufferSize` exists only as a type,
+  `packages/react-native/src/net/UdpSocketReactNative.ts:45`),
+  connectedhomeip sets none on its UDP sockets
+  (`src/inet/UDPEndPointImplSockets.cpp:116-177`, `:267-275`, `:529-567`
+  at `6170af84`); TestTMR37's overflow was a test burst, fixed in the test
+  (`86099956`); no `udp.Config` option.
+- P3c-C (machine job): R2-P5-tmut-18 rest closed — the wide run of the 28
+  recorded mutants at `c8348b35` killed none, the recorded reasons stand
+  (decision 403; phase-6a and phase-6b registers, N6b-tests-1).
+- P3c-D: R2-P6-store-0448 closed by decision 404 (the bound stated beside
+  the CHECK, `380f8ddd`; `sqlitestore.go`'s stale range comment,
+  `294a26e5`, decision 408); N6b-gen-1 fixed (`4543ea2e`, phase-6b
+  register).
+- fl-cam and P3c-F: R2-P7-fl-cam-3 above; the PASE session cleared inside
+  a CommissioningComplete answered OK (F-b25ed960-53, closed, `a4964f83`;
+  decisions 409–411). New open row F-b25ed960-54 (the fail-safe-expiry
+  close deferred for every interaction), P4-D (decision 412).

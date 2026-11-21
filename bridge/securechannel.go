@@ -1095,7 +1095,8 @@ type paseSessionIDLister interface {
 // bridge has scheduled ([Bridge.paseSessionsCloser]) is closing from that
 // moment, as a matter.js session is from initiateClose on
 // (packages/protocol/src/session/Session.ts:190-192 `isClosing`, :304-311
-// at db021da0), though it stays in the table for its grace. A registry
+// at b25ed960), though it stays in the table until the response its close
+// follows is out. A registry
 // without the capability reports none.
 func (b *Bridge) paseSessionExists() bool {
 	b.mu.RLock()

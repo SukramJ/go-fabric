@@ -625,7 +625,7 @@ placed, not verified").
 | 6b-ctl 5 — decision 219 wiring | — | taken: `fix-ctl.md:158` | `fable-read-6b-ctl.md:136` (219) — a reference statement of the read, not restated here |
 | 6b-ctl 6 — sec-2361 (Q1) facts | — | fact note, used: `fix-ctl.md:159` | `fable-read-6b-ctl.md:149` (2361) — a reference statement of the read, not restated here |
 | 6b-gen N1 none | note | taken: `fix-gen.md:166` | `fable-read-6b-gen.md:39` (2703) — a reference statement of the read, not restated here |
-| 6b-gen N3 latent silent pass | note | not taken up: no fix note names it — see "Not placed, not verified" | `fable-read-6b-gen.md:41` (2703) — jsonable writes a bigint as a string so a bigint default would render as a Go string; not at the pin; for the open list |
+| 6b-gen N3 latent silent pass | note | not taken up: no fix note names it — see "Not placed, not verified"; fixed with N6b-gen-1 (`4543ea2e`, P3c-D) | `fable-read-6b-gen.md:41` (2703) — jsonable writes a bigint as a string so a bigint default would render as a Go string; not at the pin; for the open list |
 | 6b-gen 4 — 2713 | low | taken: `fix-gen.md:164`, `fix-gen.md:165` | `fable-read-6b-gen.md:81` (2713) — effectiveDirection and the by_design line hold with reworks: name the six tags, say regex over element source, and do one real generate-level run at v0.13.0 |
 | 6b-gen 5 — 2701/2702 | low | taken: `fix-gen.md:163` | `fable-read-6b-gen.md:109` (2701; 2702) — a reference statement of the read, not restated here |
 | 6b-facade 1a | low | taken: `fix-facade.md:180` | `fable-read-6b-facade.md:31` (R2-P6-sec-2401; U4-fr-sec-2) — an item on a held row, not restated here |
@@ -1233,7 +1233,7 @@ rows.
 | F-db021da0-51 | — | open findings row (6a), the direction of ADR 0032 | fixed in part `4eb4517f`, `c3412963`: a chunked write on a client-stack session is refused whole; the rest stays with ADR 0032 (decision 242) |
 | F-db021da0-55 | — | open findings row (6a) | fixed `e0b17ea3`, `217ee3da`: a MEI helper exported from `cluster/spec`, used by the dispatcher (decision 246) |
 | F-db021da0-59 | — | open findings row (6a) | fixed `31fa3cc9` |
-| R2-P5-tmut-18 rest | — | open (6a) | fixed in part `34b0a737`, `1e9eac1b`, `115fff1f`, `f3fd05fa`, `6904065a`, `649a2637`: 73 of 101 mutants killed, 28 recorded |
+| R2-P5-tmut-18 rest | — | open (6a) | fixed in part `34b0a737`, `1e9eac1b`, `115fff1f`, `f3fd05fa`, `6904065a`, `649a2637`: 73 of 101 mutants killed, 28 recorded; pin lift b25ed960, P3c: the wide run of the 28 at `c8348b35` — 28 survived, the recorded reasons stand (decision 403) |
 | TM R3.8 rest | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
 | N4-d4wifi-1 | — | open findings row (6a) | fixed `f1f92c87`; the findings row closed |
 | "cover/fan change naming" | — | open, as F-db021da0-57 (6a) | fixed with F-db021da0-57 `e30c2b06`, `6f02028e` |
@@ -1491,7 +1491,7 @@ here. The ids are this register's (`N6b-<group>-<n>`).
 | N6b-radio-5 | fix-radio-nix.md:85 | no retry of an owed `UnregisterApplication` in `peripheral.Close` | not a finding: the bus closes there (the fix note) | `ble/bluez` |
 | N6b-cpeer-1 | fix-cpeer.md:67 | R2-P6-conc-2112's `c.mu` sites left as the row states | phase 7 (the register editor's judgement) | `client/` |
 | N6b-cam-1 | fix-cam.md:67, :68 | no `GOARCH=386` test leg for `controller/camera` (R2-P6-bound-2250, -2251 at run time) and no lint for a new `int(uint32)` conversion; the 32-bit leg runs `./controller/...` (`fix-guards.md:39`) | not a finding: the guards unit found the 32-bit leg present | `controller/camera` |
-| N6b-gen-1 | fix-gen.md:107 | the extractor writes a bigint as a string, so a bigint default renders as a Go string | phase 7 (the register editor's judgement) | `script/extract-from-matter-js.ts` |
+| N6b-gen-1 | fix-gen.md:107 | the extractor writes a bigint as a string, so a bigint default renders as a Go string | phase 7 (the register editor's judgement); fixed `4543ea2e` (pin lift b25ed960, P3c-D): `script/clustergen` refuses a string default on a numeric type, naming cluster and element (`typedDefault`, `TestGenerateRejects`); `script/devicegen` already refused any non-numeric default; a string bound is already refused (`boundLiteral`); the extractor stays, the Go side catches it; regeneration moved no generated file | `script/extract-from-matter-js.ts` |
 | N6b-gen-2 | fix-gen.md:109 | the level extractor and `generate-level.sh` were run against matter.js tags only once, in the round-3 re-extraction | not a finding: the run of decision 227 (`fix-gen.md` round 3) (the register editor's judgement) | `script/` |
 | N6b-facade-1 | fix-facade.md:84 | R2-P6-store-2406: a re-Add of a half-forgotten key before the next `New` still meets the leftovers | phase 7 (the register editor's judgement) | `node/` |
 | N6b-facade-2 | fix-facade.md:85 | R2-P6-err-2451 has no red test | phase 7 (the register editor's judgement) | `node/` |
@@ -1503,7 +1503,7 @@ here. The ids are this register's (`N6b-<group>-<n>`).
 | N6b-ex-1 | fix-examples.md:68 | R2-P6-fsm-2608: the CMAF session number of an event emitted after a later transition (a module port change; demo only) | phase 7 (the register editor's judgement) | `examples/reference-bridge` |
 | N6b-ex-2 | fix-examples.md:69 | R2-P6-sec-2615: `ble-wifi-light`'s `--passcode` takes no file or environment form | phase 7 (the register editor's judgement) | `examples/ble-wifi-light` |
 | N6b-ex-3 | fix-examples.md:70 | R2-P6-conc-2614: no deterministic test of the swap race | phase 7 (the register editor's judgement) | `examples/` |
-| N6b-tests-1 | fix-tests-6b.md:101 | the wide mutant run of the 28 remaining `R2-P5-tmut-18` mutants stopped after three for its run time | phase 7 (the register editor's judgement) | `cluster/core`, `bridge`, `node` |
+| N6b-tests-1 | fix-tests-6b.md:101 | the wide mutant run of the 28 remaining `R2-P5-tmut-18` mutants stopped after three for its run time | phase 7 (the register editor's judgement); closed in the pin lift b25ed960, P3c (decision 403): run in full at `c8348b35` (23 min, `-p 2`, 4 mutants at a time) — 28 survived, 0 killed, 0 gone | `cluster/core`, `bridge`, `node` |
 | N6b-docs-1 | fix-docs.md:80 | `store/schema.go:220` cites a `vid_verification.go` range for a key no longer there | phase 7 (the register editor's judgement) | `store/schema.go` |
 | N6b-docs-2 | fix-docs.md:81 | the ADR index row 0022 says CastingVideoClient stays out, while a generated device file exists | phase 7 (the register editor's judgement) | `docs/adr/` |
 | N6b-docs-3 | fix-docs.md:83 | `notes/parity/matter/README.md:33` repeats S-12's stale build step | fixed `3ca20082`, `76269095` (the register editor's judgement) | `notes/parity/matter/README.md` |

@@ -117,6 +117,16 @@ five cases whose matter.js content changed stay read at db021da0
 (decision 307) until P2b-F re-mirrors them at b25ed960. Three register rows caught up before their units land are
 listed in `script/aheadcheck/caught-up.txt` (decision 308).
 
+Wave P3c (2026-11-21) settled three matters read at b25ed960 that no PR row
+above carries: `dropHandshakeNotBegun` (`bridge/securechannel.go`) closed as
+matching — the comment and its citations re-read at the pin, the standalone
+ack following from the exchange's ack timer (P3c-A); the bridge's peer loss
+on a give-up of an exchange it opened, now only while the exchange heard
+nothing (`MessageExchange.ts:490`, `:674-681`; F-b25ed960-51, fixed in
+P3c-A); and the PASE session cleared inside a CommissioningComplete answered
+OK (`FailsafeContext.ts:156-157`; F-b25ed960-53, fixed in P3c-F, decision
+410). Opened for P4-D: F-b25ed960-52 and -54.
+
 ### Protocol, sessions, security
 
 | PR | Fix | Verdict | Where |

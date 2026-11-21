@@ -236,7 +236,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// requiresAck → sendStandaloneAckForMessage without delay, unless
 	// #kickRetransmissionForLiveness re-sent the pending message instead,
 	// :593-646 — a kick confined to BDX exchanges that the bridge does not
-	// have yet, an open gap in notes/parity/matter_behaviour_findings.md).
+	// have yet, F-b25ed960-50 in notes/parity/matter_behaviour_findings.md).
 	if duplicate {
 		b.expediteDuplicateAck(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
 		b.RunAckPumpOnce(b.clk().Now())
