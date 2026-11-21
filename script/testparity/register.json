@@ -9694,14 +9694,15 @@
         "client/exchange:TestMessageExchangePaddedBDXCap",
         "client/exchange:TestMessageExchangePeerLossDeclaration",
         "client/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
-        "client/exchange:TestMessageExchangeOnTransmitted"
+        "client/exchange:TestMessageExchangeOnTransmitted",
+        "bridge:TestInitiatedExchangePeerLossDeclarationParity"
       ],
       "missing": [
         "emits closed but not closing when destroyed",
         "does not wake a sleeping LIT peer on an outbound message",
         "emits closing for an ack-only exchange on a reliable channel, which sends nothing"
       ],
-      "reason": "Peer loss, the unacked state, the BDX liveness kick and the padded and unpadded BDX caps, timers that outlive their message, activity, the close end and its closing hook (Options.OnClosing), cross-protocol StatusReports, the ack-wait abort and the MRP margins (Config.LocalAdditionalMrpDelay and LocalFixedMrpBackoff, Options.PeerAdditionalMrpDelay, Session.SetPeerMargins) are ported against the controller exchange. Missing: Go's OnClosing also runs on the final close of a destroyed exchange, since its one user — a network profile's slot — is released on closing or closed alike (PeerExchangeProvider.ts:136-141), so the destroy-without-closing characterisation does not hold; and ICD wakefulness is not in the controller exchange. Pin lift b25ed960: the onTransmitted hook of a send (#4882, what the CASE responder's Success uses) is Exchange.send's, reached through internal/exchangeseam (client/exchange:TestMessageExchangeOnTransmitted, P1-A); the ack-only exchange of an unsolicited message has no Go subject, the controller Manager acks it outside any exchange.",
+      "reason": "Peer loss, the unacked state, the BDX liveness kick and the padded and unpadded BDX caps, timers that outlive their message, activity, the close end and its closing hook (Options.OnClosing), cross-protocol StatusReports, the ack-wait abort and the MRP margins (Config.LocalAdditionalMrpDelay and LocalFixedMrpBackoff, Options.PeerAdditionalMrpDelay, Session.SetPeerMargins) are ported against the controller exchange. Missing: Go's OnClosing also runs on the final close of a destroyed exchange, since its one user — a network profile's slot — is released on closing or closed alike (PeerExchangeProvider.ts:136-141), so the destroy-without-closing characterisation does not hold; and ICD wakefulness is not in the controller exchange. Pin lift b25ed960: the onTransmitted hook of a send (#4882, what the CASE responder's Success uses) is Exchange.send's, reached through internal/exchangeseam (client/exchange:TestMessageExchangeOnTransmitted, P1-A); the ack-only exchange of an unsolicited message has no Go subject, the controller Manager acks it outside any exchange. Pin lift b25ed960, P3c-A: the send() peer-loss declaration is ported on the bridge's initiated exchange too (bridge:TestInitiatedExchangePeerLossDeclarationParity) — a give-up reports peer loss only while the exchange heard nothing, a standalone acknowledgement counting; the nextMessage() cases (:126-149) are not ported: matter.js also reports peer loss when a receive fails with a TransientPeerCommunicationError on an exchange that heard nothing (MessageExchange.ts:882-892); the bridge's Receive reports none — findings F-b25ed960-52.",
       "snapshotSha": "0a27eba01e86d924fed19976de23e2f6002ffa5b"
     },
     {

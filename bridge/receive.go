@@ -199,6 +199,10 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	if !duplicate {
 		b.bindUnsecuredWindow(&hdr, proto.ExchangeID)
 	}
+	// A message on an exchange this node opened is the peer heard on it,
+	// before any rule below refuses or drops it: its give-up then reports
+	// no peer loss ([Bridge.noteInitiatedReceived]).
+	b.noteInitiatedReceived(&hdr, proto)
 
 	// A new message on an exchange whose earlier reliable message from this
 	// node still waits for its acknowledgement must acknowledge it, or it
@@ -228,8 +232,11 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// carries the piggyback grace window, behind which a duplicate
 	// ack must not hide (the peer would retransmit again meanwhile).
 	// Expedite it to due-now, flush the pump, drop processing.
-	// Mirrors matter.js MessageExchange.ts:501-511 at db021da0 (duplicate +
-	// requiresAck → sendStandaloneAckForMessage without delay).
+	// Mirrors matter.js MessageExchange.ts:514-523 at b25ed960 (duplicate +
+	// requiresAck → sendStandaloneAckForMessage without delay, unless
+	// #kickRetransmissionForLiveness re-sent the pending message instead,
+	// :593-646 — a kick confined to BDX exchanges that the bridge does not
+	// have yet, F-b25ed960-50 in notes/parity/matter_behaviour_findings.md).
 	if duplicate {
 		b.expediteDuplicateAck(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
 		b.RunAckPumpOnce(b.clk().Now())

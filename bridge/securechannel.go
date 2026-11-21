@@ -412,12 +412,14 @@ func (b *Bridge) refusePaseWindowClosed(src net.Addr, requestHdr *message.Header
 // review II, phase 7, decision 284), and so does a Sigma1 on a completed
 // handshake's key that begins nothing ([Bridge.handleSigma1]).
 // Mirrors matter.js
-// packages/protocol/src/securechannel/SecureChannelProtocol.ts:152-153 and
-// :43-50 at db021da0 (any other opening message goes to the base handler,
+// packages/protocol/src/securechannel/SecureChannelProtocol.ts:138-139 and
+// :36-51 at b25ed960 (any other opening message goes to the base handler,
 // which throws StatusResponseError) with
-// packages/protocol/src/protocol/ExchangeManager.ts:494 and :538-549 (the
-// error is logged, nothing is sent); connectedhomeip registers unsolicited
-// handlers for PBKDFParamRequest and Sigma1 only
+// packages/protocol/src/protocol/ExchangeManager.ts:485-489 and :547-558
+// (the error is logged; no report): the exchange took the message before
+// the handler ran (:485), so the standalone acknowledgement follows from
+// its ack timer (MessageExchange.ts:566-573, :274-283); connectedhomeip
+// registers unsolicited handlers for PBKDFParamRequest and Sigma1 only
 // (src/app/server/CommissioningWindowManager.cpp:280-281,
 // src/protocols/secure_channel/CASEServer.cpp:54-55 at 6170af84) and for a
 // message no handler takes sends the standalone acknowledgement only
@@ -1093,7 +1095,8 @@ type paseSessionIDLister interface {
 // bridge has scheduled ([Bridge.paseSessionsCloser]) is closing from that
 // moment, as a matter.js session is from initiateClose on
 // (packages/protocol/src/session/Session.ts:190-192 `isClosing`, :304-311
-// at db021da0), though it stays in the table for its grace. A registry
+// at b25ed960), though it stays in the table until the response its close
+// follows is out. A registry
 // without the capability reports none.
 func (b *Bridge) paseSessionExists() bool {
 	b.mu.RLock()

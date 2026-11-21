@@ -22,6 +22,18 @@
 -- endpoint_id is UNIQUE as well as monotonically allocated. The uniqueness
 -- is the last line of defence: two sources sharing a number would serve one
 -- controller two accessories under one identity.
+--
+-- The CHECK on endpoint_id admits 1, one wider than the range a stored
+-- number may take: allocation starts at 2 (matter_endpoint_allocation
+-- below) and endpoint.Assembler refuses a stored number outside
+-- [2, 65534], because 0 is the RootNode and 1 the Aggregator
+-- (R2-P6-store-0448). The bound is not tightened here: that is a table
+-- rebuild, a new migration step every host would have to run, and the
+-- assembler already fences the range. The next migration that is needed
+-- for another reason raises the lower bound to 2. This note sits above
+-- the statement rather than inside it because SQLite keeps a CREATE
+-- statement's text, comments included, in sqlite_schema, and
+-- SchemaFingerprint hashes that text.
 CREATE TABLE IF NOT EXISTS matter_endpoints (
     source_key   TEXT    PRIMARY KEY,
     scope        TEXT    NOT NULL,

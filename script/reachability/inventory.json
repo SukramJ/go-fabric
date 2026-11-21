@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10210,
+  "entry_points": 10213,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27891,
+    "total_exported": 27894,
     "reachable": 20889,
-    "whitelisted": 6980,
+    "whitelisted": 6983,
     "unreachable": 22
   },
   "by_package": [
@@ -387,7 +387,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3295,
+      "line": 3284,
       "kind": "method"
     },
     {
@@ -1594,7 +1594,7 @@
       "identifier": "TestCASEAdapterReturnsItsSessionIDWhenItsHandshakeDoesNotFinish",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 142
+      "line": 145
     },
     {
       "package": "bridge",
@@ -1615,7 +1615,7 @@
       "identifier": "TestCASEMessagesThatStartNoHandshakeBuildNoAdapter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 45
+      "line": 48
     },
     {
       "package": "bridge",
@@ -2484,6 +2484,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioning_attempt_limit_parity_matterjs_test.go",
       "line": 123
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCommissioningCompleteClearsThePASESessionAtOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_close_at_once_test.go",
+      "line": 103
     },
     {
       "package": "bridge",
@@ -4261,7 +4268,7 @@
       "identifier": "TestFailSafeExpiredClosesThePASESessionsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "bridge",
@@ -4878,6 +4885,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/invoke_max_payload_test.go",
       "line": 118
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInitiatedExchangePeerLossDeclarationParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_heard_test.go",
+      "line": 140
     },
     {
       "package": "bridge",
@@ -5556,7 +5570,7 @@
       "identifier": "TestPASEAdapterReturnsItsSessionIDWhenItsProviderDropsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 200
+      "line": 203
     },
     {
       "package": "bridge",
@@ -5570,14 +5584,14 @@
       "identifier": "TestPASEClosedOnCommissioningCompleteParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 64
+      "line": 66
     },
     {
       "package": "bridge",
       "identifier": "TestPASEContinuationsThatStartNoHandshakeAreDroppedOnTheSingleton",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 97
+      "line": 100
     },
     {
       "package": "bridge",
@@ -5612,14 +5626,14 @@
       "identifier": "TestPASEMessagesThatStartNoHandshakeBuildNoAdapter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 68
+      "line": 71
     },
     {
       "package": "bridge",
       "identifier": "TestPASEStaysOpenDuringCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 93
+      "line": 95
     },
     {
       "package": "bridge",
@@ -6459,7 +6473,7 @@
       "identifier": "TestReassembleQueuedAcrossStopTakesNoSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_teardown_test.go",
-      "line": 403
+      "line": 410
     },
     {
       "package": "bridge",
@@ -7793,6 +7807,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestStopLeavesNoPASECloseTimer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/lifecycle_teardown_test.go",
+      "line": 334
+    },
+    {
+      "package": "bridge",
       "identifier": "TestStopOfAnUnstartedBridgeClosesWhatItHolds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_teardown_test.go",
@@ -7804,13 +7825,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ble_stop_handlers_test.go",
       "line": 83
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestStopStopsThePASECloseTimer",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/lifecycle_teardown_test.go",
-      "line": 332
     },
     {
       "package": "bridge",
@@ -7894,7 +7908,7 @@
       "identifier": "TestStrictValidationSetAfterStartJudgesEveryEndpointAsAdded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_teardown_test.go",
-      "line": 376
+      "line": 383
     },
     {
       "package": "bridge",
@@ -8171,6 +8185,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTCPCloseEvictsSessionBoundByHandlerInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_close_inflight_test.go",
+      "line": 34
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTCPConnClosedWhenLastSessionGoes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
@@ -8237,14 +8258,14 @@
       "identifier": "TestTMR37",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/tmr37_internal_test.go",
-      "line": 60
+      "line": 61
     },
     {
       "package": "bridge",
       "identifier": "TestTMR37Claims",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/tmr37_internal_test.go",
-      "line": 33
+      "line": 34
     },
     {
       "package": "bridge",

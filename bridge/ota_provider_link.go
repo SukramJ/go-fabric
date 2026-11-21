@@ -405,6 +405,14 @@ type initiatedSecureExchange struct {
 	// notify is the [bdx.ReceiveNotifier] callback the outbound flow
 	// installs; the receive path calls it before it queues a message.
 	notify atomic.Pointer[func(bdx.Message)]
+	// received counts the messages the peer sent on the exchange — every
+	// authenticated one, a standalone acknowledgement and a duplicate
+	// included ([Bridge.noteInitiatedReceived]). While it is zero, a
+	// message given up reports the peer lost
+	// ([Bridge.handleInitiatedPeerLoss]). Mirrors matter.js
+	// packages/protocol/src/protocol/MessageExchange.ts:490 at b25ed960
+	// (onMessageReceived: #messageReceivedCounter++ first).
+	received atomic.Uint64
 }
 
 // OnReceive implements [bdx.ReceiveNotifier]: fn is called with every
@@ -554,16 +562,24 @@ type peerLossCloser interface {
 }
 
 // handleInitiatedPeerLoss is the outbound-reliable tracker giving up on a
-// message of an exchange this node opened: the peer is lost. Every
-// session with that peer is force-closed — the next
-// [Bridge.ConnectOtaProvider] then runs a fresh CASE instead of reusing
-// a session the peer no longer knows (a provider restarted under the same
-// node id answers nothing on the old keys). Mirrors matter.js
-// MessageExchange.ts:643-651 at db021da0 (the send failed with a peer
-// communication error → context.peerLost) → ExchangeManager.ts:621-644
-// (a commissioned peer: SessionManager.handlePeerLoss for the peer
-// address, asOf the exchange context's creation; otherwise the session
-// alone) → SessionManager.ts:686-688.
+// message of an exchange this node opened. The exchange ends; and when
+// the peer never sent a message on it, the peer is lost: every session
+// with that peer is force-closed — the next [Bridge.ConnectOtaProvider]
+// then runs a fresh CASE instead of reusing a session the peer no longer
+// knows (a provider restarted under the same node id answers nothing on
+// the old keys). An exchange the peer answered — an acknowledgement is
+// enough — was reachable, and its give-up closes no session (the
+// exchange's received count, [Bridge.noteInitiatedReceived]). Mirrors
+// matter.js packages/protocol/src/protocol/MessageExchange.ts:656-666 at
+// b25ed960 (send: a peer communication error → context.peerLost, only
+// when #reportsPeerLoss) and :670-681 (#reportsPeerLoss: only while
+// #messageReceivedCounter === 0, "Only if we never heard from it on this
+// exchange") → ExchangeManager.ts:630-652 (a commissioned peer:
+// SessionManager.handlePeerLoss for the peer address; otherwise the
+// session alone) → SessionManager.ts:742-748, :812-838. matter.js keeps
+// the sessions registered after the exchange context was created
+// (registeredBefore, ExchangeManager.ts:623); this sweep keeps those
+// created after the exchange, by the clock ([Bridge.closeLostPeer]).
 // An exhausted counter of a subscription report is no peer loss
 // ([Bridge.noteReportUndelivered]).
 func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
@@ -575,8 +591,41 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	if !ok {
 		return
 	}
-	b.closeLostPeer(sessionID, exchangeID, ex.createdAtMono, "an exchange this node opened")
+	if ex.received.Load() == 0 {
+		b.closeLostPeer(sessionID, exchangeID, ex.createdAtMono, "an exchange this node opened")
+	} else if b.logger != nil {
+		b.logger.Debug("matter.exchange.initiated.given_up",
+			slog.Int("session_id", int(sessionID)),
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.String("hint", "the peer answered on this exchange; no peer loss"))
+	}
 	ex.fail(mrp.ErrMaxRetransmissionsReached)
+}
+
+// noteInitiatedReceived counts a message the peer sent as the responder on
+// a secure exchange this node opened ([initiatedSecureExchange.received]):
+// every authenticated one, before any rule of the exchange looks at it —
+// a standalone acknowledgement, a duplicate and a message the receive
+// rules refuse count too, as matter.js increments the counter before its
+// protocol check and its ack rules
+// (packages/protocol/src/protocol/MessageExchange.ts:490, :505-509,
+// :534-548 at b25ed960). A message on an exchange whose session was
+// replaced under the same id is not counted: boundTo fails that stale
+// exchange here with errExchangeSessionGone, as any other path that
+// finds it would.
+func (b *Bridge) noteInitiatedReceived(hdr *message.Header, proto message.ProtocolHeader) {
+	if hdr.SessionID == 0 || proto.Initiator {
+		return
+	}
+	raw, ok := b.resumption.initiated.Load(secureExchangeKey{sessionID: hdr.SessionID, exchangeID: proto.ExchangeID})
+	if !ok {
+		return
+	}
+	ex, ok := raw.(*initiatedSecureExchange)
+	if !ok || !ex.boundTo(b.sessionNow(hdr.SessionID)) {
+		return
+	}
+	ex.received.Add(1)
 }
 
 // closeLostPeer force-closes the sessions of the peer of sessionID that
@@ -787,8 +836,9 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 		if isConnRoute(dest) {
 			// A send on a connection that is gone is the reliable
 			// transport's "retransmissions exhausted": the peer is lost
-			// on that session, as matter.js's send reports peerLost on a
-			// failed send (MessageExchange.ts:643-651 at db021da0) — the
+			// on that session when the exchange never heard from it, as
+			// matter.js's send reports peerLost on a failed send
+			// (MessageExchange.ts:656-666, :674-681 at b25ed960) — the
 			// next connection to the peer runs a fresh CASE.
 			b.handleInitiatedPeerLoss(e.sessionID, e.exchangeID)
 		}

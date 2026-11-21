@@ -679,3 +679,26 @@ notes `p3/fix-{a,b,f}.md` (`.git/review2-local/pin-b25ed960/`).
 | 398 | Owner (O-13): when review II's full-cut run 2 runs | **After P5**, not in P3c: the convergence holds for the HEAD read |
 | 399 | Coordinator (C-16, P3b-R): the bend in `bridge/subscription_persistence_bound_test.go` | **Accepted**: the bound tests activate a subscription before they persist it, as a Subscribe does (three lines; `fix-r.md` Q1) |
 | 400 | Coordinator: decisions 356 and 360 | **Implemented in P3b**: 356 as `thermostatdef.Host.ActivatePreset` (P3b-G, the break line per 366); 360 as `node.Config.TimeFormat` (`node.TimeFormatConfig`, P3b-H) |
+
+## 2026-11-21, the pin lift db021da0 → b25ed960, wave P3c
+
+The owner's wizard over the wave plan's questions Q1–Q7 (401–407, all as
+recommended). Units P3c-A, P3c-B, P3c-D and P3c-E are the wave; P3c-C is a
+machine job; P3c-F joined by decision 410, and 408–412 are the
+integration's. Sources: the wave plan `p3c/plan.md` §4, the Fable pre-read
+`p3c/fable-pre-AB.md`.
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 401 | Owner (Q1, R2-P7-V3-giveup): after a message is given up the bridge takes the exchange's next message; matter.js refuses it until its close timer (`MessageExchange.ts:996-1001`, `:534-548`, `:1198-1215` at `b25ed960`) | **Recorded as by_design**, no tombstone: the bridge keeps no IM exchange object, a tombstone would copy an incidental timer, and no honest peer tells the difference; `BD-Matter-GiveUp-NextMessageTaken`, the findings row closes re-cited at the pin |
+| 402 | Owner (Q2, TestTMR37): `transport/udp/listener.go` sets no SO_RCVBUF | **Closed as matching**: neither matter.js (`NodeJsUdpSocket.ts:119-126` at `b25ed960`) nor connectedhomeip sets a receive buffer; MRP recovers a dropped datagram; no `udp.Config` option |
+| 403 | Owner (Q3, mutants): the 104 bridge-blind mutants and the 28 of R2-P5-tmut-18 | **The 104 after P5**, on the base of the full-cut run 2; **the 28-mutant wide run now**, as a background machine job |
+| 404 | Owner (Q4, R2-P6-store-0448): `endpoint/sqlitestore/schema.sql:28` allows endpoint 1, the assembler refuses anything outside [2, 65534] | **No migration now**: the bound is stated at the CHECK and tightened in the next migration that is needed anyway; the assembler is the fence |
+| 405 | Owner (Q5, N2): the bridge's `closeLostPeer` cuts a lost peer's sessions by time, matter.js by registration order (`ExchangeManager.ts:623`, `:630-652` at `b25ed960`) | **Findings row now** (F-b25ed960-49), **the fix in a new unit P4-D**: `secure/operational` gets the registration-order form beside `ClosePeerLostSince` (exported, into the deprecation window), `bridge` follows, `BD-Matter-PeerLoss-OwnSessionAtTheSameInstant` re-read and retired or rewritten |
+| 406 | Owner (Q6, fl-cam): one unknown-session drop per run of `TestControllerServesTheCameraRequestor`, never traced | **One bounded diagnosis** (one Opus agent, ≈ 150 k), else a findings row |
+| 407 | Owner (Q7, F1): the bridge's BDX exchanges lack matter.js's liveness kick (`MessageExchange.ts:514-523`, `:593-646` at `b25ed960`) | **Findings row now** (F-b25ed960-50), **the fix in P4-D with 405**, sharing the predicate with `client/exchange` |
+| 408 | Coordinator (C-1, P3c-D): `endpoint/sqlitestore/sqlitestore.go:52-58` gave the port's endpoint range as [1, 65534] | **Corrected in P3c** (comment only, `294a26e5`): the port's range is [2, 65534] (`endpoint/identity.go:58`, `endpoint/types.go:66`); `endpointIDMin = 1` still admits 1 as the schema CHECK does, the assembler refuses it; both rise to 2 with the next migration (decision 404) |
+| 409 | Coordinator (C-2, P3c-F): the CHANGELOG heading of the PASE clear on CommissioningComplete | **`### Security`**: at `c8348b35` a request on the fabric-adopted PASE session inside the grace was served with the implicit Administer grant (an ArmFailSafe re-armed the fail-safe, measured), on a channel the specification says is cleared |
+| 410 | Owner (2026-11-21, wizard): the PASE session outlived a successful CommissioningComplete by the response plus 100 ms (F-b25ed960-53, found by the fl-cam diagnosis of 406) | **Fixed in P3c**, not in P4 — new unit P3c-F: cleared inside the command, before the response, silently, no timer, as matter.js (`FailsafeContext.ts:156-157` at `b25ed960`) |
+| 411 | Coordinator (C-3, P3c-F): a bend into `bridge/bridge.go` outside the unit's files | **Accepted**: the grace's three timer fields and the Stop call of `stopPASECloseTimers` removed with the timers; `paseClosing` stays for the deferred closes |
+| 412 | Coordinator (C-4, P3c-F's Fable post-read): the fail-safe-expiry PASE close is deferred past the response for every interaction; matter.js defers only when the exchange is on the PASE session itself (`Session.ts:336-339`, `:315` at `b25ed960`) | **Findings row now** (F-b25ed960-54, Low, effect not measured), **the fix in P4-D**; the owner may pull it forward |

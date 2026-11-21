@@ -55,12 +55,14 @@ func commissioningCompleteAnswer(code uint8) im.InvokeResponse {
 }
 
 // TestPASEClosedOnCommissioningCompleteParity pins Matter §11.10.6.6 step 4
-// as matter.js packages/protocol/src/common/FailsafeContext.ts:152-153 at
-// db021da0 performs it (completeCommission → closePaseSession), in the
+// as matter.js packages/protocol/src/common/FailsafeContext.ts:138-160 at
+// b25ed960 performs it (completeCommission; step 4 at :156-157 calls
+// closePaseSession, awaited before the response is built,
+// GeneralCommissioningServer.ts:255), in the
 // bridge: the PASE session — the one AddNOC adopted onto the fabric
-// included — is cleared after the CommissioningComplete response has gone
-// out and the grace has elapsed, not before, and a PASE session a new
-// commissioning establishes within the grace stays.
+// included — is cleared at once, before the CommissioningComplete response
+// goes out and with no timer, and a PASE session a new commissioning
+// establishes afterwards stays when the response is sent and time passes.
 func TestPASEClosedOnCommissioningCompleteParity(t *testing.T) {
 	t.Parallel()
 	b, mgr, clk := paseCloseBridge(t)
@@ -68,19 +70,19 @@ func TestPASEClosedOnCommissioningCompleteParity(t *testing.T) {
 	ctx := im.WithAfterResponse(context.Background(), after)
 
 	b.closePASESessionsOnCommissioningComplete(ctx, commissioningCompleteAnswer(core.CommissioningErrorOK))
-	if got := openPASESessions(mgr); got != 1 {
-		t.Fatalf("PASE sessions before the response = %d, want 1 (the response may travel on it)", got)
+	if got := openPASESessions(mgr); got != 0 {
+		t.Fatalf("PASE sessions before the response = %d, want 0 (cleared inside the command)", got)
 	}
-	after.Run()
-	if got := openPASESessions(mgr); got != 1 {
-		t.Fatalf("PASE sessions right after the response = %d, want 1 until the grace elapses", got)
+	if got := clk.Pending(); got != 0 {
+		t.Errorf("timers armed by the close = %d, want 0", got)
 	}
-	// A new commissioning's PASE session established within the grace is
-	// not this fail-safe context's and survives it.
+	// A new commissioning's PASE session is not this fail-safe context's:
+	// neither the response nor time closes it.
 	if _, err := mgr.OpenFromPase(1, 3, 8, []byte("next-pase-secret")); err != nil {
 		t.Fatalf("OpenFromPase: %v", err)
 	}
-	clk.Advance(paseCloseGrace)
+	after.Run()
+	clk.Advance(time.Minute)
 	if got := openPASESessions(mgr); got != 1 {
 		t.Errorf("PASE sessions after CommissioningComplete = %d, want 1 (only the new commissioning's)", got)
 	}
@@ -127,7 +129,7 @@ func TestPASEStaysOpenDuringCommissioning(t *testing.T) {
 
 // TestFailSafeExpiredClosesThePASESessionsParity pins the fail-safe
 // rollback's step 1, matter.js
-// packages/protocol/src/common/FailsafeContext.ts:277-279 at db021da0
+// packages/protocol/src/common/FailsafeContext.ts:281-283 at b25ed960
 // (closePaseSession), on a bridge without the node facade: a timer expiry
 // clears the PASE sessions at once, an expiry inside an interaction
 // (ArmFailSafe with expiry 0) after its response.

@@ -157,7 +157,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1908,
+    "line": 1900,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -167,7 +167,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1915,
+    "line": 1907,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -176,7 +176,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1947,
+    "line": 1939,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -186,7 +186,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2837,
+    "line": 2826,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
@@ -215,7 +215,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 699,
+    "line": 718,
     "citation": "NodeSession.ts:319-328",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -301,7 +301,7 @@
   },
   {
     "file": "bridge/ota_provider_link.go",
-    "line": 585,
+    "line": 634,
     "citation": "SessionManager.ts:677-695",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "#handlePeerLoss",
@@ -3103,7 +3103,7 @@
   },
   {
     "file": "im/read.go",
-    "line": 541,
+    "line": 546,
     "citation": "packages/protocol/src/action/server/AttributeReadResponse.ts:238-274",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "identifier": "addConcrete",

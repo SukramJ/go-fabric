@@ -95,6 +95,17 @@ work it has accepted and not finished.
 - The runtime-metrics check is no longer the arbiter, so parallel tests of
   one package no longer starve each other's sites; `holdSite` stays only
   because sites still share one process's CPU.
+- A loopback site on a fake clock cannot see its sockets' work and judges
+  quiet by the process's goroutines, so two in parallel read each other's
+  work as their own. `fabrictest` therefore runs such sites one test tree
+  at a time across the process — the loopback slot
+  (`fabrictest/loopback_slot.go`, `loopbackSlot`), taken by `NewSite`
+  (`fabrictest/site.go`): a site of a test outside the holder's tree
+  waits until the holding test ends (`holdLoopbackSlot`, which releases
+  the slot in the holder's cleanup). The node package's `holdSite` does the same for
+  that package's sites. A test that opens a loopback site and then calls
+  `t.Parallel` keeps the slot while it is paused, so a serial test waiting
+  for the slot would block it (inferred from the code, not run).
 - Divergences from matter.js are recorded in `by_design.md`: the site
   counts work where MockTime observes a single thread; the build is
   exempt from the budget; the mDNS socket deadlines and bridgetest keep

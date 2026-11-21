@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -81,6 +82,16 @@ func TestTMR37(t *testing.T) {
 	lookup.fabric[ids[holders]] = 2
 	b.AttachSessionLookup(lookup)
 	others, last := peers[:holders], peers[holders]
+	// Answers are read from the bridge's socket only: a peer socket on a
+	// loopback port another test process also reached (a wildcard bind
+	// handed the same port out) would otherwise fail its decrypt on that
+	// process's datagram (as 7c15bb7a's reader does; P3c, aesccm failure
+	// under make ci).
+	bridgeAddr, err := net.ResolveUDPAddr("udp", b.LocalAddr())
+	if err != nil {
+		t.Fatalf("the bridge's address %q: %v", b.LocalAddr(), err)
+	}
+	bridgeAddr.IP = net.IPv4(127, 0, 0, 1)
 
 	// One session at a time: its reads, then their answers. A burst of
 	// every session's reads overflowed the bridge socket's receive buffer
@@ -97,7 +108,7 @@ func TestTMR37(t *testing.T) {
 		}
 		seen := map[uint16]bool{}
 		for len(seen) < maxChunkWaitsPerSession {
-			proto, body, answered := readOneIMDatagram(t, p.conn, p.sess, 10*time.Second)
+			proto, body, answered := readOneIMDatagramFrom(t, p.conn, bridgeAddr, p.sess, 10*time.Second)
 			if !answered {
 				t.Fatalf("session %#x: %d of its %d reads answered", p.id, len(seen), maxChunkWaitsPerSession)
 			}
@@ -126,7 +137,7 @@ func TestTMR37(t *testing.T) {
 	}
 
 	sendToBridge(t, b, last, wildcardRead(t, last, 0x6000))
-	proto, _, answered := readOneIMDatagram(t, last.conn, last.sess, 5*time.Second)
+	proto, _, answered := readOneIMDatagramFrom(t, last.conn, bridgeAddr, last.sess, 5*time.Second)
 	for _, p := range others {
 		b.SessionClosed(p.id)
 	}

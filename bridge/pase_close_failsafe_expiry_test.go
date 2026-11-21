@@ -117,10 +117,10 @@ func (r *failSafeRig) waitClosed(t *testing.T) []uint16 {
 // GeneralCommissioning expires without a CommissioningComplete, for a host
 // that wired nothing for it — no node facade, no fail-safe-expiry hook, no
 // call of Bridge.FailSafeExpired. Mirrors matter.js
-// packages/protocol/src/common/FailsafeContext.ts:277-279 at db021da0
+// packages/protocol/src/common/FailsafeContext.ts:281-283 at b25ed960
 // (rollback: "1. Terminate any open PASE secure session by clearing any
 // associated Secure Session Context at the Server" → closePaseSession,
-// :187-192). Before, the close was the host's call from its own hook, and a
+// :191-196). Before, the close was the host's call from its own hook, and a
 // host that did not make it kept the commissioning channel's implicit
 // Administer open (review II, R2-P0-sec-A03, owner decision 9).
 func TestFailSafeExpiryThroughTheBridgeClosesThePASESessions(t *testing.T) {

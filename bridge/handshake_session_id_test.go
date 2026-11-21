@@ -24,10 +24,13 @@ import (
 // Such a message is acknowledged and no more: no StatusReport, no counted
 // PASE failure (review II, R2-P4-cert-02, owner decision 70). matter.js hands
 // every other opening message to the base handler, which throws
-// (SecureChannelProtocol.ts:152-153, :43-50 at db021da0), and the exchange
-// manager only logs the error (ExchangeManager.ts:494, :538-549); chip has
-// no unsolicited handler for the type and sends the standalone
-// acknowledgement only (src/messaging/ExchangeMgr.cpp:437 at 6170af84).
+// (SecureChannelProtocol.ts:138-139, :36-51 at b25ed960), and the exchange
+// manager only logs the error (ExchangeManager.ts:485-489, :547-558): no
+// report, and the standalone acknowledgement follows from the ack timer the
+// exchange armed when it took the message (MessageExchange.ts:566-573,
+// :274-283); chip has no unsolicited handler for the type and sends the
+// standalone acknowledgement only (src/messaging/ExchangeMgr.cpp:437 at
+// 6170af84).
 
 // requireAcknowledgedOnly fails t unless the message on exchangeID was
 // acknowledged and no more: its acknowledgement is still owed — no reply

@@ -626,28 +626,47 @@ func (b *Bridge) handleTCPMessage(c *tcp.Conn, msg []byte, release func()) {
 }
 
 // handleTCPClose evicts every session bound to a dropped connection —
-// the Go translation of matter.js ExchangeManager.ts:715-731 at db021da0
+// the Go translation of matter.js ExchangeManager.ts:724-740 at b25ed960
 // #onConnectionDisconnect, subscribed to the transport's disconnect event
-// at :665-674.
+// at :674-683.
+//
+// It runs when the close begins (the close callback of transport/tcp
+// Listener.Serve), while a handler that passed the reader's closed check
+// before the close may still be dispatching: matter.js delivers nothing on a closed channel
+// (TcpChannel.ts:196-198 at b25ed960), but such a handler binds its
+// session to the dead connection after the first eviction. So the
+// connection's handlers are waited for and the eviction runs once more
+// (review II, R2-P6-conc-0306, the TCP half; the BLE receiver's wait is
+// the same fence, ble.go connReceiver.wait). The callback runs on the
+// listener's own goroutine for the connection, not the reader's, and
+// Listener.Close already waits for these handlers, so the wait adds no
+// wait to Stop.
 func (b *Bridge) handleTCPClose(c *tcp.Conn) {
+	b.evictConn(c)
+	_ = c.Wait(context.Background())
 	b.evictConn(c)
 }
 
-// evictConn closes every session whose route is c's and forgets c.
-// Returns the evicted session ids.
+// evictConn closes every session bound to c and forgets c's route.
+// Returns the evicted session ids. A session is matched by its route's
+// connection, not by the route c maps to now: a handler that took the
+// route before an earlier eviction forgot it can bind a session to that
+// route afterwards. Mirrors matter.js ExchangeManager.ts:707-722 at
+// b25ed960 (#sessionsOnChannel matches a session whose transport channel
+// is the connection). Idempotent: a second call evicts only what bound
+// since the first.
 func (b *Bridge) evictConn(c transport.Conn) []uint16 {
-	raw, ok := b.connRoutes.LoadAndDelete(c)
-	if !ok {
-		// No message ever arrived on the connection: nothing is bound.
-		return nil
-	}
-	route, _ := raw.(*connRoute)
-	var sids []uint16
+	b.connRoutes.Delete(c)
+	var (
+		sids   []uint16
+		routes []*connRoute
+	)
 	b.sessionPeerAddrs.Range(func(k, v any) bool {
 		sid, okK := k.(uint16)
 		r, okV := v.(*connRoute)
-		if okK && okV && r == route {
+		if okK && okV && r != nil && r.conn == c {
 			sids = append(sids, sid)
+			routes = append(routes, r)
 		}
 		return true
 	})
@@ -655,16 +674,16 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 		return nil
 	}
 	b.logger.Info("matter.tcp.evict",
-		slog.String("conn", route.String()),
+		slog.String("conn", routes[0].String()),
 		slog.Int("sessions", len(sids)))
-	for _, sid := range sids {
+	for i, sid := range sids {
 		// One line per evicted session, as matter.js
-		// packages/protocol/src/protocol/ExchangeManager.ts:720 at
-		// db021da0 logs per session.
+		// packages/protocol/src/protocol/ExchangeManager.ts:729 at
+		// b25ed960 logs per session.
 		b.logger.Debug("matter.tcp.evict.session",
-			slog.String("conn", route.String()),
+			slog.String("conn", routes[i].String()),
 			slog.Int("session_id", int(sid)))
-		b.evictSession(sid, route)
+		b.evictSession(sid, routes[i])
 	}
 	return sids
 }
@@ -673,10 +692,10 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 // first its exchanges, then the session itself without a CloseSession
 // farewell (the peer is lost), which cascades to its subscriptions
 // through the registry's close hook. Mirrors matter.js
-// ExchangeManager.ts:722-729 at db021da0 (close every exchange, then
-// Session.initiateForceClose, Session.ts:310-331, which closes the
-// subscriptions and does not notify the peer — NodeSession.ts:363-366
-// marks it lost).
+// ExchangeManager.ts:731-738 at b25ed960 (close every exchange, then
+// Session.initiateForceClose, Session.ts:331-344, which closes the
+// subscriptions and does not notify the peer — NodeSession.ts:450-453
+// marks it lost, and :490 sends no farewell to a lost peer).
 func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 	// Exchanges: a chunked report waiting for its StatusResponse on the
 	// dead connection is released now rather than at its timeout, and
