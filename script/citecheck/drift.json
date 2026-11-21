@@ -806,7 +806,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 123,
+    "line": 131,
     "citation": "ClientInteraction.ts:265-267",
     "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
     "identifier": "ClosedError",
@@ -815,7 +815,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 359,
+    "line": 408,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1034,7 +1034,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 324,
+    "line": 325,
     "citation": "InteractionMessenger.ts:1129",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ackWaitAbort",
@@ -1043,7 +1043,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 361,
+    "line": 362,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
@@ -2357,7 +2357,7 @@
   },
   {
     "file": "controller/client/registry.go",
-    "line": 432,
+    "line": 433,
     "citation": "CommissioningClient.ts:685-714",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#bindPeer",
@@ -2440,7 +2440,7 @@
   },
   {
     "file": "controller/commissioner/commissioner.go",
-    "line": 208,
+    "line": 209,
     "citation": "ControllerCommissioner.ts:740-746",
     "resolved": "packages/protocol/src/peer/ControllerCommissioner.ts",
     "identifier": "CommissionResult",
@@ -2449,7 +2449,7 @@
   },
   {
     "file": "controller/commissioner/commissioner.go",
-    "line": 442,
+    "line": 448,
     "citation": "NodeSession.ts:349-352",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
