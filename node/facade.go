@@ -177,7 +177,7 @@ type OTAConsentState = mattercore.OTAConsentState
 
 // OTAApplyPolicy is the type of [OTAProviderConfig].ApplyPolicy: when a requestor may apply a downloaded image ([mattercore.OTAApplyPolicy]).
 //
-// Deprecated: the apply is the [OTAUpdateManager]'s to decide; removable in v0.26.0.
+// Deprecated: the delay is [OTAProviderConfig].ApplyDelay and the apply is the [OTAUpdateManager]'s to decide; removable in v0.26.0.
 type OTAApplyPolicy = mattercore.OTAApplyPolicy //nolint:staticcheck // the deprecated alias keeps its type for its window
 
 // OTAUpdateManager is the type of [OTAProviderConfig].Manager: the owner of the requestors' update attempts the provider asks ([mattercore.OTAUpdateManager]).
