@@ -316,7 +316,10 @@ const (
 // not held to (by design, BD-Thermostat-HostSchedules, owner decision O-8),
 // and CommissioningFailsafeExpiryTest.ts's expiry before the flow armed (by
 // design, BD-chip-Commissioner-AbortDisarmsFailSafe): 765.
-const testparityLeftRatchet = 765
+// Pin lift b25ed960 wave P3b ports TimeFormatLocalizationServerTest.ts's
+// stored and detected calendar fallback on node over Config.TimeFormat's
+// calendar list (decision 360, C-15): 764.
+const testparityLeftRatchet = 764
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

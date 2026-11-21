@@ -2217,7 +2217,7 @@
       "path": "packages/node/test/behavior/cluster/BehaviorAccessorsTypingTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "TypeScript type-level checks of the commandsOf/stateOf/setStateOf accessors; nothing runs on the wire.",
+      "reason": "TypeScript type-level checks of the commandsOf/stateOf/setStateOf accessors; nothing runs on the wire. The one command a Go host reaches this way, SetActivePresetRequest, is thermostatdef.Host.ActivatePreset, held by device's TestThermostatHostActivatePreset.",
       "snapshotSha": "e0f228c7dde5266e922d75eabbc72766d958aae4"
     },
     {
@@ -4610,9 +4610,10 @@
         "cluster/core:TestTimeFormatLocalizationServerParityMatterJS",
         "cluster/core:TestParityMatterJS_TimeFormatLocalization",
         "cluster/core:TestTimeFormatLocalizationServerStartParityMatterJS",
-        "node:TestTimeFormatLocalizationStoredParityMatterJS"
+        "node:TestTimeFormatLocalizationStoredParityMatterJS",
+        "node:TestTimeFormatConfigStoredParityMatterJS"
       ],
-      "reason": "The createEndpoint writes, start-up with the host's detected values, the empty or absent list seeded, the accepted and refused writes (UseActiveLocale included) and the restart through OnWrite run on the server (cluster/core/time_format_localization_server_parity_matterjs_test.go). Pin lift b25ed960, P1-F (decision 296). Decision 358: an unset ActiveCalendarType starts at the list's first, an unset HourFormat and an unset calendar without a list are refused; NoFeatures is the server without CalendarFormat (decision 359). The stored-calendar case runs on node (node/localization_stored_parity_matterjs_test.go; P2b-I).",
+      "reason": "The createEndpoint writes, start-up with the host's detected values, the empty or absent list seeded, the accepted and refused writes (UseActiveLocale included) and the restart through OnWrite run on the server (cluster/core/time_format_localization_server_parity_matterjs_test.go). Pin lift b25ed960, P1-F (decision 296). Decision 358: an unset ActiveCalendarType starts at the list's first, an unset HourFormat and an unset calendar without a list are refused; NoFeatures is the server without CalendarFormat (decision 359). The stored-calendar case runs on node (node/localization_stored_parity_matterjs_test.go; P2b-I). The second stored-calendar case runs on node over Config.TimeFormat's calendar list (node/time_format_config_test.go; P3b-H, decision 360).",
       "snapshotSha": "8fa44075d5ef8a50461f06067cd8a7479591a7e5",
       "left": [
         {
@@ -4629,11 +4630,6 @@
           "it": "replaces a configured ActiveCalendarType that is not in the configured list",
           "class": "by-design",
           "reason": "BD-Matter-Localization-ConfiguredStartValueRefused: a configured ActiveCalendarType the configured list lacks is refused with ErrLocalizationConfig, not replaced"
-        },
-        {
-          "it": "falls back to the first supported calendar when the stored and the detected calendar are not listed",
-          "class": "by-design",
-          "reason": "BD-Matter-Localization-ConfiguredStartValueRefused: the node builds TimeFormatLocalization with [Gregorian] and takes no calendar list from its configuration (node/root.go buildRootOptional, decision 360); its list always holds its start calendar, and cluster/core holds no stored value"
         }
       ]
     },
