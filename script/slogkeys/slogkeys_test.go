@@ -106,7 +106,7 @@ var areaKeys = []string{
 	"protocol_code", "protocol_id", "provider",
 	"queued", "reachable", "rearm_for", "recovered_total",
 	"reestablished", "registered", "reports", "req_paths", "request_id",
-	"requirement", "resp", "responder", "response_type", "responses",
+	"requested", "requirement", "resp", "responder", "response_type", "responses",
 	"result", "resumed", "retained", "retransmission", "retry", "retry_in", "retry_limit",
 	"role", "running", "schedule_handle", "scope", "send_failures", "send_interval", "served", "served_as", "service",
 	"sessions", "since_last_restart", "skid", "source", "source_endpoint",
@@ -118,7 +118,7 @@ var areaKeys = []string{
 	"status_name", "statuses", "step", "stored", "stored_fabrics", "subject",
 	"subsystem", "supported", "suppress_response",
 	"sw_version", "system_mode", "target", "targets", "tcp", "test", "timed", "timeout",
-	"timeout_ms", "to", "token", "took", "total", "total_endpoints",
+	"timeout_ms", "to", "token", "took", "token_version", "total", "total_endpoints",
 	"trimmed_bytes", "type", "uri_node", "url", "valid",
 	// controller/camera (phase 37): a camera's WebRTC session and stream ids
 	// and the track of a session start.
