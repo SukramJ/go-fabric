@@ -88,10 +88,13 @@ func testTCPCloseInFlight(t *testing.T, resume func(b *Bridge, c *tcp.Conn, rout
 	if err := client.Send(h.sealedInvoke(0x311)); err != nil {
 		t.Fatal(err)
 	}
+	// One deadline bounds both waits on the handler.
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer waitCancel()
 	var server *tcp.Conn
 	select {
 	case server = <-parked:
-	case <-time.After(5 * time.Second):
+	case <-waitCtx.Done():
 		t.Fatal("the handler never ran")
 	}
 
@@ -106,7 +109,7 @@ func testTCPCloseInFlight(t *testing.T, resume func(b *Bridge, c *tcp.Conn, rout
 	unparkOnce.Do(func() { close(unpark) })
 	select {
 	case <-handled:
-	case <-time.After(5 * time.Second):
+	case <-waitCtx.Done():
 		t.Fatal("the handler never returned")
 	}
 
