@@ -619,3 +619,33 @@ func TestOTAProvider_RebootJudgedBySessionActivity(t *testing.T) {
 		t.Fatal("the old transfer was not cancelled")
 	}
 }
+
+// TestOTAStandaloneManagerUnderItsLock (decision 292 (b)): the default
+// manager changes the attempts only under its lock — the provider's
+// queries, applies and notifications and a consent removal race here, and
+// -race reports a path that does not; the outcome is not asserted.
+func TestOTAStandaloneManagerUnderItsLock(t *testing.T) {
+	t.Parallel()
+	f := newOTAFixture(t, nil)
+	var wg sync.WaitGroup
+	for g := range 4 {
+		wg.Go(func() {
+			for i := range 25 {
+				r := f.query(t, uint16(10+g), bdxQuery())
+				if r.UpdateToken == nil {
+					continue
+				}
+				switch (g + i) % 3 {
+				case 0:
+					f.apply(t, *r.UpdateToken, 2)
+				case 1:
+					f.removeConsent(0, true)
+				default:
+					_, _ = f.p.MatterInvoke(otaCtx(7), provdef.CmdNotifyUpdateApplied, provdef.NotifyUpdateAppliedRequest{UpdateToken: *r.UpdateToken, SoftwareVersion: 2})
+				}
+				_ = f.p.MatterHeldFabrics()
+			}
+		})
+	}
+	wg.Wait()
+}
