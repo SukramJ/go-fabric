@@ -922,7 +922,7 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 		w.p("// %sDef describes %s.", di.goName, d.Name)
 		w.p("//")
 		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
-		w.p("var %sDef = &spec.Struct{Name: %q, Fields: %s}", di.goName, d.Name, g.fieldsLiteral(di.fields))
+		w.p("var %sDef = &spec.Struct{Name: %q, Fields: %s}", di.goName, d.Name, g.fieldsLiteral("struct "+d.Name, di.fields))
 		w.p("")
 	default:
 	}
@@ -1310,7 +1310,7 @@ func (g *generator) writeDefinition(w *writer) {
 				w.p("\t\t\tAccess: %s,", lit)
 			}
 			if len(p.fields) > 0 {
-				w.p("\t\t\tFields: %s,", g.fieldsLiteral(p.fields))
+				w.p("\t\t\tFields: %s,", g.fieldsLiteral("command "+cmd.Name, p.fields))
 			}
 			if lit := p.check.literal(); lit != "" {
 				w.p("\t\t\tCheck: %s,", lit)
@@ -1332,7 +1332,7 @@ func (g *generator) writeDefinition(w *writer) {
 				w.p("\t\t\tAccess: %s,", lit)
 			}
 			if len(p.fields) > 0 {
-				w.p("\t\t\tFields: %s,", g.fieldsLiteral(p.fields))
+				w.p("\t\t\tFields: %s,", g.fieldsLiteral("event "+ev.Name, p.fields))
 			}
 			w.p("\t\t\tDecode: decode%s,", p.goName)
 			w.p("\t\t},")
@@ -1345,6 +1345,7 @@ func (g *generator) writeDefinition(w *writer) {
 
 // writeAttribute writes one attribute of the definition.
 func (g *generator) writeAttribute(w *writer, a *element) {
+	defer within("attribute " + a.Name)
 	v := &a.Effective.value
 	t := g.attrType[a.ID]
 	w.p("\t\t{")
@@ -1360,7 +1361,7 @@ func (g *generator) writeAttribute(w *writer, a *element) {
 	if lit := constraintLiteral(v.Constraint, v.Type, v.Metatype); lit != "" {
 		w.p("\t\t\tConstraint: %s,", lit)
 	}
-	if lit := defaultLiteral(v.Default, v.Type, v.Metatype); lit != "" {
+	if lit := typedDefault(t, v); lit != "" {
 		w.p("\t\t\tDefault: %s,", lit)
 	} else if lit := structDefault(t); lit != "" {
 		w.p("\t\t\tDefault: %s,", lit)
@@ -1414,7 +1415,7 @@ func (g *generator) typeLiteral(t typeInfo, v *value) string {
 			if g.data[t.dt.dt.Name] == t.dt {
 				parts = append(parts, "Struct: "+t.dt.goName+"Def")
 			} else {
-				parts = append(parts, fmt.Sprintf("Struct: &spec.Struct{Name: %q, Fields: %s}", t.dt.goName, g.fieldsLiteral(t.dt.fields)))
+				parts = append(parts, fmt.Sprintf("Struct: &spec.Struct{Name: %q, Fields: %s}", t.dt.goName, g.fieldsLiteral("struct "+t.dt.goName, t.dt.fields)))
 			}
 		default:
 		}
@@ -1426,7 +1427,10 @@ func (g *generator) typeLiteral(t typeInfo, v *value) string {
 	return "spec.Type{" + strings.Join(parts, ", ") + "}"
 }
 
-func (g *generator) fieldsLiteral(fields []*fieldInfo) string {
+// fieldsLiteral renders the fields of owner ("struct S", "command C",
+// "event E"), which a render error names ([within]).
+func (g *generator) fieldsLiteral(owner string, fields []*fieldInfo) string {
+	defer within(owner)
 	if len(fields) == 0 {
 		return "nil"
 	}
@@ -1438,6 +1442,7 @@ func (g *generator) fieldsLiteral(fields []*fieldInfo) string {
 }
 
 func (g *generator) fieldLiteral(f *fieldInfo) string {
+	defer within("field " + f.name)
 	parts := []string{}
 	if f.name != "entry" {
 		parts = append(parts, fmt.Sprintf("ID: %d", f.id))
@@ -1456,7 +1461,7 @@ func (g *generator) fieldLiteral(f *fieldInfo) string {
 		if f.v.Access != nil && f.v.Access.Fabric == "S" {
 			parts = append(parts, "FabricSensitive: true")
 		}
-		if lit := defaultLiteral(f.v.Default, f.v.Type, f.v.Metatype); lit != "" {
+		if lit := typedDefault(f.t, f.v); lit != "" {
 			parts = append(parts, "Default: "+lit)
 		}
 	}
@@ -1731,6 +1736,31 @@ func referenceOf(raw json.RawMessage) string {
 	return ref.Name
 }
 
+// typedDefault is [defaultLiteral] of v's stated default, after refusing
+// a string where t is numeric (an integer, a float, an enum or a bitmap).
+// The extractor writes every bigint as its decimal string
+// (script/extract-from-matter-js.ts jsonable), so a default matter.js
+// states as a bigint arrives in the snapshot as a string; rendered by
+// defaultLiteral as a Go string it would never compare equal to the
+// number the runtime holds. No numeric default is a bigint at the pin,
+// so this fails the generation ([renderError]) the day one is, and the
+// extractor is then taught to tell the two apart (N6b-gen-1, R5). A
+// string default on an untyped element is no numeric type and stays as
+// it was: DoorLock SecurityLevel's "0", a string in matter.js
+// packages/model/src/standard/elements/door-lock-cluster.element.ts:123
+// at b25ed960.
+func typedDefault(t typeInfo, v *value) string {
+	if numericKinds[t.kind] && bytes.HasPrefix(bytes.TrimSpace(v.Default), []byte(`"`)) {
+		panic(renderError{fmt.Errorf("default %s on numeric type %q: a string where a number is due, as the extractor writes a bigint", compactJSON(v.Default), t.name)})
+	}
+	return defaultLiteral(v.Default, v.Type, v.Metatype)
+}
+
+// numericKinds are the kinds whose value is a number on the wire.
+var numericKinds = map[kind]bool{
+	kindUint: true, kindInt: true, kindFloat32: true, kindFloat64: true, kindEnum: true, kindBitmap: true,
+}
+
 // defaultLiteral renders a stated default: a scalar as itself, null as
 // spec.NullDefault, and a temperature or percentage stated with its unit
 // ({"type":"celsius","value":26}) in the encoding units of the type that
@@ -1865,6 +1895,20 @@ func confLiteral(c *conformance) string {
 // which return no error, to generate: every generator refuses a form it
 // does not render (wizard-6b §2 gen Q1).
 type renderError struct{ err error }
+
+// within, deferred, prefixes a [renderError] raised below it with where
+// ("attribute X", "struct S", "field F"), so the error generate returns
+// names the element as well as the cluster. Any other panic passes on.
+func within(where string) {
+	r := recover()
+	if r == nil {
+		return
+	}
+	if re, ok := r.(renderError); ok {
+		panic(renderError{fmt.Errorf("%s: %w", where, re.err)})
+	}
+	panic(r)
+}
 
 var opLiteral = map[string]string{
 	"M": "spec.ConfMandatory", "O": "spec.ConfOptional", "P": "spec.ConfProvisional", "D": "spec.ConfDeprecated",
