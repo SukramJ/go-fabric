@@ -255,11 +255,14 @@ func TestPersistedOrderIsTheActivationOrder(t *testing.T) {
 	ctrl.setBridge(run1.addr(t))
 
 	subA := subscribeOverCASE(t, run1, ctrl)
-	select {
-	case <-park.parked:
-	case <-time.After(5 * time.Second):
-		t.Fatal("A's handler did not reach its debug record")
-	}
+	waitFor(t, "A's handler held on its debug record", func() bool {
+		select {
+		case <-park.parked:
+			return true
+		default:
+			return false
+		}
+	})
 	subB := subscribeAgainOverCASE(t, ctrl)
 	waitFor(t, "B persisted", func() bool { return slices.Contains(st.saved(), subB) })
 	if got := st.saved(); !slices.Equal(got, []uint32{subA, subB}) {
