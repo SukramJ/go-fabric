@@ -591,13 +591,12 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	if !ok {
 		return
 	}
-	if heard := ex.received.Load(); heard == 0 {
+	if ex.received.Load() == 0 {
 		b.closeLostPeer(sessionID, exchangeID, ex.createdAtMono, "an exchange this node opened")
 	} else if b.logger != nil {
 		b.logger.Debug("matter.exchange.initiated.given_up",
 			slog.Int("session_id", int(sessionID)),
 			slog.Int("exchange_id", int(exchangeID)),
-			slog.Uint64("received", heard),
 			slog.String("hint", "the peer answered on this exchange; no peer loss"))
 	}
 	ex.fail(mrp.ErrMaxRetransmissionsReached)
