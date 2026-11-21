@@ -210,10 +210,11 @@ func transferOf(r *bdx.Responder, peer OTAPeer) interface {
 	if r == nil {
 		return nil
 	}
-	if s := r.SessionFor(peer.bdx(), otaScope); s != nil {
-		return s
+	s := r.SessionFor(peer.bdx(), otaScope)
+	if s == nil {
+		return nil // no typed nil in the interface
 	}
-	return nil
+	return s
 }
 
 // MayDelegateConsentTo implements [OTAUpdateManager]: a requestor that
