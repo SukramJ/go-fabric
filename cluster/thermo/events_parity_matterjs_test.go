@@ -343,8 +343,8 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 			t.Parallel()
 			c := onlineEvents(t, basicConfig(func(cfg *thermo.ThermostatConfig) { cfg.Sink = refusingSink{} }))
 			c.record()
-			if err := c.srv.MatterWrite(context.Background(), tdef.AttrSystemMode, uint8(tdef.SystemModeHeat)); err == nil {
-				t.Fatal("the refused write succeeded")
+			if err := c.srv.MatterWrite(context.Background(), tdef.AttrSystemMode, uint8(tdef.SystemModeHeat)); !isStatus(err, im.StatusFailure) {
+				t.Fatalf("the refused write: %v, want FAILURE", err)
 			}
 			if got := c.rec.of(tdef.EventSystemModeChange); len(got) != 0 {
 				t.Fatalf("SystemModeChange %+v, want none", got)
