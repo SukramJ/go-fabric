@@ -228,8 +228,11 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// carries the piggyback grace window, behind which a duplicate
 	// ack must not hide (the peer would retransmit again meanwhile).
 	// Expedite it to due-now, flush the pump, drop processing.
-	// Mirrors matter.js MessageExchange.ts:501-511 at db021da0 (duplicate +
-	// requiresAck → sendStandaloneAckForMessage without delay).
+	// Mirrors matter.js MessageExchange.ts:514-523 at b25ed960 (duplicate +
+	// requiresAck → sendStandaloneAckForMessage without delay, unless
+	// #kickRetransmissionForLiveness re-sent the pending message instead,
+	// :593-646 — a kick confined to BDX exchanges that the bridge does not
+	// have yet, an open gap in notes/parity/matter_behaviour_findings.md).
 	if duplicate {
 		b.expediteDuplicateAck(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
 		b.RunAckPumpOnce(b.clk().Now())
