@@ -159,7 +159,8 @@ import (
 // securechannel_close_parity_test.go and fabric_session_close_test.go
 // re-read at b25ed960 leave two rows (measured by make cite-report).
 // 415 after P5-A: controller/softwareupdate's cites re-pointed at b25ed960.
-const citecheckDriftRatchet = 415
+// 412 after P5-S: client/interaction/interaction.go's #network, #interactions and ClosedError cites re-read at b25ed960.
+const citecheckDriftRatchet = 412
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -219,8 +220,8 @@ const citecheckDriftRatchet = 415
 // cites, the CloseSession tests, commissioning_window.go's
 // PaseSessionCloser). Wave P5-B relabelled 3 more (controller/client
 // fabricops.go, client/interaction/interaction.go, controller/client/node.go). Wave P5-A re-pointed controller/softwareupdate's
-// cites at b25ed960.
-const citecheckOffPinRatchet = 2690
+// cites at b25ed960. Wave P5-S re-pointed images.go's and interaction.go's remaining cites at b25ed960 (2675; images.go's checkForUpdate cite labelled at db021da0, its selection not yet the pin's).
+const citecheckOffPinRatchet = 2675
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

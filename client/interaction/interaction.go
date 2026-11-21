@@ -13,7 +13,7 @@
 // the peer's MaxPathsPerInvoke (InvokeBatch), and single commands invoked
 // within one batch duration share an InvokeRequest when the peer takes
 // more than one path (Invoke). The batcher is matter.js's
-// #invokeWithBatching (ClientInteraction.ts:744-1005 at db021da0).
+// #invokeWithBatching (ClientInteraction.ts:752-1014 at b25ed960).
 //
 // The messages are encoded and decoded with im/'s client encoders and
 // decoders, the shapes of matter.js's TLV message definitions.
@@ -35,9 +35,10 @@ import (
 )
 
 // Timeouts of the client. Mirrors matter.js
-// packages/protocol/src/action/client/ClientInteraction.ts:175
-// (DEFAULT_TIMED_REQUEST_TIMEOUT = 10 s) and :176
-// (DEFAULT_MINIMUM_RESPONSE_TIMEOUT_WITH_FAILSAFE = 30 s) at db021da0.
+// packages/protocol/src/action/client/ClientInteraction.ts at b25ed960:
+// DEFAULT_TIMED_REQUEST_TIMEOUT = 10 s (ClientInteraction.ts:194 at b25ed960)
+// and DEFAULT_MINIMUM_RESPONSE_TIMEOUT_WITH_FAILSAFE = 30 s
+// (ClientInteraction.ts:195 at b25ed960).
 const (
 	DefaultTimedRequestTimeout                = 10 * time.Second
 	DefaultMinimumResponseTimeoutWithFailsafe = 30 * time.Second
@@ -80,8 +81,8 @@ func (e *StatusError) Error() string {
 }
 
 // Interaction is the client side of the Interaction Model towards one
-// peer — matter.js ClientInteraction (ClientInteraction.ts:219-1343 at
-// db021da0) bound to an exchange [Provider]: a session ([New]) or a peer
+// peer — matter.js ClientInteraction (ClientInteraction.ts:239-1367 at
+// b25ed960) bound to an exchange [Provider]: a session ([New]) or a peer
 // whose sessions come and go ([ForPeer]). It is safe for concurrent use;
 // each call runs on its own exchange.
 type Interaction struct {
@@ -90,7 +91,8 @@ type Interaction struct {
 	log      *slog.Logger
 	clock    exchange.Clock
 	rand     func() float64
-	// network is [Config].Network, #network (ClientInteraction.ts:231).
+	// network is [Config].Network, #network (ClientInteraction.ts:252 at
+	// b25ed960).
 	network string
 	// maxReport is the report bound of its exchanges
 	// ([Config].MaxReportBytesPerSession).
@@ -101,9 +103,11 @@ type Interaction struct {
 	attemptHook func(ctx context.Context, req SubscribeRequest, opts ExchangeOptions) (*Subscription, error)
 
 	// closeMu guards closed and the in-flight count's Add against Close;
-	// inflight is #interactions, one per running exchange
-	// (ClientInteraction.ts:225-226); abort is #abort (:228, :291-293),
-	// which every running exchange's context follows.
+	// inflight is #interactions (ClientInteraction.ts:245-246 at b25ed960),
+	// one per running exchange; abort is #abort (ClientInteraction.ts:249 at
+	// b25ed960), aborted by close (ClientInteraction.ts:311 at b25ed960),
+	// which every running exchange's context follows
+	// (ClientInteraction.ts:1269 at b25ed960).
 	closeMu  sync.Mutex
 	closed   error
 	inflight sync.WaitGroup
@@ -111,7 +115,7 @@ type Interaction struct {
 	abortFn  context.CancelCauseFunc
 
 	// batchMu guards the batcher: lanes is #batchLanes and nextCommandRef
-	// #nextCommandRef (ClientInteraction.ts:233-236 at db021da0).
+	// #nextCommandRef (ClientInteraction.ts:254-257 at b25ed960).
 	batchMu        sync.Mutex
 	lanes          map[string]*batchLane
 	nextCommandRef uint16
@@ -128,7 +132,8 @@ type Interaction struct {
 }
 
 // ErrClosed is the reason of [Interaction.Close] without one — matter.js
-// ClosedError "Interaction component closed" (ClientInteraction.ts:265-267).
+// ClosedError "Interaction component closed" (ClientInteraction.ts:286-288
+// at b25ed960).
 var ErrClosed = errors.New("interaction: interaction component closed")
 
 // Config configures an [Interaction] — what matter.js ClientInteraction
@@ -148,9 +153,12 @@ type Config struct {
 	Rand func() float64
 	// Network is the network profile of every request that names none —
 	// matter.js ClientInteractionContext.network
-	// (ClientInteraction.ts:162, :231, :250 at db021da0), applied as
-	// `request.network ?? this.#network` to the exchange (:1250) and to the
-	// batch lane of a command (:765): a command without a network and one
+	// (ClientInteraction.ts:181 at b25ed960), the field #network
+	// (ClientInteraction.ts:252 at b25ed960) set in the constructor
+	// (ClientInteraction.ts:271 at b25ed960), applied as
+	// `request.network ?? this.#network` to the exchange
+	// (ClientInteraction.ts:1273 at b25ed960) and to the batch lane of a
+	// command (ClientInteraction.ts:773 at b25ed960): a command without a network and one
 	// naming this network share a batch. "" is the peer's medium profile.
 	Network string
 	// MaxReportBytesPerSession bounds the report chunks the session's
@@ -201,8 +209,8 @@ func (c *Interaction) Session() *exchange.Session { return c.provider.Session() 
 // message with expected processing time ept: our retransmissions, ept and
 // the 5 s buffer, plus — with includeSending — the peer's retransmissions
 // back to us. Mirrors matter.js ClientInteraction.maximumPeerResponseTime
-// (packages/protocol/src/action/client/ClientInteraction.ts:1333-1334 at
-// db021da0), the provider's computation (review II, R2-P6-doc-2906).
+// (packages/protocol/src/action/client/ClientInteraction.ts:1357-1358 at
+// b25ed960), the provider's computation (review II, R2-P6-doc-2906).
 func (c *Interaction) MaximumPeerResponseTime(ept time.Duration, includeSending bool) time.Duration {
 	return c.provider.MaximumPeerResponseTime(ept, includeSending)
 }
@@ -227,7 +235,8 @@ func (c *Interaction) Close(reason error) {
 	c.closeMu.Unlock()
 	c.closeEstablished()
 	// The queued commands are rejected before the abort, so an in-flight
-	// batch cancels instead of running to completion (ClientInteraction.ts:284-295).
+	// batch cancels instead of running to completion
+	// (ClientInteraction.ts:300-311 at b25ed960).
 	c.closeBatches(reason)
 	c.abortFn(reason)
 	c.inflight.Wait()
@@ -312,10 +321,12 @@ type messenger struct {
 	// maxReport is the bound on the report chunks the exchange's session
 	// holds ([Config].MaxReportBytesPerSession); zero is the default.
 	maxReport int
-	// reportAwaitsStatus and reportSubscriptionID are #reportAwaitsStatus
-	// and #subscriptionId (InteractionMessenger.ts:982, :1013-1025 at
-	// db021da0): a report was read whose status is still owed, and the
-	// subscription it named.
+	// reportAwaitsStatus and reportSubscriptionID are matter.js's
+	// #reportAwaitsStatus (InteractionMessenger.ts:988 at b25ed960) and
+	// #subscriptionId (InteractionMessenger.ts:990 at b25ed960), set in
+	// readDataReports (InteractionMessenger.ts:1019-1032 at b25ed960): a
+	// report was read whose status is still owed, and the subscription it
+	// named.
 	reportAwaitsStatus   bool
 	reportSubscriptionID uint32
 	// unacknowledgedReportStatus is #unacknowledgedReportStatus
@@ -433,7 +444,7 @@ func (m *messenger) sendStatus(ctx context.Context, status im.StatusCode) error 
 
 // sendInvalidSubscription sends a StatusResponse INVALID_SUBSCRIPTION
 // whose wait for the acknowledgement ackWaitAbort ends — sendInvalidSubscription
-// (InteractionMessenger.ts:1070-1080 at db021da0).
+// (InteractionMessenger.ts:1094-1104 at b25ed960).
 func (m *messenger) sendInvalidSubscription(ackWaitAbort <-chan struct{}) error {
 	enc := tlv.NewEncoder()
 	im.StatusResponse{Status: im.StatusInvalidSubscription}.MarshalTLV(enc)

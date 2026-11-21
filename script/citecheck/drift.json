@@ -741,7 +741,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 48,
+    "line": 49,
     "citation": "InteractionMessenger.ts:186-190",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "MatterFlowError",
@@ -750,7 +750,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 58,
+    "line": 59,
     "citation": "ControllerCommissioningFlow.ts:519-523",
     "resolved": "packages/protocol/src/peer/ControllerCommissioningFlow.ts",
     "identifier": "StatusResponseError",
@@ -759,7 +759,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 60,
+    "line": 61,
     "citation": "InteractionMessenger.ts:201-214",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ReceivedStatusResponseError",
@@ -768,34 +768,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 93,
-    "citation": "ClientInteraction.ts:231",
-    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
-    "identifier": "#network",
-    "nearest": 252,
-    "occurrences": 5
-  },
-  {
-    "file": "client/interaction/interaction.go",
-    "line": 105,
-    "citation": "ClientInteraction.ts:225-226",
-    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
-    "identifier": "#interactions",
-    "nearest": 246,
-    "occurrences": 8
-  },
-  {
-    "file": "client/interaction/interaction.go",
-    "line": 131,
-    "citation": "ClientInteraction.ts:265-267",
-    "resolved": "packages/protocol/src/action/client/ClientInteraction.ts",
-    "identifier": "ClosedError",
-    "nearest": 287,
-    "occurrences": 2
-  },
-  {
-    "file": "client/interaction/interaction.go",
-    "line": 423,
+    "line": 434,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
