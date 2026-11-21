@@ -215,9 +215,11 @@ type CommissioningWindow struct {
 	// RevokeWindow to evict any open PASE session per Matter §11.19.7.3.
 	paseSessionCloser PaseSessionCloser
 	// sessionOwner, when non-nil, closes the PASE sessions of the bridge
-	// the window is attached to; RevokeWindow runs it after
-	// paseSessionCloser. Set by [Bridge.AttachCommissioningWindow].
-	sessionOwner func()
+	// the window is attached to. RevokeWindow hands it the run of
+	// paseSessionCloser (hostClose), which it calls after it told the
+	// sessions' peers with a CloseSession and before it closes them
+	// itself. Set by [Bridge.AttachCommissioningWindow].
+	sessionOwner func(hostClose func())
 
 	// paseVerifierInstaller, when non-nil, installs a window-lifetime PASE
 	// acceptor from a commissioner-supplied PAKE verifier on the Enhanced
@@ -280,7 +282,7 @@ func (w *CommissioningWindow) SetPaseSessionCloser(c PaseSessionCloser) {
 
 // setSessionOwner wires (or clears, when nil) the bridge's own close of
 // its PASE sessions; see the sessionOwner field.
-func (w *CommissioningWindow) setSessionOwner(closePASE func()) {
+func (w *CommissioningWindow) setSessionOwner(closePASE func(hostClose func())) {
 	w.mu.Lock()
 	w.sessionOwner = closePASE
 	w.mu.Unlock()
@@ -858,18 +860,24 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	// the close until the session's exchanges end (NodeSession
 	// deferredClose): closing first left the RevokeCommissioning
 	// unanswered (TC-CADMIN-1.10 step 9).
+	//
+	// The bridge the window is attached to runs the host's closer: it
+	// tells the PASE sessions' peers with a CloseSession first, while the
+	// sessions are live, since a host's closer closes silently (the node
+	// facade's is CloseFabric(0)) — see [Bridge.closePASESessionsOnRevoke].
 	w.mu.RLock()
 	closer := w.paseSessionCloser
 	owner := w.sessionOwner
 	w.mu.RUnlock()
 	if closer != nil || owner != nil {
-		closeNow := func() {
+		hostClose := func() {
 			if closer != nil {
 				_ = closer.ClosePaseSessions(context.WithoutCancel(ctx))
 			}
-			if owner != nil {
-				owner()
-			}
+		}
+		closeNow := hostClose
+		if owner != nil {
+			closeNow = func() { owner(hostClose) }
 		}
 		if !im.IsPASEFromContext(ctx) || !im.DeferAfterResponse(ctx, closeNow) {
 			closeNow()
