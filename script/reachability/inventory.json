@@ -1594,7 +1594,7 @@
       "identifier": "TestCASEAdapterReturnsItsSessionIDWhenItsHandshakeDoesNotFinish",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 142
+      "line": 145
     },
     {
       "package": "bridge",
@@ -1615,7 +1615,7 @@
       "identifier": "TestCASEMessagesThatStartNoHandshakeBuildNoAdapter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 45
+      "line": 48
     },
     {
       "package": "bridge",
@@ -4881,6 +4881,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInitiatedExchangePeerLossDeclarationParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_heard_test.go",
+      "line": 140
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInitiatedExchangePeerLoss_ForceClosesPeerSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
@@ -5556,7 +5563,7 @@
       "identifier": "TestPASEAdapterReturnsItsSessionIDWhenItsProviderDropsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 200
+      "line": 203
     },
     {
       "package": "bridge",
@@ -5577,7 +5584,7 @@
       "identifier": "TestPASEContinuationsThatStartNoHandshakeAreDroppedOnTheSingleton",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 97
+      "line": 100
     },
     {
       "package": "bridge",
@@ -5612,7 +5619,7 @@
       "identifier": "TestPASEMessagesThatStartNoHandshakeBuildNoAdapter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_session_id_test.go",
-      "line": 68
+      "line": 71
     },
     {
       "package": "bridge",

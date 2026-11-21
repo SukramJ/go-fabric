@@ -301,7 +301,7 @@
   },
   {
     "file": "bridge/ota_provider_link.go",
-    "line": 585,
+    "line": 631,
     "citation": "SessionManager.ts:677-695",
     "resolved": "packages/protocol/src/session/SessionManager.ts",
     "identifier": "#handlePeerLoss",
