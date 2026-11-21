@@ -1525,6 +1525,10 @@ func (m *Manager) QueuedUpdates() []PendingUpdate {
 			continue
 		}
 		ph := *e.phase
+		if ph.legacy != nil {
+			l := *ph.legacy // refreshBdxProgressLocked moves its time under m.mu
+			ph.legacy = &l
+		}
 		u := PendingUpdate{Peer: e.peer, VendorID: e.VendorID, ProductID: e.ProductID, TargetSoftwareVersion: e.TargetSoftwareVersion}
 		switch ph.state {
 		case phaseProgress:
