@@ -40,6 +40,8 @@ type managerRig struct {
 	basic basicinfo.State
 	// extra are further present peers with testPeer's node.
 	extra map[Peer]bool
+	// notApplicable has the nodes present but not applicable for updates.
+	notApplicable bool
 }
 
 func newManagerRig(t *testing.T, edit func(*Config)) *managerRig {
@@ -80,6 +82,9 @@ func (r *managerRig) nodeOf(p Peer) (nodeView, bool) {
 		return nodeView{}, false
 	}
 	basic, endpoint := r.basic, uint16(0)
+	if r.notApplicable {
+		return nodeView{basic: &basic}, true
+	}
 	return nodeView{basic: &basic, endpoint: &endpoint}, true
 }
 

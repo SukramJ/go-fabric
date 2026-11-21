@@ -1271,13 +1271,16 @@ func TestManagerProductCheckQueuesParity(t *testing.T) {
 		name      string
 		consent   uint32 // 0: none
 		gone      bool
+		unqueued  bool // the consent was given while the node was not applicable: no entry
 		queued    []uint32
 		available int
 	}{
-		{"queues a lower consent and asks for the version found", 1, false, []uint32{1}, 1},
-		{"queues a higher consent without asking", 3, false, []uint32{3}, 0},
-		{"asks for a node without a consent", 0, false, []uint32{}, 1},
-		{"skips a node removed during the check", 1, true, []uint32{1}, 0},
+		// SUM:1619-1621: "a later update check queues its update"
+		{name: "queues a consent given while the node was not applicable, also for another version", consent: 1, unqueued: true, queued: []uint32{1}, available: 1},
+		{name: "queues a lower consent and asks for the version found", consent: 1, queued: []uint32{1}, available: 1},
+		{name: "queues a higher consent without asking", consent: 3, queued: []uint32{3}},
+		{name: "asks for a node without a consent", queued: []uint32{}, available: 1},
+		{name: "skips a node removed during the check", consent: 1, gone: true, queued: []uint32{1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -1286,9 +1289,18 @@ func TestManagerProductCheckQueuesParity(t *testing.T) {
 				c.OnUpdateAvailable = func(Peer, SoftwareUpdateInfo) { available.Add(1) }
 			})
 			r.storeImage(t, 2, ModeProd)
+			r.mu.Lock()
+			r.notApplicable = tc.unqueued
+			r.mu.Unlock()
 			if tc.consent != 0 {
 				r.consentTo(t, tc.consent)
 			}
+			if _, targets := r.consentsAndTargets(); tc.unqueued && len(targets) != 0 {
+				t.Fatalf("queued %v before the check, want no entry", targets)
+			}
+			r.mu.Lock()
+			r.notApplicable = false
+			r.mu.Unlock()
 			r.setNode(tc.gone, nil)
 			if _, err := r.m.checkProductForUpdates(context.Background(), 0xFFF1, 0x8001, 0,
 				[]prepared{{peer: testPeer, vendorID: 0xFFF1, productID: 0x8001}}, true); err != nil {
