@@ -90,9 +90,9 @@ func readPeerDatagrams(t *testing.T, conn *net.UDPConn, wait time.Duration, peer
 }
 
 // TestCommissioningCompleteClearsThePASESessionAtOnce pins Matter
-// §11.10.6.6 step 4 as matter.js performs it — completeCommission closes
-// the PASE session inside the command, before the response is built,
-// silently and with no timer (FailsafeContext.ts:156-157, :191-196,
+// §11.10.6.6 step 4 as matter.js performs it — the PASE session is closed
+// inside the command, before the response is built, silently and with no
+// timer (FailsafeContext.ts:156-157, :191-196,
 // Session.ts:331-344, NodeSession.ts:450-453 at b25ed960) — on a bridge
 // with a real session table: after a CommissioningComplete answered OK
 // over CASE, (a) the PASE session AddNOC adopted onto the fabric is gone

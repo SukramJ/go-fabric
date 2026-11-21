@@ -92,8 +92,8 @@ func (l caseOnFabricLookup) IsPASE(id uint16) (pase, ok bool) { return false, id
 // that wires the bridge and the root clusters itself — no node facade —
 // has the PASE sessions cleared by a successful CommissioningComplete,
 // before its response goes out, Matter §11.10.6.6 step 4. Mirrors matter.js
-// packages/protocol/src/common/FailsafeContext.ts:156-157 at b25ed960
-// (completeCommission: "The Secure Session Context of any PASE session
+// packages/protocol/src/common/FailsafeContext.ts:138-160 at b25ed960
+// (completeCommission; step 4 at :156-157: "The Secure Session Context of any PASE session
 // still established at the Server SHALL be cleared" → closePaseSession).
 // The CASE session the command arrived on stays, and the close is logged
 // with the PASE session's id (matter.session.pase_close, the line the

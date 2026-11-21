@@ -55,9 +55,10 @@ func commissioningCompleteAnswer(code uint8) im.InvokeResponse {
 }
 
 // TestPASEClosedOnCommissioningCompleteParity pins Matter §11.10.6.6 step 4
-// as matter.js packages/protocol/src/common/FailsafeContext.ts:156-157 at
-// b25ed960 performs it (completeCommission → closePaseSession, awaited
-// before the response is built, GeneralCommissioningServer.ts:255), in the
+// as matter.js packages/protocol/src/common/FailsafeContext.ts:138-160 at
+// b25ed960 performs it (completeCommission; step 4 at :156-157 calls
+// closePaseSession, awaited before the response is built,
+// GeneralCommissioningServer.ts:255), in the
 // bridge: the PASE session — the one AddNOC adopted onto the fabric
 // included — is cleared at once, before the CommissioningComplete response
 // goes out and with no timer, and a PASE session a new commissioning

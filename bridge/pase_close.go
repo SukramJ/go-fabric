@@ -146,13 +146,12 @@ func (b *Bridge) closePASESessionsOnRevoke() {
 // every host that mounts core.GeneralCommissioning, with or without the
 // node facade. ctx is not consulted: nothing waits for the response.
 //
-// Mirrors matter.js
+// Mirrors matter.js packages/protocol/src/common/FailsafeContext.ts:138-160
+// at b25ed960 (completeCommission), which
 // packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:255
-// at b25ed960 (commissioningComplete awaits completeCommission before :268
-// builds the response) and packages/protocol/src/common/FailsafeContext.ts
-// :156-157 (completeCommission, step 4: "The Secure Session Context of any
-// PASE session still established at the Server SHALL be cleared" →
-// closePaseSession) and :191-196 (closePaseSession →
+// awaits before :268 builds the response. Its step 4 at :156-157 ("The
+// Secure Session Context of any PASE session still established at the
+// Server SHALL be cleared") calls :191-196 (closePaseSession →
 // initiateForceClose, no current exchange): the session is marked peer
 // lost (packages/protocol/src/session/NodeSession.ts:450-453), its
 // exchanges close with no deferral (Session.ts:331-344) and it closes
