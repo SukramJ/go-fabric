@@ -791,7 +791,7 @@ Fable post-reads `p5/fable-post-{a,b,c,s}.md`.
 | 463 | Coordinator (C-7): F-b25ed960-C3 | **Fixed in A** (same files, plan item #17); decision 452's "not in P4b" is closed with it |
 | 464 | Coordinator (C-8): the equal-version order of stored images | **matter.js's order (local, test, prod) in the manager's candidates only**; `Images.Find`'s own order unchanged (other callers) |
 | 465 | Coordinator (C-9): the fabric index of the announcement record | **No change, no findings row**: the record carries the controller's fabric index and filters by it |
-| 466 | Coordinator (C-10): the deprecated `Manager.OnStatusChange` and `SuppressNextStartUp` | **Kept through their window**; the phase type carries their legacy status (decision 474) |
+| 466 | Coordinator (C-10): the deprecated `Manager.OnStatusChange` and `SuppressNextStartUp` | **Kept through their window**; the phase type carries their legacy status (decision 472) |
 | 467 | Coordinator (C-11): `Interaction.Close`'s narrowing | **A mirror of the pin** (`ClientInteraction.ts:285-315` at `b25ed960`) → `### Changed`; a behaviour cannot be deprecated; the note names `CloseSubscriptions` for callers of the old sweep |
 | 468 | Coordinator (C-12): the generated snapshots | **Regenerated once, in `p5-int`**: reachability, cover floors, testparity, cite constants |
 | 469 | Coordinator (C-13): the scope of unit C | **F-b25ed960-56 part (ii) only** (the CloseSession on the revoke's close); (i) and (iii) hold; (iv) stays a residual in the row |
