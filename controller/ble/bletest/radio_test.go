@@ -242,3 +242,62 @@ func TestRadioAcceptsOneAtATime(t *testing.T) {
 		t.Fatalf("Connect after Serve returned: %v, want ErrNoService", err)
 	}
 }
+
+// TestRadioHoldsAConnectUntilServed: a central that connects after
+// RegisterService returned and before Serve runs is held — bounded by its
+// context — and accepted once Serve runs, as contract.GATTService.Serve
+// obliges (the node registers, advertises and serves on another
+// goroutine, bridge/ble.go); a radio with no registration, or whose
+// service's Serve returned, refuses at once (review II P3b-R, candidate 4).
+func TestRadioHoldsAConnectUntilServed(t *testing.T) {
+	t.Parallel()
+	per := &bletest.Peripheral{Address: "AA:BB:CC:00:00:52"}
+	r := per.Radio()
+	c := bletest.NewCentral(per)
+	at := ble.Peripheral{Address: per.Address}
+	if _, err := c.Connect(context.Background(), at); !errors.Is(err, bletest.ErrNoService) {
+		t.Fatalf("connect without a registration: %v, want ErrNoService", err)
+	}
+	svc, err := r.RegisterService(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone, cancelGone := context.WithCancel(context.Background())
+	cancelGone()
+	if _, err := c.Connect(gone, at); !errors.Is(err, context.Canceled) {
+		t.Fatalf("connect between RegisterService and Serve, its context ended: %v, want context.Canceled", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	type result struct {
+		conn ble.Connection
+		err  error
+	}
+	held := make(chan result, 1)
+	go func() {
+		conn, err := c.Connect(ctx, at)
+		held <- result{conn, err}
+	}()
+	accepted := make(chan struct{}, 1)
+	serveCtx, stop := context.WithCancel(ctx)
+	serveDone := make(chan error, 1)
+	go func() {
+		serveDone <- svc.Serve(serveCtx, func(contract.BLEConnection) { accepted <- struct{}{} })
+	}()
+	res := <-held
+	if res.err != nil {
+		t.Fatalf("connect between RegisterService and Serve: %v, want it held and accepted", res.err)
+	}
+	select {
+	case <-accepted:
+	default:
+		t.Fatal("the connect returned before the node's accept ran")
+	}
+	stop()
+	if err := <-serveDone; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Connect(ctx, at); !errors.Is(err, bletest.ErrNoService) {
+		t.Fatalf("connect after Serve returned: %v, want ErrNoService", err)
+	}
+}

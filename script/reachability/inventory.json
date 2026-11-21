@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10203,
+  "entry_points": 10210,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27888,
-    "reachable": 20887,
-    "whitelisted": 6979,
+    "total_exported": 27891,
+    "reachable": 20889,
+    "whitelisted": 6980,
     "unreachable": 22
   },
   "by_package": [
@@ -5038,7 +5038,7 @@
       "identifier": "TestKeepSubscriptionsFalseForgetsThePeersFormerRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_persistence_bound_test.go",
-      "line": 82
+      "line": 84
     },
     {
       "package": "bridge",
@@ -6032,21 +6032,28 @@
       "identifier": "TestPersistSubscriptionSkipsUnattributableTargets",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_persistence_bound_test.go",
-      "line": 133
+      "line": 135
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPersistedOrderIsTheActivationOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_reestablish_order_test.go",
+      "line": 239
     },
     {
       "package": "bridge",
       "identifier": "TestPersistedRowsAreCappedAtTheManagersQuota",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_persistence_bound_test.go",
-      "line": 167
+      "line": 170
     },
     {
       "package": "bridge",
       "identifier": "TestPersistedRowsAreCappedPerFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_persistence_bound_test.go",
-      "line": 107
+      "line": 109
     },
     {
       "package": "bridge",
@@ -6529,7 +6536,7 @@
       "identifier": "TestReestablishKeepsTheCreationOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_reestablish_order_test.go",
-      "line": 166
+      "line": 168
     },
     {
       "package": "bridge",
@@ -6550,14 +6557,14 @@
       "identifier": "TestReestablishStopsWithTheBridge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_reestablish_order_test.go",
-      "line": 197
+      "line": 283
     },
     {
       "package": "bridge",
       "identifier": "TestReestablishTriesTheNewestFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_reestablish_order_test.go",
-      "line": 112
+      "line": 114
     },
     {
       "package": "bridge",
@@ -34242,7 +34249,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 387
+      "line": 382
     },
     {
       "package": "device",
@@ -34333,7 +34340,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 422
+      "line": 417
     },
     {
       "package": "device",
@@ -42131,7 +42138,7 @@
       "identifier": "Advertiser",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "node",
@@ -42306,7 +42313,7 @@
       "identifier": "Groups",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/config.go",
-      "line": 42
+      "line": 43
     },
     {
       "package": "node",

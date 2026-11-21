@@ -1051,6 +1051,20 @@ type Host interface {
 	// SetOccupied records the occupancy the host measured (OCC): the
 	// Occupancy attribute follows, and so do the setpoints in effect.
 	SetOccupied(occupied bool)
+	// ActivatePreset activates the preset handle names (nil: none) with
+	// its setpoints, as the SetActivePresetRequest command does, run as
+	// the host: a handle that names no stored preset is INVALID_COMMAND,
+	// and without the Presets feature the call is UNSUPPORTED_COMMAND.
+	// Otherwise the handle becomes ActivePresetHandle and the setpoints
+	// of the occupancy in effect take the preset's, clamped to their
+	// limits; nil clears the handle and moves no setpoint. The moved
+	// setpoints reach the Sink before they are stored, so the Sink must
+	// not call back into the server. Set of ActivePresetHandle sets the
+	// handle alone. The activation is matter.js's setActivePresetRequest
+	// called by the application, ThermostatServer.ts:551-553 with :523-538
+	// and :556-567 at b25ed960; the refusal without the feature and the
+	// Sink order are this module's.
+	ActivatePreset(ctx context.Context, handle []byte) error
 }
 
 // Host returns the mounted server's host methods when it implements

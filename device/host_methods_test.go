@@ -173,11 +173,6 @@ var hostCases = map[uint32]hostCase{
 		"SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
 		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
 		"Suggestions",
-	}, deferred: []string{
-		// ActivatePreset (decision 318, P2-G): the application's activation
-		// of a preset with its setpoints; the device facade has no path to
-		// it yet, a host reaches it on the kit server it holds.
-		"ActivatePreset",
 	}},
 	h_color.ClusterID:  {kit: kitOf[*light.ColorControlServer](), covered: []string{"Color", "Set", "SetColorWriter", "SetScenes", "SetWriter", "SyncColorTemperatureWithLevel"}},
 	h_eco.ClusterID:    {kit: kitOf[*core.EcosystemInformation](), host: hostOf[h_eco.Host](h_eco.Wrap)},

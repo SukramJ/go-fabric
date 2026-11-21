@@ -147,7 +147,10 @@ import (
 // (AttributeWriteResponse.ts:419) around its catch block :463-470, read.
 // 434 after wave P3: one row fewer after P3-A's citation corrections in
 // cluster/thermo (measured by make cite-report).
-const citecheckDriftRatchet = 434
+// 432 after wave P3b: the pinned re-reads of presets.go's
+// setActivePresetRequest (:551-553) and subscription.go's activate()
+// (:415/:433) leave the drift list (measured by make cite-report).
+const citecheckDriftRatchet = 432
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit

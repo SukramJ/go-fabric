@@ -27,7 +27,9 @@ var ErrServing = errors.New("bletest: the Matter GATT service is served already"
 // bridge.Config.GATT) — and the deprecated contract.BLEPeripheral — which
 // the centrals reach as its [Peripheral]. While
 // the node serves the Matter GATT service on it ([Radio.Serve]) every
-// connection a central opens reaches the node's BTP server through the
+// connection a central opens — held, while the service is registered but
+// its Serve has not run yet, until it runs — reaches the node's BTP
+// server through the
 // contract.BLEConnection the radio hands to Serve's accept — the node's
 // production path — and the peripheral advertises only while the node
 // does, the payload the node gives. The connections deliver writes,
@@ -37,7 +39,8 @@ var ErrServing = errors.New("bletest: the Matter GATT service is served already"
 type Radio struct {
 	p *Peripheral
 
-	// mu guards adv, ads, stops, serving, accept, c3 and links.
+	// mu guards adv, ads, stops, serving, registered, changed, accept, c3
+	// and links.
 	mu      sync.Mutex
 	adv     *contract.BLEAdvertisement
 	ads     []contract.BLEAdvertisement
@@ -45,9 +48,13 @@ type Radio struct {
 	serving bool
 	// registered: a RegisterService whose Serve has not returned.
 	registered bool
-	accept     func(contract.BLEConnection)
-	c3         []byte
-	links      []*radioLink
+	// changed, when not nil, is closed once serving starts or a
+	// registration ends: a connect held between RegisterService and
+	// Serve looks again.
+	changed chan struct{}
+	accept  func(contract.BLEConnection)
+	c3      []byte
+	links   []*radioLink
 	// acceptMu serialises the node's accept, as contract.GATTService.Serve
 	// promises ("calls of accept do not overlap"), and orders it against
 	// the end of Serve: no accept runs once Serve dropped its links
@@ -134,6 +141,7 @@ func (s radioService) Serve(ctx context.Context, accept func(contract.BLEConnect
 	defer func() {
 		s.r.mu.Lock()
 		s.r.registered = false
+		s.r.wakeLocked()
 		s.r.mu.Unlock()
 	}()
 	return s.r.serve(ctx, s.c3, accept, true)
@@ -155,6 +163,7 @@ func (r *Radio) serve(ctx context.Context, c3 []byte, accept func(contract.BLECo
 		return ErrServing
 	}
 	r.serving, r.accept, r.c3 = true, accept, bytes.Clone(c3)
+	r.wakeLocked()
 	r.mu.Unlock()
 	<-ctx.Done()
 	r.acceptMu.Lock() // an accept in flight completes first
@@ -225,14 +234,58 @@ func matterServiceData(data []byte) ([]byte, bool) {
 	return nil, false
 }
 
+// wakeLocked releases every connect held for the service; r.mu is held.
+func (r *Radio) wakeLocked() {
+	if r.changed != nil {
+		close(r.changed)
+		r.changed = nil
+	}
+}
+
+// awaitServing returns once the node serves the Matter GATT service: at
+// once while it serves, and — while a registered service's Serve has not
+// run yet — when Serve runs, bounded by ctx (contract.GATTService.Serve: a
+// central connecting after RegisterService returned and before Serve runs
+// is held and accepted once Serve runs). A radio with no registration
+// returns [ErrNoService].
+func (r *Radio) awaitServing(ctx context.Context) error {
+	for {
+		r.mu.Lock()
+		switch {
+		case r.serving:
+			r.mu.Unlock()
+			return nil
+		case !r.registered:
+			r.mu.Unlock()
+			return ErrNoService
+		}
+		if r.changed == nil {
+			r.changed = make(chan struct{})
+		}
+		changed := r.changed
+		r.mu.Unlock()
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return fmt.Errorf("bletest: waiting for the registered Matter GATT service to be served: %w", ctx.Err())
+		}
+	}
+}
+
 // connect opens a connection to the radio for a central: the node's
 // accept runs before the central holds it, so the node's handlers see
 // every event, one connect's accept at a time and none after Serve ended.
-func (r *Radio) connect() (ble.Connection, error) {
+// A connect while the service is registered but not yet served is held
+// until Serve runs ([Radio.awaitServing]).
+func (r *Radio) connect(ctx context.Context) (ble.Connection, error) {
+	if err := r.awaitServing(ctx); err != nil {
+		return nil, err
+	}
 	r.acceptMu.Lock()
 	defer r.acceptMu.Unlock()
 	r.mu.Lock()
 	if !r.serving {
+		// Serve ended between the wait and the accept: the service is gone.
 		r.mu.Unlock()
 		return nil, ErrNoService
 	}

@@ -1757,15 +1757,6 @@
     "occurrences": 3
   },
   {
-    "file": "cluster/thermo/presets.go",
-    "line": 564,
-    "citation": "ThermostatServer.ts:281-316",
-    "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
-    "identifier": "setActivePresetRequest",
-    "nearest": 218,
-    "occurrences": 4
-  },
-  {
     "file": "cluster/thermo/thermostat_hold_parity_matterjs_test.go",
     "line": 81,
     "citation": "ThermostatServer.ts:365-369",
@@ -3175,15 +3166,6 @@
     "occurrences": 4
   },
   {
-    "file": "im/subscription/subscription.go",
-    "line": 415,
-    "citation": "packages/node/src/node/server/ServerSubscription.ts:412",
-    "resolved": "packages/node/src/node/server/ServerSubscription.ts",
-    "identifier": "#sendUpdatesActivated",
-    "nearest": 433,
-    "occurrences": 4
-  },
-  {
     "file": "im/timed.go",
     "line": 57,
     "citation": "packages/node/src/node/server/InteractionServer.ts:426-436",
@@ -3294,7 +3276,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 47,
+    "line": 48,
     "citation": "packages/node/src/node/ServerNode.ts:107-127",
     "resolved": "packages/node/src/node/ServerNode.ts",
     "identifier": "commissioning",
@@ -3303,7 +3285,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 51,
+    "line": 52,
     "citation": "NetworkServer.ts:202-223",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "at": "b25ed960",
@@ -3313,7 +3295,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 99,
+    "line": 100,
     "citation": "OtaSoftwareUpdateRequestorServer.ts:255-280",
     "resolved": "packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts",
     "at": "b25ed960",
@@ -3323,7 +3305,7 @@
   },
   {
     "file": "node/config.go",
-    "line": 281,
+    "line": 295,
     "citation": "NetworkServer.ts:202-223",
     "resolved": "packages/node/src/behavior/system/network/NetworkServer.ts",
     "at": "b25ed960",

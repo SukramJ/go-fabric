@@ -60,8 +60,9 @@ func boundTestBridge(t *testing.T) (*Bridge, *subscription.Manager, *memstore.St
 	return b, m, st
 }
 
-// liveSubscription admits a live subscription of peer on fabric 1 and
-// routes it as a CASE subscription, as a Subscribe does before it persists.
+// liveSubscription admits a live subscription of peer on fabric 1, routes
+// it as a CASE subscription and activates it, as a Subscribe does before
+// it persists.
 func liveSubscription(t *testing.T, b *Bridge, m *subscription.Manager, peer uint64, keep bool) uint32 {
 	t.Helper()
 	sub, err := m.Subscribe(subscription.SubscribeArgs{
@@ -72,6 +73,7 @@ func liveSubscription(t *testing.T, b *Bridge, m *subscription.Manager, peer uin
 		t.Fatal(err)
 	}
 	b.routing.subTargets.Store(sub.ID, subTarget{sessionID: 0x10, fabricIndex: 1, subjectNodeID: peer, fabricFiltered: true})
+	b.activateSubscription(sub, time.Now())
 	return sub.ID
 }
 
@@ -152,6 +154,7 @@ func TestPersistSubscriptionSkipsUnattributableTargets(t *testing.T) {
 			t.Fatal(err)
 		}
 		b.routing.subTargets.Store(sub.ID, tc.target)
+		b.activateSubscription(sub, time.Now())
 		b.persistSubscription(context.Background(), sub.ID)
 		if got := persistedIDs(t, st); (len(got) == 1) != tc.persist {
 			t.Errorf("%s: store holds %#x, persisted want %v", tc.name, got, tc.persist)

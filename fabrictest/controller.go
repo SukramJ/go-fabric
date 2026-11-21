@@ -539,7 +539,9 @@ func (c *Controller) awaitDeviceSession(ctx context.Context, d *Device, deviceNo
 	controllerNodeID := c.opts.NodeID
 	c.mu.RUnlock()
 	return c.site.Eventually(ctx, "the device's CASE session with the controller", func() bool {
-		return d.listsCASESession(controllerNodeID, deviceNodeID)
+		return d.listsCASESession(func(_ uint8, peer, local uint64) bool {
+			return peer == controllerNodeID && local == deviceNodeID
+		})
 	})
 }
 

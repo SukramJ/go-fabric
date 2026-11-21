@@ -183,8 +183,14 @@ The device's own changes come back through `SetLocalTemperature`,
 `SetActivePresetHandle`, `SetTemperatureSetpointHold` and
 `SetThermostatRunningState`, the kit server's methods. The typed server's
 `Set` reaches every one of them (a `Patch` with `Presets` goes through
-`SetPresets`), so `thermostatdef` has no `Host`: a host on the facade uses
-`Set`. They do not call the Sink. A change they store is reported as the host's change
+`SetPresets`, one with `ActivePresetHandle` sets the handle alone).
+Activating a preset with its setpoints, as the SetActivePresetRequest
+command does, is `thermostatdef.Host`'s `ActivatePreset`
+(`d.Thermostat().Host().ActivatePreset(ctx, handle)`): an unknown handle is
+INVALID_COMMAND, nil clears the handle and moves no setpoint, and the moved
+setpoints reach the Sink before they are stored. `Host` also carries
+`SetMeasuredTemperature` and `SetOccupied`. The setters do not call the
+Sink. A change they store is reported as the host's change
 (`contract.OriginHostSet`); LocalTemperature is reported by the
 subscription's own reporting instead. `SetSystemMode`, the setpoint setters
 and the hold and running-state setters log and ignore a value the

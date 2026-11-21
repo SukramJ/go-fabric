@@ -237,6 +237,7 @@ Defaults worth knowing:
 | `ProductDescription.DeviceType` | inferred for the commissionable advertisement (`DT`, `_T<id>`) when the node advertises, as matter.js's `ProductDescriptionServer` infers it: the first device type of the first endpoint of a simple device type — or of a device type outside the schema snapshot, which matter.js also treats as simple — below the root and the Aggregator (a bridged device's type); the first type found stays; RootNode (0x0016) while no such endpoint is served |
 | `BasicInformation.UniqueID` | derived on the first boot and pinned in the store |
 | `Locales` | `en-US` alone |
+| `TimeFormat` | 24-hour, Gregorian, Gregorian the only calendar listed; set (`node.TimeFormatConfig`), the root TimeFormatLocalization starts at its `HourFormat` and `ActiveCalendarType` (nil: the first of `SupportedCalendarTypes`) and lists `SupportedCalendarTypes` (empty: the active calendar alone), or serves HourFormat alone without the CalendarFormat feature with `NoFeatures`; a start the server refuses fails `node.New` with `core.ErrLocalizationConfig` — the node adds no default of its own |
 | `Logger` | `slog.Default()` |
 | `Client` | nil runs no client stack; set, the node opens its client socket and peers for its Binding entries |
 | `Network.WiFi` | nil is an Ethernet-attached node, with no Wi-Fi cluster; set, its `Driver` mounts NetworkCommissioning with the Wi-Fi feature and its `Reporter` serves WiFiNetworkDiagnostics — one of the two is required |

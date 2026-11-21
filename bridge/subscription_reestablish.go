@@ -330,7 +330,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 	if latest, ok := latestEventNumber(report.EventReports); ok {
 		sub.PrimedEvents(latest)
 	}
-	sub.EndPriming(b.clk().Now())
+	b.activateSubscription(sub, b.clk().Now())
 	b.logger.Info("matter.subscription.reestablished_one",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("session_id", int(link.sessionID)),

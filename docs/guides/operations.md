@@ -89,7 +89,10 @@ completes over CASE on the IP network. The node gets the radio as a host
 port, `node.Config.Network.GATT` (a `contract.GATTPeripheral`): the node
 registers the Matter GATT service with `RegisterService` before it
 advertises, so a service the platform refuses keeps the node off the air
-instead of advertising a service that is not there. The older
+instead of advertising a service that is not there. It calls `Serve` on
+another goroutine, so a central that connects between `RegisterService` and
+`Serve` must be held by the platform and accepted once `Serve` runs
+(`contract.GATTService.Serve`; `ble/bluez` and `bletest` do). The older
 `contract.BLEPeripheral` (`Network.BLE`) is deprecated and still works: it
 registers inside `Serve`, which reports a refusal only in the log. On Linux
 the radio is `ble/bluez`, a nested module a host without BLE never pulls;

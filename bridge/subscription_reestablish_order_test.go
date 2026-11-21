@@ -5,8 +5,10 @@ package bridge
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -171,6 +173,10 @@ func TestReestablishKeepsTheCreationOrder(t *testing.T) {
 	ctrl.setBridge(run1.addr(t))
 
 	subA := subscribeOverCASE(t, run1, ctrl)
+	// The subject is the order after re-establishment: A is recorded
+	// before B subscribes, as in TestReestablishTriesTheNewestFirst (the
+	// order of two activations is TestPersistedOrderIsTheActivationOrder's).
+	waitFor(t, "A persisted", func() bool { return slices.Equal(st.saved(), []uint32{subA}) })
 	subB := subscribeAgainOverCASE(t, ctrl)
 	waitFor(t, "A and B persisted", func() bool { return slices.Equal(st.saved(), []uint32{subA, subB}) })
 	run1.stop()
@@ -186,6 +192,86 @@ func TestReestablishKeepsTheCreationOrder(t *testing.T) {
 	}
 	if got := st.saved(); !slices.Equal(got, []uint32{subA, subB}) {
 		t.Fatalf("store holds %v after the re-establishment, want the creation order [A=%#x B=%#x]", got, subA, subB)
+	}
+}
+
+// parkFirstSubscribe is a slog handler that holds the first
+// "matter.rx.im.subscribe" record — logged by a Subscribe handler after
+// it activated its subscription and before it records it
+// (sendSubscribeResponse, then persistSubscription) — until release is
+// closed; parked is closed once it holds it. Every other record is
+// dropped.
+type parkFirstSubscribe struct {
+	first   atomic.Bool
+	parked  chan struct{}
+	release chan struct{}
+}
+
+func (h *parkFirstSubscribe) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *parkFirstSubscribe) Handle(_ context.Context, r slog.Record) error {
+	if r.Message != "matter.rx.im.subscribe" {
+		return nil
+	}
+	// Not a sync.Once: a later record's Do would wait for the held one.
+	if h.first.CompareAndSwap(false, true) {
+		close(h.parked)
+		<-h.release
+	}
+	return nil
+}
+
+func (h *parkFirstSubscribe) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h *parkFirstSubscribe) WithGroup(string) slog.Handler      { return h }
+
+// TestPersistedOrderIsTheActivationOrder (review II P3b-R, candidate 3):
+// a peer's subscriptions are recorded in the order they were activated,
+// whichever handler reaches the store first. A's handler is held between
+// its activation and its record (on its debug log line, which sits
+// there); B subscribes meanwhile on the same session — its handler runs
+// on a goroutine of its own, A's having left the session's order — and
+// its record writes A first. Before, B's handler recorded B alone and A
+// followed once released: [B, A], the reverse of the creation order the
+// newest-first re-establishment rests on. Mirrors matter.js, which
+// appends on ServerSubscription.activate in emission order
+// (ServerSubscription.ts:425, SubscriptionsServer.ts:55, :134-166,
+// Reactors.ts:173-175, :276-289, :359-371 at b25ed960).
+func TestPersistedOrderIsTheActivationOrder(t *testing.T) {
+	fab := newResumeFabric(t)
+	st := &savedOrderStore{}
+	ctrl := newFakeController(t, fab)
+	park := &parkFirstSubscribe{parked: make(chan struct{}), release: make(chan struct{})}
+	released := false
+	release := func() {
+		if !released {
+			released = true
+			close(park.release)
+		}
+	}
+	t.Cleanup(release)
+	run1 := startResumeDevice(t, st, func(br *Bridge, _ *operational.Manager) {
+		br.logger = slog.New(park)
+	})
+	ctrl.setBridge(run1.addr(t))
+
+	subA := subscribeOverCASE(t, run1, ctrl)
+	waitFor(t, "A's handler held on its debug record", func() bool {
+		select {
+		case <-park.parked:
+			return true
+		default:
+			return false
+		}
+	})
+	subB := subscribeAgainOverCASE(t, ctrl)
+	waitFor(t, "B persisted", func() bool { return slices.Contains(st.saved(), subB) })
+	if got := st.saved(); !slices.Equal(got, []uint32{subA, subB}) {
+		t.Fatalf("store holds %#x while A's handler is held, want the activation order [A=%#x B=%#x]", got, subA, subB)
+	}
+	release()
+	run1.stop()
+	if got := st.saved(); !slices.Equal(got, []uint32{subA, subB}) {
+		t.Fatalf("store holds %#x after A's handler went on, want [A=%#x B=%#x]", got, subA, subB)
 	}
 }
 

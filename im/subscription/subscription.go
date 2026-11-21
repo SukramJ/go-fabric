@@ -411,8 +411,9 @@ func (s *Subscription) touchLastReport(now time.Time) {
 // Changes marked dirty while it was priming stay queued and go out once
 // MinInterval has elapsed, as matter.js reports what changed during the
 // initial report afterwards (ServerSubscription.ts: the subscription is
-// activated only once the initial report completed — activate() sets
-// #sendUpdatesActivated, packages/node/src/node/server/ServerSubscription.ts:412).
+// activated only once the initial report completed — activate() (:415)
+// sets #sendUpdatesActivated,
+// packages/node/src/node/server/ServerSubscription.ts:433 at b25ed960).
 // The events fired in that window go with them, urgent or not: matter.js
 // sends whatever is outstanding at activation, attribute changes and
 // events alike (ServerSubscription.ts:443-445 at db021da0). There they

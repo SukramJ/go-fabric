@@ -102,7 +102,10 @@ func newCameraPeers(ctx context.Context, t *testing.T, camTCP, ctlTCP *node.TCPC
 }
 
 // requestorOpens has the requestor open a session to the camera over the
-// transport t from its own client stack.
+// transport t from its own client stack, and waits until the camera lists
+// it: the camera completes its side of CASE after the Success that ends
+// the requestor's Connect, and its peer path picks no session still
+// establishing (review II P3b-R, candidate 1).
 func (cp *cameraPeers) requestorOpens(ctx context.Context, t *testing.T, tr exchange.Transport) {
 	t.Helper()
 	err := cp.site.Run(ctx, func(ctx context.Context) error {
@@ -118,6 +121,9 @@ func (cp *cameraPeers) requestorOpens(ctx context.Context, t *testing.T, tr exch
 	})
 	if err != nil {
 		t.Fatalf("the requestor's connect over %v: %v", tr, err)
+	}
+	if err := cp.cam.AwaitCASESession(ctx, cp.camFabric.FabricIndex, cp.ctlFabric.NodeID); err != nil {
+		t.Fatal(err)
 	}
 }
 
