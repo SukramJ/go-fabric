@@ -695,7 +695,7 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 // ExchangeManager.ts:731-738 at b25ed960 (close every exchange, then
 // Session.initiateForceClose, Session.ts:331-344, which closes the
 // subscriptions and does not notify the peer — NodeSession.ts:450-453
-// marks it lost, and :436 sends no farewell to a lost peer).
+// marks it lost, and :490 sends no farewell to a lost peer).
 func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 	// Exchanges: a chunked report waiting for its StatusResponse on the
 	// dead connection is released now rather than at its timeout, and
