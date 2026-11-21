@@ -419,7 +419,8 @@ func TestParityMatterJS_OTAProviderConsentWhileQuerying(t *testing.T) {
 	// hook :382-393); that is the mechanism of OtaTest.ts:4696, whose
 	// assertion is the asked hook. On, the offer goes out with the newest
 	// version (:201-202, :312). OtaTest.ts:4666 itself is the manager's
-	// choice (updateExistsFor, SoftwareUpdateManager.ts:698-705), ported in
+	// choice (updateExistsFor, SoftwareUpdateManager.ts:673-715, the choice
+	// :698-705), ported in
 	// controller/softwareupdate:TestManagerDelegatesConsentOnlyWhenOnParity.
 	t.Run("asks its consent port instead of delegating while delegation is off, and delegates while it is on", func(t *testing.T) {
 		t.Parallel()

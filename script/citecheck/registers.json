@@ -73,13 +73,13 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 2738,
+    "line": 2747,
     "citation": "endpoints/bridged-node.ts:39-73",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4445,
+    "line": 4454,
     "citation": "BleScanner.ts:46-52",
     "at": "862ad75f",
     "error": "ambiguous"
