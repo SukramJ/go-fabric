@@ -1366,6 +1366,9 @@ func (g *generator) writeAttribute(w *writer, a *element) {
 	} else if lit := structDefault(t); lit != "" {
 		w.p("\t\t\tDefault: %s,", lit)
 	}
+	if v.IsSecret {
+		w.p("\t\t\tSecret: true,")
+	}
 	if r := g.attrRelaxed[a.ID]; r != "" {
 		w.p("\t\t\tRelaxed: %q,", r)
 	}
@@ -1460,6 +1463,9 @@ func (g *generator) fieldLiteral(f *fieldInfo) string {
 		}
 		if f.v.Access != nil && f.v.Access.Fabric == "S" {
 			parts = append(parts, "FabricSensitive: true")
+		}
+		if f.v.IsSecret {
+			parts = append(parts, "Secret: true")
 		}
 		if lit := typedDefault(f.t, f.v); lit != "" {
 			parts = append(parts, "Default: "+lit)

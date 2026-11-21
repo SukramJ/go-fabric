@@ -73,6 +73,10 @@ type value struct {
 	Quality     map[string]bool `json:"quality"`
 	Constraint  *constraint     `json:"constraint"`
 	Default     json.RawMessage `json:"default"`
+	// IsSecret is matter.js's mark for a key, passcode or credential
+	// whose value its logs redact, read through the base chain at
+	// extraction (effectiveIsSecret) and present only when true.
+	IsSecret bool `json:"isSecret"`
 }
 
 type conformance struct {
@@ -117,6 +121,11 @@ type datatype struct {
 	Conformance *conformance `json:"conformance"`
 	Constraint  *constraint  `json:"constraint"`
 	Fields      []*value     `json:"fields"`
+	// IsSecret is the mark on a datatype itself. spec.Struct, spec.Enum
+	// and spec.Bitmap carry no mark, so [parseSnapshot] refuses a marked
+	// datatype rather than drop it (none at the pin: every mark sits on a
+	// value).
+	IsSecret bool `json:"isSecret"`
 }
 
 func loadSnapshot(path string) (*snapshot, error) {
@@ -160,7 +169,33 @@ func parseSnapshot(raw []byte) (*snapshot, error) {
 			}
 		}
 	}
+	if err := refuseSecretDatatypes(&s); err != nil {
+		return nil, err
+	}
 	return &s, nil
+}
+
+// refuseSecretDatatypes fails on a datatype that carries isSecret itself:
+// the generated definitions carry the mark on a field or an attribute only,
+// and a dropped mark would let the secret reach the module's logs.
+func refuseSecretDatatypes(s *snapshot) error {
+	check := func(owner string, dts []*datatype) error {
+		for _, d := range dts {
+			if d.IsSecret {
+				return fmt.Errorf("%s.%s: a datatype marked isSecret is not carried by the generated definitions", owner, d.Name)
+			}
+		}
+		return nil
+	}
+	if err := check("globalDatatypes", s.GlobalDatatypes); err != nil {
+		return err
+	}
+	for _, c := range append(append([]*cluster{}, s.Clusters...), s.Definitions...) {
+		if err := check(c.Name, c.Datatypes); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *snapshot) cluster(name string) *cluster {

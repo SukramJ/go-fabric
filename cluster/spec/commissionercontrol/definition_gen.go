@@ -357,7 +357,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Fields: []spec.Field{
 				{ID: 0, Name: "CommissioningTimeout", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
-				{ID: 1, Name: "PakePasscodeVerifier", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "97", Value: &spec.Bound{Int: 97}}},
+				{ID: 1, Name: "PakePasscodeVerifier", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "97", Value: &spec.Bound{Int: 97}}, Secret: true},
 				{ID: 2, Name: "Discriminator", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 4095", Max: &spec.Bound{Int: 4095}}},
 				{ID: 3, Name: "Iterations", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1000 to 100000", Min: &spec.Bound{Int: 1000}, Max: &spec.Bound{Int: 100000}}},
 				{ID: 4, Name: "Salt", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16 to 32", Min: &spec.Bound{Int: 16}, Max: &spec.Bound{Int: 32}}},

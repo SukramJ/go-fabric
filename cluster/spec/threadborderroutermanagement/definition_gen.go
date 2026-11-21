@@ -290,7 +290,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Fields: []spec.Field{
-				{ID: 0, Name: "Dataset", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 0, Name: "Dataset", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Secret: true},
 			},
 			Decode: decodeDatasetResponse,
 		},
@@ -300,7 +300,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Timed: true},
 			Fields: []spec.Field{
-				{ID: 0, Name: "ActiveDataset", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 0, Name: "ActiveDataset", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Secret: true},
 				{ID: 1, Name: "Breadcrumb", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 			},
 			Decode: decodeSetActiveDatasetRequestRequest,
@@ -311,7 +311,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "PC", Op: spec.ConfName, Name: "PC"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Timed: true},
 			Fields: []spec.Field{
-				{ID: 0, Name: "PendingDataset", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 0, Name: "PendingDataset", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Secret: true},
 			},
 			Decode: decodeSetPendingDatasetRequestRequest,
 		},

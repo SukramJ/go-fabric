@@ -227,7 +227,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate, Fabric: "F"},
 			Fields: []spec.Field{
-				{ID: 0, Name: "SetupPin", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
+				{ID: 0, Name: "SetupPin", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Secret: true},
 			},
 			Decode: decodeGetSetupPinResponse,
 		},
@@ -238,7 +238,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister, Fabric: "F", Timed: true},
 			Fields: []spec.Field{
 				{ID: 0, Name: "TempAccountIdentifier", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16 to 100", Min: &spec.Bound{Int: 16}, Max: &spec.Bound{Int: 100}}},
-				{ID: 1, Name: "SetupPin", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 8", Min: &spec.Bound{Int: 8}}},
+				{ID: 1, Name: "SetupPin", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 8", Min: &spec.Bound{Int: 8}}, Secret: true},
 				{ID: 2, Name: "Node", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 			},
 			Decode: decodeLoginRequest,

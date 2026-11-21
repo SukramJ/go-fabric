@@ -313,3 +313,19 @@ func TestPortDocsStateTheStatusRule(t *testing.T) {
 		}
 	}
 }
+
+// TestSecretDatatypeRefused: a datatype marked isSecret itself is refused
+// — the generated definitions carry the mark on a field or an attribute
+// only, and a dropped mark would let the secret into the module's logs.
+func TestSecretDatatypeRefused(t *testing.T) {
+	t.Parallel()
+	for _, snap := range []string{
+		`{"clusters":[{"id":6,"name":"X","datatypes":[{"name":"S","type":"struct","isSecret":true}]}]}`,
+		`{"clusters":[{"id":6,"name":"X"}],"globalDatatypes":[{"name":"G","type":"octstr","isSecret":true}]}`,
+		`{"clusters":[{"id":6,"name":"X"}],"definitions":[{"name":"D","datatypes":[{"name":"S","type":"struct","isSecret":true}]}]}`,
+	} {
+		if _, err := parseSnapshot([]byte(snap)); err == nil || !strings.Contains(err.Error(), "isSecret") {
+			t.Errorf("%s: err = %v, want a refusal of the marked datatype", snap, err)
+		}
+	}
+}
