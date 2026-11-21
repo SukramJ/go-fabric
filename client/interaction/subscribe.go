@@ -180,6 +180,15 @@ func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Sub
 	if c.subs == nil {
 		return nil, ErrNoSubscriptions
 	}
+	// A closed interaction establishes nothing: a sustained subscription
+	// would otherwise retry for ever against it (ClientInteraction.ts:293-298
+	// at b25ed960 closes only what it established before).
+	c.closeMu.Lock()
+	closed := c.closed
+	c.closeMu.Unlock()
+	if closed != nil {
+		return nil, closed
+	}
 	floor, ceiling := DefaultMinIntervalFloor, SubscriptionMaxIntervalPublisherLimit
 	if req.MinIntervalFloor != nil {
 		floor = *req.MinIntervalFloor
@@ -204,7 +213,7 @@ func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Sub
 		}
 	}
 	if req.Sustain {
-		return c.sustain(peer, req, floor, ceiling), nil
+		return c.sustain(peer, req, floor, ceiling)
 	}
 	sub, err := c.subscribeOnce(ctx, peer, req, floor, ceiling, req.exchangeOptions())
 	if err != nil {
@@ -288,8 +297,9 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	sub.maxPeerResponseTime = c.provider.MaximumPeerResponseTime(SubscriptionProcessingTime, false)
 	// Mirrors matter.js ClientInteraction.ts:1086-1095, :1126 at b25ed960.
 	sub.compactPriming = primesCompactly(req, allFiltersSent)
-	c.establish(sub)
-	c.subs.AddPeer(sub)
+	if err := c.register(sub, c.subs.AddPeer); err != nil {
+		return nil, err
+	}
 	c.log.Info("matter.controller.interaction.subscribed",
 		slog.Uint64("subscription_id", uint64(resp.SubscriptionID)), slog.Int("max_interval", int(resp.MaxInterval)), slog.Duration("timeout", sub.timeout()))
 	return sub, nil

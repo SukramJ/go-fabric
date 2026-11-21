@@ -233,17 +233,15 @@ func (c *Interaction) Close(reason error) {
 	c.inflight.Wait()
 }
 
-// establish adds s to the subscriptions the interaction established; s
-// leaves them when it closes. It runs before s is registered, so no other
-// goroutine closes s yet (ClientInteraction.ts:1121, :1129, :1169, :1190
-// at b25ed960).
-func (c *Interaction) establish(s *Subscription) {
-	c.estMu.Lock()
-	if c.established == nil {
-		c.established = map[*Subscription]struct{}{}
-	}
-	c.established[s] = struct{}{}
-	c.estMu.Unlock()
+// register adds s to the subscriptions the interaction established and
+// then registers it with add; s leaves the set when it closes. The check
+// of the close and the addition run under closeMu, so a subscription
+// either is in the set Close snapshots or sees the interaction closed:
+// then it is closed once registered and register returns the close
+// reason, so no subscription outlives the interaction
+// (ClientInteraction.ts:1121, :1129, :1169, :1190 at b25ed960). s is not
+// yet registered, so no other goroutine closes it before add.
+func (c *Interaction) register(s *Subscription, add func(*Subscription)) error {
 	registered := s.closed
 	s.closed = func() {
 		if registered != nil {
@@ -253,6 +251,23 @@ func (c *Interaction) establish(s *Subscription) {
 		delete(c.established, s)
 		c.estMu.Unlock()
 	}
+	c.closeMu.Lock()
+	closed := c.closed
+	if closed == nil {
+		c.estMu.Lock()
+		if c.established == nil {
+			c.established = map[*Subscription]struct{}{}
+		}
+		c.established[s] = struct{}{}
+		c.estMu.Unlock()
+	}
+	c.closeMu.Unlock()
+	add(s)
+	if closed != nil {
+		s.Close()
+		return closed
+	}
+	return nil
 }
 
 // closeEstablished closes the subscriptions the interaction established —

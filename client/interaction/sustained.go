@@ -245,13 +245,16 @@ func (s *Subscription) Active() bool {
 // with SustainedSubscription (SustainedSubscription.ts:52-310): the
 // subscription is returned at once and its loop establishes the
 // underlying one, with a connection that does not time out (:1093-1095).
-func (c *Interaction) sustain(peer exchange.PeerAddress, req SubscribeRequest, floor, ceiling time.Duration) *Subscription {
+func (c *Interaction) sustain(peer exchange.PeerAddress, req SubscribeRequest, floor, ceiling time.Duration) (*Subscription, error) {
 	outer := c.subs.newSubscription(peer, req, c.log)
 	outer.sustained = &sustainedState{finished: make(chan struct{}), trusted: true, changed: req.MaxEventNumberChanged, log: c.log}
-	c.establish(outer)
-	c.subs.addActive(outer)
+	err := c.register(outer, c.subs.addActive)
 	go c.runSustained(outer, floor, ceiling)
-	return outer
+	if err != nil {
+		// Closed meanwhile: register closed it, its loop ends at once.
+		return nil, err
+	}
+	return outer, nil
 }
 
 // setActive is the active/inactive observable pair (:262-263, :312-316).
