@@ -2026,22 +2026,31 @@ By design. The settings table is the module's one durable seam for
 per-endpoint state; a write the store cannot hold is refused rather than
 held in memory alone.
 
-### BD-Matter-OTAProvider-HostPorts — the OTA provider decides images, consent and apply through host ports, not a software-update manager
+### BD-Matter-OTAProvider-HostPorts — the OTA provider takes images and consent from host ports, and its attempt decisions from a manager port
 
 matter.js's `OtaSoftwareUpdateProviderServer` (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts`
-at `db021da0`) is welded to a `SoftwareUpdateManager` that validates the
-requestor's BasicInformation, consults the DCL and queues consent
-(`:66-71` the four consent states, `:245-278`, `:506-516`).
+at `b25ed960`) requires a `SoftwareUpdateManager` (`:81-82`): its default
+`checkUpdateAvailable` offers what the manager's `updateExistsFor` selects
+(`:402-414`; the requestor's Basic Information matched and a stored image
+chosen, `SoftwareUpdateManager.ts:673-715`), the consent hook is asked only
+for a consent-required offer that is not delegated and declines by default
+(`:199-231`, `:382-393`; the four consent states `:43-48`), and an apply is
+the manager's `applyUpdate` after the provider's `State.applyDelay`,
+answered Proceed or Discontinue only (`:346-362`, `:434`).
 `core.OTAProvider` keeps the server's statuses, timers and responses
-(the 32-byte token, the 86 400 s DelayedActionTime cap, Busy with the
-2-minute retry, the 15-minute stale entry, `BdxSynchronous` with the
-5-minute idle timeout, Discontinue without consent) and asks three host
-ports — `OTAImageSource`, `OTAConsent`, `OTAApplyPolicy` — for what the
-manager decides; the apply policy may also answer AwaitNextAction or
-Discontinue, which matter.js never does once consent holds. The provider
-sits on its own OtaProvider endpoint beside the Aggregator
-(`packages/node/src/endpoints/ota-provider.ts:57-64` defines the type, not its place).
-Report AQ.
+(the 32-byte token `:41`, the 86 400 s DelayedActionTime cap `:39`, Busy
+with the 2-minute retry `:189-194`, the 15-minute stale attempt
+`OtaProgress.ts:14`, `BdxSynchronous` with the 5-minute message timeout
+`:259`, Discontinue for two minutes without the apply right `:353-357`)
+and asks two host ports — `OTAImageSource`, `OTAConsent` — for the image
+and the consent. The attempt decisions (admission, apply,
+NotifyUpdateApplied) are an `OTAUpdateManager`'s: a host's own, or the
+default one without a queue (`BD-Matter-OTAProvider-StandaloneManager`);
+the apply delay is `OTAProviderConfig.ApplyDelay`. The deprecated
+`OTAApplyPolicy` (removable in v0.26.0) still runs before the apply table
+and may answer AwaitNextAction, which matter.js's provider never sends.
+The provider sits on its own OtaProvider endpoint beside the Aggregator.
+Report AQ. Reworded in pin lift b25ed960, wave P4b.
 
 By design (ADR 0021). A bridge host owns its images and its consent
 flow; the DCL enters as the opt-in helper `controller/dcl` (wave 25,

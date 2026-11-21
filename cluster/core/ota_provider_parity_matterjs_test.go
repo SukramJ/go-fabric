@@ -411,11 +411,17 @@ func TestParityMatterJS_OTAProviderConsentWhileQuerying(t *testing.T) {
 		}
 	})
 
-	// :4666: delegation is off by default (SoftwareUpdateManager.ts:2171,
-	// mayDelegateConsentTo :638-647), so a requestor that can consent gets
-	// no offer without a consent (:698-705) — the provider asks its consent
-	// port, and without one declines (OtaSoftwareUpdateProviderServer.ts:201-231).
-	t.Run("offers a requestor that can consent the newest image without a consent only while delegation is on", func(t *testing.T) {
+	// Delegation is off by default (SoftwareUpdateManager.ts:2171 at
+	// b25ed960, mayDelegateConsentTo :638-647). Off, an image that needs a
+	// consent is not delegated to a requestor that can consent: the
+	// provider asks its consent port, which without one declines —
+	// NotAvailable (OtaSoftwareUpdateProviderServer.ts:201-231, the default
+	// hook :382-393); that is the mechanism of OtaTest.ts:4696, whose
+	// assertion is the asked hook. On, the offer goes out with the newest
+	// version (:201-202, :312). OtaTest.ts:4666 itself is the manager's
+	// choice (updateExistsFor, SoftwareUpdateManager.ts:698-705), ported in
+	// controller/softwareupdate:TestManagerDelegatesConsentOnlyWhenOnParity.
+	t.Run("asks its consent port instead of delegating while delegation is off, and delegates while it is on", func(t *testing.T) {
 		t.Parallel()
 		off := newOTAFixture(t, otaNeedsRequestorConsent)
 		if r := off.query(t, 7, canConsentQuery()); r.Status != provdef.StatusNotAvailable {

@@ -224,9 +224,11 @@ func transferOf(r *bdx.Responder, peer OTAPeer) interface {
 
 // MayDelegateConsentTo implements [OTAUpdateManager]: with
 // [OTAProviderConfig].DelegateConsentToRequestor on, a requestor that says
-// it can consent may; off, none may. The manager holds no Basic
-// Information of a requestor, so matter.js's refusal of a node with
-// LocalConfigDisabled has nothing to read here.
+// it can consent may; off, none may. matter.js also refuses a node whose
+// Basic Information it has not cached or that has LocalConfigDisabled set
+// (:645-646); this manager holds no Basic Information of a requestor and
+// delegates on the switch and RequestorCanConsent alone
+// (BD-Matter-OTAProvider-StandaloneManager, F-b25ed960-21).
 //
 // Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:638-647 at b25ed960
 // (mayDelegateConsentTo).
