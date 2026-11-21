@@ -173,11 +173,6 @@ var hostCases = map[uint32]hostCase{
 		"SetOccupiedCoolingSetpoint", "SetOccupiedHeatingSetpoint", "SetPresets", "SetSchedules",
 		"SetSystemMode", "SetTemperatureSetpointHold", "SetThermostatRunningMode", "SetThermostatRunningState",
 		"Suggestions",
-	}, deferred: []string{
-		// P4-A: the LocalTemperatureChange threshold, settable after the
-		// start as matter.js's state; whether the Host carries it is the
-		// coordinator's decision (p4/fix-a.md).
-		"SetLocalTemperatureChangeThreshold",
 	}},
 	h_color.ClusterID:  {kit: kitOf[*light.ColorControlServer](), covered: []string{"Color", "Set", "SetColorWriter", "SetScenes", "SetWriter", "SyncColorTemperatureWithLevel"}},
 	h_eco.ClusterID:    {kit: kitOf[*core.EcosystemInformation](), host: hostOf[h_eco.Host](h_eco.Wrap)},
