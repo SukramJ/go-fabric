@@ -115,7 +115,7 @@ type Interaction struct {
 	abortFn  context.CancelCauseFunc
 
 	// batchMu guards the batcher: lanes is #batchLanes and nextCommandRef
-	// #nextCommandRef (ClientInteraction.ts:254-257 at b25ed960).
+	// #nextCommandRef (ClientInteraction.ts:255-256 at b25ed960).
 	batchMu        sync.Mutex
 	lanes          map[string]*batchLane
 	nextCommandRef uint16
@@ -234,9 +234,9 @@ func (c *Interaction) Close(reason error) {
 	reason = c.closed
 	c.closeMu.Unlock()
 	c.closeEstablished()
-	// The queued commands are rejected before the abort, so an in-flight
-	// batch cancels instead of running to completion
-	// (ClientInteraction.ts:300-311 at b25ed960).
+	// The queued commands are rejected, then the interaction aborts before
+	// it waits for what is in flight, so an in-flight batch cancels instead
+	// of running to completion (ClientInteraction.ts:300-311 at b25ed960).
 	c.closeBatches(reason)
 	c.abortFn(reason)
 	c.inflight.Wait()

@@ -571,10 +571,12 @@ func (i *Images) store(ctx context.Context, name string, image []byte, info *Upd
 // from store at DclOtaUpdateService.ts:594-595 at b25ed960;
 // OtaImageReader.file, OtaImageReader.ts:65-110 at b25ed960); otherwise
 // the payload size (OtaImageReader.ts:246-260 at b25ed960) and, ahead of
-// matter.js, which checks it only at extraction
-// (OtaImageReader.ts:262-278 at b25ed960), the header's
-// payload digest, so a truncated or corrupted local image is refused before
-// it is offered over BDX (W4-ctlint-03, BD-Matter-OtaImageDigestAtStore).
+// matter.js, the header's payload digest, which matter.js's store check
+// leaves to the extraction (OtaImageReader.ts:246-249 at b25ed960;
+// extractPayload, OtaImageReader.ts:116-127 at b25ed960, checks it in
+// #extractAndValidatePayload, OtaImageReader.ts:282-332 at b25ed960),
+// so a truncated or corrupted local image is refused before it is offered
+// over BDX (W4-ctlint-03, BD-Matter-OtaImageDigestAtStore).
 func storeValidation(info *UpdateInfo) otaimage.FileOptions {
 	opts := otaimage.FileOptions{SkipFullChecksum: true}
 	if info == nil || info.ledger == nil {
