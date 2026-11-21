@@ -74,6 +74,15 @@ type resumptionState struct {
 	// Start, until ReestablishFormerSubscriptions takes them.
 	former []subscription.PeerSubscription
 
+	// orderMu guards activated alone. It is a leaf: taken alone or under
+	// mu, never the other way round; under it only a subscription's own
+	// lock (EndPriming).
+	orderMu sync.Mutex
+	// activated are the subscriptions activated ([Bridge.activateSubscription])
+	// and not yet taken by a [Bridge.persistSubscription], in activation
+	// order.
+	activated []uint32
+
 	caseInitiator CaseInitiatorProvider
 	resolver      OperationalResolver
 	// block is non-nil while ReestablishFormerSubscriptions runs.
@@ -190,11 +199,46 @@ func (b *Bridge) FormerSubscriptionCount() int {
 	return len(b.resumption.former)
 }
 
-// persistSubscription records an active subscription. Mirrors matter.js
+// activateSubscription ends sub's priming — the engine reports from now
+// on — and takes sub's place in the order [Bridge.persistSubscription]
+// records in, in one step: the persisted order is the activation order.
+// matter.js records a subscription when ServerSubscription.activate adds
+// it to its session (ServerSubscription.ts:425), its reactions running
+// in emission order (Reactors.ts:173-175, :276-289, :359-371), appended
+// to the peer's list (SubscriptionsServer.ts:55, :134-166); the
+// newest-first re-establishment rests on that order (:190-191, :323-325),
+// all at b25ed960. Two Subscribe handlers of one session run on
+// goroutines of their own once the first left the session's order, so
+// the queue gives them what matter.js's single thread gives it.
+func (b *Bridge) activateSubscription(sub *subscription.Subscription, now time.Time) {
+	b.resumption.orderMu.Lock()
+	defer b.resumption.orderMu.Unlock()
+	sub.EndPriming(now)
+	b.resumption.activated = append(b.resumption.activated, sub.ID)
+}
+
+// nextActivated takes the oldest activated subscription not yet
+// recorded; false when there is none.
+func (r *resumptionState) nextActivated() (uint32, bool) {
+	r.orderMu.Lock()
+	defer r.orderMu.Unlock()
+	if len(r.activated) == 0 {
+		return 0, false
+	}
+	id := r.activated[0]
+	r.activated = r.activated[1:]
+	if len(r.activated) == 0 {
+		r.activated = nil
+	}
+	return id, true
+}
+
+// persistSubscription records the subscriptions activated up to subID
+// ([Bridge.activateSubscription]), subID included, in activation order:
+// a handler that reaches this point after a later-activated one was
+// already recorded by that one's call. Mirrors matter.js
 // SubscriptionsServer.#addSubscription, which fires when a subscription of
 // a CASE session becomes active (SessionsBehavior skips PASE sessions).
-// The identity is the session's — fabric and peer node — not the request
-// header's, which carries no source node id on a secure session.
 //
 // ctx is the caller's; the store write outlives its cancellation (an
 // established subscription is recorded even if the request that made it
@@ -204,6 +248,27 @@ func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 	if m == nil || subID == 0 {
 		return
 	}
+	// Taken and recorded under mu: the store sees the activation order.
+	b.resumption.mu.Lock()
+	defer b.resumption.mu.Unlock()
+	for {
+		id, ok := b.resumption.nextActivated()
+		if !ok {
+			return
+		}
+		b.persistOneLocked(ctx, m, id)
+		if id == subID {
+			return
+		}
+	}
+}
+
+// persistOneLocked records the active subscription subID; b.resumption.mu
+// is held. The identity is the session's — fabric and peer node — not the
+// request header's, which carries no source node id on a secure session.
+// A subscription of a PASE session, or one whose fabric or subject is
+// unknown, is not recorded.
+func (b *Bridge) persistOneLocked(ctx context.Context, m *subscription.Manager, subID uint32) {
 	raw, ok := b.routing.subTargets.Load(subID)
 	if !ok {
 		return
@@ -212,9 +277,6 @@ func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 	if !ok || target.pase || target.fabricIndex == 0 || target.fabricIndex == endpoint.FabricIndexUnresolvable || target.subjectNodeID == 0 {
 		return
 	}
-
-	b.resumption.mu.Lock()
-	defer b.resumption.mu.Unlock()
 	if b.resumption.disabled {
 		return
 	}

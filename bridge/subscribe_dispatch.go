@@ -886,7 +886,7 @@ func (b *Bridge) sendSubscribeResponse(
 			if latest, ok := latestEventNumber(initialReport.EventReports); ok {
 				sub.PrimedEvents(latest)
 			}
-			sub.EndPriming(b.clk().Now())
+			b.activateSubscription(sub, b.clk().Now())
 		}
 	}
 	b.logger.Debug("matter.rx.im.subscribe",
