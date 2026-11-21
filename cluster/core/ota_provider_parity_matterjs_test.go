@@ -4,6 +4,7 @@
 package core
 
 import (
+	"context"
 	"slices"
 	"sync"
 	"testing"
@@ -342,11 +343,13 @@ func TestParityMatterJS_OTAProviderAdmission(t *testing.T) {
 			mu.Unlock()
 			if done != nil {
 				if tc.transferCancelled {
+					limit, stop := context.WithTimeout(context.Background(), 5*time.Second)
 					select {
 					case <-done:
-					case <-time.After(5 * time.Second):
+					case <-limit.Done():
 						t.Fatal("the transfer of the restarted node was not cancelled")
 					}
+					stop()
 				} else {
 					_ = f.bdx.DisablePeerForScope(bdx.Peer{FabricIndex: otaTestFabric, NodeID: otaTestPeerNode}, otaScope, true)
 					<-done

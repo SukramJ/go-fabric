@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -92,7 +91,9 @@ func (r *attemptRig) notify(t *testing.T, token []byte, version uint32) {
 
 // startTransfer opens the requestor's receiver-driven download of the
 // offer on sessionID and returns once the responder recorded its
-// negotiation; done closes when the responder ends the transfer.
+// negotiation — it records it before it serves the first block, so the
+// first Block is the event that proves it, with no wait on the clock;
+// done closes when the responder ends the transfer.
 func (r *attemptRig) startTransfer(t *testing.T, sessionID uint16, uri string) (done chan struct{}) {
 	t.Helper()
 	fd, _, err := bdx.ParseBdxURI(uri)
@@ -112,19 +113,18 @@ func (r *attemptRig) startTransfer(t *testing.T, sessionID uint16, uri string) (
 	if _, _, err := m.Next(context.Background(), bdx.MessageReceiveAccept); err != nil {
 		t.Fatalf("ReceiveAccept: %v", err)
 	}
-	peer := bdx.Peer{FabricIndex: testPeer.FabricIndex, NodeID: testPeer.NodeID}
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		if s := r.bdx.SessionFor(peer, "ota"); s != nil {
-			if _, ok := s.Negotiated(); ok {
-				return done
-			}
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the transfer's negotiation was never recorded")
-		}
-		runtime.Gosched()
+	if err := m.SendBlockQuery(context.Background(), 0); err != nil {
+		t.Fatal(err)
 	}
+	if _, _, err := m.Next(context.Background(), bdx.MessageBlock); err != nil {
+		t.Fatalf("first Block: %v", err)
+	}
+	if s := r.bdx.SessionFor(bdx.Peer{FabricIndex: testPeer.FabricIndex, NodeID: testPeer.NodeID}, "ota"); s == nil {
+		t.Fatal("no transfer runs after its first block")
+	} else if _, ok := s.Negotiated(); !ok {
+		t.Fatal("the transfer serves blocks without a recorded negotiation")
+	}
+	return done
 }
 
 type attemptPipe struct{ in, out chan bdx.Message }
@@ -332,10 +332,14 @@ func TestManagerUpdateAppliedBranchesParity(t *testing.T) {
 
 // TestManagerAttemptsUnderTheManagerLock (decision 292 (b), W3): the
 // attempts have no lock of their own beyond their fields', so every path
-// that changes them — the provider's queries, applies and notifications,
-// the transfer listeners, RemoveConsent, the queue's runs — holds the
-// manager's lock. Run under -race, a path that does not is a reported
-// race; the outcome of the interleaving is not asserted.
+// that changes them holds the manager's lock. This runs the provider's
+// queries, applies and notifications, RemoveConsent and AddUpdateConsent,
+// the fabric removal, the node's removal and the queue's runs against each
+// other; the transfer listeners are not in the mix (no transfer runs — the
+// BDX listeners report outside the responder's lock, through the same
+// ReportAttemptStatus the queries use). Run under -race, a path that does
+// not hold the lock is a reported race; the outcome of the interleaving is
+// not asserted.
 func TestManagerAttemptsUnderTheManagerLock(t *testing.T) {
 	t.Parallel()
 	r := newAttemptRig(t)
@@ -349,13 +353,17 @@ func TestManagerAttemptsUnderTheManagerLock(t *testing.T) {
 				if q.UpdateToken == nil {
 					continue
 				}
-				switch (g + i) % 4 {
+				switch (g + i) % 6 {
 				case 0:
 					r.apply(t, *q.UpdateToken, 2)
 				case 1:
 					r.m.RemoveConsent(testPeer, 0)
 				case 2:
 					r.notify(t, *q.UpdateToken, 1)
+				case 3:
+					_ = providerPorts{r.m}.MatterDropFabric(context.Background(), testPeer.FabricIndex)
+				case 4:
+					r.m.NodeDeleted(testPeer)
 				default:
 					_, _ = r.m.AddUpdateConsent(context.Background(), testPeer, Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: 2})
 				}
