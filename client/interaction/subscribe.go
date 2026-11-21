@@ -288,6 +288,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	sub.maxPeerResponseTime = c.provider.MaximumPeerResponseTime(SubscriptionProcessingTime, false)
 	// Mirrors matter.js ClientInteraction.ts:1086-1095, :1126 at b25ed960.
 	sub.compactPriming = primesCompactly(req, allFiltersSent)
+	c.establish(sub)
 	c.subs.AddPeer(sub)
 	c.log.Info("matter.controller.interaction.subscribed",
 		slog.Uint64("subscription_id", uint64(resp.SubscriptionID)), slog.Int("max_interval", int(resp.MaxInterval)), slog.Duration("timeout", sub.timeout()))

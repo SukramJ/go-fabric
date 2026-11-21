@@ -21,10 +21,13 @@ import (
 	"sync/atomic"
 	"testing"
 
+	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/fabrictest"
+	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // staleFabricIndex is STALE_FABRIC_INDEX (:104): an index the device never
@@ -173,6 +176,44 @@ func TestOperationalCertificateUpdateFacade(t *testing.T) {
 		if !w.has("matter.controller.client.registry.fabric_index_replaced") {
 			t.Fatal("no warning of the replaced index")
 		}
+	})
+}
+
+// TestOperationalCertificateUpdateInteractionClose is :2255-2271: an
+// interaction's Close closes only the subscriptions it established, so
+// closing another registry-bound interaction with the node's peer — the
+// one Commissioner.Interaction hands out — leaves the node's default
+// subscription open and its reports flowing.
+func TestOperationalCertificateUpdateInteractionClose(t *testing.T) {
+	t.Parallel()
+	t.Run("closing one interaction leaves the subscriptions of another to the same peer open", func(t *testing.T) {
+		t.Parallel()
+		cp := newClientPair(t, clientPairOptions{})
+		subs := fabrictestseam.Subscriptions(cp.pair.Controller)
+		before := subs.Active()
+		if len(before) == 0 {
+			t.Fatal("no active subscription")
+		}
+		pr := fabrictestseam.Peers(cp.pair.Controller).Get(*cp.node.Record().PeerAddress)
+		if pr == nil {
+			t.Fatal("no peer")
+		}
+		cp.pair.Controller.Commissioner().Interaction(pr).Close(nil)
+		cp.settle(t)
+		after := subs.Active()
+		if len(after) != len(before) || !cp.node.SubscriptionActive() {
+			t.Fatalf("%d active subscriptions, were %d", len(after), len(before))
+		}
+		if err := cp.pair.Device.Act(func(n *node.Node) error {
+			return n.SetNodeLabel(context.Background(), "after another interaction closed")
+		}); err != nil {
+			t.Fatal(err)
+		}
+		cp.eventually(t, "the NodeLabel", func() bool {
+			v, err := cp.node.Endpoint(0).Cluster(basicinfo.ClusterID).Decoded(basicinfo.AttrNodeLabel)
+			s, _ := v.(string)
+			return err == nil && s == "after another interaction closed"
+		})
 	})
 }
 

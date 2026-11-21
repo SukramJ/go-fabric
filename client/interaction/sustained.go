@@ -248,6 +248,7 @@ func (s *Subscription) Active() bool {
 func (c *Interaction) sustain(peer exchange.PeerAddress, req SubscribeRequest, floor, ceiling time.Duration) *Subscription {
 	outer := c.subs.newSubscription(peer, req, c.log)
 	outer.sustained = &sustainedState{finished: make(chan struct{}), trusted: true, changed: req.MaxEventNumberChanged, log: c.log}
+	c.establish(outer)
 	c.subs.addActive(outer)
 	go c.runSustained(outer, floor, ceiling)
 	return outer
