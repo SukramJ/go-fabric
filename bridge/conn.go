@@ -630,9 +630,9 @@ func (b *Bridge) handleTCPMessage(c *tcp.Conn, msg []byte, release func()) {
 // #onConnectionDisconnect, subscribed to the transport's disconnect event
 // at :674-683.
 //
-// It runs when the close begins (transport/tcp Listener.Serve's onClose),
-// while a handler that passed the reader's closed check before the close
-// may still be dispatching: matter.js delivers nothing on a closed channel
+// It runs when the close begins (the close callback of transport/tcp
+// Listener.Serve), while a handler that passed the reader's closed check
+// before the close may still be dispatching: matter.js delivers nothing on a closed channel
 // (TcpChannel.ts:196-198 at b25ed960), but such a handler binds its
 // session to the dead connection after the first eviction. So the
 // connection's handlers are waited for and the eviction runs once more
