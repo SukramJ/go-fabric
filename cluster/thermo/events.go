@@ -222,8 +222,8 @@ func activeScheduleChange(previous, current []byte) tdef.ActiveScheduleChangeEve
 // emitActivePresetChange emits the ActivePresetChange of a stored change
 // of ActivePresetHandle from previous to current, and nothing when the
 // handle stayed. Mirrors matter.js
-// ThermostatServer.ts:2126-2134 at b25ed960 (the activePresetHandle$Changed
-// reaction of #setupEvents, whatever source changed the handle).
+// ThermostatServer.ts:2126-2134 at b25ed960 (activePresetChange, emitted
+// on every committed change of the handle, whatever source changed it).
 func (s *ThermostatServer) emitActivePresetChange(ctx context.Context, previous, current []byte) {
 	if s.features&ThermostatFeatureTEVT == 0 || sameHandle(previous, current) {
 		return
@@ -233,8 +233,7 @@ func (s *ThermostatServer) emitActivePresetChange(ctx context.Context, previous,
 
 // emitActiveScheduleChange is [ThermostatServer.emitActivePresetChange]
 // for ActiveScheduleHandle. Mirrors matter.js
-// ThermostatServer.ts:2136-2144 at b25ed960 (the activeScheduleHandle$Changed
-// reaction).
+// ThermostatServer.ts:2136-2144 at b25ed960 (activeScheduleChange).
 func (s *ThermostatServer) emitActiveScheduleChange(ctx context.Context, previous, current []byte) {
 	if s.features&ThermostatFeatureTEVT == 0 || sameHandle(previous, current) {
 		return

@@ -1788,8 +1788,9 @@ func (s *ThermostatServer) occupiedLocked() bool {
 }
 
 // SetOccupied records the occupancy the host measured — matter.js's
-// externallyMeasuredOccupancy (ThermostatServer.ts:568, :573-575 at
-// db021da0): Occupancy follows and is announced, and the setpoints in
+// externallyMeasuredOccupancy (ThermostatServer.ts:1058 at b25ed960; the
+// handler #handleExternalOccupancyChange, ThermostatServer.ts:1063-1065 at b25ed960):
+// Occupancy follows and is announced, and the setpoints in
 // effect for SetpointRaiseLower and SetActivePresetRequest become the
 // occupied or the unoccupied pair. With TEVT a change emits
 // OccupancyChange (events.go). Without OCC it is logged and ignored.
@@ -1995,8 +1996,8 @@ func (s *ThermostatServer) MatterEvents() []uint32 { return s.inst.MatterEvents(
 // suggestion activates a preset on the host's Sink or reports a change
 // afterwards, and it closes every atomic write in progress with its
 // timeout, as matter.js's [Symbol.asyncDispose] closes the
-// AtomicWriteHandler (ThermostatServer.ts:1582-1585,
-// AtomicWriteHandler.ts:84-89 at db021da0). A LocalTemperatureChange
+// AtomicWriteHandler (ThermostatServer.ts:3088-3091 at b25ed960; its close,
+// AtomicWriteHandler.ts:92-97 at b25ed960). A LocalTemperatureChange
 // waiting for the end of its window is dropped, as a closed node runs no
 // timer (ThermostatEventsTest.ts:795-812 at b25ed960, "generates no event
 // after the node closed"). The server stays usable: the

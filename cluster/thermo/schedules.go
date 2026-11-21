@@ -129,9 +129,8 @@ func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 			slog.String("schedule_handle", handleKey(active)), slog.String("reason", "matches no schedule"))
 		// The clear is a change of the handle at the start: its event goes
 		// out with the start's, as the preset twin's
-		// (ThermostatEventsTest.ts:485-505 at b25ed960; the schedule clear
-		// takes the same activeScheduleHandle$Changed path, no test of its
-		// own).
+		// (ThermostatEventsTest.ts:485-505 at b25ed960). The schedule clear
+		// has no test of its own; it takes the same path of the start.
 		s.queueStartupEventLocked(tdef.EventActiveScheduleChange, activeScheduleChange(active, nil))
 		active = nil
 	}
