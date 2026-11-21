@@ -76,7 +76,9 @@ import (
 // restarts on stored schedules missing (P3-A, coordinator decision C-7): 6.
 // Pin lift b25ed960 wave P4 ports two: ThermostatEventsTest.ts (P4-A) and
 // SecretRedactionTest.ts (P4-B): 4.
-const testparityPlannedRatchet = 4
+// Pin lift b25ed960 wave P5 ports OperationalCertificateUpdateTest.ts (P5-B,
+// owner decision 293: 73 of 75 cases, two left): 3.
+const testparityPlannedRatchet = 3
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -231,9 +233,15 @@ const testparityPlannedRatchet = 4
 // the apply and admission tables, the consent while querying, the
 // NotifyUpdateApplied branches, the delegation switch); the apply under an
 // unknown token (OtaTest.ts:1897) goes back, its link not ported: 1039 missing.
+// Pin lift b25ed960 wave P5 ports 22 OtaTest.ts cases (P5-A, decision 292:
+// the queue's phases, the failed consent, #retarget, the announcement, the
+// consent tables and the exact offer; P5-A2: the four stored-image selection
+// rows), completes DclOtaUpdateServiceTest.ts (P5-A2, findApplicable's skip of
+// a stored local image under isProduction) and ports
+// OperationalCertificateUpdateTest.ts (P5-B): 179 ported, 1016 missing.
 const (
-	testparityPortedRatchet  = 177
-	testparityMissingRatchet = 1039
+	testparityPortedRatchet  = 179
+	testparityMissingRatchet = 1016
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -334,7 +342,10 @@ const (
 // decision W2) and SecretRedactionTest.ts's two cases with the switch off (by
 // design, BD-Matter-SecretRedaction-NoOffSwitch, owner decision W1), its
 // derived-cluster and elemental-form cases (js-runtime-only): 770.
-const testparityLeftRatchet = 770
+// Pin lift b25ed960 wave P5 leaves OperationalCertificateUpdateTest.ts's two
+// cases that wait for matter.js's commissioning-state transaction
+// (js-runtime-only, P5-B): 772.
+const testparityLeftRatchet = 772
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by
