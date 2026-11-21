@@ -538,15 +538,9 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		occupied:            true,
 		clk:                 clock.Or(cfg.Clock),
 		persist:             make(chan struct{}, 1),
-		ltEvent:             localTempEvent{threshold: defaultLocalTemperatureChangeThreshold},
 	}
-	if t := cfg.LocalTemperatureChangeThreshold; t != nil {
-		if s.servesLocalTemperatureChange() {
-			if err := checkLocalTemperatureChangeThreshold(*t); err != nil {
-				return nil, err
-			}
-		}
-		s.ltEvent.threshold = *t
+	if err := s.initLocalTemperatureChange(cfg.LocalTemperatureChangeThreshold); err != nil {
+		return nil, err
 	}
 	// Mirrors matter.js ThermostatServer.ts:154-160 at db021da0: a deadband
 	// above 127 is reset to the default, one below 0 refused.
@@ -604,22 +598,8 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		if err := s.seedPresets(cfg); err != nil {
 			return nil, err
 		}
-		// A setpoint in effect the initial reconcile moved clears the
-		// active preset: matter.js's ThermostatBehaviorTest asserts it
-		// (packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts:134-149 at b25ed960,
-		// "clears the active preset when it adjusts a setpoint"). The clear
-		// is a change of the handle at the start, so its ActivePresetChange
-		// is queued with the start's other events — inferred from the
-		// activePresetHandle$Changed reaction (ThermostatServer.ts:2126-2134 at b25ed960),
-		// no matter.js test asserts that event.
-		unocc := !s.occupied
-		if s.activePresetHandle != nil &&
-			(before.setpoint(true, unocc) != st.setpoint(true, unocc) || before.setpoint(false, unocc) != st.setpoint(false, unocc)) {
-			s.queueStartupEventLocked(tdef.EventActivePresetChange, activePresetChange(s.activePresetHandle, nil))
-			s.activePresetHandle = nil
-			if err := s.savePresets(context.Background(), s.presets, nil); err != nil {
-				return nil, fmt.Errorf("%w: %w", ErrPresets, err)
-			}
+		if err := s.clearPresetMovedByReconcile(before, st); err != nil {
+			return nil, err
 		}
 	}
 
@@ -635,16 +615,32 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	}
 
 	s.systemMode = defaultSystemMode(features)
-	// A setpoint the initial reconcile moved is a change of the start: its
-	// SetpointChange goes out with the start's other events. Inferred from
-	// matter.js's setpoint reactions, which are installed before the
-	// initialization commits (ThermostatServer.ts:2150-2187 at b25ed960);
-	// no matter.js test asserts these events.
-	for _, e := range s.pendingSetpointEvents {
-		s.queueStartupEventLocked(tdef.EventSetpointChange, e)
-	}
-	s.pendingSetpointEvents = nil
+	s.queueReconcileEvents()
 	return s, nil
+}
+
+// clearPresetMovedByReconcile clears the active preset when the initial
+// reconcile moved a setpoint in effect (before to st). A setpoint in
+// effect the initial reconcile moved clears the active preset: matter.js's
+// ThermostatBehaviorTest asserts it
+// (packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts:134-149 at b25ed960,
+// "clears the active preset when it adjusts a setpoint"). The clear is a
+// change of the handle at the start, so its ActivePresetChange is queued
+// with the start's other events — inferred from the
+// activePresetHandle$Changed reaction (ThermostatServer.ts:2126-2134 at b25ed960);
+// no matter.js test asserts that event.
+func (s *ThermostatServer) clearPresetMovedByReconcile(before, st setpointState) error {
+	unocc := !s.occupied
+	if s.activePresetHandle == nil ||
+		(before.setpoint(true, unocc) == st.setpoint(true, unocc) && before.setpoint(false, unocc) == st.setpoint(false, unocc)) {
+		return nil
+	}
+	s.queueStartupEventLocked(tdef.EventActivePresetChange, activePresetChange(s.activePresetHandle, nil))
+	s.activePresetHandle = nil
+	if err := s.savePresets(context.Background(), s.presets, nil); err != nil {
+		return fmt.Errorf("%w: %w", ErrPresets, err)
+	}
+	return nil
 }
 
 // defaultSystemMode is SystemMode's default: Auto with the AUTO feature,

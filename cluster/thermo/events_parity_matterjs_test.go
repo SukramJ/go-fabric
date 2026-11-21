@@ -312,7 +312,9 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 	t.Parallel()
 
 	t.Run("SystemModeChange", func(t *testing.T) {
+		t.Parallel()
 		t.Run("generates one event with previous and current mode", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.srv.SetSystemMode(uint8(tdef.SystemModeHeat))
@@ -326,6 +328,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates no event when the value does not change", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.srv.SetSystemMode(uint8(tdef.SystemModeAuto))
@@ -337,6 +340,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		// The transaction that throws after the state write is a write the
 		// Sink refuses: nothing is stored, nothing emitted.
 		t.Run("generates no event when the transaction rolls back", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig(func(cfg *thermo.ThermostatConfig) { cfg.Sink = refusingSink{} }))
 			c.record()
 			if err := c.srv.MatterWrite(context.Background(), tdef.AttrSystemMode, uint8(tdef.SystemModeHeat)); err == nil {
@@ -352,7 +356,9 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 	})
 
 	t.Run("RunningModeChange and RunningStateChange", func(t *testing.T) {
+		t.Parallel()
 		t.Run("generates RunningModeChange with previous and current mode", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			for range 2 {
@@ -370,6 +376,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates RunningModeChange when a SystemMode change sets the running mode", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			if err := c.srv.SetAttributes(map[uint32]any{tdef.AttrSystemMode: uint8(tdef.SystemModeHeat)}); err != nil {
@@ -385,6 +392,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates RunningStateChange with previous and current state", func(t *testing.T) {
+			t.Parallel()
 			state := uint16(0)
 			c := onlineEvents(t, basicConfig(func(cfg *thermo.ThermostatConfig) { cfg.ThermostatRunningState = &state }))
 			c.record()
@@ -401,7 +409,9 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 	})
 
 	t.Run("OccupancyChange", func(t *testing.T) {
+		t.Parallel()
 		t.Run("generates one event with previous and current occupancy", func(t *testing.T) {
+			t.Parallel()
 			occupied := true
 			c := onlineEvents(t, fullConfig(func(cfg *thermo.ThermostatConfig) { cfg.Occupied = &occupied }))
 			c.record()
@@ -418,6 +428,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 	})
 
 	t.Run("SetpointChange", func(t *testing.T) {
+		t.Parallel()
 		for _, tc := range []struct {
 			attribute         string
 			attrID            uint32
@@ -431,6 +442,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 			{"unoccupiedCoolingSetpoint", tdef.AttrUnoccupiedCoolingSetpoint, tdef.SystemModeCool, false, 2700, 2800},
 		} {
 			t.Run("reports "+tc.attribute+" with the Occupancy field", func(t *testing.T) {
+				t.Parallel()
 				c := onlineEvents(t, fullConfig(func(cfg *thermo.ThermostatConfig) {
 					cfg.InitialUnoccupiedHeatingSetpoint, cfg.InitialUnoccupiedCoolingSetpoint = temp(1900), temp(2700)
 				}))
@@ -454,6 +466,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		}
 
 		t.Run("encodes the Occupancy field of an Unoccupied setpoint change as 0", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, fullConfig(func(cfg *thermo.ThermostatConfig) { cfg.InitialUnoccupiedHeatingSetpoint = temp(1900) }))
 			c.record()
 			if err := c.srv.SetAttributes(map[uint32]any{tdef.AttrUnoccupiedHeatingSetpoint: int16(1950)}); err != nil {
@@ -490,6 +503,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 
 		heatingOnly := func(cfg *thermo.ThermostatConfig) { cfg.InitialHeatingSetpoint = 2000 }
 		t.Run("generates events on a Heating-only server", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, configBase(thermo.ThermostatFeatureHEAT|thermo.ThermostatFeatureTEVT, heatingOnly))
 			c.record()
 			if err := c.srv.SetAttributes(map[uint32]any{tdef.AttrOccupiedHeatingSetpoint: int16(2100)}); err != nil {
@@ -505,6 +519,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates events on a Cooling-only server", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, configBase(thermo.ThermostatFeatureCOOL|thermo.ThermostatFeatureTEVT, func(cfg *thermo.ThermostatConfig) { cfg.InitialCoolingSetpoint = 2600 }))
 			c.record()
 			if err := c.srv.SetAttributes(map[uint32]any{tdef.AttrOccupiedCoolingSetpoint: int16(2500)}); err != nil {
@@ -520,6 +535,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates no event for an identical value", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, fullConfig())
 			c.record()
 			if err := c.srv.SetAttributes(map[uint32]any{tdef.AttrOccupiedHeatingSetpoint: int16(2000)}); err != nil {
@@ -531,6 +547,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("leaves out the Occupancy field without the Occupancy feature", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			if err := c.srv.SetAttributes(map[uint32]any{tdef.AttrOccupiedHeatingSetpoint: int16(2100)}); err != nil {
@@ -546,6 +563,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates one event per setpoint changed by SetpointRaiseLower, including one pushed by the deadband", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig(func(cfg *thermo.ThermostatConfig) {
 				cfg.InitialHeatingSetpoint, cfg.InitialCoolingSetpoint = 2000, 2025
 			}))
@@ -554,7 +572,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 			if _, err := c.srv.MatterInvoke(ctx, tdef.CmdSetpointRaiseLower, tdef.SetpointRaiseLowerRequest{Mode: tdef.SetpointRaiseLowerModeHeat, Amount: 60}); err != nil {
 				t.Fatal(err)
 			}
-			var got [][2]int
+			got := make([][2]int, 0, 2)
 			for _, d := range c.rec.of(tdef.EventSetpointChange) {
 				e := d.(tdef.SetpointChangeEvent)
 				got = append(got, [2]int{int(e.SystemMode), int(e.CurrentSetpoint)})
@@ -567,6 +585,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 	})
 
 	t.Run("ActivePresetChange", func(t *testing.T) {
+		t.Parallel()
 		withPresets := func(t *testing.T) (*eventsCase, [][]byte) {
 			t.Helper()
 			heat, cool := int16(2100), int16(2500)
@@ -579,21 +598,24 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 					}),
 				}
 			}))
-			var handles [][]byte
-			for _, p := range c.srv.Presets() {
+			presets := c.srv.Presets()
+			handles := make([][]byte, 0, len(presets))
+			for _, p := range presets {
 				handles = append(handles, p.PresetHandle.Value)
 			}
 			return c, handles
 		}
 		presetEvents := func(c *eventsCase) []tdef.ActivePresetChangeEvent {
-			var out []tdef.ActivePresetChangeEvent
-			for _, d := range c.rec.of(tdef.EventActivePresetChange) {
+			recorded := c.rec.of(tdef.EventActivePresetChange)
+			out := make([]tdef.ActivePresetChangeEvent, 0, len(recorded))
+			for _, d := range recorded {
 				out = append(out, d.(tdef.ActivePresetChangeEvent))
 			}
 			return out
 		}
 
 		t.Run("generates one event per change of the active preset", func(t *testing.T) {
+			t.Parallel()
 			c, handles := withPresets(t)
 			c.record()
 			activatePreset(t, c.srv, handles[0])
@@ -609,6 +631,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates one event plus the SetpointChange events when the preset changes the setpoints", func(t *testing.T) {
+			t.Parallel()
 			c, handles := withPresets(t)
 			c.record()
 			activatePreset(t, c.srv, handles[1])
@@ -616,8 +639,9 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 			if len(got) != 1 || !got[0].PreviousPresetHandle.Null || !bytes.Equal(got[0].CurrentPresetHandle.Value, handles[1]) {
 				t.Fatalf("ActivePresetChange %+v, want one from null to h1", got)
 			}
-			var setpoints [][3]int
-			for _, d := range c.rec.of(tdef.EventSetpointChange) {
+			recorded := c.rec.of(tdef.EventSetpointChange)
+			setpoints := make([][3]int, 0, len(recorded))
+			for _, d := range recorded {
 				e := d.(tdef.SetpointChangeEvent)
 				setpoints = append(setpoints, [3]int{int(e.SystemMode), int(*e.PreviousSetpoint), int(e.CurrentSetpoint)})
 			}
@@ -629,6 +653,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates no event when the handle stays", func(t *testing.T) {
+			t.Parallel()
 			c, handles := withPresets(t)
 			activatePreset(t, c.srv, handles[0])
 			c.record()
@@ -641,6 +666,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		// The recorder sees every event from the start, as the event log
 		// matter.js reads (OccurrenceManager) holds them.
 		t.Run("generates an event when initialization clears a handle that matches no preset", func(t *testing.T) {
+			t.Parallel()
 			stale := filled(16, 9)
 			c := onlineEvents(t, fullConfig(func(cfg *thermo.ThermostatConfig) {
 				cfg.Presets = []thermo.Preset{newPreset(withHandle(filled(16, 1)))}
@@ -659,6 +685,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates an event when the application sets the handle", func(t *testing.T) {
+			t.Parallel()
 			c, handles := withPresets(t)
 			c.record()
 			if err := c.srv.SetActivePresetHandle(context.Background(), handles[1]); err != nil {
@@ -672,7 +699,9 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 	})
 
 	t.Run("ActiveScheduleChange", func(t *testing.T) {
+		t.Parallel()
 		t.Run("generates one event per change of the active schedule", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, fullConfig())
 			if err := c.srv.SetSchedules([]thermo.Schedule{newSchedule()}); err != nil {
 				t.Fatal(err)
@@ -695,10 +724,12 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 	})
 
 	t.Run("LocalTemperatureChange", func(t *testing.T) {
+		t.Parallel()
 		// The host configures no measurement here (matter.js's
 		// externalMeasuredIndoorTemperature); its first report of the sensor
 		// after the start is the measurement.
 		t.Run("reports the first measurement at startup", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.srv.SetMeasuredTemperature(temp(2000))
@@ -707,6 +738,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 
 		// NaN and +Inf have no int16 form.
 		t.Run("refuses to start with a threshold that is not greater than 0", func(t *testing.T) {
+			t.Parallel()
 			for _, threshold := range []int16{0, -1} {
 				_, err := thermo.New(basicConfig(func(cfg *thermo.ThermostatConfig) { cfg.LocalTemperatureChangeThreshold = &threshold }))
 				if err == nil || !strings.Contains(err.Error(), "is "+strconv.Itoa(int(threshold))+" but must be a finite number greater than 0") {
@@ -716,6 +748,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("refuses a threshold that is not greater than 0 when it is set", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			for _, threshold := range []int16{0, -1} {
 				err := c.srv.SetLocalTemperatureChangeThreshold(threshold)
@@ -735,6 +768,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("reports the change from null to a value", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.setTemperature(t, temp(2000))
@@ -742,6 +776,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("reports a change of at least the threshold and no smaller one", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.setTemperature(t, temp(2000))
 			c.clk.Advance(61 * time.Second)
@@ -754,6 +789,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("measures the change against the last reported value", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.setTemperature(t, temp(2000))
 			c.clk.Advance(61 * time.Second)
@@ -764,6 +800,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("uses the configured threshold", func(t *testing.T) {
+			t.Parallel()
 			threshold := int16(200)
 			c := onlineEvents(t, basicConfig(func(cfg *thermo.ThermostatConfig) { cfg.LocalTemperatureChangeThreshold = &threshold }))
 			c.setTemperature(t, temp(2000))
@@ -781,6 +818,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 			}
 		}
 		t.Run("treats the configured temperature as already reported", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig(), configured)
 			c.record()
 			c.setTemperature(t, temp(2020))
@@ -788,6 +826,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("reports the change from a value to null", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.setTemperature(t, temp(2000))
 			c.clk.Advance(61 * time.Second)
@@ -797,6 +836,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("reports the changes from and to null regardless of the threshold", func(t *testing.T) {
+			t.Parallel()
 			threshold := int16(10000)
 			c := onlineEvents(t, basicConfig(func(cfg *thermo.ThermostatConfig) { cfg.LocalTemperatureChangeThreshold = &threshold }))
 			c.record()
@@ -807,6 +847,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("reports no change from a reported null to null", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig(), configured)
 			c.record()
 			c.setTemperature(t, nil)
@@ -818,6 +859,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("reports a second significant change after the 60 second window with the value of that time", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.setTemperature(t, temp(2000))
@@ -840,6 +882,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		// matter.js): the expiry re-decides on the value then and re-arms
 		// for what is left of the window.
 		t.Run("waits for the end of the window when the timer expires early", func(t *testing.T) {
+			t.Parallel()
 			early := &earlyClock{Fake: clocktest.New(time.Unix(1_700_000_000, 0))}
 			c := onlineEventsOn(t, basicConfig(), early, early.Fake)
 			c.record()
@@ -857,6 +900,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("reports at once when exactly 60 seconds passed since the last report", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.setTemperature(t, temp(2000))
@@ -866,6 +910,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("drops the deferred report when a raised threshold makes the change not significant", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.setTemperature(t, temp(2000))
@@ -879,6 +924,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("drops the deferred report when the value moves back inside the window", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.setTemperature(t, temp(2000))
@@ -893,6 +939,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("defers the change to null until the window ends", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.setTemperature(t, temp(2000))
@@ -904,6 +951,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates no event after the node closed", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			c.record()
 			c.setTemperature(t, temp(2000))
@@ -922,7 +970,9 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 	})
 
 	t.Run("event availability", func(t *testing.T) {
+		t.Parallel()
 		t.Run("has no events for features that are not selected", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, basicConfig())
 			events := c.srv.MatterEvents()
 			for _, id := range []uint32{tdef.EventSystemModeChange, tdef.EventLocalTemperatureChange, tdef.EventSetpointChange, tdef.EventRunningStateChange, tdef.EventRunningModeChange} {
@@ -938,6 +988,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("has no LocalTemperatureChange with LocalTemperatureNotExposed", func(t *testing.T) {
+			t.Parallel()
 			c := onlineEvents(t, configBase(featAutoTEVT|thermo.ThermostatFeatureLTNE))
 			events := c.srv.MatterEvents()
 			if !slices.Contains(events, tdef.EventSystemModeChange) || slices.Contains(events, tdef.EventLocalTemperatureChange) {
@@ -946,6 +997,7 @@ func TestParityMatterJS_ThermostatEventsTest(t *testing.T) { //nolint:funlen,goc
 		})
 
 		t.Run("generates nothing and does not fail without the Events feature", func(t *testing.T) {
+			t.Parallel()
 			log := &warnLog{}
 			c := onlineEvents(t, configBase(thermo.ThermostatFeatureHEAT|thermo.ThermostatFeatureCOOL|thermo.ThermostatFeatureAUTO, func(cfg *thermo.ThermostatConfig) {
 				cfg.Logger = slog.New(slog.NewTextHandler(log, &slog.HandlerOptions{Level: slog.LevelWarn}))

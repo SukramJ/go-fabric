@@ -211,8 +211,9 @@ func TestStartupEventsWaitForTheEndpoint(t *testing.T) {
 	prec := &payloadRecorder{}
 	psrv.SetMatterEventEmitter(prec)
 	psrv.SetEndpoint(2)
-	var presets []tdef.ActivePresetChangeEvent
-	for _, d := range prec.of(tdef.EventActivePresetChange) {
+	recorded := prec.of(tdef.EventActivePresetChange)
+	presets := make([]tdef.ActivePresetChangeEvent, 0, len(recorded))
+	for _, d := range recorded {
 		presets = append(presets, d.(tdef.ActivePresetChangeEvent))
 	}
 	if len(presets) != 1 || !bytes.Equal(presets[0].PreviousPresetHandle.Value, presetHandle) || !presets[0].CurrentPresetHandle.Null {

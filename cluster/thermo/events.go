@@ -422,6 +422,36 @@ func checkLocalTemperatureChangeThreshold(threshold int16) error {
 	return nil
 }
 
+// initLocalTemperatureChange takes the configured threshold: nil is the
+// default, a value of 0 or below is refused when the selection has the
+// event.
+func (s *ThermostatServer) initLocalTemperatureChange(threshold *int16) error {
+	s.ltEvent.threshold = defaultLocalTemperatureChangeThreshold
+	if threshold == nil {
+		return nil
+	}
+	if s.servesLocalTemperatureChange() {
+		if err := checkLocalTemperatureChangeThreshold(*threshold); err != nil {
+			return err
+		}
+	}
+	s.ltEvent.threshold = *threshold
+	return nil
+}
+
+// queueReconcileEvents moves the SetpointChange events the initial
+// reconcile queued to the start's events. A setpoint the initial reconcile
+// moved is a change of the start; inferred from matter.js's setpoint
+// reactions, which are installed before the initialization commits
+// (ThermostatServer.ts:2150-2187 at b25ed960); no matter.js test asserts
+// these events.
+func (s *ThermostatServer) queueReconcileEvents() {
+	for _, e := range s.pendingSetpointEvents {
+		s.queueStartupEventLocked(tdef.EventSetpointChange, e)
+	}
+	s.pendingSetpointEvents = nil
+}
+
 // SetLocalTemperatureChangeThreshold changes the smallest change of
 // LocalTemperature, in 0.01 °C, that the LocalTemperatureChange event
 // reports ([ThermostatConfig.LocalTemperatureChangeThreshold]). With the
@@ -451,7 +481,7 @@ func (s *ThermostatServer) localTemperatureChanged(ctx context.Context, v *int16
 		return
 	}
 	s.mu.Lock()
-	report := s.decideLocalTemperatureLocked(v)
+	report := s.decideLocalTemperatureLocked(v) //nolint:contextcheck // a deferred report outlives the change's context; it emits on the stamped endpoint
 	s.mu.Unlock()
 	if report {
 		s.emitLocalTemperatureChange(ctx, v)
