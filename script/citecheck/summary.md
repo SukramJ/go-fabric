@@ -6,15 +6,15 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 
 | Metric | Count |
 |---|---|
-| Citations | 11145 |
+| Citations | 11146 |
 | Go files citing | 1832 |
-| Resolved: exact path from a tree root (packages/, support/, examples/) | 3145 |
+| Resolved: exact path from a tree root (packages/, support/, examples/) | 3146 |
 | Resolved: unique suffix | 249 |
 | Resolved: unique basename | 7751 |
-| Checked at their own `at <sha>`, the pin | 1790 |
+| Checked at their own `at <sha>`, the pin | 1791 |
 | **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 2780 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 678 |
-| Drift-checked (the sentence names a name the file contains) | 4940 |
+| Drift-checked (the sentence names a name the file contains) | 4941 |
 | Hard-checked only | 6205 |
 | **Hard errors** | 0 |
 | **Drift** | 432 |
@@ -36,7 +36,7 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 
 | Reference | Count |
 |---|---|
-| A .ts file named without a line part | 2719 |
+| A .ts file named without a line part | 2721 |
 | … whose sentence names another matter.js commit | 606 |
 | A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 566 |
 | … checked at another matter.js commit | 316 |
