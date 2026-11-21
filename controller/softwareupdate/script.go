@@ -196,8 +196,9 @@ func (m *Manager) observedNotifyApplied(ctx context.Context, op mattercore.OTAPe
 // applyOverride is what a scripted ApplyUpdateRequest asks of the
 // manager's apply ([providerPorts.ApplyUpdate]): a delay in
 // place of [Config].ApplyDelay (the scripted Proceed's state.applyDelay,
-// InProcessControllerAdapter.ts:775-789 at b25ed960), or the refusal the provider
-// gives an update without consent (the scripted Discontinue, :590-594).
+// InProcessControllerAdapter.ts:775-789 at b25ed960), or the refusal of a
+// scripted Discontinue (:765-772, where matter.js removes the consent of
+// the token's version and lets the provider answer; F-b25ed960-C3).
 type applyOverride struct {
 	delay  time.Duration
 	set    bool
