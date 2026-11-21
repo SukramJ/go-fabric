@@ -50,10 +50,13 @@ import (
 var schemaDDL string
 
 // Bounds on a stored endpoint number. The port documents the persisted
-// range as [1, 65534] — 0 is the RootNode and 65535 is reserved — while
-// fresh allocation starts at 2 because endpoint 1 is the Aggregator. A
-// number below allocMin can therefore still be stored (a host restoring one
-// it allocated elsewhere), but is never handed out by this package.
+// range as [2, 65534] (endpoint/identity.go:58, Record.EndpointID;
+// endpoint/types.go:66): 0 is the RootNode, 1 the Aggregator, 65535 is
+// reserved. Fresh allocation starts at allocMin = 2. endpointIDMin = 1
+// deliberately still admits 1 here, matching the CHECK on
+// matter_endpoints.endpoint_id in schema.sql; the assembler refuses it on
+// read. Both rise to 2 with the next migration that is needed anyway
+// (R2-P6-store-0448, the note beside the CHECK in schema.sql).
 const (
 	endpointIDMin uint16 = 1
 	allocMin      uint16 = 2

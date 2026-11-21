@@ -60,6 +60,18 @@ func TestGenerateRejects(t *testing.T) {
 		{"unscaled unit default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"int16","metatype":"integer","primitive":"int16","default":{"type":"celsius","value":26}}}],"commands":[],"events":[]}`, `default {"type":"celsius"`},
 		{"unknown default", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint8","metatype":"integer","primitive":"uint8","default":{"type":"x"}}}],"commands":[],"events":[]}`, `default {"type":"x"}`},
 		{"unknown default in a struct field", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"datatypes":[{"name":"S","type":"struct","metatype":"object","primitive":"struct","fields":[{"id":0,"name":"F","type":"uint8","metatype":"integer","primitive":"uint8","default":{"type":"x"}}]}]}`, `default {"type":"x"}`},
+		// A string default on a numeric type is refused, naming the
+		// element: the extractor writes a bigint as its decimal string
+		// (script/extract-from-matter-js.ts jsonable), and rendered as a Go
+		// string it would never compare equal to the number the runtime
+		// holds (N6b-gen-1, R5).
+		{"string default on an integer attribute", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint64","metatype":"integer","primitive":"uint64","default":"18446744073709551615"}}],"commands":[],"events":[]}`, `A: attribute X: default "18446744073709551615" on numeric type "uint64"`},
+		{"string default on an enum attribute", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"enum8","metatype":"enum","primitive":"uint8","default":"0"}}],"commands":[],"events":[]}`, `A: attribute X: default "0" on numeric type "enum8"`},
+		{"string default in a struct field", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[],"datatypes":[{"name":"S","type":"struct","metatype":"object","primitive":"struct","fields":[{"id":0,"name":"F","type":"int64","metatype":"integer","primitive":"int64","default":"-9007199254740993"}]}]}`, `A: struct S: field F: default "-9007199254740993" on numeric type "int64"`},
+		{"string default in a command field", `{"id":1,"name":"A","attributes":[],"commands":[{"id":0,"name":"C","effective":{"direction":"request","fields":[{"id":0,"name":"F","type":"single","metatype":"float","primitive":"single","default":"1.5"}]}}],"events":[]}`, `A: command C: field F: default "1.5" on numeric type "single"`},
+		// A bigint bound, written as a string the same way, is no number
+		// and no expression the runtime computes: already refused.
+		{"string bound", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"uint64","metatype":"integer","primitive":"uint64","constraint":{"text":"max 18446744073709551615","max":"18446744073709551615"}}}],"commands":[],"events":[]}`, `constraint bound "18446744073709551615"`},
 		{"unknown privilege", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"bool","metatype":"boolean","access":{"rw":"R","readPriv":"R"}}}],"commands":[],"events":[]}`, `privilege "R"`},
 		{"unknown write privilege", `{"id":1,"name":"A","attributes":[{"id":0,"name":"X","effective":{"type":"bool","metatype":"boolean","access":{"rw":"RW","readPriv":"V","writePriv":"X"}}}],"commands":[],"events":[]}`, `privilege "X"`},
 		{"unknown priority", `{"id":1,"name":"A","attributes":[],"commands":[],"events":[{"id":0,"name":"E","effective":{"priority":"warning","fields":[]}}]}`, `priority "warning"`},
