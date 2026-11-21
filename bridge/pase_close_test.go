@@ -46,6 +46,18 @@ func openPASESessions(mgr *operational.Manager) int {
 	return count
 }
 
+// paseSessionID is the id of the one PASE session in mgr.
+func paseSessionID(t *testing.T, mgr *operational.Manager) uint16 {
+	t.Helper()
+	for _, s := range mgr.Sessions() {
+		if s.IsPASE {
+			return s.SessionID
+		}
+	}
+	t.Fatal("no PASE session")
+	return 0
+}
+
 func commissioningCompleteAnswer(code uint8) im.InvokeResponse {
 	return im.InvokeResponse{Responses: []im.InvokeResponseEntry{{
 		Path:        im.ConcreteCommandPath{Endpoint: 0, Cluster: generalCommissioningClusterID, Command: 0x04, HasEndpoint: true},
@@ -132,7 +144,10 @@ func TestPASEStaysOpenDuringCommissioning(t *testing.T) {
 // packages/protocol/src/common/FailsafeContext.ts:281-283 at b25ed960
 // (closePaseSession), on a bridge without the node facade: a timer expiry
 // clears the PASE sessions at once, an expiry inside an interaction
-// (ArmFailSafe with expiry 0) after its response.
+// (ArmFailSafe with expiry 0) on the PASE session after its response, and
+// one inside an interaction on another session at once — the force close
+// defers only for the current exchange among the PASE session's own
+// (packages/protocol/src/session/Session.ts:336-339 at b25ed960).
 func TestFailSafeExpiredClosesThePASESessionsParity(t *testing.T) {
 	t.Parallel()
 	t.Run("timer", func(t *testing.T) {
@@ -143,11 +158,33 @@ func TestFailSafeExpiredClosesThePASESessionsParity(t *testing.T) {
 			t.Errorf("PASE sessions after the fail-safe expired = %d, want 0", got)
 		}
 	})
-	t.Run("in an interaction", func(t *testing.T) {
+	t.Run("in an interaction on another session", func(t *testing.T) {
+		t.Parallel()
+		b, mgr, _ := paseCloseBridge(t)
+		after := &im.AfterResponse{}
+		ctx := core.WithInvokeSessionID(im.WithAfterResponse(context.Background(), after), paseSessionID(t, mgr)+1)
+		b.FailSafeExpired(ctx)
+		if got := openPASESessions(mgr); got != 0 {
+			t.Errorf("PASE sessions before the response of a command on another session = %d, want 0", got)
+		}
+		after.Run()
+	})
+	t.Run("in an interaction without a session", func(t *testing.T) {
 		t.Parallel()
 		b, mgr, _ := paseCloseBridge(t)
 		after := &im.AfterResponse{}
 		b.FailSafeExpired(im.WithAfterResponse(context.Background(), after))
+		if got := openPASESessions(mgr); got != 0 {
+			t.Errorf("PASE sessions before the response = %d, want 0", got)
+		}
+		after.Run()
+	})
+	t.Run("in an interaction on the PASE session", func(t *testing.T) {
+		t.Parallel()
+		b, mgr, _ := paseCloseBridge(t)
+		after := &im.AfterResponse{}
+		ctx := core.WithInvokeSessionID(im.WithAfterResponse(context.Background(), after), paseSessionID(t, mgr))
+		b.FailSafeExpired(ctx)
 		if got := openPASESessions(mgr); got != 1 {
 			t.Fatalf("PASE sessions before the response = %d, want 1", got)
 		}

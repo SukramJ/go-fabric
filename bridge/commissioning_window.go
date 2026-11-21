@@ -849,8 +849,8 @@ func (w *CommissioningWindow) setRestore(restore func()) bool {
 func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	// Matter §11.19.7.3 step 1: close any open PASE session before
 	// touching window state. Mirrors matter.js
-	// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:137-141
-	// at db021da0 (revokeCommissioning, step 1: getPaseSession() →
+	// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
+	// at b25ed960 (revokeCommissioning, step 1: getPaseSession() →
 	// paseSession.initiateClose()).
 	//
 	// Revoked over the PASE session itself, the close waits for the
