@@ -6,16 +6,16 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 
 | Metric | Count |
 |---|---|
-| Citations | 11147 |
-| Go files citing | 1832 |
-| Resolved: exact path from a tree root (packages/, support/, examples/) | 3147 |
+| Citations | 11159 |
+| Go files citing | 1834 |
+| Resolved: exact path from a tree root (packages/, support/, examples/) | 3152 |
 | Resolved: unique suffix | 249 |
-| Resolved: unique basename | 7751 |
-| Checked at their own `at <sha>`, the pin | 1797 |
-| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 2775 |
+| Resolved: unique basename | 7758 |
+| Checked at their own `at <sha>`, the pin | 1822 |
+| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 2761 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 678 |
-| Drift-checked (the sentence names a name the file contains) | 4940 |
-| Hard-checked only | 6207 |
+| Drift-checked (the sentence names a name the file contains) | 4944 |
+| Hard-checked only | 6215 |
 | **Hard errors** | 0 |
 | **Drift** | 432 |
 
@@ -29,19 +29,19 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 | `862ad75f` | 3 | 127 |
 | `9892fa39` | 2 | 0 |
 | `d87d1de4` | 2 | 0 |
-| `db021da0` | 2653 | 182 |
+| `db021da0` | 2639 | 182 |
 | `e812bd07` | 1 | 0 |
 
 ## Counted, not ratcheted
 
 | Reference | Count |
 |---|---|
-| A .ts file named without a line part | 2719 |
+| A .ts file named without a line part | 2721 |
 | … whose sentence names another matter.js commit | 606 |
 | A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 566 |
 | … checked at another matter.js commit | 316 |
 | … with a hard error at the commit it was checked at | 2 |
-| A bare line part after a .ts citation or after no file (not checked) | 2902 |
+| A bare line part after a .ts citation or after no file (not checked) | 2915 |
 | A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 1768 |
 | … naming a commit that is no matter.js commit | 847 |
 | … at a commit other than the harness commit `6170af84` (Makefile CHIP_TEST_IMAGE_COMMIT) | 4 |

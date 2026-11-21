@@ -27,10 +27,11 @@ import (
 //
 // matter.js keeps a controller's fabric and nodes in the StorageService
 // of the controller's Environment: the constructor builds the Environment
-// (packages/matter.js/src/CommissioningController.ts:341-353),
-// #initializeController hands it to MatterController.create (:419-440,
-// :436), which opens the controller's storage from it (packages/matter.js/src/MatterController.ts:177), and the
-// node's store opens its own there with a "nodes" context
+// (packages/matter.js/src/CommissioningController.ts:341-353), and
+// MatterController.create (:419-440, :436), called from
+// #initializeController (:398-459), opens the controller's storage from
+// it (packages/matter.js/src/MatterController.ts:177), and the node's
+// store opens its own there with a "nodes" context
 // (packages/node/src/storage/server/ServerNodeStore.ts:183-188), at
 // b25ed960; the Go controller keeps them in the SQL database the host
 // owns, so the opener is a convenience over database/sql with no matter.js
