@@ -51,7 +51,7 @@ const (
 
 // CertificateUpdateOptions configures
 // [Commissioner.UpdateOperationalCertificate] — matter.js
-// OperationalCertificateUpdate.Options (OperationalCertificateUpdate.ts:120-138
+// OperationalCertificateUpdate.Options (OperationalCertificateUpdate.ts:121-138
 // at b25ed960); the abort signal is the call's context.
 type CertificateUpdateOptions struct {
 	// Address is the peer whose certificate to replace. Required.
@@ -292,7 +292,7 @@ func (c *Commissioner) nocSeam() nocUpdateSeam {
 // when CommissioningComplete fails, it disarms and decides from a read on
 // another new session; an UpdateNOC or a later step that goes unanswered
 // gets one recovery pass. The step table is matter.js's
-// (OperationalCertificateUpdate.ts:184-219). After UpdateNOC, after a
+// (OperationalCertificateUpdate.ts:185-214). After UpdateNOC, after a
 // rollback and on an unknown outcome it gives up the peer's sessions,
 // drops the resumption record and restarts the peer's subscriptions.
 //
@@ -570,7 +570,7 @@ func (u *nocUpdate) forgetSessions(ctx context.Context, reason string) {
 }
 
 // installKind is the outcome of the steps over the first session —
-// matter.js InstalledCertificate (OperationalCertificateUpdate.ts:356-359
+// matter.js InstalledCertificate (OperationalCertificateUpdate.ts:356-360
 // at b25ed960).
 type installKind int
 
@@ -968,7 +968,7 @@ func (u *nocUpdate) commissioningComplete(ctx context.Context, ia *interaction.I
 // certificateState is what the update reads of the accessing fabric:
 // Breadcrumb, the NOCs and CurrentFabricIndex, each nil when the peer
 // reported no value — matter.js CertificateState
-// (OperationalCertificateUpdate.ts:659-669 at b25ed960).
+// (OperationalCertificateUpdate.ts:659-668 at b25ed960).
 type certificateState struct {
 	breadcrumb  *uint64
 	nocs        []operationalCertificate
@@ -987,7 +987,7 @@ type operationalCertificate struct {
 // the accessing fabric in one fabric-filtered request, under a context no
 // cancel ends. Values of another type count as not reported; a NOCs
 // entry without a NOC octet string is skipped. Mirrors matter.js
-// OperationalCertificateUpdate.ts:736-782 at b25ed960 (certificateState).
+// OperationalCertificateUpdate.ts:736-775 at b25ed960 (certificateState).
 func (u *nocUpdate) certificateState(ctx context.Context, ia *interaction.Interaction) (certificateState, error) {
 	values, ok, err := u.seam.read(context.WithoutCancel(ctx), ia, []im.ConcreteAttributePath{
 		rootAttr(gencomm.ClusterID, gencomm.AttrBreadcrumb),
@@ -1048,7 +1048,7 @@ func nocEntry(n spec.Node) (operationalCertificate, bool) {
 
 // startState checks the start read: Breadcrumb and the NOCs reported and
 // CurrentFabricIndex a valid fabric index. Mirrors matter.js
-// OperationalCertificateUpdate.ts:688-700 at b25ed960 (readStartState).
+// OperationalCertificateUpdate.ts:688-701 at b25ed960 (readStartState).
 func (st certificateState) startState(addr string) error {
 	switch {
 	case st.breadcrumb == nil:
@@ -1096,7 +1096,7 @@ func (st certificateState) heldNOC(cert installed) held {
 // could obtain tags it never held — and its tags must equal sessionCATs,
 // those of the NOC the peer proved to hold in CASE, because an older NOC
 // our CA issued to the same node verifies too and may carry tags a later
-// rotation removed. Mirrors matter.js OperationalCertificateUpdate.ts:702-734
+// rotation removed. Mirrors matter.js OperationalCertificateUpdate.ts:703-734
 // at b25ed960 (verifiedCurrentNoc), with Fabric.verifyCredentials
 // (packages/protocol/src/fabric/Fabric.ts:359-369) as the fabric's
 // verifier.
