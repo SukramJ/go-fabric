@@ -81,9 +81,8 @@ func TestParityMatterJS_OTAProviderConstants(t *testing.T) {
 // with the generated codecs the requestor uses.
 func TestParityMatterJS_OTAProviderResponseFields(t *testing.T) {
 	t.Parallel()
-	f := newOTAFixture(t, nil)
+	f := newOTAFixture(t, otaDelegatesConsent) // UserConsentNeeded goes out only for a delegated consent
 	f.src.img.MetadataForRequestor = []byte{1, 2, 3}
-	f.src.img.ConsentRequired = true
 	yes := true
 	req := bdxQuery()
 	req.RequestorCanConsent = &yes
@@ -399,13 +398,29 @@ func TestParityMatterJS_OTAProviderConsentWhileQuerying(t *testing.T) {
 	// consent — the offer allows the apply (OtaUpdateAttempts.ts:81).
 	t.Run("lets a requestor that obtains consent itself apply the newest image it was offered without a consent", func(t *testing.T) {
 		t.Parallel()
-		f := newOTAFixture(t, otaNeedsRequestorConsent)
+		f := newOTAFixture(t, otaDelegatesConsent) // delegateConsent: true (:4567)
 		r := f.query(t, 7, canConsentQuery())
 		if r.UserConsentNeeded == nil || !*r.UserConsentNeeded {
 			t.Fatalf("response %+v, want UserConsentNeeded", r)
 		}
 		if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed {
 			t.Fatalf("apply %+v, want Proceed", a)
+		}
+	})
+
+	// :4666: delegation is off by default (SoftwareUpdateManager.ts:2171,
+	// mayDelegateConsentTo :638-647), so a requestor that can consent gets
+	// no offer without a consent (:698-705) — the provider asks its consent
+	// port, and without one declines (OtaSoftwareUpdateProviderServer.ts:201-231).
+	t.Run("offers a requestor that can consent the newest image without a consent only while delegation is on", func(t *testing.T) {
+		t.Parallel()
+		off := newOTAFixture(t, otaNeedsRequestorConsent)
+		if r := off.query(t, 7, canConsentQuery()); r.Status != provdef.StatusNotAvailable {
+			t.Fatalf("delegation off: response %+v, want NotAvailable", r)
+		}
+		on := newOTAFixture(t, otaDelegatesConsent)
+		if r := on.query(t, 7, canConsentQuery()); r.Status != provdef.StatusUpdateAvailable || r.SoftwareVersion == nil || *r.SoftwareVersion != 2 {
+			t.Fatalf("delegation on: response %+v, want version 2", r)
 		}
 	})
 }
@@ -438,6 +453,13 @@ func TestParityMatterJS_OTAProviderUpdateApplied(t *testing.T) {
 func otaNeedsRequestorConsent(c *OTAProviderConfig) {
 	src := c.ImageSource.(*otaTestSource)
 	src.img.ConsentRequired = true
+}
+
+// otaDelegatesConsent offers an image that needs a consent, with the
+// delegation to a requestor that can consent on.
+func otaDelegatesConsent(c *OTAProviderConfig) {
+	otaNeedsRequestorConsent(c)
+	c.DelegateConsentToRequestor = true
 }
 
 func canConsentQuery() provdef.QueryImageRequest {

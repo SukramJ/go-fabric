@@ -34,6 +34,13 @@ type OTAProviderConfig struct {
 	// statuses are the manager's: [Node.OnOTAProviderStatus] learns none,
 	// and RebootQuery and TransferBlockSize are refused at Start.
 	Manager OTAUpdateManager
+	// DelegateConsentToRequestor lets the default manager offer a
+	// requestor that says it can consent an image that needs a consent
+	// without asking Consent, with UserConsentNeeded
+	// (mattercore.OTAProviderConfig.DelegateConsentToRequestor); off, as
+	// matter.js's default, Consent is asked. With a Manager it is refused
+	// at Start: the manager decides the delegation.
+	DelegateConsentToRequestor bool
 	// ApplyPolicy decides an apply before the manager's apply table; nil
 	// leaves it to the table.
 	//
@@ -115,6 +122,7 @@ func (n *Node) buildOTAProvider() error {
 		ImageSource: cfg.ImageSource, Consent: cfg.Consent, Manager: cfg.Manager,
 		ApplyPolicy: cfg.ApplyPolicy, //nolint:staticcheck // the deprecated policy is honoured for its window
 		BDX:         n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize,
+		DelegateConsentToRequestor: cfg.DelegateConsentToRequestor,
 		// The host's deprecated hooks go to the provider as given: beside a
 		// Manager it refuses them rather than drop them.
 		RebootQuery:       cfg.RebootQuery,       //nolint:staticcheck // honoured for the deprecation window

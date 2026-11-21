@@ -187,6 +187,17 @@ type OTAProviderConfig struct {
 	// Deprecated: the apply is the Manager's to decide (matter.js's
 	// SoftwareUpdateManager.applyUpdate); removable in v0.26.0.
 	ApplyPolicy OTAApplyPolicy
+	// DelegateConsentToRequestor lets the default manager delegate the
+	// consent of an image that needs one to a requestor whose QueryImage
+	// says it can consent (RequestorCanConsent): it gets the offer without
+	// the [OTAConsent] port being asked, with UserConsentNeeded, and may
+	// apply it. Off — matter.js's default — the port is asked. A [Manager]
+	// decides the delegation itself: [NewOTAProvider] refuses the two
+	// together.
+	//
+	// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:2158-2171 at b25ed960
+	// (State.delegateConsentToRequestor, default false).
+	DelegateConsentToRequestor bool
 	// BDX is the node's BDX responder the images are served through
 	// (matter.js BdxProtocol, OP:254-296); nil offers no BDX download.
 	BDX *bdx.Responder
@@ -285,7 +296,7 @@ var _ contract.FabricScopedState = (*OTAProvider)(nil)
 // errOTAManagerHooks refuses a Manager beside the hooks only the default
 // manager runs.
 var errOTAManagerHooks = errors.New("core: OTA provider with a Manager takes none of OnStatusChange, RebootQuery, " +
-	"TransferBlockSize and SessionActivity: they configure the default manager")
+	"TransferBlockSize, SessionActivity and DelegateConsentToRequestor: they configure the default manager")
 
 // otaProviderInst is the definition the provider serves: no attribute but
 // the globals, the three commands and their responses.
@@ -299,7 +310,8 @@ func NewOTAProvider(cfg OTAProviderConfig) (*OTAProvider, error) {
 	if cfg.BDX != nil && cfg.NodeID == nil {
 		return nil, ErrNoNodeID
 	}
-	if cfg.Manager != nil && (cfg.OnStatusChange != nil || cfg.RebootQuery != nil || cfg.TransferBlockSize != nil || cfg.SessionActivity != nil) {
+	if cfg.Manager != nil && (cfg.OnStatusChange != nil || cfg.RebootQuery != nil || cfg.TransferBlockSize != nil || cfg.SessionActivity != nil ||
+		cfg.DelegateConsentToRequestor) {
 		return nil, errOTAManagerHooks
 	}
 	cfg.Clock = clock.Or(cfg.Clock)

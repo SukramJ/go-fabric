@@ -229,13 +229,10 @@ func (m *Manager) cancelTransferForRestart(p Peer) error {
 	return nil
 }
 
-// MayDelegateConsentTo implements mattercore.OTAUpdateManager: a node
-// whose QueryImage says it can consent may obtain the consent itself
-// (mayDelegateConsentTo, :631-647 at b25ed960, without its
-// delegateConsentToRequestor switch and LocalConfigDisabled check, which
-// the module's manager does not have).
+// MayDelegateConsentTo implements mattercore.OTAUpdateManager
+// ([Manager.mayDelegateConsentTo]).
 func (s providerPorts) MayDelegateConsentTo(_ mattercore.OTAPeer, req provdef.QueryImageRequest) bool {
-	return req.RequestorCanConsent != nil && *req.RequestorCanConsent
+	return s.m.mayDelegateConsentTo(req)
 }
 
 // ReportAttemptStatus implements mattercore.OTAUpdateManager

@@ -192,6 +192,13 @@ type Config struct {
 	// UpdateCheckInterval is the period of the update check
 	// (State.updateCheckInterval, default 24 h); 0 is the default.
 	UpdateCheckInterval time.Duration
+	// DelegateConsentToRequestor offers a node whose QueryImage says it can
+	// obtain the user's consent itself (RequestorCanConsent) the newest
+	// applicable stored image without a consent given to the manager, with
+	// UserConsentNeeded, and accepts its apply (State.delegateConsentToRequestor,
+	// SoftwareUpdateManager.ts:2158-2171 at b25ed960, default false). Off,
+	// such a node is offered only a version the manager holds a consent for.
+	DelegateConsentToRequestor bool
 	// AnnounceAsDefaultProvider writes the provider as every node's
 	// default provider (State.announceAsDefaultProvider, default false).
 	AnnounceAsDefaultProvider bool
@@ -1070,25 +1077,7 @@ func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.Query
 		return AvailableDetails{}, false
 	}
 	m.mu.Lock()
-	consented := func(c StoredImage) bool {
-		return slices.ContainsFunc(m.consents, func(k consent) bool {
-			return k.VendorID == c.VendorID && k.ProductID == c.ProductID && k.TargetSoftwareVersion >= c.SoftwareVersion && k.peer == p
-		})
-	}
-	var chosen *StoredImage
-	required := false
-	canConsent := req.RequestorCanConsent != nil && *req.RequestorCanConsent
-	if canConsent {
-		chosen = &candidates[0]
-		required = !consented(*chosen)
-	} else {
-		for i := range candidates {
-			if consented(candidates[i]) {
-				chosen = &candidates[i]
-				break
-			}
-		}
-	}
+	chosen, required := m.offerOfLocked(p, candidates, req)
 	m.mu.Unlock()
 	if chosen == nil {
 		m.log.Info("ota.manager.no_candidate", slog.String("node", peerString(p)))
@@ -1098,6 +1087,40 @@ func (m *Manager) UpdateExistsFor(ctx context.Context, p Peer, req provdef.Query
 		NewSoftwareVersion: chosen.SoftwareVersion, NewSoftwareVersionString: chosen.SoftwareVersionString,
 		Filename: chosen.Filename, ConsentRequired: required,
 	}, true
+}
+
+// offerOfLocked is the candidate UpdateExistsFor offers: the highest one
+// the manager holds a consent for, else — when the node may obtain the
+// consent itself — the newest one, flagged consent-required; nil for
+// none. m.mu is held.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:698-713 at b25ed960
+// (updateExistsFor, the choice).
+func (m *Manager) offerOfLocked(p Peer, candidates []StoredImage, req provdef.QueryImageRequest) (*StoredImage, bool) {
+	for i := range candidates {
+		c := candidates[i]
+		if slices.ContainsFunc(m.consents, func(k consent) bool {
+			return k.VendorID == c.VendorID && k.ProductID == c.ProductID && k.TargetSoftwareVersion >= c.SoftwareVersion && k.peer == p
+		}) {
+			return &candidates[i], false
+		}
+	}
+	if len(candidates) > 0 && m.mayDelegateConsentTo(req) {
+		return &candidates[0], true
+	}
+	return nil, false
+}
+
+// mayDelegateConsentTo reports whether a node whose QueryImage is req may
+// obtain the user's consent itself: it says it can, and the delegation is
+// on ([Config].DelegateConsentToRequestor). matter.js also refuses a node
+// with LocalConfigDisabled or without cached Basic Information, which the
+// manager does not read here (F-b25ed960-21).
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:638-647 at b25ed960
+// (mayDelegateConsentTo).
+func (m *Manager) mayDelegateConsentTo(req provdef.QueryImageRequest) bool {
+	return m.cfg.DelegateConsentToRequestor && req.RequestorCanConsent != nil && *req.RequestorCanConsent
 }
 
 // storedCandidates are UpdateExistsFor's candidates: the stored images

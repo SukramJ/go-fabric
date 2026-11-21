@@ -486,3 +486,46 @@ func TestManagerConsentRemovalKeepsALegacyApplyingUpdate(t *testing.T) {
 		t.Error("the applying update left the queue")
 	}
 }
+
+// TestManagerDelegatesConsentOnlyWhenOnParity ports "offers a requestor
+// that can consent the newest image without a consent only while
+// delegation is on" (OtaTest.ts:4666 at b25ed960): the delegation is off by
+// default (SoftwareUpdateManager.ts:2171), so a node that can consent and
+// holds no consent is offered nothing (:698-705); with it on, the newest
+// candidate, consent-required (:700, :713). A consented version is offered
+// first either way (:699, :701).
+func TestManagerDelegatesConsentOnlyWhenOnParity(t *testing.T) {
+	t.Parallel()
+	yes := true
+	req := provdef.QueryImageRequest{RequestorCanConsent: &yes}
+	candidates := []StoredImage{{VendorID: 0xFFF1, ProductID: 0x8001, SoftwareVersion: 3}, {VendorID: 0xFFF1, ProductID: 0x8001, SoftwareVersion: 2}}
+	t.Run("offers a requestor that can consent the newest image without a consent only while delegation is on", func(t *testing.T) {
+		t.Parallel()
+		for _, on := range []bool{false, true} {
+			r := newManagerRig(t, func(c *Config) { c.DelegateConsentToRequestor = on })
+			r.m.mu.Lock()
+			chosen, required := r.m.offerOfLocked(testPeer, candidates, req)
+			r.m.mu.Unlock()
+			if delegated := (providerPorts{r.m}).MayDelegateConsentTo(otaPeerOfTest(), req); delegated != on {
+				t.Errorf("delegation %v: MayDelegateConsentTo %v", on, delegated)
+			}
+			switch {
+			case !on && chosen != nil:
+				t.Errorf("delegation off: offered %d", chosen.SoftwareVersion)
+			case on && (chosen == nil || chosen.SoftwareVersion != 3 || !required):
+				t.Errorf("delegation on: offered %v required %v, want 3 consent-required", chosen, required)
+			}
+		}
+	})
+	t.Run("offers the consented version before a delegated one", func(t *testing.T) {
+		t.Parallel()
+		r := newManagerRig(t, func(c *Config) { c.DelegateConsentToRequestor = true })
+		r.queue(2, nil)
+		r.m.mu.Lock()
+		chosen, required := r.m.offerOfLocked(testPeer, candidates, req)
+		r.m.mu.Unlock()
+		if chosen == nil || chosen.SoftwareVersion != 2 || required {
+			t.Errorf("offered %v required %v, want the consented 2", chosen, required)
+		}
+	})
+}

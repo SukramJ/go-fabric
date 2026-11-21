@@ -84,6 +84,7 @@ type otaStandaloneManager struct {
 	maxBlock    uint16
 	blockFor    func(OTAPeer) uint16
 	activity    func(uint16) (time.Time, bool)
+	delegate    bool
 	onStatus    func(OTAPeer, OTAUpdateStatus, uint32)
 	rebootQuery func(OTAPeer, uint16)
 	clock       clock.Clock
@@ -105,7 +106,8 @@ var (
 // matter.js has no provider without its SoftwareUpdateManager
 // (OtaSoftwareUpdateProviderServer.ts:81-82 at b25ed960).
 //
-// It reads cfg's BDX, BDXMaxBlockSize, Clock and Logger, and honours a
+// It reads cfg's BDX, BDXMaxBlockSize, DelegateConsentToRequestor, Clock
+// and Logger, and honours a
 // manager-less provider's hooks (all four deprecated): OnStatusChange learns each
 // status an attempt takes (and Done at each NotifyUpdateApplied),
 // RebootQuery each query admitted for the requestor's restart (the host's
@@ -122,7 +124,7 @@ func NewOTAStandaloneManager(cfg OTAProviderConfig) OTAUpdateManager {
 	return &otaStandaloneManager{
 		set: NewOTAUpdateAttempts(clk), bdx: cfg.BDX, maxBlock: cfg.BDXMaxBlockSize,
 		blockFor: cfg.TransferBlockSize, activity: cfg.SessionActivity,
-		onStatus: cfg.OnStatusChange, rebootQuery: cfg.RebootQuery,
+		delegate: cfg.DelegateConsentToRequestor, onStatus: cfg.OnStatusChange, rebootQuery: cfg.RebootQuery,
 		clock: clk, logger: logger,
 	}
 }
@@ -217,10 +219,16 @@ func transferOf(r *bdx.Responder, peer OTAPeer) interface {
 	return s
 }
 
-// MayDelegateConsentTo implements [OTAUpdateManager]: a requestor that
-// says it can consent may; the manager has no peer state to refuse it by.
+// MayDelegateConsentTo implements [OTAUpdateManager]: with
+// [OTAProviderConfig].DelegateConsentToRequestor on, a requestor that says
+// it can consent may; off, none may. The manager holds no Basic
+// Information of a requestor, so matter.js's refusal of a node with
+// LocalConfigDisabled has nothing to read here.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:638-647 at b25ed960
+// (mayDelegateConsentTo).
 func (m *otaStandaloneManager) MayDelegateConsentTo(_ OTAPeer, req provdef.QueryImageRequest) bool {
-	return req.RequestorCanConsent != nil && *req.RequestorCanConsent
+	return m.delegate && req.RequestorCanConsent != nil && *req.RequestorCanConsent
 }
 
 // ReportAttemptStatus implements [OTAUpdateManager].

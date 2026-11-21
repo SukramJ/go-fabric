@@ -415,7 +415,9 @@ func TestOTAProvider_Consent(t *testing.T) {
 		{"granted", otaConsentFunc(func() (OTAConsentState, time.Duration) { return OTAConsentGranted, 0 }), false, provdef.StatusUpdateAvailable, 0},
 		{"requestor can consent", nil, true, provdef.StatusUpdateAvailable, 0},
 	} {
-		f := newOTAFixture(t, nil)
+		// The requestor that can consent obtains it with the delegation on
+		// (SoftwareUpdateManager.ts:638-647 at b25ed960).
+		f := newOTAFixture(t, func(c *OTAProviderConfig) { c.DelegateConsentToRequestor = tc.can })
 		f.p.cfg.Consent = tc.consent
 		f.src.img.ConsentRequired = true
 		req := bdxQuery()
@@ -672,5 +674,27 @@ func TestOTAUpdateAttemptZeroValue(t *testing.T) {
 	s.End(b)
 	if !ended || len(s.All()) != 0 {
 		t.Errorf("ended %v, %d attempts left", ended, len(s.All()))
+	}
+}
+
+// TestOTAProviderRefusesDefaultManagerSettingsBesideAManager: what only the
+// default manager reads is refused beside a Manager, never dropped.
+func TestOTAProviderRefusesDefaultManagerSettingsBesideAManager(t *testing.T) {
+	t.Parallel()
+	mgr := NewOTAStandaloneManager(OTAProviderConfig{})
+	for name, set := range map[string]func(*OTAProviderConfig){
+		"OnStatusChange":    func(c *OTAProviderConfig) { c.OnStatusChange = func(OTAPeer, OTAUpdateStatus, uint32) {} },
+		"RebootQuery":       func(c *OTAProviderConfig) { c.RebootQuery = func(OTAPeer, uint16) {} },
+		"TransferBlockSize": func(c *OTAProviderConfig) { c.TransferBlockSize = func(OTAPeer) uint16 { return 0 } },
+		"SessionActivity": func(c *OTAProviderConfig) {
+			c.SessionActivity = func(uint16) (time.Time, bool) { return time.Time{}, false }
+		},
+		"DelegateConsentToRequestor": func(c *OTAProviderConfig) { c.DelegateConsentToRequestor = true },
+	} {
+		cfg := OTAProviderConfig{ImageSource: &otaTestSource{}, Manager: mgr}
+		set(&cfg)
+		if _, err := NewOTAProvider(cfg); !errors.Is(err, errOTAManagerHooks) {
+			t.Errorf("%s beside a Manager: %v, want errOTAManagerHooks", name, err)
+		}
 	}
 }
