@@ -2643,7 +2643,7 @@ type SessionRegistry interface {
 // [SessionRegistry] implements to receive the bridge's outbound
 // CloseSession sender. The operational manager fires it once per
 // session before zeroising the keys on graceful teardown — the Go
-// translation of matter.js ExchangeManager.ts:758 (at db021da0) observing
+// translation of matter.js ExchangeManager.ts:767 (at b25ed960) observing
 // session.gracefulClose and shipping the report via #sendCloseSession.
 type gracefulCloseNotifierSetter interface {
 	SetGracefulCloseNotifier(fn func(sessionID uint16, sess *channel.Session))
@@ -2840,7 +2840,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 //
 // Returns nil when the peer address was never observed; the caller
 // skips the notification (best-effort, matching the try/catch around
-// matter.js ExchangeManager.ts:781-791 #sendCloseSession at db021da0).
+// matter.js ExchangeManager.ts:790-800 #sendCloseSession at b25ed960).
 func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 	if raw, ok := b.sessionPeerAddrs.Load(sessionID); ok {
 		if addr, ok := raw.(net.Addr); ok && !isNilRoute(addr) {
@@ -2879,12 +2879,12 @@ func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 // the session keys are still live. Strictly best-effort: any failure
 // (unknown peer address, encrypt error, socket error) is logged at
 // debug and swallowed — matter.js wraps the same send in a
-// try/catch-and-warn (ExchangeManager.ts:781-791 #sendCloseSession at
-// db021da0).
+// try/catch-and-warn (ExchangeManager.ts:790-800 #sendCloseSession at
+// b25ed960).
 //
-// Wire shape mirrors matter.js SecureChannelMessenger.ts:156-158
-// sendCloseSession → #sendStatusReport(Success, CloseSession,
-// requiresAck=false): the report is NOT MRP-tracked, the peer does not
+// Wire shape mirrors matter.js SecureChannelMessenger.ts:199-204 at b25ed960
+// (sendCloseSession → #sendStatusReport(Success, CloseSession,
+// suppressAck: true)): the report is NOT MRP-tracked, the peer does not
 // ack a farewell.
 func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session) {
 	// The session is being torn down whether or not the farewell
