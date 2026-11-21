@@ -493,17 +493,33 @@ func (d *Device) Node() *node.Node {
 	return d.n
 }
 
+// AwaitCASESession waits, bounded by ctx and on the site's clock
+// ([Site.Eventually]), until the device's node lists an established CASE
+// session with the node peerNodeID on its fabric fabricIndex — after a
+// peer connected to the device directly, before the test reads the
+// device's session state or acts on the session from the device's side.
+// The device completes its side of CASE after it sent the status report
+// that ends the handshake and lets the peer go on, and lists no session
+// still establishing; [Controller.Commission] waits the same way.
+func (d *Device) AwaitCASESession(ctx context.Context, fabricIndex uint8, peerNodeID uint64) error {
+	return d.site.Eventually(ctx, fmt.Sprintf("device %d's CASE session with node %#x on fabric %d", d.index, peerNodeID, fabricIndex), func() bool {
+		return d.listsCASESession(func(fabric uint8, peer, _ uint64) bool {
+			return fabric == fabricIndex && peer == peerNodeID
+		})
+	})
+}
+
 // listsCASESession reports whether the device's node lists an
-// established CASE session between peer (the controller's node id) and
-// local (the device's node id on that fabric). Sessions omits a session
-// still establishing (operational.Manager.Sessions).
-func (d *Device) listsCASESession(peer, local uint64) bool {
+// established CASE session match accepts, by its fabric index, peer node
+// id and local node id. Sessions omits a session still establishing
+// (operational.Manager.Sessions).
+func (d *Device) listsCASESession(match func(fabric uint8, peer, local uint64) bool) bool {
 	n := d.Node()
 	if n == nil {
 		return false
 	}
 	for _, s := range n.Sessions().Sessions() {
-		if !s.IsPASE && s.PeerNodeID == peer && s.LocalNodeID == local {
+		if !s.IsPASE && match(s.FabricIndex, s.PeerNodeID, s.LocalNodeID) {
 			return true
 		}
 	}

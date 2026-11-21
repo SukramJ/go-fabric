@@ -4,6 +4,7 @@
 package fabrictest_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -33,5 +34,32 @@ func TestControllerOptionsSessionsAreReported(t *testing.T) {
 		if s.PeerIdleInterval != want.Idle || s.PeerActiveInterval != want.Active || s.PeerActiveThreshold != want.ActiveThreshold {
 			t.Errorf("device recorded %v/%v/%v, want %v/%v/%v", s.PeerIdleInterval, s.PeerActiveInterval, s.PeerActiveThreshold, want.Idle, want.Active, want.ActiveThreshold)
 		}
+	}
+}
+
+// Device.AwaitCASESession returns once the device lists an established
+// CASE session with the peer on the fabric, and runs out with ctx for a
+// peer it holds none with.
+func TestDeviceAwaitCASESession(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	p := site.CommissionedPair(fabrictest.PairOptions{})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	fabrics, err := p.Device.Node().FabricInfos(ctx)
+	if err != nil || len(fabrics) != 1 {
+		t.Fatalf("fabrics %v, %v", fabrics, err)
+	}
+	fabric, ctl := fabrics[0].FabricIndex, p.Controller.Fabric().RootNodeID
+	if err := p.Device.AwaitCASESession(ctx, fabric, ctl); err != nil {
+		t.Fatalf("the controller's session: %v", err)
+	}
+	short, cancelShort := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancelShort()
+	if err := p.Device.AwaitCASESession(short, fabric, ctl+1); err == nil {
+		t.Error("a session with a node the device never met")
+	}
+	if err := p.Device.AwaitCASESession(short, fabric+1, ctl); err == nil {
+		t.Error("a session on a fabric the device is not on")
 	}
 }
