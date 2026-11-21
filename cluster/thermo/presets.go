@@ -461,7 +461,7 @@ func (s *ThermostatServer) SetActivePresetHandle(ctx context.Context, handle []b
 // matter.js: the SetActivePresetRequest command's path, run as the host —
 // a handle that names no stored preset is INVALID_COMMAND; otherwise it
 // becomes ActivePresetHandle (saved, announced, ActivePresetChange
-// emitted) and the setpoints of the occupancy in effect take the preset's,
+// emitted when the handle changed) and the setpoints of the occupancy in effect take the preset's,
 // each clamped to its limits, and the preset stays active (the moved
 // setpoints are the activation's, not a direct write). It is the path a
 // followed thermostat suggestion takes too: the moved setpoints reach the
@@ -482,29 +482,41 @@ func (s *ThermostatServer) ActivatePreset(ctx context.Context, handle []byte) er
 	return s.activatePreset(contract.WithOrigin(ctx, contract.OriginHostSet), handle)
 }
 
-// storeActiveHandle saves and stores the active handle and reports
-// whether the change started or ended a thermostat suggestion's override
-// (trackOverrideLocked): the caller then re-evaluates the suggestions,
-// once it holds no persist. The caller holds s.op.
+// storeActiveHandle saves and stores the active handle, announces it and,
+// when it changed, emits ActivePresetChange (emitActivePresetChange); it
+// reports whether the change started or ended a thermostat suggestion's
+// override (trackOverrideLocked): the caller then re-evaluates the
+// suggestions, once it holds no persist. The caller holds s.op.
 func (s *ThermostatServer) storeActiveHandle(ctx context.Context, handle []byte) (reevaluate bool, err error) {
+	previous, changed, reevaluate, err := s.saveActiveHandle(ctx, handle)
+	if changed {
+		s.emitActivePresetChange(ctx, previous, handle)
+	}
+	return reevaluate, err
+}
+
+// saveActiveHandle is storeActiveHandle under persist, without the
+// event: it reports the handle before and whether it changed.
+func (s *ThermostatServer) saveActiveHandle(ctx context.Context, handle []byte) (previous []byte, changed, reevaluate bool, err error) {
 	s.lockPersist()
 	defer s.unlockPersist()
 	s.mu.RLock()
 	presets := s.presets
-	same := bytes.Equal(s.activePresetHandle, handle) && (s.activePresetHandle == nil) == (handle == nil)
+	previous = s.activePresetHandle
 	s.mu.RUnlock()
-	if same {
-		return false, nil
+	if sameHandle(previous, handle) {
+		return nil, false, false, nil
 	}
 	if err := s.savePresets(ctx, presets, handle); err != nil {
-		return false, err
+		return nil, false, false, err
 	}
 	s.mu.Lock()
+	previous = s.activePresetHandle
 	s.activePresetHandle = handle
 	reevaluate = s.trackOverrideLocked(handle, false)
 	s.mu.Unlock()
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
-	return reevaluate, nil
+	return previous, true, reevaluate, nil
 }
 
 // clearActivePresetOnDirectWrite clears the active preset after a direct
@@ -539,9 +551,7 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 		s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
 	}
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActivePresetHandle)
-	// chip clears the active preset after a write of a setpoint in effect
-	// through SetActivePreset(null), which emits ActivePresetChange
-	// (ThermostatCluster.h:215-224, ThermostatClusterPresets.cpp:499).
+	// The cleared handle is a change of ActivePresetHandle: its event.
 	s.emitActivePresetChange(ctx, previous, nil)
 	return reevaluate
 }
@@ -604,7 +614,6 @@ func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) er
 	}
 	st := s.setpointState()
 	unoccupied := !s.occupiedLocked()
-	previous := bytes.Clone(s.activePresetHandle)
 	s.mu.RUnlock()
 	if handle != nil && preset == nil {
 		return spec.Errorf(im.StatusInvalidCommand, "Requested PresetHandle not found")
@@ -633,13 +642,13 @@ func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) er
 			return err
 		}
 	}
+	// storeActiveHandle emits ActivePresetChange when the handle changed,
+	// none for the handle that stays (ThermostatEventsTest.ts:474-483 at
+	// b25ed960, "generates no event when the handle stays").
 	reevaluate, err := s.storeActiveHandle(ctx, handle)
 	if err != nil {
 		return err
 	}
-	// chip's SetActivePreset emits the event on every accepted request,
-	// the unchanged handle included (ThermostatClusterPresets.cpp:461-500).
-	s.emitActivePresetChange(ctx, previous, handle)
 	if reevaluate {
 		s.reevaluateSuggestions(ctx)
 	}
@@ -718,6 +727,9 @@ func (s *ThermostatServer) seedPresets(cfg ThermostatConfig) error {
 	}) {
 		s.logger().Warn("matter.thermostat.active_preset_cleared",
 			slog.String("active_preset_handle", handleKey(active)), slog.String("reason", "matches no preset, reporting no active preset"))
+		// The clear is a change of the handle at the start: its event goes
+		// out with the start's (ThermostatEventsTest.ts:485-505 at b25ed960).
+		s.queueStartupEventLocked(tdef.EventActivePresetChange, activePresetChange(active, nil))
 		active, cleared = nil, true
 	}
 	s.activePresetHandle = active

@@ -251,7 +251,15 @@ type ThermostatConfig struct {
 	// override with TSUGGEST, so both survive a restart; nil keeps them in
 	// memory. A start drops the stored entries that name no preset.
 	SuggestionStore SuggestionStore
-	// Clock times the atomic writes; nil is the system clock.
+	// LocalTemperatureChangeThreshold is the smallest change of
+	// LocalTemperature, in 0.01 °C as LocalTemperature, that the
+	// LocalTemperatureChange event reports; nil is the default, 50
+	// (0.5 °C). With the event (TEVT without LTNE) [New] refuses a value
+	// of 0 or below; [ThermostatServer.SetLocalTemperatureChangeThreshold]
+	// changes it later.
+	LocalTemperatureChangeThreshold *int16
+	// Clock times the atomic writes, the ThermostatSuggestions timer and
+	// the 60 s window of LocalTemperatureChange; nil is the system clock.
 	Clock clock.Clock
 	// Sink is the optional host port; nil keeps the server self-contained.
 	Sink Sink
@@ -440,6 +448,11 @@ type ThermostatServer struct {
 	// pendingSetpointEvents are the SetpointChange events commitSetpoints
 	// queued under mu (events.go).
 	pendingSetpointEvents []tdef.SetpointChangeEvent
+	// startupEvents are the events the construction produced, emitted at
+	// the first SetEndpoint (events.go).
+	startupEvents []startupEvent
+	// ltEvent is the LocalTemperatureChange state (events.go).
+	ltEvent localTempEvent
 
 	// MSCH-gated state (schedules.go): the configuration, the stored
 	// schedules, the active handle and the port.
@@ -525,6 +538,15 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		occupied:            true,
 		clk:                 clock.Or(cfg.Clock),
 		persist:             make(chan struct{}, 1),
+		ltEvent:             localTempEvent{threshold: defaultLocalTemperatureChangeThreshold},
+	}
+	if t := cfg.LocalTemperatureChangeThreshold; t != nil {
+		if s.servesLocalTemperatureChange() {
+			if err := checkLocalTemperatureChangeThreshold(*t); err != nil {
+				return nil, err
+			}
+		}
+		s.ltEvent.threshold = *t
 	}
 	// Mirrors matter.js ThermostatServer.ts:154-160 at db021da0: a deadband
 	// above 127 is reset to the default, one below 0 refused.
@@ -582,15 +604,18 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		if err := s.seedPresets(cfg); err != nil {
 			return nil, err
 		}
-		// The setpoints initialize repaired change in its transaction, so
-		// their $Changing reactors run at its commit: a direct change of the
-		// setpoints in effect clears the active preset
-		// (ThermostatServer.ts:682-706, :744-768 at db021da0; matter.js
-		// ThermostatBehaviorTest "clears the active preset when it adjusts a
-		// setpoint").
+		// A setpoint in effect the initial reconcile moved clears the
+		// active preset: matter.js's ThermostatBehaviorTest asserts it
+		// (packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts:134-149 at b25ed960,
+		// "clears the active preset when it adjusts a setpoint"). The clear
+		// is a change of the handle at the start, so its ActivePresetChange
+		// is queued with the start's other events — inferred from the
+		// activePresetHandle$Changed reaction (ThermostatServer.ts:2126-2134 at b25ed960),
+		// no matter.js test asserts that event.
 		unocc := !s.occupied
 		if s.activePresetHandle != nil &&
 			(before.setpoint(true, unocc) != st.setpoint(true, unocc) || before.setpoint(false, unocc) != st.setpoint(false, unocc)) {
+			s.queueStartupEventLocked(tdef.EventActivePresetChange, activePresetChange(s.activePresetHandle, nil))
 			s.activePresetHandle = nil
 			if err := s.savePresets(context.Background(), s.presets, nil); err != nil {
 				return nil, fmt.Errorf("%w: %w", ErrPresets, err)
@@ -610,7 +635,14 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	}
 
 	s.systemMode = defaultSystemMode(features)
-	// The initial reconcile is no change a controller hears of.
+	// A setpoint the initial reconcile moved is a change of the start: its
+	// SetpointChange goes out with the start's other events. Inferred from
+	// matter.js's setpoint reactions, which are installed before the
+	// initialization commits (ThermostatServer.ts:2150-2187 at b25ed960);
+	// no matter.js test asserts these events.
+	for _, e := range s.pendingSetpointEvents {
+		s.queueStartupEventLocked(tdef.EventSetpointChange, e)
+	}
 	s.pendingSetpointEvents = nil
 	return s, nil
 }
@@ -1763,18 +1795,22 @@ func (s *ThermostatServer) occupiedLocked() bool {
 // externallyMeasuredOccupancy (ThermostatServer.ts:568, :573-575 at
 // db021da0): Occupancy follows and is announced, and the setpoints in
 // effect for SetpointRaiseLower and SetActivePresetRequest become the
-// occupied or the unoccupied pair. Without OCC it is logged and ignored.
+// occupied or the unoccupied pair. With TEVT a change emits
+// OccupancyChange (events.go). Without OCC it is logged and ignored.
 func (s *ThermostatServer) SetOccupied(occupied bool) {
 	if s.features&ThermostatFeatureOCC == 0 {
 		s.logger().Warn("matter.thermostat.inbound_occupancy_ignored", slog.String("reason", "feature not served"))
 		return
 	}
 	s.mu.Lock()
+	before := s.eventStateLocked()
 	changed := s.occupied != occupied
 	s.occupied = occupied
+	after := s.eventStateLocked()
 	s.mu.Unlock()
 	if changed {
 		s.changes.NotifyFrom(contract.OriginHostSet, thermoAttrOccupancy)
+		s.emitChanges(context.Background(), before, after)
 	}
 }
 
@@ -1964,7 +2000,10 @@ func (s *ThermostatServer) MatterEvents() []uint32 { return s.inst.MatterEvents(
 // afterwards, and it closes every atomic write in progress with its
 // timeout, as matter.js's [Symbol.asyncDispose] closes the
 // AtomicWriteHandler (ThermostatServer.ts:1582-1585,
-// AtomicWriteHandler.ts:84-89 at db021da0). The server stays usable: the
+// AtomicWriteHandler.ts:84-89 at db021da0). A LocalTemperatureChange
+// waiting for the end of its window is dropped, as a closed node runs no
+// timer (ThermostatEventsTest.ts:795-812 at b25ed960, "generates no event
+// after the node closed"). The server stays usable: the
 // next
 // command or MatterTimeChanged arms the suggestion timer again, and so
 // does the [ThermostatServer.SetEndpoint] of a reassembly that puts the
@@ -1977,6 +2016,7 @@ func (s *ThermostatServer) MatterQuiesce() {
 	}
 	s.suggest.pending = false
 	s.suggest.quiesced = true
+	s.stopLocalTemperatureTimerLocked()
 	s.mu.Unlock()
 	s.atomic.closeAll()
 }
