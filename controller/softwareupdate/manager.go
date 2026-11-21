@@ -312,8 +312,8 @@ const (
 	// phaseAnnounced: the node was announced and made no answered attempt
 	// since since.
 	phaseAnnounced
-	// phaseProgress: the node follows attempt (or, without one, the
-	// deprecated OnStatusChange moved the entry: legacy).
+	// phaseProgress: the node follows attempt (or, without one,
+	// the deprecated OnStatusChange moved the entry: legacy).
 	phaseProgress
 )
 
@@ -2660,8 +2660,8 @@ func (m *Manager) updateAppliedLocked(op mattercore.OTAPeer, token []byte, softw
 	}
 }
 
-// progressLocked is onOtaStatusChange's last branch for an entry the
-// deprecated OnStatusChange moves: the entry is in progress with the
+// progressLocked is onOtaStatusChange's last branch for an entry
+// the deprecated OnStatusChange moves: the entry is in progress with the
 // status and its time; the first Downloading reports the transfer started,
 // Applying arms the reboot re-subscription and, the first time, reports
 // the update applying. m.mu is held.

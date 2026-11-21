@@ -71,6 +71,7 @@ var coreKeys = []key{
 // the same key, and a thing the core table names never takes one of
 // these.
 var areaKeys = []string{
+	"recovered", "reported", "within",
 	"accept_test", "accepted_findings", "ack_counter", "action",
 	"active_preset_handle", "additional_mrp_delay", "address",
 	"address_index", "addresses", "adjusted", "admin_vendor_id",
