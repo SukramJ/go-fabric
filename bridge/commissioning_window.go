@@ -85,11 +85,13 @@ type PaseVerifierInstaller interface {
 // attached to a bridge ([Bridge.AttachCommissioningWindow]) closes the
 // PASE sessions of the bridge's session registry by itself; the hook is
 // for a window used without one, or for sessions the host keeps
-// elsewhere, and runs before the bridge's own close.
+// elsewhere. On a window attached to a bridge the bridge first tells each
+// PASE session's peer with a CloseSession, then calls this hook, then
+// closes the sessions; a window without a bridge calls the hook alone.
 //
 // Mirrors matter.js
-// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:137-141
-// at db021da0 (revokeCommissioning: `SessionManager.getPaseSession()` →
+// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
+// at b25ed960 (revokeCommissioning: `SessionManager.getPaseSession()` →
 // `paseSession.initiateClose()`).
 type PaseSessionCloser interface {
 	ClosePaseSessions(ctx context.Context) error
@@ -272,7 +274,9 @@ func (w *CommissioningWindow) SetFailSafeExpirer(e FailSafeExpirer) {
 
 // SetPaseSessionCloser wires (or clears, when nil) the hook called at
 // the start of [RevokeWindow] to evict open PASE sessions per Matter
-// §11.19.7.3.
+// §11.19.7.3. On a window attached to a bridge the bridge first tells
+// each PASE session's peer with a CloseSession, then calls this hook,
+// then closes the sessions ([PaseSessionCloser]).
 // Safe to call concurrently with [RevokeWindow].
 func (w *CommissioningWindow) SetPaseSessionCloser(c PaseSessionCloser) {
 	w.mu.Lock()
