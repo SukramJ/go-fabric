@@ -206,7 +206,7 @@
   },
   {
     "file": "bridge/commissioning_window.go",
-    "line": 1150,
+    "line": 1154,
     "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:524",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "randomBytes",
@@ -244,17 +244,7 @@
   },
   {
     "file": "bridge/fabric_session_close_test.go",
-    "line": 45,
-    "citation": "ExchangeManager.ts:781-791",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "at": "db021da0",
-    "identifier": "gracefulClose",
-    "nearest": 758,
-    "occurrences": 1
-  },
-  {
-    "file": "bridge/fabric_session_close_test.go",
-    "line": 171,
+    "line": 172,
     "citation": "Fabric.ts:432-439",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "UpdateNOC",
@@ -263,7 +253,7 @@
   },
   {
     "file": "bridge/fabric_session_close_test.go",
-    "line": 171,
+    "line": 172,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -272,7 +262,7 @@
   },
   {
     "file": "bridge/fabric_session_close_test.go",
-    "line": 215,
+    "line": 216,
     "citation": "CaseServer.ts:175-176",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "identifier": "CloseSession",
@@ -336,16 +326,6 @@
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "#scheduleRolloverClose",
     "nearest": 469,
-    "occurrences": 2
-  },
-  {
-    "file": "bridge/securechannel_close_parity_test.go",
-    "line": 169,
-    "citation": "ExchangeManager.ts:781-791",
-    "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
-    "at": "db021da0",
-    "identifier": "requiresAck",
-    "nearest": 496,
     "occurrences": 2
   },
   {

@@ -41,8 +41,9 @@ func readCloseSessionTargets(t *testing.T, peer net.PacketConn) []uint16 {
 // TestCloseFabricSessionsExcept_TellsEachOtherSession: the NOC-rotation
 // path tells every other session of the rotated fabric with a CloseSession
 // and closes it; the invoking session and another fabric's session stay
-// open and are not told (matter.js Fabric.ts:432-439 replaced →
-// initiateClose → gracefulClose → ExchangeManager.ts:781-791 at db021da0).
+// open and are not told (matter.js Fabric.ts:432-439 at db021da0 replaced →
+// initiateClose → the gracefulClose observer, ExchangeManager.ts:767 at b25ed960,
+// → ExchangeManager.ts:790-800 at b25ed960, #sendCloseSession).
 func TestCloseFabricSessionsExcept_TellsEachOtherSession(t *testing.T) {
 	t.Parallel()
 	dev := startResumeDevice(t, newMemSubscriptionStore(), nil)
