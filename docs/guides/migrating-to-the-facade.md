@@ -42,6 +42,40 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
+## Deprecated in the next release, removable in v0.26.0: the OTA provider's hooks
+
+The OTA provider's requestors now have update attempts, owned by the
+provider's manager: `OTAProviderConfig.Manager` (`cluster/core`, `node`,
+`controller/softwareupdate.ProviderConfig`), an `OTAUpdateManager`. A
+provider without one runs the default manager
+(`core.NewOTAStandaloneManager`), which queues no update. The hooks that
+stood in for the manager are deprecated and still honoured by the default
+manager; beside a `Manager` they are refused.
+
+| Symbol | Route |
+| --- | --- |
+| `OTAApplyPolicy`, `OTAProviderConfig.ApplyPolicy` (`cluster/core`, `node`, `softwareupdate.ProviderConfig`) | `OTAProviderConfig.ApplyDelay` for the delay the policy answered with Proceed; a refusal of one's own goes into an `OTAUpdateManager` |
+| `core.OTAProviderConfig.OnStatusChange` | `OTAProviderConfig.OnAttemptStatus`, fed for every manager; on a `Node`, `Node.OnOTAProviderStatus` |
+| `OTAProviderConfig.RebootQuery`, `.TransferBlockSize`, `core.OTAProviderConfig.SessionActivity`, `softwareupdate.ProviderConfig.OnStatusChange` | the manager's `AdmitQuery` and `BDXTransferOptionsFor` |
+| `softwareupdate.Manager.OnStatusChange`, `Manager.SuppressNextStartUp` | `ProviderConfig.Manager`: the provider reports to the manager's attempts, and the manager judges a restart query itself |
+
+A host with its own OTA update logic implements `OTAUpdateManager`
+(embedding `OTAUpdateAttempts` keeps the Matter rules) and sets
+`OTAProviderConfig.Manager`; the deprecated provider hooks go,
+`ApplyPolicy`'s delay becomes `ApplyDelay`, and `OnAttemptStatus` (or the
+node's `OnOTAProviderStatus`) observes the statuses. A host without one
+sets nothing: the default manager runs the rules; it delegates consent
+only with `DelegateConsentToRequestor`.
+
+A host that serves `softwareupdate.Manager`'s updates builds the provider
+from `Manager.ProviderConfig()` and copies `Manager` and `ApplyDelay`:
+only then does `Manager.RemoveConsent` take the apply right of the node's
+offers. A provider built without `Manager` runs the default manager,
+whose attempts `softwareupdate.Manager` does not see — `RemoveConsent`
+then closes the gap only for the manager's queued update, not for an
+offer the default manager made — and `ProviderConfig()` no longer fills
+the hooks such a host copied.
+
 ## Deprecated in v0.23.0, removable in v0.25.0: `Bridge.ConnectPeer` and `Bridge.ConnectOtaProvider`
 
 A node reaches the peers its device-side servers talk to — the OTA

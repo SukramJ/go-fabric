@@ -15,6 +15,7 @@ import (
 	"time"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	otaprov "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	otareq "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	"github.com/SukramJ/go-fabric/controller"
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
@@ -275,5 +276,33 @@ func TestOTACancelByRemovingConsentParity(t *testing.T) {
 	}
 	if v, _ := r.dev.Node().Root().BasicInformation.MatterRead(0x0009); v != uint32(1) {
 		t.Errorf("device SoftwareVersion %v, want 1", v)
+	}
+}
+
+// TestOTADelegatesConsentOnlyWhenOnParity: the controller hands
+// OTAConfig.DelegateConsentToRequestor to its update manager. Off (the
+// default), a node that says it can consent is offered nothing without a
+// consent given to the manager; on, it is offered the newest stored image,
+// consent-required — OtaTest.ts:4666 at b25ed960, through the controller's
+// configuration.
+func TestOTADelegatesConsentOnlyWhenOnParity(t *testing.T) {
+	t.Parallel()
+	for _, on := range []bool{false, true} {
+		t.Run(strconv.FormatBool(on), func(t *testing.T) {
+			t.Parallel()
+			r := newOTARig(t, func(o *controller.OTAConfig) { o.DelegateConsentToRequestor = on })
+			r.storeImage(t, 2)
+			yes := true
+			req := otaprov.QueryImageRequest{VendorId: 0xFFF1, ProductId: 0x8001, SoftwareVersion: 1, RequestorCanConsent: &yes}
+			var got softwareupdate.AvailableDetails
+			var ok bool
+			r.run(t, func(ctx context.Context) error {
+				got, ok = r.c.SoftwareUpdates().UpdateExistsFor(ctx, r.peer(t), req)
+				return nil
+			})
+			if ok != on || (on && (got.NewSoftwareVersion != 2 || !got.ConsentRequired)) {
+				t.Errorf("delegation %v: offer %+v, %v; want offered=%v (version 2, consent required)", on, got, ok, on)
+			}
+		})
 	}
 }

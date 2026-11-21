@@ -16,32 +16,24 @@ import (
 
 // TestOTAProviderDropFabricForgetsItsUpdates (review II, R2-P6-bound-1206,
 // owner decision 167): the provider is fabric-scoped state — it names the
-// fabrics its in-progress entries and consents belong to, and a removed
-// fabric's entries and consents go (their cleanup run); another fabric's
-// stay.
+// fabrics its manager holds update attempts of, and a removed fabric's
+// attempts end; another fabric's stay.
 func TestOTAProviderDropFabricForgetsItsUpdates(t *testing.T) {
 	t.Parallel()
 	f := newOTAFixture(t, nil)
 	if r := f.query(t, 7, bdxQuery()); r.Status != provdef.StatusUpdateAvailable {
 		t.Fatalf("query %+v", r)
 	}
-	f.apply(t, []byte{1, 2, 3, 4}, 2)
 	other := OTAPeer{FabricIndex: otaTestFabric + 1, NodeID: 5}
-	f.p.mu.Lock()
-	f.p.consents[other] = 9
-	f.p.mu.Unlock()
+	f.p.mgr.ApplyUpdate(context.Background(), other, []byte{9}, 9, 0)
 	if got := f.p.MatterHeldFabrics(); !slices.Equal(got, []uint8{otaTestFabric, otaTestFabric + 1}) {
 		t.Fatalf("held %v", got)
 	}
 	if err := f.p.MatterDropFabric(context.Background(), otaTestFabric); err != nil {
 		t.Fatal(err)
 	}
-	f.p.mu.Lock()
-	n, kept := len(f.p.inProgress), f.p.consents[other]
-	_, gone := f.p.consents[otaTestPeer]
-	f.p.mu.Unlock()
-	if n != 0 || gone || kept != 9 {
-		t.Errorf("after the drop: %d entries, own consent kept %v, other's consent %d", n, gone, kept)
+	if a := f.p.mgr.AttemptFor(other, []byte{9}); a == nil || f.attempts() != 1 {
+		t.Errorf("after the drop: %d attempts, the other fabric's kept %v", f.attempts(), a != nil)
 	}
 	if got := f.p.MatterHeldFabrics(); !slices.Equal(got, []uint8{otaTestFabric + 1}) {
 		t.Errorf("held after the drop %v", got)

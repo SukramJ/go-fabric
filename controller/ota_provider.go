@@ -47,8 +47,8 @@ type otaProvider struct {
 }
 
 // newOTAProvider composes node/'s OTA provider ([mattercore.NewOTAProvider])
-// over the update manager's ports — image source, consent and apply
-// policy — with the manager's scripted commands in front of it, as
+// over the update manager's ports — image source, consent, the update
+// manager and the apply delay — with the manager's scripted commands in front of it, as
 // node/controllernode wrapped them for the own node.
 func (c *Controller) newOTAProvider(ctx context.Context, mgr *softwareupdate.Manager, bdxDelay *time.Duration) (*otaProvider, error) {
 	p := mgr.ProviderConfig()
@@ -59,15 +59,19 @@ func (c *Controller) newOTAProvider(ctx context.Context, mgr *softwareupdate.Man
 	}
 	ours := c.fabricIndex()
 	srv, err := mattercore.NewOTAProvider(mattercore.OTAProviderConfig{
-		ImageSource: p.ImageSource, Consent: p.Consent, ApplyPolicy: p.ApplyPolicy,
-		BDX: responder, BDXMaxBlockSize: p.BDXMaxBlockSize,
+		ImageSource: p.ImageSource, Consent: p.Consent,
+		// The manager owns the update attempts with its queue (decision
+		// 292 (b)) and decides a scripted refusal; the apply delay is the
+		// provider's (State.applyDelay).
+		Manager:    p.Manager,
+		ApplyDelay: p.ApplyDelay,
+		BDX:        responder,
 		NodeID: func(fabricIndex uint8) (uint64, bool) {
 			if fabricIndex != ours {
 				return 0, false
 			}
 			return c.fabric.RootNodeID, true
 		},
-		OnStatusChange: p.OnStatusChange, RebootQuery: p.RebootQuery, TransferBlockSize: p.TransferBlockSize,
 		Clock: c.clock, Logger: c.log,
 	})
 	if err != nil {

@@ -201,7 +201,7 @@ unit removes the line with the row.
 | BD-Matter-Messages-IdPerFabric | `MessagesServer.ts:14` at `b25ed960` is the empty subclass (absence: the class line) | `packages/node/src/behaviors/messages/MessagesServer.ts` | `"export class MessagesServer extends MessagesBehavior {}"` | this module's own fence (owner decision 129), ahead of connectedhomeip, whose example looks a MessageID up by the id alone (`examples/tv-app/tv-common/clusters/messages/MessagesManager.cpp:73-87` at `6170af84`) | no |
 | BD-Matter-OTARequestor-ProvidersPerFabric | `OtaSoftwareUpdateRequestorServer.ts:423-438` at `b25ed960`: `#addActiveOtaProvider` pushes a new provider with no count (presence, `:434`) | `packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts` | `"            this.state.activeOtaProviders.push(activeProviderEntry);"` | this module's own bound (owner decision 134): 4 active providers and 4 deferred announcements per fabric | no |
 | BD-Matter-OTARequestor-FabricRemoval | `OtaSoftwareUpdateRequestorServer.ts:109-116` at `b25ed960`: `activeOtaProviders` is node-wide state of quality N with no fabric-removal handling (presence, `:112`) | `packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts` | `"        { name: \"activeOtaProviders\", type: \"list\", quality: \"N\", conformance: \"M\" },"` | this module's own rule (review II, R2-P6-store-1204): a removed fabric's providers, selection and deferred announcements go | no |
-| BD-Matter-OTAProvider-InProgressPerFabric | `SoftwareUpdateManager.ts:1931-1935` at `b25ed960`: an ApplyUpdateRequest under an unknown token still creates an attempt for any peer (`:1933`, presence), and `OtaUpdateAttempts` keeps the attempts in a plain `Set` with no count (`OtaUpdateAttempts.ts:143-181`, `#attempts` `:144`, `begin` `:147-152`; absence: the whole class body); the manager's only fabric observer is `fabricAdded` (`:279`). The in-progress state left the provider server at this pin and NotifyUpdateApplied no longer creates an entry (`SoftwareUpdateManager.ts:1970-1980`; partly caught up); the row is reworded in pin-lift unit P4-C | `packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts`<br>`packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts` | `"                attempt = this.internal.attempts.begin(peerAddress);"`<br>`class OtaUpdateAttempts` | this module's own bound (owner decisions 134, 167): 16 entries per fabric, a removed fabric's entries and consents dropped | no |
+| BD-Matter-OTAProvider-InProgressPerFabric | `SoftwareUpdateManager.ts:1931-1935` at `b25ed960`: an ApplyUpdateRequest under an unknown token still creates an attempt for any peer (`:1933`, presence), and `OtaUpdateAttempts` keeps the attempts in a plain `Set` with no count (`OtaUpdateAttempts.ts:143-181`, `#attempts` `:144`, `begin` `:147-152`; absence: the whole class body); the manager's only fabric observer is `fabricAdded` (`:279`). The in-progress state left the provider server at this pin and NotifyUpdateApplied no longer creates an entry (`SoftwareUpdateManager.ts:1970-1980`; partly caught up); the row was reworded in wave P4b (decision 444) | `packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts`<br>`packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts` | `"                attempt = this.internal.attempts.begin(peerAddress);"`<br>`class OtaUpdateAttempts` | this module's own bound (owner decisions 134, 167): 16 running update attempts per fabric, a removed fabric's attempts ended and its BDX scope withdrawn | no |
 | BD-Matter-PersistedSubscriptionsBounded | `SubscriptionsServer.ts:168-186` at `b25ed960`: a persisted subscription is removed only when the subscription is terminated (presence, `:170`), and `#addSubscription` appends per peer (`:160-165`) | `packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts` | `"            !subscription.isTerminated"` | this module's own bound (owner decisions 134, 175): a KeepSubscriptions=false peer loses its not-live rows, and a fabric keeps at most the manager's `MaxSubscriptionsPerFabric` rows | no |
 | BD-Matter-Controller-PeerOpenedHandshakesOnly | `ExchangeManager.ts:308-312` at `db021da0`: the unsecured session is found by the initiator node id alone (`getUnsecuredSession(initiatorNodeId)`), with no test of who opened it (presence) | `packages/protocol/src/protocol/ExchangeManager.ts` | `"session = this.#sessions.getUnsecuredSession(initiatorNodeId);"` | this module's own rule (review II, R2-P6-sec-1801, R2-P6-bound-1802, owner decision 189): a Sigma1, PBKDFParamRequest or ICD Check-In takes only an unsecured session a peer's initiating message opened | no |
 | BD-Matter-Controller-ExchangeQueueBounded | `MessageExchange.ts:562` (`this.#messagesQueue.write(message)`) and `packages/general/src/util/DataReadQueue.ts:72` (`this.#queue.push(data)`, no limit in `:60-72`) at `db021da0` (presence) | `packages/protocol/src/protocol/MessageExchange.ts`<br>`packages/general/src/util/DataReadQueue.ts` | `"this.#messagesQueue.write(message);"`<br>`"this.#queue.push(data);"` | this module's own rule (review II, R2-P6-bound-1807, owner decision 45): 16 unread messages an exchange, a number chosen without a source | no |
@@ -2026,22 +2026,31 @@ By design. The settings table is the module's one durable seam for
 per-endpoint state; a write the store cannot hold is refused rather than
 held in memory alone.
 
-### BD-Matter-OTAProvider-HostPorts — the OTA provider decides images, consent and apply through host ports, not a software-update manager
+### BD-Matter-OTAProvider-HostPorts — the OTA provider takes images and consent from host ports, and its attempt decisions from a manager port
 
 matter.js's `OtaSoftwareUpdateProviderServer` (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts`
-at `db021da0`) is welded to a `SoftwareUpdateManager` that validates the
-requestor's BasicInformation, consults the DCL and queues consent
-(`:66-71` the four consent states, `:245-278`, `:506-516`).
+at `b25ed960`) requires a `SoftwareUpdateManager` (`:81-82`): its default
+`checkUpdateAvailable` offers what the manager's `updateExistsFor` selects
+(`:402-414`; the requestor's Basic Information matched and a stored image
+chosen, `SoftwareUpdateManager.ts:673-715`), the consent hook is asked only
+for a consent-required offer that is not delegated and declines by default
+(`:199-231`, `:382-393`; the four consent states `:43-48`), and an apply is
+the manager's `applyUpdate` after the provider's `State.applyDelay`,
+answered Proceed or Discontinue only (`:346-362`, `:434`).
 `core.OTAProvider` keeps the server's statuses, timers and responses
-(the 32-byte token, the 86 400 s DelayedActionTime cap, Busy with the
-2-minute retry, the 15-minute stale entry, `BdxSynchronous` with the
-5-minute idle timeout, Discontinue without consent) and asks three host
-ports — `OTAImageSource`, `OTAConsent`, `OTAApplyPolicy` — for what the
-manager decides; the apply policy may also answer AwaitNextAction or
-Discontinue, which matter.js never does once consent holds. The provider
-sits on its own OtaProvider endpoint beside the Aggregator
-(`packages/node/src/endpoints/ota-provider.ts:57-64` defines the type, not its place).
-Report AQ.
+(the 32-byte token `:41`, the 86 400 s DelayedActionTime cap `:39`, Busy
+with the 2-minute retry `:189-194`, the 15-minute stale attempt
+`OtaProgress.ts:14`, `BdxSynchronous` with the 5-minute message timeout
+`:259`, Discontinue for two minutes without the apply right `:353-357`)
+and asks two host ports — `OTAImageSource`, `OTAConsent` — for the image
+and the consent. The attempt decisions (admission, apply,
+NotifyUpdateApplied) are an `OTAUpdateManager`'s: a host's own, or the
+default one without a queue (`BD-Matter-OTAProvider-StandaloneManager`);
+the apply delay is `OTAProviderConfig.ApplyDelay`. The deprecated
+`OTAApplyPolicy` (removable in v0.26.0) still runs before the apply table
+and may answer AwaitNextAction, which matter.js's provider never sends.
+The provider sits on its own OtaProvider endpoint beside the Aggregator.
+Report AQ. Reworded in pin lift b25ed960, wave P4b.
 
 By design (ADR 0021). A bridge host owns its images and its consent
 flow; the DCL enters as the opt-in helper `controller/dcl` (wave 25,
@@ -9231,9 +9240,17 @@ matter.js bounds neither the active provider list — `#addActiveOtaProvider` pu
 
 matter.js keeps `activeOtaProviders` node-wide and persisted (quality N) with no fabric-removal handling (`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts:109-116`, `:1354` at `b25ed960`; it is no fabric-scoped attribute, so the fabric-scoped data handler skips it — inferred); its `#online` re-adds the defaults (`:221-228`). The module drops a removed fabric's active providers, selection and deferred announcements and stores the state (`cluster/core/ota_software_update_requestor.go`). Review II, R2-P6-store-1204. Register row above.
 
-### BD-Matter-OTAProvider-InProgressPerFabric — the OTA provider holds each fabric to 16 in-progress entries and drops them with the fabric
+### BD-Matter-OTAProvider-InProgressPerFabric — the OTA provider holds each fabric to 16 running update attempts and ends them with the fabric
 
-matter.js keeps an entry for a token it never issued when the peer holds a consent for the version (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:417-420`, `:444`, `:474-481`, created `:605-614`, stored `:635` at `db021da0`); without one the entry is created and deleted in the same call (`:452-458`, `:644-647`). It drops a peer's stale entries on that peer's next lookup (`:556-557`, `:565-577`) and none at a fabric's removal. The module holds each fabric to 16 entries (`cluster/core/ota_provider.go` `otaInProgressPerFabric`) and drops a removed fabric's entries and consents and withdraws its transfer scope (`OTAProvider.MatterDropFabric`, a `contract.FabricScopedState`; the node's removal fan-out reaches it). Review II, R2-P6-bound-1206, owner decisions 134 and 167. Register row above.
+The update attempts of one fabric's requestors are capped at 16 running attempts; `OTAUpdateAttempts.Begin` ends the one active longest ago (as a rule end, so a queued update that followed it is reset), and a fabric's removal ends its attempts and withdraws its requestors' BDX scope (`cluster/core/ota_attempts.go` `otaAttemptsPerFabric`, `DropFabric`; the default manager and `controller/softwareupdate`'s, each a `contract.FabricScopedState`). matter.js keeps an attempt until the requestor's next query, the queue, the peer's removal or the node going offline ends it, without a bound (`packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:143-181`; `SoftwareUpdateManager.ts:319-338`, `#forgetPeer` ending the peer's attempts at `:333-335`; `:1229-1237`; all at `b25ed960`), and its manager's only fabric observer is `fabricAdded` (`:279`): it ends nothing at a fabric's removal (whether another layer removes a removed fabric's peers was not read). Why: a fabric's requestors cannot hold memory without bound. Review II, R2-P6-bound-1206, owner decisions 134 and 167; reworded in pin lift b25ed960, wave P4b (decision 444). Register row above.
+
+### BD-Matter-OTAProvider-StandaloneManager — a provider without an update queue runs the attempt rules alone
+
+`cluster/core.NewOTAStandaloneManager` is the manager an `OTAProvider` runs with when `OTAProviderConfig.Manager` is nil: offer and answer, the admission of a new query without row 2 (the linked update below its target, which needs a queue), the apply table and NotifyUpdateApplied, over `OTAUpdateAttempts` (`cluster/core/ota_standalone.go`). matter.js has no provider without its SoftwareUpdateManager (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:81-82` at `b25ed960`). It delegates the consent to a requestor that says it can consent only with `OTAProviderConfig.DelegateConsentToRequestor` (matter.js's switch, off by default, `packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:638-647`, `:2171` at `b25ed960`). matter.js also refuses a node whose Basic Information it has not cached or that has LocalConfigDisabled set (`:645-646`); the standalone manager holds no Basic Information and delegates on the switch and RequestorCanConsent alone. Row 5's startUp suppression goes to the deprecated `RebootQuery` hook unconditionally, where matter.js suppresses only with a queued update (`:1873-1879`), since the host's queue decides. Why: a host with its own image source and no manager still answers by the Matter rules. Pin lift b25ed960, wave P4b (decisions 435, 439).
+
+### BD-Matter-OTAProvider-ReportAttemptStatusUnless — a status report and its "unless settled" check are one step under the manager's lock
+
+`OTAUpdateManager.ReportAttemptStatus` takes `unless` statuses, so the closed BDX transfer's "cancel unless settled" is checked and written under one hold of the manager's lock (`cluster/core/ota_standalone.go`, `controller/softwareupdate/provider.go` `providerPorts`); matter.js's closed listener checks the status (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:285-290` at `b25ed960`) and reports through `endpoint.act` (`:417-419`). It returns whether it recorded the status, which the provider's `OnAttemptStatus` observer needs; matter.js's `reportAttemptStatus` returns nothing (`packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:2014-2019` at `b25ed960`). Why: the provider's listeners run on BDX goroutines, and a resent ApplyUpdateRequest between the check and the write would otherwise be overwritten with Cancelled. Pin lift b25ed960, wave P4b (decisions 439, 446).
 
 ### BD-chip-TimeSync-StateBeforePersist — a time-zone or DST transition moves the state before it is stored, as connectedhomeip
 

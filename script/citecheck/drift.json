@@ -1354,39 +1354,12 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 72,
+    "line": 60,
     "citation": "SoftwareUpdateManager.ts:95-102",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "OtaUpdateAvailableDetails",
     "nearest": 161,
     "occurrences": 2
-  },
-  {
-    "file": "cluster/core/ota_provider.go",
-    "line": 75,
-    "citation": "SoftwareUpdateManager.ts:454",
-    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
-    "identifier": "FileDesignator",
-    "nearest": 711,
-    "occurrences": 3
-  },
-  {
-    "file": "cluster/core/ota_provider.go",
-    "line": 213,
-    "citation": "OtaSoftwareUpdateProviderServer.ts:293-298",
-    "resolved": "packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts",
-    "identifier": "bdxTransferOptionsFor",
-    "nearest": 260,
-    "occurrences": 1
-  },
-  {
-    "file": "cluster/core/ota_provider.go",
-    "line": 674,
-    "citation": "SoftwareUpdateManager.ts:1219-1232",
-    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
-    "identifier": "NotifyUpdateApplied",
-    "nearest": 1959,
-    "occurrences": 4
   },
   {
     "file": "cluster/core/scenes_management.go",
@@ -2639,7 +2612,7 @@
   },
   {
     "file": "controller/ota_parity_matterjs_test.go",
-    "line": 39,
+    "line": 40,
     "citation": "OtaTest.ts:1126-1155",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "otaSiteWithImage",
@@ -2648,7 +2621,7 @@
   },
   {
     "file": "controller/ota_parity_matterjs_test.go",
-    "line": 64,
+    "line": 65,
     "citation": "OtaTest.ts:1157-1174",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "bdxTransferOptionsFor",
@@ -2657,7 +2630,7 @@
   },
   {
     "file": "controller/ota_parity_matterjs_test.go",
-    "line": 145,
+    "line": 146,
     "citation": "OtaTest.ts:1216-1291",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "addUpdateConsent",
@@ -2666,7 +2639,7 @@
   },
   {
     "file": "controller/ota_parity_matterjs_test.go",
-    "line": 176,
+    "line": 177,
     "citation": "SoftwareUpdateManager.ts:703-776",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "#preparePeerForUpdate",
@@ -2675,7 +2648,7 @@
   },
   {
     "file": "controller/ota_parity_matterjs_test.go",
-    "line": 200,
+    "line": 201,
     "citation": "OtaTest.ts:1049-1124",
     "resolved": "packages/node/test/behaviors/ota/OtaTest.ts",
     "identifier": "removeConsent",
@@ -2719,6 +2692,16 @@
     "occurrences": 7
   },
   {
+    "file": "controller/softwareupdate/manager.go",
+    "line": 260,
+    "citation": "SoftwareUpdateManager.ts:114-118",
+    "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
+    "at": "b25ed960",
+    "identifier": "UpdateQueueEntry",
+    "nearest": 134,
+    "occurrences": 21
+  },
+  {
     "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
     "line": 109,
     "citation": "OtaTest.ts:1660-1691",
@@ -2753,15 +2736,6 @@
     "identifier": "queryImage",
     "nearest": 661,
     "occurrences": 9
-  },
-  {
-    "file": "controller/softwareupdate/script.go",
-    "line": 191,
-    "citation": "InProcessControllerAdapter.ts:596-614",
-    "resolved": "support/chip-testing/src/cert/InProcessControllerAdapter.ts",
-    "identifier": "applyDelay",
-    "nearest": 779,
-    "occurrences": 3
   },
   {
     "file": "device/device.go",

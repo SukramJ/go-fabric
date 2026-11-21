@@ -31,7 +31,9 @@
 //     ([NewScenesState], [NewPersistedScenesState]), [NewMessages].
 //   - Software update: [NewOTASoftwareUpdateRequestor] (0x002A, built by
 //     node/ota.go) and [NewOTAProvider] (0x0029, built by
-//     node/ota_provider.go for a node or a controller).
+//     node/ota_provider.go for a node or a controller), which asks an
+//     [OTAUpdateManager] — by default [NewOTAStandaloneManager] over the
+//     attempt set [NewOTAUpdateAttempts].
 //
 // PowerSource (0x002F) for bridged battery endpoints lives in the
 // measurement package (measurement.PowerSourceServer), not here.
