@@ -49,6 +49,11 @@ const (
 	commissioningCompleteMargin = 10 * time.Second
 )
 
+// forgetDisconnectBound bounds forgetSessions' wait for the peer's
+// connection process to stop: this module's, matter.js awaits
+// Peer.disconnect without one. A variable for the tests.
+var forgetDisconnectBound = 5 * time.Second
+
 // CertificateUpdateOptions configures
 // [Commissioner.UpdateOperationalCertificate] — matter.js
 // OperationalCertificateUpdate.Options (OperationalCertificateUpdate.ts:121-138
@@ -206,18 +211,22 @@ func (e fabricChangedError) Error() string { return "commissioner: " + e.reason 
 // nocUpdateSeam is what the update reaches the peer through: its invokes
 // and reads, the CASE connection, the resumption record's delete and the
 // subscriptions' restart. A test replaces them to inject the faults
-// matter.js injects by replacing ClientInteraction.prototype.invoke and
-// read, Peer.prototype.connect, SessionManager.prototype.deleteResumptionRecord
-// and ClientSubscriptions.prototype.closeForPeer
-// (packages/node/test/node/OperationalCertificateUpdateTest.ts:304-355,
-// :465-498 at b25ed960). opened, when set, sees each interaction the
-// update binds to a session.
+// matter.js injects in packages/node/test/node/OperationalCertificateUpdateTest.ts
+// at b25ed960, by replacing
+// ClientInteraction.prototype.invoke and read (:304-355,
+// :465-498),
+// Peer.prototype.connect (:741-749),
+// SessionManager.prototype.deleteResumptionRecord (:1567-1570),
+// ClientSubscriptions.prototype.closeForPeer (:1571-1576).
+// disconnect is the peer's Disconnect; opened, when set, sees each
+// interaction the update binds to a session.
 type nocUpdateSeam struct {
 	invoke                 func(ctx context.Context, ia *interaction.Interaction, path im.ConcreteCommandPath, fields spec.Encodable, opts interaction.InvokeOptions) (interaction.Result, error)
 	read                   func(ctx context.Context, ia *interaction.Interaction, paths []im.ConcreteAttributePath) ([]spec.Node, []bool, error)
 	connect                func(ctx context.Context, p *peer.Peer, opts peer.ConnectOptions) (*exchange.Session, error)
 	deleteResumptionRecord func(a handshake.PeerAddress) error
 	closeForPeer           func(a handshake.PeerAddress)
+	disconnect             func(ctx context.Context, p *peer.Peer, cause error)
 	opened                 func(ia *interaction.Interaction)
 }
 
@@ -248,6 +257,7 @@ func (c *Commissioner) defaultNOCUpdateSeam() nocUpdateSeam {
 			_, err := c.ctx.Resumption.DeleteResumptionRecord(a)
 			return err
 		},
+		disconnect: func(ctx context.Context, p *peer.Peer, cause error) { p.Disconnect(ctx, cause) },
 		closeForPeer: func(a handshake.PeerAddress) {
 			if c.ctx.Subscriptions != nil {
 				c.ctx.Subscriptions.CloseForPeer(a)
@@ -302,6 +312,11 @@ func (c *Commissioner) nocSeam() nocUpdateSeam {
 // every disarm run under context.WithoutCancel(ctx) to their own response
 // timeouts, so a cancel never leaves the peer's fail-safe armed by
 // cutting a disarm or UpdateNOC short.
+//
+// The call is not serialized per peer: two concurrent updates of one peer
+// would arm over each other. [client.Registry.UpdateOperationalCertificate]
+// is the serialized entry, under the node's fabric-operation lock, as for
+// a commission.
 //
 // Errors: a plain error for an unknown peer, a fabric whose CA the
 // commissioner does not hold, a fail-safe out of range, no CASE session
@@ -561,8 +576,15 @@ func withCase[T any](ctx context.Context, u *nocUpdate, timeout time.Duration, f
 // and restarts the peer's subscriptions instead of waiting for them to
 // time out; a failed step is logged and the next runs. Mirrors matter.js
 // OperationalCertificateUpdate.ts:784-800 at b25ed960 (forgetSessions).
+//
+// The disconnect waits for the peer's connection process to end after
+// its cancel (client/peer stopConnecting) under a context no cancel of
+// ctx ends, bounded by forgetDisconnectBound so a process slow to stop
+// cannot hold the update; the sessions are given up either way.
 func (u *nocUpdate) forgetSessions(ctx context.Context, reason string) {
-	u.peer.Disconnect(context.WithoutCancel(ctx), fabricChangedError{reason: reason})
+	dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), forgetDisconnectBound)
+	u.seam.disconnect(dctx, u.peer, fabricChangedError{reason: reason})
+	cancel()
 	if err := u.seam.deleteResumptionRecord(u.address); err != nil {
 		u.c.log.Info("matter.controller.noc_update.resumption_delete_failed", slog.String("peer", peerName(u.address)), slog.Any("err", err))
 	}
@@ -923,7 +945,8 @@ func (u *nocUpdate) completeUpdate(ctx context.Context, cert installed, timeout 
 		return st.done, nil
 	}
 
-	// :606-627: decided from a read on another new session.
+	// :606-627: decided from a read on another new session. As matter.js,
+	// this pass only reads: an unconfirmed disarm is not sent again here.
 	u.forgetSessions(ctx, "Peer may have reverted to its previous operational certificate")
 	state, err := withCase(ctx, u, timeout, func(s adminSession) (certificateState, error) {
 		return u.certificateState(ctx, s.ia)

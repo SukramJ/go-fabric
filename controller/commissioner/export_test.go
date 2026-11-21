@@ -5,6 +5,7 @@ package commissioner
 
 import (
 	"context"
+	"time"
 
 	"github.com/SukramJ/go-fabric/client/exchange"
 	"github.com/SukramJ/go-fabric/client/handshake"
@@ -25,6 +26,7 @@ type NOCUpdateSeam struct {
 	Connect                func(ctx context.Context, p *peer.Peer, opts peer.ConnectOptions) (*exchange.Session, error)
 	DeleteResumptionRecord func(a handshake.PeerAddress) error
 	CloseForPeer           func(a handshake.PeerAddress)
+	Disconnect             func(ctx context.Context, p *peer.Peer, cause error)
 	Opened                 func(ia *interaction.Interaction)
 }
 
@@ -35,11 +37,19 @@ func PatchNOCUpdate(c *Commissioner, patch func(current NOCUpdateSeam) NOCUpdate
 	cur := c.nocSeam()
 	next := patch(NOCUpdateSeam{
 		Invoke: cur.invoke, Read: cur.read, Connect: cur.connect,
-		DeleteResumptionRecord: cur.deleteResumptionRecord, CloseForPeer: cur.closeForPeer, Opened: cur.opened,
+		DeleteResumptionRecord: cur.deleteResumptionRecord, CloseForPeer: cur.closeForPeer, Disconnect: cur.disconnect, Opened: cur.opened,
 	})
 	c.nocSeamOverride.Store(&nocUpdateSeam{
 		invoke: next.Invoke, read: next.Read, connect: next.Connect,
-		deleteResumptionRecord: next.DeleteResumptionRecord, closeForPeer: next.CloseForPeer, opened: next.Opened,
+		deleteResumptionRecord: next.DeleteResumptionRecord, closeForPeer: next.CloseForPeer, disconnect: next.Disconnect, opened: next.Opened,
 	})
 	return func() { c.nocSeamOverride.Store(prev) }
+}
+
+// SetForgetDisconnectBound sets the bound of the update's disconnect
+// until restore.
+func SetForgetDisconnectBound(d time.Duration) (restore func()) {
+	prev := forgetDisconnectBound
+	forgetDisconnectBound = d
+	return func() { forgetDisconnectBound = prev }
 }

@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,7 +31,7 @@ import (
 	"github.com/SukramJ/go-fabric/node"
 )
 
-// staleFabricIndex is STALE_FABRIC_INDEX (:104): an index the device never
+// staleFabricIndex is STALE_FABRIC_INDEX (:106): an index the device never
 // assigns, stored before an update to show whether the update replaces
 // it.
 const staleFabricIndex = 200
@@ -98,7 +99,7 @@ func (w *warnings) has(msg string) bool {
 }
 
 // failingStore fails every save while failing is set — matter.js
-// FabricIndexFailingStorage (:146-170), which fails the write of the
+// FabricIndexFailingStorage (:157-177), which fails the write of the
 // fabric index.
 type failingStore struct {
 	client.Store
@@ -200,9 +201,15 @@ func TestOperationalCertificateUpdateInteractionClose(t *testing.T) {
 		}
 		cp.pair.Controller.Commissioner().Interaction(pr).Close(nil)
 		cp.settle(t)
+		// The same subscription objects stay (:2269), not re-established ones.
 		after := subs.Active()
 		if len(after) != len(before) || !cp.node.SubscriptionActive() {
 			t.Fatalf("%d active subscriptions, were %d", len(after), len(before))
+		}
+		for _, s := range before {
+			if !slices.Contains(after, s) {
+				t.Fatal("a subscription was replaced")
+			}
 		}
 		if err := cp.pair.Device.Act(func(n *node.Node) error {
 			return n.SetNodeLabel(context.Background(), "after another interaction closed")
@@ -219,7 +226,7 @@ func TestOperationalCertificateUpdateInteractionClose(t *testing.T) {
 
 // TestCertificateUpdateStoresIndexOfFailedUpdate: the index read before an
 // update that then fails replaces a stale stored one (matter.js
-// expectFabricIndexReported after updateFailure, :128-136 with :104-121).
+// expectFabricIndexReported after updateFailure, :179-183 with :108-120).
 // A Go case, not a port: the facade half of the rejected updates.
 func TestCertificateUpdateStoresIndexOfFailedUpdate(t *testing.T) {
 	t.Parallel()

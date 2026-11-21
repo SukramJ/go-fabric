@@ -10,10 +10,13 @@
 // matter.js drives a ClientNode of a MockSite pair; the port drives the
 // registry's [client.Registry.UpdateOperationalCertificate] of a
 // fabrictest pair, the device the module's node. matter.js injects its
-// faults by replacing ClientInteraction.prototype.invoke and read,
-// Peer.prototype.connect and SessionManager.prototype.deleteResumptionRecord
-// (:304-355, :465-498); the port replaces the same calls through the
-// update's seam (commissioner.PatchNOCUpdate). Where matter.js patches a
+// faults by replacing
+// ClientInteraction.prototype.invoke and read (:304-355,
+// :465-498),
+// Peer.prototype.connect (:741-749),
+// SessionManager.prototype.deleteResumptionRecord (:1567-1570),
+// ClientSubscriptions.prototype.closeForPeer (:1571-1576);
+// the port replaces the same calls through the update's seam (commissioner.PatchNOCUpdate). Where matter.js patches a
 // command handler of the device (patchDeviceCommand, :243) the port
 // answers or rewrites the command at that seam: the controller sees the
 // same answer, and a handler that never calls the original changes
@@ -59,6 +62,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/tlv"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -350,7 +354,7 @@ func (p *ocuPair) answer(cluster, command uint32, fn func(fields spec.Encodable,
 }
 
 // countCommissioningComplete counts the CommissioningComplete commands
-// that reach the device (:395-410).
+// that reach the device (:418-432).
 func (p *ocuPair) countCommissioningComplete() *atomic.Int32 {
 	handled := new(atomic.Int32)
 	p.answer(gencomm.ClusterID, gencomm.CmdCommissioningComplete, func(f spec.Encodable, next func(spec.Encodable) (interaction.Result, error)) (interaction.Result, error) {
@@ -361,7 +365,7 @@ func (p *ocuPair) countCommissioningComplete() *atomic.Int32 {
 }
 
 // refuseDisarm answers ArmFailSafe with expiry 0 with ValueOutsideRange
-// (:270-290).
+// (:274-292).
 func (p *ocuPair) refuseDisarm() {
 	p.answer(gencomm.ClusterID, gencomm.CmdArmFailSafe, func(f spec.Encodable, next func(spec.Encodable) (interaction.Result, error)) (interaction.Result, error) {
 		if req, ok := f.(gencomm.ArmFailSafeRequest); ok && req.ExpiryLengthSeconds == 0 {
@@ -371,7 +375,7 @@ func (p *ocuPair) refuseDisarm() {
 	})
 }
 
-// missingResponse is reportMissingResponse (:369-400): the first matching
+// missingResponse is reportMissingResponse (:375-412): the first matching
 // command's answer lacks its entry; delivered says whether the device
 // executed it.
 func (p *ocuPair) missingResponse(cluster, command uint32, delivered bool) {
@@ -414,7 +418,7 @@ const (
 	readFabricIndex
 )
 
-// dropAttribute is dropAttributeReports (:451-466): the reads report no
+// dropAttribute is dropAttributeReports (:461-478): the reads report no
 // value of the path at index while active holds.
 func (p *ocuPair) dropAttribute(index int, active func() bool) {
 	p.patch(func(s commissioner.NOCUpdateSeam) commissioner.NOCUpdateSeam {
@@ -430,7 +434,7 @@ func (p *ocuPair) dropAttribute(index int, active func() bool) {
 	})
 }
 
-// reportNOCs is reportNocs (:483-498): a read that starts while active
+// reportNOCs is reportNocs (:495-513): a read that starts while active
 // holds reports the NOCs forge builds from the device's.
 func (p *ocuPair) reportNOCs(forge func([]opcreds.NOCStruct) []opcreds.NOCStruct, active func() bool) {
 	p.patch(func(s commissioner.NOCUpdateSeam) commissioner.NOCUpdateSeam {
@@ -452,14 +456,14 @@ func (p *ocuPair) reportNOCs(forge func([]opcreds.NOCStruct) []opcreds.NOCStruct
 	})
 }
 
-// reportNOCsOnce is reportNocsOnce (:501-508).
+// reportNOCsOnce is reportNocsOnce (:516-523).
 func (p *ocuPair) reportNOCsOnce(forge func([]opcreds.NOCStruct) []opcreds.NOCStruct) {
 	var first atomic.Bool
 	first.Store(true)
 	p.reportNOCs(forge, func() bool { return first.Swap(false) })
 }
 
-// forged is forgedNocs (:511-514).
+// forged is forgedNocs (:526-529).
 func forged(noc []byte) func([]opcreds.NOCStruct) []opcreds.NOCStruct {
 	return func(entries []opcreds.NOCStruct) []opcreds.NOCStruct {
 		out := make([]opcreds.NOCStruct, len(entries))
@@ -500,11 +504,14 @@ func keyBytes(t *testing.T, pub *ecdsa.PublicKey) []byte {
 	return k.Bytes()
 }
 
-// expectForgedRefused is expectForgedNocsRefused (:520-552): refused
+// expectForgedRefused is expectForgedNocsRefused (:535-568): refused
 // before any fail-safe was armed — so before the CA issued a NOC, which
 // follows the arm.
 func (p *ocuPair) expectForgedRefused(forge func([]opcreds.NOCStruct) []opcreds.NOCStruct) {
 	p.t.Helper()
+	// issued: the serial of a probe NOC before and after the update — one
+	// apart when the CA issued nothing in between.
+	before := p.probeSerial()
 	arms := p.intercept(gencomm.ClusterID, gencomm.CmdArmFailSafe, fault{delivered: true, answered: true})
 	p.reportNOCsOnce(forge)
 	f := p.failure()
@@ -518,6 +525,28 @@ func (p *ocuPair) expectForgedRefused(forge func([]opcreds.NOCStruct) []opcreds.
 	if arms.Load() != 0 || p.armed() {
 		p.t.Fatalf("%d arms, armed %v", arms.Load(), p.armed())
 	}
+	if issued := p.probeSerial() - before - 1; issued != 0 {
+		p.t.Fatalf("the CA issued %d NOCs", issued)
+	}
+}
+
+// probeSerial is the serial number of a NOC the controller's CA issues
+// now; the CA numbers its certificates in sequence.
+func (p *ocuPair) probeSerial() uint64 {
+	p.t.Helper()
+	noc, err := p.pair.Controller.CA().GenerateNOC(p.devicePublicKey(), p.pair.Controller.Fabric().FabricID, 0x4242, nil)
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	c, err := mattercert.Decode(noc)
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	var n uint64
+	for _, b := range c.SerialNumber {
+		n = n<<8 | uint64(b)
+	}
+	return n
 }
 
 // expectOutcome fails unless f states the outcome and the message part.
@@ -1612,4 +1641,33 @@ func TestOperationalCertificateUpdate(t *testing.T) {
 			t.Fatalf("got %v", decommission)
 		}
 	})
+}
+
+// TestCertificateUpdateDisconnectBound: forgetSessions' disconnect waits
+// for the peer's connection process at most forgetDisconnectBound, under
+// a context no cancel of the call's ends; the update goes on after it.
+// A Go case: matter.js awaits Peer.disconnect without a bound.
+func TestCertificateUpdateDisconnectBound(t *testing.T) {
+	t.Cleanup(commissioner.SetForgetDisconnectBound(50 * time.Millisecond))
+	p := newOCUPair(t, ocuOptions{})
+	before := p.noc()
+	var bounded atomic.Int32
+	p.patch(func(s commissioner.NOCUpdateSeam) commissioner.NOCUpdateSeam {
+		next := s.Disconnect
+		s.Disconnect = func(ctx context.Context, pr *peer.Peer, cause error) {
+			// A connection process that does not stop: the wait ends with
+			// the bound.
+			<-ctx.Done()
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				bounded.Add(1)
+			}
+			next(ctx, pr, cause)
+		}
+		return s
+	})
+	p.update()
+	if bounded.Load() != 1 {
+		t.Fatalf("%d bounded disconnects, want 1", bounded.Load())
+	}
+	p.expectNOC(before, false)
 }
