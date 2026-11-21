@@ -9,7 +9,7 @@
 // [TestStore]) where matter.js consults its DclCertificateService.
 //
 // The package's comments cite that file as DAV: DAV:<n> is line n of
-// DeviceAttestationValidator.ts at db021da0, and script/citecheck checks
+// DeviceAttestationValidator.ts at b25ed960, and script/citecheck checks
 // each as a citation of that file.
 //
 // [Validate] runs the checks in matter.js's order: the DAC and PAI parse,

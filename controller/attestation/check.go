@@ -67,12 +67,12 @@ const (
 	// (DeviceAttestationValidator.ts:85-89 at db021da0).
 	TrustedAsTestCertificate Check = "TrustedAsTestCertificate"
 	// ValidationError is an unexpected error during validation (an
-	// unrecoverably corrupt trust-store certificate, say), DAV:91-92.
+	// unrecoverably corrupt trust-store certificate, say), DAV:105-106.
 	ValidationError Check = "ValidationError"
 )
 
 // Level is a finding's severity — matter.js AttestationFinding.level
-// (DAV:97-98).
+// (DAV:111-112).
 type Level string
 
 // The levels.
@@ -83,7 +83,7 @@ const (
 )
 
 // Finding is one finding of the validation — matter.js AttestationFinding
-// (DAV:96-105).
+// (DAV:110-119).
 type Finding struct {
 	Level   Level
 	Check   Check
