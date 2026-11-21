@@ -97,6 +97,15 @@ func newOTAFixture(t *testing.T, mutate func(*OTAProviderConfig)) *otaFixture {
 	return f
 }
 
+// attempts is the number of update attempts the fixture's default manager
+// runs.
+func (f *otaFixture) attempts() int {
+	m := f.p.mgr.(*otaStandaloneManager)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.set.All())
+}
+
 // otaCtx is an invoke from the test requestor on sessionID.
 func otaCtx(sessionID uint16) context.Context {
 	ctx := im.WithFabricFilter(context.Background(), false, otaTestFabric)
@@ -339,11 +348,13 @@ func TestOTAProvider_DownloadToApply(t *testing.T) {
 	if got := f.status.states(); !statusesEqual(got, want) {
 		t.Fatalf("states %v, want %v", got, want)
 	}
-	if f.p.detailsForPeer(otaTestPeer, nil) != nil {
-		t.Fatal("Done left the entry behind (OP:614-618)")
+	if f.p.mgr.AttemptFor(otaTestPeer, *r.UpdateToken) != nil {
+		t.Fatal("Done left the attempt running (SoftwareUpdateManager.ts:1978-1979 at b25ed960)")
 	}
-	// The consent went with the update (SoftwareUpdateManager.ts:1229-1232).
-	if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionDiscontinue {
+	// The token's attempt ended, so a second apply under it is an apply
+	// under an unknown token, allowed for a version above 0
+	// (SoftwareUpdateManager.ts:1912-1915 at b25ed960).
+	if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed {
 		t.Fatalf("a second apply after Done: %+v", a)
 	}
 }
@@ -386,8 +397,8 @@ func (f otaConsentFunc) RequestConsent(context.Context, OTAPeer, provdef.QueryIm
 // cannot give is asked for (OP:245-284): without a consent port (Unknown,
 // OP:488) and when denied it is NotAvailable, while obtaining it is Busy
 // after the port's delay or 120 s (OP:248, :269-273), granted it is
-// offered with UserConsentNeeded (OP:399). A requestor that can consent
-// gets it without asking.
+// offered. A requestor that can consent gets it without asking, with
+// UserConsentNeeded (OP:312 at b25ed960: only a delegated consent).
 func TestOTAProvider_Consent(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -420,15 +431,14 @@ func TestOTAProvider_Consent(t *testing.T) {
 		if tc.delay != 0 && (r.DelayedActionTime == nil || *r.DelayedActionTime != tc.delay) {
 			t.Errorf("%s: delay %v, want %d", tc.name, r.DelayedActionTime, tc.delay)
 		}
-		if tc.status == provdef.StatusUpdateAvailable && (r.UserConsentNeeded == nil || !*r.UserConsentNeeded) {
-			t.Errorf("%s: UserConsentNeeded not set", tc.name)
+		if needed := r.UserConsentNeeded != nil && *r.UserConsentNeeded; tc.status == provdef.StatusUpdateAvailable && needed != tc.can {
+			t.Errorf("%s: UserConsentNeeded %v, want %v", tc.name, needed, tc.can)
 		}
 		if tc.can {
-			// The requestor consents itself, but the provider holds no
-			// consent for the version: matter.js discontinues the apply
-			// (OP:430-437).
-			if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionDiscontinue || a.DelayedActionTime != 120 {
-				t.Errorf("%s: apply %+v, want Discontinue after 120 s", tc.name, a)
+			// The requestor obtains the consent itself: the offer allows
+			// the apply (OtaUpdateAttempts.ts:81 at b25ed960).
+			if a := f.apply(t, *r.UpdateToken, 2); a.Action != provdef.ApplyUpdateActionProceed {
+				t.Errorf("%s: apply %+v, want Proceed", tc.name, a)
 			}
 		}
 	}
@@ -473,8 +483,13 @@ func TestOTAProvider_BDXNotEnabled(t *testing.T) {
 	f := newOTAFixture(t, nil)
 	r := f.query(t, 7, bdxQuery())
 	_, done := f.startDownload(t, 7, *r.ImageUri)
-	f.p.cfg.BDXMaxBlockSize = 100
-	f.p.removeInProgress(otaTestPeer) // past the in-progress check
+	m := f.p.mgr.(*otaStandaloneManager)
+	m.mu.Lock()
+	m.maxBlock = 100
+	for _, a := range m.set.All() {
+		m.set.EndAttempt(a) // past the admission
+	}
+	m.mu.Unlock()
 	busy := f.query(t, 7, bdxQuery())
 	if busy.Status != provdef.StatusBusy || *busy.DelayedActionTime != 300 {
 		t.Fatalf("response %+v", busy)
@@ -538,13 +553,13 @@ func TestOTAProvider_ApplyWhileTheTransferCloses(t *testing.T) {
 }
 
 // TestOTAProvider_ClosedTransferCancelsOnlyUnsettled: the transfer
-// session's closed listener (OP:348-364) cancels an update that is
-// querying or downloading and leaves one that waits for its apply or
-// applies; it decides and writes under one hold of the provider's lock,
-// so an apply between the two is not overwritten.
+// session's closed listener (OP:284-293 at b25ed960) cancels an attempt
+// that is querying or downloading and leaves one that waits for its apply
+// or applies; the manager decides and writes under one hold of its lock
+// (ReportAttemptStatus's unless), so an apply between the two is not
+// overwritten.
 func TestOTAProvider_ClosedTransferCancelsOnlyUnsettled(t *testing.T) {
 	t.Parallel()
-	token := []byte{1, 2, 3}
 	for _, tc := range []struct {
 		state OTAUpdateStatus
 		want  OTAUpdateStatus
@@ -555,13 +570,11 @@ func TestOTAProvider_ClosedTransferCancelsOnlyUnsettled(t *testing.T) {
 		{OTAUpdateApplying, OTAUpdateApplying},
 	} {
 		f := newOTAFixture(t, nil)
-		f.p.updateInProgress(otaTestPeer, token, tc.state, nil, false)
-		f.p.cancelUnlessSettled(otaTestPeer, token, 2)
-		got := OTAUpdateCancelled // a cancelled entry is removed (OP:614-618)
-		if d := f.p.detailsForPeer(otaTestPeer, token); d != nil {
-			got = d.lastState
-		}
-		if got != tc.want {
+		a := f.p.mgr.BeginQuery(otaTestPeer)
+		f.p.mgr.OfferUpdate(a, []byte{1, 2, 3}, 2)
+		f.p.mgr.ReportAttemptStatus(a, tc.state)
+		f.p.mgr.ReportAttemptStatus(a, OTAUpdateCancelled, OTAUpdateWaitForApply, OTAUpdateApplying, OTAUpdateDone, OTAUpdateCancelled)
+		if got := a.Status(); got != tc.want {
 			t.Errorf("closed in %v: %v, want %v", tc.state, got, tc.want)
 		}
 	}

@@ -4,9 +4,11 @@
 package core
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"testing"
+	"time"
 
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/im"
@@ -14,9 +16,11 @@ import (
 
 // TestOTAProvider_InProgressBoundedPerFabric (review II, R2-P6-bound-1206,
 // decision 134): ApplyUpdateRequests with tokens the provider never issued
-// still answer as matter.js does (an unknown token matches any version),
-// but one fabric's entries are held to otaInProgressPerFabric, the oldest
-// leaving first.
+// still answer as matter.js does (an unknown token with a version above 0
+// is allowed, SoftwareUpdateManager.ts:1932-1935 at b25ed960), each
+// replacing the requestor's answered attempt before it; and the requestors
+// of one fabric hold at most otaAttemptsPerFabric running attempts, the
+// one active longest ago ending first.
 func TestOTAProvider_InProgressBoundedPerFabric(t *testing.T) {
 	t.Parallel()
 	f := newOTAFixture(t, nil)
@@ -30,11 +34,29 @@ func TestOTAProvider_InProgressBoundedPerFabric(t *testing.T) {
 			t.Fatalf("apply %d: %+v", i, a)
 		}
 	}
-	f.p.mu.Lock()
-	n := len(f.p.inProgress)
-	f.p.mu.Unlock()
-	if n > otaInProgressPerFabric {
-		t.Errorf("%d in-progress entries after 500 unknown tokens, want at most %d", n, otaInProgressPerFabric)
+	if n := f.attempts(); n != 1 {
+		t.Errorf("%d running attempts after 500 unknown tokens of one requestor, want 1", n)
+	}
+	m := f.p.mgr.(*otaStandaloneManager)
+	for i := range 3 * otaAttemptsPerFabric {
+		peer := OTAPeer{FabricIndex: otaTestFabric, NodeID: uint64(100 + i)}
+		m.ApplyUpdate(context.Background(), peer, []byte{byte(i)}, 2, 0)
+		f.clock.Advance(time.Second)
+	}
+	m.ApplyUpdate(context.Background(), OTAPeer{FabricIndex: otaTestFabric + 1, NodeID: 1}, []byte{1}, 2, 0)
+	m.mu.Lock()
+	n, other := 0, 0
+	for _, a := range m.set.All() {
+		if a.Peer().FabricIndex == otaTestFabric {
+			n++
+		} else {
+			other++
+		}
+	}
+	oldest := m.set.Of(OTAPeer{FabricIndex: otaTestFabric, NodeID: uint64(100 + 2*otaAttemptsPerFabric)})
+	m.mu.Unlock()
+	if n != otaAttemptsPerFabric || other != 1 || len(oldest) != 1 {
+		t.Errorf("fabric holds %d attempts (want %d), other fabric %d (want 1), oldest kept %d (want 1)", n, otaAttemptsPerFabric, other, len(oldest))
 	}
 }
 

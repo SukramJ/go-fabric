@@ -13,43 +13,38 @@ import (
 )
 
 // TestParityMatterJS_OTAProviderTransferKeepsEntryAlive ports OtaTest.ts:
-// 2100-2183 (packages/node/test/behaviors/ota/OtaTest.ts at db021da0) on
-// the provider: the blocks of a running BDX transfer refresh the update's
-// in-progress entry (internal.inProgressDetails, the Go inProgress map;
-// progressInfo, OtaSoftwareUpdateProviderServer.ts:329-331), and a fresh
-// session that retries the download within the same query cycle still
-// finds the provider listening (:314-320): the entry moves to Downloading
-// and its blocks refresh it too. A test of the provider alone; no seam.
+// 2550 ("A running BDX transfer keeps its in-progress entry alive,
+// including a session opened for a retry", packages/node/test/behaviors/ota/OtaTest.ts
+// at b25ed960) on the provider: the blocks of a running BDX transfer touch
+// the update's attempt (progressInfo → attempt.touch(),
+// OtaSoftwareUpdateProviderServer.ts:281), and a fresh session that
+// retries the download within the same attempt still finds the provider
+// listening (:277-283): the attempt moves to Downloading and its blocks
+// touch it too. A test of the provider alone; no seam.
 func TestParityMatterJS_OTAProviderTransferKeepsEntryAlive(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		f := newOTAFixture(t, nil)
 		r := f.query(t, 7, bdxQuery())
-		key := otaKey(otaTestPeer, *r.UpdateToken)
-		entry := func() otaInProgress {
-			f.p.mu.Lock()
-			defer f.p.mu.Unlock()
-			d := f.p.inProgress[key]
-			if d == nil {
-				t.Fatal("no in-progress entry")
-			}
-			return *d
+		attempt := f.p.mgr.AttemptFor(otaTestPeer, *r.UpdateToken)
+		if attempt == nil {
+			t.Fatal("no attempt for the offer")
 		}
 		age := func() time.Time {
-			f.p.mu.Lock()
-			defer f.p.mu.Unlock()
+			attempt.mu.Lock()
+			defer attempt.mu.Unlock()
 			aged := f.clock.Now().Add(-20 * time.Minute)
-			f.p.inProgress[key].timestamp = aged
+			attempt.lastActivity = aged
 			return aged
 		}
-		// refreshed waits for the entry's timestamp to move past aged; the
+		// refreshed waits for the attempt's activity to move past aged; the
 		// progress listener runs on the session's goroutine.
 		refreshed := func(what string, aged time.Time) {
 			t.Helper()
 			synctest.Wait() // the session's goroutine has run the progress listener
-			if !entry().timestamp.After(aged) {
-				t.Fatalf("%s: the entry kept its aged timestamp", what)
+			if !attempt.LastActivity().After(aged) {
+				t.Fatalf("%s: the attempt kept its aged activity", what)
 			}
 		}
 		block := func(m *bdx.Messenger, counter uint32) bdx.MessageType {
@@ -80,13 +75,13 @@ func TestParityMatterJS_OTAProviderTransferKeepsEntryAlive(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Fatal("the first transfer did not end")
 		}
-		if s := entry().lastState; s != OTAUpdateWaitForApply {
+		if s := attempt.Status(); s != OTAUpdateWaitForApply {
 			t.Fatalf("state %v after the transfer, want WaitForApply", s)
 		}
 
 		// The retry on a fresh session of the same query cycle.
 		retry, retryDone := f.startDownload(t, 7, *r.ImageUri)
-		if s := entry().lastState; s != OTAUpdateDownloading {
+		if s := attempt.Status(); s != OTAUpdateDownloading {
 			t.Fatalf("state %v of the retry, want Downloading", s)
 		}
 		aged = age()
