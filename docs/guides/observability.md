@@ -39,7 +39,7 @@ counts them; the logger never waits for it. `Handler.SetLevel` moves the
 ring's level gate at run time: a record below it is neither kept nor
 forwarded, while `inner`'s own level still decides what `inner` prints.
 The UI reads the ring through a port of the host's own; the ring applies
-no redaction beyond the fact that the module logs no passcodes and no keys.
+no redaction of its own: the module logs no passcodes and no keys, and a value the Matter model marks secret (an ICD client key, a group epoch key, …) is logged as `"(redacted)"` by the read and subscription priming report logs, always — there is no switch to turn it off (`cluster/spec.Redact`; `notes/parity/by_design.md` `BD-Matter-SecretRedaction-NoOffSwitch`).
 
 ### Event names
 

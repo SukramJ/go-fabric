@@ -74,7 +74,9 @@ import (
 // CommissioningFailsafeExpiryTest.ts and PaseBleChannelCloseTest.ts (P3-D);
 // SchedulesConfigurationTest.ts and SchedulesLocalWriteTest.ts in part, their
 // restarts on stored schedules missing (P3-A, coordinator decision C-7): 6.
-const testparityPlannedRatchet = 6
+// Pin lift b25ed960 wave P4 ports two: ThermostatEventsTest.ts (P4-A) and
+// SecretRedactionTest.ts (P4-B): 4.
+const testparityPlannedRatchet = 4
 
 // testparityPortedRatchet is the number of ported entries, and
 // testparityMissingRatchet the number of matter.js it cases the partial
@@ -221,8 +223,12 @@ const testparityPlannedRatchet = 6
 // revoke (P3-C) leave missing; SchedulesConfigurationTest.ts's two and
 // SchedulesLocalWriteTest.ts's one restart on stored schedules join it
 // (coordinator decision C-7): 175 ported, 1052 missing.
+// Pin lift b25ed960 wave P4 ports ThermostatEventsTest.ts (P4-A, 44 of 46
+// cases, two left) and SecretRedactionTest.ts (P4-B, 16 of 20, four left);
+// P4-D1's bridge ports of MessageExchangeTest.ts and SessionManagerTest.ts
+// cover cases already ported on the controller: 177 ported, 1052 missing.
 const (
-	testparityPortedRatchet  = 175
+	testparityPortedRatchet  = 177
 	testparityMissingRatchet = 1052
 )
 
@@ -319,7 +325,12 @@ const (
 // Pin lift b25ed960 wave P3b ports TimeFormatLocalizationServerTest.ts's
 // stored and detected calendar fallback on node over Config.TimeFormat's
 // calendar list (decision 360, C-15): 764.
-const testparityLeftRatchet = 764
+// Pin lift b25ed960 wave P4 leaves six: ThermostatEventsTest.ts's events not
+// enabled and forward-gate start (by design, BD-chip-Thermostat-Events, owner
+// decision W2) and SecretRedactionTest.ts's two cases with the switch off (by
+// design, BD-Matter-SecretRedaction-NoOffSwitch, owner decision W1), its
+// derived-cluster and elemental-form cases (js-runtime-only): 770.
+const testparityLeftRatchet = 770
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

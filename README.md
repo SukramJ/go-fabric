@@ -218,6 +218,7 @@ becomes permissible in:
 | `cluster/spec.RequestCheck.Unchecked` | none; a command with its own refusal states `RequestCheck.Refusal` | `v0.26.0` |
 | `im/subscription.Subscription.SessionID` (reading the field) | `Subscription.CurrentSessionID`, read under the subscription's lock: the session changes when a newer one supersedes it | `v0.26.0` |
 | `client/peer.RebootArmerContext.ClosePeerSessionsBefore` | `RebootArmerContext.ClosePeerSessionsRegisteredBefore`, which cuts by registration order | `v0.26.0` |
+| `secure/operational.Manager.ClosePeerLost`, `Manager.ClosePeerLostSince` | `Manager.ClosePeerLostBefore` with the `Manager.RegistrationCount` read when the exchange began, which cuts by registration order | `v0.26.0` |
 | `cluster/wire.ScenesManagement` | `cluster/core.ScenesManagement` (`core.NewScenesManagement`) | `v0.25.0` |
 | `cluster/wire.SchedulesServer`, `NewSchedulesServer`, `SchedulesSource`, `ScheduleEntry`, `ScheduleStruct`, `ErrSchedulesReadOnly`, the `Schedules*` constants | the Thermostat server's schedules (`cluster/thermo`, `docs/guides/thermostat.md`) | `v0.25.0` |
 | `bridge.Bridge.ConnectPeer`, `bridge.Bridge.ConnectOtaProvider` | none to call: a node reaches its OTA provider and its camera's requestor over its own peer path (ADR 0032); `Bridge.LivePeerSession` reuses a live session without a handshake | `v0.25.0` |

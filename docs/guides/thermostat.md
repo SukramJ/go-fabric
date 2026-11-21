@@ -118,24 +118,36 @@ With the Events feature (TEVT), `SetActiveScheduleRequest` emits
 
 ## Events (TEVT)
 
-matter.js's server emits none of the cluster's eight events. The server
-follows connectedhomeip (`ThermostatClusterEvents.cpp` and its call sites
-at `6170af84`; ActiveScheduleChange's call site is in
-`ThermostatClusterSchedules.cpp` at `645b267a`): every event needs TEVT, and the EventList carries the
-events of the selection (LocalTemperatureChange without LTNE,
-OccupancyChange with OCC, RunningModeChange with AUTO,
-ActiveScheduleChange with MSCH, ActivePresetChange with PRES).
+The server follows matter.js, which emits all eight events behind its
+forward feature `thermostat-events` (`ThermostatServer.ts:2082-2259` at
+`b25ed960`): every event needs TEVT, and the EventList carries the events
+of the selection (LocalTemperatureChange without LTNE, OccupancyChange
+with OCC, RunningModeChange with AUTO, ActiveScheduleChange with MSCH,
+ActivePresetChange with PRES). An event goes out after its change
+committed, and none for a value that did not change. Unlike matter.js,
+where the application enables each event, TEVT selects every event its
+conformance admits (`notes/parity/by_design.md`, the events paragraph of
+`BD-chip-Thermostat-Schedules`).
 
 | Event | Emitted when | Payload |
 | --- | --- | --- |
 | SystemModeChange | SystemMode changes (a write, `SetSystemMode`, `SetAttributes`) | the previous and the current mode |
-| LocalTemperatureChange | LocalTemperature changes (`SetLocalTemperature`, `SetAttributes`) | the current value, null included |
-| SetpointChange | one of the four occupied and unoccupied setpoints changes, by a write, a command, a host setter or a companion the deadband moves | Heat or Cool, Occupied or no occupancy, the previous and the current setpoint; a user limit emits none |
+| LocalTemperatureChange | LocalTemperature moves by at least the threshold, or between null and a value (`SetLocalTemperature`, `SetAttributes`); at most one per 60 s, a change held back is re-decided when the 60 s end | the current value, null included |
+| SetpointChange | one of the four occupied and unoccupied setpoints changes, by a write, a command, a host setter, a companion the deadband moves or the start's reconcile | Heat or Cool, the previous and the current setpoint, and Occupied or no occupancy only with OCC; a user limit emits none |
 | RunningStateChange | ThermostatRunningState changes | the previous and the current relays |
 | RunningModeChange | ThermostatRunningMode changes (`SetThermostatRunningMode`) | the previous and the current mode |
-| ActiveScheduleChange | `SetActiveScheduleRequest` succeeds | the previous and the new handle |
-| ActivePresetChange | `SetActivePresetRequest` succeeds (the same handle again included), or a write of a setpoint in effect — or of a setpoint limit whose reconcile moves that setpoint — clears the active preset | the previous and the new handle |
-| OccupancyChange | never: connectedhomeip does not emit it | |
+| ActiveScheduleChange | the active schedule handle changes, from any source: `SetActiveScheduleRequest`, `SetActiveScheduleHandle`, a `SetSchedules` that drops the active schedule, the start clearing a handle that names no schedule | the previous and the new handle |
+| ActivePresetChange | the active preset handle changes, from any source: `SetActivePresetRequest`, `SetActivePresetHandle`, `ActivatePreset`, a write of a setpoint in effect — or of a setpoint limit whose reconcile moves that setpoint — that ends the preset, the start's reconcile moving a setpoint in effect, the start clearing a stale handle | the previous and the new handle |
+| OccupancyChange | Occupied changes (`SetOccupied`, `SetAttributes`) | the previous and the current occupancy |
+
+The LocalTemperatureChange threshold is
+`ThermostatConfig.LocalTemperatureChangeThreshold` (0.01 °C, 50 when nil,
+as matter.js) and can be moved later with
+`ThermostatServer.SetLocalTemperatureChangeThreshold`; with the event, 0 or
+below is refused. The events of the start — a stale handle cleared, the
+setpoints the initial reconcile moved — go out when the bridge first stamps
+the endpoint (`SetEndpoint`), and a LocalTemperature set before that is the
+configured value, which emits nothing.
 
 With TEVT and AUTO the server serves `ThermostatRunningMode` (0x001E),
 which the selection makes mandatory. The host sets it with
