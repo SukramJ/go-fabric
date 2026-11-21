@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10213,
+  "entry_points": 10217,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27894,
-    "reachable": 20889,
-    "whitelisted": 6983,
+    "total_exported": 27898,
+    "reachable": 20892,
+    "whitelisted": 6984,
     "unreachable": 22
   },
   "by_package": [
@@ -8563,6 +8563,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestValueLogsRedactSecrets",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/log_redact_test.go",
+      "line": 109
+    },
+    {
+      "package": "bridge",
       "identifier": "TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_ack_wait_test.go",
@@ -15937,7 +15944,7 @@
       "identifier": "NullDefault",
       "reason": "the Default of a generated attribute whose stated default is null; it is only ever a package-level initializer value, which RTA does not follow",
       "file": "cluster/spec/model.go",
-      "line": 224
+      "line": 228
     },
     {
       "package": "cluster/spec",
@@ -16238,7 +16245,7 @@
       "identifier": "UnresolvedDefault",
       "reason": "the Default of a generated attribute whose stated default is a field value; it is only ever a package-level initializer value, which RTA does not follow",
       "file": "cluster/spec/model.go",
-      "line": 217
+      "line": 221
     },
     {
       "package": "cluster/spec",
