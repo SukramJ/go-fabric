@@ -30,14 +30,14 @@ const respMax = 900
 const cdFormatVersion = 1
 
 // Context is what [Validate] works with — matter.js
-// DeviceAttestationValidator.Context (DAV:201-212).
+// DeviceAttestationValidator.Context (DAV:220-231).
 type Context struct {
 	// Challenge is the PASE session's attestation challenge.
 	Challenge []byte
 	// Store is the trust store; nil skips the PAA, chain and revocation
 	// checks (dclCertificateService undefined), and the CD signature is
 	// verified with the built-in signers only ([KnownCDSigner]: the CSA
-	// keys and the Matter test CD signer; DAV:205-211).
+	// keys and the Matter test CD signer; DAV:224-230).
 	Store PAAStore
 	// Clock is the current time a DAC past its notAfter is judged at (an
 	// error finding, [CertificateExpired]); nil judges no certificate at
@@ -64,7 +64,7 @@ type Data struct {
 }
 
 // Result is a successful validation — matter.js ValidationResult
-// (DAV:225-228).
+// (DAV:247-250).
 type Result struct {
 	// DACPublicKey is the DAC's key, which the CSR signature is checked with.
 	DACPublicKey *ecdsa.PublicKey
@@ -127,9 +127,9 @@ func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, er
 		return Result{}, err
 	}
 
-	// === Local checks (always run, no DCL needed), DAV:266 ===
+	// === Local checks (always run, no DCL needed), DAV:306 ===
 
-	// Step 4 (local part): DAC vendorId = PAI vendorId (DAV:268-274).
+	// Step 4 (local part): DAC vendorId = PAI vendorId (DAV:308-314).
 	if !sameID(dac.vendorID, pai.vendorID) {
 		return Result{}, fail(VendorIDMismatch, fmt.Sprintf("DAC vendorId %s does not match PAI vendorId %s", idHex(dac.vendorID), idHex(pai.vendorID)))
 	}
@@ -141,7 +141,7 @@ func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, er
 	}
 
 	// Step 6: the attestation elements decode and carry our nonce
-	// (DAV:276-287).
+	// (DAV:323-334).
 	elements, err := decodeAttestationElements(data.Elements)
 	if err != nil {
 		return Result{}, &Error{Check: AttestationElementsUnparseable, Message: "Device returned attestation elements that cannot be decoded: " + err.Error(), Err: err}
@@ -151,7 +151,7 @@ func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, er
 	}
 
 	// Step 7: the attestation signature over elements ‖ challenge verifies
-	// with the DAC key (DAV:289-306); the signature is the raw r‖s.
+	// with the DAC key (DAV:336-353); the signature is the raw r‖s.
 	if !verifyRaw(dacPublicKey, slices.Concat(data.Elements, ctx.Challenge), data.Signature) {
 		return Result{}, fail(AttestationSignatureInvalid, "Attestation signature verification failed against DAC public key")
 	}
@@ -164,12 +164,12 @@ func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, er
 	// 193; ahead of matter.js).
 	*findings = append(*findings, deviceCertificateFindings(ctx.Clock, dac, pai)...)
 
-	// === DCL-dependent checks (only with a store), DAV:308 ===
+	// === DCL-dependent checks (only with a store), DAV:355 ===
 
 	var paa *attCert
 	testPAA := false
 	if ctx.Store == nil {
-		// DAV:312-319 at db021da0.
+		// DAV:359-366 at b25ed960.
 		*findings = append(*findings, Finding{
 			Level: LevelWarning, Check: DclServiceUnavailable,
 			Message: "DclCertificateService not available; skipping PAA trust store, chain, and revocation checks. " +
@@ -181,7 +181,7 @@ func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, er
 		}
 	}
 
-	// === Remaining local checks (CD validation), DAV:454 ===
+	// === Remaining local checks (CD validation), DAV:501 ===
 
 	// Step 8: the Certification Declaration parses, a broken encoding rule
 	// apart from a CD that cannot be decoded (DeviceAttestationValidator.ts
@@ -221,8 +221,8 @@ func validateCollecting(ctx Context, data Data, findings *[]Finding) (Result, er
 		return Result{}, err
 	}
 
-	// Step 10, firmware information: a TODO upstream (DAV:636-642), as is
-	// the certificate_id check (DAV:529-530).
+	// Step 10, firmware information: a TODO upstream (DAV:685-691), as is
+	// the certificate_id check (DAV:576-577).
 	return Result{DACPublicKey: dacPublicKey, TestPAA: testPAA, TestCDSigner: signer.IsTestSigner}, nil
 }
 
@@ -252,18 +252,18 @@ func deviceCertificateFindings(clk clock.Clock, dac, pai *attCert) []Finding {
 	return out
 }
 
-// checkChain is the store branch, DAV:320-452: the PAA, the chain, the
+// checkChain is the store branch, DAV:367-499: the PAA, the chain, the
 // validity at the DAC's notBefore, the PAA vendor id, revocation. It
 // returns the PAA and whether the store holds it as not production.
 func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCert, bool, error) {
 	// Step 2: the PAA by the PAI's authority key identifier, test roots
-	// considered (DAV:321-329).
+	// considered (DAV:368-376).
 	paiAkid := pai.x509.AuthorityKeyId
 	meta, ok := store.PAA(paiAkid)
 	if !ok {
 		return nil, false, fail(PaaNotTrusted, "PAA not found in trust store for authority key identifier "+hex.EncodeToString(paiAkid))
 	}
-	// A test root under a production policy (DAV:331-339).
+	// A test root under a production policy (DAV:378-386).
 	if !meta.Production && !store.AcceptsTestCertificates() {
 		*findings = append(*findings, Finding{
 			Level: LevelError, Check: TrustedAsTestCertificate,
@@ -271,7 +271,7 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 				"device presented a valid test attestation but production trust policy is in effect",
 		})
 	}
-	// Step 2b: the root fetched after the DAC's notBefore (DAV:341-354).
+	// Step 2b: the root fetched after the DAC's notBefore (DAV:388-401).
 	if !meta.FetchedAt.IsZero() {
 		dacNotBefore := time.Unix(dac.notBefore+matterEpochOffset, 0)
 		if meta.FetchedAt.After(dacNotBefore) {
@@ -284,13 +284,13 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 		}
 	}
 
-	// Step 3: the chain's signatures (DAV:356-391). A trust-store PAA that
-	// does not parse is not the peer's fault: a plain error (DAV:358).
+	// Step 3: the chain's signatures (DAV:403-438). A trust-store PAA that
+	// does not parse is not the peer's fault: a plain error (DAV:405).
 	paa, err := parseAttCert(meta.DER, kindPAA, false)
 	if err != nil {
 		return nil, false, fmt.Errorf("attestation: trust store PAA: %w", err)
 	}
-	// The PAA key is read inside matter.js's try (DAV:360-367), so a key
+	// The PAA key is read inside matter.js's try (DAV:407-414), so a key
 	// it cannot use fails the chain as the signature does. The key and the
 	// signature are EC P-256 or, with PQC Phase 1, ML-DSA (pqc.go).
 	paaAlgorithm, err := KeyAlgorithmOf(paa.x509)
@@ -300,23 +300,23 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 	if err != nil {
 		return nil, false, fail(CertificateChainInvalid, "PAI signature verification failed: "+err.Error())
 	}
-	// Reading the PAI key apart from the DAC check (DAV:369-374).
+	// Reading the PAI key apart from the DAC check (DAV:416-421).
 	paiAlgorithm, err := KeyAlgorithmOf(pai.x509)
 	if err != nil {
 		return nil, false, &Error{Check: CertificateUnparseable, Message: "Device returned a PAI whose public key cannot be read: " + err.Error(), Err: err}
 	}
-	// mayIssue (DAV:376-382; kinds/CertificateSignature.ts:46-54 at
-	// db021da0): a PAI key no stronger than its PAA's.
+	// mayIssue (DAV:423-429; kinds/CertificateSignature.ts:46-54 at
+	// b25ed960): a PAI key no stronger than its PAA's.
 	if !MayIssue(paaAlgorithm, paiAlgorithm) {
 		return nil, false, fail(CertificateChainInvalid, fmt.Sprintf("PAI key algorithm %s is stronger than the %s of its PAA", paiAlgorithm, paaAlgorithm))
 	}
-	// The DAC's signature by the PAI (DAV:384-391).
+	// The DAC's signature by the PAI (DAV:431-438).
 	if err := VerifyIssuedBy(dac.x509, pai.x509); err != nil {
 		return nil, false, fail(CertificateChainInvalid, "DAC signature verification failed: "+err.Error())
 	}
 
 	// Step 3b: validity at the DAC's notBefore; notAfter 0 is none
-	// (DAV:393-419).
+	// (DAV:440-466).
 	nb := dac.notBefore
 	switch {
 	case nb < pai.notBefore:
@@ -330,13 +330,13 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 	}
 
 	// Step 4 (DCL part): a PAA vendor id, when present, is the PAI's
-	// (DAV:421-428).
+	// (DAV:468-475).
 	if paa.vendorID != nil && !sameID(paa.vendorID, pai.vendorID) {
 		return nil, false, fail(VendorIDMismatch, fmt.Sprintf("PAA vendorId %s does not match PAI vendorId %s", idHex(paa.vendorID), idHex(pai.vendorID)))
 	}
 
 	// Step 5: revocation of the DAC, then the PAI, keyed by (AKID, serial,
-	// issuer DN) (DAV:430-451). A store without Revocations revokes
+	// issuer DN) (DAV:477-498). A store without Revocations revokes
 	// nothing.
 	if r, ok := store.(Revocations); ok {
 		revoked, err := r.IsRevoked(dac.x509.AuthorityKeyId, serialBytes(dac.x509.SerialNumber), strings.ToUpper(hex.EncodeToString(dac.x509.RawIssuer)))
@@ -405,13 +405,13 @@ func checkDeclaration(cd cdContent, testSigner bool, data Data, dac, pai, paa *a
 		})
 	}
 	// Both or neither of dac_origin_vendor_id and dac_origin_product_id
-	// (DAV:548-556).
+	// (DAV:597-605).
 	hasOriginVID, hasOriginPID := cd.dacOriginVendorID != nil, cd.dacOriginProductID != nil
 	if hasOriginVID != hasOriginPID {
 		return fail(CertificationDeclarationFieldMismatch, "CD has only one of dac_origin_vendor_id and dac_origin_product_id")
 	}
 	if hasOriginVID {
-		// Both: against the dac_origin values (DAV:558-585).
+		// Both: against the dac_origin values (DAV:607-634).
 		switch {
 		case !sameID(dac.vendorID, cd.dacOriginVendorID):
 			return fail(CertificationDeclarationFieldMismatch, fmt.Sprintf("DAC vendorId %s does not match CD dac_origin_vendor_id %s", idHex(dac.vendorID), idHex(cd.dacOriginVendorID)))
@@ -423,7 +423,7 @@ func checkDeclaration(cd cdContent, testSigner bool, data Data, dac, pai, paa *a
 			return fail(CertificationDeclarationFieldMismatch, fmt.Sprintf("PAI productId %s does not match CD dac_origin_product_id %s", idHex(pai.productID), idHex(cd.dacOriginProductID)))
 		}
 	} else {
-		// Neither: against vendor_id and product_id_array (DAV:586-613).
+		// Neither: against vendor_id and product_id_array (DAV:635-662).
 		switch {
 		case !sameID(dac.vendorID, &cd.vendorID):
 			return fail(CertificationDeclarationFieldMismatch, fmt.Sprintf("DAC vendorId %s does not match CD vendor_id %s", idHex(dac.vendorID), idHex(&cd.vendorID)))
@@ -436,7 +436,7 @@ func checkDeclaration(cd cdContent, testSigner bool, data Data, dac, pai, paa *a
 		}
 	}
 
-	// authorized_paa_list, which needs the PAA (DAV:616-634).
+	// authorized_paa_list, which needs the PAA (DAV:665-683).
 	if cd.authorizedPAAList != nil {
 		if paa != nil {
 			ski := paa.x509.SubjectKeyId
@@ -493,7 +493,7 @@ func sameID(a, b *uint16) bool {
 	return *a == *b
 }
 
-// idHex is DAV:196-198.
+// idHex is DAV:211-213.
 func idHex(id *uint16) string {
 	if id == nil {
 		return "undefined"

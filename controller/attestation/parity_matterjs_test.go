@@ -46,10 +46,10 @@ func TestParityChecks(t *testing.T) {
 			t.Errorf("check %d = %q, want %q", i, got[i], want[i])
 		}
 	}
-	// AttestationFinding.level (DAV:98) and CertificationType
+	// AttestationFinding.level (DAV:112) and CertificationType
 	// (kinds/definitions/certification-declaration.ts:21-28).
 	if attestation.LevelError != "error" || attestation.LevelWarning != "warning" || attestation.LevelInfo != "info" {
-		t.Error("levels differ from DAV:98")
+		t.Error("levels differ from DAV:112")
 	}
 	if attestation.CertificationTest != 0 || attestation.CertificationProvisional != 1 || attestation.CertificationOfficial != 2 {
 		t.Error("certification types differ from certification-declaration.ts:21-28")

@@ -2031,60 +2031,6 @@
     "occurrences": 4
   },
   {
-    "file": "controller/attestation/store.go",
-    "line": 26,
-    "citation": "DAV:341-354",
-    "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
-    "identifier": "PaaTrustStoreTimeMismatch",
-    "nearest": 394,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/attestation/store.go",
-    "line": 54,
-    "citation": "DAV:430-451",
-    "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
-    "identifier": "serialNumber",
-    "nearest": 482,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/attestation/validate.go",
-    "line": 40,
-    "citation": "DAV:205-211",
-    "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
-    "identifier": "dclCertificateService",
-    "nearest": 230,
-    "occurrences": 13
-  },
-  {
-    "file": "controller/attestation/validate.go",
-    "line": 67,
-    "citation": "DAV:225-228",
-    "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
-    "identifier": "ValidationResult",
-    "nearest": 247,
-    "occurrences": 2
-  },
-  {
-    "file": "controller/attestation/validate.go",
-    "line": 132,
-    "citation": "DAV:268-274",
-    "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
-    "identifier": "vendorId",
-    "nearest": 240,
-    "occurrences": 17
-  },
-  {
-    "file": "controller/attestation/validate.go",
-    "line": 274,
-    "citation": "DAV:341-354",
-    "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
-    "identifier": "notBefore",
-    "nearest": 390,
-    "occurrences": 10
-  },
-  {
     "file": "controller/attestation/validate.go",
     "line": 523,
     "citation": "Certificate.ts:650",
