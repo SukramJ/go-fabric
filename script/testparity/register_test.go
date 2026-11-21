@@ -227,9 +227,12 @@ const testparityPlannedRatchet = 4
 // cases, two left) and SecretRedactionTest.ts (P4-B, 16 of 20, four left);
 // P4-D1's bridge ports of MessageExchangeTest.ts and SessionManagerTest.ts
 // cover cases already ported on the controller: 177 ported, 1052 missing.
+// Wave P4b ports fourteen OtaTest.ts cases of the update attempts (unit C,
+// the apply and admission tables, the consent while querying, the
+// NotifyUpdateApplied branches, the delegation switch): 1038 missing.
 const (
 	testparityPortedRatchet  = 177
-	testparityMissingRatchet = 1052
+	testparityMissingRatchet = 1038
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
