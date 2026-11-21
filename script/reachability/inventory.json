@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10210,
+  "entry_points": 10211,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27891,
+    "total_exported": 27892,
     "reachable": 20889,
-    "whitelisted": 6980,
+    "whitelisted": 6981,
     "unreachable": 22
   },
   "by_package": [
@@ -8168,6 +8168,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/switch_events_wire_test.go",
       "line": 51
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTCPCloseEvictsSessionBoundByHandlerInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_close_inflight_test.go",
+      "line": 34
     },
     {
       "package": "bridge",
