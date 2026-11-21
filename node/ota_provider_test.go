@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/store"
@@ -17,6 +18,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -288,5 +290,46 @@ func TestOTAProviderACLWithdrawnGrantKeepsTheEntry(t *testing.T) {
 		if err := n.Stop(ctx); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// TestOTAProviderStatusWithAHostManager (C-28): the node's status
+// listeners learn the statuses of a provider whose update attempts a
+// host's OTAUpdateManager owns — the provider observes what it reports
+// (mattercore.OTAProviderConfig.OnAttemptStatus), whichever manager runs.
+func TestOTAProviderStatusWithAHostManager(t *testing.T) {
+	t.Parallel()
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	cfg.OTAProvider = &node.OTAProviderConfig{
+		ImageSource: &oneImage{img: mattercore.OTAImage{FileDesignator: bdx.FileDesignator("img.ota"), SoftwareVersion: 2, SoftwareVersionString: "2"}},
+		Manager:     mattercore.NewOTAStandaloneManager(mattercore.OTAProviderConfig{}),
+	}
+	n := newNode(t, cfg)
+	var mu sync.Mutex
+	var got []mattercore.OTAUpdateStatus
+	n.OnOTAProviderStatus(func(_ node.OTAPeer, s node.OTAUpdateStatus, _ uint32) {
+		mu.Lock()
+		got = append(got, s)
+		mu.Unlock()
+	})
+	if err := n.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	ctx := im.WithSubject(im.WithFabricFilter(context.Background(), false, 1), 0x55, nil)
+	ctx = mattercore.WithInvokeSessionID(ctx, 7)
+	resp, err := n.OTAProvider().QueryImage(ctx, provdef.QueryImageRequest{
+		VendorId: 0xFFF1, ProductId: 0x8001, SoftwareVersion: 1,
+		ProtocolsSupported: []provdef.DownloadProtocolEnum{provdef.DownloadProtocolBdxSynchronous},
+	})
+	if err != nil || resp.UpdateToken == nil {
+		t.Fatalf("QueryImage %+v %v", resp, err)
+	}
+	if err := n.OTAProvider().NotifyUpdateApplied(ctx, provdef.NotifyUpdateAppliedRequest{UpdateToken: *resp.UpdateToken, SoftwareVersion: 2}); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Equal(got, []mattercore.OTAUpdateStatus{mattercore.OTAUpdateQuerying, mattercore.OTAUpdateDone}) {
+		t.Errorf("statuses %v, want [Querying Done]", got)
 	}
 }

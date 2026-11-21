@@ -235,13 +235,14 @@ func (s providerPorts) MayDelegateConsentTo(_ mattercore.OTAPeer, req provdef.Qu
 
 // ReportAttemptStatus implements mattercore.OTAUpdateManager
 // (reportAttemptStatus, :2006-2019 at b25ed960).
-func (s providerPorts) ReportAttemptStatus(a *mattercore.OTAUpdateAttempt, status mattercore.OTAUpdateStatus, unless ...mattercore.OTAUpdateStatus) {
+func (s providerPorts) ReportAttemptStatus(a *mattercore.OTAUpdateAttempt, status mattercore.OTAUpdateStatus, unless ...mattercore.OTAUpdateStatus) bool {
 	s.m.mu.Lock()
 	defer s.m.unlock()
 	if a.Ended() || slices.Contains(unless, a.Status()) {
-		return
+		return false
 	}
 	s.m.reportAttemptStatusLocked(a, status, 0)
+	return true
 }
 
 // OfferUpdate implements mattercore.OTAUpdateManager (offerUpdate,

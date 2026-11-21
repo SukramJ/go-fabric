@@ -31,9 +31,9 @@ type OTAProviderConfig struct {
 	// Manager owns the requestors' update attempts and decides the
 	// queries and applies the provider takes
 	// (mattercore.OTAProviderConfig.Manager); nil is the provider's
-	// default manager, which queues no update. With a Manager, the
-	// statuses are the manager's: [Node.OnOTAProviderStatus] learns none,
-	// and RebootQuery and TransferBlockSize are refused at Start.
+	// default manager, which queues no update. [Node.OnOTAProviderStatus]
+	// learns the statuses with either; with a Manager, RebootQuery,
+	// TransferBlockSize and DelegateConsentToRequestor are refused at Start.
 	Manager OTAUpdateManager
 	// DelegateConsentToRequestor lets the default manager offer a
 	// requestor that says it can consent an image that needs a consent
@@ -141,14 +141,16 @@ func (n *Node) buildOTAProvider() error {
 		},
 		Logger: n.logger,
 		Clock:  n.cfg.Clock,
+		// The provider reports the statuses to the node's listeners,
+		// whichever manager runs.
+		OnAttemptStatus: func(peer OTAPeer, status OTAUpdateStatus, version uint32) {
+			n.otaStatusListeners.emit(n.logger, "ota_provider_status", otaProviderStatus{peer, status, version})
+		},
 	}
 	if cfg.Manager == nil {
-		// The default manager reports the statuses to the node's
-		// listeners and compares a transfer's session with a query's by
-		// the peer's last activity on each (review II, F-db021da0-27).
-		pcfg.OnStatusChange = func(peer OTAPeer, status OTAUpdateStatus, version uint32) { //nolint:staticcheck // the default manager's status report, until the node has its own port
-			n.otaStatusListeners.emit(n.logger, "ota_provider_status", otaProviderStatus{peer, status, version})
-		}
+		// The default manager compares a transfer's session with a
+		// query's by the peer's last activity on each (review II,
+		// F-db021da0-27).
 		pcfg.SessionActivity = n.peerActivity //nolint:staticcheck // the default manager's admission input, until the node has its own port
 	}
 	p, err := mattercore.NewOTAProvider(pcfg)
@@ -170,9 +172,9 @@ type otaProviderStatus struct {
 
 // OnOTAProviderStatus registers fn for every update state a requestor of
 // the node's OTA provider ([Config].OTAProvider) reports: the peer, its
-// status and the version it concerns. It learns the statuses of the
-// provider's default manager; with [OTAProviderConfig].Manager, they are
-// that manager's to report, and fn learns none. fn runs inline on the provider's
+// status and the version it concerns — the statuses the provider reports
+// to its manager, whichever manager runs ([OTAProviderConfig].Manager or
+// the default; mattercore.OTAProviderConfig.OnAttemptStatus). fn runs inline on the provider's
 // goroutine and must not block — a download's WaitForApply is reported on
 // the receive path, when the requestor's final BlockAckEof arrives, so a
 // blocking fn stalls that session's datagrams; [Node.OnOTAProviderStatusAsync]

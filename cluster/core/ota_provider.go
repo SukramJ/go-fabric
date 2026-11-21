@@ -220,6 +220,19 @@ type OTAProviderConfig struct {
 	// (OP:300: the session's associatedFabric.rootNodeId); mandatory with
 	// BDX.
 	NodeID func(fabricIndex uint8) (uint64, bool)
+	// OnAttemptStatus observes the requestors' update statuses, whichever
+	// manager runs: each status the provider reports and its manager
+	// records ([OTAUpdateManager].ReportAttemptStatus), the outcome of an
+	// ApplyUpdateRequest — Applying, or Cancelled for a refused apply of a
+	// known attempt — and Done with the reported version at every
+	// NotifyUpdateApplied; each with the version the attempt concerns. A
+	// status the manager moves on its own (a failed queued update) is the
+	// manager's to report. nil observes nothing. It runs with no lock held,
+	// and the WaitForApply of a transfer runs on the receive path — the
+	// final BlockAckEof finishes the download at its arrival — so it must
+	// not block. matter.js's provider has no observer: its
+	// SoftwareUpdateManager emits the queue's events.
+	OnAttemptStatus func(peer OTAPeer, status OTAUpdateStatus, version uint32)
 	// OnStatusChange is told, by the default manager, every status a
 	// requestor's update attempt takes, with the version it offers, and
 	// Done with the reported version at every NotifyUpdateApplied; nil
@@ -227,8 +240,8 @@ type OTAProviderConfig struct {
 	// a transfer runs on the receive path — the final BlockAckEof finishes
 	// the download at its arrival — so it must not block.
 	//
-	// Deprecated: the statuses are the Manager's (matter.js's
-	// SoftwareUpdateManager.reportAttemptStatus); removable in v0.26.0.
+	// Deprecated: OnAttemptStatus observes the same statuses for every
+	// manager; removable in v0.26.0.
 	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
 	// RebootQuery, when set, learns from the default manager a QueryImage
 	// it admitted for the requestor's restart — another session than the
@@ -474,7 +487,7 @@ func (p *OTAProvider) answerQuery(ctx context.Context, req provdef.QueryImageReq
 	if !p.mgr.OfferUpdate(attempt, token, img.SoftwareVersion) { // OP:246-248
 		return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, nil
 	}
-	p.mgr.ReportAttemptStatus(attempt, OTAUpdateQuerying) // OP:249
+	p.reportStatus(attempt, OTAUpdateQuerying) // OP:249
 
 	imageURI := httpsURI
 	if viaBDX {
@@ -514,7 +527,7 @@ func (p *OTAProvider) answerQuery(ctx context.Context, req provdef.QueryImageReq
 // Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:202-231 at b25ed960
 // (the consent of the query's answer).
 func (p *OTAProvider) askConsent(ctx context.Context, req provdef.QueryImageRequest, peer OTAPeer, img OTAImage, token []byte, attempt *OTAUpdateAttempt) (provdef.QueryImageResponse, bool, error) {
-	p.mgr.ReportAttemptStatus(attempt, OTAUpdateWaitForConsent)
+	p.reportStatus(attempt, OTAUpdateWaitForConsent)
 	state, delay := OTAConsentUnknown, time.Duration(0)
 	if p.cfg.Consent != nil {
 		var err error
@@ -532,7 +545,7 @@ func (p *OTAProvider) askConsent(ctx context.Context, req provdef.QueryImageRequ
 	case OTAConsentObtaining:
 		return provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: seconds(delay)}, true, nil
 	default:
-		p.mgr.ReportAttemptStatus(attempt, OTAUpdateCancelled)
+		p.reportStatus(attempt, OTAUpdateCancelled)
 		return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, true, nil
 	}
 }
@@ -562,14 +575,14 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAtt
 		// A failed download is retried on a fresh session, so the listener
 		// stays until the attempt ends (OP:277-283); a transfer in flight
 		// keeps the attempt alive.
-		p.mgr.ReportAttemptStatus(attempt, OTAUpdateDownloading)
+		p.reportStatus(attempt, OTAUpdateDownloading)
 		s.OnProgress(func(uint64, *uint64) { attempt.Touch() })
-		s.OnFinished(func(uint64) { p.mgr.ReportAttemptStatus(attempt, OTAUpdateWaitForApply) })
-		s.OnCancelled(func() { p.mgr.ReportAttemptStatus(attempt, OTAUpdateCancelled) })
+		s.OnFinished(func(uint64) { p.reportStatus(attempt, OTAUpdateWaitForApply) })
+		s.OnCancelled(func() { p.reportStatus(attempt, OTAUpdateCancelled) })
 		// OP:284-293: the closed transfer cancels an attempt not yet
 		// settled; the check and the report are one step of the manager.
 		s.OnClosed(func() {
-			p.mgr.ReportAttemptStatus(attempt, OTAUpdateCancelled,
+			p.reportStatus(attempt, OTAUpdateCancelled,
 				OTAUpdateWaitForApply, OTAUpdateApplying, OTAUpdateDone, OTAUpdateCancelled)
 		})
 	})
@@ -616,9 +629,17 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 	}
 	// OP:346-351: whole seconds rounded up, at most a day.
 	delayed := min(*seconds(delay), otaMaxDelayedActionTime)
+	version := req.NewVersion
+	if version == 0 && attempt != nil {
+		version, _ = attempt.Version()
+	}
 	if !p.mgr.ApplyUpdate(ctx, peer, req.UpdateToken, req.NewVersion, time.Duration(delayed)*time.Second) { // OP:352-358
+		if attempt != nil {
+			p.observe(peer, OTAUpdateCancelled, version)
+		}
 		return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionDiscontinue, DelayedActionTime: *seconds(otaBusyRetry)}, nil
 	}
+	p.observe(peer, OTAUpdateApplying, version)
 	return provdef.ApplyUpdateResponse{Action: provdef.ApplyUpdateActionProceed, DelayedActionTime: delayed}, nil
 }
 
@@ -642,7 +663,7 @@ func (p *OTAProvider) applyPolicy(ctx context.Context, peer OTAPeer, req provdef
 		return provdef.ApplyUpdateResponse{}, false, delay, nil
 	}
 	if action == provdef.ApplyUpdateActionDiscontinue && attempt != nil {
-		p.mgr.ReportAttemptStatus(attempt, OTAUpdateCancelled)
+		p.reportStatus(attempt, OTAUpdateCancelled)
 	}
 	return provdef.ApplyUpdateResponse{Action: action, DelayedActionTime: min(*seconds(delay), otaMaxDelayedActionTime)}, true, 0, nil
 }
@@ -658,7 +679,24 @@ func (p *OTAProvider) NotifyUpdateApplied(ctx context.Context, req provdef.Notif
 		return err
 	}
 	p.mgr.UpdateApplied(peer, req.UpdateToken, req.SoftwareVersion)
+	p.observe(peer, OTAUpdateDone, req.SoftwareVersion)
 	return nil
+}
+
+// reportStatus reports a status of the attempt to the manager and, when
+// the manager recorded it, to [OTAProviderConfig].OnAttemptStatus.
+func (p *OTAProvider) reportStatus(a *OTAUpdateAttempt, status OTAUpdateStatus, unless ...OTAUpdateStatus) {
+	if p.mgr.ReportAttemptStatus(a, status, unless...) {
+		v, _ := a.Version()
+		p.observe(a.Peer(), status, v)
+	}
+}
+
+// observe tells [OTAProviderConfig].OnAttemptStatus of a status.
+func (p *OTAProvider) observe(peer OTAPeer, status OTAUpdateStatus, version uint32) {
+	if fn := p.cfg.OnAttemptStatus; fn != nil {
+		fn(peer, status, version)
+	}
 }
 
 // MatterDropFabric implements [contract.FabricScopedState]: the manager,

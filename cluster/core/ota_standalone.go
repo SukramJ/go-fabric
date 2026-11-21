@@ -48,11 +48,14 @@ type OTAUpdateManager interface {
 	// user's consent itself (:631-647).
 	MayDelegateConsentTo(peer OTAPeer, req provdef.QueryImageRequest) bool
 	// ReportAttemptStatus records a status of the attempt, other than
-	// Done (:2006-2019); an ended attempt takes none. A status in unless
-	// leaves the attempt as it is: the check and the report are one step
-	// under the manager's lock (the transfer's closed listener, which
-	// matter.js runs in one turn, OtaSoftwareUpdateProviderServer.ts:284-293).
-	ReportAttemptStatus(a *OTAUpdateAttempt, status OTAUpdateStatus, unless ...OTAUpdateStatus)
+	// Done (:2006-2019), and reports whether it did: an ended attempt
+	// takes none, and a status in unless leaves the attempt as it is. The
+	// check and the report are one step under the manager's lock — the
+	// transfer's closed listener checks the status
+	// (OtaSoftwareUpdateProviderServer.ts:285-290) and reports through
+	// endpoint.act (:417-419). The provider's [OTAProviderConfig].OnAttemptStatus
+	// learns a status that was recorded.
+	ReportAttemptStatus(a *OTAUpdateAttempt, status OTAUpdateStatus, unless ...OTAUpdateStatus) bool
 	// OfferUpdate records the offer of the query, after the provider's
 	// last wait; false when the attempt ended meanwhile, which the
 	// provider answers NotAvailable (:1743-1761).
@@ -232,13 +235,14 @@ func (m *otaStandaloneManager) MayDelegateConsentTo(_ OTAPeer, req provdef.Query
 }
 
 // ReportAttemptStatus implements [OTAUpdateManager].
-func (m *otaStandaloneManager) ReportAttemptStatus(a *OTAUpdateAttempt, status OTAUpdateStatus, unless ...OTAUpdateStatus) {
+func (m *otaStandaloneManager) ReportAttemptStatus(a *OTAUpdateAttempt, status OTAUpdateStatus, unless ...OTAUpdateStatus) bool {
 	m.mu.Lock()
 	if a.Ended() || slices.Contains(unless, a.Status()) {
 		m.unlock(nil)
-		return
+		return false
 	}
 	m.unlock([]otaStatusReport{m.setStatus(a, status, 0)})
+	return true
 }
 
 // OfferUpdate implements [OTAUpdateManager].

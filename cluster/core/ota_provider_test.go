@@ -707,3 +707,38 @@ func TestOTAProviderRefusesDefaultManagerSettingsBesideAManager(t *testing.T) {
 		}
 	}
 }
+
+// TestOTAProviderAttemptStatusObserver (C-28): OnAttemptStatus learns what
+// the default manager's deprecated OnStatusChange learns — the reported
+// statuses, the apply's outcome and Done — and the same with a Manager,
+// where OnStatusChange is refused.
+func TestOTAProviderAttemptStatusObserver(t *testing.T) {
+	t.Parallel()
+	flow := func(f *otaFixture) {
+		r := f.query(t, 7, bdxQuery())
+		f.apply(t, *r.UpdateToken, 3) // another version: refused, Cancelled
+		r = f.query(t, 8, bdxQuery())
+		f.apply(t, *r.UpdateToken, 2)
+		f.apply(t, []byte{9}, 0) // version 0 under an unknown token: no attempt, no status
+		if _, err := f.p.MatterInvoke(otaCtx(8), provdef.CmdNotifyUpdateApplied, provdef.NotifyUpdateAppliedRequest{UpdateToken: *r.UpdateToken, SoftwareVersion: 2}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := []OTAUpdateStatus{OTAUpdateQuerying, OTAUpdateCancelled, OTAUpdateQuerying, OTAUpdateApplying, OTAUpdateDone}
+	observed := &otaStatusLog{}
+	f := newOTAFixture(t, func(c *OTAProviderConfig) { c.OnAttemptStatus = observed.add })
+	flow(f)
+	if got := observed.states(); !statusesEqual(got, want) || !statusesEqual(f.status.states(), want) {
+		t.Errorf("default manager: OnAttemptStatus %v, OnStatusChange %v, want %v", got, f.status.states(), want)
+	}
+	withManager := &otaStatusLog{}
+	g := newOTAFixture(t, func(c *OTAProviderConfig) {
+		c.OnStatusChange = nil
+		c.Manager = NewOTAStandaloneManager(OTAProviderConfig{BDX: c.BDX, Clock: c.Clock})
+		c.OnAttemptStatus = withManager.add
+	})
+	flow(g)
+	if got := withManager.states(); !statusesEqual(got, want) {
+		t.Errorf("with a Manager: OnAttemptStatus %v, want %v", got, want)
+	}
+}
