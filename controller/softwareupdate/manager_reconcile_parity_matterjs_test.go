@@ -158,6 +158,127 @@ func TestManagerOfferParity(t *testing.T) {
 	})
 }
 
+// offered is an update the check reported (OtaTest's queryUpdates records
+// updateAvailable's softwareVersion and source).
+type offered struct {
+	version uint32
+	source  string
+}
+
+// selectionRig is a serving rig that records the updates the check
+// reports to the node, with testImages as AllowTestImages and delegate as
+// DelegateConsentToRequestor (initSiteWithoutTestImages, OtaTest.ts:3275
+// at b25ed960).
+func selectionRig(t *testing.T, testImages, delegate bool) (r *managerRig, query func() []offered) {
+	t.Helper()
+	var mu sync.Mutex
+	var got []offered
+	r = servingRig(t, func(c *Config) {
+		c.AllowTestImages, c.DelegateConsentToRequestor = testImages, delegate
+		c.OnUpdateAvailable = func(_ Peer, info SoftwareUpdateInfo) {
+			mu.Lock()
+			got = append(got, offered{info.SoftwareVersion, info.Source})
+			mu.Unlock()
+		}
+	})
+	// queryUpdates (OtaTest.ts:3466-3476 at b25ed960): the check with the
+	// stored images of the node's product group, as queryUpdates runs it
+	// for the rig's one node (the rig has no registry node).
+	query = func() []offered {
+		t.Helper()
+		if _, err := r.m.checkProductForUpdates(context.Background(), 0xFFF1, 0x8001, 0,
+			[]prepared{{peer: testPeer, vendorID: 0xFFF1, productID: 0x8001}}, true); err != nil {
+			t.Fatal(err)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(got)
+	}
+	return r, query
+}
+
+// forceAndOffer forces version for testPeer's node, its announcement left
+// unanswered, and returns what the manager then offers the node's
+// QueryImage (OtaTest's forceUpdate, OtaTest.ts:3564-3572 at b25ed960, and
+// the query the device answers it with).
+func (r *managerRig) forceAndOffer(t *testing.T, version uint32) (AvailableDetails, bool) {
+	t.Helper()
+	l := r.interceptAnnouncements(hanging)
+	if err := r.m.ForceUpdate(context.Background(), testPeer, testTarget(version)); err != nil {
+		t.Fatal(err)
+	}
+	r.settle(t, l)
+	return r.offerToRequestor(false)
+}
+
+// storedFile is the file name the store gives the test product's image of
+// version in mode.
+func storedFile(version uint32, mode Mode) string { return fileName(0xFFF1, 0x8001, mode, version) }
+
+// TestManagerStoredImageSelectionParity ports the stored-image selection
+// rows of OtaTest (OtaTest.ts at b25ed960): the update check and the
+// QueryImage answer select the stored images alike — through
+// findApplicable (DclOtaUpdateService.ts:394-407 at b25ed960), production
+// images only without test images, on equal versions local, test, prod.
+func TestManagerStoredImageSelectionParity(t *testing.T) {
+	t.Parallel()
+	// OtaTest.ts:3591-3611 at b25ed960
+	t.Run("offers neither a stored local nor a stored test-net image", func(t *testing.T) {
+		t.Parallel()
+		r, query := selectionRig(t, false, true)
+		r.storeImage(t, 1, ModeLocal)
+		r.storeImage(t, 2, ModeTest)
+		if got := query(); len(got) != 0 {
+			t.Fatalf("the check reported %+v, want nothing", got)
+		}
+		if d, ok := r.offerToRequestor(true); ok {
+			t.Fatalf("offer %+v to a requestor that can consent, want none", d)
+		}
+		if d, ok := r.forceAndOffer(t, 1); ok {
+			t.Fatalf("offer %+v for the forced version 1, want none (NotAvailable)", d)
+		}
+	})
+	// OtaTest.ts:3613-3624 at b25ed960
+	t.Run("offers a stored production image, not a newer stored local image", func(t *testing.T) {
+		t.Parallel()
+		r, query := selectionRig(t, false, false)
+		r.storeImage(t, 1, ModeProd)
+		r.storeImage(t, 2, ModeLocal)
+		if got := query(); !slices.Equal(got, []offered{{1, SourceProd}}) {
+			t.Fatalf("the check reported %+v, want version 1 from dcl-prod", got)
+		}
+		if d, ok := r.forceAndOffer(t, 1); !ok || d.NewSoftwareVersion != 1 || d.Filename != storedFile(1, ModeProd) {
+			t.Fatalf("offer %+v %v, want the stored prod image of version 1", d, ok)
+		}
+	})
+	// OtaTest.ts:3709-3724 at b25ed960
+	t.Run("offers a stored test-net image over a stored production image of the same version once enabled", func(t *testing.T) {
+		t.Parallel()
+		r, query := selectionRig(t, true, false)
+		r.storeImage(t, 1, ModeProd)
+		r.storeImage(t, 1, ModeTest)
+		if got := query(); !slices.Equal(got, []offered{{1, SourceTest}}) {
+			t.Fatalf("the check reported %+v, want version 1 from dcl-test", got)
+		}
+		if d, ok := r.forceAndOffer(t, 1); !ok || d.Filename != storedFile(1, ModeTest) {
+			t.Fatalf("offer %+v %v, want the stored test image of version 1", d, ok)
+		}
+	})
+	// OtaTest.ts:3726-3741 at b25ed960
+	t.Run("offers a stored local image over a stored production image of the same version once test images are enabled", func(t *testing.T) {
+		t.Parallel()
+		r, query := selectionRig(t, true, false)
+		r.storeImage(t, 1, ModeProd)
+		r.storeImage(t, 1, ModeLocal)
+		if got := query(); !slices.Equal(got, []offered{{1, SourceLocal}}) {
+			t.Fatalf("the check reported %+v, want version 1 from local", got)
+		}
+		if d, ok := r.forceAndOffer(t, 1); !ok || d.Filename != storedFile(1, ModeLocal) {
+			t.Fatalf("offer %+v %v, want the stored local image of version 1", d, ok)
+		}
+	})
+}
+
 // TestManagerConsentParity ports the consent rows of addUpdateConsent and
 // forceUpdate (SoftwareUpdateManager.ts:1455-1625 at b25ed960).
 func TestManagerConsentParity(t *testing.T) {

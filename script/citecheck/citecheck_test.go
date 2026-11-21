@@ -221,7 +221,8 @@ const citecheckDriftRatchet = 412
 // PaseSessionCloser). Wave P5-B relabelled 3 more (controller/client
 // fabricops.go, client/interaction/interaction.go, controller/client/node.go). Wave P5-A re-pointed controller/softwareupdate's
 // cites at b25ed960. Wave P5-S re-pointed images.go's and interaction.go's remaining cites at b25ed960 (2675; images.go's checkForUpdate cite labelled at db021da0, its selection not yet the pin's).
-const citecheckOffPinRatchet = 2675
+// Wave P5-A2 moved checkForUpdate onto the pin's findApplicable selection and its cite to b25ed960 (2674).
+const citecheckOffPinRatchet = 2674
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

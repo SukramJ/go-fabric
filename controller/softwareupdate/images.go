@@ -837,35 +837,28 @@ type CheckOptions struct {
 	// IncludeStored considers the stored images beside the ledgers.
 	IncludeStored bool
 	// IsProduction, when set, asks the production ledger only (true) or
-	// the test-net one only (false); nil asks both.
+	// the test-net one only (false); nil asks both. True also restricts
+	// the stored images to production ones, a stored test or local image
+	// is then not considered; false and nil consider every stored image.
 	IsProduction *bool
 	// Target, when set, considers that version only.
 	Target *uint32
 }
 
-// CheckForUpdate is the applicable update of vid/pid over current —
-// checkForUpdate (DclOtaUpdateService.ts:292-386 at db021da0): the stored
-// images (highest first; a stored test image only when the test-net
-// ledger is allowed), then the production and test-net ledgers; the
-// highest version wins, or the target version alone. At b25ed960
-// checkForUpdate selects the stored images through findApplicable
-// (DclOtaUpdateService.ts:385-407 at b25ed960): a stored local image is
-// skipped too when isProduction is true, and equal versions order local,
-// test, prod; this check keeps the db021da0 selection (testparity
-// "skips stored local-mode files when isProduction is true", open).
+// CheckForUpdate is the applicable update of vid/pid over current: the
+// stored images (production ones only when IsProduction is true), then the
+// production and test-net ledgers; the highest version wins, on equal
+// versions a stored image before a ledger one, or the target version
+// alone.
+//
+// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:299-383 at b25ed960
+// (checkForUpdate); the stored images are selected as
+// [Images.applicable] selects them, called as at
+// DclOtaUpdateService.ts:318-324 at b25ed960.
 func (i *Images) CheckForUpdate(ctx context.Context, vid, pid uint16, current uint32, opts CheckOptions) (UpdateInfo, bool) {
 	var found []UpdateInfo
 	if opts.IncludeStored {
-		local := i.Find(ctx, FindOptions{VendorID: &vid, ProductID: &pid, CurrentVersion: &current})
-		for k := len(local) - 1; k >= 0; k-- {
-			e := local[k]
-			if opts.IsProduction != nil && *opts.IsProduction && e.Mode == ModeTest {
-				continue
-			}
-			if !i.servable(ctx, e.Filename) {
-				i.log.Debug("ota.images.unverified_not_offered", slog.String("file", e.Filename))
-				continue
-			}
+		for _, e := range i.applicable(ctx, vid, pid, current, opts.IsProduction == nil || !*opts.IsProduction) {
 			u := UpdateInfo{
 				VendorID: vid, ProductID: pid, SoftwareVersion: e.SoftwareVersion, SoftwareVersionString: e.SoftwareVersionString,
 				MaxApplicable: e.SoftwareVersion - 1, SpecificationVersion: e.SpecificationVersion, Source: sourceOf(e.Mode),
@@ -876,12 +869,10 @@ func (i *Images) CheckForUpdate(ctx context.Context, vid, pid uint16, current ui
 			if e.MaxApplicable != nil {
 				u.MaxApplicable = *e.MaxApplicable
 			}
-			if u.SoftwareVersion > current && current >= u.MinApplicable && current <= u.MaxApplicable {
-				if opts.Target != nil && u.SoftwareVersion == *opts.Target {
-					return u, true
-				}
-				found = append(found, u)
+			if opts.Target != nil && u.SoftwareVersion == *opts.Target {
+				return u, true
 			}
+			found = append(found, u)
 		}
 	}
 	if i.ledger != nil {
@@ -911,6 +902,52 @@ func (i *Images) CheckForUpdate(ctx context.Context, vid, pid uint16, current ui
 	}
 	slices.SortStableFunc(found, func(a, b UpdateInfo) int { return cmp.Compare(b.SoftwareVersion, a.SoftwareVersion) })
 	return found[0], true
+}
+
+// applicable are the stored images of vid/pid a node at current can
+// update to and the store serves: newer than current, current inside the
+// image's applicable range, test and local images only with
+// includeNonProduction; highest version first and, on equal versions,
+// local before test before prod. The update check
+// ([Images.CheckForUpdate]) and the QueryImage answer
+// ([Manager.UpdateExistsFor]) both select through it, so the version a
+// check reports is one a QueryImage is offered. That the store serves
+// the image (ImagesConfig.AllowUnverifiedLedgerImages) is Go's own
+// condition.
+//
+// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:394-407 at b25ed960
+// (findApplicable; STORED_MODE_PRECEDENCE at
+// DclOtaUpdateService.ts:59 at b25ed960).
+func (i *Images) applicable(ctx context.Context, vid, pid uint16, current uint32, includeNonProduction bool) []StoredImage {
+	var out []StoredImage
+	for _, st := range i.Find(ctx, FindOptions{VendorID: &vid, ProductID: &pid, CurrentVersion: &current}) {
+		if st.SoftwareVersion <= current || (!includeNonProduction && st.Mode != ModeProd) {
+			continue
+		}
+		if !i.servable(ctx, st.Filename) {
+			i.log.Debug("ota.images.unverified_not_offered", slog.String("file", st.Filename))
+			continue
+		}
+		out = append(out, st)
+	}
+	slices.SortStableFunc(out, func(a, b StoredImage) int {
+		return cmp.Or(cmp.Compare(b.SoftwareVersion, a.SoftwareVersion),
+			cmp.Compare(storedModePrecedence(a.Mode), storedModePrecedence(b.Mode)))
+	})
+	return out
+}
+
+// storedModePrecedence is STORED_MODE_PRECEDENCE: local 0, test 1, prod 2
+// (DclOtaUpdateService.ts:59 at b25ed960).
+func storedModePrecedence(mode Mode) int {
+	switch mode {
+	case ModeLocal:
+		return 0
+	case ModeTest:
+		return 1
+	default:
+		return 2
+	}
 }
 
 func sourceOf(m Mode) string {

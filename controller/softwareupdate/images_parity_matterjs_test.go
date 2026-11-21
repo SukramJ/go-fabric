@@ -50,7 +50,7 @@ func TestImagesStoredUpdatesParity(t *testing.T) {
 		return imgs.CheckForUpdate(ctx, 0xfff1, 0x8000, 2, softwareupdate.CheckOptions{IncludeStored: true, IsProduction: &production})
 	}
 
-	// :420-469
+	// DclOtaUpdateServiceTest.ts:420-469 at b25ed960
 	t.Run("skips stored test-mode files when isProduction is true", func(t *testing.T) {
 		t.Parallel()
 		imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
@@ -63,23 +63,50 @@ func TestImagesStoredUpdatesParity(t *testing.T) {
 		}
 	})
 
-	// :471-513
-	t.Run("surfaces local-mode stored files regardless of isProduction", func(t *testing.T) {
+	// DclOtaUpdateServiceTest.ts:471-522 at b25ed960
+	t.Run("skips stored local-mode files when isProduction is true", func(t *testing.T) {
 		t.Parallel()
 		imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
 		store(t, imgs, 0xfff1, 0x8000, 3, 2, softwareupdate.ModeLocal)
-		if u, ok := check(imgs, true); !ok || u.Source != softwareupdate.SourceLocal {
-			t.Fatalf("%+v %v", u, ok)
+		if u, ok := check(imgs, true); ok {
+			t.Fatalf("a production check found %+v", u)
+		}
+		if u, ok := check(imgs, false); !ok || u.Source != softwareupdate.SourceLocal {
+			t.Fatalf("a test check: %+v %v", u, ok)
 		}
 	})
 
-	// :515-554
+	// DclOtaUpdateServiceTest.ts:524-563 at b25ed960
 	t.Run("surfaces stored prod-mode files when isProduction is false", func(t *testing.T) {
 		t.Parallel()
 		imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
 		store(t, imgs, 0xfff1, 0x8000, 3, 2, softwareupdate.ModeProd)
 		if u, ok := check(imgs, false); !ok || u.Source != softwareupdate.SourceProd || u.SoftwareVersion != 3 {
 			t.Fatalf("%+v %v", u, ok)
+		}
+	})
+
+	// Go-only: the equal-version order of findApplicable
+	// (DclOtaUpdateService.ts:394-407 at b25ed960; STORED_MODE_PRECEDENCE,
+	// DclOtaUpdateService.ts:59 at b25ed960) through checkForUpdate, which
+	// keeps the stored images' order on equal versions
+	// (DclOtaUpdateService.ts:379-380 at b25ed960).
+	t.Run("prefers a stored local, then a stored test image over a stored prod image of the same version", func(t *testing.T) {
+		t.Parallel()
+		for _, tc := range []struct {
+			other softwareupdate.Mode
+			want  string
+		}{
+			{softwareupdate.ModeLocal, softwareupdate.SourceLocal},
+			{softwareupdate.ModeTest, softwareupdate.SourceTest},
+		} {
+			imgs := softwareupdate.NewImages(softwareupdate.ImagesConfig{})
+			store(t, imgs, 0xfff1, 0x8000, 3, 2, softwareupdate.ModeProd)
+			store(t, imgs, 0xfff1, 0x8000, 3, 2, tc.other)
+			u, ok := imgs.CheckForUpdate(ctx, 0xfff1, 0x8000, 2, softwareupdate.CheckOptions{IncludeStored: true})
+			if !ok || u.Source != tc.want || u.SoftwareVersion != 3 {
+				t.Fatalf("prod and %s at one version: %+v %v, want %s", tc.other, u, ok, tc.want)
+			}
 		}
 	})
 }

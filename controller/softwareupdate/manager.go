@@ -1748,48 +1748,15 @@ func (m *Manager) mayDelegateConsentTo(p Peer, req provdef.QueryImageRequest) bo
 }
 
 // storedCandidates are UpdateExistsFor's candidates: the stored images
-// of vid/pid applicable over version, prod ones and test ones only with
-// AllowTestImages, that the store serves, highest version first and, on
-// equal versions, local before test before prod.
+// of vid/pid applicable over version, test and local ones only with
+// AllowTestImages, as [Images.applicable] selects them for the update
+// check — the same set in the same order.
 //
-// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:394-407 at b25ed960
-// (findApplicable; STORED_MODE_PRECEDENCE, DclOtaUpdateService.ts:59 at
-// b25ed960).
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:685-690 at b25ed960
+// (updateExistsFor's findApplicable call; #includeNonProductionImages at
+// SoftwareUpdateManager.ts:653-655 at b25ed960).
 func (m *Manager) storedCandidates(ctx context.Context, vid, pid uint16, version uint32) []StoredImage {
-	var candidates []StoredImage
-	for _, st := range m.cfg.Images.Find(ctx, FindOptions{VendorID: &vid, ProductID: &pid}) {
-		lo, hi := uint32(0), version
-		if st.MinApplicable != nil {
-			lo = *st.MinApplicable
-		}
-		if st.MaxApplicable != nil {
-			hi = *st.MaxApplicable
-		}
-		if version < st.SoftwareVersion && version >= lo && version <= hi && (st.Mode == ModeProd || m.cfg.AllowTestImages) &&
-			m.cfg.Images.servable(ctx, st.Filename) {
-			candidates = append(candidates, st)
-		}
-	}
-	slices.SortStableFunc(candidates, func(a, b StoredImage) int {
-		if c := cmp.Compare(b.SoftwareVersion, a.SoftwareVersion); c != 0 {
-			return c
-		}
-		return cmp.Compare(storedModePrecedence(a.Mode), storedModePrecedence(b.Mode))
-	})
-	return candidates
-}
-
-// storedModePrecedence is STORED_MODE_PRECEDENCE: local 0, test 1, prod 2
-// (DclOtaUpdateService.ts:59 at b25ed960).
-func storedModePrecedence(mode Mode) int {
-	switch mode {
-	case ModeLocal:
-		return 0
-	case ModeTest:
-		return 1
-	default:
-		return 2
-	}
+	return m.cfg.Images.applicable(ctx, vid, pid, version, m.cfg.AllowTestImages)
 }
 
 // CheckForUpdates checks every node for updates, stored images included,

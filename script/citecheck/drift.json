@@ -2610,7 +2610,7 @@
   },
   {
     "file": "controller/softwareupdate/images_parity_matterjs_test.go",
-    "line": 186,
+    "line": 213,
     "citation": "DclOtaUpdateService.ts:573-574",
     "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
     "identifier": "#verifyUpdate",
