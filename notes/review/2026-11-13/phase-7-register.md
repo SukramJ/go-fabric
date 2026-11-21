@@ -170,3 +170,17 @@ reproduced in 30 isolated and 8 package runs) read the timers after one
 now waits for the stop. Left in the backlog: R2-P7-V3-giveup, the citation remnants, the
 full-cut run 2, and the Fable note on `dropHandshakeNotBegun`'s "nothing is
 sent".
+
+## Backlog round pin lift b25ed960, wave P3c (2026-11-21)
+
+Closed: R2-P7-V3-giveup (decision 401, `BD-Matter-GiveUp-NextMessageTaken`);
+row 902 (`BD-Matter-ReadRequest-EmptyListLeftOut`, phase-6b N6b-cite-5); the
+ADR 0028 consequences paragraph (the loopback slot); the `policy.go` part of
+N6b-cite-7 (the file no longer exists) and `controller/open.go:28-30`
+re-cited at `b25ed960`. Struck: CodeQL 57–59 (no open code-scanning alert,
+`gh api`, 2026-11-21, the coordinator's measurement); TM R2.1 rest (fixed
+`1b0b693a`, phase-6b register). Moved to P4-D: the peer-loss cutoff
+(F-b25ed960-49, decision 405) and the BDX liveness kick (F-b25ed960-50,
+N6b-cite-4, decision 407). The DAV alias (N6b-cite-8) stays labelled
+db021da0 for the cite sweep. The other units' rows of this round are added
+at integration.

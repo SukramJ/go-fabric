@@ -8765,6 +8765,14 @@ sustained subscription comes back on a new session. Pinned by
 `client/exchange:TestExchangePeerLossLosesItsOwnSessionAtTheSameInstant` and
 `fabrictest:TestControllerRecoversFromASilentRestart`. Retire when matter.js
 exempts the failing exchange's session from its cutoff.
+Pin lift b25ed960 (unit P3c-E, decision 405): at the pin matter.js hands the
+loss over with `registeredBefore`, the registration count at the exchange
+context's creation, where it had `asOf: createdAt`
+(`packages/protocol/src/protocol/ExchangeManager.ts:623`, `:630-652` at
+`b25ed960`); the citations above are db021da0's. The bridge's
+`closeLostPeer` still cuts by time (`bridge/ota_provider_link.go:583-611` at
+`c8348b35`; findings row F-b25ed960-49). Unit P4-D re-reads this entry
+against the pin and retires or rewrites it.
 
 ### BD-Matter-Camera-FabricRemovalEndsStreams — a removed fabric's camera sessions and push transports end through the host's ports
 
@@ -9482,3 +9490,11 @@ The host's `SetSchedules` is an authoritative replace. It is held to matter.js's
 ### BD-Matter-Example-FakeReadingsBothEndpoints — with endpoint bits 0 the reference daemon's fake readings reach both of the grid meter's measurement endpoints
 
 With endpoint bits 0 the reference daemon's grid meter starts or stops the fake readings on both of its measurement endpoints (the meter's and its ElectricalSensor part's), where matter.js's dispatcher stops at the first endpoint whose handler accepts (`support/chip-testing/src/cluster/TestGeneralDiagnosticsServer.ts:25-36` at b25ed960, `!handled`, `:28`) and chip's delegate at the first handler (`src/app/TestEventTriggerDelegate.h:78-85` at 6170af84): the two endpoints are one meter's and the CSA cases trigger with endpoint bits 0 whichever endpoint they read; matter.js's handler states the same intent (`support/chip-testing/src/cluster/FakeElectricalReadingsHandler.ts:13`). Code: `examples/reference-bridge/fleet_energy_market.go`, `fakeReadingsTrigger`. Coordinator decision C-10 (388); pin lift b25ed960, unit P3-E.
+
+### BD-Matter-GiveUp-NextMessageTaken — after this node gives up on a message, its exchange takes the next message, where matter.js refuses one without the acknowledgement until the exchange's close timer
+
+At the give-up matter.js clears the owed acknowledgement (`#receivedMessageToAck`) and both callbacks but keeps `#sentMessageToAck`, and transmits nothing (`packages/protocol/src/protocol/MessageExchange.ts:996-1001` at `b25ed960`); while that is set the exchange refuses a message without an acknowledgement ("Previous message ack is missing") or with another one unless it is a standalone ack (`:534-548`), until it closes — a `close()` without a cause waits out the sum of the remaining retransmission backoffs (`:1198-1215`). The bridge transmits nothing at the give-up either (`outboundReliableTracker.Tick`, `bridge/outbound_reliable.go:1057-1064` at `c8348b35`), but drops the entry, and the receive rules read the live tracker only (`refuseUnacknowledging` → `outstandingOn`, `bridge/receive.go:1412-1437`), so the exchange's next message is taken. For a BDX exchange the give-up ends the exchange and a send waiting on it ends unsent (decision 283), so no difference shows there; for an interaction exchange or a handshake it shows between the give-up and matter.js's close timer. Reason (owner decision 401): the bridge keeps no IM exchange object, so the span would have to be rebuilt as a tombstone that copies an incidental timer of matter.js, and no honest peer tells the difference — it would have to let five transmissions go unacknowledged and then go on with the same exchange without the acknowledgement (Fable's read, none found). No test pins the span. Retire when the bridge gains an exchange object that outlives the give-up. Closes findings row R2-P7-V3-giveup; pin lift b25ed960, unit P3c-E.
+
+### BD-Matter-ReadRequest-EmptyListLeftOut — a ReadRequest this module sends leaves out every list without members, where matter.js sets an empty one it was handed
+
+matter.js's request builder sets each of the four lists that is not undefined (`packages/protocol/src/action/request/Read.ts:75-88` at `b25ed960`: `if (attributeRequests)`, `if (versionFilters)`, `if (eventRequests)`, `if (eventFilters !== undefined)`). A list is undefined when the caller gave neither the option nor a selector of that kind (`:41`); it is empty when the caller passed `[]`, or when a selector has an empty `attributes` or `events` list — the builder creates the list (`:137-139`, `:179-181`) and pushes nothing. The version and event filters are only ever created with a member (`:123-124`, `:173-174`). Whether matter.js's encoder then writes a set empty list was not read (`TlvReadRequest.ts`; unverified). This module's client leaves out every list without members, nil or empty (`ReadRequest.MarshalTLV`, `im/read.go`; the marshal helpers in `im/client.go`). Reason: in Go's `ReadRequest` a nil and an empty list are one value, so the encoder has one form for a list without members; the case is degenerate — a request that names no path of a kind. No test of its own pins it. Recorded for row 902 (phase-6b register, N6b-cite-5); pin lift b25ed960, unit P3c-E.
