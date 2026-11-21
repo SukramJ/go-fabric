@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10213,
+  "entry_points": 10222,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27894,
-    "reachable": 20889,
-    "whitelisted": 6983,
+    "total_exported": 27905,
+    "reachable": 20893,
+    "whitelisted": 6990,
     "unreachable": 22
   },
   "by_package": [
@@ -1290,6 +1290,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestBDXLivenessKickOnDuplicate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_liveness_kick_test.go",
+      "line": 114
+    },
+    {
+      "package": "bridge",
       "identifier": "TestBDXResponder_ExchangeNotifiesAtArrival",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
@@ -1315,6 +1322,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
       "line": 175
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXRetransmissionIntervalCap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_retransmission_cap_parity_matterjs_test.go",
+      "line": 40
     },
     {
       "package": "bridge",
@@ -4902,6 +4916,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInitiatedExchangeReceivePeerLoss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_registration_test.go",
+      "line": 182
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
@@ -4912,7 +4933,7 @@
       "identifier": "TestInitiatedHandshakeIgnoresPeerInitiatedCollision",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/exchange_direction_test.go",
-      "line": 98
+      "line": 99
     },
     {
       "package": "bridge",
@@ -4934,6 +4955,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/initiated_handshake_peer_test.go",
       "line": 82
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInitiatedPeerLossCutsByRegistrationOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_registration_test.go",
+      "line": 42
     },
     {
       "package": "bridge",
@@ -5949,6 +5977,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/boolean_state_event_test.go",
       "line": 107
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPeerLossCapabilityOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_registration_test.go",
+      "line": 120
     },
     {
       "package": "bridge",
@@ -44585,6 +44620,13 @@
     },
     {
       "package": "secure/operational",
+      "identifier": "TestRegistrationAtEveryKeyedInsert",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/peer_loss_registration_parity_matterjs_test.go",
+      "line": 163
+    },
+    {
+      "package": "secure/operational",
       "identifier": "TestReleaseStakeFreesOnlyItsOwnStake",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_full_table_test.go",
@@ -44624,6 +44666,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/sessionmanager_parity_matterjs_test.go",
       "line": 88
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestSessionManagerPeerLossByRegistrationOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/peer_loss_registration_parity_matterjs_test.go",
+      "line": 23
     },
     {
       "package": "secure/operational",
