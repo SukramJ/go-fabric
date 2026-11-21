@@ -372,13 +372,20 @@ type initiatedSecureExchange struct {
 	// message, in or out ([Bridge.boundSessionExchanges]): a value of
 	// bdxRouting.activity.
 	lastActive atomic.Uint64
-	// createdAt bounds the peer-loss sweep this exchange may trigger:
-	// a session the peer established after the exchange was opened is
-	// not what went unanswered (matter.js ExchangeManager.ts:614, :641 takes
-	// the context's creation time, SessionManager.ts:740 compares, at
-	// db021da0).
-	// createdAtMono is the same instant on the clock's monotonic reading,
-	// the one the sweep compares (matter.js's asOf is Time.nowUs).
+	// registeredBefore bounds the peer-loss sweep this exchange may
+	// trigger: the session registry's registration count read when the
+	// exchange was opened, after its session was looked up — the
+	// exchange's own session registered before it, a session the peer
+	// established since did not and is not what went unanswered
+	// ([Bridge.closeLostPeer]). counted reports that the registry gave
+	// one ([peerLossOrder]).
+	// Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:623 at b25ed960
+	// (registeredBefore = registrationCount at the exchange context's creation).
+	registeredBefore uint64
+	counted          bool
+	// createdAt and createdAtMono are the exchange's creation on the wall
+	// clock and on the clock's monotonic reading: the cutoff a registry
+	// without registration order gets ([peerLossCloser]).
 	createdAt     time.Time
 	createdAtMono time.Duration
 	// responder is set on an exchange the peer opened (bdx_responder.go):
@@ -527,6 +534,7 @@ func (b *Bridge) sessionNow(sessionID uint16) (*channel.Session, bool) {
 func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange, error) {
 	b.mu.RLock()
 	sessions := b.sessions
+	registry := b.sessionRegistry
 	b.mu.RUnlock()
 	if sessions == nil {
 		return nil, ErrUnsolicitedSessionMissing
@@ -538,6 +546,10 @@ func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange,
 	ex := &initiatedSecureExchange{
 		b: b, sessionID: link.sessionID, addr: link.addr, session: sess,
 		createdAt: b.clk().Now(), createdAtMono: clock.MonotonicOf(b.clk()), in: make(chan bdx.Message, 16), done: make(chan struct{}),
+	}
+	// The count is read after the lookup: the session found is below it.
+	if order, ok := registry.(peerLossOrder); ok {
+		ex.registeredBefore, ex.counted = order.RegistrationCount(), true
 	}
 	ex.touch()
 	// The id skips one an open exchange this node opened on the session
@@ -554,9 +566,21 @@ func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange,
 	return nil, errExchangeIDsExhausted
 }
 
+// peerLossOrder is the optional [SessionRegistry] capability that cuts a
+// lost peer's sessions by registration order: the count an exchange takes
+// when it opens, and the sweep that force-closes every session of the peer
+// registered before it (secure/operational.Manager.RegistrationCount,
+// Manager.ClosePeerLostBefore). [Bridge.closeLostPeer] prefers it.
+type peerLossOrder interface {
+	RegistrationCount() uint64
+	ClosePeerLostBefore(fabricIndex uint8, peerNodeID uint64, registeredBefore uint64) int
+}
+
 // peerLossCloser is the optional [SessionRegistry] capability that
 // force-closes every session of a peer created before a monotonic
-// reading of the registry's clock (secure/operational.Manager.ClosePeerLostSince).
+// reading of the registry's clock (secure/operational.Manager.ClosePeerLostSince,
+// deprecated). A registry without [peerLossOrder] that has it is still
+// honoured through the deprecation window, removable in v0.26.0 with it.
 type peerLossCloser interface {
 	ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, sinceMono time.Duration) int
 }
@@ -576,10 +600,9 @@ type peerLossCloser interface {
 // #messageReceivedCounter === 0, "Only if we never heard from it on this
 // exchange") → ExchangeManager.ts:630-652 (a commissioned peer:
 // SessionManager.handlePeerLoss for the peer address; otherwise the
-// session alone) → SessionManager.ts:742-748, :812-838. matter.js keeps
-// the sessions registered after the exchange context was created
-// (registeredBefore, ExchangeManager.ts:623); this sweep keeps those
-// created after the exchange, by the clock ([Bridge.closeLostPeer]).
+// session alone) → SessionManager.ts:742-748, :812-838: the sessions
+// registered after the exchange context was created are kept
+// (registeredBefore, ExchangeManager.ts:623; [Bridge.closeLostPeer]).
 // An exhausted counter of a subscription report is no peer loss
 // ([Bridge.noteReportUndelivered]).
 func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
@@ -592,7 +615,7 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 		return
 	}
 	if ex.received.Load() == 0 {
-		b.closeLostPeer(sessionID, exchangeID, ex.createdAtMono, "an exchange this node opened")
+		b.closeLostPeer(ex, "max retransmissions reached on an exchange this node opened")
 	} else if b.logger != nil {
 		b.logger.Debug("matter.exchange.initiated.given_up",
 			slog.Int("session_id", int(sessionID)),
@@ -628,14 +651,22 @@ func (b *Bridge) noteInitiatedReceived(hdr *message.Header, proto message.Protoc
 	ex.received.Add(1)
 }
 
-// closeLostPeer force-closes the sessions of the peer of sessionID that
-// were created before sinceMono, the clock's monotonic reading of the
-// exchange's creation ([clock.MonotonicOf]) — every one with a commissioned peer
-// (SessionManager.ts:677-695 #handlePeerLoss), the session alone without a
-// fabric or node id (ExchangeManager.ts:561-571). The sessions'
-// subscriptions fall with them through the registry's close hook. what
-// names the exchange for the log.
-func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, sinceMono time.Duration, what string) {
+// closeLostPeer force-closes the sessions of the peer of ex's session that
+// registered before ex opened — every one with a commissioned peer, the
+// session alone without a fabric or node id. The sessions' subscriptions
+// fall with them through the registry's close hook. The registry's
+// registration order cuts them ([peerLossOrder]) when ex took a count from
+// it; a registry with the deprecated time form only ([peerLossCloser])
+// gets ex's creation on the clock's monotonic reading; one with neither
+// closes ex's session alone. why is the cause, for the log.
+// Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:635-645 at b25ed960
+// (no fabric or node id: the session alone),
+// packages/protocol/src/protocol/ExchangeManager.ts:648-652 at b25ed960
+// (else SessionManager.handlePeerLoss with registeredBefore),
+// packages/protocol/src/session/SessionManager.ts:812-838 at b25ed960
+// (#handlePeerLoss: the cutoff, the loop over the registered sessions).
+func (b *Bridge) closeLostPeer(ex *initiatedSecureExchange, why string) {
+	sessionID, exchangeID := ex.sessionID, ex.exchangeID
 	b.mu.RLock()
 	sessions := b.sessions
 	registry := b.sessionRegistry
@@ -653,11 +684,18 @@ func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, sinceMono time.Dura
 		fabricIndex, _ = resolver.FabricFor(sessionID)
 	}
 	closed := 0
-	closer, perPeer := registry.(peerLossCloser)
-	if perPeer && fabricIndex != 0 && peerNodeID != 0 {
-		closed = closer.ClosePeerLostSince(fabricIndex, peerNodeID, sinceMono)
-	} else if err := registry.Close(sessionID); err == nil {
-		closed = 1
+	order, ordered := registry.(peerLossOrder)
+	closer, timed := registry.(peerLossCloser)
+	commissioned := fabricIndex != 0 && peerNodeID != 0
+	switch {
+	case commissioned && ordered && ex.counted:
+		closed = order.ClosePeerLostBefore(fabricIndex, peerNodeID, ex.registeredBefore)
+	case commissioned && timed:
+		closed = closer.ClosePeerLostSince(fabricIndex, peerNodeID, ex.createdAtMono)
+	default:
+		if err := registry.Close(sessionID); err == nil {
+			closed = 1
+		}
 	}
 	if b.logger != nil {
 		b.logger.Info("matter.session.peer_lost",
@@ -666,7 +704,7 @@ func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, sinceMono time.Dura
 			slog.Int("fabric_index", int(fabricIndex)),
 			slog.Uint64("node_id", peerNodeID),
 			slog.Int("closed", closed),
-			slog.String("hint", "max retransmissions reached on "+what+"; the peer's sessions are force-closed"))
+			slog.String("hint", why+"; the peer's sessions are force-closed"))
 	}
 }
 
@@ -847,7 +885,19 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 	return nil
 }
 
-// Receive implements [bdx.Exchange].
+// Receive implements [bdx.Exchange]. When ctx's deadline passes before a
+// message arrived on an exchange this node opened, and the peer never sent
+// one on it, the peer is lost as on a give-up of a message the exchange
+// sent ([Bridge.handleInitiatedPeerLoss]) — over MRP an acknowledged send
+// has counted the acknowledgement, so this reports where no MRP runs. The
+// deadline is the caller's: the response time of a command
+// ([PeerSession.Invoke]), the BDX idle timeout (bdx.Messenger.Next). A
+// cancelled ctx is no evidence of the peer and reports nothing, nor does an
+// exchange the peer opened (responder).
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:882-892 at b25ed960
+// (nextMessage: peerLost on a TransientPeerCommunicationError under #reportsPeerLoss),
+// packages/protocol/src/protocol/MessageExchange.ts:670-681 at b25ed960
+// (#reportsPeerLoss: only while #messageReceivedCounter === 0).
 func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, error) {
 	e.turn.waiting()
 	select {
@@ -857,8 +907,25 @@ func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, err
 	case <-e.done:
 		return bdx.Message{}, e.closedErr()
 	case <-ctx.Done():
-		return bdx.Message{}, ctx.Err()
+		err := ctx.Err()
+		if errors.Is(err, context.DeadlineExceeded) && !e.responder && e.received.Load() == 0 {
+			e.b.receiveTimedOut(e)
+		}
+		return bdx.Message{}, err
 	}
+}
+
+// receiveTimedOut is the peer loss of a receive on ex that timed out
+// ([initiatedSecureExchange.Receive]): ex is looked up as an exchange this
+// node opened, so one already ended and dropped reports nothing. Unlike a
+// give-up, the exchange itself is not ended here: matter.js's nextMessage
+// rethrows and leaves the exchange to its session's close.
+func (b *Bridge) receiveTimedOut(ex *initiatedSecureExchange) {
+	raw, ok := b.resumption.initiated.Load(secureExchangeKey{sessionID: ex.sessionID, exchangeID: ex.exchangeID})
+	if !ok || raw != ex || !ex.boundTo(b.sessionNow(ex.sessionID)) {
+		return
+	}
+	b.closeLostPeer(ex, "no response before the receive deadline on an exchange this node opened")
 }
 
 // MaxPayloadSize implements [bdx.Exchange]: the channel's maximum less the

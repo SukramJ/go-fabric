@@ -442,7 +442,7 @@ func TestPeerLossWithoutAFabricClosesOnlyItsSession(t *testing.T) {
 			b := &Bridge{}
 			b.sessions = lostPeerLookup{sid: sid, sess: sess, fabric: c.fabric}
 			b.sessionRegistry = reg
-			b.closeLostPeer(sid, 1, 0, "a test exchange")
+			b.closeLostPeer(&initiatedSecureExchange{b: b, sessionID: sid, exchangeID: 1}, "a test exchange")
 			if c.perPeer {
 				if len(reg.perPeer) != 1 || reg.perPeer[0] != [2]uint64{uint64(c.fabric), c.node} || len(reg.closed) != 0 {
 					t.Fatalf("per peer %v, closed %v; want one per-peer close of (%d, %#x) only", reg.perPeer, reg.closed, c.fabric, c.node)
