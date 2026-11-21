@@ -1020,7 +1020,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Fields: []spec.Field{
 				{ID: 0, Name: "Ssid", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
-				{ID: 1, Name: "Credentials", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
+				{ID: 1, Name: "Credentials", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}, Secret: true},
 				{ID: 2, Name: "Breadcrumb", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 			},
 			Decode: decodeAddOrUpdateWiFiNetworkRequest,
@@ -1031,7 +1031,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "TH", Op: spec.ConfName, Name: "TH"},
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeAdminister, Write: spec.PrivilegeAdminister},
 			Fields: []spec.Field{
-				{ID: 0, Name: "OperationalDataset", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
+				{ID: 0, Name: "OperationalDataset", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}, Secret: true},
 				{ID: 1, Name: "Breadcrumb", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 			},
 			Decode: decodeAddOrUpdateThreadNetworkRequest,

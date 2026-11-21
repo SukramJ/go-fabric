@@ -13,6 +13,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -69,6 +70,13 @@ type Manager struct {
 	// peer's bucket is read (supersededByLocked) or by the idle reaper
 	// (prunePeerIndexLocked). Guarded by mu.
 	byPeer map[uint64][]*Entry
+	// registrations counts the keyed sessions installed so far: the next
+	// one's registration position ([Entry].registration). Incremented
+	// under mu at the install, read without it by
+	// [Manager.RegistrationCount]. Mirrors matter.js
+	// packages/protocol/src/session/SessionManager.ts:1266-1284 at b25ed960
+	// (RegisteredSessions.add: #positions.set(session, this.#count++)).
+	registrations atomic.Uint64
 
 	// onGracefulClose, when non-nil, fires once per session BEFORE its
 	// key material is zeroised on every locally-initiated ("graceful")
@@ -571,9 +579,19 @@ type Entry struct {
 	// isEstablishing table). Guarded by the manager's mu, written only
 	// while the entry holds its id.
 	establishing bool
+	// registration is the session's registration position: the value of
+	// [Manager.RegistrationCount] when it entered the table with its keys
+	// ([Manager.registerLocked]), an establishing CASE responder session
+	// included. Written once under the manager's mu before the entry is
+	// visible, never rewritten, and kept after the session left the table.
+	// 0 and meaningless for a placeholder, which no sweep visits. Mirrors
+	// matter.js packages/protocol/src/session/SessionManager.ts:1258 at
+	// b25ed960 (#positions, a WeakMap nothing deletes from).
+	registration uint64
 	// createdAt is when the session was installed with its keys. The
-	// peer-loss sweep spares sessions created at or after the exchange
-	// that reported the loss (matter.js SessionManager.ts:688-690).
+	// deprecated time form of the peer-loss sweep ([Manager.ClosePeerLost])
+	// spares sessions created at or after its instant (matter.js
+	// packages/protocol/src/session/SessionManager.ts:832-834 at b25ed960).
 	createdAt time.Time
 	// lastActivityMono, lastPeerActivityMono and createdAtMono are the
 	// same stamps on the clock's monotonic reading (clock.MonotonicOf): the
@@ -907,6 +925,7 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		createdAtMono:        clock.MonotonicOf(m.clk()),
 		clock:                m.clk(),
 	}
+	m.registerLocked(entry)
 	m.sessions[id] = entry
 	m.indexPeerLocked(entry)
 	superseded := m.supersededByLocked(entry)
@@ -1326,6 +1345,7 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 		createdAtMono:        clock.MonotonicOf(m.clk()),
 		clock:                m.clk(),
 	}
+	m.registerLocked(entry)
 	m.sessions[id] = entry
 	m.mu.Unlock()
 	return entry, nil
@@ -1464,14 +1484,47 @@ func (m *Manager) openFromPase(id uint16, stake *Stake, localNodeID, peerNodeID 
 // packages/protocol/src/session/SessionManager.ts:490-508, where
 // getNextAvailableSessionId closes a session before reusing its id.
 //
+// The install is the session's registration ([Manager.registerLocked]).
+//
 // The caller must hold m.mu in write mode.
 func (m *Manager) installEntryLocked(id uint16, entry *Entry) *Entry {
+	m.registerLocked(entry)
 	displaced := m.sessions[id]
 	m.sessions[id] = entry
 	if displaced == nil || displaced.Session == nil {
 		return nil
 	}
 	return displaced
+}
+
+// registerLocked gives entry the next registration position. Every keyed
+// insert into the table calls it — [Manager.OpenFromSigma],
+// [Manager.OpenFromPase] and the two that go through
+// [Manager.installEntryLocked] — and nothing else: not the entry's
+// construction (its creation time may precede a registration made
+// meanwhile), not [Manager.completeEstablishment] (an establishing
+// session registers at its install, as it routes from then on), not the
+// placeholder [Manager.AllocateStake] stakes (it has no keys). The
+// caller must hold m.mu in write mode.
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:1266-1284 at b25ed960
+// (RegisteredSessions.add: the position is set before the establishing check),
+// called from packages/protocol/src/session/NodeSession.ts:163-165 at b25ed960
+// (the NodeSession constructor, once the keys are derived).
+func (m *Manager) registerLocked(entry *Entry) {
+	entry.registration = m.registrations.Add(1) - 1
+}
+
+// RegistrationCount is the number of keyed sessions the manager has
+// registered so far — the registration position the next one gets. A
+// caller that reads it when an exchange begins and later passes it to
+// [Manager.ClosePeerLostBefore] closes the peer's sessions that existed
+// then, the exchange's own among them, and spares every session that
+// registered since, whatever its creation time. Mirrors matter.js
+// packages/protocol/src/session/SessionManager.ts:408-410 at b25ed960
+// (registrationCount), read where an exchange's context is created
+// (packages/protocol/src/protocol/ExchangeManager.ts:623 at b25ed960).
+func (m *Manager) RegistrationCount() uint64 {
+	return m.registrations.Load()
 }
 
 // Get looks up an established session by id.
@@ -1763,7 +1816,7 @@ func (m *Manager) PASESessionIDs() []uint16 {
 // ClosePeer tears down every live session matching the
 // (fabricIndex, peerNodeID) pair, telling each peer with a CloseSession
 // first. Returns the number of sessions closed. A peer that stopped
-// answering is closed with [Manager.ClosePeerLost] instead.
+// answering is closed with [Manager.ClosePeerLostBefore] instead.
 //
 // Deprecated: nothing in the module calls it — the KeepSubscriptions=false
 // teardown it was written for closes the peer's subscriptions, not its
@@ -1800,25 +1853,41 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	return len(victims)
 }
 
+// ClosePeerLostBefore force-closes every live session with the
+// (fabricIndex, peerNodeID) pair that registered before registeredBefore —
+// a value of [Manager.RegistrationCount] read when the exchange that
+// observed the loss began. The exchange's own session is among them; a
+// session that registered since, an establishing one included, carries the
+// peer's data after the loss and is kept, whatever its creation time. No
+// CloseSession goes on the wire: the peer is lost, so each session is
+// marked peer-lost and force-closed. Returns the number of sessions closed.
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:742-748 at b25ed960
+// (handlePeerLoss with PeerLossContext.registeredBefore),
+// packages/protocol/src/session/SessionManager.ts:812-838 at b25ed960
+// (#handlePeerLoss: a session not registered before the cutoff is skipped),
+// packages/protocol/src/session/SessionManager.ts:1295-1298 at b25ed960
+// (isRegisteredBefore: own position < registeredBefore),
+// packages/protocol/src/session/NodeSession.ts:412-415 at b25ed960
+// (handlePeerLoss: #isPeerLost, then initiateForceClose).
+func (m *Manager) ClosePeerLostBefore(fabricIndex uint8, peerNodeID, registeredBefore uint64) int {
+	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
+		return entry.registration >= registeredBefore
+	})
+}
+
 // ClosePeerLost force-closes every live session with the
-// (fabricIndex, peerNodeID) pair that was created before asOf — the
-// sessions a peer held when an exchange on one of them ran out of MRP
-// retransmissions. No CloseSession goes on the wire: the peer is
-// lost, so matter.js marks the session peer-lost and force-closes it
-// (NodeSession.ts:341-344 handlePeerLoss → initiateForceClose), and
-// the session manager applies that to every session of the peer
-// created before the reporting exchange (SessionManager.ts:727-746
-// #handlePeerLoss, the `asOf` check at :740, at db021da0). A zero asOf
-// closes them all. Returns the number of sessions closed.
+// (fabricIndex, peerNodeID) pair that was created before asOf, as
+// [Manager.ClosePeerLostBefore] closes them; a session created in the same
+// instant as asOf counts as newer and is kept. A zero asOf closes them all.
+// asOf is compared with the session's wall-clock creation time
+// ([Entry.CreatedAt]). Returns the number of sessions closed.
 //
-// asOf is compared with the session's wall-clock creation time: on
-// [clock.System] both carry Go's monotonic reading and a wall-clock step
-// between them does not change the verdict; on a clock without one the
-// comparison follows the step. A caller that holds the clock's monotonic
-// reading of the moment the loss was observed uses
-// [Manager.ClosePeerLostSince], the form matter.js's `asOf` has
-// (Time.nowUs, SessionManager.ts:674-681 handlePeerShutdown and :686-688
-// handlePeerLoss at db021da0).
+// Deprecated: two sessions may have the same creation time, so the time
+// does not say which session is newer; use [Manager.ClosePeerLostBefore],
+// which cuts by registration order. Removable in v0.26.0.
+// Mirrors matter.js packages/protocol/src/peer/PeerLossContext.ts:42-48 at b25ed960
+// (asOf, deprecated for registeredBefore),
+// applied at packages/protocol/src/session/SessionManager.ts:832-834 at b25ed960.
 func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.Time) int {
 	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
 		return !asOf.IsZero() && !entry.CreatedAt().Before(asOf)
@@ -1828,20 +1897,25 @@ func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.
 // ClosePeerLostSince is [Manager.ClosePeerLost] with the cutoff on the
 // clock's monotonic reading ([clock.MonotonicOf], [Entry.CreatedAtMonotonic]):
 // every live session of the peer created before sinceMono is force-closed,
-// one created at or after it is kept — matter.js keeps "sessions created
-// at or after this instant", its asOf being Time.nowUs, the monotonic
-// reading (SessionManager.ts:667-686 handlePeerShutdown, :740
-// #handlePeerLoss at db021da0), so a wall-clock step between the session's
-// creation and the loss neither spares nor condemns it. Returns the number
-// of sessions closed.
+// one created at or after it is kept, so a wall-clock step between the
+// session's creation and the loss neither spares nor condemns it. Returns
+// the number of sessions closed.
+//
+// Deprecated: two sessions may have the same creation time, so the time
+// does not say which session is newer; use [Manager.ClosePeerLostBefore],
+// which cuts by registration order. Removable in v0.26.0.
+// Mirrors matter.js packages/protocol/src/peer/PeerLossContext.ts:42-48 at b25ed960
+// (asOf on the clock of Time.nowUs, deprecated for registeredBefore),
+// applied at packages/protocol/src/session/SessionManager.ts:832-834 at b25ed960.
 func (m *Manager) ClosePeerLostSince(fabricIndex uint8, peerNodeID uint64, sinceMono time.Duration) int {
 	return m.closePeerLost(fabricIndex, peerNodeID, func(entry *Entry) bool {
 		return entry.CreatedAtMonotonic() >= sinceMono
 	})
 }
 
-// closePeerLost is the sweep behind ClosePeerLost and ClosePeerLostSince:
-// keep reports a session of the peer that survives the sweep.
+// closePeerLost is the sweep behind ClosePeerLostBefore, ClosePeerLost and
+// ClosePeerLostSince: keep reports a session of the peer that survives the
+// sweep. keep runs under m.mu.
 func (m *Manager) closePeerLost(fabricIndex uint8, peerNodeID uint64, keep func(*Entry) bool) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0)

@@ -139,7 +139,7 @@ func (v MonitoringRegistrationStruct) Clone() MonitoringRegistrationStruct {
 var MonitoringRegistrationStructDef = &spec.Struct{Name: "MonitoringRegistrationStruct", Fields: []spec.Field{
 	{ID: 1, Name: "CheckInNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{NonVolatile: true}, FabricSensitive: true},
 	{ID: 2, Name: "MonitoredSubject", Type: spec.Type{Name: "subject-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{NonVolatile: true}, FabricSensitive: true},
-	{ID: 3, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "D", Op: spec.ConfDeprecated}, Quality: spec.Quality{NonVolatile: true}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
+	{ID: 3, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "D", Op: spec.ConfDeprecated}, Quality: spec.Quality{NonVolatile: true}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Secret: true},
 	{ID: 4, Name: "ClientType", Type: spec.Type{Name: "ClientTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: ClientTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{NonVolatile: true}, FabricSensitive: true, Default: float64(0)},
 	{ID: 254, Name: "FabricIndex", Type: spec.Type{Name: "FabricIndex", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 254", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 254}}},
 }}
@@ -515,8 +515,8 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "CheckInNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 1, Name: "MonitoredSubject", Type: spec.Type{Name: "subject-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
-				{ID: 3, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at b25ed960"},
+				{ID: 2, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Secret: true},
+				{ID: 3, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Secret: true, Relaxed: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-69 at b25ed960"},
 				{ID: 4, Name: "ClientType", Type: spec.Type{Name: "ClientTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: ClientTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 			},
 			Decode: decodeRegisterClientRequest,
@@ -537,7 +537,7 @@ var Definition = &spec.Cluster{
 			Access:      spec.Access{RW: "R", Read: spec.PrivilegeManage, Write: spec.PrivilegeManage, Fabric: "F"},
 			Fields: []spec.Field{
 				{ID: 0, Name: "CheckInNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 1, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Relaxed: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at b25ed960"},
+				{ID: 1, Name: "VerificationKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Secret: true, Relaxed: "matter.js packages/node/src/behaviors/icd-management/IcdManagementServer.ts:58-74 at b25ed960"},
 			},
 			Decode: decodeUnregisterClientRequest,
 		},

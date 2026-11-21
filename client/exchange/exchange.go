@@ -722,8 +722,9 @@ func (x *Exchange) sendPad() Pad {
 // sendAdditionalDelay is the amplified backoff addition of our sends: the
 // larger of our own network's margin and the peer's for the exchange's
 // traffic class — the exchange's PeerAdditionalMrpDelay, else the
-// session's peer margins (matter.js MessageExchange.ts:1215-1222,
-// #sendAdditionalDelay).
+// session's peer margins.
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:1281-1284 at b25ed960
+// (#sendAdditionalDelay).
 func (x *Exchange) sendAdditionalDelay() time.Duration {
 	if x.peerAdditional != nil {
 		return max(x.m.localAdditional, *x.peerAdditional)
@@ -750,9 +751,9 @@ func (x *Exchange) baseBackoffLocked() time.Duration { return x.backoffForLocked
 
 // budgetSpentLocked reports whether transmission number n may not be sent
 // any more, by MaxRetransmissions (negative unlimited) or by
-// RetransmissionTimeLimit once [MaxTransmissions] went out. Mirrors
-// matter.js MessageExchange.#isTransmissionBudgetSpent
-// (MessageExchange.ts:909-927 at db021da0).
+// RetransmissionTimeLimit once [MaxTransmissions] went out.
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:938-949 at b25ed960
+// (#isTransmissionBudgetSpent).
 func (x *Exchange) budgetSpentLocked(n int) bool {
 	if limit := x.sendOpts.MaxRetransmissions; limit >= 0 && n >= cmp.Or(limit, MaxTransmissions) {
 		return true
@@ -864,29 +865,36 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 // kickLocked decides whether a duplicate of the message our pending one
 // answers proves the peer awake and our reply lost, so the pending message
 // is retransmitted now instead of on its schedule; it returns the message
-// to retransmit with its timer stopped, or nil. Only on BDX, never on the
-// last transmission slot, never faster than the peer's active interval and
-// only when the scheduled attempt lies beyond the peer's active threshold.
-// Mirrors matter.js MessageExchange.ts:564-617
-// (#kickRetransmissionForLiveness), the cadence with the medium margin
-// (:588-589).
+// to retransmit with its timer stopped, or nil — the verdict is
+// [mrp.ShouldKickForLiveness] on the exchange's state. retransArmed is
+// false while a transmission is in flight ([Exchange.retransmit] clears it
+// before the send and arms after it), and during the final wait the
+// counter is put back, so the next transmission is past the budget there.
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:593-646 at b25ed960
+// (#kickRetransmissionForLiveness; the doc :578-592).
 func (x *Exchange) kickLocked(dup *Message) *pending {
-	if x.protocol != bdxProtocolID || x.closed || (x.initiator && x.closing) {
-		return nil
-	}
 	p := x.sentToAck
-	if p == nil || !x.retransArmed || !p.hasAck || dup.Counter != p.ackCounter {
-		return nil
+	k := mrp.LivenessKick{
+		BDX:              x.protocol == bdxProtocolID,
+		Closed:           x.closed || (x.initiator && x.closing),
+		Armed:            p != nil && x.retransArmed,
+		DuplicateCounter: dup.Counter,
+		NextBudgetSpent:  x.budgetSpentLocked(x.retransCount + 1),
+		Transmitted:      !x.lastTransmitAt.IsZero(),
+		Interval:         x.retransInterval,
 	}
-	if x.budgetSpentLocked(x.retransCount + 1) {
-		return nil
+	if p != nil {
+		k.PendingAcks, k.PendingAckCounter = p.hasAck, p.ackCounter
 	}
-	iv, _ := x.session.timing()
-	elapsed := x.m.clock.Now().Sub(x.lastTransmitAt)
-	if !x.lastTransmitAt.IsZero() && elapsed < iv.Active+x.sendAdditionalDelay() {
-		return nil
+	if k.Transmitted {
+		k.Elapsed = x.m.clock.Now().Sub(x.lastTransmitAt)
 	}
-	if remaining := max(0, x.retransInterval-elapsed); remaining <= iv.ActiveThreshold {
+	if k.BDX && !k.Closed && k.Armed {
+		iv, _ := x.session.timing()
+		k.ActiveInterval, k.ActiveThreshold = iv.Active, iv.ActiveThreshold
+		k.AdditionalDelay = x.sendAdditionalDelay()
+	}
+	if !mrp.ShouldKickForLiveness(k) {
 		return nil
 	}
 	x.stopRetransTimerLocked()

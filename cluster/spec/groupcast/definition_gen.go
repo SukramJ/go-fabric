@@ -687,7 +687,7 @@ var Definition = &spec.Cluster{
 				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 				{ID: 1, Name: "Endpoints", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 				{ID: 2, Name: "KeySetId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
-				{ID: 3, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
+				{ID: 3, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Secret: true},
 				{ID: 4, Name: "UseAuxiliaryAcl", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "[LN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "LN"}}}},
 				{ID: 5, Name: "ReplaceEndpoints", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "[LN]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "LN"}}}},
 				{ID: 6, Name: "McastAddrPolicy", Type: spec.Type{Name: "MulticastAddrPolicyEnum", Kind: spec.KindEnum, Bits: 8, Enum: MulticastAddrPolicyEnumDef}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -723,7 +723,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 				{ID: 1, Name: "KeySetId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
-				{ID: 2, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
+				{ID: 2, Name: "Key", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Secret: true},
 			},
 			Decode: decodeUpdateGroupKeyRequest,
 		},

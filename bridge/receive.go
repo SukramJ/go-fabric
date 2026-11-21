@@ -231,13 +231,22 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// immediately: the obligation owedInboundAck registered above
 	// carries the piggyback grace window, behind which a duplicate
 	// ack must not hide (the peer would retransmit again meanwhile).
-	// Expedite it to due-now, flush the pump, drop processing.
-	// Mirrors matter.js MessageExchange.ts:514-523 at b25ed960 (duplicate +
-	// requiresAck → sendStandaloneAckForMessage without delay, unless
-	// #kickRetransmissionForLiveness re-sent the pending message instead,
-	// :593-646 — a kick confined to BDX exchanges that the bridge does not
-	// have yet, F-b25ed960-50 in notes/parity/matter_behaviour_findings.md).
+	// Expedite it to due-now, flush the pump, drop processing — unless
+	// the liveness kick retransmitted the exchange's outstanding message,
+	// which acknowledges the duplicate itself ([Bridge.kickForLiveness]).
+	// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:514-523 at b25ed960
+	// (duplicate + requiresAck: sendStandaloneAckForMessage without delay
+	// unless #kickRetransmissionForLiveness re-sent the pending message).
 	if duplicate {
+		if proto.NeedsAck && b.kickForLiveness(&hdr, proto) {
+			b.dischargeOwedAck(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
+			b.logger.Debug("matter.rx.duplicate_kicked",
+				slog.String("src", srcString(src)),
+				slog.Int("session_id", int(hdr.SessionID)),
+				slog.Int("exchange_id", int(proto.ExchangeID)),
+				slog.Uint64("counter", uint64(hdr.MessageCounter)))
+			return nil
+		}
 		b.expediteDuplicateAck(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
 		b.RunAckPumpOnce(b.clk().Now())
 		b.logger.Debug("matter.rx.duplicate_acked",

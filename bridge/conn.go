@@ -204,15 +204,15 @@ func sendVia(listener *udp.Listener, dst net.Addr, datagram []byte) error {
 // called for every message with a new counter that authenticated under
 // it. The UDP path keeps its rule — the source address of the newest such
 // message wins, connectedhomeip's rule; matter.js adopts the address only
-// of a message that opens a new exchange (ExchangeManager.ts:480-486 at
-// db021da0; by_design BD-chip-SessionRouteByNewCounter). A session is
+// of a message that opens a new exchange (ExchangeManager.ts:474-480 at
+// b25ed960; by_design BD-chip-SessionRouteByNewCounter). A session is
 // never moved
 // between transports or connections: matter.js replaces a session's
 // channel only when both the old and the new one are UDP
 // (MessageChannel.ts:155-164 at b25ed960), so a session first seen on a TCP
 // connection stays bound to it, and one first seen over UDP stays on
 // UDP. The binding is what the connection's drop evicts
-// (ExchangeManager.ts:699-713 #sessionsOnChannel at db021da0).
+// (ExchangeManager.ts:708-722 #sessionsOnChannel at b25ed960).
 //
 // "The same session" is the session object, not the id: an id is
 // reused once its session is gone, and the new session binds afresh
@@ -282,10 +282,10 @@ func noteSessionTraffic(route net.Addr) {
 // unbindSessionRoute forgets the route of secure session sid, which is
 // closing or closed. When the route is a connection and sid was the last
 // session bound to it, the connection is closed — the Go translation of
-// matter.js ExchangeManager.ts:739-746 at db021da0
-// #closeTcpChannelIfLastSession, scheduled from :761-779 #deleteSession
+// matter.js ExchangeManager.ts:748-755 at b25ed960
+// #closeTcpChannelIfLastSession, scheduled from :770-788 #deleteSession
 // for every session whose transport channel is TCP. matter.js recounts the
-// live sessions on the channel (#sessionsOnChannel, :699-713); the bridge
+// live sessions on the channel (#sessionsOnChannel, :708-722); the bridge
 // keeps the count
 // on the route instead. The 10 s first-message timer of the listener is
 // not involved: it covers only a connection that never carried a message.
@@ -306,11 +306,11 @@ func (b *Bridge) unbindSessionRoute(sid uint16) {
 // otherwise. The caller holds b.routeBindMu.
 //
 // matter.js counts the unsecured sessions on the channel with the secure
-// ones (ExchangeManager.ts:699-713 at db021da0 #sessionsOnChannel, both
-// loops at :709-710), so #closeTcpChannelIfLastSession (:739-746) keeps a
+// ones (ExchangeManager.ts:708-722 at b25ed960 #sessionsOnChannel, both
+// loops at :718-719), so #closeTcpChannelIfLastSession (:748-755) keeps a
 // connection that carries a handshake. A handshake's own end closes
 // nothing: only a secure session's removal schedules the check
-// (#deleteSession :761-779; #addSession :748-759 observes NodeSessions
+// (#deleteSession :770-788; #addSession :757-768 observes NodeSessions
 // only).
 func (b *Bridge) releaseConnRouteLocked(r *connRoute) *connRoute {
 	r.sessions--
@@ -473,8 +473,8 @@ func (b *Bridge) bindEstablishedSession(src net.Addr, h any) {
 // forgets the route.
 //
 // Only a TCP connection is closed: matter.js schedules the check for a
-// session whose transport channel is TCP (ExchangeManager.ts:770-775 at
-// db021da0), so a BLE connection stays when its PASE session goes — it
+// session whose transport channel is TCP (ExchangeManager.ts:779-784 at
+// b25ed960), so a BLE connection stays when its PASE session goes — it
 // ends with the central or with the node leaving the radio.
 func (b *Bridge) closeConnRoute(r *connRoute) {
 	if r == nil || r.conn == nil {
@@ -533,7 +533,7 @@ func (b *Bridge) sessionHoldsSubscription(sessionID uint16) bool {
 // deadlines, exchange reply routes and ack obligations
 // ([Bridge.purgeSessionState]), forgets the session's route and closes a TCP
 // connection whose last session this was (unbindSessionRoute;
-// matter.js ExchangeManager.ts:739-746 at db021da0). Calling it for a session the
+// matter.js ExchangeManager.ts:748-755 at b25ed960). Calling it for a session the
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
 	b.purgeSessionState(sessionID)
@@ -606,13 +606,13 @@ func (b *Bridge) receive(ctx context.Context, buf []byte, c transport.Conn) erro
 		// An unsecured (PASE / CASE handshake) message is served on the
 		// connection like any other: matter.js creates the unsecured
 		// session for an inbound message from whatever channel carried it
-		// (ExchangeManager.ts:325-328 at db021da0 `createUnsecuredSession({
+		// (ExchangeManager.ts:324-327 at b25ed960 `createUnsecuredSession({
 		// channel, initiatorNodeId })`), and its secure-channel servers never ask
 		// which transport they run on. Replies go back on the connection
 		// (sendVia) without MRP (routeUsesMRP). The handshake holds the
 		// connection open while it runs (holdHandshake, settleHandshake),
 		// as matter.js counts the unsecured session on the channel
-		// (ExchangeManager.ts:699-713 at db021da0).
+		// (ExchangeManager.ts:708-722 at b25ed960).
 	}
 	return b.dispatch(ctx, buf, route)
 }

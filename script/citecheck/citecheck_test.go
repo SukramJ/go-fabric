@@ -150,7 +150,10 @@ import (
 // 432 after wave P3b: the pinned re-reads of presets.go's
 // setActivePresetRequest (:551-553) and subscription.go's activate()
 // (:415/:433) leave the drift list (measured by make cite-report).
-const citecheckDriftRatchet = 432
+// 426 after wave P4-S: the DAV: lines of controller/attestation
+// renumbered to DeviceAttestationValidator.ts at b25ed960 leave six rows
+// (measured by make cite-report).
+const citecheckDriftRatchet = 425
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -202,7 +205,10 @@ const citecheckDriftRatchet = 432
 // one more (controller/commissioner/fabric.go's MaxLabelLength). Wave P3
 // relabelled 15 more at b25ed960 in the files its units touched (A 10, C 2,
 // D 3). Wave P3c relabelled 27 more (units A, E, F and the register pass).
-const citecheckOffPinRatchet = 2753
+// Wave P4-S relabelled 12 more at b25ed960: bridge/conn.go's eight
+// ExchangeManager.ts citations and four in controller/attestation
+// (validate.go 3, policy.go 1).
+const citecheckOffPinRatchet = 2721
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

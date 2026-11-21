@@ -334,7 +334,7 @@ func TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd(t *testing.T) {
 	}
 
 	tr := newOutboundReliableTracker(nil, clock.System{})
-	if err := tr.trackExchangeMessage(1, 7, 0x10, false, []byte{1}, dest, now, 0); err != nil {
+	if err := tr.trackKickable(1, 7, 0x10, false, []byte{1}, dest, now, 0, nil); err != nil {
 		t.Fatal(err)
 	}
 	out := wait(tr, make(chan struct{}))
@@ -349,7 +349,7 @@ func TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd(t *testing.T) {
 	}
 
 	tr = newOutboundReliableTracker(nil, clock.System{})
-	if err := tr.trackExchangeMessage(2, 7, 0x10, false, []byte{2}, dest, now, 0); err != nil {
+	if err := tr.trackKickable(2, 7, 0x10, false, []byte{2}, dest, now, 0, nil); err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan struct{})
@@ -362,7 +362,7 @@ func TestWaitExchangeFreeEndsOnGiveUpAndExchangeEnd(t *testing.T) {
 	// The slot freed and the exchange ended together — a session drop
 	// that ends its exchanges: the end wins.
 	tr = newOutboundReliableTracker(nil, clock.System{})
-	if err := tr.trackExchangeMessage(3, 7, 0x10, false, []byte{3}, dest, now, 0); err != nil {
+	if err := tr.trackKickable(3, 7, 0x10, false, []byte{3}, dest, now, 0, nil); err != nil {
 		t.Fatal(err)
 	}
 	done = make(chan struct{})

@@ -137,7 +137,7 @@ var Definition = &spec.Cluster{
 			Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory},
 			Access:      spec.Access{RW: "RW", Read: spec.PrivilegeView, Write: spec.PrivilegeOperate},
 			Fields: []spec.Field{
-				{ID: 0, Name: "Passphrase", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
+				{ID: 0, Name: "Passphrase", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}, Secret: true},
 			},
 			Decode: decodeNetworkPassphraseResponse,
 		},

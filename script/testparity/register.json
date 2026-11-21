@@ -2055,9 +2055,35 @@
     },
     {
       "path": "packages/model/test/logic/SecretRedactionTest.ts",
-      "status": "planned",
-      "reason": "Pin lift b25ed960, unit P4-B: the redaction of model fields marked isSecret in a command, a response, an attribute value and a list entry (#4931, SecretRedaction.ts); 21 cases. The mark reaches Go through the snapshot's isSecret.",
-      "snapshotSha": "a0371e04b9724f70d5515a5183b6bca906ad952e"
+      "status": "ported",
+      "go": [
+        "cluster/spec:TestSecretRedactionParityMatterJS",
+        "cluster/spec:TestGeneratedSecretMarksMatchSnapshot"
+      ],
+      "reason": "Pin lift b25ed960, unit P4-B: the redaction of model fields marked isSecret (#4931, SecretRedaction.ts), 16 of 20 cases ported against spec.Redact, spec.RedactEntry and spec.ContainsSecret, each subtest named by its it; redactAttributes is not built (no property-keyed cluster state in Go), its two cases are ported by meaning per attribute, as the bridge logs attribute by attribute. The mark reaches Go through the snapshot's isSecret, generated onto spec.Field and spec.Attribute and held by TestGeneratedSecretMarksMatchSnapshot.",
+      "snapshotSha": "a0371e04b9724f70d5515a5183b6bca906ad952e",
+      "left": [
+        {
+          "it": "replaces a field a derived cluster redefines without marking it",
+          "class": "js-runtime-only",
+          "reason": "the base chain of matter.js's model classes is flattened into the snapshot at extraction (effectiveIsSecret in this module's extractor script); the generated marks are held by cluster/spec:TestGeneratedSecretMarksMatchSnapshot"
+        },
+        {
+          "it": "returns its input while redaction is off",
+          "class": "by-design",
+          "reason": "BD-Matter-SecretRedaction-NoOffSwitch: no Logger.redactSecrets switch (owner decision W1, 433)"
+        },
+        {
+          "it": "keeps the mark in elemental form",
+          "class": "js-runtime-only",
+          "reason": "matter.js's model toElement API; the Go analogue, the mark in the generated definitions, is cluster/spec:TestGeneratedSecretMarksMatchSnapshot"
+        },
+        {
+          "it": "keeps an entry of a secret list while redaction is off",
+          "class": "by-design",
+          "reason": "BD-Matter-SecretRedaction-NoOffSwitch: no Logger.redactSecrets switch (owner decision W1, 433)"
+        }
+      ]
     },
     {
       "path": "packages/model/test/logic/SelectDefaultValueTest.ts",
@@ -4494,9 +4520,24 @@
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatEventsTest.ts",
-      "status": "planned",
-      "reason": "Pin lift b25ed960, unit P4-A: the Thermostat events behind matter.js's forward feature thermostat-events (#4990, decision 291); 43 cases, replacing cluster/thermo/events_chip_test.go.",
-      "snapshotSha": "d0308bd5290ee4b9a9057e628ef8bfb578a609bf"
+      "status": "ported",
+      "go": [
+        "cluster/thermo:TestParityMatterJS_ThermostatEventsTest"
+      ],
+      "reason": "Pin lift b25ed960, unit P4-A: the Thermostat events behind matter.js's forward feature thermostat-events (#4990, decision 291), 44 of 46 cases by meaning on a fake clock (node start = the bridge's SetEndpoint, node close = MatterQuiesce, application writes = the host setters); NaN/Inf thresholds have no int16 form; \"first measurement at startup\" is the host's first SetMeasuredTemperature; \"timer expires early\" by a clock whose next timer fires 1 ms early. Replaces events_chip_test.go.",
+      "snapshotSha": "d0308bd5290ee4b9a9057e628ef8bfb578a609bf",
+      "left": [
+        {
+          "it": "generates nothing and does not fail when the events are not enabled",
+          "class": "by-design",
+          "reason": "BD-chip-Thermostat-Events: TEVT selects every event its conformance admits; matter.js's per-event enabling (ThermostatServer.ts:180-184) has no counterpart (owner decision W2, 434)"
+        },
+        {
+          "it": "refuses to start",
+          "class": "by-design",
+          "reason": "BD-chip-Thermostat-Events: the thermostat-events forward gate is matter.js's release switch; the Ahead register row keeps it as the marker"
+        }
+      ]
     },
     {
       "path": "packages/node/test/behaviors/thermostat/ThermostatSuggestionsTest.ts",
@@ -9695,14 +9736,18 @@
         "client/exchange:TestMessageExchangePeerLossDeclaration",
         "client/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
         "client/exchange:TestMessageExchangeOnTransmitted",
-        "bridge:TestInitiatedExchangePeerLossDeclarationParity"
+        "bridge:TestInitiatedExchangePeerLossDeclarationParity",
+        "bridge:TestInitiatedExchangeReceivePeerLoss",
+        "transport/mrp:TestShouldKickForLivenessParityMatterJS",
+        "bridge:TestBDXLivenessKickOnDuplicate",
+        "bridge:TestBDXRetransmissionIntervalCap"
       ],
       "missing": [
         "emits closed but not closing when destroyed",
         "does not wake a sleeping LIT peer on an outbound message",
         "emits closing for an ack-only exchange on a reliable channel, which sends nothing"
       ],
-      "reason": "Peer loss, the unacked state, the BDX liveness kick and the padded and unpadded BDX caps, timers that outlive their message, activity, the close end and its closing hook (Options.OnClosing), cross-protocol StatusReports, the ack-wait abort and the MRP margins (Config.LocalAdditionalMrpDelay and LocalFixedMrpBackoff, Options.PeerAdditionalMrpDelay, Session.SetPeerMargins) are ported against the controller exchange. Missing: Go's OnClosing also runs on the final close of a destroyed exchange, since its one user — a network profile's slot — is released on closing or closed alike (PeerExchangeProvider.ts:136-141), so the destroy-without-closing characterisation does not hold; and ICD wakefulness is not in the controller exchange. Pin lift b25ed960: the onTransmitted hook of a send (#4882, what the CASE responder's Success uses) is Exchange.send's, reached through internal/exchangeseam (client/exchange:TestMessageExchangeOnTransmitted, P1-A); the ack-only exchange of an unsolicited message has no Go subject, the controller Manager acks it outside any exchange. Pin lift b25ed960, P3c-A: the send() peer-loss declaration is ported on the bridge's initiated exchange too (bridge:TestInitiatedExchangePeerLossDeclarationParity) — a give-up reports peer loss only while the exchange heard nothing, a standalone acknowledgement counting; the nextMessage() cases (:126-149) are not ported: matter.js also reports peer loss when a receive fails with a TransientPeerCommunicationError on an exchange that heard nothing (MessageExchange.ts:882-892); the bridge's Receive reports none — findings F-b25ed960-52.",
+      "reason": "Peer loss, the unacked state, the BDX liveness kick and the padded and unpadded BDX caps, timers that outlive their message, activity, the close end and its closing hook (Options.OnClosing), cross-protocol StatusReports, the ack-wait abort and the MRP margins (Config.LocalAdditionalMrpDelay and LocalFixedMrpBackoff, Options.PeerAdditionalMrpDelay, Session.SetPeerMargins) are ported against the controller exchange. Missing: Go's OnClosing also runs on the final close of a destroyed exchange, since its one user — a network profile's slot — is released on closing or closed alike (PeerExchangeProvider.ts:136-141), so the destroy-without-closing characterisation does not hold; and ICD wakefulness is not in the controller exchange. Pin lift b25ed960: the onTransmitted hook of a send (#4882, what the CASE responder's Success uses) is Exchange.send's, reached through internal/exchangeseam (client/exchange:TestMessageExchangeOnTransmitted, P1-A); the ack-only exchange of an unsolicited message has no Go subject, the controller Manager acks it outside any exchange. Pin lift b25ed960, P3c-A: the send() peer-loss declaration is ported on the bridge's initiated exchange too (bridge:TestInitiatedExchangePeerLossDeclarationParity) — a give-up reports peer loss only while the exchange heard nothing, a standalone acknowledgement counting; the nextMessage() cases (:126-149) followed in P4-D1. Pin lift b25ed960, unit P4-D1, on the bridge's initiated and BDX exchanges: \"nextMessage()\" (2 it) as bridge:TestInitiatedExchangeReceivePeerLoss (F-b25ed960-52), \"liveness kick on duplicate\" (7 it) as transport/mrp:TestShouldKickForLivenessParityMatterJS and bridge:TestBDXLivenessKickOnDuplicate (F-b25ed960-50), \"BDX retransmission interval cap\" (4 it) as bridge:TestBDXRetransmissionIntervalCap (F-b25ed960-55); \"on a session that suppresses peer loss\" (2 it) stays on the controller exchange only: the bridge has no suppressPeerLoss option (coordinator decision C-4, 416).",
       "snapshotSha": "0a27eba01e86d924fed19976de23e2f6002ffa5b"
     },
     {
@@ -9905,9 +9950,10 @@
         "client/exchange:TestSessionManagerPeerLossByRegistrationOrder",
         "secure/operational:TestSessionManagerEstablishing",
         "secure/operational:TestSessionManagerSupersession",
-        "client/exchange:TestSessionManagerSessionsRegisteredSince"
+        "client/exchange:TestSessionManagerSessionsRegisteredSince",
+        "secure/operational:TestSessionManagerPeerLossByRegistrationOrder"
       ],
-      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. The peer-shutdown case after a backward clock step runs on the sweep's monotonic cutoff, Manager.ClosePeerLostSince (seam wave, issue #396): matter.js runs both causes through #handlePeerLoss with asOf on Time.nowUs, and the shutdown cause's keepSubscriptions is the controller's own subscriptions, no device-side subject. Pin lift b25ed960 (#4882): the supersession of a peer's older sessions is ported on the device table (secure/operational:TestSessionManagerSupersession, P2b-B; the PASE check covers the older session too, a Go PASE session carries a peer node id), sessionsRegisteredSince on the controller's (client/exchange:TestSessionManagerSessionsRegisteredSince, P2b-B); the establishing state is ported on the controller's exchange.Manager (client/exchange:TestSessionManagerEstablishing, the observer being the per-peer cap; \"finds an establishing session only once it is established\" by meaning in client/handshake, OnSession at the establishment; \"neither counts nor evicts an establishing session for the per-peer cap\" with it, coordinator decision C-8); on the device side's table too (secure/operational:TestSessionManagerEstablishing, the CASE responder of bridge/node, P2-J), with the per-peer cap run at establishment over established sessions, and peer loss by registration order (client/exchange:TestSessionManagerPeerLossByRegistrationOrder) (P1-A).",
+      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; the session pick by activity and the wall-clock steps run on the clock's monotonic reading (client/peer:TestNewestSessionActivityParityMatterJS, secure/operational:TestSessionManagerWallClockSteps, phase 32). Left: placeholder-only reuse (by design), subscriptions and log origins, the Lifetime and legacy-counter cases and values a Go field cannot carry. The peer-shutdown case after a backward clock step runs on the sweep's monotonic cutoff, Manager.ClosePeerLostSince (seam wave, issue #396): matter.js runs both causes through #handlePeerLoss with asOf on Time.nowUs, and the shutdown cause's keepSubscriptions is the controller's own subscriptions, no device-side subject. Pin lift b25ed960 (#4882): the supersession of a peer's older sessions is ported on the device table (secure/operational:TestSessionManagerSupersession, P2b-B; the PASE check covers the older session too, a Go PASE session carries a peer node id), sessionsRegisteredSince on the controller's (client/exchange:TestSessionManagerSessionsRegisteredSince, P2b-B); the establishing state is ported on the controller's exchange.Manager (client/exchange:TestSessionManagerEstablishing, the observer being the per-peer cap; \"finds an establishing session only once it is established\" by meaning in client/handshake, OnSession at the establishment; \"neither counts nor evicts an establishing session for the per-peer cap\" with it, coordinator decision C-8); on the device side's table too (secure/operational:TestSessionManagerEstablishing, the CASE responder of bridge/node, P2-J), with the per-peer cap run at establishment over established sessions, and peer loss by registration order (client/exchange:TestSessionManagerPeerLossByRegistrationOrder) (P1-A). Pin lift b25ed960, unit P4-D1: peer loss by registration order (describe :1128-1240) on the device table too: secure/operational:TestSessionManagerPeerLossByRegistrationOrder (6 it; handlePeerShutdown and sessionsRegisteredSince by meaning on Manager.ClosePeerLostBefore with the kept session's position).",
       "snapshotSha": "a2f189858045a968dbb38c27baf6a0438ed50cdf",
       "left": [
         {

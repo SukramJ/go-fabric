@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
@@ -17,17 +18,18 @@ import (
 // moved from the facade's hook into the bridge.
 
 // TestPASEClosedOnFailSafeExpiryParity pins the fail-safe rollback's step
-// 1, matter.js packages/protocol/src/common/FailsafeContext.ts:277-279 at
-// db021da0 (closePaseSession), through the facade's own root clusters: when
+// 1, matter.js packages/protocol/src/common/FailsafeContext.ts:281-283 at
+// b25ed960 (closePaseSession), through the facade's own root clusters: when
 // the root's fail-safe expires, the node holds no PASE session — the one
 // AddNOC adopted onto a fabric included — at once outside an interaction,
-// after the response inside one (ArmFailSafe with expiry 0). The close is
+// after the response inside one on the PASE session (ArmFailSafe with
+// expiry 0 over PASE; over CASE at once, bridge/pase_close_rollback_test.go). The close is
 // the bridge's (bridge.Bridge.FailSafeExpired, wired into the root's
 // GeneralCommissioning by AttachRootClusters); the facade adds nothing to
 // it. bridge/pase_close_failsafe_expiry_test.go holds the same without the
 // facade, on the fail-safe's timer too.
 func TestPASEClosedOnFailSafeExpiryParity(t *testing.T) {
-	armed := func(t *testing.T) *node.Node {
+	armed := func(t *testing.T) (*node.Node, uint16) {
 		t.Helper()
 		n := startedNode(t, mdns.NewNoop())
 		e, err := n.Sessions().OpenFromPase(1, 2, 7, []byte("pase-shared-secret"))
@@ -43,19 +45,19 @@ func TestPASEClosedOnFailSafeExpiryParity(t *testing.T) {
 		if got := paseSessions(n); got != 1 {
 			t.Fatalf("PASE sessions under the armed fail-safe = %d, want 1", got)
 		}
-		return n
+		return n, e.SessionID
 	}
 	t.Run("outside an interaction", func(t *testing.T) {
-		n := armed(t)
+		n, _ := armed(t)
 		n.Root().GeneralCommissioning.ExpireFailSafe(context.Background())
 		if got := paseSessions(n); got != 0 {
 			t.Errorf("PASE sessions after the fail-safe expired = %d, want 0", got)
 		}
 	})
-	t.Run("in an interaction", func(t *testing.T) {
-		n := armed(t)
+	t.Run("in an interaction on the PASE session", func(t *testing.T) {
+		n, pase := armed(t)
 		after := &im.AfterResponse{}
-		n.Root().GeneralCommissioning.ExpireFailSafe(im.WithAfterResponse(context.Background(), after))
+		n.Root().GeneralCommissioning.ExpireFailSafe(core.WithInvokeSessionID(im.WithAfterResponse(context.Background(), after), pase))
 		if got := paseSessions(n); got != 1 {
 			t.Fatalf("PASE sessions before the response = %d, want 1", got)
 		}

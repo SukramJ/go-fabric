@@ -127,6 +127,11 @@ func (s *ThermostatServer) seedSchedules(cfg ThermostatConfig) error {
 	if active != nil && !scheduleHandleIn(schedules, active) {
 		s.logger().Warn("matter.thermostat.active_schedule_cleared",
 			slog.String("schedule_handle", handleKey(active)), slog.String("reason", "matches no schedule"))
+		// The clear is a change of the handle at the start: its event goes
+		// out with the start's, as the preset twin's
+		// (ThermostatEventsTest.ts:485-505 at b25ed960). The schedule clear
+		// has no test of its own; it takes the same path of the start.
+		s.queueStartupEventLocked(tdef.EventActiveScheduleChange, activeScheduleChange(active, nil))
 		active = nil
 	}
 	s.activeScheduleHandle = active
@@ -184,7 +189,8 @@ func (s *ThermostatServer) validateHostSchedules(stored, list []Schedule) ([]Sch
 // built-in schedule may be dropped. An active schedule the list drops is
 // cleared, as a start clears an active handle that names no schedule
 // (:353-366): the host's list says the program is gone, and the
-// ActiveScheduleHandle never names a missing schedule. The list is stored
+// ActiveScheduleHandle never names a missing schedule; with TEVT the clear
+// emits ActiveScheduleChange. The list is stored
 // and reported through the change notifier, without the port. The error
 // is the refusal, with its IM status (UNSUPPORTED_ATTRIBUTE without MSCH);
 // schedules is not modified.
@@ -209,7 +215,9 @@ func (s *ThermostatServer) SetSchedules(schedules []Schedule) error {
 		changed = append(changed, tdef.AttrSchedules)
 	}
 	s.schedules = list
+	var dropped []byte
 	if s.activeScheduleHandle != nil && !scheduleHandleIn(list, s.activeScheduleHandle) {
+		dropped = s.activeScheduleHandle
 		s.activeScheduleHandle = nil
 		changed = append(changed, tdef.AttrActiveScheduleHandle)
 	}
@@ -217,13 +225,14 @@ func (s *ThermostatServer) SetSchedules(schedules []Schedule) error {
 	if len(changed) > 0 {
 		s.changes.NotifyFrom(contract.OriginHostSet, changed...)
 	}
+	s.emitActiveScheduleChange(context.Background(), dropped, nil)
 	return nil
 }
 
 // SetActiveScheduleHandle records the schedule the device follows now
 // (nil for none), without the port: stored and reported through the change
-// notifier. A handle that names no stored schedule is refused
-// ([spec.ErrInvalidValue]).
+// notifier, and with TEVT a change emits ActiveScheduleChange. A handle
+// that names no stored schedule is refused ([spec.ErrInvalidValue]).
 func (s *ThermostatServer) SetActiveScheduleHandle(handle []byte) error {
 	if s.features&ThermostatFeatureMSCH == 0 {
 		return spec.Errorf(im.StatusUnsupportedAttribute, "thermo: ActiveScheduleHandle needs the MatterScheduleConfiguration feature")
@@ -235,11 +244,13 @@ func (s *ThermostatServer) SetActiveScheduleHandle(handle []byte) error {
 			return fmt.Errorf("%w: schedule handle %s names no schedule", spec.ErrInvalidValue, handleKey(handle))
 		}
 	}
-	changed := !bytes.Equal(s.activeScheduleHandle, handle) || (s.activeScheduleHandle == nil) != (handle == nil)
+	previous := s.activeScheduleHandle
+	changed := !sameHandle(previous, handle)
 	s.activeScheduleHandle = bytes.Clone(handle)
 	s.mu.Unlock()
 	if changed {
 		s.changes.NotifyFrom(contract.OriginHostSet, tdef.AttrActiveScheduleHandle)
+		s.emitActiveScheduleChange(context.Background(), previous, handle)
 	}
 	return nil
 }
@@ -277,11 +288,8 @@ func scheduleRequest(fields any) (tdef.SetActiveScheduleRequestRequest, error) {
 // schedule is INVALID_COMMAND, else the handle is stored. Before it is
 // stored the [SchedulePort] switches the device (its refusal answers the
 // command and stores nothing; chip's delegate, matter.js has no port); the
-// handle is reported, and with the Events feature the
-// ActiveScheduleChange event carries the previous and the new handle
-// (ThermostatClusterEvents.cpp:189-213 at 6170af84: emitted only with
-// TEVT; without it the event is outside the EventList and
-// [spec.Events.Emit] drops it).
+// handle is reported, and with the Events feature a changed handle emits
+// ActiveScheduleChange with the previous and the new handle (events.go).
 func (s *ThermostatServer) handleSetActiveScheduleRequest(ctx context.Context, fields any) error {
 	req, err := scheduleRequest(fields)
 	if err != nil {
@@ -314,12 +322,6 @@ func (s *ThermostatServer) handleSetActiveScheduleRequest(ctx context.Context, f
 	s.mu.Unlock()
 	s.logger().Info("matter.thermostat.active_schedule", slog.String("schedule_handle", handleKey(handle)))
 	s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrActiveScheduleHandle)
-	prev := spec.Nullable[[]byte]{Null: previous == nil, Value: previous}
-	if path, ok := im.CommandPathFromContext(ctx); ok {
-		event := tdef.ActiveScheduleChangeEvent{PreviousScheduleHandle: &prev, CurrentScheduleHandle: spec.ValueOf(bytes.Clone(handle))}
-		if err := s.events.Emit(s.inst, path.Endpoint, tdef.EventActiveScheduleChange, event); err != nil && !errors.Is(err, spec.ErrNotEmitted) {
-			s.logger().Warn("matter.thermostat.event_failed", slog.String("reason", err.Error()))
-		}
-	}
+	s.emitActiveScheduleChange(ctx, previous, handle)
 	return nil
 }

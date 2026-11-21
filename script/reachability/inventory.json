@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10213,
+  "entry_points": 10229,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27894,
-    "reachable": 20889,
-    "whitelisted": 6983,
+    "total_exported": 27912,
+    "reachable": 20897,
+    "whitelisted": 6993,
     "unreachable": 22
   },
   "by_package": [
@@ -1038,6 +1038,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestArmFailSafeZeroClosesThePASESessionByTheExchangeItArrivedOn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_close_rollback_test.go",
+      "line": 224
+    },
+    {
+      "package": "bridge",
       "identifier": "TestArmFailSafe_ResponseRoundtrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/armfailsafe_response_test.go",
@@ -1290,6 +1297,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestBDXLivenessKickOnDuplicate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_liveness_kick_test.go",
+      "line": 114
+    },
+    {
+      "package": "bridge",
       "identifier": "TestBDXResponder_ExchangeNotifiesAtArrival",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
@@ -1315,6 +1329,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_responder_test.go",
       "line": 175
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXRetransmissionIntervalCap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_retransmission_cap_parity_matterjs_test.go",
+      "line": 40
     },
     {
       "package": "bridge",
@@ -4268,7 +4289,7 @@
       "identifier": "TestFailSafeExpiredClosesThePASESessionsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 136
+      "line": 151
     },
     {
       "package": "bridge",
@@ -4902,6 +4923,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInitiatedExchangeReceivePeerLoss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_registration_test.go",
+      "line": 182
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInitiatedHandshakeFailureUnreportedWhileSigma1IsUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
@@ -4912,7 +4940,7 @@
       "identifier": "TestInitiatedHandshakeIgnoresPeerInitiatedCollision",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/exchange_direction_test.go",
-      "line": 98
+      "line": 99
     },
     {
       "package": "bridge",
@@ -4934,6 +4962,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/initiated_handshake_peer_test.go",
       "line": 82
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInitiatedPeerLossCutsByRegistrationOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_registration_test.go",
+      "line": 42
     },
     {
       "package": "bridge",
@@ -5584,7 +5619,7 @@
       "identifier": "TestPASEClosedOnCommissioningCompleteParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 66
+      "line": 78
     },
     {
       "package": "bridge",
@@ -5633,7 +5668,7 @@
       "identifier": "TestPASEStaysOpenDuringCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 95
+      "line": 107
     },
     {
       "package": "bridge",
@@ -5949,6 +5984,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/boolean_state_event_test.go",
       "line": 107
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPeerLossCapabilityOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_registration_test.go",
+      "line": 120
     },
     {
       "package": "bridge",
@@ -8560,6 +8602,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/decode_error_reply_test.go",
       "line": 47
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestValueLogsRedactSecrets",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/log_redact_test.go",
+      "line": 109
     },
     {
       "package": "bridge",
@@ -15937,7 +15986,7 @@
       "identifier": "NullDefault",
       "reason": "the Default of a generated attribute whose stated default is null; it is only ever a package-level initializer value, which RTA does not follow",
       "file": "cluster/spec/model.go",
-      "line": 224
+      "line": 228
     },
     {
       "package": "cluster/spec",
@@ -16238,7 +16287,7 @@
       "identifier": "UnresolvedDefault",
       "reason": "the Default of a generated attribute whose stated default is a field value; it is only ever a package-level initializer value, which RTA does not follow",
       "file": "cluster/spec/model.go",
-      "line": 217
+      "line": 221
     },
     {
       "package": "cluster/spec",
@@ -27764,6 +27813,13 @@
     },
     {
       "package": "cluster/thermo",
+      "identifier": "LocalTemperatureChangeThresholdOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/export_test.go",
+      "line": 9
+    },
+    {
+      "package": "cluster/thermo",
       "identifier": "Preset",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/presets.go",
@@ -27823,7 +27879,7 @@
       "identifier": "SetpointChange",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostat_server.go",
-      "line": 345
+      "line": 353
     },
     {
       "package": "cluster/thermo",
@@ -44585,6 +44641,13 @@
     },
     {
       "package": "secure/operational",
+      "identifier": "TestRegistrationAtEveryKeyedInsert",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/peer_loss_registration_parity_matterjs_test.go",
+      "line": 163
+    },
+    {
+      "package": "secure/operational",
       "identifier": "TestReleaseStakeFreesOnlyItsOwnStake",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_full_table_test.go",
@@ -44624,6 +44687,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/sessionmanager_parity_matterjs_test.go",
       "line": 88
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestSessionManagerPeerLossByRegistrationOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/peer_loss_registration_parity_matterjs_test.go",
+      "line": 23
     },
     {
       "package": "secure/operational",

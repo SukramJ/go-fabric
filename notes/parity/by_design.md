@@ -128,7 +128,7 @@ unit removes the line with the row.
 | BD-chip-AmbientContextSensing-RulesInServer | `AmbientContextSensingServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/ambient-context-sensing/AmbientContextSensingServer.ts` | `"export class AmbientContextSensingServer extends AmbientContextSensingBehavior {}"` | connectedhomeip `src/app/clusters/ambient-context-sensing-server/AmbientContextSensingCluster.cpp` at `6170af84` (the constructor and `Startup` :48-89, `WriteAttribute` :140-159, `AddDetection` :205-301, `SetObjectCountConfig` :303-367, `SetObjectCount` :369-385, `SetHoldTimeLimits` :438-466, `TimerFired` :498-509, `UpdateDetectionAttributes` :600-646, `CheckPredictedActivity` :844-892; `AmbientContextSensingDelegate.h:78-106`), tests `tests/TestAmbientContextSensingCluster.cpp` | no |
 | BD-chip-TimeSynchronization-Features | `TimeSynchronizationServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/time-synchronization/TimeSynchronizationServer.ts` | `"export class TimeSynchronizationServer extends TimeSynchronizationBehavior {}"` | connectedhomeip `src/app/clusters/time-synchronization-server/TimeSynchronizationCluster.cpp` at `6170af84` (the attribute gating :186-248, the time client :379-593, the feature logic :619-1028, `SetUTCTime` :856-872, `HandleSetUTCTime` :1110-1136, the four handlers :1138-1275), `TimeSyncDataProvider.h:58-75`, `src/system/SystemClock.cpp:284-306` (`GetClock_MatterEpochS`, the node's one Matter time), tests `tests/TestTimeSynchronizationCluster.cpp` | yes |
 | BD-chip-GeneralCommissioning-TermsAndConditions | `GeneralCommissioningServer.ts:31` is the class line; no terms-and-conditions text in the file (absence: the class body, 285 lines in all) | `packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts` | `class GeneralCommissioningServer` | connectedhomeip `src/app/clusters/general-commissioning-server/GeneralCommissioningCluster.cpp` at `6170af84` (the attribute reads :199-230, the change notifications :73-135 and :367-372, the fail-safe revert :149-157, the CommissioningComplete gate :476-525, `HandleSetTCAcknowledgements` :617-672, `OnFabricRemoved` :357-374), `src/app/server/TermsAndConditionsProvider.h:35-220`, `DefaultTermsAndConditionsProvider.cpp:153-252`, tests `tests/TestGeneralCommissioningCluster.cpp`, the CSA cases TC-CGEN-2.5 to 2.11 | yes |
-| BD-chip-Thermostat-Events | `ThermostatServer.ts:272` at `b25ed960`: implemented in matter.js behind a forward gate, not released — the model's events are emitted (`#setupEvents`, `:2086` ff.) only with the forward feature `thermostat-events`, and `initialize` throws otherwise (`:272-276`; class doc `:180-182`) (presence: the gate line, which goes when matter.js releases the feature; owner decision 291 keeps this row open as ahead of matter.js's forward gate, reconciled in pin-lift unit P4-A) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"        if (this.features.events && !Specification.isForwardFeatureEnabled(\"thermostat-events\")) {"` | connectedhomeip `src/app/clusters/thermostat-server/ThermostatClusterEvents.cpp` at `6170af84` (every `Generate*` gated on `Feature::kEvents`, :33-36, :59-61, :83-86, :109-112), the emit sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`, `ThermostatClusterSetpointsBase.cpp:63-85`, `ThermostatClusterPresets.cpp:461-500`; the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
+| BD-chip-Thermostat-Events | `ThermostatServer.ts:272` at `b25ed960`: implemented in matter.js behind a forward gate, not released — the model's events are emitted (`#setupEvents`, `:2086` ff.) only with the forward feature `thermostat-events`, and `initialize` throws otherwise (`:272-276`; class doc `:180-194`) (presence: the gate line, which goes when matter.js releases the feature; owner decision 291 keeps this row open as ahead of matter.js's forward gate; reconciled in pin-lift unit P4-A) | `packages/node/src/behaviors/thermostat/ThermostatServer.ts` | `"        if (this.features.events && !Specification.isForwardFeatureEnabled(\"thermostat-events\")) {"` | matter.js `ThermostatServer.ts:2082-2259` at `b25ed960` (`#setupEvents`, `#setupSetpointChange`, `#setupLocalTemperatureChange`); the entry is the events paragraph of `BD-chip-Thermostat-Schedules` | yes |
 | BD-matterjs-server-CameraStreamManagement | `camera-controller.ts:133` mandates the requestor as the device type's whole server set — matter.js's controller-side camera surface is the WebRtcTransportRequestor and nothing above it (absence: the tree at the pin holds six WebRTC behaviour files and one test under `packages/node`, no stream management) | `packages/node/src/devices/camera-controller.ts` | `"export const server = { mandatory: { WebRtcTransportRequestor: WebRtcTransportRequestorServer } };"` | matterjs-server `packages/ws-controller/src/camera/CameraStreamManager.ts`, `streamPolicy.ts`, `sdpConstraints.ts`, `sessionRegistry.ts` at 0bd06f2; connectedhomeip `WebRTCTransportProviderCluster.cpp` at 6170af84 for the provider's rules | no |
 | BD-chip-JointFabricDatastore-RulesInServer | `JointFabricDatastoreServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts` | `"export class JointFabricDatastoreServer extends JointFabricDatastoreBehavior {}"` | connectedhomeip `src/app/server/JointFabricDatastore.cpp` at `6170af84` (the operations :181-2373, `RefreshNode`/`ContinueRefresh` :241-1130, the status codes), `JointFabricDatastore.h` (the capacities :512-517, the delegate :166-285, `MarkEntryCommittedIfFound` :75-85), `src/app/clusters/joint-fabric-datastore-server/joint-fabric-datastore-server.cpp` (the 20 commands :293-785), tests `src/app/server/tests/TestJointFabricDatastore.cpp`, `examples/jf-admin-app/linux/JFADatastoreSync.cpp` (the endpoint's whole binding list, `SyncEndpointBindings`: the delegate's merge :1706-1757, the write :1759-1779 and :661-685) | no |
 | BD-chip-JointFabricAdministrator-RulesInServer | `JointFabricAdministratorServer.ts:14` is the empty subclass (absence: the class line, 14 lines in all) | `packages/node/src/behaviors/joint-fabric-administrator/JointFabricAdministratorServer.ts` | `"export class JointFabricAdministratorServer extends JointFabricAdministratorBehavior {}"` | connectedhomeip `src/app/clusters/joint-fabric-administrator-server/joint-fabric-administrator-server.cpp` at `6170af84` (the handlers :172-449), `JCMCommissionee.{h,cpp}`, `src/app/server/JointFabricAdministrator.h`, `src/credentials/jcm/` (`TrustVerification.cpp`, `VendorIdVerificationClient.cpp`), tests `joint-fabric-administrator-server/tests/TestJCMCommissionee.cpp`, `src/credentials/tests/jcm/` | no |
@@ -3705,6 +3705,7 @@ names one of these IDs is stale.
 | BD-chip-Thermostat-Suggestions | 2026-11-20 (pin lift b25ed960, unit P2b-F, owner decision 336, coordinator decision C-9) | Caught up and closed: matter.js implements ThermostatSuggestions, ungated (`packages/node/src/behaviors/thermostat/ThermostatServer.ts:196-213`, `:375`, `#setupSuggestions` `:2261-2293` at `b25ed960`); P1-E and P2-G reconciled the server onto it (decisions 316-318). `thermo.Ahead` no longer names TSUGGEST, the device layer accepts the feature without a `surface.Policies.Extensions` row, the reference bridge serves it by default, and `--extensions BD-chip-Thermostat-Suggestions` is no longer a known id there. What stays different by design is `BD-Matter-Thermostat-Suggestions-Seams`; the connectedhomeip-derived choices the entry recorded before P1-E are in Git history. |
 | BD-chip-ZoneManagement-RulesInServer | 2026-11-20 (pin lift b25ed960, unit P3-B, decisions 290, 371, 377) | Caught up and closed: matter.js's server carries the command rules (`packages/node/src/behaviors/zone-management/ZoneManagementServer.ts:67-251` at `b25ed960`, #4840) and `TwoDCartesianGeometry.ts:24-60` the polygon check; reconciled in P3-B — `camera.Zones` mirrors both, the server assigns the zone ID, and `ZoneManagementServerTest.ts` is ported. The last assigned ID is the host's (`BD-Matter-ZoneManagement-LastZoneIdHostPersisted`). |
 | BD-chip-EnergyReporting-FakeReadings | 2026-11-20 (pin lift b25ed960, unit P3-E, decision 303) | Caught up and closed: matter.js's chip-testing node answers the three EnergyReporting triggers at `b25ed960` (`support/chip-testing/src/cluster/FakeElectricalReadingsHandler.ts`, dispatched by `TestGeneralDiagnosticsServer.ts:20`); the reference daemon's grid meter mirrors it — the nine stepped values, the step running on across starts, the endpoint bits, a reading's setMeasurement on every reading — on its narrower ImportedEnergy + CumulativeEnergy feature set (decision 303), with endpoint bits 0 reaching both of its measurement endpoints (`BD-Matter-Example-FakeReadingsBothEndpoints`). `script/aheadcheck/caught-up.txt` no longer lists it. |
+| BD-Matter-PeerLoss-OwnSessionAtTheSameInstant | 2026-11-21 (pin lift b25ed960, unit P4-D1, decisions 405, 417) | Not a divergence at the pin: at b25ed960 the cutoff is the registration count read when the exchange's context is created (`packages/protocol/src/protocol/ExchangeManager.ts:623`), and the exchange's session registered before that (`packages/protocol/src/session/SessionManager.ts:1266-1284`), so matter.js gives it up as this module does: no divergence remains. The entry recorded `client/exchange`'s exception to the time cutoff `asOf` of db021da0; the bridge now cuts by registration order too (`secure/operational` `Manager.ClosePeerLostBefore`, F-b25ed960-49 closed). `client/exchange:TestExchangePeerLossLosesItsOwnSessionAtTheSameInstant` stays as a parity case. |
 
 ### BD-Matter-LevelControl-LenientDecoders — LevelControl's omitted request fields take a fallback
 
@@ -5611,22 +5612,32 @@ host's radio.
 matter.js implements MatterScheduleConfiguration behind its forward feature `thermostat-msch` (`packages/node/src/behaviors/thermostat/ThermostatServer.ts:267-271` at `b25ed960`, class doc `:177-178`). `cluster/thermo` (`schedules.go`, `schedules_write.go`, the Schedules branch of `atomic.go`) mirrors it — the write rules, the normalisation, the commit checks in the three passes of `packages/node/src/behaviors/thermostat/AtomicWriteHandler.ts:298-320`, the ScheduleTypes start checks — and offers it behind the extension BD-chip-Thermostat-Schedules, off by default (owner decision 291; the reference bridge's `--thermostat-schedules`). The three suites are ported (`schedules_*_parity_matterjs_test.go`). Without a matter.js counterpart: the `SchedulePort` (after chip's Delegate), which switches the device before a SetActiveScheduleRequest stores the handle and stores a committed list before the server does. Where two rules hit one entry the Go order differs (NOT_FOUND before a repeated handle; a transition's preset checks before the setpoint combination) and answers the same status (coordinator decision C-7, 385). Two smaller differences are open in the findings register: a staged Schedules value carries its BuiltIn resolved (F-b25ed960-46), and the commit re-validates against this unit's Presets only (F-b25ed960-47). The host's own writes are `BD-Thermostat-HostSchedules`. The row closes when matter.js releases the feature (its gate line goes). Pin lift b25ed960, unit P3-A; the entry's earlier text, which followed connectedhomeip's `ThermostatSchedules` at `645b267a` with five choices of its own, is in Git history.
 
 
-**The events (wave 27-B, TEVT).** matter.js's `ThermostatServer.ts` emits
-none of the model's eight events (its only `events.` emit is the custom
-`calibratedTemperature$Changed`, :525), so the TEVT feature follows
-connectedhomeip: `ThermostatClusterEvents.cpp` (every `Generate*` gated on
-`Feature::kEvents`, :33-36, :59-61, :83-86, :109-112, …) with the emit
-sites `ThermostatClusterBase.cpp:158-162, :179-183, :246-250, :283-287`,
-`ThermostatClusterSetpointsBase.cpp:63-85` and
-`ThermostatClusterPresets.cpp:461-500`. Emitted: SystemModeChange,
-LocalTemperatureChange, SetpointChange, RunningStateChange,
-RunningModeChange, ActivePresetChange; ActiveScheduleChange keeps the emit
-of the `645b267a` schedule port; OccupancyChange is in the EventList and
-never emitted, as chip never emits it; a user-limit change emits no
-SetpointChange, and ActivePresetChange on a setpoint write fires only when
-a preset was active. ThermostatRunningMode is served with TEVT and AUTO,
-as the conformance says (chip's test serves it without AUTO). Pinned by
-the thermostat event cases of `cluster/thermo` (5 chip cases, 6 rules).
+**The events (TEVT).** matter.js emits all eight events, each from a
+`$Changed` reaction after the change commits (`ThermostatServer.ts:2082-2259`
+at `b25ed960`, `#setupEvents`), behind its forward feature `thermostat-events`
+(`:272-276`), which is why the row stays in the Ahead register;
+`cluster/thermo` mirrors it: SystemModeChange, RunningModeChange,
+RunningStateChange and OccupancyChange with previous and current value, none
+for an unchanged value; SetpointChange for the four setpoints (none for a user
+limit), the Occupancy field only with OCC (`:2167`); ActivePresetChange and
+ActiveScheduleChange on every change of the handle from any source — command,
+host setter, direct setpoint write ending a preset, the start clearing a stale
+handle, the start's reconcile moving a setpoint in effect
+(`ThermostatBehaviorTest.ts:134-149`; its event inferred from `:2126-2134`, no
+matter.js test) — and none for an unchanged one; LocalTemperatureChange for a
+change of at least `localTemperatureChangeThreshold` (default 50, `:3159`;
+settable, refused ≤ 0 when the event exists, `:2191-2196`) or a null↔value
+switch, at most one per 60 s, a held-back one re-decided when the window ends
+(`:2190-2259`). ThermostatRunningMode is served with TEVT and AUTO. Two Go
+choices: the events of the start (stale handle cleared, setpoints the initial
+reconcile moved — their SetpointChange inferred from `:2176-2187`, no
+matter.js test) are emitted at the first SetEndpoint; a LocalTemperature set
+before it is the configured value. One divergence (owner decision W2, 434):
+matter.js creates an event only when the application enabled it
+(`:180-184`); here TEVT selects every event its conformance admits — re-read
+when matter.js releases TEVT. Pinned by `TestParityMatterJS_ThermostatEventsTest`
+(44 cases) and the rules in `events_rules_test.go`. Pin lift b25ed960, unit
+P4-A.
 
 Review II, phase 4 (2026-11-14): connectedhomeip at `645b267a`
 (`ThermostatClusterSchedules.cpp` and `.h`) is outside the exports the
@@ -8727,52 +8738,13 @@ the farewell a controller drops the session at once and establishes CASE
 again. The decision also has the controller hardened to recover from a peer
 that went away without a farewell, as after a power loss: the interaction that
 finds the peer gone gives up the session it ran on, and the next one
-establishes CASE again (`BD-Matter-PeerLoss-OwnSessionAtTheSameInstant`).
+establishes CASE again.
 Review II, R2-P2-sess-03. Pinned by `bridge:TestStop_DrainsSessionsGracefully`
 for the farewell and `TestStopFlushesTheSubscriptionsBeforeTheSessionsEnd` and
 `node:TestStopFlushesTheShutDownEventToItsSubscribers` for the flush. Retire
 when the owner reopens the decision — the controller's recovery from a silent
 peer, its precondition, is in the tree — or when matter.js resolves its TODO
 for the farewell.
-
-### BD-Matter-PeerLoss-OwnSessionAtTheSameInstant — the session of the exchange that found its peer gone is given up even when it is no older than the exchange
-
-matter.js reports a peer as lost when a send fails with a transient, timeout
-or network error (`packages/protocol/src/protocol/MessageExchange.ts:643-650`
-at `db021da0`) and hands the loss to the session manager with `asOf`, the
-instant the exchange's context was created
-(`packages/protocol/src/protocol/ExchangeManager.ts:613-614`, `:621-644`); the
-manager gives up every session of the peer except those created at or after
-`asOf` (`packages/protocol/src/session/SessionManager.ts:727-746`, the cutoff
-at `:740-742`; `createdAt`, `packages/protocol/src/session/Session.ts:60`, on
-the same clock, `packages/general/src/time/Time.ts:63-65`). The cutoff spares
-a session established while the failing exchange ran. By its letter it also
-spares the failing exchange's own session when the two instants are equal;
-whether matter.js's clock ever yields that was not measured (unverified).
-`client/exchange` mirrors the chain and the cutoff (`handlePeerLoss`,
-`client/exchange/manager.go`) with one exception: the session the failing
-exchange ran on is always given up, whatever its creation instant — it existed
-before its exchange by construction. Reason (owner decision 49 of review II):
-on a clock that did not move between a session's creation and its exchange's —
-a test's fake clock, a coarse one — the cutoff kept the session of a peer that
-had restarted, and the next interaction failed on it the same way (the fix's
-measurement under a fake clock, not repeated here); with the exception the
-failed interaction returns its transient error once and the next one
-establishes CASE again. Nothing else of the recovery departs, by the fix's
-reading of matter.js, which was not re-read for this entry (unverified): the
-failed interaction is not retried, the next one connects again, and a
-sustained subscription comes back on a new session. Pinned by
-`client/exchange:TestExchangePeerLossLosesItsOwnSessionAtTheSameInstant` and
-`fabrictest:TestControllerRecoversFromASilentRestart`. Retire when matter.js
-exempts the failing exchange's session from its cutoff.
-Pin lift b25ed960 (unit P3c-E, decision 405): at the pin matter.js hands the
-loss over with `registeredBefore`, the registration count at the exchange
-context's creation, where it had `asOf: createdAt`
-(`packages/protocol/src/protocol/ExchangeManager.ts:623`, `:630-652` at
-`b25ed960`); the citations above are db021da0's. The bridge's
-`closeLostPeer` still cuts by time (`bridge/ota_provider_link.go:583-611` at
-`c8348b35`; findings row F-b25ed960-49). Unit P4-D re-reads this entry
-against the pin and retires or rewrites it.
 
 ### BD-Matter-Camera-FabricRemovalEndsStreams — a removed fabric's camera sessions and push transports end through the host's ports
 
@@ -9485,7 +9457,7 @@ matter.js keeps the ID it assigned last as the server's nonvolatile state `lastZ
 
 ### BD-Thermostat-HostSchedules — the host's SetSchedules is an authoritative replace, held to matter.js's content rules only
 
-The host's `SetSchedules` is an authoritative replace. It is held to matter.js's content rules for Schedules (`#validateScheduleWriteRequest`, `#validateScheduleTransitions`, `packages/node/src/behaviors/thermostat/ThermostatServer.ts:2693-3002` at `b25ed960`) and its normalisation (`:3028-3049`), not to the lifecycle rules matter.js applies to every stored write, a local one included (`:2618-2620`): an unknown handle (NOT_FOUND, `:2728-2734`), a new built-in schedule (`:2735-2738`, `:2746-2748`), a changed BuiltIn (`:2739-2743`), dropping a built-in or the active schedule (`#validateScheduleCommit`, `:3056-3086`). An active schedule the replace drops is cleared, as matter.js's start clears a handle that names no schedule (`:353-366`). The configured list is validated against itself, as matter.js does (`:331`), which already admits fixed handles and built-in schedules; the one difference there is a configured schedule with a null handle and BuiltIn true, which matter.js refuses (`:2746-2748`) and the host flag admits. A `SchedulePort` may confirm a commit through `SetSchedules`. Reason: the host is the source of truth for device-owned programs (openccu-loom mirrors CCU week programs with fixed handles, `openccu-loom/internal/model/custom/climate/matter_schedule.go:300, :354` at `934a7dc8`, a host's file — the implementer's lines, not re-read); matter.js models a node that owns its programs. Matter peers keep every rule (owner decision O-8, 378). Tests: `cluster/thermo` `TestHostReplaceOfSchedules`, `TestSchedulesFromTheDevice`. Pin lift b25ed960, unit P3-A.
+The host's `SetSchedules` is an authoritative replace. It is held to matter.js's content rules for Schedules (`#validateScheduleWriteRequest`, `#validateScheduleTransitions`, `packages/node/src/behaviors/thermostat/ThermostatServer.ts:2693-3002` at `b25ed960`) and its normalisation (`:3028-3049`), not to the lifecycle rules matter.js applies to every stored write, a local one included (`:2618-2620`): an unknown handle (NOT_FOUND, `:2728-2734`), a new built-in schedule (`:2735-2738`, `:2746-2748`), a changed BuiltIn (`:2739-2743`), dropping a built-in or the active schedule (`#validateScheduleCommit`, `:3056-3086`). An active schedule the replace drops is cleared, as matter.js's start clears a handle that names no schedule (`:353-366`). With TEVT the clear emits ActiveScheduleChange `{dropped, null}`, as every change of the handle does (`ThermostatServer.ts:2136-2144` at `b25ed960`); matter.js refuses such a replace (`#validateScheduleCommit`, `:3072-3085`), so it has no event here (pin lift b25ed960, unit P4-A). The configured list is validated against itself, as matter.js does (`:331`), which already admits fixed handles and built-in schedules; the one difference there is a configured schedule with a null handle and BuiltIn true, which matter.js refuses (`:2746-2748`) and the host flag admits. A `SchedulePort` may confirm a commit through `SetSchedules`. Reason: the host is the source of truth for device-owned programs (openccu-loom mirrors CCU week programs with fixed handles, `openccu-loom/internal/model/custom/climate/matter_schedule.go:300, :354` at `934a7dc8`, a host's file — the implementer's lines, not re-read); matter.js models a node that owns its programs. Matter peers keep every rule (owner decision O-8, 378). Tests: `cluster/thermo` `TestHostReplaceOfSchedules`, `TestSchedulesFromTheDevice`. Pin lift b25ed960, unit P3-A.
 
 ### BD-Matter-Example-FakeReadingsBothEndpoints — with endpoint bits 0 the reference daemon's fake readings reach both of the grid meter's measurement endpoints
 
@@ -9498,3 +9470,7 @@ At the give-up matter.js clears the owed acknowledgement (`#receivedMessageToAck
 ### BD-Matter-ReadRequest-EmptyListLeftOut — a ReadRequest this module sends leaves out every list without members, where matter.js sets an empty one it was handed
 
 matter.js's request builder sets each of the four lists that is not undefined (`packages/protocol/src/action/request/Read.ts:75-88` at `b25ed960`: `if (attributeRequests)`, `if (versionFilters)`, `if (eventRequests)`, `if (eventFilters !== undefined)`). A list is undefined when the caller gave neither the option nor a selector of that kind (`:41`); it is empty when the caller passed `[]`, or when a selector has an empty `attributes` or `events` list — the builder creates the list (`:137-139`, `:179-181`) and pushes nothing. The version and event filters are only ever created with a member (`:123-124`, `:173-174`). Whether matter.js's encoder then writes a set empty list was not read (`TlvReadRequest.ts`; unverified). This module's client leaves out every list without members, nil or empty (`ReadRequest.MarshalTLV`, `im/read.go`; the marshal helpers in `im/client.go`). Reason: in Go's `ReadRequest` a nil and an empty list are one value, so the encoder has one form for a list without members; the case is degenerate — a request that names no path of a kind. No test of its own pins it. Recorded for row 902 (phase-6b register, N6b-cite-5); pin lift b25ed960, unit P3c-E.
+
+### BD-Matter-SecretRedaction-NoOffSwitch — a value the model marks secret never reaches the module's log; there is no switch to turn redaction off
+
+matter.js redacts values its model marks `isSecret` from its logs (`packages/model/src/logic/SecretRedaction.ts:17-147` at b25ed960) unless `Logger.redactSecrets` is set false (default true, `packages/general/src/log/Logger.ts:80-88` at b25ed960; checked at `SecretRedaction.ts:33`, `:44`, `:55`). This module redacts unconditionally (`cluster/spec/redact.go`, applied by `bridge/log_redact.go` to the read and priming report value logs): a key, passcode or credential must never reach a log an embedder ships, and an opt-out is a switch nobody audits (owner decision W1, 433). Redaction is applied where a log statement prints a value by its model; error texts and panic values do not pass through it. matter.js names the limit of its own redaction for raw bytes: the decrypted message payload of a debug message log still carries the secrets TLV-encoded (`packages/general/src/log/Logger.ts:73-78`, `:85-86` at b25ed960). Pinned by `cluster/spec:TestSecretRedactionParityMatterJS`, `cluster/spec:TestGeneratedSecretMarksMatchSnapshot` and `bridge:TestValueLogsRedactSecrets`; the two cases of `SecretRedactionTest.ts` that turn the switch off are left by design. Pin lift b25ed960, unit P4-B.

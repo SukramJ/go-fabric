@@ -1092,7 +1092,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "NocValue", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 400", Max: &spec.Bound{Int: 400}}},
 				{ID: 1, Name: "IcacValue", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 400", Max: &spec.Bound{Int: 400}}},
-				{ID: 2, Name: "IpkValue", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}},
+				{ID: 2, Name: "IpkValue", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, Secret: true},
 				{ID: 3, Name: "CaseAdminSubject", Type: spec.Type{Name: "subject-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 				{ID: 4, Name: "AdminVendorId", Type: spec.Type{Name: "vendor-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 			},

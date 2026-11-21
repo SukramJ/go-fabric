@@ -7,44 +7,50 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// The Events feature (TEVT) and its events, served after connectedhomeip:
-// matter.js's ThermostatServer emits none of the cluster's eight events
-// (its only emit is the calibratedTemperature$Changed observable,
-// ThermostatServer.ts:525 at db021da0), so chip's
-// src/app/clusters/thermostat-server at 6170af84 is the authority. Every
-// Generate…Event there returns unless the selection has TEVT
-// (ThermostatClusterEvents.cpp:33-36, :59-61, :83-86, :109-112, :137-140,
-// :163-166, :189-192, :215-218); here the selection's EventList is that
-// gate ([spec.Events.Emit] answers [spec.ErrNotEmitted] for an event
-// outside it). chip emits:
+// The Events feature (TEVT) and its events, as matter.js's ThermostatServer
+// emits them behind its forward feature thermostat-events (the Ahead of
+// matter.js register keeps that gate as the marker; here TEVT serves every
+// event its conformance admits, as the selection's EventList, and
+// [spec.Events.Emit] answers [spec.ErrNotEmitted] for one outside it).
+// Every event reacts to a committed change of its attribute, never to a
+// write that could still be refused, and none to a value that did not
+// change. Mirrors matter.js
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:2082-2148 at b25ed960
+// (#setupEvents):
 //
-//   - SystemModeChange when SystemMode changed (ThermostatClusterBase.cpp:
-//     158-162), with the previous mode;
-//   - LocalTemperatureChange when LocalTemperature changed (:179-183);
-//   - RunningModeChange when ThermostatRunningMode changed (:246-250);
-//   - RunningStateChange when ThermostatRunningState changed (:283-287);
-//   - SetpointChange for each of the four occupied and unoccupied
-//     setpoints a change moved, Heat or Cool with Occupied or no
-//     occupancy (ThermostatClusterSetpointsBase.cpp:63-85, called from
-//     ThermostatClusterHeatingSetpoints.cpp:196-241 and
-//     ThermostatClusterCoolingSetpoints.cpp:247-292, where a changed user
-//     limit reaches the switch without a case);
-//   - ActivePresetChange whenever SetActivePreset runs
-//     (ThermostatClusterPresets.cpp:461-500), the command's and the one a
-//     write of a setpoint in effect makes (ThermostatCluster.h:215-224).
+//   - SystemModeChange, RunningModeChange and RunningStateChange with the
+//     previous and the current value;
+//   - OccupancyChange (OCC) with the previous and the current occupancy;
+//   - ActivePresetChange (PRES) and ActiveScheduleChange (MSCH) on every
+//     change of the handle, whatever changed it — a command, the host's
+//     setter, a direct setpoint write that ends the preset, the start that
+//     clears a handle naming nothing — with the previous and the current
+//     handle;
+//   - SetpointChange for each of the four occupied and unoccupied setpoints
+//     a change moved (none for a limit), Heat or Cool, with the Occupancy
+//     field only with OCC (ThermostatServer.ts:2150-2187 at b25ed960,
+//     #setupSetpointChange);
+//   - LocalTemperatureChange (without LTNE) for a significant change only,
+//     at most one per 60 s (ThermostatServer.ts:2190-2259 at b25ed960,
+//     #setupLocalTemperatureChange; localTempEvent).
 //
-// chip never calls GenerateOccupancyChangeEvent, and at 6170af84 has no
-// schedule server; ActiveScheduleChange is emitted by SetActiveScheduleRequest
-// after the earlier pin the schedules follow (schedules.go).
+// The events a start produces — the handle a stale configuration names
+// cleared, the setpoints the initial reconcile moved — are queued and
+// emitted when the bridge stamps the endpoint the first time
+// ([ThermostatServer.SetEndpoint]): before it the server has no endpoint
+// to emit on, and matter.js records them with the start.
 
 // ThermostatFeatureTEVT is the Events feature (bit 9).
 const ThermostatFeatureTEVT = uint32(tdef.FeatureEvents)
@@ -81,6 +87,7 @@ func servedEvents(features uint32) []uint32 {
 type eventState struct {
 	systemMode   uint8
 	localTemp    *int16
+	occupied     bool
 	runningMode  uint8
 	runningState uint16
 }
@@ -92,13 +99,16 @@ func (s *ThermostatServer) eventStateLocked() eventState {
 		local = nil // the attribute stays null under LTNE: no LocalTemperatureChange
 	}
 	return eventState{
-		systemMode: s.systemMode, localTemp: local, runningMode: s.runningMode, runningState: s.runningState,
+		systemMode: s.systemMode, localTemp: local, occupied: s.occupiedLocked(),
+		runningMode: s.runningMode, runningState: s.runningState,
 	}
 }
 
-// emitChanges emits the events of what moved from before to after, in
-// chip's attribute order, then the SetpointChange events commitSetpoints
-// queued; the caller does not hold s.mu.
+// emitChanges emits the events of what moved from before to after —
+// SystemMode, Occupancy, LocalTemperature (through its 60 s window), the
+// running mode and state — then the SetpointChange events
+// commitSetpoints queued; the caller does not hold s.mu. No matter.js test
+// asserts an order between the events of one change.
 func (s *ThermostatServer) emitChanges(ctx context.Context, before, after eventState) {
 	defer s.flushSetpointEvents(ctx)
 	if s.features&ThermostatFeatureTEVT == 0 {
@@ -108,12 +118,12 @@ func (s *ThermostatServer) emitChanges(ctx context.Context, before, after eventS
 		prev := tdef.SystemModeEnum(before.systemMode)
 		s.emit(ctx, tdef.EventSystemModeChange, tdef.SystemModeChangeEvent{PreviousSystemMode: &prev, CurrentSystemMode: tdef.SystemModeEnum(after.systemMode)})
 	}
+	if s.features&ThermostatFeatureOCC != 0 && before.occupied != after.occupied {
+		prev, cur := occupancyBitmap(before.occupied), occupancyBitmap(after.occupied)
+		s.emit(ctx, tdef.EventOccupancyChange, tdef.OccupancyChangeEvent{PreviousOccupancy: &prev, CurrentOccupancy: cur})
+	}
 	if !equalTemperature(before.localTemp, after.localTemp) {
-		cur := spec.Nullable[int16]{Null: after.localTemp == nil}
-		if after.localTemp != nil {
-			cur.Value = *after.localTemp
-		}
-		s.emit(ctx, tdef.EventLocalTemperatureChange, tdef.LocalTemperatureChangeEvent{CurrentLocalTemperature: cur})
+		s.localTemperatureChanged(ctx, after.localTemp)
 	}
 	if before.runningMode != after.runningMode {
 		prev := tdef.ThermostatRunningModeEnum(before.runningMode)
@@ -125,15 +135,21 @@ func (s *ThermostatServer) emitChanges(ctx context.Context, before, after eventS
 	}
 }
 
+// occupancyBitmap is the Occupancy attribute of occupied.
+func occupancyBitmap(occupied bool) tdef.OccupancyBitmap {
+	if occupied {
+		return tdef.OccupancyOccupied
+	}
+	return 0
+}
+
 // queueSetpointEventLocked queues the SetpointChange of a setpoint
-// commitSetpoints moved from was to is: ThermostatSetpointsBase::
-// GenerateSetpointEvent (ThermostatClusterSetpointsBase.cpp:63-85), Heat
-// or Cool with Occupied for an occupied setpoint and an empty Occupancy
-// bitmap — the field present, value 0 — for an unoccupied one, and nothing
-// for a user limit (no case in its switch). Mirrors connectedhomeip
-// ThermostatClusterSetpointsBase.cpp:75, :81 (BitMask<OccupancyBitmap>())
-// and ThermostatClusterEvents.cpp:109-120 at 6170af84
-// (event.occupancy = MakeOptional(occupancy)).
+// commitSetpoints moved from was to is: Heat or Cool, the Occupancy field
+// only with OCC — occupied for an occupied setpoint, the empty bitmap
+// (value 0) for an unoccupied one — and nothing for a user limit. Mirrors
+// matter.js ThermostatServer.ts:2150-2187 at b25ed960 (#setupSetpointChange:
+// `occupancy: features.occupancy ? { occupied } : undefined`, the four
+// setpoint reactions).
 // The caller holds s.mu; [ThermostatServer.flushSetpointEvents] emits the
 // queue once it let go.
 func (s *ThermostatServer) queueSetpointEventLocked(attrID uint32, was, is int16) {
@@ -141,23 +157,28 @@ func (s *ThermostatServer) queueSetpointEventLocked(attrID uint32, was, is int16
 		return
 	}
 	var (
-		mode tdef.SystemModeEnum
-		occ  tdef.OccupancyBitmap
+		mode     tdef.SystemModeEnum
+		occupied bool
 	)
 	switch attrID {
 	case thermoAttrOccupiedHeatingSetpoint:
-		mode, occ = tdef.SystemModeHeat, tdef.OccupancyOccupied
+		mode, occupied = tdef.SystemModeHeat, true
 	case thermoAttrUnoccupiedHeatingSetpoint:
 		mode = tdef.SystemModeHeat
 	case thermoAttrOccupiedCoolingSetpoint:
-		mode, occ = tdef.SystemModeCool, tdef.OccupancyOccupied
+		mode, occupied = tdef.SystemModeCool, true
 	case thermoAttrUnoccupiedCoolingSetpoint:
 		mode = tdef.SystemModeCool
 	default:
 		return
 	}
 	prev := was
-	s.pendingSetpointEvents = append(s.pendingSetpointEvents, tdef.SetpointChangeEvent{SystemMode: mode, Occupancy: &occ, PreviousSetpoint: &prev, CurrentSetpoint: is})
+	event := tdef.SetpointChangeEvent{SystemMode: mode, PreviousSetpoint: &prev, CurrentSetpoint: is}
+	if s.features&ThermostatFeatureOCC != 0 {
+		occ := occupancyBitmap(occupied)
+		event.Occupancy = &occ
+	}
+	s.pendingSetpointEvents = append(s.pendingSetpointEvents, event)
 }
 
 // flushSetpointEvents emits the queued SetpointChange events; the caller
@@ -172,17 +193,68 @@ func (s *ThermostatServer) flushSetpointEvents(ctx context.Context) {
 	}
 }
 
-// emitActivePresetChange is GenerateActivePresetChangeEvent
-// (ThermostatClusterEvents.cpp:215-240) with the handles of a
-// SetActivePreset (ThermostatClusterPresets.cpp:470-499): the previous
-// handle, null included, and the new one.
+// sameHandle reports whether two handles are equal, null (nil) only to
+// null.
+func sameHandle(a, b []byte) bool {
+	return (a == nil) == (b == nil) && bytes.Equal(a, b)
+}
+
+// activePresetChange is the ActivePresetChange of a handle that moved from
+// previous to current, null (nil) included.
+func activePresetChange(previous, current []byte) tdef.ActivePresetChangeEvent {
+	prev := spec.Nullable[[]byte]{Null: previous == nil, Value: bytes.Clone(previous)}
+	return tdef.ActivePresetChangeEvent{
+		PreviousPresetHandle: &prev,
+		CurrentPresetHandle:  spec.Nullable[[]byte]{Null: current == nil, Value: bytes.Clone(current)},
+	}
+}
+
+// activeScheduleChange is the ActiveScheduleChange of a handle that moved
+// from previous to current, null (nil) included.
+func activeScheduleChange(previous, current []byte) tdef.ActiveScheduleChangeEvent {
+	prev := spec.Nullable[[]byte]{Null: previous == nil, Value: bytes.Clone(previous)}
+	return tdef.ActiveScheduleChangeEvent{
+		PreviousScheduleHandle: &prev,
+		CurrentScheduleHandle:  spec.Nullable[[]byte]{Null: current == nil, Value: bytes.Clone(current)},
+	}
+}
+
+// emitActivePresetChange emits the ActivePresetChange of a stored change
+// of ActivePresetHandle from previous to current, and nothing when the
+// handle stayed. Mirrors matter.js
+// ThermostatServer.ts:2126-2134 at b25ed960 (activePresetChange, emitted
+// on every committed change of the handle, whatever source changed it).
 func (s *ThermostatServer) emitActivePresetChange(ctx context.Context, previous, current []byte) {
+	if s.features&ThermostatFeatureTEVT == 0 || sameHandle(previous, current) {
+		return
+	}
+	s.emit(ctx, tdef.EventActivePresetChange, activePresetChange(previous, current))
+}
+
+// emitActiveScheduleChange is [ThermostatServer.emitActivePresetChange]
+// for ActiveScheduleHandle. Mirrors matter.js
+// ThermostatServer.ts:2136-2144 at b25ed960 (activeScheduleChange).
+func (s *ThermostatServer) emitActiveScheduleChange(ctx context.Context, previous, current []byte) {
+	if s.features&ThermostatFeatureTEVT == 0 || sameHandle(previous, current) {
+		return
+	}
+	s.emit(ctx, tdef.EventActiveScheduleChange, activeScheduleChange(previous, current))
+}
+
+// startupEvent is an event the construction produced, emitted at the first
+// [ThermostatServer.SetEndpoint].
+type startupEvent struct {
+	id   uint32
+	data any
+}
+
+// queueStartupEventLocked queues an event of the start; the caller owns s
+// (the constructor) or holds s.mu.
+func (s *ThermostatServer) queueStartupEventLocked(id uint32, data any) {
 	if s.features&ThermostatFeatureTEVT == 0 {
 		return
 	}
-	prev := spec.Nullable[[]byte]{Null: previous == nil, Value: bytes.Clone(previous)}
-	cur := spec.Nullable[[]byte]{Null: current == nil, Value: bytes.Clone(current)}
-	s.emit(ctx, tdef.EventActivePresetChange, tdef.ActivePresetChangeEvent{PreviousPresetHandle: &prev, CurrentPresetHandle: cur})
+	s.startupEvents = append(s.startupEvents, startupEvent{id: id, data: data})
 }
 
 // emit emits one event on the invoking command's endpoint, else on the
@@ -203,13 +275,24 @@ func (s *ThermostatServer) emit(ctx context.Context, eventID uint32, data any) {
 // back here — a reassembly that puts the same object back — and its
 // suggestions are re-evaluated and the timer armed from the state, as a
 // moved Matter time does (review II, R2-P1-dr-rest-03).
+//
+// The first call starts the server for its events: the events its
+// construction produced are emitted on the endpoint now, and a later change
+// of LocalTemperature is measured against the value it has then (the
+// configured one; localTempEvent).
 func (s *ThermostatServer) SetEndpoint(endpoint uint16) {
 	s.endpoint.Store(uint32(endpoint))
 	s.events.SetEndpoint(endpoint) // EmitEvent, the typed Record<Event>
 	s.mu.Lock()
 	back := s.suggest.quiesced
 	s.suggest.quiesced = false
+	startup := s.startupEvents
+	s.startupEvents = nil
+	s.ltEvent.started = true
 	s.mu.Unlock()
+	for _, e := range startup {
+		s.emit(context.Background(), e.id, e.data)
+	}
 	if back {
 		s.scheduleSuggestionReevaluation()
 	}
@@ -280,6 +363,225 @@ func (s *ThermostatServer) followSystemModeLocked(mode uint8) bool {
 	}
 	s.runningMode = uint8(running)
 	return true
+}
+
+// localTemperatureChangeInterval is the shortest time between two
+// LocalTemperatureChange events. Mirrors matter.js
+// ThermostatServer.ts:51 at b25ed960 (LOCAL_TEMPERATURE_CHANGE_INTERVAL).
+const localTemperatureChangeInterval = 60 * time.Second
+
+// defaultLocalTemperatureChangeThreshold is the threshold without
+// [ThermostatConfig.LocalTemperatureChangeThreshold], in 0.01 °C. Mirrors
+// matter.js ThermostatServer.ts:3159 at b25ed960
+// (localTemperatureChangeThreshold = 50).
+const defaultLocalTemperatureChangeThreshold = 50
+
+// localTempEvent is the state of the LocalTemperatureChange event, guarded
+// by s.mu. Mirrors matter.js ThermostatServer.ts:3385-3391 at b25ed960
+// (lastReportedLocalTemperature, lastLocalTemperatureReportAt,
+// localTemperatureChangeTimer). Before the first
+// [ThermostatServer.SetEndpoint] (started false) a change of
+// LocalTemperature is the configuration: it becomes the reported value
+// and emits nothing, as matter.js takes the configured value as reported
+// when the behavior initializes (:2198).
+type localTempEvent struct {
+	// threshold is the smallest significant change, > 0 with the event.
+	threshold int16
+	// reported is the value of the last event, or the value at the start
+	// before the first event (nil for null).
+	reported *int16
+	// reportedAt is the monotonic reading of the last event; hasReport is
+	// false until the first.
+	reportedAt time.Duration
+	hasReport  bool
+	// timer runs while a significant change waits for the end of the
+	// window; gen tells a callback that lost the race against a stop that
+	// its decision was taken over.
+	timer clock.Timer
+	gen   uint64
+	// started is set by the first SetEndpoint.
+	started bool
+}
+
+// servesLocalTemperatureChange reports whether the selection has the
+// event: TEVT without LTNE (thermostat-cluster.element.ts:292 at b25ed960,
+// "P, TEVT & !LTNE").
+func (s *ThermostatServer) servesLocalTemperatureChange() bool {
+	return s.features&ThermostatFeatureTEVT != 0 && s.features&ThermostatFeatureLTNE == 0
+}
+
+// checkLocalTemperatureChangeThreshold refuses a threshold of 0 or below.
+// Mirrors matter.js ThermostatServer.ts:2202-2208 at b25ed960
+// (#assertLocalTemperatureChangeThreshold: finite and greater than 0;
+// every int16 is finite).
+func checkLocalTemperatureChangeThreshold(threshold int16) error {
+	if threshold <= 0 {
+		return fmt.Errorf("thermo: localTemperatureChangeThreshold is %d but must be a finite number greater than 0", threshold)
+	}
+	return nil
+}
+
+// initLocalTemperatureChange takes the configured threshold: nil is the
+// default, a value of 0 or below is refused when the selection has the
+// event.
+func (s *ThermostatServer) initLocalTemperatureChange(threshold *int16) error {
+	s.ltEvent.threshold = defaultLocalTemperatureChangeThreshold
+	if threshold == nil {
+		return nil
+	}
+	if s.servesLocalTemperatureChange() {
+		if err := checkLocalTemperatureChangeThreshold(*threshold); err != nil {
+			return err
+		}
+	}
+	s.ltEvent.threshold = *threshold
+	return nil
+}
+
+// queueReconcileEvents moves the SetpointChange events the initial
+// reconcile queued to the start's events. A setpoint the initial reconcile
+// moved is a change of the start; inferred from matter.js's setpoint
+// reactions, which are installed before the initialization commits
+// (ThermostatServer.ts:2150-2187 at b25ed960); no matter.js test asserts
+// these events.
+func (s *ThermostatServer) queueReconcileEvents() {
+	for _, e := range s.pendingSetpointEvents {
+		s.queueStartupEventLocked(tdef.EventSetpointChange, e)
+	}
+	s.pendingSetpointEvents = nil
+}
+
+// SetLocalTemperatureChangeThreshold changes the smallest change of
+// LocalTemperature, in 0.01 °C, that the LocalTemperatureChange event
+// reports ([ThermostatConfig.LocalTemperatureChangeThreshold]). With the
+// event (TEVT without LTNE) a value of 0 or below is refused and the
+// threshold kept. A change waiting for the end of the 60 s window is
+// judged against the new threshold when the window ends; the change of the
+// threshold itself reports nothing. Mirrors matter.js
+// ThermostatServer.ts:2195-2196 at b25ed960 (the threshold checked at the
+// start and on every change, before it commits).
+func (s *ThermostatServer) SetLocalTemperatureChangeThreshold(threshold int16) error {
+	if s.servesLocalTemperatureChange() {
+		if err := checkLocalTemperatureChangeThreshold(threshold); err != nil {
+			return err
+		}
+	}
+	s.mu.Lock()
+	s.ltEvent.threshold = threshold
+	s.mu.Unlock()
+	return nil
+}
+
+// localTemperatureChanged is a stored change of LocalTemperature to v
+// (nil for null): reported at once, held back to the end of the window, or
+// nothing. The caller does not hold s.mu.
+func (s *ThermostatServer) localTemperatureChanged(ctx context.Context, v *int16) {
+	if !s.servesLocalTemperatureChange() {
+		return
+	}
+	s.mu.Lock()
+	report := s.decideLocalTemperatureLocked(v) //nolint:contextcheck // a deferred report outlives the change's context; it emits on the stamped endpoint
+	s.mu.Unlock()
+	if report {
+		s.emitLocalTemperatureChange(ctx, v)
+	}
+}
+
+// decideLocalTemperatureLocked decides on a change of LocalTemperature to
+// v and reports whether to emit it now; the caller holds s.mu. A pending
+// report always stops first; a change that is not significant leaves
+// nothing pending; a significant one is reported when 60 s passed since
+// the last report (or there was none), else a timer waits for the rest of
+// the window. Mirrors matter.js
+// ThermostatServer.ts:2215-2237 at b25ed960 (#handleLocalTemperatureChange).
+func (s *ThermostatServer) decideLocalTemperatureLocked(v *int16) bool {
+	lt := &s.ltEvent
+	if lt.timer != nil {
+		lt.timer.Stop()
+		lt.timer = nil
+	}
+	lt.gen++
+	if !lt.started {
+		lt.reported = cloneTemperature(v)
+		return false
+	}
+	if !s.significantLocalTemperatureLocked(v) {
+		return false
+	}
+	now := clock.MonotonicOf(s.clk)
+	elapsed := localTemperatureChangeInterval
+	if lt.hasReport {
+		elapsed = now - lt.reportedAt
+	}
+	if elapsed >= localTemperatureChangeInterval {
+		lt.reported, lt.reportedAt, lt.hasReport = cloneTemperature(v), now, true
+		return true
+	}
+	gen := lt.gen
+	lt.timer = s.clk.AfterFunc(localTemperatureChangeInterval-elapsed, func() { s.localTemperatureTimerFired(gen) })
+	return false
+}
+
+// localTemperatureTimerFired runs the decision again on the value
+// LocalTemperature has when the window ends: a timer that expires early
+// waits for the rest, a change no longer significant is dropped. Mirrors
+// matter.js ThermostatServer.ts:2239-2241 at b25ed960
+// (#handlePendingLocalTemperatureChange).
+func (s *ThermostatServer) localTemperatureTimerFired(gen uint64) {
+	s.mu.Lock()
+	if s.ltEvent.gen != gen {
+		s.mu.Unlock()
+		return
+	}
+	s.ltEvent.timer = nil
+	v := cloneTemperature(s.eventStateLocked().localTemp)
+	report := s.decideLocalTemperatureLocked(v)
+	s.mu.Unlock()
+	if report {
+		s.emitLocalTemperatureChange(context.Background(), v)
+	}
+}
+
+// significantLocalTemperatureLocked reports whether v differs
+// significantly from the last reported value: a switch between null and a
+// value whatever the threshold, else a difference of at least the
+// threshold. Mirrors matter.js
+// ThermostatServer.ts:2253-2259 at b25ed960 (#isSignificantLocalTemperatureChange).
+func (s *ThermostatServer) significantLocalTemperatureLocked(v *int16) bool {
+	reported := s.ltEvent.reported
+	if v == nil || reported == nil {
+		return (v == nil) != (reported == nil)
+	}
+	return absInt(int(*v)-int(*reported)) >= int(s.ltEvent.threshold)
+}
+
+// stopLocalTemperatureTimerLocked drops a report waiting for the end of
+// the window; the caller holds s.mu.
+func (s *ThermostatServer) stopLocalTemperatureTimerLocked() {
+	if s.ltEvent.timer != nil {
+		s.ltEvent.timer.Stop()
+		s.ltEvent.timer = nil
+	}
+	s.ltEvent.gen++
+}
+
+// emitLocalTemperatureChange emits the event of v (nil for null). Mirrors
+// matter.js ThermostatServer.ts:2243-2247 at b25ed960
+// (#reportLocalTemperatureChange).
+func (s *ThermostatServer) emitLocalTemperatureChange(ctx context.Context, v *int16) {
+	cur := spec.Nullable[int16]{Null: v == nil}
+	if v != nil {
+		cur.Value = *v
+	}
+	s.emit(ctx, tdef.EventLocalTemperatureChange, tdef.LocalTemperatureChangeEvent{CurrentLocalTemperature: cur})
+}
+
+func cloneTemperature(v *int16) *int16 {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }
 
 // endpointStamp holds the stamped endpoint ([ThermostatServer.SetEndpoint]).

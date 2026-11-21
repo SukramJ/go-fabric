@@ -6,8 +6,8 @@ package attestation
 import "log/slog"
 
 // Policy decides whether commissioning proceeds on attestation findings —
-// matter.js DeviceAttestationValidator.OnAttestationFailure (DAV:230-244
-// at db021da0) as ControllerCommissioningFlow applies it
+// matter.js DeviceAttestationValidator.OnAttestationFailure (DAV:252-266
+// at b25ed960) as ControllerCommissioningFlow applies it
 // (ControllerCommissioningFlow.ts:
 // 129-151, #resolveAttestationFindings :1341-1368 at 0ceb202d). The
 // commissioner applies it; [Validate] does not.
