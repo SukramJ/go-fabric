@@ -33,6 +33,7 @@ import (
 	webrtcr "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
 	wifinm "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
 	"github.com/SukramJ/go-fabric/parity"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // Parity with matter.js packages/model/test/logic/SecretRedactionTest.ts at b25ed960,
@@ -457,3 +458,39 @@ func list(v any) []map[string]any {
 func obj(v any) map[string]any { m, _ := v.(map[string]any); return m }
 
 func str(v any) string { s, _ := v.(string); return s }
+
+// TestRedactShapes holds the walk to matter.js's guards for a value whose
+// shape is not the model's — SecretRedaction.ts:107-109 (no entry model,
+// or not an array) and :114-116 (not an object) at b25ed960: the value
+// comes back as it is — and the cases without a model.
+func TestRedactShapes(t *testing.T) {
+	t.Parallel()
+	octstr := spec.Type{Name: "octstr", Kind: spec.KindBytes}
+	inner := &spec.Struct{Name: "S", Fields: []spec.Field{{ID: 0, Name: "Key", Type: octstr, Secret: true}}}
+	structField := &spec.Field{Name: "s", Type: spec.Type{Name: "S", Kind: spec.KindStruct, Struct: inner}}
+	listField := &spec.Field{Name: "l", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: structField}}
+	scalar := encode(t, nil, `5`)
+	for name, c := range map[string]struct {
+		f *spec.Field
+		n spec.Node
+	}{
+		"a list model over a scalar":   {listField, scalar},
+		"a struct model over a scalar": {structField, scalar},
+	} {
+		if out := spec.Redact(c.f, c.n); !sameNode(c.n, out) || untyped(t, out) != "5" {
+			t.Errorf("%s: got %s, want the input", name, untyped(t, out))
+		}
+	}
+	// A member without a context tag is not a field the model names: kept.
+	member := spec.Node{El: tlv.Element{Tag: tlv.AnonymousTag(), Type: tlv.TypeOctetStr1, Octets: []byte{1}}}
+	anon := spec.Node{El: tlv.Element{Type: tlv.TypeStructure, IsContainer: true}, Children: []spec.Node{member}}
+	if out := spec.Redact(structField, anon); len(out.Children) != 1 || !reflect.DeepEqual(out.Children[0], member) {
+		t.Errorf("anonymous member: got %+v", out.Children)
+	}
+	if spec.ContainsSecret(nil) {
+		t.Error("ContainsSecret(nil) = true")
+	}
+	if in := encode(t, nil, `"hex:01"`); !reflect.DeepEqual(spec.RedactEntry(nil, in), in) {
+		t.Error("RedactEntry without a model changed the entry")
+	}
+}
