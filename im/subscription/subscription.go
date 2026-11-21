@@ -416,7 +416,7 @@ func (s *Subscription) touchLastReport(now time.Time) {
 // packages/node/src/node/server/ServerSubscription.ts:433 at b25ed960).
 // The events fired in that window go with them, urgent or not: matter.js
 // sends whatever is outstanding at activation, attribute changes and
-// events alike (ServerSubscription.ts:443-445 at db021da0). There they
+// events alike (ServerSubscription.ts:447-449 at b25ed960). There they
 // go at once; here they wait for MinIntervalFloor, as connectedhomeip
 // holds the floor from the establishment: the priming done, the handler
 // is registered with the scheduler at now (src/app/ReadHandler.cpp:249-259,
