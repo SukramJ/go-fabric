@@ -8258,14 +8258,14 @@
       "identifier": "TestTMR37",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/tmr37_internal_test.go",
-      "line": 60
+      "line": 61
     },
     {
       "package": "bridge",
       "identifier": "TestTMR37Claims",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/tmr37_internal_test.go",
-      "line": 33
+      "line": 34
     },
     {
       "package": "bridge",
