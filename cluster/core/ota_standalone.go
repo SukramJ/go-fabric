@@ -155,7 +155,7 @@ func reportOf(a *OTAUpdateAttempt, previous OTAUpdateStatus) otaStatusReport {
 
 func (m *otaStandaloneManager) setStatus(a *OTAUpdateAttempt, status OTAUpdateStatus, delay time.Duration) otaStatusReport {
 	previous := a.Status()
-	a.SetStatus(status, delay)
+	m.set.SetStatus(a, status, delay)
 	return reportOf(a, previous)
 }
 

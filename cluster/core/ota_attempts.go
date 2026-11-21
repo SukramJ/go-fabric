@@ -23,15 +23,18 @@ import (
 // Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:11-137 at b25ed960
 // (OtaUpdateAttempt).
 //
-// The attempt's owner — the [OTAUpdateManager] that holds the
-// [OTAUpdateAttempts] it came from — decides every transition under its
-// own lock: the mutators MakeOffer, DisallowApply, SetStatus and End are
-// the owner's only, called with that lock held, and are exported because
-// the owner may live in another package (controller/softwareupdate). The
-// provider holds the attempt of its query and calls only Touch, OnEnd and
-// the getters, as matter.js's provider does (OtaSoftwareUpdateProviderServer.ts:281,
-// :286-289, :296 at b25ed960); a small lock of the attempt's own keeps
-// those calls, which arrive on BDX goroutines, from racing the owner's.
+// The attempt itself is read-only to whoever holds it: its transitions —
+// the offer, the apply right, a status, the end — are methods of the
+// [OTAUpdateAttempts] it came from, which its owner, the [OTAUpdateManager],
+// calls under its own lock. The provider holds the attempt of its query and
+// calls only Touch, OnEnd and the getters, as matter.js's provider does
+// (OtaSoftwareUpdateProviderServer.ts:281, :286-289, :296 at b25ed960); a
+// small lock of the attempt's own keeps those calls, which arrive on BDX
+// goroutines, from racing the owner's.
+//
+// An attempt comes from [OTAUpdateAttempts.Begin]. The zero value is an
+// attempt of no requestor that never begins: its getters answer zero
+// values and Touch and OnEnd are safe, on the system clock.
 type OTAUpdateAttempt struct {
 	peer  OTAPeer
 	clock clock.Clock
@@ -112,11 +115,12 @@ func (a *OTAUpdateAttempt) Ended() bool {
 	return a.ended
 }
 
-// MakeOffer records the offer, once; it allows the apply. Owner only.
-//
-// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:74-83 at b25ed960
-// (makeOffer).
-func (a *OTAUpdateAttempt) MakeOffer(token []byte, version uint32) error {
+// now is the attempt's clock, the system clock for the zero value.
+func (a *OTAUpdateAttempt) now() time.Time { return clock.Or(a.clock).Now() }
+
+// makeOffer records the offer, once; it allows the apply
+// ([OTAUpdateAttempts.MakeOffer]).
+func (a *OTAUpdateAttempt) makeOffer(token []byte, version uint32) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.offered {
@@ -129,13 +133,13 @@ func (a *OTAUpdateAttempt) MakeOffer(token []byte, version uint32) error {
 	a.version = version
 	a.offered = true
 	a.applyAllowed = true
-	a.lastActivity = a.clock.Now()
+	a.lastActivity = a.now()
 	return nil
 }
 
-// DisallowApply takes the apply right of the offer, as its consent was
-// removed (OtaUpdateAttempts.ts:85-88 at b25ed960). Owner only.
-func (a *OTAUpdateAttempt) DisallowApply() {
+// disallowApply takes the apply right of the offer
+// ([OTAUpdateAttempts.DisallowApply]).
+func (a *OTAUpdateAttempt) disallowApply() {
 	a.mu.Lock()
 	a.applyAllowed = false
 	a.mu.Unlock()
@@ -149,19 +153,15 @@ func (a *OTAUpdateAttempt) answer() {
 	a.mu.Unlock()
 }
 
-// SetStatus records a status; applyDelay counts only with Applying. Owner
-// only.
-//
-// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:95-100 at b25ed960
-// (setStatus).
-func (a *OTAUpdateAttempt) SetStatus(status OTAUpdateStatus, applyDelay time.Duration) {
+// setStatus records a status ([OTAUpdateAttempts.SetStatus]).
+func (a *OTAUpdateAttempt) setStatus(status OTAUpdateStatus, applyDelay time.Duration) {
 	a.mu.Lock()
 	a.status = status
 	a.applyDelay = 0
 	if status == OTAUpdateApplying {
 		a.applyDelay = applyDelay
 	}
-	a.lastActivity = a.clock.Now()
+	a.lastActivity = a.now()
 	a.mu.Unlock()
 }
 
@@ -170,7 +170,7 @@ func (a *OTAUpdateAttempt) SetStatus(status OTAUpdateStatus, applyDelay time.Dur
 // it from a transfer's progress observer.
 func (a *OTAUpdateAttempt) Touch() {
 	a.mu.Lock()
-	a.lastActivity = a.clock.Now()
+	a.lastActivity = a.now()
 	a.mu.Unlock()
 }
 
@@ -186,7 +186,7 @@ func (a *OTAUpdateAttempt) IsStale(now time.Time) bool {
 }
 
 // OnEnd runs fn when the attempt ends, at once when it already ended
-// (OtaUpdateAttempts.ts:112-119 at b25ed960). fn runs where End runs —
+// (OtaUpdateAttempts.ts:112-119 at b25ed960). fn runs where the end runs —
 // under the owner's lock — so it must not call back into the owner.
 func (a *OTAUpdateAttempt) OnEnd(fn func()) {
 	a.mu.Lock()
@@ -199,14 +199,8 @@ func (a *OTAUpdateAttempt) OnEnd(fn func()) {
 	a.mu.Unlock()
 }
 
-// End ends the attempt and runs its disposers; ending it again does
-// nothing. Owner only: this is matter.js's plain attempt.end(), which
-// leaves a queued update linked to it as it is — [OTAUpdateAttempts.EndAttempt]
-// is the end the owner's queue learns of.
-//
-// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:121-130 at b25ed960
-// (end).
-func (a *OTAUpdateAttempt) End() {
+// end ends the attempt and runs its disposers ([OTAUpdateAttempts.End]).
+func (a *OTAUpdateAttempt) end() {
 	a.mu.Lock()
 	if a.ended {
 		a.mu.Unlock()
@@ -263,7 +257,8 @@ type OTAUpdateAttempts struct {
 	ended []*OTAUpdateAttempt
 }
 
-// NewOTAUpdateAttempts returns an empty set on clk; nil is [clock.System].
+// NewOTAUpdateAttempts returns an empty set on clk; nil is [clock.System],
+// as for the zero value, an empty set on the system clock.
 func NewOTAUpdateAttempts(clk clock.Clock) *OTAUpdateAttempts {
 	return &OTAUpdateAttempts{clock: clock.Or(clk)}
 }
@@ -297,7 +292,8 @@ func (s *OTAUpdateAttempts) Begin(peer OTAPeer) *OTAUpdateAttempt {
 		}
 		s.EndAttempt(victim)
 	}
-	a := &OTAUpdateAttempt{peer: peer, clock: s.clock, status: OTAUpdateQuerying, lastActivity: s.clock.Now()}
+	a := &OTAUpdateAttempt{peer: peer, clock: s.clock, status: OTAUpdateQuerying}
+	a.lastActivity = a.now()
 	s.attempts = append(s.attempts, a)
 	a.OnEnd(func() { s.attempts = slices.DeleteFunc(s.attempts, func(x *OTAUpdateAttempt) bool { return x == a }) })
 	return a
@@ -352,6 +348,39 @@ func (s *OTAUpdateAttempts) Of(peer OTAPeer) []*OTAUpdateAttempt {
 // All are the running attempts, oldest first (OtaUpdateAttempts.ts:177-180 at b25ed960).
 func (s *OTAUpdateAttempts) All() []*OTAUpdateAttempt { return slices.Clone(s.attempts) }
 
+// MakeOffer records the offer of a, once; it allows the apply. An error
+// reports a second offer, where matter.js throws an InternalError.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:74-83 at b25ed960
+// (makeOffer).
+func (s *OTAUpdateAttempts) MakeOffer(a *OTAUpdateAttempt, token []byte, version uint32) error {
+	return a.makeOffer(token, version)
+}
+
+// DisallowApply takes the apply right of the offer of a, as its consent
+// was removed.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:85-88 at b25ed960
+// (disallowApply).
+func (s *OTAUpdateAttempts) DisallowApply(a *OTAUpdateAttempt) { a.disallowApply() }
+
+// SetStatus records a status of a; applyDelay counts only with Applying.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:95-100 at b25ed960
+// (setStatus).
+func (s *OTAUpdateAttempts) SetStatus(a *OTAUpdateAttempt, status OTAUpdateStatus, applyDelay time.Duration) {
+	a.setStatus(status, applyDelay)
+}
+
+// End ends a and runs its disposers, the set's removal of it among them;
+// ending it again does nothing. This is matter.js's plain attempt.end(),
+// which leaves a queued update linked to it as it is — EndAttempt is the
+// end the owner's queue learns of.
+//
+// Mirrors matter.js packages/node/src/behavior/system/software-update/OtaUpdateAttempts.ts:121-130 at b25ed960
+// (end).
+func (s *OTAUpdateAttempts) End(a *OTAUpdateAttempt) { a.end() }
+
 // EndAttempt ends the attempt as a rule does, and keeps it for the owner's
 // TakeEnded: matter.js's #endAttempt ends it and resets the queued update
 // linked to it, which is the owner's half.
@@ -362,7 +391,7 @@ func (s *OTAUpdateAttempts) EndAttempt(a *OTAUpdateAttempt) {
 	if a.Ended() {
 		return
 	}
-	a.End()
+	a.end()
 	s.ended = append(s.ended, a)
 }
 
@@ -406,7 +435,7 @@ func (s *OTAUpdateAttempts) OfferUpdate(a *OTAUpdateAttempt, token []byte, versi
 	if a.Ended() {
 		return false
 	}
-	return a.MakeOffer(token, version) == nil
+	return a.makeOffer(token, version) == nil
 }
 
 // AppliedVersionOf is the version an ApplyUpdateRequest under token asks
@@ -456,7 +485,7 @@ func (s *OTAUpdateAttempts) ApplyUpdate(peer OTAPeer, token []byte, newVersion u
 	a := s.Find(peer, token)
 	if a == nil {
 		a = s.Begin(peer)
-		_ = a.MakeOffer(token, version) // a fresh attempt has no offer yet
+		_ = a.makeOffer(token, version) // a fresh attempt has no offer yet
 		s.AnswerAttempt(a)
 		return a, true
 	}
@@ -542,8 +571,8 @@ func (s *OTAUpdateAttempts) UpdateApplied(peer OTAPeer, token []byte) *OTAUpdate
 	if a == nil {
 		return nil
 	}
-	a.SetStatus(OTAUpdateDone, 0)
-	a.End()
+	a.setStatus(OTAUpdateDone, 0)
+	a.end()
 	return a
 }
 
@@ -559,9 +588,9 @@ func (s *OTAUpdateAttempts) RemoveConsent(peer OTAPeer, version uint32, all bool
 		v, offered := a.Version()
 		switch {
 		case !offered:
-			a.End()
+			a.end()
 		case all || v == version:
-			a.DisallowApply()
+			a.disallowApply()
 		}
 	}
 }

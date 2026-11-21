@@ -457,7 +457,7 @@ func (m *Manager) Close() {
 	// #endAllAttempts (:1229-1237, :309 at b25ed960): the attempts end;
 	// an entry that followed one keeps following it.
 	for _, at := range m.attempts.All() {
-		at.End()
+		m.attempts.End(at)
 	}
 	m.unlock()
 	m.stopLife()
@@ -724,9 +724,9 @@ func (m *Manager) failAppliedLocked(i int) {
 func (m *Manager) failUpdateLocked(e *queueEntry) {
 	if a := e.attempt; a != nil {
 		if a.Status() == mattercore.OTAUpdateApplying {
-			a.SetStatus(mattercore.OTAUpdateCancelled, 0)
+			m.attempts.SetStatus(a, mattercore.OTAUpdateCancelled, 0)
 		}
-		a.End()
+		m.attempts.End(a)
 	}
 	i := slices.Index(m.queue, e)
 	if i < 0 {
@@ -875,7 +875,7 @@ func (m *Manager) linkAttemptLocked(a *mattercore.OTAUpdateAttempt) *queueEntry 
 // (#reportAttemptStatus).
 func (m *Manager) reportAttemptStatusLocked(a *mattercore.OTAUpdateAttempt, status Status, applyDelay time.Duration) {
 	wasApplying := a.Status() == mattercore.OTAUpdateApplying
-	a.SetStatus(status, applyDelay)
+	m.attempts.SetStatus(a, status, applyDelay)
 	p := peerOf(a.Peer())
 	version, _ := a.Version()
 	if fn := m.cfg.OnStatus; fn != nil {
@@ -1302,7 +1302,7 @@ func (m *Manager) forgetGone(nodes []*client.Node) {
 	maps.DeleteFunc(m.observed, func(p Peer, _ uint32) bool { return !keep[p] })
 	for _, a := range m.attempts.All() {
 		if !keep[peerOf(a.Peer())] {
-			a.End() // #forgetPeer (:333-334 at b25ed960)
+			m.attempts.End(a) // #forgetPeer (:333-334 at b25ed960)
 		}
 	}
 	maps.DeleteFunc(m.applyDelays, func(p Peer, _ time.Duration) bool { return !keep[p] })
@@ -1756,7 +1756,7 @@ func (m *Manager) NodeDeleted(p Peer) {
 	delete(m.startUpSuppress, p)
 	// #forgetPeer (:333-334 at b25ed960): the node's attempts end.
 	for _, a := range m.attempts.Of(mattercore.OTAPeer{FabricIndex: p.FabricIndex, NodeID: p.NodeID}) {
-		a.End()
+		m.attempts.End(a)
 	}
 	failed := m.cfg.OnUpdateFailed
 	m.unlock()

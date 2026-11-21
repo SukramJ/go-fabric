@@ -649,3 +649,28 @@ func TestOTAStandaloneManagerUnderItsLock(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// TestOTAUpdateAttemptZeroValue (review L5): an attempt or a set a host
+// builds as a zero value works on the system clock instead of panicking.
+func TestOTAUpdateAttemptZeroValue(t *testing.T) {
+	t.Parallel()
+	var a OTAUpdateAttempt
+	a.Touch()
+	if a.IsStale(a.LastActivity()) || a.Ended() {
+		t.Fatalf("zero attempt stale %v ended %v", a.IsStale(a.LastActivity()), a.Ended())
+	}
+	var s OTAUpdateAttempts
+	b := s.Begin(OTAPeer{FabricIndex: 1, NodeID: 2})
+	if err := s.MakeOffer(b, []byte{1}, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MakeOffer(b, []byte{1}, 3); err == nil {
+		t.Error("a second offer was accepted")
+	}
+	ended := false
+	b.OnEnd(func() { ended = true })
+	s.End(b)
+	if !ended || len(s.All()) != 0 {
+		t.Errorf("ended %v, %d attempts left", ended, len(s.All()))
+	}
+}
