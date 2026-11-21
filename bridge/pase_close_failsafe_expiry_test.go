@@ -219,8 +219,8 @@ func TestFailSafeExpiredAfterItsInteractionClosesAtOnce(t *testing.T) {
 // TestRevokeWindowThroughTheBridgeClosesThePASESessions: a window attached
 // to the bridge closes the PASE sessions when it is revoked, for a host
 // that wired no PaseSessionCloser. Mirrors matter.js
-// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:137-141
-// at db021da0 (revokeCommissioning, "Step 1: Regardless of window state —
+// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
+// at b25ed960 (revokeCommissioning, "Step 1: Regardless of window state —
 // terminate PASE sessions" → getPaseSession().initiateClose()).
 func TestRevokeWindowThroughTheBridgeClosesThePASESessions(t *testing.T) {
 	t.Parallel()

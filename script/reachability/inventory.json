@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10213,
+  "entry_points": 10214,
   "initializers": 368,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27894,
+    "total_exported": 27895,
     "reachable": 20889,
-    "whitelisted": 6983,
+    "whitelisted": 6984,
     "unreachable": 22
   },
   "by_package": [
@@ -1035,6 +1035,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
       "line": 270
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestArmFailSafeZeroClosesThePASESessionByTheExchangeItArrivedOn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_close_rollback_test.go",
+      "line": 224
     },
     {
       "package": "bridge",
@@ -4268,7 +4275,7 @@
       "identifier": "TestFailSafeExpiredClosesThePASESessionsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 136
+      "line": 151
     },
     {
       "package": "bridge",
@@ -5584,7 +5591,7 @@
       "identifier": "TestPASEClosedOnCommissioningCompleteParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 66
+      "line": 78
     },
     {
       "package": "bridge",
@@ -5633,7 +5640,7 @@
       "identifier": "TestPASEStaysOpenDuringCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_test.go",
-      "line": 95
+      "line": 107
     },
     {
       "package": "bridge",

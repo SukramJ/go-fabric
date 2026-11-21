@@ -6,6 +6,7 @@ package bridge
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -28,10 +29,11 @@ type sessionLister interface {
 // FailSafeExpired clears every PASE session open now, the ones AddNOC
 // adopted onto a fabric included: the fail-safe expired without a
 // CommissioningComplete, and what it covered is rolled back. Inside an
-// interaction (ctx is the command's context — ArmFailSafe with expiry 0,
-// RevokeCommissioning) the sessions close once its response is out,
-// otherwise — the fail-safe's timer, whose context belongs to an
-// interaction long answered — at once.
+// interaction that arrived on one of those PASE sessions (ctx is the
+// command's context — ArmFailSafe with expiry 0 or RevokeCommissioning over
+// the PASE session) the sessions close once its response is out; otherwise
+// — a command over CASE, or the fail-safe's timer, whose context belongs to
+// an interaction long answered — at once.
 //
 // The bridge calls it itself: [Bridge.AttachRootClusters] wires it into the
 // fail-safe expiry of a core.GeneralCommissioning among the root clusters
@@ -127,8 +129,8 @@ func (b *Bridge) wireFailSafeExpiry(servers []contract.ClusterServer) {
 // moment are closed, the ones AddNOC adopted onto a fabric included. The
 // window decides when (after the response, when the revoke arrived over
 // the PASE session itself). Mirrors matter.js
-// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:137-141
-// at db021da0 (revokeCommissioning, "Step 1: Regardless of window state —
+// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
+// at b25ed960 (revokeCommissioning, "Step 1: Regardless of window state —
 // terminate PASE sessions and expire PASE-held fail-safe":
 // `SessionManager.getPaseSession()` → `paseSession.initiateClose()`).
 func (b *Bridge) closePASESessionsOnRevoke() {
@@ -197,13 +199,31 @@ func (b *Bridge) closePASESessionsOnCommissioningComplete(_ context.Context, res
 // closePASESessions clears the PASE sessions open now, including the ones
 // AddNOC adopted onto a fabric (they stay PASE sessions,
 // operational.Manager.AdoptFabricIndex), once the response of the
-// interaction ctx belongs to has been sent (at once without one). The
-// sessions are named when this is called and closed by id: a PASE session
-// a new commissioning establishes before the response is out is not this
+// interaction ctx belongs to has been sent when that interaction arrived
+// on one of them, and at once otherwise: over another session (a CASE
+// session), with no interaction, or after its response. The sessions are
+// named when this is called and closed by id: a PASE session a new
+// commissioning establishes before the response is out is not this
 // fail-safe context's and stays (matter.js closes the PASE session it
 // finds when the hook runs, FailsafeContext.ts:191-196 at b25ed960,
 // closePaseSession). closing, when set, runs with the named ids just
 // before they close. It returns the named ids.
+//
+// The deferral is matter.js's force close with the current exchange:
+// packages/protocol/src/common/FailsafeContext.ts:283 at b25ed960
+// (rollback → closePaseSession with currentExchange) reaches
+// packages/protocol/src/session/Session.ts:336-342 at b25ed960
+// (initiateForceClose: deferredClose only for the current exchange among
+// the PASE session's own exchanges, the others closed), and
+// Session.ts:315-317 at b25ed960 holds the close only then. matter.js tests whether
+// the command's exchange is one of the PASE session's own; here that is
+// whether the interaction's session id is one of the named ids — exact,
+// not "is PASE":
+// two PASE sessions coexist while a closing one admits a new handshake
+// ([Bridge.paseSessionExists]). Before, the close waited for the response
+// of a command over CASE as well, and a request on the PASE session in
+// that window was served with the commissioning channel's implicit
+// Administer grant (F-b25ed960-54).
 func (b *Bridge) closePASESessions(ctx context.Context, closing func(ids []uint16)) []uint16 {
 	closeNow, ids := b.paseSessionsCloser()
 	if closeNow == nil {
@@ -216,7 +236,8 @@ func (b *Bridge) closePASESessions(ctx context.Context, closing func(ids []uint1
 			closeIDs()
 		}
 	}
-	if !im.DeferAfterResponse(ctx, closeNow) {
+	invoking := core.InvokeSessionIDFromContext(ctx)
+	if !slices.Contains(ids, invoking) || !im.DeferAfterResponse(ctx, closeNow) {
 		closeNow()
 	}
 	return ids
