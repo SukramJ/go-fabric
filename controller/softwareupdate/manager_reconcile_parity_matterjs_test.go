@@ -24,6 +24,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"github.com/SukramJ/go-fabric/controller/client"
 )
 
 // The queue, consent and offer rules of matter.js's SoftwareUpdateManager
@@ -233,7 +234,11 @@ func TestManagerFailedUpdateParity(t *testing.T) {
 		if q := r.m.QueuedUpdates(); len(q) != 0 {
 			t.Fatalf("queue %+v, want the failed update unlisted", q)
 		}
-		r.clock.Advance(24*time.Hour + time.Second)
+		r.clock.Advance(24*time.Hour - time.Second)
+		if !r.m.HasConsent(testPeer, 2) {
+			t.Fatal("the failed consent expired before 24 hours")
+		}
+		r.clock.Advance(2 * time.Second)
 		if r.m.HasConsent(testPeer, 0) {
 			t.Fatal("the failed consent outlived 24 hours")
 		}
@@ -244,7 +249,7 @@ func TestManagerFailedUpdateParity(t *testing.T) {
 }
 
 // TestManagerQueueEndsParity ports how entries leave the queue: the node
-// gone (#dequeueIfGone, #forgetPeer, SoftwareUpdateManager.ts:312-341,
+// gone (#dequeueIfGone, #forgetPeer, SoftwareUpdateManager.ts:312-342,
 // :1342-1353 at b25ed960) and an update done while a consent for a higher
 // version waits (#completeUpdate :1120-1140).
 func TestManagerQueueEndsParity(t *testing.T) {
@@ -837,12 +842,34 @@ func TestManagerQueuePhasesParity(t *testing.T) {
 	t.Run("aborts an announcement the node does not answer within the progress timeout", func(t *testing.T) {
 		t.Parallel()
 		r := newManagerRig(t, nil)
-		l := r.interceptAnnouncements(hanging)
+		l := r.interceptAnnouncements(func(n int) (bool, error) {
+			return n == 1, errors.New("simulated unreachable node") // the retry fails at once
+		})
 		r.consentTo(t, 2)
-		r.clock.Advance(ProgressTimeout + time.Second)
+		r.clock.Advance(ProgressTimeout - time.Second)
+		r.settle(t, l)
+		if got := l.abortedAll(); len(got) != 1 || got[0] {
+			t.Fatalf("aborted %v before the progress timeout, want one running announcement", got)
+		}
+		wantPhases(t, r, phase{2, "announcing", ""})
+		r.clock.Advance(2 * time.Second)
 		r.settle(t, l)
 		if got := l.abortedAll(); len(got) < 1 || !got[0] {
 			t.Fatalf("aborted %v, want the first announcement aborted", got)
+		}
+		// The 15-minute queue tick falls on the abort and may retry (the
+		// retry fails at once): either way the entry ends queued, reset.
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			q := r.m.QueuedUpdates()
+			if len(q) == 1 && q[0].Status == PendingQueued && q[0].LastProgressStatus != nil &&
+				*q[0].LastProgressStatus == mattercore.OTAUpdateUnknown {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("queue %+v, want the entry queued again, reset (Unknown)", q)
+			}
+			runtime.Gosched()
 		}
 	})
 }
@@ -1149,4 +1176,188 @@ func TestManagerConsentRequiredOverrideParity(t *testing.T) {
 			t.Fatalf("consent hook asked %d times, want 1", asked)
 		}
 	})
+}
+
+// staleOnce has the next presence read answer from a snapshot taken before
+// during runs — another change made while the manager's lock is released
+// for that read, as the registry read leaves it (review-a M1).
+func (r *managerRig) staleOnce(during func()) {
+	var used atomic.Bool
+	r.m.presenceOf = func() func(Peer) bool {
+		r.mu.Lock()
+		gone := r.gone
+		r.mu.Unlock()
+		if used.CompareAndSwap(false, true) {
+			during() // a nested read during it answers from its own, live snapshot
+		}
+		return func(p Peer) bool { return p == testPeer && !gone }
+	}
+}
+
+// TestManagerPresenceAsOfTheRun (review-a M1; C-23): the queue run and the
+// check's cleanup judge a peer gone only for what was there when they read
+// the registry — matter.js reads #peerOf inside the change
+// (SoftwareUpdateManager.ts:1346-1353 at b25ed960) — so an update queued
+// while the manager's lock was released for that read stays.
+func TestManagerPresenceAsOfTheRun(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		run  func(r *managerRig)
+	}{
+		{"keeps an update queued while the queue run read the registry", func(r *managerRig) { r.m.triggerQueuedUpdate() }},
+		{"keeps a consent and update given while the check read the registry", func(r *managerRig) {
+			r.m.query = func(ctx context.Context, only *client.Node, includeStored bool) ([]PeerUpdate, bool, error) {
+				r.m.forgetGone()
+				return nil, true, nil
+			}
+			_ = r.m.CheckForUpdates(context.Background())
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := newManagerRig(t, nil)
+			r.setNode(true, nil)
+			r.staleOnce(func() {
+				r.setNode(false, nil)
+				r.consentTo(t, 2)
+			})
+			tc.run(r)
+			if q := r.m.QueuedUpdates(); len(q) != 1 || !r.m.HasConsent(testPeer, 2) {
+				t.Fatalf("queue %+v, consent %v; want the new update and its consent kept", q, r.m.HasConsent(testPeer, 2))
+			}
+		})
+	}
+}
+
+// TestManagerChangeEmitsItsOwnEvents (review-a L1; C-23): the events of a
+// change run when that change ends, on its caller — #mutate
+// (SoftwareUpdateManager.ts:539-561 at b25ed960) — not in another change
+// that took the lock while it read the registry.
+func TestManagerChangeEmitsItsOwnEvents(t *testing.T) {
+	t.Parallel()
+	var inOther atomic.Bool
+	var failedInOther, failedCalls atomic.Int32
+	r := newManagerRig(t, func(c *Config) {
+		c.OnUpdateFailed = func(Peer) {
+			failedCalls.Add(1)
+			if inOther.Load() {
+				failedInOther.Add(1)
+			}
+		}
+	})
+	r.consentTo(t, 2)
+	r.staleOnce(func() {
+		inOther.Store(true)
+		done := make(chan struct{})
+		go func() { defer close(done); r.m.triggerQueuedUpdate() }()
+		<-done
+		inOther.Store(false)
+	})
+	r.m.RemoveConsent(testPeer, 2)
+	if failedCalls.Load() != 1 || failedInOther.Load() != 0 {
+		t.Fatalf("updateFailed %d times, %d of them in another change; want once, in RemoveConsent", failedCalls.Load(), failedInOther.Load())
+	}
+}
+
+// TestManagerProductCheckQueuesParity ports #checkProductForUpdates
+// (SoftwareUpdateManager.ts:902-935 at b25ed960; C-22): a node removed
+// during the check is skipped; a consent for the product queues its
+// version, and updateAvailable is asked when there is none or it is below
+// the version found.
+func TestManagerProductCheckQueuesParity(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		consent   uint32 // 0: none
+		gone      bool
+		queued    []uint32
+		available int
+	}{
+		{"queues a lower consent and asks for the version found", 1, false, []uint32{1}, 1},
+		{"queues a higher consent without asking", 3, false, []uint32{3}, 0},
+		{"asks for a node without a consent", 0, false, []uint32{}, 1},
+		{"skips a node removed during the check", 1, true, []uint32{1}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var available atomic.Int32
+			r := servingRig(t, func(c *Config) {
+				c.OnUpdateAvailable = func(Peer, SoftwareUpdateInfo) { available.Add(1) }
+			})
+			r.storeImage(t, 2, ModeProd)
+			if tc.consent != 0 {
+				r.consentTo(t, tc.consent)
+			}
+			r.setNode(tc.gone, nil)
+			if _, err := r.m.checkProductForUpdates(context.Background(), 0xFFF1, 0x8001, 0,
+				[]prepared{{peer: testPeer, vendorID: 0xFFF1, productID: 0x8001}}, true); err != nil {
+				t.Fatal(err)
+			}
+			_, targets := r.consentsAndTargets()
+			if !slices.Equal(targets, tc.queued) || int(available.Load()) != tc.available {
+				t.Fatalf("queued %v, updateAvailable %d; want %v and %d", targets, available.Load(), tc.queued, tc.available)
+			}
+			r.m.mu.Lock()
+			_, known := r.m.known[testPeer]
+			r.m.mu.Unlock()
+			if known == tc.gone {
+				t.Fatalf("known update %v for a node gone %v", known, tc.gone)
+			}
+		})
+	}
+}
+
+// TestManagerForceRunsTheQueueFirstParity (F2; C-23): forceUpdate's
+// #storeConsent runs the queue (#queueUpdate, SoftwareUpdateManager.ts:1291
+// at b25ed960) before the forced #startAnnouncement (:1521), so a waiting
+// update of another node is announced too.
+func TestManagerForceRunsTheQueueFirstParity(t *testing.T) {
+	t.Parallel()
+	r := newManagerRig(t, nil)
+	other := Peer{FabricIndex: 1, NodeID: 0x22}
+	r.mu.Lock()
+	r.extra = map[Peer]bool{other: true}
+	r.mu.Unlock()
+	if _, err := r.m.AddUpdateConsent(context.Background(), other, testTarget(2)); err != nil {
+		t.Fatal(err) // no announcements yet: it waits as queued
+	}
+	l := r.interceptAnnouncements(hanging)
+	if err := r.m.ForceUpdate(context.Background(), testPeer, testTarget(2)); err != nil {
+		t.Fatal(err)
+	}
+	r.settle(t, l)
+	if n := l.count(); n != 2 {
+		t.Fatalf("%d announcements, want the waiting node's and the forced one", n)
+	}
+}
+
+// TestManagerErrNoNodeIsNotApplicable (F3; C-24): matter.js throws one
+// OtaUpdateError for an address no node has and for a node not applicable
+// (SoftwareUpdateManager.ts:1486-1489, :1574-1578 at b25ed960).
+func TestManagerErrNoNodeIsNotApplicable(t *testing.T) {
+	t.Parallel()
+	r := newManagerRig(t, nil)
+	r.setNode(true, nil)
+	err := r.m.ForceUpdate(context.Background(), testPeer, testTarget(2))
+	if !errors.Is(err, ErrNoNode) || !errors.Is(err, ErrNotApplicable) || !errors.Is(ErrNoNode, ErrNotApplicable) {
+		t.Fatalf("ForceUpdate for a gone node: %v, want ErrNoNode that is ErrNotApplicable", err)
+	}
+}
+
+// TestManagerGoneNodeConsentReported (F4): the check's cleanup reports the
+// consent of a gone node removed, as NodeDeleted does (Go-only
+// UpdateConsentChanged; #forgetPeer deletes it, SoftwareUpdateManager.ts:312-342
+// at b25ed960).
+func TestManagerGoneNodeConsentReported(t *testing.T) {
+	t.Parallel()
+	r := newManagerRig(t, nil)
+	r.consentTo(t, 2)
+	l := observe(t, r.m)
+	r.setNode(true, nil)
+	r.m.forgetGone()
+	evs := l.await(t, 1)
+	if evs[0].Kind != UpdateConsentChanged || evs[0].Consented || evs[0].Peer != testPeer {
+		t.Fatalf("event %+v, want the consent reported removed", evs[0])
+	}
 }

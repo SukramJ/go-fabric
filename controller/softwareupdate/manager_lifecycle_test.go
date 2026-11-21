@@ -250,7 +250,7 @@ func TestQueryUpdatesReturnsTheProductFailures(t *testing.T) {
 // TestManagerNodeDeleted (review II, R2-P6-bound-1914, decision 219): a
 // node that left the registry is forgotten at once — its consent and its
 // queued update go, the update without an event (#forgetPeer,
-// SoftwareUpdateManager.ts:312-341 at b25ed960; the contract :2303-2308),
+// SoftwareUpdateManager.ts:312-342 at b25ed960; the contract :2303-2308),
 // and nothing of it stays for a later node at the same address; another
 // node keeps its state.
 func TestManagerNodeDeleted(t *testing.T) {

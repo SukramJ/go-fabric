@@ -38,6 +38,8 @@ type managerRig struct {
 	// gone and basic are testPeer's node (nodeOf).
 	gone  bool
 	basic basicinfo.State
+	// extra are further present peers with testPeer's node.
+	extra map[Peer]bool
 }
 
 func newManagerRig(t *testing.T, edit func(*Config)) *managerRig {
@@ -74,7 +76,7 @@ func newManagerRig(t *testing.T, edit func(*Config)) *managerRig {
 func (r *managerRig) nodeOf(p Peer) (nodeView, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if p != testPeer || r.gone {
+	if (p != testPeer || r.gone) && !r.extra[p] {
 		return nodeView{}, false
 	}
 	basic, endpoint := r.basic, uint16(0)

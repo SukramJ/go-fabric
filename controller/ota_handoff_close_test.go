@@ -13,11 +13,20 @@ import (
 	"github.com/SukramJ/go-fabric/controller/softwareupdate"
 )
 
-// deletedWithQueuedUpdate is an OTA rig whose node has an update queued —
-// its QueryImage held in the provider until the returned release — with
-// onFailed as the host's OnUpdateFailed, and the node forgotten: the
-// update manager's NodeDeleted runs on its hand-off goroutine.
+// deletedWithQueuedUpdate is queuedWithHeldQuery with the node forgotten:
+// the update manager's NodeDeleted runs on its hand-off goroutine.
 func deletedWithQueuedUpdate(t *testing.T, onFailed func(r *otaRig, p softwareupdate.Peer)) (r *otaRig, release func()) {
+	t.Helper()
+	r, release = queuedWithHeldQuery(t, onFailed)
+	reg := r.c.Registry()
+	r.run(t, func(ctx context.Context) error { return reg.Forget(ctx, r.n) })
+	return r, release
+}
+
+// queuedWithHeldQuery is an OTA rig whose node has an update queued — its
+// QueryImage held in the provider until the returned release — with
+// onFailed as the host's OnUpdateFailed.
+func queuedWithHeldQuery(t *testing.T, onFailed func(r *otaRig, p softwareupdate.Peer)) (r *otaRig, release func()) {
 	t.Helper()
 	entered, held := make(chan struct{}), make(chan struct{})
 	var hold, once sync.Once
@@ -49,8 +58,6 @@ func deletedWithQueuedUpdate(t *testing.T, onFailed func(r *otaRig, p softwareup
 			return ctx.Err()
 		}
 	})
-	reg := r.c.Registry()
-	r.run(t, func(ctx context.Context) error { return reg.Forget(ctx, r.n) })
 	return r, release
 }
 
@@ -80,5 +87,48 @@ func TestCloseAfterADeletedNodeWithAQueuedUpdate(t *testing.T) {
 	case p := <-called:
 		t.Fatalf("OnUpdateFailed for %v: the deleted node's update ends without an event", p)
 	default:
+	}
+}
+
+// TestOnUpdateFailedMayCloseTheController (review II, fable-read-6b-ctl
+// item 5; review-a L1): a host OnUpdateFailed that closes the controller
+// returns, and so does the Close it called and the RemoveConsent that
+// reported the failure: a change's events run on its own caller, after its
+// queue run, never on an announcement goroutine Close waits for
+// (#mutate, SoftwareUpdateManager.ts:539-561 at b25ed960).
+func TestOnUpdateFailedMayCloseTheController(t *testing.T) {
+	t.Parallel()
+	closed := make(chan error, 1)
+	var once sync.Once
+	var release func()
+	set := make(chan struct{})
+	r, release := queuedWithHeldQuery(t, func(r *otaRig, _ softwareupdate.Peer) {
+		once.Do(func() {
+			<-set // release is assigned
+			release()
+			closed <- r.c.Close(context.Background())
+		})
+	})
+	close(set)
+	peer := r.peer(t)
+	removed := make(chan struct{})
+	go func() {
+		defer close(removed)
+		r.c.SoftwareUpdates().RemoveConsent(peer, 0)
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	select {
+	case err := <-closed:
+		if err != nil {
+			t.Fatalf("Close from OnUpdateFailed: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("Close from OnUpdateFailed did not return")
+	}
+	select {
+	case <-removed:
+	case <-ctx.Done():
+		t.Fatal("RemoveConsent did not return after its OnUpdateFailed closed the controller")
 	}
 }

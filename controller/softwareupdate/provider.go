@@ -154,6 +154,7 @@ func (s providerPorts) RequestConsent(ctx context.Context, p mattercore.OTAPeer,
 func (s providerPorts) BeginQuery(p mattercore.OTAPeer) *mattercore.OTAUpdateAttempt {
 	s.m.mu.Lock()
 	defer s.m.unlock()
+	s.m.touchLocked(peerOf(p))
 	return s.m.attempts.Begin(p)
 }
 
@@ -204,6 +205,7 @@ func (s providerPorts) AdmitQuery(_ context.Context, op mattercore.OTAPeer, sess
 	// cancelled (SoftwareUpdateManager.ts:1875-1878 at b25ed960).
 	if m.indexOfLocked(p) >= 0 {
 		m.startUpSuppress[p] = sessionID
+		m.touchLocked(p)
 	}
 	m.unlock()
 	return true
@@ -245,7 +247,7 @@ func (s providerPorts) MayDelegateConsentTo(p mattercore.OTAPeer, req provdef.Qu
 }
 
 // ReportAttemptStatus implements mattercore.OTAUpdateManager
-// (reportAttemptStatus, :2006-2019 at b25ed960).
+// (reportAttemptStatus, SoftwareUpdateManager.ts:2006-2019 at b25ed960).
 func (s providerPorts) ReportAttemptStatus(a *mattercore.OTAUpdateAttempt, status mattercore.OTAUpdateStatus, unless ...mattercore.OTAUpdateStatus) bool {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -257,7 +259,7 @@ func (s providerPorts) ReportAttemptStatus(a *mattercore.OTAUpdateAttempt, statu
 }
 
 // OfferUpdate implements mattercore.OTAUpdateManager (offerUpdate,
-// :1743-1761 at b25ed960).
+// SoftwareUpdateManager.ts:1743-1761 at b25ed960).
 func (s providerPorts) OfferUpdate(a *mattercore.OTAUpdateAttempt, token []byte, version uint32) bool {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -284,7 +286,7 @@ func (s providerPorts) OfferAnswered(a *mattercore.OTAUpdateAttempt) {
 }
 
 // AttemptFor implements mattercore.OTAUpdateManager (attemptFor,
-// :1793-1800 at b25ed960).
+// SoftwareUpdateManager.ts:1793-1800 at b25ed960).
 func (s providerPorts) AttemptFor(p mattercore.OTAPeer, token []byte) *mattercore.OTAUpdateAttempt {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -302,6 +304,7 @@ func (s providerPorts) ApplyUpdate(ctx context.Context, p mattercore.OTAPeer, to
 	m := s.m
 	m.mu.Lock()
 	defer m.unlock()
+	m.touchLocked(peerOf(p)) // an unknown token begins an attempt
 	if o, ok := applyOverrideFrom(ctx); ok && o.set {
 		applyDelay = wholeSeconds(o.delay)
 	}
@@ -318,7 +321,7 @@ func (s providerPorts) ApplyUpdate(ctx context.Context, p mattercore.OTAPeer, to
 }
 
 // UpdateApplied implements mattercore.OTAUpdateManager (updateApplied,
-// :1958-1968 at b25ed960).
+// SoftwareUpdateManager.ts:1958-1968 at b25ed960).
 func (s providerPorts) UpdateApplied(p mattercore.OTAPeer, token []byte, softwareVersion uint32) {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -327,7 +330,7 @@ func (s providerPorts) UpdateApplied(p mattercore.OTAPeer, token []byte, softwar
 
 // BDXTransferOptionsFor implements mattercore.OTAUpdateManager: the
 // options [Manager.TransferOptionsFor] names (bdxTransferOptionsFor,
-// :1530-1536 at b25ed960).
+// SoftwareUpdateManager.ts:1526-1536 at b25ed960).
 func (s providerPorts) BDXTransferOptionsFor(p mattercore.OTAPeer) bdx.ScopeConfig {
 	o := s.m.TransferOptionsFor(peerOf(p))
 	out := bdx.ScopeConfig{AdditionalMrpDelay: o.AdditionalMrpDelay}
