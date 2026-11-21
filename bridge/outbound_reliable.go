@@ -177,6 +177,28 @@ type outboundEntry struct {
 	// every reported round-trip zero. Nothing in the MRP state machine
 	// reads this field.
 	sentWall time.Time
+	// kick is what the liveness kick reads of the entry's exchange
+	// ([outboundReliableTracker.kickForLiveness]); nil for an entry not
+	// tracked as an exchange's message, which is never kicked. sentAt is
+	// the instant of the message's last transmission on the schedule's
+	// clock (zero until its first send went out), interval the wait armed
+	// at it, and inFlight marks a transmission under way — the first until
+	// [outboundReliableTracker.markSent], a retransmission until its send
+	// returned.
+	kick     *exchangeKick
+	sentAt   time.Time
+	interval time.Duration
+	inFlight bool
+}
+
+// exchangeKick is what the liveness kick reads of the exchange a tracked
+// message belongs to: whether its protocol is BDX, the acknowledgement the
+// message carries, and whether the exchange ended.
+type exchangeKick struct {
+	bdx        bool
+	hasAck     bool
+	ackCounter uint32
+	ended      func() bool
 }
 
 // newOutboundReliableTracker returns a fresh, empty tracker.
@@ -293,7 +315,7 @@ func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID ui
 // ([secureSlot]).
 func (t *outboundReliableTracker) TrackOnExchange(counter uint32, sessionID, exchangeID uint16, initiator bool, datagram []byte, dest net.Addr, now time.Time) error {
 	role := roleOf(initiator)
-	return t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, 0, nil, role)
+	return t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, 0, nil, role, nil)
 }
 
 // trackExchangeMessage is [outboundReliableTracker.TrackOnExchange] with
@@ -307,7 +329,95 @@ func (t *outboundReliableTracker) TrackOnExchange(counter uint32, sessionID, exc
 // ([outboundReliableTracker.waitExchangeFree]), so the refusal is left for
 // a concurrent send.
 func (t *outboundReliableTracker) trackExchangeMessage(counter uint32, sessionID, exchangeID uint16, initiator bool, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) error {
-	return t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil, roleOf(initiator))
+	return t.trackKickable(counter, sessionID, exchangeID, initiator, datagram, dest, now, margin, nil)
+}
+
+// trackKickable is [outboundReliableTracker.trackExchangeMessage] with what
+// the liveness kick reads of the exchange; a nil kick tracks a message that
+// is never kicked. The entry counts its first transmission under way until
+// [outboundReliableTracker.markSent].
+func (t *outboundReliableTracker) trackKickable(counter uint32, sessionID, exchangeID uint16, initiator bool, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, kick *exchangeKick) error {
+	return t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil, roleOf(initiator), kick)
+}
+
+// markSent records the first transmission of the kickable message counter
+// of sessionID as gone out at at, the instant its schedule was armed from:
+// from now on a liveness kick may retransmit it. Mirrors matter.js
+// packages/protocol/src/protocol/MessageExchange.ts:840-842 at b25ed960
+// (#lastTransmissionAt once the first send resolved).
+func (t *outboundReliableTracker) markSent(sessionID uint16, counter uint32, at time.Time) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if p := t.pending[outboundKey{sessionID, counter}]; p != nil && p.kick != nil && p.sentAt.IsZero() {
+		p.sentAt, p.inFlight = at, false
+	}
+}
+
+// kickForLiveness is the liveness kick on the exchange (sessionID,
+// exchangeID) of this node's role: when the peer sent dupCounter again —
+// a duplicate requiring an acknowledgement — and [mrp.ShouldKickForLiveness]
+// holds for the exchange's outstanding message, that message is
+// retransmitted now through send, its acknowledgement of the duplicate
+// with it, and its schedule restarts from now as a retransmission's would.
+// active and threshold are the peer's active interval and threshold. It
+// reports whether it retransmitted; a send that failed counts too, as
+// matter.js's kick has replaced the standalone acknowledgement once it
+// started the retransmission.
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:593-646 at b25ed960
+// (#kickRetransmissionForLiveness),
+// packages/protocol/src/protocol/MessageExchange.ts:956-1040 at b25ed960
+// (#retransmitMessage: counted, stamped, re-armed after the send).
+func (t *outboundReliableTracker) kickForLiveness(sessionID, exchangeID uint16, initiator bool, dupCounter uint32, now time.Time, active, threshold time.Duration, send func(net.Addr, []byte) error) bool {
+	if t == nil || sessionID == 0 {
+		return false
+	}
+	t.mu.Lock()
+	key, ok := t.secureByExchange[secureSlot{sessionID, exchangeID, roleOf(initiator)}]
+	p := t.pending[key]
+	if !ok || p == nil || p.kick == nil {
+		t.mu.Unlock()
+		return false
+	}
+	k := mrp.LivenessKick{
+		BDX:               p.kick.bdx,
+		Closed:            p.kick.ended != nil && p.kick.ended(),
+		Armed:             !p.inFlight,
+		PendingAcks:       p.kick.hasAck,
+		PendingAckCounter: p.kick.ackCounter,
+		DuplicateCounter:  dupCounter,
+		// matter.js's #isTransmissionBudgetSpent(retransmissions + 1)
+		// against MAX_TRANSMISSIONS: the tracker gives up once
+		// [mrp.MaxRetransmissions] retransmissions went out.
+		NextBudgetSpent: p.retries >= mrp.MaxRetransmissions,
+		Transmitted:     !p.sentAt.IsZero(),
+		Elapsed:         now.Sub(p.sentAt),
+		Interval:        p.interval,
+		ActiveInterval:  active,
+		ActiveThreshold: threshold,
+		AdditionalDelay: p.margin,
+	}
+	if !mrp.ShouldKickForLiveness(k) {
+		t.mu.Unlock()
+		return false
+	}
+	p.retries++
+	delay := mrp.BackoffDuration(t.entryBase(p.sessionID, p.peer, now)+p.margin, p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
+	p.nextSendAt, p.interval, p.sentAt, p.inFlight = now.Add(delay), delay, now, true
+	dest, datagram := p.dest, p.datagram
+	t.mu.Unlock()
+	_ = send(dest, datagram)
+	t.settled(key, p)
+	return true
+}
+
+// settled ends the transmission of p under way, if p is still the entry
+// at key.
+func (t *outboundReliableTracker) settled(key outboundKey, p *outboundEntry) {
+	t.mu.Lock()
+	if t.pending[key] == p {
+		p.inFlight = false
+	}
+	t.mu.Unlock()
 }
 
 // roleOf is this node's exchange role: the initiator, or the responder.
@@ -340,7 +450,7 @@ var errExchangeAwaitsAck = errors.New("bridge: outbound retransmit: the exchange
 // retransmissionIntervalOf's additionalDelay (MRP.ts, `baseInterval =
 // (isPeerActive ? activeInterval : idleInterval) + additionalDelay`).
 func (t *outboundReliableTracker) TrackWithMargin(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time, margin time.Duration) {
-	_ = t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil, exchangeRoleUnnamed)
+	_ = t.track(counter, sessionID, exchangeID, 0, datagram, dest, now, margin, nil, exchangeRoleUnnamed, nil)
 }
 
 // trackUnsecured tracks a reliable message on session 0: a responder's
@@ -361,7 +471,7 @@ func (t *outboundReliableTracker) trackUnsecured(counter uint32, key HandshakeKe
 // entry's give-up, and the bridge closes it
 // ([Bridge.closeUnacknowledgedResume]). Zero is none.
 func (t *outboundReliableTracker) trackUnsecuredInstalled(counter uint32, key HandshakeKey, datagram []byte, dest net.Addr, now time.Time, peer *handshakePeerTiming, installed uint16) {
-	_ = t.track(counter, 0, key.ExchangeID, key.InitiatorNodeID, datagram, dest, now, 0, peer, exchangeRoleUnnamed)
+	_ = t.track(counter, 0, key.ExchangeID, key.InitiatorNodeID, datagram, dest, now, 0, peer, exchangeRoleUnnamed, nil)
 	if installed == 0 {
 		return
 	}
@@ -544,7 +654,7 @@ func (t *outboundReliableTracker) reportSecureEvictions(evs []secureEviction) {
 	}
 }
 
-func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, initiator uint64, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming, role exchangeRole) error {
+func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID uint16, initiator uint64, datagram []byte, dest net.Addr, now time.Time, margin time.Duration, peer *handshakePeerTiming, role exchangeRole, kick *exchangeKick) error {
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
@@ -595,6 +705,9 @@ func (t *outboundReliableTracker) track(counter uint32, sessionID, exchangeID ui
 		peer:       peer,
 		sentWall:   t.clock.Now(),
 		role:       role,
+		kick:       kick,
+		interval:   delay,
+		inFlight:   kick != nil,
 	}
 	t.mu.Unlock()
 	if oldest != nil && t.evicted != nil {
@@ -1070,6 +1183,10 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		// matter.js MRP.ts:125-146 retransmissionIntervalOf.
 		delay := mrp.BackoffDuration(t.entryBase(p.sessionID, p.peer, now)+p.margin, p.retries, rand.Float64) + time.Duration(t.fixedBackoff.Load())
 		p.nextSendAt = now.Add(delay)
+		// The liveness kick's view: stamped before the send, the
+		// transmission under way until it returned (MessageExchange.ts:1012,
+		// :1029 at b25ed960).
+		p.interval, p.sentAt, p.inFlight = delay, now, true
 		todo = append(todo, resend{key: key, p: p, dest: p.dest, datagram: p.datagram})
 	}
 	t.mu.Unlock()
@@ -1082,7 +1199,9 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 		if acked {
 			continue
 		}
-		if err := send(r.dest, r.datagram); err != nil {
+		err := send(r.dest, r.datagram)
+		t.settled(r.key, r.p)
+		if err != nil {
 			out = append(out, outboundTickResult{SessionID: r.key.sessionID, ExchangeID: r.p.exchangeID, Counter: r.key.counter, Err: err})
 			continue
 		}

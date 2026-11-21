@@ -239,8 +239,11 @@ func (e *invokeStatusError) MatterStatusCode() im.StatusCode { return e.status.S
 
 // Invoke implements [core.OtaProviderSession]: one InvokeRequest on a new
 // exchange, the InvokeResponse awaited for as long as matter.js's exchange
-// waits for a peer's response (MessageExchange.ts:877-886 at db021da0,
-// calculateMaximumPeerResponseTime — [Bridge.chunkStatusResponseTimeout]).
+// waits for a peer's response ([Bridge.chunkStatusResponseTimeout]); a
+// response missing at that deadline reports the peer lost while it sent
+// nothing on the exchange ([initiatedSecureExchange.Receive]).
+// Mirrors matter.js packages/protocol/src/protocol/MessageExchange.ts:899-908 at b25ed960
+// (#nextMessage: the default timeout, calculateMaximumPeerResponseTime).
 // A command answered with data returns its fields; one answered with
 // Success returns nil; any other status is an error carrying it
 // ([im.StatusCodeError]). A request larger than one message of the
@@ -412,6 +415,13 @@ type initiatedSecureExchange struct {
 	// notify is the [bdx.ReceiveNotifier] callback the outbound flow
 	// installs; the receive path calls it before it queues a message.
 	notify atomic.Pointer[func(bdx.Message)]
+	// protocol is the exchange's protocol id plus one, 0 before it has
+	// one: the protocol of its first message — the first this node sent
+	// on an exchange it opened ([initiatedSecureExchange.Send]), the
+	// peer's *Init on one the peer opened (bdx_responder.go). The liveness
+	// kick runs on a BDX exchange only (matter.js #protocolId,
+	// MessageExchange.ts:594 at b25ed960).
+	protocol atomic.Uint32
 	// received counts the messages the peer sent on the exchange — every
 	// authenticated one, a standalone acknowledgement and a duplicate
 	// included ([Bridge.noteInitiatedReceived]). While it is zero, a
@@ -840,6 +850,7 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 	if counter, owed := b.takeOwedAck(e.sessionID, e.exchangeID, !e.responder); owed {
 		proto.HasAck, proto.AckCounter = true, counter
 	}
+	e.protocol.CompareAndSwap(0, uint32(protocolID)+1)
 	body := append(proto.Marshal(), payload...) //nolint:gocritic // single-allocation join
 	hdr := message.Header{SessionID: e.sessionID}
 	if peerID := sess.PeerSessionID(); peerID != 0 {
@@ -850,8 +861,10 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 		return fmt.Errorf("%w: %w", ErrUnsolicitedEncrypt, err)
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
+	sentAt := e.b.clk().Now()
 	if tracker != nil {
-		if err := tracker.trackExchangeMessage(hdr.MessageCounter, e.sessionID, e.exchangeID, !e.responder, datagram, dest, e.b.clk().Now(), time.Duration(e.peerMargin.Load())); err != nil {
+		kick := &exchangeKick{bdx: e.isBDX(), hasAck: proto.HasAck, ackCounter: proto.AckCounter, ended: e.ended}
+		if err := tracker.trackKickable(hdr.MessageCounter, e.sessionID, e.exchangeID, !e.responder, datagram, dest, sentAt, time.Duration(e.peerMargin.Load()), kick); err != nil {
 			// A concurrent send on the exchange took its place since the
 			// wait: this message is not sent.
 			return err
@@ -882,7 +895,16 @@ func (e *initiatedSecureExchange) Send(ctx context.Context, protocolID uint16, o
 		}
 		return err
 	}
+	if tracker != nil {
+		tracker.markSent(e.sessionID, hdr.MessageCounter, sentAt)
+	}
 	return nil
+}
+
+// isBDX reports whether the exchange's protocol is BDX
+// ([initiatedSecureExchange.protocol]).
+func (e *initiatedSecureExchange) isBDX() bool {
+	return e.protocol.Load() == uint32(bdx.ProtocolID)+1
 }
 
 // Receive implements [bdx.Exchange]. When ctx's deadline passes before a

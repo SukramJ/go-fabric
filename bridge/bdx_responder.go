@@ -241,6 +241,7 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 		b: b, sessionID: hdr.SessionID, addr: b.currentPeerAddr(hdr.SessionID, nil), exchangeID: proto.ExchangeID, session: sess,
 		createdAt: b.clk().Now(), responder: true, turn: newResponderTurn(b.clk()), in: make(chan bdx.Message, 16), done: make(chan struct{}),
 	}
+	ex.protocol.Store(uint32(bdx.ProtocolID) + 1)
 	ex.touch()
 	if _, loaded := b.bdx.exchanges.LoadOrStore(key, ex); loaded {
 		// A concurrent first message of the same exchange won the race;
