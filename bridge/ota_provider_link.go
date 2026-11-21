@@ -572,7 +572,7 @@ type peerLossCloser interface {
 // exchange's received count, [Bridge.noteInitiatedReceived]). Mirrors
 // matter.js packages/protocol/src/protocol/MessageExchange.ts:656-666 at
 // b25ed960 (send: a peer communication error → context.peerLost, only
-// when #reportsPeerLoss) and :674-681 (#reportsPeerLoss: only while
+// when #reportsPeerLoss) and :670-681 (#reportsPeerLoss: only while
 // #messageReceivedCounter === 0, "Only if we never heard from it on this
 // exchange") → ExchangeManager.ts:630-652 (a commissioned peer:
 // SessionManager.handlePeerLoss for the peer address; otherwise the
@@ -609,7 +609,10 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 // rules refuse count too, as matter.js increments the counter before its
 // protocol check and its ack rules
 // (packages/protocol/src/protocol/MessageExchange.ts:490, :505-509,
-// :534-548 at b25ed960).
+// :534-548 at b25ed960). A message on an exchange whose session was
+// replaced under the same id is not counted: boundTo fails that stale
+// exchange here with errExchangeSessionGone, as any other path that
+// finds it would.
 func (b *Bridge) noteInitiatedReceived(hdr *message.Header, proto message.ProtocolHeader) {
 	if hdr.SessionID == 0 || proto.Initiator {
 		return
