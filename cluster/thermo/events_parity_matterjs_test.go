@@ -128,7 +128,7 @@ type eventsCase struct {
 	clk *clocktest.Fake
 }
 
-// onlineEvents is online(device) (ThermostatEventsTest.ts:132-135): the
+// onlineEvents is online(device) (ThermostatEventsTest.ts:126-129): the
 // server of cfg on a fake clock, configured by before, then started —
 // the emitter and the endpoint the bridge hands it.
 func onlineEvents(t *testing.T, cfg thermo.ThermostatConfig, before ...func(*thermo.ThermostatServer)) *eventsCase {
@@ -196,7 +196,7 @@ func temps(vs []*int16) string {
 	return "[" + strings.Join(parts, " ") + "]"
 }
 
-// configBase is CONFIG (ThermostatEventsTest.ts:89-95):
+// configBase is CONFIG (ThermostatEventsTest.ts:87-93):
 // CoolingAndHeating and Auto (the features' here), the occupied setpoints
 // 2000 and 2600, the deadband 25.
 func configBase(features uint32, edit ...func(*thermo.ThermostatConfig)) thermo.ThermostatConfig {
@@ -210,15 +210,15 @@ func configBase(features uint32, edit ...func(*thermo.ThermostatConfig)) thermo.
 	return cfg
 }
 
-// basicConfig is basicThermostat (:145-147): BasicServer, Heating,
+// basicConfig is basicThermostat (:139-141): BasicServer, Heating,
 // Cooling, AutoMode and Events (:51-61).
 func basicConfig(edit ...func(*thermo.ThermostatConfig)) thermo.ThermostatConfig {
 	return configBase(featAutoTEVT, edit...)
 }
 
-// fullConfig is fullThermostat (:137-143): FullServer (:33-41) — Heating,
+// fullConfig is fullThermostat (:131-137): FullServer (:33-41) — Heating,
 // Cooling, Occupancy, AutoMode, Presets, MatterScheduleConfiguration and
-// Events — with PRESETS_CONFIG (:97-121).
+// Events — with PRESETS_CONFIG (:95-116).
 func fullConfig(edit ...func(*thermo.ThermostatConfig)) thermo.ThermostatConfig {
 	return configBase(featAutoTEVT|thermo.ThermostatFeatureOCC|thermo.ThermostatFeaturePRES|thermo.ThermostatFeatureMSCH, func(cfg *thermo.ThermostatConfig) {
 		cfg.NumberOfPresets = 5

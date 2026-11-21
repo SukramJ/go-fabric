@@ -621,9 +621,12 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 
 // clearPresetMovedByReconcile clears the active preset when the initial
 // reconcile moved a setpoint in effect (before to st). A setpoint in
-// effect the initial reconcile moved clears the active preset: matter.js's
-// ThermostatBehaviorTest asserts it
-// (packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts:134-149 at b25ed960,
+// effect the initial reconcile moved clears the active preset: the
+// reconcile's write is a direct change of that setpoint, whose $Changing
+// reaction runs when the initialization pre-commits and leaves the preset
+// (ThermostatServer.ts:1213-1220 at b25ed960,
+// ThermostatServer.ts:769-789 at b25ed960; asserted by
+// packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts:134-149 at b25ed960,
 // "clears the active preset when it adjusts a setpoint"). The clear is a
 // change of the handle at the start, so its ActivePresetChange is queued
 // with the start's other events — inferred from the
