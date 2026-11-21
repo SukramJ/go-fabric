@@ -250,8 +250,8 @@ type consent struct {
 	peer Peer
 }
 
-// queueEntry is UpdateQueueEntry (SoftwareUpdateManager.ts:75-118 at
-// b25ed960).
+// queueEntry is UpdateQueueEntry (SoftwareUpdateManager.ts:114-118,
+// :133-140 at b25ed960).
 type queueEntry struct {
 	consent
 	endpoint uint16
@@ -301,7 +301,8 @@ type Manager struct {
 	applyDelays map[Peer]time.Duration
 	// attempts are the nodes' update attempts — internal.attempts
 	// (SoftwareUpdateManager.ts:1739-1741 at b25ed960) — under m.mu with
-	// the queue, as matter.js changes both in one #mutate.
+	// the queue, as matter.js changes both in one synchronous change
+	// (:536-560).
 	attempts *mattercore.OTAUpdateAttempts
 	// post is what a change under m.mu leaves to run once m.mu is
 	// released — #mutate's queued events (:543-560); unlock runs it.
@@ -1570,7 +1571,7 @@ func (m *Manager) ForceUpdate(ctx context.Context, p Peer, t Target) error {
 // closed when every consent went (version 0) or the update was underway —
 // announced or following an attempt — but not while it applies.
 //
-// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1694-1718 at b25ed960
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1670-1718 at b25ed960
 // (removeConsent, the queue): the dequeue decision reads the status of
 // the attempt the entry follows (:1700).
 func (m *Manager) cancelUpdate(p Peer, version uint32) {

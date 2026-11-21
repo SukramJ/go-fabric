@@ -552,7 +552,7 @@ func (s *OTAUpdateAttempts) UpdateApplied(peer OTAPeer, token []byte) *OTAUpdate
 // NotAvailable), and an offer of version — of any version when all is
 // set — loses its apply right.
 //
-// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1686-1692 at b25ed960
+// Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1670-1692 at b25ed960
 // (removeConsent, the attempts).
 func (s *OTAUpdateAttempts) RemoveConsent(peer OTAPeer, version uint32, all bool) {
 	for _, a := range s.Of(peer) {

@@ -150,7 +150,7 @@ func (r *attemptRig) entryStatus() (*Status, bool) {
 
 // TestManagerConsentRemovalEndsTheApplyRightParity is F-b25ed960-57 (C-24):
 // removeConsent takes the apply right of the offers of the peer
-// (SoftwareUpdateManager.ts:1686-1692 at b25ed960), so the apply under the
+// (SoftwareUpdateManager.ts:1670-1692 at b25ed960), so the apply under the
 // token is refused (:1951-1955 → :1936-1938) — unless the attempt already
 // applies (:1951).
 func TestManagerConsentRemovalEndsTheApplyRightParity(t *testing.T) {
@@ -232,8 +232,8 @@ func TestManagerAdmissionFailsAnAppliedUpdateParity(t *testing.T) {
 
 // TestManagerRestartQuerySuppressesOnlyAQueuedUpdateParity (C-25): a query
 // admitted for the requestor's restart — its transfer on an older session
-// cancelled — suppresses the next startUp on the query's session only
-// while the peer has a queued update (SoftwareUpdateManager.ts:1873-1879
+// cancelled — suppresses the node's next start-up report on the query's
+// session only while the peer has a queued update (SoftwareUpdateManager.ts:1873-1879
 // at b25ed960).
 func TestManagerRestartQuerySuppressesOnlyAQueuedUpdateParity(t *testing.T) {
 	t.Parallel()

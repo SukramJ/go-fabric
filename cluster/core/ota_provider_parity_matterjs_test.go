@@ -113,7 +113,7 @@ func TestParityMatterJS_OTAProviderResponseFields(t *testing.T) {
 // on the provider (otaFixture) and its default manager
 // (NewOTAStandaloneManager), the requests as the requestor sends them. A
 // removed consent is the manager's removeConsent on the attempts
-// (OTAUpdateAttempts.RemoveConsent, SoftwareUpdateManager.ts:1686-1692);
+// (OTAUpdateAttempts.RemoveConsent, SoftwareUpdateManager.ts:1670-1692);
 // the queue's half of each case is controller/softwareupdate's.
 
 // removeConsent is SoftwareUpdateManager.removeConsent's half on the
@@ -220,7 +220,7 @@ func TestParityMatterJS_OTAProviderApplyTable(t *testing.T) {
 
 // TestParityMatterJS_OTAProviderApplyDelay ports the wire half of OtaTest.ts
 // :2007-2027 at b25ed960: what a Proceed sends under the provider's apply
-// delay (State.applyDelay; here the ApplyPolicy's, a deprecated port). The
+// delay (here the ApplyPolicy's, a deprecated port). The
 // RebootResubscribeArmer half is SoftwareUpdateManager's (the register
 // names it).
 func TestParityMatterJS_OTAProviderApplyDelay(t *testing.T) {

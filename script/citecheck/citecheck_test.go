@@ -153,7 +153,7 @@ import (
 // 426 after wave P4-S: the DAV: lines of controller/attestation
 // renumbered to DeviceAttestationValidator.ts at b25ed960 leave six rows
 // (measured by make cite-report).
-const citecheckDriftRatchet = 425
+const citecheckDriftRatchet = 424
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -208,7 +208,7 @@ const citecheckDriftRatchet = 425
 // Wave P4-S relabelled 12 more at b25ed960: bridge/conn.go's eight
 // ExchangeManager.ts citations and four in controller/attestation
 // (validate.go 3, policy.go 1).
-const citecheckOffPinRatchet = 2721
+const citecheckOffPinRatchet = 2712
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

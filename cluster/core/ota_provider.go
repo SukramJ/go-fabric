@@ -489,7 +489,7 @@ func (p *OTAProvider) answerQuery(ctx context.Context, req provdef.QueryImageReq
 // granted, which lets the offer go on.
 //
 // Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:202-231 at b25ed960
-// (#answerQuery, the consent).
+// (the consent of the query's answer).
 func (p *OTAProvider) askConsent(ctx context.Context, req provdef.QueryImageRequest, peer OTAPeer, img OTAImage, token []byte, attempt *OTAUpdateAttempt) (provdef.QueryImageResponse, bool, error) {
 	p.mgr.ReportAttemptStatus(attempt, OTAUpdateWaitForConsent)
 	state, delay := OTAConsentUnknown, time.Duration(0)
@@ -521,7 +521,7 @@ func (p *OTAProvider) askConsent(ctx context.Context, req provdef.QueryImageRequ
 // the scope is held with other details.
 //
 // Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:251-300 at b25ed960
-// (#answerQuery, the BDX offer).
+// (the BDX offer of the query's answer).
 func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAttempt) (string, bool) {
 	responder := p.cfg.BDX
 	opts := p.mgr.BDXTransferOptionsFor(peer)
