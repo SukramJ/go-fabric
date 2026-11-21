@@ -28,7 +28,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -196,6 +198,33 @@ func (p *icdPair) silence(silent bool) {
 	}
 	dev := p.pair.Device.Addr()
 	p.site.Net().Filter(func(d fabrictest.Datagram) bool { return !sameUDP(d.From, dev) })
+}
+
+// icdReRegister replaces p's registration with one under the uncovered
+// subject. An automatic registration (onSubscriptionActive on a LIT peer)
+// may start between the Unregister and the Register, or run when the
+// Register admits again, and refuse it with ErrICDOperation — "other
+// options in progress" while it runs, "exists" once it finished: the
+// helper waits, on the site's clock, until no registration is in flight
+// and goes again, a bounded number of rounds (review II P3b-R,
+// candidate 5).
+func icdReRegister(t *testing.T, p *icdPair) {
+	t.Helper()
+	const rounds = 5
+	for range rounds {
+		p.eventually(t, "no ICD registration in flight", func() bool { return !client.ICDRegistering(p.icd()) })
+		if err := p.do(t, func(ctx context.Context) error { return p.icd().Unregister(ctx) }); err != nil {
+			t.Fatal(err)
+		}
+		err := p.do(t, func(ctx context.Context) error { return p.icd().Register(ctx, uncovered) })
+		if err == nil {
+			return
+		}
+		if !errors.Is(err, client.ErrICDOperation) {
+			t.Fatal(err)
+		}
+	}
+	t.Fatalf("the registration under the uncovered subject was refused %d times", rounds)
 }
 
 func sameUDP(a, b *net.UDPAddr) bool {
@@ -653,25 +682,7 @@ func TestIcdClientParity(t *testing.T) {
 	})
 
 	t.Run("availability", func(t *testing.T) {
-		reRegister := func(t *testing.T, p *icdPair) {
-			t.Helper()
-			if err := p.do(t, func(ctx context.Context) error { return p.icd().Unregister(ctx) }); err != nil {
-				t.Fatal(err)
-			}
-			if err := p.do(t, func(ctx context.Context) error {
-				err := p.icd().Register(ctx, uncovered)
-				if errors.Is(err, client.ErrICDOperation) && p.icd().Registered() {
-					// The auto-registration came first: re-register under the subject.
-					if err := p.icd().Unregister(ctx); err != nil {
-						return err
-					}
-					return p.icd().Register(ctx, uncovered)
-				}
-				return err
-			}); err != nil {
-				t.Fatal(err)
-			}
-		}
+		reRegister := icdReRegister
 		t.Run("seeds available true on register and expires it once the peer goes silent", func(t *testing.T) {
 			p := litOperatingPair(t)
 			reRegister(t, p)
@@ -989,5 +1000,59 @@ func forceSIT(t *testing.T, p *icdPair) {
 	t.Helper()
 	if err := p.device().ICD().SetOperatingMode(node.ICDModeSIT); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestIcdReRegisterWaitsForARunningRegistration (review II P3b-R,
+// candidate 5; a harness test, not a port): an automatic registration
+// that starts after the helper's Unregister and is still in flight when
+// the helper's Register admits again refuses that Register ("other
+// options in progress"); the helper waits for it to end and replaces it
+// under the uncovered subject. The automatic registration is stood in for
+// by a Register with its options (AllowMultiAdmin, IcdClient.ts:217-272 as
+// cited in icd.go), started from the Register seam, its RegisterClient
+// held on the way to the device until the site's clock moves.
+func TestIcdReRegisterWaitsForARunningRegistration(t *testing.T) {
+	t.Parallel()
+	p := litOperatingPair(t)
+	dev := p.pair.Device.Addr()
+	var hold atomic.Bool
+	var dropped atomic.Int32
+	p.site.Net().Filter(func(d fabrictest.Datagram) bool {
+		if hold.Load() && sameUDP(d.To, dev) {
+			dropped.Add(1)
+			return false
+		}
+		return true
+	})
+	var first atomic.Bool
+	var auto atomic.Pointer[started]
+	client.OnRegisterChecked(p.icd(), func() {
+		if !first.CompareAndSwap(false, true) {
+			return
+		}
+		hold.Store(true)
+		auto.Store(start(func() error {
+			return p.icd().Register(parityCtx(t), client.ICDRegisterOptions{AllowMultiAdmin: true})
+		}))
+		// The stand-in's RegisterClient is on the way and dropped: it
+		// completes only after a retransmission, which waits for the site's
+		// clock, which waits for this Register to go on.
+		for deadline := time.Now().Add(time.Minute); dropped.Load() == 0; runtime.Gosched() {
+			if time.Now().After(deadline) {
+				t.Error("the stand-in's RegisterClient was not sent")
+				break
+			}
+		}
+		hold.Store(false)
+	})
+	icdReRegister(t, p)
+	if !first.Load() {
+		t.Fatal("the Register seam did not run")
+	}
+	p.eventually(t, "the stand-in registration's end", func() bool { return auto.Load().done.Load() })
+	r, ok := p.icd().Registration()
+	if !ok || r.MonitoredSubject != *uncovered.MonitoredSubject {
+		t.Fatalf("registration %+v (%v), want one under subject %#x", r, ok, *uncovered.MonitoredSubject)
 	}
 }
