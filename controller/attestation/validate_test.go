@@ -248,7 +248,7 @@ func TestHardFailures(t *testing.T) {
 }
 
 // TestStoreErrors: a trust-store fault is a plain error, not the peer's
-// failure (DAV:405, the revocation lookup).
+// failure (DAV:405, the PAA parse; DAV:479-493, the revocation lookup).
 func TestStoreErrors(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, defaultSpec(), defaultCD())

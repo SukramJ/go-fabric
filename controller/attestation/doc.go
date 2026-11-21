@@ -4,7 +4,8 @@
 // Package attestation is the commissioner's device attestation check: the
 // port of matter.js
 // packages/protocol/src/certificate/DeviceAttestationValidator.ts
-// (DeviceAttestationValidator.validate, :258-645) at db021da0, ADR 0020
+// (DeviceAttestationValidator.validate, :283-293, and the
+// validateCollecting it wraps, :295-694) at b25ed960, ADR 0020
 // stage 2, with a static trust store ([PAAStore], [StaticStore],
 // [TestStore]) where matter.js consults its DclCertificateService.
 //
