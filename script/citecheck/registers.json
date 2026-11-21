@@ -49,15 +49,9 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1059,
+    "line": 1060,
     "citation": "packages/protocol/src/interaction/SubscriptionHandler.ts:284",
     "error": "file not found"
-  },
-  {
-    "file": "notes/parity/by_design.md",
-    "line": 1087,
-    "citation": "element.ts:568-573",
-    "error": "line beyond end of file"
   },
   {
     "file": "notes/parity/by_design.md",
@@ -67,19 +61,25 @@
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 1265,
+    "line": 1089,
+    "citation": "element.ts:568-573",
+    "error": "line beyond end of file"
+  },
+  {
+    "file": "notes/parity/by_design.md",
+    "line": 1266,
     "citation": "aggregator.ts:62",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 2747,
+    "line": 2754,
     "citation": "endpoints/bridged-node.ts:39-73",
     "error": "ambiguous"
   },
   {
     "file": "notes/parity/by_design.md",
-    "line": 4454,
+    "line": 4461,
     "citation": "BleScanner.ts:46-52",
     "at": "862ad75f",
     "error": "ambiguous"
@@ -100,7 +100,7 @@
   },
   {
     "file": "notes/parity/matter_behaviour_findings.md",
-    "line": 521,
+    "line": 518,
     "citation": "ValueValidatorTest.ts:478-480",
     "error": "ambiguous"
   }
