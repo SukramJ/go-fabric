@@ -769,14 +769,6 @@ type Bridge struct {
 	// closing, and do not keep a new PASE exchange out
 	// ([Bridge.paseSessionExists]). Guarded by b.mu.
 	paseClosing map[uint16]struct{}
-	// paseCloseTimers are the PASE closes [Bridge.closePASESessions] armed
-	// to run after their grace, by the sequence number paseCloseSeq hands
-	// out; [Bridge.Stop] stops them, and paseCloseOver keeps a further one
-	// from being armed after it (review II, R2-P6-fsm-0615). Guarded by
-	// b.mu.
-	paseCloseTimers map[uint64]clock.Timer
-	paseCloseSeq    uint64
-	paseCloseOver   bool
 	// advertiserClosed: [Bridge.Stop] withdrew the advertiser's records and
 	// closed it ([Bridge.closeAdvertiser]); a second Stop does not again.
 	// Guarded by b.mu.
@@ -2448,9 +2440,6 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// Off the radio before the transports go: the advertisement stops,
 	// the central is disconnected and the GATT service unregistered.
 	b.stopBLEForShutdown(ctx)
-	// A PASE close armed after a CommissioningComplete does not fire on a
-	// stopped bridge; the sessions it names close with the others above.
-	b.stopPASECloseTimers()
 	b.mu.Lock()
 	if !b.started {
 		b.mu.Unlock()

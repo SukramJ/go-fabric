@@ -325,47 +325,54 @@ func TestFailedStartTakesItsAssemblyBack(t *testing.T) {
 	}
 }
 
-// TestStopStopsThePASECloseTimer: the PASE close a CommissioningComplete
-// armed for after its grace is stopped by Stop, and none is armed after it
-// — before, it ran on an untracked timer that outlived Stop (review II,
-// R2-P6-fsm-0615).
-func TestStopStopsThePASECloseTimer(t *testing.T) {
+// TestStopLeavesNoPASECloseTimer: no PASE close of the bridge runs on a
+// timer, so none stays armed on its clock after Stop (review II,
+// R2-P6-fsm-0615) — before, a CommissioningComplete armed one for a grace
+// after its response. The CommissioningComplete close is done before Stop,
+// inside the command; a close deferred to a response sent after Stop runs
+// when the response is out, at once, on no timer.
+func TestStopLeavesNoPASECloseTimer(t *testing.T) {
 	t.Parallel()
-	for _, armAfterStop := range []bool{false, true} {
-		name := "armed before Stop"
-		if armAfterStop {
-			name = "response sent after Stop"
+	t.Run("CommissioningComplete before Stop", func(t *testing.T) {
+		t.Parallel()
+		b, mgr, clk := paseCloseBridge(t)
+		after := &im.AfterResponse{}
+		ctx := im.WithAfterResponse(context.Background(), after)
+		b.closePASESessionsOnCommissioningComplete(ctx, commissioningCompleteAnswer(mattercore.CommissioningErrorOK))
+		if got := openPASESessions(mgr); got != 0 {
+			t.Fatalf("PASE sessions after CommissioningComplete = %d, want 0", got)
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			b, _, clk := paseCloseBridge(t)
-			after := &im.AfterResponse{}
-			ctx := im.WithAfterResponse(context.Background(), after)
-			var closings atomic.Int32
-			if ids := b.closePASESessions(ctx, paseCloseGrace, func([]uint16) { closings.Add(1) }); len(ids) != 1 {
-				t.Fatalf("closePASESessions named %v, want one session", ids)
-			}
-			if !armAfterStop {
-				after.Run()
-				if got := clk.Pending(); got != 1 {
-					t.Fatalf("timers armed after the response = %d, want 1", got)
-				}
-			}
-			if err := b.Stop(context.Background()); err != nil {
-				t.Fatalf("Stop: %v", err)
-			}
-			if armAfterStop {
-				after.Run()
-			}
-			if got := clk.Pending(); got != 0 {
-				t.Errorf("timers armed after Stop = %d, want 0", got)
-			}
-			clk.Advance(paseCloseGrace)
-			if got := closings.Load(); got != 0 {
-				t.Errorf("PASE closes run after Stop = %d, want 0", got)
-			}
-		})
-	}
+		after.Run()
+		if got := clk.Pending(); got != 0 {
+			t.Fatalf("timers armed after the response = %d, want 0", got)
+		}
+		if err := b.Stop(context.Background()); err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+		if got := clk.Pending(); got != 0 {
+			t.Errorf("timers armed after Stop = %d, want 0", got)
+		}
+	})
+	t.Run("response sent after Stop", func(t *testing.T) {
+		t.Parallel()
+		b, mgr, clk := paseCloseBridge(t)
+		after := &im.AfterResponse{}
+		ctx := im.WithAfterResponse(context.Background(), after)
+		var closings atomic.Int32
+		if ids := b.closePASESessions(ctx, func([]uint16) { closings.Add(1) }); len(ids) != 1 {
+			t.Fatalf("closePASESessions named %v, want one session", ids)
+		}
+		if err := b.Stop(context.Background()); err != nil {
+			t.Fatalf("Stop: %v", err)
+		}
+		after.Run()
+		if got := clk.Pending(); got != 0 {
+			t.Errorf("timers armed after Stop = %d, want 0", got)
+		}
+		if got, open := closings.Load(), openPASESessions(mgr); got != 1 || open != 0 {
+			t.Errorf("after the response: %d closes run, %d PASE sessions open; want 1 and 0", got, open)
+		}
+	})
 }
 
 // TestStrictValidationSetAfterStartJudgesEveryEndpointAsAdded pins what
