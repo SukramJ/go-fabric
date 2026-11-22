@@ -45,6 +45,7 @@ func TestPeerIndexDropsSessionAtRemoval(t *testing.T) {
 		close func(t *testing.T, m *Manager, a, b *Entry) int
 	}{
 		{"Close", func(t *testing.T, m *Manager, a, _ *Entry) int {
+			t.Helper()
 			if err := m.Close(a.SessionID); err != nil {
 				t.Fatal(err)
 			}
@@ -80,12 +81,14 @@ func TestPeerIndexDropsSessionAtRemoval(t *testing.T) {
 			return 0
 		}},
 		{"occupant replacement", func(t *testing.T, m *Manager, a, _ *Entry) int {
+			t.Helper()
 			// Installed establishing: no supersession check reads (and
 			// prunes) the peer's bucket at the install.
 			openEstablishing(t, m, a.SessionID, peerIndexPeer)
 			return 2
 		}},
 		{"per-peer cap eviction", func(t *testing.T, m *Manager, _, _ *Entry) int {
+			t.Helper()
 			for id := uint16(3); id <= MaxSessionsPerPeer+1; id++ {
 				open(t, m, id)
 			}

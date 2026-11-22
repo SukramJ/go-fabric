@@ -113,7 +113,7 @@ func (r *recordRig) full(t *testing.T) (uint16, *caseEstablishment) {
 
 // resume presents rec in a Sigma1 on a new adapter. It returns the reply's
 // opcode and, for a Sigma2_Resume, the installed session's id.
-func (r *recordRig) resume(t *testing.T, rec store.ResumptionRecord) (uint8, uint16, *caseEstablishment) {
+func (r *recordRig) resume(t *testing.T, rec store.ResumptionRecord) (op uint8, id uint16, est *caseEstablishment) {
 	t.Helper()
 	a, est := r.adapter(t)
 	initiator, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
@@ -131,7 +131,7 @@ func (r *recordRig) resume(t *testing.T, rec store.ResumptionRecord) (uint8, uin
 	if err != nil {
 		t.Fatal(err)
 	}
-	op, _, err := a.ProcessSigma1(sigma1)
+	op, _, err = a.ProcessSigma1(sigma1)
 	if err != nil {
 		t.Fatalf("ProcessSigma1 (resume): %v", err)
 	}

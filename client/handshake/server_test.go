@@ -492,7 +492,7 @@ func TestCASEServerHandsTheSessionOverAsItIsEstablished(t *testing.T) {
 					t.Fatalf("CASE to the controller: %v", err)
 				}
 			}
-			var held []*exchange.Session
+			held := make([]*exchange.Session, 0, 5)
 			for range 5 {
 				open()
 				held = append(held, r.accepted(t))
