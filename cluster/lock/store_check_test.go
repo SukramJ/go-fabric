@@ -152,9 +152,9 @@ func wantDisallowedEnum(t *testing.T, err error, member string) {
 }
 
 // A defined value whose member conformance the lock's features do not
-// meet is refused at the store as well, as matter.js's store validation
-// refuses it (addEnumMemberValidation, conformance-compiler.ts:762-862 at
-// b25ed960); the request gate does the same for a peer's request.
+// meet is refused at the store as well, following matter.js's store
+// validation (addEnumMemberValidation, conformance-compiler.ts:762-862 at
+// b25ed960; derived, not run); the request gate does the same for a peer.
 func TestLocalStoreRefusesFeatureDisallowedEnumValues(t *testing.T) {
 	t.Parallel()
 	noCOTA := func(c *lock.DoorLockConfig) { c.Features &^= lock.FeatureCOTA }

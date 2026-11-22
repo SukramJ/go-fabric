@@ -447,10 +447,10 @@ func (s *DoorLockServer) findUserIndexForCredential(credType uint8, index uint16
 //
 // A defined value whose own conformance the lock's features do not meet
 // is refused as well (checkEnumValue), as matter.js's store validation
-// refuses it. Only the record being stored is checked: a record a host
-// loaded through the configuration or the store is not checked at load,
-// so a later Modify of such a user — a peer's too — is refused until the
-// value is changed.
+// does by the lines cited there (derived, not run against a DoorLock).
+// Only the record being stored is checked: one a host loaded through the
+// configuration or the store is not checked at load, so a later Modify
+// of such a user — a peer's too — is refused until the value is changed.
 //
 // Mirrors matter.js
 // packages/node/src/behavior/state/managed/values/StructManager.ts:278-297
