@@ -50,8 +50,8 @@ func init() {
 		}
 		return x.send(ctx, opcode, payload, o, onTransmitted)
 	}
-	exchangeseam.CompleteSecureSessionEstablishment = func(sess any) bool {
+	exchangeseam.CompleteSecureSessionEstablishment = func(sess any, onEstablished func()) bool {
 		s, ok := sess.(*Session)
-		return ok && s.completeEstablishment()
+		return ok && s.completeEstablishmentWith(onEstablished)
 	}
 }

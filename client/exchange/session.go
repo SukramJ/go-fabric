@@ -687,6 +687,21 @@ func (s *Session) holdWhileEstablishing(duplicate bool, deliver func()) bool {
 // NodeSession.ts:233-251 at b25ed960 (completeEstablishment) and
 // SessionManager.ts:757-769 (#sessionEstablished, its eviction).
 func (s *Session) completeEstablishment() bool {
+	return s.completeEstablishmentWith(nil)
+}
+
+// completeEstablishmentWith is [Session.completeEstablishment] that runs
+// onEstablished, when not nil, in the call that establishes the session:
+// after the session became established and before the per-peer cap's
+// eviction it sets off, so whoever onEstablished hands the session to
+// holds it before any effect of the establishment is observable —
+// "established ⇒ adopted" (F-b25ed960-44). matter.js's established event
+// adds the session to the established set, whose added observers adopt it
+// into its peer synchronously, and queues the eviction
+// (packages/protocol/src/session/NodeSession.ts:241-251,
+// packages/protocol/src/session/SessionManager.ts:764-768, :1266-1284,
+// packages/protocol/src/peer/PeerSet.ts:104 at b25ed960).
+func (s *Session) completeEstablishmentWith(onEstablished func()) bool {
 	s.mu.Lock()
 	if !s.establishing.Load() {
 		s.mu.Unlock()
@@ -700,6 +715,9 @@ func (s *Session) completeEstablishment() bool {
 	}
 	s.establishing.Store(false)
 	s.mu.Unlock()
+	if onEstablished != nil {
+		onEstablished()
+	}
 	s.m.sessionEstablished(s)
 	return true
 }
