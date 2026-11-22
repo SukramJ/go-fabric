@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/lock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -82,6 +83,28 @@ func TestLocalStoreRefusesUndefinedEnumValues(t *testing.T) {
 		got := localUser(t, srv, 1)
 		if got.UserType.Value != lockdef.UserTypeUnrestrictedUser || got.UserName.Value != "" {
 			t.Errorf("user 1 changed: type %d, name %q", got.UserType.Value, got.UserName.Value)
+		}
+	})
+
+	t.Run("a refused Modify leaves the expiry timer running", func(t *testing.T) {
+		t.Parallel()
+		// by_design BD-Matter-DoorLock-RefusedModifyKeepsExpiryTimer:
+		// matter.js stops the timer before it refuses
+		// (DoorLockServer.ts:312-326 at b25ed960); here the refused
+		// command changes nothing, so the user is disabled at the deadline.
+		f := setUpScheduledLock(t, expiringUserTimeout(1), scheduledUser(lockdef.UserTypeExpiringUser, nil))
+		if err := f.unlockScheduled(); err != nil {
+			t.Fatal(err)
+		}
+		f.advance(30 * time.Second)
+		req := setUserReq(lockdef.DataOperationTypeModify, 1)
+		req.UserType = spec.ValueOf(lockdef.UserTypeEnum(99))
+		_, err := f.srv.MatterInvoke(withPairFabric(), lockdef.CmdSetUser, req)
+		wantUndefinedEnum(t, err, "99", "UserTypeEnum")
+		f.advance(40 * time.Second)
+		f.settle()
+		if got := f.userStatus(); got != lockdef.UserStatusOccupiedDisabled {
+			t.Errorf("status %d after the deadline, want OccupiedDisabled (timer kept)", got)
 		}
 	})
 

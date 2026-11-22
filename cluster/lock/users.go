@@ -157,8 +157,12 @@ func (s *DoorLockServer) modifyUserLocked(ctx context.Context, req lockdef.SetUs
 	if !req.CredentialRule.Null {
 		candidate.CredentialRule = uint8(req.CredentialRule.Value)
 	}
-	// Checked before the expiry timer or the record changes: an error
-	// that leaves nothing dirty is not rolled back by commit.
+	// Checked before the expiry timer or the record changes. matter.js
+	// stops the timer first (:312-315) and refuses in replaceUser
+	// (:317-326), so a refused Modify leaves its timer stopped until the
+	// PIN's next use or a restart; here a refused command changes nothing
+	// (by_design BD-Matter-DoorLock-RefusedModifyKeepsExpiryTimer). commit
+	// could not undo it either: it restores the records, not the timers.
 	if err := checkUserRecord(&candidate); err != nil {
 		return err
 	}
@@ -441,6 +445,11 @@ func (s *DoorLockServer) findUserIndexForCredential(credType uint8, index uint16
 // a local MatterInvoke — which no request gate judges — is held to the
 // same values a peer's request is.
 //
+// Only membership is checked. matter.js's validation at the store also
+// refuses a defined value whose conformance the lock's features do not
+// meet (findings: DoorLock store enum member conformance); the request
+// gate does that for a peer's request.
+//
 // Mirrors matter.js
 // packages/node/src/behavior/state/managed/values/StructManager.ts:278-297
 // at b25ed960 (a managed property set is validated; a throw undoes the
@@ -499,7 +508,7 @@ func checkUserRecord(u *store.DoorLockUser) error {
 // Mirrors matter.js
 // packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
 // at b25ed960 (createEnumValidator: definesValues, the valid ids and the
-// range members, the message).
+// range members; the message's stem).
 func checkEnumValue(field string, e *spec.Enum, v uint8) error {
 	if len(e.Values) == 0 && len(e.Ranges) == 0 {
 		return nil
