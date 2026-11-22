@@ -30,7 +30,7 @@ still held there. Each row names the facade route, or the section of
 | `secure/operational` | `Manager` (`daemon_matter.go:153`, `:1193`) | `node.SessionManager` (the same type) |
 | `im/subscription` | `Manager` (`daemon_matter.go:154`, `:1194`) | `node.SubscriptionManager` (the same type); [`im/subscription`](advanced-seams.md#imsubscription) |
 | `secure/attestation` | `LoadChainFiles`, `ChainFiles`, `ErrNoChainConfigured` (`daemon_matter.go:318`, `:329`) | `Config.Attestation.Files` (`node.AttestationFiles`); loom starts on a chain that does not load and blocks commissioning (`daemon_matter.go:480-491`, `:552-554`): `Attestation.BlockCommissioningOnError`, the error in `Node.AttestationError`. Files naming nothing keep the test chain, so `ErrNoChainConfigured` has no counterpart |
-| `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Off}` for loom's `noop`; a host that builds the advertiser itself calls `mdns.NewResponder()` ([the mDNS responder](#removed-or-changed-in-the-next-release-the-mdns-responder)) |
+| `mdns` | `NewZeroconf`, `NewSubtypeResponder`, `NewNoop`, `Advertiser` (`daemon_matter.go:81-121`) | a nil `Config.Advertiser`; `Network.MDNS{Off}` for loom's `noop`; a host that builds the advertiser itself calls `mdns.NewResponder()` ([the mDNS responder](#removed-or-changed-in-v0170-the-mdns-responder)) |
 | `mdns` | `IsEnabled` (`daemon_matter.go:1263`), `Diagnose` (`:1289`), `Advertiser.Active` (`:1265`) | `Node.MDNSEnabled`, `Node.DiagnoseMDNS`, `Node.MDNSServices` (`node.MDNSFinding`, `node.MDNSService`) |
 | `endpoint` | `SourceKey` (`internal/store/matterendpoint/sourcekey.go:68`), `Topology` (`daemon_matter.go:916`) | `device.SourceKey`, `node.Topology`; a source's availability (`assembler.go:861`) is `Device.SetReachable` |
 | `endpoint` | `Assembler`, `New`, `Spec` (`assembler.go:155`, `:184`, `:627`); `endpoint/sqlitestore` (`internal/store/matterendpoint/store.go:10`) | the node's Aggregator with partitions (`Aggregator.Partition`, `Batch`) and the device kit; a host with an assembler of its own stays on [`endpoint`](advanced-seams.md#endpoint) |
@@ -42,7 +42,7 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
-## Deprecated in the next release, removable in v0.26.0: the OTA provider's hooks
+## Deprecated in v0.24.0, removable in v0.26.0: the OTA provider's hooks
 
 The OTA provider's requestors now have update attempts, owned by the
 provider's manager: `OTAProviderConfig.Manager` (`cluster/core`, `node`,
@@ -76,7 +76,7 @@ then closes the gap only for the manager's queued update, not for an
 offer the default manager made — and `ProviderConfig()` no longer fills
 the hooks such a host copied.
 
-## Changed in the next release: the update queue's phases and the NOC rotation
+## Changed in v0.24.0: the update queue's phases and the NOC rotation
 
 `controller/softwareupdate.Manager` follows matter.js's update phases
 (decision 292). No signature changed; what a host observes did:
@@ -122,7 +122,7 @@ calls nothing.
 | `Bridge.ConnectOtaProvider(ctx, fabricIndex, nodeID)` | inside a node: nothing, the OTA requestor uses the peer path; a bridge run without a node attaches its own `core.OtaProviderConnector` |
 | a camera signal over UDP | refused before sending with `camera.ErrNoLargeMessageTransport`: give the node the TCP client role (`Network.TCP.Outgoing`) |
 
-## Removed in the next release: `fabrictest.UseWiFiCommissioning`
+## Removed in v0.22.0: `fabrictest.UseWiFiCommissioning`
 
 Wi-Fi commissioning is part of the facade since milestone 7 (wave 28b):
 `node.Network.WiFi` is the node's Wi-Fi interface, and its `Driver`
@@ -150,7 +150,7 @@ request came from.
 | `(*core.OperationalCredentials).SetAttestationChallenge(challenge)` | nothing to call: the bridge stamps the invoking session's challenge on every invoke (`core.WithInvokeAttestationChallenge`), read from a session table that has `AttestationChallengeFor(sessionID uint16) ([]byte, bool)`, as `operational.Manager` does ([ports](ports.md)) |
 | a direct `MatterInvoke` of one of the three commands (a host's own test) | `core.WithInvokeAttestationChallenge(ctx, challenge)` on the context; without it the command answers FAILURE |
 
-## Removed in the next release: the controller's own node
+## Removed in v0.18.0: the controller's own node
 
 Phase 37 (issue 410) serves the OTA provider, the group sender and the
 camera controller's requestor from the controller's one operational
@@ -168,7 +168,7 @@ start whose erase of the former own node fails in the database logs
 `controller.ota.own_node.forget`, keeps the record and migrates at the
 next start.
 
-## Removed or changed in the next release: the facade review
+## Removed or changed in v0.16.0: the facade review
 
 The review of 2026-11 (`notes/review/2026-11/wave-5-api.md`) made the
 facade one shape. Each row names what a host writes now.
@@ -183,8 +183,8 @@ facade one shape. Each row names what a host writes now.
 | `device.Logger` | `device.Options.Logger` per device (nil is `slog.Default()`) |
 | `device.WithServer`, `device.Option`, `device.TypeByID` | `device.HostServer(srv)`; `device.Declaration`; `device.Lookup(uint32(id))` |
 | `Node.PairingCodes`, `Aggregator.IncreaseConfigurationVersion`, `WindowCredentials.Iterations`, `Commissioning.PBKDFIterations int` | `Node.SetupPayload()` (`.QR`, `.Manual`); `Aggregator.IncreaseConfigurationVersions(ctx, keys...)` (`node.ErrNotStarted` before `Start`); `WindowCredentials.PBKDFIterations`; `Commissioning.PBKDFIterations uint32` |
-| `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; drop the re-announce settings (`Network.Reannounce` is gone too, [the mDNS responder](#removed-or-changed-in-the-next-release-the-mdns-responder)); `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
-| `node.OTAConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `node.Network.WiFi.Driver` since milestone 7 ([above](#removed-in-the-next-release-fabrictestusewificommissioning)); `bootid.EnableRotation()` before `node.New` |
+| `node.Client` (`Enabled`), `Config.DisableTimeSynchronization`, `Config.TimeSynchronization *TimeSynchronizationConfig`, `Network.ReannounceInterval`, `Network.DisableReannounce`, `MDNS.Disabled`, `Config.Health Health`, `Network.WiFi WiFi` | `Config.Client *ClientConfig` (nil off); `Config.TimeSynchronization{Off, Config}`; drop the re-announce settings (`Network.Reannounce` is gone too, [the mDNS responder](#removed-or-changed-in-v0170-the-mdns-responder)); `MDNS.Off`; `Config.Health *Health` (nil off); `Network.WiFi *WiFi` (nil off) |
+| `node.OTAConfig.Harness`, `node.Network.WiFiCommissioning`, `node.WiFiCommissioning`, `node.Config.BootID`, `node.BootID` | not public (`internal/nodeseam`); `node.Network.WiFi.Driver` since milestone 7 ([above](#removed-in-v0220-fabrictestusewificommissioning)); `bootid.EnableRotation()` before `node.New` |
 | `contract.InitialDataVersion`, `contract.SetMeasurementMaterializer` | none: unexported; a host kind is `contract.RegisterMeasurementKind` |
 | `device.AheadRows` | `node.AheadRows()` (the root's and the devices' rows) |
 | `contract.DeviceTypeName` | `schema.DeviceTypeName(schema.DeviceTypeID(id))`; operator labels are the host's |
@@ -194,7 +194,7 @@ facade one shape. Each row names what a host writes now.
 | `fabrictest.Device.Bridge`, `.Store`, `.Peers`, `.Advertiser`, `.Endpoints`; `fabrictest.Controller.Exchanges`, `.Names`, `.Peers`, `.Resumption`, `.Subscriptions`; the fields `fabrictest.Pair.Peer`, `.Interaction`, `.PASESession`; `fabrictest.Connect`, `fabrictest.Exchange`; the aliases `fabrictest.Peer`, `Interaction`, `Session`, `Message` | a host's test drives the facade: `pair.Device.Node()` (its `Bridge()`, `Store()` and `Peers()` are the node's own seams), the wire helpers (`fabrictest.Read`, `Write`, `Invoke`, `Subscribe`, `Send`) and the pair's client node `pair.Node()`; the client machinery below `controller/client` and a pair's transport have no public route — they are the module's own test seam (`internal/fabrictestseam`) |
 | `otbr.Probe(ctx, host, port, timeout, httpClient)`, `esphome.Discover(ctx, browser, keys, timeout)` | `otbr.Probe(ctx, otbr.Config{Host, Port, Timeout, HTTPClient, Clock})`; `esphome.Discover(ctx, esphome.Options{Logger, Clock, Discover: &esphome.DiscoverOptions{Browser, Keys, Timeout}})` |
 
-## Removed or changed in the next release: the mDNS responder
+## Removed or changed in v0.17.0: the mDNS responder
 
 The module answers DNS-SD with its own responder, modelled on matter.js's
 `MdnsServer`, in place of `github.com/grandcat/zeroconf` (issue #362). Every
@@ -211,7 +211,7 @@ schedule instead of a periodic re-announce loop.
 | `operational.Manager.SetReannounceTrigger(func())` | `SetReannounceTrigger(func(fabricIndex uint8))`: fired once per (fabric, peer) pair a sweep leaves without a session, 0 for a PASE session |
 | `subscription.Manager.SetOnSubscriptionTerminated(func(subID uint32))` | `SetOnSubscriptionTerminated(func(subID uint32, fabricIndex uint8))`: the subscription's fabric |
 
-## Changed in the next release: `CommissionerReach` takes the peer
+## Changed in v0.13.12: `CommissionerReach` takes the peer
 
 Every method of `jfadef.CommissionerReach` (`jointfabric.CommissionerReach`)
 takes the commissioner as its second argument, a `jfadef.Peer{FabricIndex,
@@ -226,7 +226,7 @@ func (r myReach) ReadFabrics(ctx context.Context, peer jfadef.Peer) ([]opcreds.F
 A node with `Config.Client` on needs no reach of its own: it mounts one
 over its client stack where the declaration names none.
 
-## Changed in the next release: the resumption record's role (schema v12)
+## Changed in v0.24.0: the resumption record's role (schema v12)
 
 The per-fabric cap of 16 resumption records counts only the CASE
 responder's records; the records the CASE client writes have a per-fabric
@@ -266,7 +266,7 @@ Two signatures change with it (breaks):
 The [Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)
 guide lists every `Host`.
 
-## Removed in the next release: `controller/thread`
+## Removed in v0.13.7: `controller/thread`
 
 | Symbol | Route |
 | --- | --- |
