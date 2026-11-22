@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.24.0` (before `v0.23.0`) and are tagged `ble/bluez/v0.24.0`, `ble/esphome/v0.24.0` and `wifi/wpasupplicant/v0.24.0` at this commit — `ble/esphome` with the `golang.org/x/crypto` bump of #540; `examples/ble-wifi-light` requires the three at `v0.24.0` (owner decision of 2026-11-22, the procedure of decisions 261, 266).
+
 ## [0.24.0] — 2026-11-22
 
 The matter.js pin lift `db021da0` → `b25ed960` (`notes/parity/pin-lifts.md`), waves P0 to P6 (#559 to #569), and review II's phase 7 with its backlog (#549 to #558): the module read again against matter.js at `b25ed960`, the request gate in the endpoint dispatcher, the CASE responder and session supersession, the OTA provider's update attempts and the controller's NOC rotation as matter.js, and the PASE session's close on CommissioningComplete and on a fail-safe rollback. The API breaks are under Changed with their migrations; what is deprecated here is removable in `v0.26.0`.
