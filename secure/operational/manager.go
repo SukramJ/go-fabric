@@ -45,6 +45,16 @@ type Manager struct {
 	reaperStop context.CancelFunc
 	reaperWG   sync.WaitGroup
 
+	// establishMu orders the establishments of CASE sessions: held from
+	// before the computation under mu until the supersession hooks of that
+	// establishment ran, so the hooks of one establishment all run before
+	// those of the next, as matter.js emits them synchronously on one
+	// thread (packages/protocol/src/session/SessionManager.ts:750-769 at
+	// b25ed960, #sessionEstablished; F-b25ed960-40). Released before the
+	// per-peer eviction closes anything — matter.js queues that eviction
+	// (:764-768). Lock order: establishMu, then mu; never the reverse.
+	establishMu sync.Mutex
+
 	// mu guards the session table (sessions, nextID) and the hooks below.
 	mu             sync.RWMutex
 	sessions       map[uint16]*Entry
@@ -63,6 +73,9 @@ type Manager struct {
 	// onSessionSuperseded fires once per older session a newly
 	// established one supersedes (SetOnSessionSuperseded).
 	onSessionSuperseded func(olderID, newerID uint16)
+	// testBeforeSupersede, set by tests only, runs at every establishment
+	// between the table's unlock and the supersession hooks.
+	testBeforeSupersede func(newer *Entry)
 	// byPeer indexes the CASE sessions installed by their peer node id, so
 	// the supersession check at an establishment reads the peer's sessions
 	// rather than the whole table. Entries are added at the install and
@@ -310,6 +323,14 @@ func (m *Manager) SetOnPaseSessionClose(fn func(sessionID uint16)) {
 // either; an older session still establishing, or no longer in the table
 // (closed), is not superseded. Older sessions are reported in the order
 // they were created.
+//
+// The hooks of one establishment all run before those of the next
+// ([Manager.establishMu]), as matter.js emits them synchronously on one
+// thread: a subscription moved off a session another establishment just
+// evicted is not left behind on a superseded one (F-b25ed960-40). The hook
+// therefore must not open or complete a session on this Manager, and a
+// caller must not establish one while holding a lock the hook takes; a
+// hook that blocks holds up every establishment of the Manager.
 //
 // Mirrors matter.js packages/protocol/src/session/SessionManager.ts:750-769
 // at b25ed960 (#sessionEstablished: supersession first and synchronous,
@@ -931,10 +952,12 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		return nil, fmt.Errorf("operational: build session: %w", err)
 	}
 
+	m.establishMu.Lock()
 	m.mu.Lock()
 	id, err := m.allocateIDLocked()
 	if err != nil {
 		m.mu.Unlock()
+		m.establishMu.Unlock()
 		sess.Close()
 		return nil, err
 	}
@@ -960,9 +983,13 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 	superseded := m.supersededByLocked(entry)
 	excess := m.evictExcessPeerSessionsLocked(entry)
 	m.mu.Unlock()
+	if m.testBeforeSupersede != nil {
+		m.testBeforeSupersede(entry)
+	}
 	// Supersession before the eviction closes anything: matter.js
 	// SessionManager.ts:750-769 at b25ed960 (#sessionEstablished).
 	m.fireOnSessionSuperseded(superseded, entry)
+	m.establishMu.Unlock()
 	// Force close, no CloseSession: matter.js SessionManager.ts:779-808
 	// at b25ed960 (#evictExcessSessionsFor, a forced close) skips the
 	// graceful path for the cap because the eviction target is typically
@@ -1291,12 +1318,26 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 		createdAtMono:        clock.MonotonicOf(m.clk()),
 		clock:                m.clk(),
 	}
+	// An establishing install supersedes nothing yet: only an
+	// establishment takes the establishment order ([Manager.establishMu]).
+	// The occupant's close hooks below then run inside it too, and must
+	// not establish on this manager either.
+	ordered := !entry.establishing
+	if ordered {
+		m.establishMu.Lock()
+	}
+	unorder := func() {
+		if ordered {
+			m.establishMu.Unlock()
+		}
+	}
 	m.mu.Lock()
 	// A stake that no longer holds its id installs nothing: the id's
 	// holder now — another handshake's stake or its session — stays
 	// (N3-findev-1). The check and the install share the lock.
 	if stake != nil && !m.stakes(placeholderRef{id: stake.ID, e: stake.e}) {
 		m.mu.Unlock()
+		unorder()
 		sess.Close()
 		return nil, ErrStakeLost
 	}
@@ -1329,7 +1370,11 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 	// keyed to this id — and before the eviction closes the sessions the
 	// moved subscriptions leave (matter.js SessionManager.ts:750-769 at
 	// b25ed960, #sessionEstablished).
+	if m.testBeforeSupersede != nil && ordered {
+		m.testBeforeSupersede(entry)
+	}
 	m.fireOnSessionSuperseded(superseded, entry)
+	unorder()
 	// The per-peer cap force-closes without CloseSession — see
 	// OpenFromSigma for the matter.js provenance.
 	closeStaleEntries(excess)
@@ -1689,22 +1734,29 @@ func (m *Manager) completeEstablishment(e *Entry) bool {
 	if e == nil {
 		return false
 	}
+	m.establishMu.Lock()
 	m.mu.Lock()
 	if !e.establishing {
 		m.mu.Unlock()
+		m.establishMu.Unlock()
 		return true
 	}
 	if cur, ok := m.sessions[e.SessionID]; !ok || cur != e {
 		m.mu.Unlock()
+		m.establishMu.Unlock()
 		return false
 	}
 	e.establishing = false
 	superseded := m.supersededByLocked(e)
 	excess := m.evictExcessPeerSessionsLocked(e)
 	m.mu.Unlock()
+	if m.testBeforeSupersede != nil {
+		m.testBeforeSupersede(e)
+	}
 	// Supersession before the eviction closes anything (matter.js
 	// SessionManager.ts:750-769 at b25ed960, #sessionEstablished).
 	m.fireOnSessionSuperseded(superseded, e)
+	m.establishMu.Unlock()
 	closeStaleEntries(excess)
 	m.fireOnSessionClose(excess)
 	return true
