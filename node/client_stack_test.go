@@ -75,6 +75,31 @@ func (cp *clientPair) connect(t *testing.T, opts peer.ConnectOptions) (*exchange
 	return s, err
 }
 
+// awaitResponderRecord waits until b's resumption record of a carries the
+// resumption id a's client stack holds for b. The initiator saves its record
+// before its handshake returns; the responder saves its own after the
+// establishment, so a connect may return before b's record is in place —
+// in matter.js too, which saves the responder's record only after the
+// Success's acknowledgement wait (CaseServer.ts:331, :356-357 at b25ed960)
+// while the initiator waits for nothing after the Success
+// (CaseClient.ts:336-384). A resumption inside that window falls back to a
+// full CASE (CaseServer.ts:223-230), so a test that resumes or reads b's
+// record waits for it first (#578).
+func (cp *clientPair) awaitResponderRecord(t *testing.T) {
+	t.Helper()
+	ctx := parityCtx(t)
+	mine, err := cp.a.Node().Store().GetResumptionByPeer(ctx, cp.aFabric.FabricIndex, cp.bFabric.NodeID)
+	if err != nil {
+		t.Fatalf("a's resumption record of b: %v", err)
+	}
+	if err := cp.site.Eventually(ctx, "b's resumption record of a", func() bool {
+		theirs, err := cp.b.Node().Store().GetResumptionByPeer(ctx, cp.bFabric.FabricIndex, cp.aFabric.NodeID)
+		return err == nil && bytes.Equal(theirs.ResumptionID, mine.ResumptionID)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // TestClientStackStatesTheNodesSessionParameters: a CASE the node opens
 // from its client stack states the node's own MRP intervals,
 // MaxPathsPerInvoke and TCP roles — the ones its responder states — as
@@ -118,6 +143,7 @@ func TestClientStackStatesTheNodesSessionParameters(t *testing.T) {
 	// b's responder keeps a's parameters in its resumption record, the one
 	// record per peer a CASE client resumes from too (review II, Fable P-5;
 	// matter.js CaseServer.ts:339 at db021da0).
+	cp.awaitResponderRecord(t)
 	rec, err := cp.b.Node().Store().GetResumptionByPeer(parityCtx(t), cp.bFabric.FabricIndex, cp.aFabric.NodeID)
 	if err != nil {
 		t.Fatalf("b's resumption record of a: %v", err)
@@ -165,6 +191,7 @@ func TestClientStackResumesAcrossARestart(t *testing.T) {
 	if first.Resumed() {
 		t.Fatal("the first session resumed with no record")
 	}
+	cp.awaitResponderRecord(t)
 	if err := site.Run(parityCtx(t), cp.a.Restart); err != nil {
 		t.Fatal(err)
 	}
@@ -191,6 +218,7 @@ func TestResumedSessionKeepsTheRecordsParameters(t *testing.T) {
 	if _, err := cp.connect(t, peer.ConnectOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	cp.awaitResponderRecord(t)
 	ctx := parityCtx(t)
 	first, err := cp.b.Node().Store().GetResumptionByPeer(ctx, cp.bFabric.FabricIndex, cp.aFabric.NodeID)
 	if err != nil || first.SessionParameters.SessionIdleInterval != 900 {
@@ -208,6 +236,9 @@ func TestResumedSessionKeepsTheRecordsParameters(t *testing.T) {
 	if !again.Resumed() {
 		t.Fatal("the second session did not resume")
 	}
+	// The resumed session's record is saved after a's Success arrived
+	// (CaseServer.ts:205-217 at b25ed960).
+	cp.awaitResponderRecord(t)
 	rec, err := cp.b.Node().Store().GetResumptionByPeer(ctx, cp.bFabric.FabricIndex, cp.aFabric.NodeID)
 	if err != nil {
 		t.Fatal(err)

@@ -4,6 +4,7 @@
 package fabrictest
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -119,6 +120,19 @@ func newResumeReplayRig(t *testing.T) *resumeReplayRig {
 		})
 	}
 	if err := connect(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// b saves its record after the establishment, a before its connect
+	// returns: the resume below needs b's (matter.js CaseServer.ts:331,
+	// :356-357 and CaseClient.ts:336-384 at b25ed960; #578).
+	mine, err := a.Node().Store().GetResumptionByPeer(ctx, af[0].FabricIndex, bf[0].NodeID)
+	if err != nil {
+		t.Fatalf("a's resumption record of b: %v", err)
+	}
+	if err := site.Eventually(ctx, "b's resumption record of a", func() bool {
+		theirs, err := b.Node().Store().GetResumptionByPeer(ctx, bf[0].FabricIndex, af[0].NodeID)
+		return err == nil && bytes.Equal(theirs.ResumptionID, mine.ResumptionID)
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := site.Run(ctx, a.Restart); err != nil {
