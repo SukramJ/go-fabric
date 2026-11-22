@@ -328,6 +328,27 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 	return im.NewWriteTransaction(&r.writeHolds)
 }
 
+// latestTimedDeadline is the latest timed deadline of sessionID that has
+// not elapsed at now, and whether there is one.
+func (r *exchangeRouting) latestTimedDeadline(sessionID uint16, now time.Time) (time.Time, bool) {
+	var latest time.Time
+	found := false
+	r.timedDeadlines.Range(func(k, v any) bool {
+		key, ok := k.(timedKey)
+		if !ok || key.sessionID != sessionID {
+			return true
+		}
+		if deadline, ok := v.(time.Time); ok && !now.After(deadline) {
+			if !found || deadline.After(latest) {
+				latest = deadline
+			}
+			found = true
+		}
+		return true
+	})
+	return latest, found
+}
+
 // openWriteTxs counts the chunked writes sessionID has open.
 func (r *exchangeRouting) openWriteTxs(sessionID uint16) int {
 	n := 0

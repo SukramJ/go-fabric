@@ -1040,10 +1040,12 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		// at b25ed960); it is established once the initiator's Success
 		// arrives (:204-206, [Bridge.settleAwaitedResume]) and closed when
 		// the initiator reports a failure instead (:207-210). matter.js
-		// saves the record after that Success (:216-217); here it is saved
-		// at the install. A session whose Sigma2_Resume is not
-		// acknowledged is closed ([Bridge.closeUnacknowledgedResume];
-		// review II, R2-P6-sec-3320).
+		// saves the record after that Success (:216-217); the host saves it
+		// at the establishment too (node caseEstablishment.complete). A
+		// session whose Sigma2_Resume is not acknowledged is closed — by
+		// entry for a host that installs establishing
+		// ([Bridge.endAwaitedResume]), by id otherwise
+		// ([Bridge.closeUnacknowledgedResume]; review II, R2-P6-sec-3320).
 		out := sigma.MarshalSigma2Resume(*result.Sigma2Resume)
 
 		// Every resume that yields a session id the adapter has not

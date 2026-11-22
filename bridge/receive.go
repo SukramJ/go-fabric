@@ -209,8 +209,14 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// is refused here: not acknowledged, not processed, the exchange and
 	// the outstanding message left as they were
 	// ([Bridge.refuseUnacknowledging]).
+	//
+	// A new exchange on a PASE session whose graceful close is deferred
+	// gets nothing either — no ack owed, no handling — and the
+	// commissioning channel's implicit Administer serves no request on it
+	// ([Bridge.refuseOnClosingPASE]). A duplicate passes: its ack is sent
+	// below.
 	if !duplicate {
-		if err := b.refuseUnacknowledging(src, &hdr, proto); err != nil {
+		if err := b.refuseNewMessage(src, &hdr, proto); err != nil {
 			return err
 		}
 	}
@@ -256,6 +262,13 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 			slog.Uint64("counter", uint64(hdr.MessageCounter)))
 		return nil
 	}
+
+	// A non-duplicate message of a secure session is a handler turn on it
+	// until its handling returned: a revoked PASE session does not close
+	// under it, and its end may let one close
+	// ([Bridge.closePASESessionsOnRevoke]).
+	b.enterSessionTurn(hdr.SessionID)
+	defer b.exitSessionTurn(hdr.SessionID)
 
 	// Inbound piggyback ACK: clear the reliable outbound message of this
 	// exchange whose MessageCounter matches AckCounter (Matter §4.12.3) —

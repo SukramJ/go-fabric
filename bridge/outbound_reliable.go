@@ -843,6 +843,18 @@ func (t *outboundReliableTracker) pendingOnExchange(sessionID, exchangeID uint16
 	return key.counter, true
 }
 
+// pendingOnSession reports whether a message this node sent on the secure
+// session still waits for its acknowledgement — an entry of the session in
+// the retransmit table, whatever its exchange or role.
+func (t *outboundReliableTracker) pendingOnSession(sessionID uint16) bool {
+	if t == nil || sessionID == 0 {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.secureOrder[sessionID]) > 0
+}
+
 // pendingOnHandshake is the counters of the messages of the handshake hk on
 // the unsecured session that still wait for their acknowledgement, in the
 // order they were tracked.

@@ -157,7 +157,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1900,
+    "line": 1918,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -167,7 +167,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1907,
+    "line": 1925,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -176,7 +176,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1939,
+    "line": 1957,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -186,7 +186,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2826,
+    "line": 2847,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
@@ -206,7 +206,7 @@
   },
   {
     "file": "bridge/commissioning_window.go",
-    "line": 1154,
+    "line": 1152,
     "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:524",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "randomBytes",
@@ -215,7 +215,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 718,
+    "line": 721,
     "citation": "NodeSession.ts:319-328",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -234,7 +234,7 @@
   },
   {
     "file": "bridge/exchange_routing.go",
-    "line": 348,
+    "line": 369,
     "citation": "InteractionServer.ts:460-469",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "at": "db021da0",
@@ -340,7 +340,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2410,
+    "line": 2447,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -3085,7 +3085,7 @@
   },
   {
     "file": "node/commissioning.go",
-    "line": 674,
+    "line": 662,
     "citation": "packages/protocol/src/protocol/DeviceCommissioner.ts:236-256",
     "resolved": "packages/protocol/src/protocol/DeviceCommissioner.ts",
     "identifier": "commissioningConfig",

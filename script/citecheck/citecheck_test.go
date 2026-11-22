@@ -223,7 +223,8 @@ const citecheckDriftRatchet = 412
 // cites at b25ed960. Wave P5-S re-pointed images.go's and interaction.go's remaining cites at b25ed960 (2675; images.go's checkForUpdate cite labelled at db021da0, its selection not yet the pin's).
 // Wave P5-A2 moved checkForUpdate onto the pin's findApplicable selection and its cite to b25ed960 (2674).
 // Wave P6-B relabelled im/subscription/manager.go's flush cites at b25ed960 (2668).
-const citecheckOffPinRatchet = 2668
+// Wave P6-C relabelled bridge cites at b25ed960 (2658).
+const citecheckOffPinRatchet = 2658
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

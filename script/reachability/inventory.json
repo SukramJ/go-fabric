@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10285,
+  "entry_points": 10295,
   "initializers": 369,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28023,
+    "total_exported": 28031,
     "reachable": 20960,
-    "whitelisted": 7041,
+    "whitelisted": 7049,
     "unreachable": 22
   },
   "by_package": [
@@ -387,14 +387,14 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3284,
+      "line": 3305,
       "kind": "method"
     },
     {
       "package": "bridge",
       "identifier": "Bridge.SubscriptionFlushReporter",
       "file": "bridge/subscribe.go",
-      "line": 404,
+      "line": 407,
       "kind": "method"
     },
     {
@@ -1647,10 +1647,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCASEResumeGiveUpClosesByEntryOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_establishment_test.go",
+      "line": 264
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCASEResumeSecondSigma1FailsTheFirstWait",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_resume_second_sigma1_test.go",
       "line": 76
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCASEResumeWaitOutlivesStop",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_establishment_test.go",
+      "line": 342
     },
     {
       "package": "bridge",
@@ -2309,6 +2323,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_chunked_bound_test.go",
       "line": 93
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestClosingPASESessionTakesNoNewExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 265
     },
     {
       "package": "bridge",
@@ -7023,10 +7044,31 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRevokeClosesThePASESessionWhenItIsIdle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 142
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRevokeDeferredCloseClosesOnlyTheNamedSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 308
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRevokeMarksASessionOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 337
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRevokeWindowSendsCloseSessionOnThePASESession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_revoke_test.go",
-      "line": 134
+      "line": 141
     },
     {
       "package": "bridge",
@@ -7373,6 +7415,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestServerSubscriptionShutdownFlushRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/flush_refused_parity_matterjs_test.go",
+      "line": 32
+    },
+    {
+      "package": "bridge",
       "identifier": "TestServerSubscriptionSupersessionReporter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/supersession_parity_matterjs_test.go",
@@ -7467,7 +7516,7 @@
       "identifier": "TestSessionSupersededGuards",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/supersession_guard_test.go",
-      "line": 52
+      "line": 65
     },
     {
       "package": "bridge",
@@ -7832,6 +7881,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_race_test.go",
       "line": 69
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStopEndsDeferredPASECloses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 359
     },
     {
       "package": "bridge",
