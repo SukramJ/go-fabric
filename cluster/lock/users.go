@@ -447,18 +447,18 @@ func (s *DoorLockServer) findUserIndexForCredential(credType uint8, index uint16
 // set and reaches the caller) and
 // packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
 // at b25ed960 (createEnumValidator: UnknownEnumValueError, status
-// CONSTRAINT_ERROR), on the state lists
+// CONSTRAINT_ERROR). The state lists are
 // packages/node/src/behaviors/door-lock/DoorLockServer.ts:1547-1554 at
-// b25ed960 (State.users, State.credentials), whose records type these
-// fields by their enums:
+// b25ed960 (State.users, State.credentials). A credential reference's
+// type is
 // packages/node/src/behaviors/door-lock/LockAuth.ts:34-35 at b25ed960
-// (CredentialRef.credentialType),
-// packages/node/src/behaviors/door-lock/LockAuth.ts:55-65 at b25ed960
-// (User.userStatus, userType, credentialRule, credentials),
+// (CredentialRef). The user's enum fields are
+// packages/node/src/behaviors/door-lock/LockAuth.ts:55-62 at b25ed960
+// (userStatus, userType, credentialRule). A stored credential's type is
 // packages/node/src/behaviors/door-lock/LockAuth.ts:88-89 at b25ed960
-// (Credential.credentialType); stored by
+// (Credential). Users are stored by
 // packages/node/src/behaviors/door-lock/LockAuth.ts:173-179 at b25ed960
-// (addUser, replaceUser) and
+// (addUser, replaceUser). Credentials are stored by
 // packages/node/src/behaviors/door-lock/LockAuth.ts:229-238 at b25ed960
 // (addCredential).
 //
