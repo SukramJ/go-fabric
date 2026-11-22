@@ -45,6 +45,16 @@ type Manager struct {
 	reaperStop context.CancelFunc
 	reaperWG   sync.WaitGroup
 
+	// establishMu orders the establishments of CASE sessions: held from
+	// before the computation under mu until the supersession hooks of that
+	// establishment ran, so the hooks of one establishment all run before
+	// those of the next, as matter.js emits them synchronously on one
+	// thread (packages/protocol/src/session/SessionManager.ts:750-769 at
+	// b25ed960, #sessionEstablished; F-b25ed960-40). Released before the
+	// per-peer eviction closes anything — matter.js queues that eviction
+	// (:764-768). Lock order: establishMu, then mu; never the reverse.
+	establishMu sync.Mutex
+
 	// mu guards the session table (sessions, nextID) and the hooks below.
 	mu             sync.RWMutex
 	sessions       map[uint16]*Entry
@@ -63,12 +73,16 @@ type Manager struct {
 	// onSessionSuperseded fires once per older session a newly
 	// established one supersedes (SetOnSessionSuperseded).
 	onSessionSuperseded func(olderID, newerID uint16)
+	// testBeforeSupersede, set by tests only, runs at every establishment
+	// between the table's unlock and the supersession hooks.
+	testBeforeSupersede func(newer *Entry)
 	// byPeer indexes the CASE sessions installed by their peer node id, so
 	// the supersession check at an establishment reads the peer's sessions
 	// rather than the whole table. Entries are added at the install and
-	// dropped lazily: one no longer holding its id is pruned when its
-	// peer's bucket is read (supersededByLocked) or by the idle reaper
-	// (prunePeerIndexLocked). Guarded by mu.
+	// removed with the entry ([Manager.removeLocked], and for an occupant
+	// replaced in place [Manager.installEntryLocked]); a read of a bucket
+	// (livePeerBucketLocked) still filters on the table as the invariant's
+	// check. Guarded by mu.
 	byPeer map[uint64][]*Entry
 	// registrations counts the keyed sessions installed so far: the next
 	// one's registration position ([Entry].registration). Incremented
@@ -310,6 +324,14 @@ func (m *Manager) SetOnPaseSessionClose(fn func(sessionID uint16)) {
 // (closed), is not superseded. Older sessions are reported in the order
 // they were created.
 //
+// The hooks of one establishment all run before those of the next
+// ([Manager.establishMu]), as matter.js emits them synchronously on one
+// thread: a subscription moved off a session another establishment just
+// evicted is not left behind on a superseded one (F-b25ed960-40). The hook
+// therefore must not open or complete a session on this Manager, and a
+// caller must not establish one while holding a lock the hook takes; a
+// hook that blocks holds up every establishment of the Manager.
+//
 // Mirrors matter.js packages/protocol/src/session/SessionManager.ts:750-769
 // at b25ed960 (#sessionEstablished: supersession first and synchronous,
 // then the per-peer eviction) and :1233-1250 (supersedes, hasEqualCats),
@@ -382,12 +404,40 @@ func (m *Manager) livePeerBucketLocked(peerNodeID uint64) []*Entry {
 	return live
 }
 
-// prunePeerIndexLocked drops every indexed session that no longer holds
-// its id. Caller holds m.mu for writing.
-func (m *Manager) prunePeerIndexLocked() {
-	for peer := range m.byPeer {
-		m.livePeerBucketLocked(peer)
+// unindexPeerLocked removes e, a session leaving the table, from the peer
+// index: by identity, freeing its slot, and the peer's bucket with its
+// last session. A placeholder (no session) was never indexed. Caller holds
+// m.mu for writing.
+func (m *Manager) unindexPeerLocked(e *Entry) {
+	if e == nil || e.Session == nil {
+		return
 	}
+	peer := e.Session.PeerNodeID()
+	bucket := m.byPeer[peer]
+	i := slices.Index(bucket, e)
+	if i < 0 {
+		return
+	}
+	bucket = slices.Delete(bucket, i, i+1)
+	if len(bucket) == 0 {
+		delete(m.byPeer, peer)
+		return
+	}
+	m.byPeer[peer] = bucket
+}
+
+// removeLocked takes e, the entry under id, out of the table and out of
+// the peer index in one step, so no removal leaves the index behind
+// (F-b25ed960-41). A keyed session leaves at once, as matter.js drops a
+// closed session from its sets at the end of its close
+// (packages/protocol/src/session/NodeSession.ts:485-504 at b25ed960,
+// registeredSessions.delete :503; SessionManager.ts:333-335). A
+// placeholder's removal ([Manager.ReleaseStake], the reaper's and the
+// allocator's) may delete the id directly: it was never indexed. Caller
+// holds m.mu for writing.
+func (m *Manager) removeLocked(id uint16, e *Entry) {
+	delete(m.sessions, id)
+	m.unindexPeerLocked(e)
 }
 
 // equalCATSets reports whether a and b hold the same tags as sets.
@@ -902,10 +952,12 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		return nil, fmt.Errorf("operational: build session: %w", err)
 	}
 
+	m.establishMu.Lock()
 	m.mu.Lock()
 	id, err := m.allocateIDLocked()
 	if err != nil {
 		m.mu.Unlock()
+		m.establishMu.Unlock()
 		sess.Close()
 		return nil, err
 	}
@@ -931,9 +983,13 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 	superseded := m.supersededByLocked(entry)
 	excess := m.evictExcessPeerSessionsLocked(entry)
 	m.mu.Unlock()
+	if m.testBeforeSupersede != nil {
+		m.testBeforeSupersede(entry)
+	}
 	// Supersession before the eviction closes anything: matter.js
 	// SessionManager.ts:750-769 at b25ed960 (#sessionEstablished).
 	m.fireOnSessionSuperseded(superseded, entry)
+	m.establishMu.Unlock()
 	// Force close, no CloseSession: matter.js SessionManager.ts:779-808
 	// at b25ed960 (#evictExcessSessionsFor, a forced close) skips the
 	// graceful path for the cap because the eviction target is typically
@@ -996,7 +1052,7 @@ func (m *Manager) AllocateStake() (Stake, error) {
 	var evicted *Entry
 	if errors.Is(err, ErrSessionExhausted) {
 		if evicted = m.leastRecentlyActiveLocked(); evicted != nil {
-			delete(m.sessions, evicted.SessionID)
+			m.removeLocked(evicted.SessionID, evicted)
 			id, err = evicted.SessionID, nil
 		}
 	}
@@ -1262,12 +1318,26 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 		createdAtMono:        clock.MonotonicOf(m.clk()),
 		clock:                m.clk(),
 	}
+	// An establishing install supersedes nothing yet: only an
+	// establishment takes the establishment order ([Manager.establishMu]).
+	// The occupant's close hooks below — and its CloseSession — then run
+	// inside it too; the hooks must not establish on this manager either.
+	ordered := !entry.establishing
+	if ordered {
+		m.establishMu.Lock()
+	}
+	unorder := func() {
+		if ordered {
+			m.establishMu.Unlock()
+		}
+	}
 	m.mu.Lock()
 	// A stake that no longer holds its id installs nothing: the id's
 	// holder now — another handshake's stake or its session — stays
 	// (N3-findev-1). The check and the install share the lock.
 	if stake != nil && !m.stakes(placeholderRef{id: stake.ID, e: stake.e}) {
 		m.mu.Unlock()
+		unorder()
 		sess.Close()
 		return nil, ErrStakeLost
 	}
@@ -1300,7 +1370,11 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 	// keyed to this id — and before the eviction closes the sessions the
 	// moved subscriptions leave (matter.js SessionManager.ts:750-769 at
 	// b25ed960, #sessionEstablished).
+	if m.testBeforeSupersede != nil && ordered {
+		m.testBeforeSupersede(entry)
+	}
 	m.fireOnSessionSuperseded(superseded, entry)
+	unorder()
 	// The per-peer cap force-closes without CloseSession — see
 	// OpenFromSigma for the matter.js provenance.
 	closeStaleEntries(excess)
@@ -1494,6 +1568,7 @@ func (m *Manager) installEntryLocked(id uint16, entry *Entry) *Entry {
 	if displaced == nil || displaced.Session == nil {
 		return nil
 	}
+	m.unindexPeerLocked(displaced)
 	return displaced
 }
 
@@ -1617,7 +1692,7 @@ func (m *Manager) Close(sessionID uint16) error {
 		m.mu.Unlock()
 		return ErrSessionNotFound
 	}
-	delete(m.sessions, sessionID)
+	m.removeLocked(sessionID, entry)
 	m.mu.Unlock()
 	m.finishClose(entry)
 	return nil
@@ -1637,7 +1712,7 @@ func (m *Manager) closeEntry(e *Entry) bool {
 		m.mu.Unlock()
 		return false
 	}
-	delete(m.sessions, e.SessionID)
+	m.removeLocked(e.SessionID, e)
 	m.mu.Unlock()
 	m.finishClose(e)
 	return true
@@ -1659,22 +1734,29 @@ func (m *Manager) completeEstablishment(e *Entry) bool {
 	if e == nil {
 		return false
 	}
+	m.establishMu.Lock()
 	m.mu.Lock()
 	if !e.establishing {
 		m.mu.Unlock()
+		m.establishMu.Unlock()
 		return true
 	}
 	if cur, ok := m.sessions[e.SessionID]; !ok || cur != e {
 		m.mu.Unlock()
+		m.establishMu.Unlock()
 		return false
 	}
 	e.establishing = false
 	superseded := m.supersededByLocked(e)
 	excess := m.evictExcessPeerSessionsLocked(e)
 	m.mu.Unlock()
+	if m.testBeforeSupersede != nil {
+		m.testBeforeSupersede(e)
+	}
 	// Supersession before the eviction closes anything (matter.js
 	// SessionManager.ts:750-769 at b25ed960, #sessionEstablished).
 	m.fireOnSessionSuperseded(superseded, e)
+	m.establishMu.Unlock()
 	closeStaleEntries(excess)
 	m.fireOnSessionClose(excess)
 	return true
@@ -1718,7 +1800,7 @@ func (m *Manager) CloseAllGraceful(deadline time.Time) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0, len(m.sessions))
 	for id, e := range m.sessions {
-		delete(m.sessions, id)
+		m.removeLocked(id, e)
 		if e == nil || e.Session == nil {
 			continue // placeholder — no keys, no peer to notify
 		}
@@ -1739,7 +1821,7 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 	for id, entry := range m.sessions {
 		if entry.FabricIndex() == fabricIndex {
 			victims = append(victims, entry)
-			delete(m.sessions, id)
+			m.removeLocked(id, entry)
 		}
 	}
 	m.mu.Unlock()
@@ -1763,7 +1845,7 @@ func (m *Manager) CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16) {
 	for id, entry := range m.sessions {
 		if entry.FabricIndex() == fabricIndex && id != exceptSessionID {
 			victims = append(victims, entry)
-			delete(m.sessions, id)
+			m.removeLocked(id, entry)
 		}
 	}
 	m.mu.Unlock()
@@ -1786,7 +1868,7 @@ func (m *Manager) ClosePASESessions() int {
 	for id, entry := range m.sessions {
 		if entry.isPase {
 			victims = append(victims, entry)
-			delete(m.sessions, id)
+			m.removeLocked(id, entry)
 		}
 	}
 	m.mu.Unlock()
@@ -1839,7 +1921,7 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 		}
 		if entry.FabricIndex() == fabricIndex && entry.Session.PeerNodeID() == peerNodeID {
 			victims = append(victims, entry)
-			delete(m.sessions, id)
+			m.removeLocked(id, entry)
 		}
 	}
 	m.mu.Unlock()
@@ -1930,7 +2012,7 @@ func (m *Manager) closePeerLost(fabricIndex uint8, peerNodeID uint64, keep func(
 			continue // established after the loss was observed
 		}
 		victims = append(victims, entry)
-		delete(m.sessions, id)
+		m.removeLocked(id, entry)
 	}
 	m.mu.Unlock()
 	closeStaleEntries(victims)
@@ -1997,7 +2079,7 @@ func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
 	sort.Slice(claimants, func(i, j int) bool { return lessRecentlyActive(claimants[i], claimants[j]) })
 	evicted := claimants[:excess]
 	for _, entry := range evicted {
-		delete(m.sessions, entry.SessionID)
+		m.removeLocked(entry.SessionID, entry)
 	}
 	return evicted
 }
@@ -2117,7 +2199,6 @@ func (m *Manager) reapIdle(idleTimeout time.Duration) {
 		e  *Entry
 	}
 	m.mu.Lock()
-	m.prunePeerIndexLocked()
 	var idle []idleEntry
 	for id, e := range m.sessions {
 		if e.Session == nil {
@@ -2152,7 +2233,7 @@ func (m *Manager) reapIdle(idleTimeout time.Duration) {
 			continue // closed, replaced or active again meanwhile
 		}
 		victims = append(victims, c.e)
-		delete(m.sessions, c.id)
+		m.removeLocked(c.id, c.e)
 	}
 	m.mu.Unlock()
 	// Tell each reaped peer its session is gone while the keys can

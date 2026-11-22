@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10277,
+  "entry_points": 10279,
   "initializers": 369,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28018,
-    "reachable": 20960,
-    "whitelisted": 7036,
+    "total_exported": 28020,
+    "reachable": 20958,
+    "whitelisted": 7040,
     "unreachable": 22
   },
   "by_package": [
@@ -41648,7 +41648,7 @@
       "identifier": "CompleteSecureSessionEstablishment",
       "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
       "file": "internal/exchangeseam/exchangeseam.go",
-      "line": 77
+      "line": 80
     },
     {
       "package": "internal/exchangeseam",
@@ -42992,7 +42992,7 @@
       "identifier": "TestAResumptionRecordWithinOneIdentityStays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_resumption_after_update_internal_test.go",
-      "line": 111
+      "line": 130
     },
     {
       "package": "node",
@@ -43143,6 +43143,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestCASEResponderSavesTheRecordOfAnEstablishedSessionOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_resumption_record_parity_matterjs_test.go",
+      "line": 172
+    },
+    {
+      "package": "node",
       "identifier": "TestCASEResponderSessionEstablishingOnTheDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_establishing_internal_test.go",
@@ -43154,6 +43161,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_stake_lost_internal_test.go",
       "line": 40
+    },
+    {
+      "package": "node",
+      "identifier": "TestCASEResumeRecordReplacedOnlyOnceConfirmed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_resumption_record_parity_matterjs_test.go",
+      "line": 239
     },
     {
       "package": "node",
@@ -43356,7 +43370,7 @@
       "identifier": "TestNoResumptionRecordOutlivesAnUpdateAfterTheAdmit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_resumption_after_update_internal_test.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "node",
@@ -44882,7 +44896,14 @@
       "identifier": "TestPeerIndexDropsClosedSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/fabric_session_parity_matterjs_test.go",
-      "line": 54
+      "line": 53
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestPeerIndexDropsSessionAtRemoval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/peer_index_internal_test.go",
+      "line": 31
     },
     {
       "package": "secure/operational",
@@ -45058,6 +45079,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_idle_reaper_test.go",
       "line": 182
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestSupersessionHooksInEstablishmentOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/supersession_order_internal_test.go",
+      "line": 66
     },
     {
       "package": "secure/setup",

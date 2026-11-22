@@ -83,9 +83,12 @@ type CASEServerConfig struct {
 	// the initiator's Success arrived) or :331 (full, at the first
 	// transmission of our Success, before its acknowledgement is awaited)
 	// — which a peer set observes to adopt the session
-	// (packages/protocol/src/peer/PeerSet.ts:104-110). It runs before the
-	// record is saved, as matter.js saves it after (:216-217, :356-357).
-	// Nil ignores it.
+	// (packages/protocol/src/peer/PeerSet.ts:104-110). It runs inside the
+	// establishment, before the per-peer cap's eviction the establishment
+	// sets off, so no effect of an establishment is observable before the
+	// session is handed over (F-b25ed960-44); it must not block on the
+	// session's own handshake. It runs before the record is saved, as
+	// matter.js saves it after (:216-217, :356-357). Nil ignores it.
 	OnSession func(s *exchange.Session, fabricIndex uint8)
 	// Logger receives the diagnostics; nil is slog.Default().
 	Logger *slog.Logger
@@ -494,11 +497,11 @@ func (c *CASEServer) resume(ctx context.Context, x *exchange.Exchange, responder
 		s.Close()
 		return err
 	}
-	if err := completeEstablishmentOf(s); err != nil {
+	// Handed over inside the establishment (F-b25ed960-44).
+	if err := c.completeEstablishmentOf(s, fabric); err != nil {
 		s.Close()
 		return err
 	}
-	c.handOver(s, fabric)
 	rec := *record
 	rec.ResumptionID = append([]byte(nil), result.Sigma2Resume.ResumptionID...)
 	c.established(s, fabric, rec)
@@ -561,9 +564,7 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 	if err := exchangeseam.SendNotifyingTransmission(ctx, x, mrp.SCOpcodeStatusReport, report.Encode(),
 		exchange.SendOptions{ExpectedProcessingTime: ExpectedCryptoProcessingTime},
 		func() {
-			if established = exchangeseam.CompleteSecureSessionEstablishment(s); established {
-				c.handOver(s, fabric)
-			}
+			established = exchangeseam.CompleteSecureSessionEstablishment(s, func() { c.handOver(s, fabric) })
 		}); err != nil {
 		if !established {
 			s.Close()
@@ -572,7 +573,7 @@ func (c *CASEServer) full(ctx context.Context, x *exchange.Exchange, responder *
 		c.log.Debug("matter.controller.case_server.success_failed_after_transmission",
 			slog.Int("session_id", int(s.ID())), slog.Any("err", err))
 	}
-	if err := completeEstablishmentOf(s); err != nil {
+	if err := c.completeEstablishmentOf(s, fabric); err != nil {
 		return err
 	}
 	c.established(s, fabric, ResumptionRecord{
@@ -609,10 +610,14 @@ func (c *CASEServer) newEstablishingSession(cfg exchange.SecureSessionConfig) (*
 }
 
 // completeEstablishmentOf ends the establishment of s, refusing a session
-// that closed during its handshake. Mirrors matter.js CaseServer.ts:367-376
-// at b25ed960 (completeEstablishmentOf).
-func completeEstablishmentOf(s *exchange.Session) error {
-	if !exchangeseam.CompleteSecureSessionEstablishment(s) {
+// that closed during its handshake, and hands s over in the call that
+// establishes it ([CASEServer.handOver]) — before the per-peer cap's
+// eviction the establishment sets off, so the peer holds every established
+// session (F-b25ed960-44); a session established already was handed over
+// then. Mirrors matter.js CaseServer.ts:367-376 at b25ed960
+// (completeEstablishmentOf).
+func (c *CASEServer) completeEstablishmentOf(s *exchange.Session, fabric Fabric) error {
+	if !exchangeseam.CompleteSecureSessionEstablishment(s, func() { c.handOver(s, fabric) }) {
 		return fmt.Errorf("handshake: session %d: %w", s.ID(), errClosedBeforeEstablished)
 	}
 	return nil
