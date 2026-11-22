@@ -118,49 +118,75 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 		if !req.CredentialRule.Null {
 			user.CredentialRule = uint8(req.CredentialRule.Value)
 		}
+		if err := checkUserRecord(&user); err != nil {
+			return err
+		}
 		s.addUserLocked(user)
 		s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeAdd, &userIndex, &userIndex)
 	case lockdef.DataOperationTypeModify:
-		if existing == nil {
-			return spec.Errorf(im.StatusInvalidCommand, "lock: user slot %d is available", userIndex)
-		}
-		if !req.UserName.Null && fabricIndex != existing.CreatorFabricIndex {
-			return spec.Errorf(im.StatusInvalidCommand, "lock: cannot modify userName from a different fabric")
-		}
-		if !req.UserUniqueId.Null && fabricIndex != existing.CreatorFabricIndex {
-			return spec.Errorf(im.StatusInvalidCommand, "lock: cannot modify userUniqueId from a different fabric")
-		}
-		status, userType := existing.UserStatus, existing.UserType
-		if !req.UserStatus.Null {
-			status = uint8(req.UserStatus.Value)
-		}
-		if !req.UserType.Null {
-			userType = uint8(req.UserType.Value)
-		}
-		// A status or type change starts a new ExpiringUser cycle; the
-		// timeout arms again on the next first use (:311-315).
-		restartsExpiry := status != existing.UserStatus || userType != existing.UserType
-		if restartsExpiry {
-			s.stopExpiryTimerLocked(userIndex)
-			existing.ExpiringUserExpiresAt = nil
-		}
-		if !req.UserName.Null {
-			existing.UserName = req.UserName.Value
-		}
-		if !req.UserUniqueId.Null {
-			id := req.UserUniqueId.Value
-			existing.UserUniqueID = &id
-		}
-		existing.UserStatus, existing.UserType = status, userType
-		if !req.CredentialRule.Null {
-			existing.CredentialRule = uint8(req.CredentialRule.Value)
-		}
-		existing.LastModifiedFabricIndex, existing.ModifiedThroughMatter = fabricIndex, true
-		s.dirty = true
-		s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeModify, &userIndex, &userIndex)
+		return s.modifyUserLocked(ctx, req, existing, fabricIndex)
 	default:
 		return spec.Errorf(im.StatusInvalidCommand, "lock: invalid operation type %d", req.OperationType)
 	}
+	return nil
+}
+
+// modifyUserLocked is the Modify branch of setUserLocked: mirrors matter.js
+// packages/node/src/behaviors/door-lock/DoorLockServer.ts:293-335 at
+// b25ed960 (setUser, DataOperationType.Modify).
+func (s *DoorLockServer) modifyUserLocked(ctx context.Context, req lockdef.SetUserRequest, existing *store.DoorLockUser, fabricIndex uint8) error {
+	userIndex := req.UserIndex
+	if existing == nil {
+		return spec.Errorf(im.StatusInvalidCommand, "lock: user slot %d is available", userIndex)
+	}
+	if !req.UserName.Null && fabricIndex != existing.CreatorFabricIndex {
+		return spec.Errorf(im.StatusInvalidCommand, "lock: cannot modify userName from a different fabric")
+	}
+	if !req.UserUniqueId.Null && fabricIndex != existing.CreatorFabricIndex {
+		return spec.Errorf(im.StatusInvalidCommand, "lock: cannot modify userUniqueId from a different fabric")
+	}
+	status, userType := existing.UserStatus, existing.UserType
+	if !req.UserStatus.Null {
+		status = uint8(req.UserStatus.Value)
+	}
+	if !req.UserType.Null {
+		userType = uint8(req.UserType.Value)
+	}
+	candidate := *existing
+	candidate.UserStatus, candidate.UserType = status, userType
+	if !req.CredentialRule.Null {
+		candidate.CredentialRule = uint8(req.CredentialRule.Value)
+	}
+	// Checked before the expiry timer or the record changes. matter.js
+	// stops the timer first (:312-315) and refuses in replaceUser
+	// (:317-326), so a refused Modify leaves its timer stopped until the
+	// PIN's next use or a restart; here a refused command changes nothing
+	// (by_design BD-Matter-DoorLock-RefusedModifyKeepsExpiryTimer). commit
+	// could not undo it either: it restores the records, not the timers.
+	if err := checkUserRecord(&candidate); err != nil {
+		return err
+	}
+	// A status or type change starts a new ExpiringUser cycle; the
+	// timeout arms again on the next first use (:311-315).
+	restartsExpiry := status != existing.UserStatus || userType != existing.UserType
+	if restartsExpiry {
+		s.stopExpiryTimerLocked(userIndex)
+		existing.ExpiringUserExpiresAt = nil
+	}
+	if !req.UserName.Null {
+		existing.UserName = req.UserName.Value
+	}
+	if !req.UserUniqueId.Null {
+		id := req.UserUniqueId.Value
+		existing.UserUniqueID = &id
+	}
+	existing.UserStatus, existing.UserType = status, userType
+	if !req.CredentialRule.Null {
+		existing.CredentialRule = uint8(req.CredentialRule.Value)
+	}
+	existing.LastModifiedFabricIndex, existing.ModifiedThroughMatter = fabricIndex, true
+	s.dirty = true
+	s.emitLockUserChangeLocked(ctx, lockdef.LockDataTypeUserIndex, lockdef.DataOperationTypeModify, &userIndex, &userIndex)
 	return nil
 }
 
@@ -411,6 +437,94 @@ func (s *DoorLockServer) findUserIndexForCredential(credType uint8, index uint16
 		}
 	}
 	return 0, false
+}
+
+// checkUserRecord refuses a user record that carries a value its enum does
+// not define: UserStatus, UserType, CredentialRule and each credential's
+// CredentialType. It runs where a user is stored, before any change, so
+// a local MatterInvoke — which no request gate judges — is held to the
+// same values a peer's request is.
+//
+// Only membership is checked. matter.js's validation at the store also
+// refuses a defined value whose conformance the lock's features do not
+// meet (findings: DoorLock store enum member conformance); the request
+// gate does that for a peer's request.
+//
+// Mirrors matter.js
+// packages/node/src/behavior/state/managed/values/StructManager.ts:278-297
+// at b25ed960 (a managed property set is validated; a throw undoes the
+// set and reaches the caller) and
+// packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
+// at b25ed960 (createEnumValidator: UnknownEnumValueError, status
+// CONSTRAINT_ERROR). The state lists are
+// packages/node/src/behaviors/door-lock/DoorLockServer.ts:1547-1554 at
+// b25ed960 (State.users, State.credentials). A credential reference's
+// type is
+// packages/node/src/behaviors/door-lock/LockAuth.ts:34-35 at b25ed960
+// (CredentialRef). The user's enum fields are
+// packages/node/src/behaviors/door-lock/LockAuth.ts:55-62 at b25ed960
+// (userStatus, userType, credentialRule). A stored credential's type is
+// packages/node/src/behaviors/door-lock/LockAuth.ts:88-89 at b25ed960
+// (Credential). Users are stored by
+// packages/node/src/behaviors/door-lock/LockAuth.ts:173-179 at b25ed960
+// (addUser, replaceUser). Credentials are stored by
+// packages/node/src/behaviors/door-lock/LockAuth.ts:229-238 at b25ed960
+// (addCredential).
+//
+// matter.js refuses inside the assignment and leaves the rest of the
+// transaction to its caller: an error that leaves the act rolls back the
+// credential setCredential added before the user
+// (packages/node/src/behavior/context/server/LocalActorContext.ts:60-65
+// at b25ed960, act: a thrown actor rejects the transaction;
+// packages/general/src/transaction/Tx.ts:377-392 at b25ed960, reject:
+// rollback), one a local caller catches inside the act is committed with
+// the act
+// (packages/node/src/behavior/context/server/LocalActorContext.ts:84 at
+// b25ed960, resolve). Here every invoke is one
+// commit, so a refused user always takes the credential added before it
+// with it — this module's transaction boundary, not a matter.js line.
+func checkUserRecord(u *store.DoorLockUser) error {
+	if err := checkEnumValue("UserStatus", lockdef.UserStatusEnumDef, u.UserStatus); err != nil {
+		return err
+	}
+	if err := checkEnumValue("UserType", lockdef.UserTypeEnumDef, u.UserType); err != nil {
+		return err
+	}
+	if err := checkEnumValue("CredentialRule", lockdef.CredentialRuleEnumDef, u.CredentialRule); err != nil {
+		return err
+	}
+	for _, c := range u.Credentials {
+		if err := checkEnumValue("Credentials.CredentialType", lockdef.CredentialTypeEnumDef, c.Type); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkEnumValue refuses v when the enum e has members and none of them
+// is v: no value's id and in no range member. An enum without members
+// admits every value of its width.
+//
+// Mirrors matter.js
+// packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
+// at b25ed960 (createEnumValidator: definesValues, the valid ids and the
+// range members; the message's stem).
+func checkEnumValue(field string, e *spec.Enum, v uint8) error {
+	if len(e.Values) == 0 && len(e.Ranges) == 0 {
+		return nil
+	}
+	n := uint64(v)
+	for i := range e.Values {
+		if e.Values[i].Value == n {
+			return nil
+		}
+	}
+	for i := range e.Ranges {
+		if e.Ranges[i].Contains(n) {
+			return nil
+		}
+	}
+	return spec.Errorf(im.StatusConstraintError, "lock: %s: Matter does not define the enum value %d for %s: %w", field, v, e.Name, spec.ErrUnknownEnumValue)
 }
 
 func (s *DoorLockServer) addUserLocked(u store.DoorLockUser) {
