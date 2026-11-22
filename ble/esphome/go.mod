@@ -1,3 +1,4 @@
+// Deprecated: moved to thingfabric.dev/go-fabric/ble/esphome; v0.24.1 is the last version under this path.
 module github.com/SukramJ/go-fabric/ble/esphome
 
 go 1.27.4

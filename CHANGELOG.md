@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.24.1] — 2026-11-22
+
+The last version under `github.com/SukramJ/go-fabric`. The module moves to the GitHub organisation `thingfabric` and to the import path `thingfabric.dev/go-fabric`, from `v0.25.0` on; the nested modules move with it (`thingfabric.dev/go-fabric/ble/bluez`, `…/ble/esphome`, `…/wifi/wpasupplicant`). No code change since `v0.24.0`.
+
+### Deprecated
+
+- `github.com/SukramJ/go-fabric` and the nested modules `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant` under that path: each `go.mod` carries `// Deprecated: moved to thingfabric.dev/…`, which `go list -m -u` and `go get` report. Tagged `v0.24.1`, `ble/bluez/v0.24.1`, `ble/esphome/v0.24.1` and `wifi/wpasupplicant/v0.24.1` at one commit; the nested modules still require go-fabric `v0.24.0`.
+
 ### Changed
 
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.24.0` (before `v0.23.0`) and are tagged `ble/bluez/v0.24.0`, `ble/esphome/v0.24.0` and `wifi/wpasupplicant/v0.24.0` at this commit — `ble/esphome` with the `golang.org/x/crypto` bump of #540; `examples/ble-wifi-light` requires the three at `v0.24.0` (owner decision of 2026-11-22, the procedure of decisions 261, 266).
