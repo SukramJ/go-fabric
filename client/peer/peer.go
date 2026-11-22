@@ -608,6 +608,17 @@ func (p *Peer) HasSession() bool { return p.NewestSession() != nil }
 // NewestSession is the live session the peer was last heard from on — the
 // highest [exchange.Session.ActiveTimestamp], the first of equals — nil
 // when none (Peer.ts:581-601).
+//
+// A session this node responds to joins the peer once its handshake
+// established it, while the messages the initiator sends on it are served
+// from the start: a handler of such a session — a resumed one's first
+// request, sent with the initiator's Success — may run before the peer
+// holds it, and find NewestSession nil or another session. matter.js has
+// the same order: it processes messages on an establishing session and
+// adopts it into the peer at its establishment
+// (packages/protocol/src/session/NodeSession.ts:214-225,
+// packages/protocol/src/session/SessionManager.ts:376-381,
+// packages/protocol/src/peer/PeerSet.ts:104 at b25ed960).
 func (p *Peer) NewestSession() *exchange.Session { return p.newestOn(nil) }
 
 // NewestSessionOn is [Peer.NewestSession] among the sessions over t —

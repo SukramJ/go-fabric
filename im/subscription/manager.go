@@ -805,11 +805,12 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // none — what the bridge passes, the session carrying RemoveFabric
 // included, R2-P1-req2-04). It is
 // the flush of matter.js's Fabric.leave before the fabric goes
-// (packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0): every
+// (packages/protocol/src/fabric/Fabric.ts:456-466 at b25ed960): every
 // session of the fabric runs `closeSubscriptions(true)`
-// (NodeSession.ts:312-323), each subscription closing with a flush through
-// the session (ServerSubscription.ts:753-763 #flush, one
-// #triggerSendUpdate), so the Leave event the node emitted a moment
+// (packages/protocol/src/session/NodeSession.ts:383-395 at b25ed960),
+// each subscription closing with a flush through its own session
+// (packages/node/src/node/server/ServerSubscription.ts:773-783 at
+// b25ed960, #flush: one #triggerSendUpdate), so the Leave event the node emitted a moment
 // before reaches the subscribers while the fabric still admits them. A
 // subscription whose report is in flight is waited for, not skipped
 // ([Manager.claimReport]): the flush takes it once that report ended —
@@ -822,7 +823,8 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 // through the deprecated hooks, without a [FlushReporter]).
 //
 // Unlike matter.js, whose subscription is marked closed before its flush
-// (ServerSubscription.ts:776-788 #close, :800-809 #markClosed),
+// (ServerSubscription.ts:796-808 at b25ed960, #close;
+// :837-846, #markClosed),
 // FlushFabric leaves the subscriptions open; they close with their
 // sessions right after, when the fabric is removed. In that window only
 // an ongoing report can go out, and none waits for its answer.
@@ -836,9 +838,15 @@ func (m *Manager) FlushFabric(ctx context.Context, fabricIndex uint8, exceptSess
 // session: it reports what they owe and returns once the reports are
 // answered or given up, leaving the subscriptions open to close with
 // their session. It is the flush of matter.js's rollover close
-// (packages/protocol/src/session/NodeSession.ts:406-410 at db021da0,
-// `closeSubscriptions(true)` before the session closes; NodeSession.ts
-// :312-323) (review II, R2-P2-dr-req-07).
+// (packages/protocol/src/session/NodeSession.ts:476-481 at b25ed960,
+// `closeSubscriptions(true)` before the session closes;
+// NodeSession.ts:383-395, closeSubscriptions, which hands every
+// subscription of the session that very session, :386) (review II,
+// R2-P2-dr-req-07). The selection is by the subscription's current
+// session ([Subscription.CurrentSessionID]): a subscription moved to a
+// newer session is flushed with that one, as matter.js's #follow moves
+// it into the newer session's set (ServerSubscription.ts:820-834 at
+// b25ed960).
 func (m *Manager) FlushSession(ctx context.Context, sessionID uint16) {
 	m.flush(ctx, func(sub *Subscription) bool { return sub.CurrentSessionID() == sessionID })
 }
@@ -868,10 +876,10 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 			// The report the flush waited for failed: nothing more is
 			// sent, as matter.js returns from a closed subscription's
 			// failed update without a further report
-			// (packages/node/src/node/server/ServerSubscription.ts:558-562
-			// at db021da0; its #flush, :753-763, from #cancel only, :825,
+			// (packages/node/src/node/server/ServerSubscription.ts:564-567
+			// at b25ed960; its #flush, :773-783, from #cancel only, :863,
 			// only notes the next update while one is in flight,
-			// :520-525). Review II, R2-P6-par-0702.
+			// :525-528). Review II, R2-P6-par-0702.
 			sub.endReport()
 			continue
 		}

@@ -49,8 +49,7 @@ func TestFabricHasSessionForPeer(t *testing.T) {
 }
 
 // TestPeerIndexDropsClosedSessions: the supersession check's peer index
-// forgets a session once it no longer holds its id — read for its peer, or
-// swept by the idle reaper.
+// forgets a session as it leaves the table (F-b25ed960-41).
 func TestPeerIndexDropsClosedSessions(t *testing.T) {
 	t.Parallel()
 	m, _ := newEstablishingManager(t)
@@ -58,10 +57,9 @@ func TestPeerIndexDropsClosedSessions(t *testing.T) {
 	if err := m.Close(e.SessionID); err != nil {
 		t.Fatal(err)
 	}
-	m.mu.Lock()
-	m.prunePeerIndexLocked()
+	m.mu.RLock()
 	left := len(m.byPeer)
-	m.mu.Unlock()
+	m.mu.RUnlock()
 	if left != 0 {
 		t.Fatalf("peer index holds %d peers after their only session closed", left)
 	}

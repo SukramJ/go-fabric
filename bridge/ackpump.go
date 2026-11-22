@@ -686,6 +686,12 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 		return sendVia(listener, dest, datagram)
 	})
 	var retransmitted []uint8 // the distinct fabrics of the re-sent sessions
+	var gaveUpOn []uint16     // the sessions of the messages given up
+	defer func() {
+		for _, sid := range gaveUpOn {
+			b.recheckPASEClose(sid)
+		}
+	}()
 	for _, r := range results {
 		if r.Err == nil {
 			// A retransmission sent.
@@ -709,6 +715,11 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 			}
 		}
 		if givenUp {
+			// The message's exchange closes with it: a revoked PASE
+			// session waiting for it may be idle now (matter.js
+			// MessageExchange.ts:995-1006 at b25ed960, the budget spent
+			// while closing).
+			gaveUpOn = append(gaveUpOn, r.SessionID)
 			b.noteReportUndelivered(r.SessionID, r.Counter)
 			// Exchange ids are the initiator's: a message given up ends
 			// the exchange of its role only; one tracked without a role

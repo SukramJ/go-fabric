@@ -209,8 +209,21 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// is refused here: not acknowledged, not processed, the exchange and
 	// the outstanding message left as they were
 	// ([Bridge.refuseUnacknowledging]).
+	//
+	// A new exchange on a PASE session whose graceful close is deferred
+	// gets nothing either — no ack owed, no handling — and the
+	// commissioning channel's implicit Administer serves no request on it
+	// ([Bridge.refuseOnClosingPASE]). A duplicate passes: its ack is sent
+	// below.
+	//
+	// The message is a handler turn on its session from here on, counted
+	// before the closing-session check: a revoke that marks the session
+	// after the check finds the turn and defers, rather than closing the
+	// session under a message it then handles.
 	if !duplicate {
-		if err := b.refuseUnacknowledging(src, &hdr, proto); err != nil {
+		turn := b.enterSessionTurn(hdr.SessionID)
+		defer b.exitSessionTurn(hdr.SessionID, turn)
+		if err := b.refuseNewMessage(src, &hdr, proto); err != nil {
 			return err
 		}
 	}

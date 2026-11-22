@@ -161,6 +161,33 @@ and (v) stay open). P5-S: `images.go` and `interaction.go` citations re-read
 at b25ed960. No marker caught up; opened: F-b25ed960-C5 (the NOC update's
 force-close cause, not exported).
 
+Wave P6 (2026-11-22, the close-out) closed the remaining rows (decisions
+486–509). P6-A: a Schedules write staged as written, its BuiltIn resolved at
+commit (F-b25ed960-46); -47 not reachable, a peer holding one atomic write per
+endpoint and cluster (`AtomicWriteHandler.ts:178-185`). P6-B: the closing
+subscription's flush session not a gap (F-b25ed960-43,
+`BD-Matter-Subscription-FlushOnOwnSessionOnly`). P6-C: the revoked PASE
+session closes when it has no exchange in flight, at most 60 s later
+(F-b25ed960-56 (iv)(v), `BD-Matter-PASE-DeferredCloseCap`), the resumed
+session's give-up by entry (-38), the supersession subject (-42), and a flush
+report the peer refuses, also at shutdown, terminates the subscription — found
+in P6-B's comparison and closed in the wave (decision 495). P6-D: the CASE
+responder saves the resumption record at the establishment (-37), the
+supersession hooks in establishment order (-40), the peer index (-41), the
+hand-over inside the establishment (-44). P6-E: `SetOperatingMode` (C6),
+`ErrFabricChanged` (C5). P6-F and P6-G: the DoorLock store refuses an enum
+value its enum does not define or the lock's features disallow on a local
+invoke (-36, `BD-Matter-DoorLock-RefusedModifyKeepsExpiryTimer`). -33 is
+`BD-Matter-RelaxedEnum-HeldToWireWidth` (owner W5); -10 was stale (P4-B). No
+marker caught up.
+
+**Lift b25ed960 closed** (decisions 505, 509, by decision 287): every gap of
+the lift's delta is closed before the release, and the wave left no residual
+of its own (F-b25ed960-58 fixed, -59 no gap, decisions 506, 507). Carried past
+the lift, each with its reason in the findings register: F-b25ed960-32
+(doc-only, nothing differs at the pin), -34 (a gap of matter.js's own,
+mirrored), -45, -48 and -C7 (test watches, no reproduction).
+
 ### Protocol, sessions, security
 
 | PR | Fix | Verdict | Where |

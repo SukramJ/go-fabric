@@ -92,10 +92,15 @@ type caseIdentities struct {
 	// after its stake was taken; nil outside tests.
 	testAfterStake func()
 	// testAfterAdmit, a test seam, runs in a responder's install right
-	// after the session was admitted, before its resumption record is
-	// stored — where an update that lands after the admit meets the
-	// record's own check.
+	// after the session was admitted and put establishing, before its
+	// handshake completes — where an update that lands after the admit
+	// closes the establishing session.
 	testAfterAdmit func()
+	// testBeforeRecord, a test seam, runs in a responder's completion
+	// right after the session was established, before its resumption
+	// record is stored — where an update that lands after the admit meets
+	// the record's own check.
+	testBeforeRecord func()
 	// testEstablishment, a test seam, is handed each CASE adapter's
 	// establishment bookkeeping as the adapter is built, so a test can
 	// report the handshake's completion the bridge would report.
@@ -1186,13 +1191,13 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	// Session resumption as the responder (Matter §4.13.2.4): a Sigma1
 	// presenting a resumption id this node issued resumes with
 	// Sigma2_Resume instead of a full handshake. matter.js CaseServer looks
-	// the record up in SessionManager and saves a fresh one after every
-	// session: after the initiator's success report on a resume, after
-	// Sigma3 on a full handshake
-	// (packages/protocol/src/session/case/CaseServer.ts:217, :357 at
-	// b25ed960). Here the record is replaced when the session is installed,
-	// before Sigma2_Resume is sent (review II, R2-P6-sec-3320); TC-SC-3.2
-	// checks the resume.
+	// the record up in SessionManager and saves a fresh one for every
+	// session that became established: after the initiator's success
+	// report on a resume, after the Success's send on a full handshake
+	// (packages/protocol/src/session/case/CaseServer.ts:204-217, :329-357
+	// at b25ed960). Here the record is built at the install and saved at
+	// the handshake's completion ([caseEstablishment.complete];
+	// F-b25ed960-37); TC-SC-3.2 checks the resume.
 	responder.SetResumptionStore(resumptionLookup{sessions: sessions, claims: &ids.claims})
 
 	adapter := bridge.NewCaseAdapter(responder)
@@ -1227,7 +1232,9 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		}
 		// A resume holds its record's id from acceptance
 		// ([resumptionLookup.ClaimResumptionID]) until the record is
-		// replaced, or gives it back when it installs nothing.
+		// replaced at its establishment, or gives it back when it installs
+		// nothing or its handshake ends without an established session
+		// ([caseEstablishment.complete]).
 		var presented []byte
 		if resp := adapter.SnapshotResponder(); resp != nil {
 			if info := resp.ResumeInfo(); info.Resumed {
@@ -1263,17 +1270,14 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 				entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 			}
 		}
-		establishing.put(entry)
-		// Installed, not yet established: the bridge's report of the
-		// completed handshake establishes it, and case.session_established
-		// is logged there (caseEstablishment.complete; owner decision 353).
-		logger.Debug("case.session_establishing",
-			slog.Int("session_id", int(entry.SessionID)),
-			slog.Int("fabric_index", int(fabricIndex)),
-			slog.Uint64("node_id", peerNodeID))
 		// The record the peer resumes from next time: the id this
 		// handshake issued (Sigma2's, or the fresh one Sigma2_Resume
-		// carried) with the session's shared secret.
+		// carried) with the session's shared secret. Built here, off the
+		// responder as it answered this handshake — the singleton
+		// adapter's responder may serve another Sigma1 before the
+		// completion — and saved once the session is established
+		// ([caseEstablishment.complete]).
+		pending := &pendingCASE{entry: entry, gen: gen, presented: presented}
 		if resp := adapter.SnapshotResponder(); resp != nil {
 			if id, secret := resp.ResumptionID(), resp.ECDHSharedSecret(); len(id) == 16 && len(secret) > 0 {
 				// With the initiator's session parameters, as a CASE client
@@ -1288,19 +1292,21 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 						params = prev.SessionParameters
 					}
 				}
-				if err := ids.persistAdmitted(context.Background(), sessions, gen, store.ResumptionRecord{
+				pending.rec = store.ResumptionRecord{
 					FabricIndex: fabricIndex, PeerNodeID: peerNodeID, ResumptionID: id, SharedSecret: secret,
 					CASEAuthTags: peerCATs, SessionParameters: params,
-				}); err != nil {
-					// The presented record stays in the store; its id stays
-					// claimed, so it resumes nothing more.
-					logger.Warn("case.resumption.persist_failed", slog.Any("err", err))
-					return nil
 				}
+				pending.hasRec = true
 			}
 		}
-		// The presented record was replaced: its id is gone from the store.
-		ids.claims.release(presented)
+		establishing.put(pending)
+		// Installed, not yet established: the bridge's report of the
+		// completed handshake establishes it, and case.session_established
+		// is logged there (caseEstablishment.complete; owner decision 353).
+		logger.Debug("case.session_establishing",
+			slog.Int("session_id", int(entry.SessionID)),
+			slog.Int("fabric_index", int(fabricIndex)),
+			slog.Uint64("node_id", peerNodeID))
 		return nil
 	})
 	return adapter, nil
@@ -1336,13 +1342,16 @@ func openEstablishing(sessions *operational.Manager, stake operational.Stake, fa
 // case/CaseServer.ts:177-210, :314-344 at b25ed960). A resumed session
 // waiting for the initiator's Success has a deadline; at its expiry the
 // bridge reports the handshake failed ([bridge.CaseAdapter], the resume's
-// wait). The resumption record is still saved at the install, before the
-// establishment, where matter.js saves it after (CaseServer.ts:216-217,
-// :356-357). An entry is the installed
+// wait). The resumption record built at the install is saved once the
+// session is established, and never for one that is not
+// ([caseEstablishment.complete]). An entry is the installed
 // session itself, so the completion or the close reaches that session and
 // never another one that holds its id by then (decision 159).
 type caseEstablishment struct {
 	sessions *operational.Manager
+	// ids saves an established session's record and holds the resume
+	// claims ([caseIdentities.persistAdmitted], [resumeClaims]).
+	ids *caseIdentities
 	// onOpened, when set, learns the id of every session established (the
 	// node's OnSessionOpened).
 	onOpened func(sessionID uint16)
@@ -1353,7 +1362,27 @@ type caseEstablishment struct {
 	afterPut func()
 
 	mu      sync.Mutex
-	entries map[uint16]*operational.Entry
+	entries map[uint16]*pendingCASE
+}
+
+// pendingCASE is a session installed establishing with what its
+// establishment saves: the resumption record built at the install (hasRec),
+// the identity load gen the handshake answered under, and the resumption
+// id a resume presented, claimed until the record is replaced or the
+// resume ends without a session ([resumeClaims]).
+type pendingCASE struct {
+	entry     *operational.Entry
+	rec       store.ResumptionRecord
+	hasRec    bool
+	gen       uint64
+	presented []byte
+}
+
+// discard ends p without a save: the presented id goes back, the record's
+// copy of the shared secret is cleared.
+func (p *pendingCASE) discard(claims *resumeClaims) {
+	claims.release(p.presented)
+	clear(p.rec.SharedSecret)
 }
 
 // newCaseEstablishment is the bookkeeping of adapter, whose completion hook
@@ -1361,7 +1390,7 @@ type caseEstablishment struct {
 // the adapter does not take fails the adapter's construction: every session
 // it installs would stay establishing for good.
 func newCaseEstablishment(adapter *bridge.CaseAdapter, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger, onOpened func(sessionID uint16)) (*caseEstablishment, error) {
-	e := &caseEstablishment{sessions: sessions, onOpened: onOpened, logger: logger, afterPut: ids.testAfterAdmit}
+	e := &caseEstablishment{sessions: sessions, ids: ids, onOpened: onOpened, logger: logger, afterPut: ids.testAfterAdmit}
 	if !bridgeseam.SetCaseEstablishmentCompletion(adapter, e.complete) {
 		return nil, errors.New("node: the CASE adapter takes no establishment completion hook")
 	}
@@ -1373,21 +1402,37 @@ func newCaseEstablishment(adapter *bridge.CaseAdapter, sessions *operational.Man
 
 // complete is the bridge's report on the session sessionID installed
 // establishing: completed, it is established — the pickers see it, the
-// per-peer cap runs — and the host learns of it; failed, it is closed. It
-// reports whether the session is established: false also for one closed
-// while it was establishing (matter.js CaseServer.ts:204-210, :329-344,
-// :367-376 at b25ed960). A session not installed establishing here
-// reports completed.
+// per-peer cap runs — the host learns of it and its resumption record is
+// saved; failed, it is closed and nothing is saved. It reports whether the
+// session is established: false also for one closed while it was
+// establishing, whose record is not saved either (matter.js
+// CaseServer.ts:204-210, :329-344, :367-376 at b25ed960). A session not
+// installed establishing here reports completed.
+//
+// The save follows the establishment, as matter.js saves only for an
+// established session: on a resume after the initiator's Success
+// (CaseServer.ts:204-217 at b25ed960), on a full handshake after the
+// Success's send (:329-357) — whether that send was acknowledged, gave up
+// or failed once it went out. A resume that is not confirmed leaves the
+// presented record in the store and gives its id back: matter.js resumes
+// from a copy (SessionManager.ts:968-978) and never saves for it. One
+// instant differs: the bridge completes a full handshake at the Success's
+// first transmission, so the record is saved then, where matter.js saves
+// it once the send's acknowledgement wait ended; the outcome is the same in
+// every branch.
 func (s *caseEstablishment) complete(sessionID uint16, completed bool) bool {
-	entry := s.take(sessionID)
-	if entry == nil {
+	p := s.take(sessionID)
+	if p == nil {
 		return completed
 	}
+	entry := p.entry
 	if !completed {
 		sessionseam.CloseEntry(s.sessions, entry)
+		p.discard(&s.ids.claims)
 		return false
 	}
 	if !sessionseam.CompleteEstablishment(s.sessions, entry) {
+		p.discard(&s.ids.claims)
 		return false
 	}
 	// Logged as the session is established — the state the pickers, the
@@ -1406,25 +1451,53 @@ func (s *caseEstablishment) complete(sessionID uint16, completed bool) bool {
 	if s.onOpened != nil {
 		s.onOpened(entry.SessionID)
 	}
+	s.save(p)
 	return true
 }
 
-// put records e as establishing.
-func (s *caseEstablishment) put(e *operational.Entry) {
+// save stores p's record, its session established, and gives back the id
+// its resume presented — the record holding it is replaced. A record the
+// store refuses leaves the presented record in place, its id claimed, so
+// it resumes nothing more; the session stays established (matter.js
+// CaseServer.ts:66-97 at b25ed960 logs a failing save).
+func (s *caseEstablishment) save(p *pendingCASE) {
+	if s.ids.testBeforeRecord != nil {
+		s.ids.testBeforeRecord()
+	}
+	if p.hasRec {
+		if err := s.ids.persistAdmitted(context.Background(), s.sessions, p.gen, p.rec); err != nil {
+			if s.logger != nil {
+				s.logger.Warn("case.resumption.persist_failed", slog.Any("err", err))
+			}
+			return
+		}
+	}
+	s.ids.claims.release(p.presented)
+}
+
+// put records p's session as establishing. A unit still pending under
+// the same id — its session closed and the id handed out again before its
+// handshake's completion — ends as a failed handshake ends: its presented
+// id goes back and nothing is saved (F-b25ed960-58).
+func (s *caseEstablishment) put(p *pendingCASE) {
 	s.mu.Lock()
 	if s.entries == nil {
-		s.entries = map[uint16]*operational.Entry{}
+		s.entries = map[uint16]*pendingCASE{}
 	}
-	s.entries[e.SessionID] = e
+	replaced := s.entries[p.entry.SessionID]
+	s.entries[p.entry.SessionID] = p
 	s.mu.Unlock()
+	if replaced != nil && replaced != p {
+		replaced.discard(&s.ids.claims)
+	}
 	if s.afterPut != nil {
 		s.afterPut()
 	}
 }
 
-// take returns, once, the session installed establishing under id; nil
-// when none is.
-func (s *caseEstablishment) take(id uint16) *operational.Entry {
+// take returns, once, the session installed establishing under id with
+// what its establishment saves; nil when none is.
+func (s *caseEstablishment) take(id uint16) *pendingCASE {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	e := s.entries[id]

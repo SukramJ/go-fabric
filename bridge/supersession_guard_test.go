@@ -19,6 +19,10 @@ type supersessionRegistry struct {
 	mu       sync.Mutex
 	live     map[uint16]bool
 	subjects map[uint16]uint64
+	// fabrics overrides the fabric a live session resolves to (default 1).
+	fabrics map[uint16]uint8
+	// pase names the live sessions established over PASE.
+	pase map[uint16]bool
 }
 
 func (r *supersessionRegistry) Lookup(id uint16) (*channel.Session, bool) {
@@ -34,7 +38,16 @@ func (r *supersessionRegistry) Lookup(id uint16) (*channel.Session, bool) {
 func (r *supersessionRegistry) FabricFor(id uint16) (uint8, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if idx, ok := r.fabrics[id]; ok {
+		return idx, r.live[id]
+	}
 	return 1, r.live[id]
+}
+
+func (r *supersessionRegistry) IsPASE(id uint16) (pase, ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.pase[id], r.live[id]
 }
 
 func (r *supersessionRegistry) SubjectFor(id uint16) (nodeID uint64, cats []uint32, ok bool) {
@@ -89,6 +102,41 @@ func TestSessionSupersededGuards(t *testing.T) {
 			t.Fatalf("closed %v, on %d; want open on %d", sub.IsClosed(), sub.CurrentSessionID(), newer)
 		}
 	})
+	// F-b25ed960-42: a newer session the lookup still holds is judged, not
+	// waved through. matter.js supersedes only with a CASE session of the
+	// same peer (packages/protocol/src/session/SessionManager.ts:1242-1250
+	// at b25ed960: !newer.isPase && newer.peerIs(older.peerAddress)), so a
+	// held newer session that resolves to no fabric, to node 0 or to PASE
+	// takes nothing.
+	for _, tc := range []struct {
+		name string
+		reg  func() *supersessionRegistry
+	}{
+		{"moves nothing onto a held session without a fabric", func() *supersessionRegistry {
+			return &supersessionRegistry{
+				live: map[uint16]bool{former: true, newer: true}, subjects: map[uint16]uint64{former: subject, newer: subject},
+				fabrics: map[uint16]uint8{newer: 0},
+			}
+		}},
+		{"moves nothing onto a held session of node 0", func() *supersessionRegistry {
+			return &supersessionRegistry{live: map[uint16]bool{former: true, newer: true}, subjects: map[uint16]uint64{former: subject, newer: 0}}
+		}},
+		{"moves nothing onto a held PASE session", func() *supersessionRegistry {
+			return &supersessionRegistry{
+				live: map[uint16]bool{former: true, newer: true}, subjects: map[uint16]uint64{former: subject, newer: subject},
+				pase: map[uint16]bool{newer: true},
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b, sub := setup(t, tc.reg())
+			b.SessionSuperseded(former, newer)
+			if sub.IsClosed() || sub.CurrentSessionID() != former {
+				t.Fatalf("closed %v, on %d; want left open on %d", sub.IsClosed(), sub.CurrentSessionID(), former)
+			}
+		})
+	}
 	t.Run("moves nothing onto a session of another subject", func(t *testing.T) {
 		t.Parallel()
 		reg := &supersessionRegistry{live: map[uint16]bool{former: true, newer: true}, subjects: map[uint16]uint64{former: subject, newer: 0xCCCC}}

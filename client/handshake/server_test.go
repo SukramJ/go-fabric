@@ -11,6 +11,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -40,6 +41,9 @@ type responderRig struct {
 	// saved is told of every record the responder saved
 	// ([responderRig.accepted]).
 	saved chan struct{}
+	// onSession, when set, runs in OnSession before the session is
+	// passed on.
+	onSession atomic.Pointer[func(s *exchange.Session)]
 
 	nodeMgr    *exchange.Manager
 	nodeRec    *recorder
@@ -79,6 +83,9 @@ func newResponderRig(t *testing.T) *responderRig {
 		OnSession: func(s *exchange.Session, fabricIndex uint8) {
 			if fabricIndex != 1 || s.FabricIndex() != 1 {
 				t.Errorf("OnSession fabric index %d / %d", fabricIndex, s.FabricIndex())
+			}
+			if fn := r.onSession.Load(); fn != nil {
+				(*fn)(s)
 			}
 			r.sessions <- s
 		},
@@ -453,5 +460,58 @@ func TestCASEServerHoldsAtMostFiveSessionsPerPeer(t *testing.T) {
 		if want := i < opened-5; s.IsClosed() != want {
 			t.Errorf("session %d of %d: closed %v, want %v", i, opened, s.IsClosed(), want)
 		}
+	}
+}
+
+// TestCASEServerHandsTheSessionOverAsItIsEstablished (F-b25ed960-44, cut
+// C): the responder hands a session over ([handshake.CASEServerConfig]
+// OnSession) inside its establishment, before what the establishment sets
+// off — the per-peer cap's eviction of the peer's least recently used
+// session — runs, for a resumed and a full handshake alike: no effect of
+// the establishment is observable while the peer does not hold the
+// session yet. matter.js adopts the session on the established set's
+// added event and queues the eviction
+// (packages/protocol/src/session/SessionManager.ts:764-768, :1266-1284,
+// packages/protocol/src/peer/PeerSet.ts:104 at b25ed960).
+func TestCASEServerHandsTheSessionOverAsItIsEstablished(t *testing.T) {
+	t.Parallel()
+	for _, resumed := range []bool{true, false} {
+		name := map[bool]string{true: "resumed", false: "full"}[resumed]
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			r := newResponderRig(t)
+			ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+			defer cancel()
+			open := func() {
+				t.Helper()
+				opts := handshake.CASEOptions{}
+				if resumed {
+					opts.Resumption = r.nodeStore
+				}
+				if _, _, err := handshake.CASE(ctx, r.nodeMgr, r.serverAddr, r.nodeFabric, controllerNodeID, opts); err != nil {
+					t.Fatalf("CASE to the controller: %v", err)
+				}
+			}
+			held := make([]*exchange.Session, 0, 5)
+			for range 5 {
+				open()
+				held = append(held, r.accepted(t))
+			}
+			oldest := held[0]
+			var closedAtHandOver atomic.Bool
+			hook := func(*exchange.Session) { closedAtHandOver.Store(oldest.IsClosed()) }
+			r.onSession.Store(&hook)
+			open()
+			newest := r.accepted(t)
+			if newest.Resumed() != resumed {
+				t.Fatalf("the sixth session resumed %v; want %v", newest.Resumed(), resumed)
+			}
+			if !oldest.IsClosed() {
+				t.Fatal("the sixth session evicted none of the peer's sessions")
+			}
+			if closedAtHandOver.Load() {
+				t.Fatal("the establishment's eviction ran before the session was handed over")
+			}
+		})
 	}
 }

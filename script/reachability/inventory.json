@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10274,
+  "entry_points": 10297,
   "initializers": 369,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28016,
-    "reachable": 20958,
-    "whitelisted": 7036,
+    "total_exported": 28033,
+    "reachable": 20960,
+    "whitelisted": 7051,
     "unreachable": 22
   },
   "by_package": [
@@ -387,14 +387,14 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3284,
+      "line": 3305,
       "kind": "method"
     },
     {
       "package": "bridge",
       "identifier": "Bridge.SubscriptionFlushReporter",
       "file": "bridge/subscribe.go",
-      "line": 404,
+      "line": 407,
       "kind": "method"
     },
     {
@@ -1647,10 +1647,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCASEResumeGiveUpClosesByEntryOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_establishment_test.go",
+      "line": 264
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCASEResumeSecondSigma1FailsTheFirstWait",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_resume_second_sigma1_test.go",
       "line": 76
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCASEResumeWaitOutlivesStop",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_establishment_test.go",
+      "line": 342
     },
     {
       "package": "bridge",
@@ -2309,6 +2323,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_chunked_bound_test.go",
       "line": 93
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestClosingPASESessionTakesNoNewExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 265
     },
     {
       "package": "bridge",
@@ -7023,10 +7044,38 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRevokeClosesThePASESessionWhenItIsIdle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 142
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRevokeDeferredCloseClosesOnlyTheNamedSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 308
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRevokeLeavesAForceClosingPASESessionAlone",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 391
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRevokeMarksASessionOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 337
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRevokeWindowSendsCloseSessionOnThePASESession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_revoke_test.go",
-      "line": 134
+      "line": 141
     },
     {
       "package": "bridge",
@@ -7373,6 +7422,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestServerSubscriptionShutdownFlushRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/flush_refused_parity_matterjs_test.go",
+      "line": 32
+    },
+    {
+      "package": "bridge",
       "identifier": "TestServerSubscriptionSupersessionReporter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/supersession_parity_matterjs_test.go",
@@ -7467,7 +7523,7 @@
       "identifier": "TestSessionSupersededGuards",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/supersession_guard_test.go",
-      "line": 52
+      "line": 65
     },
     {
       "package": "bridge",
@@ -7832,6 +7888,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_race_test.go",
       "line": 69
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestStopEndsDeferredPASECloses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 359
     },
     {
       "package": "bridge",
@@ -41008,6 +41071,13 @@
     },
     {
       "package": "im/subscription",
+      "identifier": "TestFlushSessionFollowsAMovedSubscription",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/flush_session_test.go",
+      "line": 28
+    },
+    {
+      "package": "im/subscription",
       "identifier": "TestGrantedMaxIntervalIsAtLeastTwoSeconds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/subscription/min_interval_parity_matterjs_test.go",
@@ -41648,7 +41718,7 @@
       "identifier": "CompleteSecureSessionEstablishment",
       "reason": "assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow",
       "file": "internal/exchangeseam/exchangeseam.go",
-      "line": 77
+      "line": 80
     },
     {
       "package": "internal/exchangeseam",
@@ -42992,7 +43062,7 @@
       "identifier": "TestAResumptionRecordWithinOneIdentityStays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_resumption_after_update_internal_test.go",
-      "line": 111
+      "line": 130
     },
     {
       "package": "node",
@@ -43115,6 +43185,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestCASEPendingUnitReplacedUnderItsIDReleasesItsClaim",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_resumption_record_parity_matterjs_test.go",
+      "line": 304
+    },
+    {
+      "package": "node",
       "identifier": "TestCASEResponderKeepsTheResolutionOfItsAcceptedSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
@@ -43143,6 +43220,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestCASEResponderSavesTheRecordOfAnEstablishedSessionOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_resumption_record_parity_matterjs_test.go",
+      "line": 172
+    },
+    {
+      "package": "node",
       "identifier": "TestCASEResponderSessionEstablishingOnTheDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_establishing_internal_test.go",
@@ -43154,6 +43238,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_stake_lost_internal_test.go",
       "line": 40
+    },
+    {
+      "package": "node",
+      "identifier": "TestCASEResumeRecordReplacedOnlyOnceConfirmed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_resumption_record_parity_matterjs_test.go",
+      "line": 239
     },
     {
       "package": "node",
@@ -43356,7 +43447,7 @@
       "identifier": "TestNoResumptionRecordOutlivesAnUpdateAfterTheAdmit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_resumption_after_update_internal_test.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "node",
@@ -44882,7 +44973,14 @@
       "identifier": "TestPeerIndexDropsClosedSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/fabric_session_parity_matterjs_test.go",
-      "line": 54
+      "line": 53
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestPeerIndexDropsSessionAtRemoval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/peer_index_internal_test.go",
+      "line": 31
     },
     {
       "package": "secure/operational",
@@ -45058,6 +45156,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_idle_reaper_test.go",
       "line": 182
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestSupersessionHooksInEstablishmentOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/supersession_order_internal_test.go",
+      "line": 66
     },
     {
       "package": "secure/setup",

@@ -998,10 +998,9 @@ func (c *ICDClient) feed(table *icd.PeerTable, addr PeerAddress, reg *ICDRegistr
 		return
 	}
 	w.SetTimings(c.n.icdImage().timings)
-	w.SetRequiresAwait(c.litOperating())
-	if seed {
-		w.NoteActive()
-	}
+	// The flip and the seed of activity in one step, as matter.js's two
+	// synchronous statements (F-b25ed960-C6).
+	w.SetOperatingMode(c.litOperating(), seed)
 	c.unwatchAll()
 	unAvail := w.OnAvailableChanged(c.onAvailableChanged)
 	unMissed := w.OnCheckInMissed(func() { c.emit(func(o icdObserver) { call(o.checkInMiss) }) })
@@ -1235,14 +1234,15 @@ func (c *ICDClient) onSubscriptionActive(active bool) {
 
 // onOperatingModeChanged follows a peer's SIT⇄LIT flip: the wakefulness's
 // RequiresAwait, a live flip into LIT noted as activity, then the
-// automatic registration. Mirrors IcdClient.ts:166-178.
+// automatic registration. The flip and the activity are one step
+// (SetOperatingMode): matter.js runs them with no await between, so a
+// sustained subscription's recreate, woken by the flip, finds the peer
+// awake and keeps the subscription live (F-b25ed960-C6).
+// Mirrors matter.js packages/node/src/behavior/system/icd/IcdClient.ts:166-178 at b25ed960 (#onOperatingModeChanged).
 func (c *ICDClient) onOperatingModeChanged() {
 	if w := c.Wakefulness(); w != nil {
 		lit := c.litOperating()
-		w.SetRequiresAwait(lit)
-		if lit && c.n.online() {
-			w.NoteActive()
-		}
+		w.SetOperatingMode(lit, lit && c.n.online())
 		// The peer's timings may have arrived with the same report.
 		w.SetTimings(c.n.icdImage().timings)
 	}

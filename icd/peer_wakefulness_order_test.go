@@ -5,9 +5,15 @@ package icd_test
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"github.com/SukramJ/go-fabric/icd"
 )
 
 // TestPeerWakefulnessDeliversInChangeOrder holds R2-P6-conc-0208: when a
@@ -69,4 +75,40 @@ func TestPeerWakefulnessDeliversInChangeOrder(t *testing.T) {
 	if last != w.Available() {
 		t.Fatalf("observer saw %v last (all: %v), state is available=%v", last, seen, w.Available())
 	}
+}
+
+// TestPeerWakefulnessSetOperatingModeIsOneStep holds F-b25ed960-C6: a live
+// SIT→LIT flip with activity is one step, as matter.js's IcdClient sets
+// requiresAwait and notes the peer active with no await between. A
+// goroutine parked on ModeSignal — a sustained subscription's recreate —
+// reads Awake when it wakes and must find the peer awake; observers still
+// get matter.js's order (awake false, mode, awake true).
+func TestPeerWakefulnessSetOperatingModeIsOneStep(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		w := icd.NewPeerWakefulness(clocktest.New(modeEpoch))
+		w.SetTimings(wakeTimings)
+		var (
+			mu  sync.Mutex
+			evs []string
+		)
+		w.OnAwakeChanged(func(v bool) { mu.Lock(); evs = append(evs, fmt.Sprintf("awake %v", v)); mu.Unlock() })
+		w.OnOperatingModeChanged(func(v bool) { mu.Lock(); evs = append(evs, fmt.Sprintf("mode %v", v)); mu.Unlock() })
+		edge := w.ModeSignal()
+		seen := make(chan bool, 1)
+		go func() {
+			<-edge
+			seen <- w.Awake()
+		}()
+		synctest.Wait()
+		w.SetOperatingMode(true, true)
+		if !<-seen {
+			t.Fatal("the recreate woken by the flip found the peer asleep")
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if want := []string{"awake false", "mode true", "awake true"}; !slices.Equal(evs, want) {
+			t.Fatalf("events %v, want %v", evs, want)
+		}
+	})
 }

@@ -110,6 +110,11 @@ func (s *DoorLockServer) addCredentialCaseLocked(ctx context.Context, req lockde
 	if s.findCredential(credType, credIndex) != nil {
 		return respond(occupied, nil)
 	}
+	// The credential's type is checked where it is stored, as matter.js
+	// validates the credentials list it assigns (checkUserRecord).
+	if err := s.checkEnumValue("CredentialType", lockdef.CredentialTypeEnumDef, credType); err != nil {
+		return lockdef.SetCredentialResponse{}, err
+	}
 	if err := s.addCredentialLocked(credType, credIndex, req.CredentialData, fabricIndex); err != nil {
 		return lockdef.SetCredentialResponse{}, err
 	}
@@ -138,6 +143,12 @@ func (s *DoorLockServer) addCredentialCaseLocked(ctx context.Context, req lockde
 		}
 		if !req.UserType.Null {
 			user.UserType = uint8(req.UserType.Value)
+		}
+		// A refused user takes the credential added above with it: commit
+		// rolls the invoke back (checkUserRecord says where that differs
+		// from matter.js).
+		if err := s.checkUserRecord(&user); err != nil {
+			return lockdef.SetCredentialResponse{}, err
 		}
 		s.addUserLocked(user)
 		created, owner = &newIndex, newIndex

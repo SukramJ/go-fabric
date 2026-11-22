@@ -128,7 +128,8 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st store
 
 	window.SetFailSafeChecker(h.root.GeneralCommissioning)
 	window.SetFailSafeExpirer(h.root.GeneralCommissioning)
-	window.SetPaseSessionCloser(paseCloser{h.sessions})
+	// No PaseSessionCloser: the bridge closes the PASE sessions of the
+	// registry by itself, each by id once it is idle (F-b25ed960-56).
 	window.SetPaseVerifierInstaller(h)
 	// In the facade's own slot (internal/facadeseam): a host's
 	// SetTransitionHook adds to it.
@@ -582,19 +583,6 @@ func (h *commissioningHost) stop() {
 		h.active.Stop()
 		h.active = nil
 	}
-}
-
-// paseCloser closes every PASE session when a window is revoked (Matter
-// §11.19.7.3 step 1). PASE sessions live under fabric index 0.
-type paseCloser struct{ sessions *operational.Manager }
-
-// ClosePaseSessions implements [bridge.PaseSessionCloser].
-func (c paseCloser) ClosePaseSessions(context.Context) error {
-	if c.sessions == nil {
-		return errors.New("node: no session manager")
-	}
-	c.sessions.CloseFabric(0)
-	return nil
 }
 
 // WindowCredentials are the setup credentials of one [Node.OpenBasicWindow]

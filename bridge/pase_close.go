@@ -124,44 +124,6 @@ func (b *Bridge) wireFailSafeExpiry(servers []contract.ClusterServer) {
 	}
 }
 
-// closePASESessionsOnRevoke is what a [CommissioningWindow] attached to
-// the bridge runs when it is revoked: the PASE sessions open at that
-// moment are closed gracefully, the ones AddNOC adopted onto a fabric
-// included — each peer the bridge has a route to is told with a
-// CloseSession on its session while the keys are live, then hostClose
-// runs the host's [PaseSessionCloser] (nil-safe), then the sessions close.
-// The window decides when (after the response, when the revoke arrived
-// over the PASE session itself).
-//
-// The farewell is sent here, before hostClose, because a host's closer
-// closes silently and before the bridge's own close (the node facade's
-// is CloseFabric(0), which takes the un-adopted PASE session away): sent
-// after it, there would be no live session to send on. This one site
-// serves the bare bridge and the facade alike. Unlike CommissioningComplete
-// and the fail-safe expiry (force closes, [Bridge.closePASESessions]),
-// the revoke's close is matter.js's graceful one.
-//
-// Mirrors matter.js
-// packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
-// at b25ed960 (revokeCommissioning, "Step 1: Regardless of window state —
-// terminate PASE sessions and expire PASE-held fail-safe":
-// `SessionManager.getPaseSession()` → `paseSession.initiateClose()`).
-// The graceful close's event is observed by
-// packages/protocol/src/protocol/ExchangeManager.ts:757-768 at b25ed960 (gracefulClose)
-// and answered with a CloseSession on the closing session by
-// packages/protocol/src/protocol/ExchangeManager.ts:790-800 at b25ed960 (#sendCloseSession)
-// (F-b25ed960-56 (ii)).
-func (b *Bridge) closePASESessionsOnRevoke(hostClose func()) {
-	closeNow, ids := b.paseSessionsCloser()
-	b.notifySessionsClosing(ids)
-	if hostClose != nil {
-		hostClose()
-	}
-	if closeNow != nil {
-		closeNow()
-	}
-}
-
 // notifySessionsClosing sends a CloseSession on each of ids that is still
 // live and that the bridge has a route for ([Bridge.sendCloseSessionReport],
 // best-effort); one without either closes silently.
@@ -286,22 +248,40 @@ func (b *Bridge) closePASESessions(ctx context.Context, closing func(ids []uint1
 	return ids
 }
 
-// paseSessionsCloser names the PASE sessions open now and returns what
-// closes exactly those, by id, with the ids; nil when there is none, or
-// when the [SessionRegistry] does not list its sessions.
-func (b *Bridge) paseSessionsCloser() (closeNow func(), ids []uint16) {
+// listPASESessions names the PASE sessions open now, those whose graceful
+// close is deferred left out: they are closing, and a close finds only a
+// PASE session that is not — matter.js's getPaseSession skips a closing
+// session (packages/protocol/src/session/SessionManager.ts:660-664 at
+// b25ed960), so neither the fail-safe's rollback nor CommissioningComplete
+// force-closes a session a revoke closes gracefully, and a second revoke
+// does not close it again (Session.ts:305-307 at b25ed960). Empty when the
+// [SessionRegistry] does not list its sessions.
+func (b *Bridge) listPASESessions() []uint16 {
 	b.mu.RLock()
 	reg := b.sessionRegistry
 	b.mu.RUnlock()
 	lister, ok := reg.(sessionLister)
 	if !ok {
-		return nil, nil
+		return nil
 	}
+	var ids []uint16
 	for _, s := range lister.Sessions() {
-		if s.IsPASE {
+		if s.IsPASE && !b.paseCloseDeferred(s.SessionID) {
 			ids = append(ids, s.SessionID)
 		}
 	}
+	return ids
+}
+
+// paseSessionsCloser names the PASE sessions open now
+// ([Bridge.listPASESessions]) and returns what closes exactly those, by
+// id, with the ids; nil when there is none, or when the [SessionRegistry]
+// does not list its sessions.
+func (b *Bridge) paseSessionsCloser() (closeNow func(), ids []uint16) {
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	ids = b.listPASESessions()
 	if len(ids) == 0 {
 		return nil, nil
 	}

@@ -671,6 +671,11 @@ type Bridge struct {
 	// again — peer truly gone — exceed the cap and get closed via the
 	// existing eviction path.
 	subSendErrorCount sync.Map // map[uint32]int  (subscriptionID → consecutive failures)
+	// quietTerminations names the subscriptions a refused flush report is
+	// terminating at this moment ([Bridge.closeRefusedFlush]): their
+	// terminated hook forgets the persisted record but starts no
+	// re-announce.
+	quietTerminations sync.Map // map[uint32]struct{}
 	// subUpdateMu guards every change of subSendErrorCount
 	// ([Bridge.noteSubscriptionSendError], [Bridge.resetFailedUpdates]):
 	// the reporter, the ACK pump and a subscription's release change a
@@ -769,6 +774,16 @@ type Bridge struct {
 	// closing, and do not keep a new PASE exchange out
 	// ([Bridge.paseSessionExists]). Guarded by b.mu.
 	paseClosing map[uint16]struct{}
+	// paseDeferred holds the graceful close of each revoked PASE session
+	// that waits for the session to become idle
+	// ([Bridge.closePASESessionsOnRevoke]); paseDeferredN counts it for the
+	// receive path's fast check. Guarded by b.mu.
+	paseDeferred  map[uint16]*paseDeferredClose
+	paseDeferredN atomic.Int32
+	// sessionTurns counts the handler turns running per secure session
+	// ([Bridge.enterSessionTurn]): session id → *atomic.Int32, the entry
+	// dropped when the session closes ([Bridge.SessionClosed]).
+	sessionTurns sync.Map
 	// advertiserClosed: [Bridge.Stop] withdrew the advertiser's records and
 	// closed it ([Bridge.closeAdvertiser]); a second Stop does not again.
 	// Guarded by b.mu.
@@ -1856,18 +1871,21 @@ type fabricSessionExceptCloser interface {
 // peer's answer to the flushed report is not queued behind it (review
 // II, R2-P1-req2-04; matter.js's leave closes the fabric's sessions one
 // after another and excepts none, the invoking one included —
-// Fabric.ts:450-454, each one's shutdown logic awaited at
+// Fabric.ts:459-463 at b25ed960, each one's shutdown logic awaited at
 // packages/protocol/src/session/Session.ts:313). Mirrors matter.js
-// packages/protocol/src/fabric/Fabric.ts:447-457 at db021da0 `leave`: the
+// packages/protocol/src/fabric/Fabric.ts:456-466 at b25ed960 `leave`: the
 // leaving event (BasicInformationServer's Leave, BasicInformationServer.ts:175,
 // :186-188), then every session of the fabric runs closeSubscriptions
-// with a flush (NodeSession.ts:312-323, closeSubscriptions). The fabric's
+// with a flush (NodeSession.ts:383-395, closeSubscriptions). The fabric's
 // delete follows. Each subscription's flush is one report carrying its
 // events and attributes (the bridge's report sender, a
 // [subscription.Report] with Flush set), and it
 // waits for the peer's StatusResponse before the flush returns, as the
-// matter.js flush awaits its update (ServerSubscription.ts:753-763,
-// #flush), so the CloseSession that follows cannot overtake the report.
+// matter.js flush awaits its update (ServerSubscription.ts:773-783,
+// #flush) — within 500 ms, as matter.js's closed subscription waits
+// (InteractionMessenger.ts:844 at b25ed960) — so the CloseSession that
+// follows cannot overtake the report. A refused flush report terminates
+// the subscription ([Bridge.closeRefusedFlush]).
 // Needs the subscription manager attached; without it there is nothing
 // to flush.
 func (b *Bridge) EmitFabricLeavingContext(ctx context.Context, fabricIndex uint8) {
@@ -2436,6 +2454,9 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// operational.Manager.CloseAllGraceful; owner decision 49). What the
 	// subscriptions owe goes out before the sessions close.
 	b.flushSubscriptionsForShutdown(ctx)
+	// A revoked PASE session's deferred close ends here: the shutdown
+	// closes every session next, and no deferral timer outlives Stop.
+	b.dropPASECloses()
 	b.closeSecureSessionsForShutdown()
 	// Off the radio before the transports go: the advertisement stops,
 	// the central is disconnected and the GATT service unregistered.

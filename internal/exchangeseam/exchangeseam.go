@@ -72,6 +72,9 @@ var SendNotifyingTransmission func(ctx context.Context, x any, opcode uint8, pay
 // CompleteSecureSessionEstablishment ends the establishment of sess (a
 // CASE responder's *exchange.Session from NewEstablishingSecureSession)
 // and reports whether it is established: false when the session is
-// closing and so never established. Set by client/exchange's init.
+// closing and so never established. onEstablished, when not nil, runs once
+// inside the establishment — after the session became established, before
+// what the establishment sets off (the per-peer cap) — and only in the
+// call that established it. Set by client/exchange's init.
 // fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
-var CompleteSecureSessionEstablishment func(sess any) bool
+var CompleteSecureSessionEstablishment func(sess any, onEstablished func()) bool
