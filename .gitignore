@@ -43,3 +43,6 @@ examples/reference-bridge/reference-bridge
 
 # a tool binary go build ./script/<tool> leaves at the root
 /coverfloor
+
+# the API-break guard builds its own copy in a temporary directory (script/apidiff)
+/apidiff

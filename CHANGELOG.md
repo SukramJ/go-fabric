@@ -13,6 +13,8 @@ pseudo-version of `main`.
 ### Changed
 
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules move with the root to `thingfabric.dev/go-fabric/ble/bluez`, `thingfabric.dev/go-fabric/ble/esphome` and `thingfabric.dev/go-fabric/wifi/wpasupplicant`, require go-fabric `v0.25.0` (before `github.com/SukramJ/go-fabric v0.24.0`) and are tagged `ble/bluez/v0.25.0`, `ble/esphome/v0.25.0` and `wifi/wpasupplicant/v0.25.0` at this commit; `examples/ble-wifi-light` requires the three at `v0.25.0`. No code change beyond the import paths.
+- The chip-tool suite's harness image moves to `ghcr.io/thingfabric/go-fabric-chip@sha256:d683bf5b…`: the same manifest, copied by digest from `ghcr.io/sukramj/go-fabric-chip` (no rebuild; same base image and CHIP commit). `chip-image.yml` pushes there from now on. The recorded families run (`internal/chiptool/testdata/chip-cases.golden.json`, `docs/certifiability.md`) keeps naming the image it ran in until the next families run rewrites it.
+- The `apidiff` binary committed by mistake in v0.10.3 (#240) is removed from the repository root; `make apidiff-check` builds the pinned tool as before.
 
 ## [0.25.0] — 2026-11-22
 

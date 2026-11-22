@@ -4,7 +4,7 @@
 # builds of chip-tool and the all-clusters app (chip-tool-ble,
 # all-clusters-app-ble) with bluezoo for the BLE-Wi-Fi leg, built from the
 # Makefile's CHIP_TEST_IMAGE_COMMIT and pushed as
-# ghcr.io/sukramj/go-fabric-chip:<that commit>.
+# ghcr.io/thingfabric/go-fabric-chip:<that commit>.
 #
 # Manual only. After a run the digest the run's summary prints goes into
 # the Makefile's CHIP_TEST_IMAGE (phase 34): the suite then runs in this
@@ -44,7 +44,7 @@ jobs:
           commit=$(sed -n 's/^CHIP_TEST_IMAGE_COMMIT[[:space:]]*?=[[:space:]]*//p' Makefile)
           base=$(sed -n 's/^CHIP_BASE_IMAGE[[:space:]]*?=[[:space:]]*//p' Makefile)
           case "$base" in ghcr.io/matter-js/chip@*) ;; *) echo "::error::CHIP_BASE_IMAGE ($base) is not matter.js's image pinned by digest"; exit 1 ;; esac
-          tag="ghcr.io/sukramj/go-fabric-chip:$commit"
+          tag="ghcr.io/thingfabric/go-fabric-chip:$commit"
           echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
           docker buildx create --use --name chip
           docker buildx build --platform linux/amd64 --push \
@@ -57,6 +57,6 @@ jobs:
             echo "Pushed \`$tag\`. Pin it in the Makefile:"
             echo
             echo '```'
-            echo "CHIP_TEST_IMAGE        ?= ghcr.io/sukramj/go-fabric-chip@$digest"
+            echo "CHIP_TEST_IMAGE        ?= ghcr.io/thingfabric/go-fabric-chip@$digest"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -46,11 +46,11 @@ func TestMakefileImagesPinnedByDigest(t *testing.T) {
 		}
 	}
 	for src, ok := range map[string]bool{
-		"CHIP_TEST_IMAGE ?= ghcr.io/sukramj/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a08715a65ebfe0e5c9ae8dc2e322ca8f4e006ff\n": true,
-		"CHIP_TEST_IMAGE ?= ghcr.io/sukramj/go-fabric-chip:6170af84\n":                                                                false,
-		"CHIP_TEST_IMAGE ?= ghcr.io/sukramj/go-fabric-chip@sha256:d683bf5b\n":                                                         false,
-		"CHIP_TEST_IMAGE ?= ghcr.io/sukramj/go-fabric-chip:latest@sha256:\n":                                                          false,
-		"# CHIP_TEST_IMAGE ?= x@sha256:d683bf5bbca6b0d9a37bcce64a08715a65ebfe0e5c9ae8dc2e322ca8f4e006ff\n":                            false,
+		"CHIP_TEST_IMAGE ?= ghcr.io/thingfabric/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a08715a65ebfe0e5c9ae8dc2e322ca8f4e006ff\n": true,
+		"CHIP_TEST_IMAGE ?= ghcr.io/thingfabric/go-fabric-chip:6170af84\n":                                                                false,
+		"CHIP_TEST_IMAGE ?= ghcr.io/thingfabric/go-fabric-chip@sha256:d683bf5b\n":                                                         false,
+		"CHIP_TEST_IMAGE ?= ghcr.io/thingfabric/go-fabric-chip:latest@sha256:\n":                                                          false,
+		"# CHIP_TEST_IMAGE ?= x@sha256:d683bf5bbca6b0d9a37bcce64a08715a65ebfe0e5c9ae8dc2e322ca8f4e006ff\n":                                false,
 	} {
 		if _, err := makefileImagePin([]byte(src), "CHIP_TEST_IMAGE"); (err == nil) != ok {
 			t.Errorf("%q: accepted %v, want %v (%v)", src, err == nil, ok, err)

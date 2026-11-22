@@ -43,7 +43,7 @@ kernel modules and stay weekly, outside that gate.
   endpoint per device surface the module serves (lights, sensors, closures,
   climate, appliances, an air purifier with its filters, a garage door, a
   lock, a smoke/CO alarm, a switch).
-- **The harness** is the module's own image (`ghcr.io/sukramj/go-fabric-chip`,
+- **The harness** is the module's own image (`ghcr.io/thingfabric/go-fabric-chip`,
   `internal/chiptool/image`, built by `chip-image.yml`): matter.js's CHIP image
   (`ghcr.io/matter-js/chip`, the Makefile's `CHIP_BASE_IMAGE`) plus chip's
   jf-admin-app, jf-control-app and Push AV server, pinned by digest in the
