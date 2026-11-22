@@ -8,7 +8,6 @@ import (
 	"errors"
 	"log/slog"
 	"net"
-	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -30,25 +29,9 @@ import (
 // with the commissioning channel's implicit Administer — open.
 const paseCloseDeferralCap = 60 * time.Second
 
-// paseCloseBatch is the PASE sessions one revoke closes. The host's closer
-// runs once, when the last of them finishes.
-type paseCloseBatch struct {
-	remaining atomic.Int32
-	hostClose func()
-}
-
-// done counts one session of the batch finished and runs the host's closer
-// when it was the last.
-func (c *paseCloseBatch) done() {
-	if c.remaining.Add(-1) == 0 && c.hostClose != nil {
-		c.hostClose()
-	}
-}
-
 // paseDeferredClose is the graceful close of one revoked PASE session that
 // waits for the session to become idle. Guarded by the bridge's mu.
 type paseDeferredClose struct {
-	batch *paseCloseBatch
 	// cap runs the close at [paseCloseDeferralCap].
 	cap clock.Timer
 	// timed re-checks the session when its latest timed window elapses.
@@ -60,18 +43,15 @@ type paseDeferredClose struct {
 // the ones AddNOC adopted onto a fabric included, those already closing
 // left out — are closed gracefully, each when it has become idle
 // ([Bridge.paseSessionActive]): a CloseSession on its session while the
-// keys are live, then, for the last of them, hostClose — the host's
-// [PaseSessionCloser] (nil-safe) — and then the session closes. A session
-// idle at the revoke (the revoke came over CASE and the PASE session is
-// quiet) closes at once, before the revoke's response.
-//
-// The farewell is sent here, before hostClose, because a host's closer
-// closes silently and before the bridge's own close (the node facade's is
-// CloseFabric(0), which takes the un-adopted PASE session away): sent after
-// it, there would be no live session to send on. Unlike
-// CommissioningComplete and the fail-safe expiry (force closes,
-// [Bridge.closePASESessions]), the revoke's close is matter.js's graceful
-// one.
+// keys are live, then the session closes, by id. A session idle at the
+// revoke (the revoke came over CASE and the PASE session is quiet) closes
+// at once, before the revoke's response. Only the sessions named here
+// close: a PASE session a new commissioning establishes while a close is
+// deferred is not this revoke's. The host's [PaseSessionCloser] is the
+// window's, at the revoke ([CommissioningWindow.RevokeWindow]), not part of
+// this close. Unlike CommissioningComplete and the fail-safe expiry (force
+// closes, [Bridge.closePASESessions]), the revoke's close is matter.js's
+// graceful one.
 //
 // Mirrors matter.js
 // packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-154
@@ -95,29 +75,11 @@ type paseDeferredClose struct {
 // ([im.DeferAfterResponse]) — the receive path counts it as well
 // ([Bridge.enterSessionTurn]); a caller outside the receive path is held
 // the same way.
-func (b *Bridge) closePASESessionsOnRevoke(ctx context.Context, hostClose func()) {
-	ids := b.listPASESessions()
+func (b *Bridge) closePASESessionsOnRevoke(ctx context.Context) {
+	ids := b.markPASECloses(b.listPASESessions())
 	if len(ids) == 0 {
-		if hostClose != nil {
-			hostClose()
-		}
 		return
 	}
-	batch := &paseCloseBatch{hostClose: hostClose}
-	batch.remaining.Store(int32(len(ids))) //nolint:gosec // G115: the PASE sessions of one registry, far below 2^31
-	b.mu.Lock()
-	if b.paseClosing == nil {
-		b.paseClosing = make(map[uint16]struct{})
-	}
-	if b.paseDeferred == nil {
-		b.paseDeferred = make(map[uint16]*paseDeferredClose)
-	}
-	for _, id := range ids {
-		b.paseClosing[id] = struct{}{}
-		b.paseDeferred[id] = &paseDeferredClose{batch: batch}
-	}
-	b.paseDeferredN.Add(int32(len(ids))) //nolint:gosec // G115: as above
-	b.mu.Unlock()
 	if im.IsPASEFromContext(ctx) {
 		// The interaction's session, or — a context that names none —
 		// every one of them: it is one of the PASE sessions.
@@ -135,13 +97,54 @@ func (b *Bridge) closePASESessionsOnRevoke(ctx context.Context, hostClose func()
 	for _, id := range ids {
 		capTimer := b.clk().AfterFunc(paseCloseDeferralCap, func() { b.finishPASEClose(id, "deferral_cap") })
 		b.mu.Lock()
-		if st := b.paseDeferred[id]; st != nil {
+		if st := b.paseDeferred[id]; st != nil && st.cap == nil {
 			st.cap = capTimer
 		} else {
 			capTimer.Stop()
 		}
 		b.mu.Unlock()
 		b.recheckPASEClose(id)
+	}
+}
+
+// markPASECloses marks each of ids closing with a deferred close and
+// returns those it marked: an id another revoke marked first — two revokes
+// can list the same session before either marks it — is that revoke's, and
+// is left out.
+func (b *Bridge) markPASECloses(ids []uint16) []uint16 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.paseClosing == nil {
+		b.paseClosing = make(map[uint16]struct{})
+	}
+	if b.paseDeferred == nil {
+		b.paseDeferred = make(map[uint16]*paseDeferredClose)
+	}
+	marked := ids[:0:0]
+	for _, id := range ids {
+		if _, taken := b.paseDeferred[id]; taken {
+			continue
+		}
+		b.paseClosing[id] = struct{}{}
+		b.paseDeferred[id] = &paseDeferredClose{}
+		b.paseDeferredN.Add(1)
+		marked = append(marked, id)
+	}
+	return marked
+}
+
+// dropPASECloses forgets every deferred close and stops its timers: the
+// bridge stops, and its shutdown closes the sessions itself
+// ([Bridge.Stop]).
+func (b *Bridge) dropPASECloses() {
+	b.mu.RLock()
+	ids := make([]uint16, 0, len(b.paseDeferred))
+	for id := range b.paseDeferred {
+		ids = append(ids, id)
+	}
+	b.mu.RUnlock()
+	for _, id := range ids {
+		b.dropPASEClose(id)
 	}
 }
 
@@ -168,7 +171,10 @@ func (b *Bridge) paseCloseDeferred(sessionID uint16) bool {
 // (packages/protocol/src/protocol/MessageExchange.ts:1187-1216 at b25ed960),
 // (c) a timed window not yet elapsed or a chunked write still open. timedUntil
 // is the latest timed deadline when (c)'s timed windows are all that keep
-// it active.
+// it active. Two holds have no trigger of their own and end at
+// [paseCloseDeferralCap]: a stalled chunked write, counted until a later
+// write sweeps it, and a message dropped from the retransmit table
+// outside a turn of the session (an Untrack after a failed send).
 func (b *Bridge) paseSessionActive(sessionID uint16) (active bool, timedUntil time.Time) {
 	b.sessionTurnsMu.Lock()
 	turns := b.sessionTurns[sessionID]
@@ -247,7 +253,7 @@ func (b *Bridge) takePASEClose(sessionID uint16) *paseDeferredClose {
 }
 
 // finishPASEClose runs sessionID's deferred close once: the CloseSession,
-// the host's closer when the session is its revoke's last, the close.
+// then the close by id.
 func (b *Bridge) finishPASEClose(sessionID uint16, reason string) {
 	st := b.takePASEClose(sessionID)
 	if st == nil {
@@ -258,7 +264,6 @@ func (b *Bridge) finishPASEClose(sessionID uint16, reason string) {
 		slog.String("when", reason),
 		slog.Int("session_id", int(sessionID)))
 	b.notifySessionsClosing([]uint16{sessionID})
-	st.batch.done()
 	b.mu.RLock()
 	reg := b.sessionRegistry
 	b.mu.RUnlock()
@@ -270,15 +275,13 @@ func (b *Bridge) finishPASEClose(sessionID uint16, reason string) {
 	b.mu.Unlock()
 }
 
-// dropPASEClose forgets sessionID's deferred close when the session went
-// another way ([Bridge.SessionClosed]); the host's closer still runs when
-// it was its revoke's last session.
+// dropPASEClose forgets sessionID's deferred close and stops its timers:
+// the session went another way ([Bridge.SessionClosed]), or the bridge
+// stops.
 func (b *Bridge) dropPASEClose(sessionID uint16) {
-	st := b.takePASEClose(sessionID)
-	if st == nil {
+	if b.takePASEClose(sessionID) == nil {
 		return
 	}
-	st.batch.done()
 	b.mu.Lock()
 	delete(b.paseClosing, sessionID)
 	b.mu.Unlock()
@@ -341,7 +344,10 @@ func (b *Bridge) refuseNewMessage(src net.Addr, hdr *message.Header, proto messa
 // ack is owed, nothing is handled. A message of an exchange that exists —
 // one this node opened, one holding a message of this node unacknowledged,
 // a timed window, a chunked write, a chunk wait or a BDX transfer — and
-// every standalone ack pass, as does a duplicate (its ack is still sent).
+// every standalone ack pass, as does a duplicate (its ack is still sent)
+// and a message the peer sends as responder. matter.js declines those two
+// as well when their exchange is gone; here they are acknowledged and not
+// served.
 // Mirrors matter.js packages/protocol/src/protocol/ExchangeManager.ts:433-438
 // at b25ed960 (a closing session takes no new exchange: logged, no ack).
 func (b *Bridge) refuseOnClosingPASE(hdr *message.Header, proto message.ProtocolHeader) bool {

@@ -1208,9 +1208,11 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 // persisted record is forgotten — but starts no re-announce: a flush runs
 // while its session closes, and matter.js drops the subscriptionsChanged
 // emit of a closing session (packages/protocol/src/session/SessionManager.ts
-// :316-319 at b25ed960); at shutdown its advertiser is closed before the
-// flush (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts
-// :449-459, DeviceAdvertiser.ts:331-332, :356-357).
+// :316-319 at b25ed960); at shutdown the advertiser's close is started
+// before the sessions are flushed
+// (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts
+// :449-459), and a closing advertiser advertises nothing
+// (DeviceAdvertiser.ts:331-332, :356-357).
 func (b *Bridge) closeRefusedFlush(subID uint32, exchangeID uint16, cause error) {
 	b.quietTerminations.Store(subID, struct{}{})
 	defer b.quietTerminations.Delete(subID)

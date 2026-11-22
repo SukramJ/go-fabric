@@ -297,3 +297,87 @@ func TestClosingPASESessionTakesNoNewExchange(t *testing.T) {
 	r.ackResponse(t)
 	assertOneCloseSession(t, r.peer.read(t), r.peerSID)
 }
+
+// TestRevokeDeferredCloseClosesOnlyTheNamedSession: the revoke closes the
+// PASE sessions it named, by id, and nothing else when a deferred close
+// finally runs — a PASE session a new commissioning established meanwhile
+// survives it, and the host's PaseSessionCloser runs at the revoke, not
+// at the deferred close. matter.js closes the one session getPaseSession()
+// returned (packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
+// at b25ed960; packages/protocol/src/session/SessionManager.ts:660-664).
+func TestRevokeDeferredCloseClosesOnlyTheNamedSession(t *testing.T) {
+	t.Parallel()
+	r := newDeferredRevokeRig(t)
+	host := &countingPaseCloser{}
+	r.w.SetPaseSessionCloser(host)
+	r.revokeOverPASE(t, true)
+	if host.calls != 1 {
+		t.Fatalf("the host's closer ran %d times at the revoke, want 1", host.calls)
+	}
+	r.assertOpenAndQuiet(t, "before the ack")
+	// A new commissioning's PASE session, established during the deferral.
+	newer, err := r.dev.sessions.OpenFromPase(1, 3, 0x0E08, []byte("another-pase-secret"))
+	if err != nil {
+		t.Fatalf("OpenFromPase: %v", err)
+	}
+	r.ackResponse(t)
+	assertOneCloseSession(t, r.peer.read(t), r.peerSID)
+	assertPASEClosed(t, r.dev.sessions, r.sid)
+	if _, err := r.dev.sessions.Get(newer.SessionID); err != nil {
+		t.Fatalf("the PASE session established during the deferral: %v, want open", err)
+	}
+	if host.calls != 1 {
+		t.Fatalf("the host's closer ran %d times, want once, at the revoke", host.calls)
+	}
+}
+
+// TestRevokeMarksASessionOnce: two revokes that both name a PASE session —
+// a RevokeCommissioning and the attempt cap, listed before either marked
+// it — defer its close once: one deferred close, one count, one cap timer.
+func TestRevokeMarksASessionOnce(t *testing.T) {
+	t.Parallel()
+	r := newDeferredRevokeRig(t)
+	b := r.dev.br
+	if got := b.markPASECloses([]uint16{r.sid}); len(got) != 1 {
+		t.Fatalf("first mark %v, want [%d]", got, r.sid)
+	}
+	if got := b.markPASECloses([]uint16{r.sid}); len(got) != 0 {
+		t.Fatalf("second mark %v, want none: the first revoke's", got)
+	}
+	if n := b.paseDeferredN.Load(); n != 1 {
+		t.Fatalf("deferred count %d, want 1", n)
+	}
+	b.finishPASEClose(r.sid, "idle")
+	if n := b.paseDeferredN.Load(); n != 0 {
+		t.Fatalf("deferred count %d after the close, want 0", n)
+	}
+	assertOneCloseSession(t, r.peer.read(t), r.peerSID)
+}
+
+// TestStopEndsDeferredPASECloses: Bridge.Stop forgets the deferred closes
+// and stops their timers; none runs on the stopped bridge afterwards.
+func TestStopEndsDeferredPASECloses(t *testing.T) {
+	t.Parallel()
+	fake := clocktest.New(time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC))
+	dev, w, sid, _, _ := revokePASEDeviceWith(t, func(br *Bridge, _ *operational.Manager) {
+		br.clock = fake
+	})
+	dev.br.enterSessionTurn(sid)
+	if err := w.RevokeWindow(context.Background()); err != nil {
+		t.Fatalf("RevokeWindow: %v", err)
+	}
+	if !dev.br.paseCloseDeferred(sid) {
+		t.Fatal("the busy PASE session's close is not deferred")
+	}
+	if err := dev.br.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if dev.br.paseCloseDeferred(sid) || dev.br.paseDeferredN.Load() != 0 {
+		t.Fatal("a deferred close outlived Stop")
+	}
+	for _, d := range fake.Armed() {
+		if d == paseCloseDeferralCap {
+			t.Fatal("the deferral's cap timer is still armed after Stop")
+		}
+	}
+}

@@ -170,11 +170,11 @@ func TestRevokeWindowSendsCloseSessionOnThePASESession(t *testing.T) {
 		assertOneCloseSession(t, peer.read(t), peerSID)
 		assertPASEClosed(t, dev.sessions, sid)
 	})
-	t.Run("the host's closer runs first", func(t *testing.T) {
+	t.Run("the host's closer runs after the farewell", func(t *testing.T) {
 		t.Parallel()
-		// The node facade's closer is a silent CloseFabric(0) and the
-		// window runs the host's closer before the bridge's: the
-		// CloseSession must still go out.
+		// A silent CloseFabric(0) as the host's closer runs after the
+		// bridge closed the idle PASE session with its CloseSession: the
+		// farewell still goes out.
 		dev, w, sid, peerSID, peer := revokePASEDevice(t)
 		w.SetPaseSessionCloser(facadePaseCloser{dev.sessions})
 		if err := w.RevokeWindow(context.Background()); err != nil {

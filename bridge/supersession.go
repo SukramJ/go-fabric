@@ -104,7 +104,7 @@ func (b *Bridge) sessionLive(sessionID uint16) bool {
 // 0 — matter.js supersedes only with a CASE session of the same peer
 // (packages/protocol/src/session/SessionManager.ts:1242-1250 at b25ed960:
 // !newer.isPase && newer.peerIs(older.peerAddress)), and a PASE session
-// adopted onto a fabric by AddNOC keeps peer node 0. Only what the bridge
+// the node facade adopted onto a fabric keeps peer node 0. Only what the bridge
 // cannot judge passes: a newerID the lookup no longer holds (what moves
 // onto it is closed by [Bridge.SessionSuperseded]), a lookup without a
 // fabric resolver, and a subject resolver that is not wired.

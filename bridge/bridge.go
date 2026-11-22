@@ -1871,7 +1871,7 @@ type fabricSessionExceptCloser interface {
 // peer's answer to the flushed report is not queued behind it (review
 // II, R2-P1-req2-04; matter.js's leave closes the fabric's sessions one
 // after another and excepts none, the invoking one included —
-// Fabric.ts:450-455 at b25ed960, each one's shutdown logic awaited at
+// Fabric.ts:459-463 at b25ed960, each one's shutdown logic awaited at
 // packages/protocol/src/session/Session.ts:313). Mirrors matter.js
 // packages/protocol/src/fabric/Fabric.ts:456-466 at b25ed960 `leave`: the
 // leaving event (BasicInformationServer's Leave, BasicInformationServer.ts:175,
@@ -2454,6 +2454,9 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// operational.Manager.CloseAllGraceful; owner decision 49). What the
 	// subscriptions owe goes out before the sessions close.
 	b.flushSubscriptionsForShutdown(ctx)
+	// A revoked PASE session's deferred close ends here: the shutdown
+	// closes every session next, and no deferral timer outlives Stop.
+	b.dropPASECloses()
 	b.closeSecureSessionsForShutdown()
 	// Off the radio before the transports go: the advertisement stops,
 	// the central is disconnected and the GATT service unregistered.
