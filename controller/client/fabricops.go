@@ -23,7 +23,10 @@ import (
 // Peer-loss causes of the registry — matter.js PeerLeftError and
 // PeerShutdownError (protocol/src/peer/PeerCommunicationError.ts:90-94,
 // :72-76 at db021da0), which client/peer and client/exchange do
-// not declare.
+// not declare. The cause an operational certificate update force-closes
+// the peer's sessions with, matter.js FabricChangedError, is
+// commissioner.ErrFabricChanged: the commissioner runs the update and
+// cannot import this package.
 var (
 	// ErrPeerLeft: the peer left the fabric — the cause its sessions are
 	// given up with after a decommission or a leave event.

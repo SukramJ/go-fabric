@@ -200,13 +200,28 @@ func armRefusal(err error) bool {
 	return errors.As(err, &e) && (e.kind == ErrCertificateUpdateBusy || e.kind == ErrCertificateUpdateRefused) //nolint:errorlint // the identity of the kind
 }
 
-// fabricChangedError is the cause the update force-closes the peer's
-// sessions with — matter.js FabricChangedError
-// (packages/protocol/src/peer/PeerCommunicationError.ts:105-112 at
-// b25ed960), here with the update's reason as its text.
+// ErrFabricChanged reports that the fabric associated with the peer's session has
+// changed — the cause an operational certificate update force-closes the
+// peer's sessions with (forgetSessions). A request pending on one of
+// them fails with an error that matches it under errors.Is; the error's
+// text carries the update's reason. It is not transient: it does not match exchange.ErrTransient.
+// Mirrors matter.js FabricChangedError, which extends PeerCommunicationError,
+// not TransientPeerCommunicationError:
+// packages/protocol/src/peer/PeerCommunicationError.ts:105-112 at b25ed960 (FabricChangedError)
+// packages/protocol/src/peer/OperationalCertificateUpdate.ts:790 at b25ed960 (forgetSessions' disconnect cause)
+var ErrFabricChanged = errors.New("commissioner: the fabric associated with this session has changed")
+
+// fabricChangedError is the reason-carrying form of ErrFabricChanged the
+// update force-closes the peer's sessions with, the update's reason as
+// its text (OperationalCertificateUpdate.ts:790 passes the reason as the
+// message).
 type fabricChangedError struct{ reason string }
 
 func (e fabricChangedError) Error() string { return "commissioner: " + e.reason }
+
+// Is makes the error match ErrFabricChanged; it matches no other target,
+// exchange.ErrTransient among them.
+func (fabricChangedError) Is(target error) bool { return target == ErrFabricChanged }
 
 // nocUpdateSeam is what the update reaches the peer through: its invokes
 // and reads, the CASE connection, the resumption record's delete and the
