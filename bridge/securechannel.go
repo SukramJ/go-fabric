@@ -1615,11 +1615,26 @@ func (b *Bridge) handleCase(
 	// A resumed session waits for the initiator's Success from before its
 	// Sigma2_Resume goes out, so a Success that overtakes this send's
 	// return finds it ([Bridge.settleAwaitedResume]).
+	//
+	// The retransmit entry names the installed session (tracked) only for a
+	// host that installs it established: its give-up, expiry or abandonment
+	// closes that session by id ([Bridge.closeUnacknowledgedResume]). A
+	// session a host installed establishing is closed by entry on every
+	// path — the give-up and the abandonment end its wait
+	// ([Bridge.endAwaitedResume]), a failed send below, silence its
+	// deadline — never by an id another session may hold by then
+	// (F-b25ed960-38). installed itself stays set: the send-failure close
+	// reads it. matter.js closes the session object, never an id
+	// (packages/protocol/src/session/case/CaseServer.ts:177-190, :192-211 at
+	// b25ed960).
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
-	var installed uint16
+	var installed, tracked uint16
 	resumer, _ := handler.(*CaseAdapter)
 	if resumer != nil && respOpcode == mrp.SCOpcodeSigma2Resume {
 		if installed, _ = resumer.takeResumeInstall(); installed != 0 {
+			if !resumer.completesEstablishment() {
+				tracked = installed
+			}
 			if prev, ok := resumer.awaitResumeSuccess(key, installed); ok {
 				// A wait the Sigma1 dispatch did not end — another
 				// exchange's on the singleton handler — is not orphaned.
@@ -1629,7 +1644,7 @@ func (b *Bridge) handleCase(
 		}
 	}
 	establisher, establishing := sigma3EstablisherOf(handler)
-	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt), installed); err != nil {
+	if err := b.sendHandshakeReplyReliable(src, requestHdr, proto, respOpcode, respPayload, handshakePeerTimingOf(handler, rxAt), tracked); err != nil {
 		debugReplyError(b.logger, "send_"+stage, src, err)
 		if installed != 0 {
 			// matter.js closes the session when the Sigma2_Resume cannot
@@ -1821,17 +1836,9 @@ func (b *Bridge) failResume(a *CaseAdapter, id uint16) bool {
 // send and is not yet established
 // (packages/protocol/src/session/case/CaseServer.ts:177-190, :197-210 at
 // b25ed960). A session a host installed establishing was closed by entry
-// before, where the handshake key is known ([Bridge.endAwaitedResume]),
-// and is not closed by id again here — except on the give-up of the
-// retransmit table ([tickOutboundReliable]), which names only the id: that
-// close finds the id free, as the allocator's cursor has moved past it
-// (secure/operational allocateIDLocked) — short of a wrapped cursor. The
-// same holds for a wait ended by entry earlier without the Sigma2_Resume's
-// acknowledgement — a failure report, another message or the deadline —
-// whose retransmit entry the give-up still closes by id up to
-// [unsecuredEntryLifetime] later: a residual of the id-only report (Fable
-// post-read L1), to go when the give-up skips the by-id close for an
-// adapter with the host hook. The controller's CASE
+// by entry, where the handshake key is known ([Bridge.endAwaitedResume]),
+// and never reaches here: its retransmit entry names no session
+// ([Bridge.handleCase], F-b25ed960-38). The controller's CASE
 // responder closes such a session too (client/handshake). It is a liveness
 // rule, not a defence: an acknowledgement authenticates nothing. An entry
 // that lost its place in the retransmit table to a newer one

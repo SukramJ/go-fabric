@@ -252,3 +252,85 @@ func TestCASEResumeWaitsForSuccessUntilItsDeadline(t *testing.T) {
 // (secure/operational SessionIdleTimeout), the bound a resumed session's
 // wait had before it had a deadline.
 const sessionIdleTimeoutForTest = 5 * time.Minute
+
+// TestCASEResumeGiveUpClosesByEntryOnly: F-b25ed960-38 — for a host that
+// installs a resumed session establishing (the completion hook), every close
+// of that session is by entry. The Sigma2_Resume's give-up names only an id,
+// which by then may belong to another session, so it closes nothing by id:
+// neither when the give-up itself ends the wait nor when the wait was ended
+// by entry earlier, its Sigma2_Resume still unacknowledged. matter.js closes the session object, never an id
+// (packages/protocol/src/session/case/CaseServer.ts:177-190, :192-211 at
+// b25ed960).
+func TestCASEResumeGiveUpClosesByEntryOnly(t *testing.T) {
+	t.Parallel()
+	t.Run("the give-up ends the wait", func(t *testing.T) {
+		t.Parallel()
+		rr, sigma1 := newResumeRig(t, false)
+		rec := &completions{}
+		setResumeCompletion(t, rr, false, rec)
+		if err := rr.p.send(mrp.SCOpcodeSigma1, 0x0400, sigma1, nil); err != nil {
+			t.Fatal(err)
+		}
+		rr.p.recv(mrp.SCOpcodeSigma2Resume, "Sigma2_Resume")
+		rr.giveUp()
+		if got := rec.snapshot(); len(got) != 1 || got[0].sessionID != 0x2001 || got[0].completed {
+			t.Fatalf("completions %+v, want session 0x2001 failed", got)
+		}
+		if got := rr.closed(); len(got) != 0 {
+			t.Fatalf("closed %v by id; the hook closed the session by entry", got)
+		}
+	})
+	t.Run("the wait was ended by entry before the give-up", func(t *testing.T) {
+		t.Parallel()
+		rr, sigma1 := newResumeRig(t, false)
+		rec := &completions{}
+		setResumeCompletion(t, rr, false, rec)
+		if err := rr.p.send(mrp.SCOpcodeSigma1, 0x0400, sigma1, nil); err != nil {
+			t.Fatal(err)
+		}
+		rr.p.recv(mrp.SCOpcodeSigma2Resume, "Sigma2_Resume")
+		// The wait ends by entry while the Sigma2_Resume is still
+		// unacknowledged — as its deadline or a failure on another path
+		// ends it.
+		if id, byEntry := rr.r.b.endAwaitedResume(HandshakeKey{InitiatorNodeID: 0xD00D, ExchangeID: 0x0400}); id != 0x2001 || !byEntry {
+			t.Fatalf("ended %#x by entry %v, want 0x2001 by entry", id, byEntry)
+		}
+		// The id is free again; a later session may hold it. The give-up
+		// of the unacknowledged Sigma2_Resume must not close it.
+		rr.giveUp()
+		if got := rr.closed(); len(got) != 0 {
+			t.Fatalf("closed %v by id after the wait ended by entry", got)
+		}
+		if got := rec.snapshot(); len(got) != 1 {
+			t.Fatalf("completions %+v, want the one of the ended wait", got)
+		}
+	})
+	t.Run("a provider's wait whose record is gone ends at its deadline", func(t *testing.T) {
+		t.Parallel()
+		// With a provider the give-up finds the adapter through the
+		// handshake's record; once that is gone it finds none, and the
+		// deadline armed at the send is the only close.
+		rr, sigma1 := newResumeRig(t, true)
+		rec := &completions{}
+		setResumeCompletion(t, rr, true, rec)
+		if err := rr.p.send(mrp.SCOpcodeSigma1, 0x0400, sigma1, nil); err != nil {
+			t.Fatal(err)
+		}
+		rr.p.recv(mrp.SCOpcodeSigma2Resume, "Sigma2_Resume")
+		key := HandshakeKey{InitiatorNodeID: 0xD00D, ExchangeID: 0x0400}
+		rr.r.b.mu.Lock()
+		delete(rr.r.b.sigma1Replied, key)
+		rr.r.b.mu.Unlock()
+		rr.giveUp()
+		if got := rr.closed(); len(got) != 0 {
+			t.Fatalf("closed %v by id at the give-up", got)
+		}
+		rr.clk.Advance(rr.r.b.caseSigma3Wait(false) + unsecuredEntryLifetime)
+		if got := rec.snapshot(); len(got) != 1 || got[0].sessionID != 0x2001 || got[0].completed {
+			t.Fatalf("completions %+v after the deadline, want session 0x2001 failed", got)
+		}
+		if got := rr.closed(); len(got) != 0 {
+			t.Fatalf("closed %v by id", got)
+		}
+	})
+}
