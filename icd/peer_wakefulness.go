@@ -275,7 +275,7 @@ func (w *PeerWakefulness) SetRequiresAwait(v bool) {
 //
 // Mirrors matter.js, at b25ed960, requiresAwait then noteActive in one synchronous step:
 // packages/node/src/behavior/system/icd/IcdClient.ts:166-178 (#onOperatingModeChanged, LIT and online)
-// packages/node/src/behavior/system/icd/IcdClient.ts:784-788 (#feedFabricIcd, on seed)
+// packages/node/src/behavior/system/icd/IcdClient.ts:747-806 (#feedFabricIcd, on seed)
 func (w *PeerWakefulness) SetOperatingMode(requiresAwait, active bool) {
 	w.mu.Lock()
 	evs := w.setRequiresAwaitLocked(requiresAwait)
