@@ -9,10 +9,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/bdx"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The provider side: the manager as the ports of node/'s OTA provider

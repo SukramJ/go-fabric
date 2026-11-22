@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // TestControllerAddrDuringRestart (R2-P6-conc-2509): the site's resolver

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/alarm"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // gatedSource answers SmokeCOState; when armed, the next caller takes the

@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/secure/aesccm"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // Errors.

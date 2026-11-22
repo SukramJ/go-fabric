@@ -9,15 +9,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	ep "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
-	mtrid "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	whm "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	matterparity "github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	ep "thingfabric.dev/go-fabric/cluster/spec/energypreference"
+	mtrid "thingfabric.dev/go-fabric/cluster/spec/meteridentification"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	whm "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	matterparity "thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestParityMatterJS_EnergyServers builds every feature selection of both

@@ -11,12 +11,12 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tcmdef "github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
-	tcldef "github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tcmdef "thingfabric.dev/go-fabric/cluster/spec/tlscertificatemanagement"
+	tcldef "thingfabric.dev/go-fabric/cluster/spec/tlsclientmanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ClientManagementClusterID is the TlsClientManagement cluster id.

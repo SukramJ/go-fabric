@@ -993,6 +993,6 @@ product and is out of this module's reach:
 ## Open findings
 
 Class (a) gaps that are not fixed yet are listed by TC id in
-[`notes/parity/matter_behaviour_findings.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/matter_behaviour_findings.md)
+[`notes/parity/matter_behaviour_findings.md`](https://github.com/thingfabric/go-fabric/blob/main/notes/parity/matter_behaviour_findings.md)
 under *Certification harness — open certifiability findings*; each excluded
 case in the status block names its finding.

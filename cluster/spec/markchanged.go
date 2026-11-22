@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The refusals of [Server.MarkChanged] and [MarkChangedOf].

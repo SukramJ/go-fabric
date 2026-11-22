@@ -15,9 +15,9 @@ package commissioner
 import (
 	"math"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	opcredsdef "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/controller/attestation"
 )
 
 // opCredsCluster is the OperationalCredentials cluster id.

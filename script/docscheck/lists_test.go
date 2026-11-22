@@ -434,7 +434,7 @@ type settingsTree struct {
 }
 
 // modulePath is the module's import path.
-const modulePath = "github.com/SukramJ/go-fabric"
+const modulePath = "thingfabric.dev/go-fabric"
 
 // settingCalls returns the package-level string constants of the module,
 // by directory, and every SetSetting call — and every key of a

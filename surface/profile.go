@@ -9,8 +9,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/internal/surfaceseam"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/internal/surfaceseam"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Confidence is how a row of the controller-profiles register

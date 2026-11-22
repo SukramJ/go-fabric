@@ -1,11 +1,10 @@
-// Deprecated: moved to thingfabric.dev/go-fabric/ble/bluez; v0.24.1 is the last version under this path.
-module github.com/SukramJ/go-fabric/ble/bluez
+module thingfabric.dev/go-fabric/ble/bluez
 
 go 1.27.4
 
 require (
-	github.com/SukramJ/go-fabric v0.24.0
 	github.com/godbus/dbus/v5 v5.2.4
+	thingfabric.dev/go-fabric v0.24.0
 )
 
 require (
@@ -26,4 +25,4 @@ require (
 
 // In-repo builds use the main module beside this one. A release of this
 // module bumps the require above to the main module's tag it ships with.
-replace github.com/SukramJ/go-fabric => ../..
+replace thingfabric.dev/go-fabric => ../..

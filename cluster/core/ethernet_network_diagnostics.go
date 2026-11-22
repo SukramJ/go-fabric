@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ethdiagdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ethdiagdef "thingfabric.dev/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
 )
 
 // EthernetReporter is the host port for EthernetNetworkDiagnostics, read

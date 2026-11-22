@@ -6,9 +6,9 @@ package device
 import (
 	"testing"
 
-	tmdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	tmdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // clusterIDs are the cluster ids of servers, in order.

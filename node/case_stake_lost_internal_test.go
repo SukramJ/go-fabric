@@ -10,9 +10,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // fillSessionIDsAndTakeOldest stakes every free id of sessions, then

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // restartMarkTimeout is how long after a StartUp event an endpoint's first

@@ -17,12 +17,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // key is the host's stable key of a device: the device keeps its endpoint

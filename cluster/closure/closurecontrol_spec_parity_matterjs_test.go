@@ -8,11 +8,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	closuredef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // servable lists the optional features the server serves next to

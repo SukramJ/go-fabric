@@ -6,8 +6,8 @@ package diag_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/diag"
-	"github.com/SukramJ/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/diag"
+	"thingfabric.dev/go-fabric/diagevent"
 )
 
 // TestDiagnosticsEffective: a capacity below one keeps the default, any

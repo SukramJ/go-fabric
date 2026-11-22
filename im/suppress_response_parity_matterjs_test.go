@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 func encodeStruct(t *testing.T, body func(enc *tlv.Encoder)) []byte {

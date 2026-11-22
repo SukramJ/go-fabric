@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // fabricsAddBesideWriter (R2-P6-conc-0602): AddFabric with an allocated

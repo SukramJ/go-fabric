@@ -15,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestMetricsEndpointServesNoCommandLine: --metrics-expvar answers any HTTP

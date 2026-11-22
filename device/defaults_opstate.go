@@ -10,11 +10,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
-	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	ovendef "thingfabric.dev/go-fabric/cluster/spec/ovencavityoperationalstate"
+	rvcopdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The OperationalState derivations' server ([opstate]) on the declared

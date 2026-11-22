@@ -8,16 +8,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	gcdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	gddef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	lcdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	uldef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acdef "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	bidef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	gcdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	gddef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	lcdef "thingfabric.dev/go-fabric/cluster/spec/localizationconfiguration"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	uldef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestHostServerMountsAListOfServers (#220): a host whose servers are a

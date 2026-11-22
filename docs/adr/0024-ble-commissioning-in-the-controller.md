@@ -9,7 +9,7 @@
   [ADR 0020 — the commissioner and controller role](./0020-commissioner-and-controller-role.md)
   ("On-network only")
 - **Related**: [ADR 0020 — the commissioner and controller role](./0020-commissioner-and-controller-role.md),
-  [concept v3](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v3-commissioner-in-the-field.md) §A.1,
+  [concept v3](https://github.com/thingfabric/go-fabric/blob/main/docs/history/concept-v3-commissioner-in-the-field.md) §A.1,
   `docs/matterjs-comparison.md` (the BLE row and non-goal 2)
 
 ## Context
@@ -45,11 +45,11 @@ BSD-2-Clause); CoreBluetooth and WinRT need cgo or COM.
    seam `controller/ble` (`Central`, the advertisement parser, the PASE
    transport over a GATT channel) carries no dependency.
 3. **The platform is a separate Go module**,
-   `github.com/SukramJ/go-fabric/ble/bluez`, with its own `go.mod`: BlueZ
+   `thingfabric.dev/go-fabric/ble/bluez`, with its own `go.mod`: BlueZ
    over D-Bus, Linux only, no cgo. The main module keeps its five direct
    dependencies; a host without BLE never pulls `godbus`.
    *Amended 2026-10-27 (owner decision, brief BP1): a second platform
-   module, `github.com/SukramJ/go-fabric/ble/esphome`, reaches BLE through
+   module, `thingfabric.dev/go-fabric/ble/esphome`, reaches BLE through
    ESPHome Bluetooth proxies (`bluetooth_proxy: active: true`) over the
    ESPHome native API on TCP — plaintext, or
    `Noise_NNpsk0_25519_ChaChaPoly_SHA256` with the device's API key

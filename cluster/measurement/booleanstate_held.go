@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bsdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bsdef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // HeldBooleanStateConfig carries the construction parameters of a

@@ -10,15 +10,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
-	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	epmdef "thingfabric.dev/go-fabric/cluster/spec/electricalpowermeasurement"
+	evsedef "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	ptdef "thingfabric.dev/go-fabric/cluster/spec/powertopology"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // hostServer is a host's own cluster server.

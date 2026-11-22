@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/controller/ca"
 )
 
 // TestNewNeverReplacesAStoredRecord: a CA record the store holds but that

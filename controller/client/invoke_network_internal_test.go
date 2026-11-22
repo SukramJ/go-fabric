@@ -6,8 +6,8 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/peer"
 )
 
 // TestRouteInvoke pins the network a command goes out on: "unlimited" when

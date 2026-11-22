@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bsdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bsdef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
 )
 
 // TestRemovedServerEmitsIntoNoEventLog (R2-P5-apispec-07 = R2-P5-apidev-07):

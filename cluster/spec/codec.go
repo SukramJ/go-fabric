@@ -9,8 +9,8 @@ import (
 	"math"
 	"unicode/utf8"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The TLV codecs generated structs, command and event payloads are built

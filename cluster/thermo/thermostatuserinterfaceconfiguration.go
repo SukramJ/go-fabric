@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tsuic "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
-	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tsuic "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	unitdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ThermostatUserInterfaceConfiguration (0x0204) is built on its generated

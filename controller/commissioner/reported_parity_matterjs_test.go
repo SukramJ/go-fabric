@@ -10,13 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	jfadef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	opcredsdef "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestReportedValueDecodedByShapeParityMatterjs: a reported value is

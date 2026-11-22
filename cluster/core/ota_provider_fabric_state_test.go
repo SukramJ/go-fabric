@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
 )
 
 // TestOTAProviderDropFabricForgetsItsUpdates (review II, R2-P6-bound-1206,

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestHooksInvokeBehindInvokeHeldAdmitsOnce (decision 177, superseded by

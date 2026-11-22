@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestStoreEraseErrors: an erase that cannot begin or empty a table

@@ -6,7 +6,7 @@ package pump_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/pump"
+	"thingfabric.dev/go-fabric/cluster/pump"
 )
 
 // TestOptionalForMapsTheSelection: OptionalFor serves an optional

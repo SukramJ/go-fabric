@@ -17,11 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/fabrictestseam"
+	"thingfabric.dev/go-fabric/node"
 )
 
 const (

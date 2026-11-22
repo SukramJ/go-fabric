@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
 )
 
 // listingServer lists attrs, answers the ones in answers, reports

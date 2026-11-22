@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
 )
 
 // TestAFailedJoinKeepsTheReportedLinkConnected: a ConnectNetwork of a

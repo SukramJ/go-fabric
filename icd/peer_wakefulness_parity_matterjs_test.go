@@ -17,8 +17,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/icd"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/icd"
 )
 
 var wakeTimings = icd.Timings{ActiveModeThreshold: 4 * time.Second, IdleModeDuration: 30 * time.Second}

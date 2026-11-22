@@ -14,10 +14,10 @@ import (
 	"io"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // FabricConfig configures [NewFabric].

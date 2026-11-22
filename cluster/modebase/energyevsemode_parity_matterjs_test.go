@@ -14,7 +14,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/modebase"
+	"thingfabric.dev/go-fabric/cluster/modebase"
 )
 
 // evseTestModes are createNode's supportedModes (:23-44).

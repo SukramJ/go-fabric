@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/pump"
+	"thingfabric.dev/go-fabric/cluster/pump"
 )
 
 // laterPump is a host that applies a write later: its state does not

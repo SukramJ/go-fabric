@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	"github.com/SukramJ/go-fabric/im"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The getCapabilities, resolveVideoStream, withEndpointLock and

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // ListeningMeter accumulates the time a [Central]'s radio scanned, which

@@ -1,13 +1,13 @@
 # `ble/bluez` — BlueZ for both BLE roles
 
-`github.com/SukramJ/go-fabric/ble/bluez` speaks BlueZ on the D-Bus system bus,
+`thingfabric.dev/go-fabric/ble/bluez` speaks BlueZ on the D-Bus system bus,
 in pure Go (no cgo), for both roles of go-fabric:
 
 - **The commissioner's central**: `NewCentral` implements
   `controller/ble.Central` and `controller/ble.Connection`. With it,
   `controller/ble.NewScanner`, `controller/ble.Dial` and
   `commissioner.Options.Channel` commission a Wi-Fi or Thread device over BLE
-  ([ADR 0024](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0024-ble-commissioning-in-the-controller.md)).
+  ([ADR 0024](https://github.com/thingfabric/go-fabric/blob/main/docs/adr/0024-ble-commissioning-in-the-controller.md)).
 - **The node's peripheral**: `NewPeripheral` implements
   `contract.GATTPeripheral`, the radio a device-side host hands its node
   (`node.Config.Network.GATT`), so an uncommissioned node is commissionable

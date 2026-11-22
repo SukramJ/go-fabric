@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/facadeseam"
+	"thingfabric.dev/go-fabric/internal/facadeseam"
 )
 
 // TestFacadeSlotsRunBeforeTheHosts (R2-P5-apinode-07): the facade's slot of

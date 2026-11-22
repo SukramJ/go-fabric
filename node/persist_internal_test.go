@@ -15,10 +15,10 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/diagevent"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/store"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func testStore(t *testing.T) *store.Store {

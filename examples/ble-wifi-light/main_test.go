@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/controller/ble/bletest"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 // joinAll is a Wi-Fi driver that finds and joins every network.

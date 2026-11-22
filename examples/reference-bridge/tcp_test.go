@@ -6,7 +6,7 @@ package main
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestParseTCPFlag mirrors matter.js NetworkServer.ts:261-272

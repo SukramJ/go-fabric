@@ -6,8 +6,8 @@ package bridge
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // administratorCommissioningClusterID is AdministratorCommissioning (0x003C).

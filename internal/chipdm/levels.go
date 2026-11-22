@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/script/levelgen/leveltable"
+	"thingfabric.dev/go-fabric/script/levelgen/leveltable"
 )
 
 // The specification-level cross-check (ADR 0015 addendum 2026-10-30,

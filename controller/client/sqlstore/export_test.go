@@ -7,7 +7,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // SealWithoutScrub runs NewSealed's sealing transaction and stops before

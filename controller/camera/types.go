@@ -6,7 +6,7 @@ package camera
 import (
 	"strconv"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // The quirks of tested cameras that this package works around, each a named

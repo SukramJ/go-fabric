@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/channel"
 )
 
 // TestAllocateIDAtAFullTableOfLiveSessionsClosesTheLeastRecentlyActive: when

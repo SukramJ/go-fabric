@@ -6,9 +6,9 @@ package energy
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	mtrid "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	mtrid "thingfabric.dev/go-fabric/cluster/spec/meteridentification"
 )
 
 // ClusterIDMeterIdentification is the MeterIdentification cluster id.

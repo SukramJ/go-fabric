@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	"github.com/SukramJ/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/controller/attestation"
 )
 
 // The CRL revocation check of DclCertificateService.isRevoked

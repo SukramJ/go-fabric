@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	admincommdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/client/interaction"
+	admincommdef "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/store"
 )
 
 var errChainNotLoaded = errors.New("vendor attestation chain did not load")

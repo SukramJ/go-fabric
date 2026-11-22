@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // Endpoint-number reservation per stable key (brief CK §2).

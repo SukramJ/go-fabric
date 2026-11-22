@@ -4,8 +4,8 @@
 package closure_test
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // ready puts a fresh ControlServer, which starts in SetupRequired, into

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/handshake"
 )
 
 // TestAddKnownPeerCallsFabricsWithoutTheLock pins G2-13 (ADR 0026 P6):

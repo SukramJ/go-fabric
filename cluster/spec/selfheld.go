@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The parts a self-held server — a hand-written cluster server with its

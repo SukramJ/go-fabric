@@ -13,13 +13,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/tlv"
 
 	// Every generated definition, so spec.Lookup knows each one.
-	_ "github.com/SukramJ/go-fabric/controller/client"
+	_ "thingfabric.dev/go-fabric/controller/client"
 )
 
 // synth builds a JSON value of t. variant picks between forms: 0 uses the

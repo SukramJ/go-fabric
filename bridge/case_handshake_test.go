@@ -23,10 +23,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/aesccm"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/tlv"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // caseTestVerifier mirrors the sigma-package test verifier: the noc

@@ -4,8 +4,8 @@
 package core
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acldef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
 )
 
 // The Go fields of the AccessControl write forms (the bridge decodes ACL

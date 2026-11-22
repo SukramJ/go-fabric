@@ -17,14 +17,14 @@ import (
 	"syscall"
 	"time"
 
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	doorlockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	doorlockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // key is the host's stable key of a device.

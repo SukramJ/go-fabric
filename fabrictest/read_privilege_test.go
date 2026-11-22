@@ -10,16 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	icd "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/client/interaction"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	icd "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // readPrivilegesAboveView reads every attribute's read privilege above View

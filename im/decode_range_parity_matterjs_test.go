@@ -17,7 +17,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 func TestDecodeRangeParity(t *testing.T) {

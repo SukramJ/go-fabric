@@ -12,7 +12,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // --- dataVersionDispatcher: test helper ---

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/contract"
-	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/contract"
+	endpointpkg "thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // heldReadServer answers attribute 0 with a boolean: once armed, its first

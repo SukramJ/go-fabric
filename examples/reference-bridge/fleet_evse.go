@@ -10,15 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	demmdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode"
-	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	evsemdef "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
-	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dem "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	demmdef "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagementmode"
+	evse "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	evsemdef "thingfabric.dev/go-fabric/cluster/spec/energyevsemode"
+	psdef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // --- device: an EV charger ---------------------------------------------------

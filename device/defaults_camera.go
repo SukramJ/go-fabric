@@ -8,16 +8,16 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
-	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	avdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
+	padef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	zmdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The kit's camera servers (cluster/camera, brief 26-A1): the

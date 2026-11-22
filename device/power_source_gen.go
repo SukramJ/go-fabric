@@ -6,8 +6,8 @@
 package device
 
 import (
-	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	"github.com/SukramJ/go-fabric/schema"
+	powersourcedef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // PowerSource device type identity: 0x0011, revision 1.

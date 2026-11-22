@@ -8,10 +8,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	admdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	admdef "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The Basic feature (BC): served only behind the switch of

@@ -7,13 +7,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	lightcluster "github.com/SukramJ/go-fabric/cluster/light"
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-	soildef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/groups"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	lightcluster "thingfabric.dev/go-fabric/cluster/light"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	soildef "thingfabric.dev/go-fabric/cluster/spec/soilmeasurement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/groups"
 )
 
 // What the module itself controls, held to its device types by the

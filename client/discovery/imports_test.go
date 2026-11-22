@@ -18,8 +18,8 @@ import (
 func TestImportsAreWhatTheDocSays(t *testing.T) {
 	t.Parallel()
 	allowed := map[string]bool{
-		"github.com/SukramJ/go-fabric/mdns":  true,
-		"github.com/SukramJ/go-fabric/clock": true,
+		"thingfabric.dev/go-fabric/mdns":  true,
+		"thingfabric.dev/go-fabric/clock": true,
 	}
 	entries, err := os.ReadDir(".")
 	if err != nil {

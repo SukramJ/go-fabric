@@ -12,12 +12,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dldef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dldef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	icddef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The two value logs of an attribute read — the read's per-path report

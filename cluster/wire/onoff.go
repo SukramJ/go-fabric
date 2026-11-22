@@ -6,7 +6,7 @@ package wire
 import (
 	"errors"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // OnOff command IDs per Matter §1.5.6.

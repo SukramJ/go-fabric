@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/media"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // TestConstructorsRefuseAnUndefinedSelection: every media server whose

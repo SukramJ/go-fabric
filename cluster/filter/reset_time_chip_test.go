@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/filter"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/filter"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
 )
 
 // TestResetConditionStampsLastChangedTime: ResetCondition sets a served

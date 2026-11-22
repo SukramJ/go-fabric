@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/light"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"thingfabric.dev/go-fabric/cluster/light"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
 )
 
 // TestIssue84_OneWritePerCommand: a command that moves two attributes

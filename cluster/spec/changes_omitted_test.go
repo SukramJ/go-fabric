@@ -9,9 +9,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	eth "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	eth "thingfabric.dev/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestChangesOmittedIsNotReported (review II, Fable read 5b-write F6): a

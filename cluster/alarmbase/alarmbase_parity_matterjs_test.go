@@ -6,14 +6,14 @@ package alarmbase_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/alarmbase"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dwa "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
-	rfa "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	tma "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/alarmbase"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dwa "thingfabric.dev/go-fabric/cluster/spec/dishwasheralarm"
+	rfa "thingfabric.dev/go-fabric/cluster/spec/refrigeratoralarm"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	tma "thingfabric.dev/go-fabric/cluster/spec/temperaturealarm"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // allThresholds answers every TemperatureAlarm threshold, in the order the

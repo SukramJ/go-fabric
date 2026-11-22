@@ -11,9 +11,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // updateIdentity stands in for an UpdateNOC of fabric 1 (node.fabricUpdated):

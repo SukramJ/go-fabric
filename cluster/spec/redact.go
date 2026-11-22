@@ -3,7 +3,7 @@
 
 package spec
 
-import "github.com/SukramJ/go-fabric/tlv"
+import "thingfabric.dev/go-fabric/tlv"
 
 // Secret redaction removes the values the model marks secret ([Field.Secret],
 // [Attribute.Secret]) from a value before the module logs it. It mirrors

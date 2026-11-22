@@ -7,10 +7,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestALabelForAStandardStateIsRefused (R2-P6-par-1567): a label belongs

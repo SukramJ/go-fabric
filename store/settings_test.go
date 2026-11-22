@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // TestSettings_GetSetting_MissReturnsNotOK verifies that GetSetting

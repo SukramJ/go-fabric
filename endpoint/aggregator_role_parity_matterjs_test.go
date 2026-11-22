@@ -14,7 +14,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 func TestAggregatorRoleParity(t *testing.T) {

@@ -6,10 +6,10 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	opcredsdef "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestAttributeValueReader_ContainerWithoutDecoder writes a container to

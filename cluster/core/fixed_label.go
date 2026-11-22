@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	fixedlabeldef "thingfabric.dev/go-fabric/cluster/spec/fixedlabel"
 )
 
 // NewFixedLabel builds a FixedLabel (0x0040) server whose LabelList holds

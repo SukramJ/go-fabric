@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
-	"github.com/SukramJ/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	"thingfabric.dev/go-fabric/cluster/valve"
 )
 
 // TestEmitEventOnTheMountedEndpoint (R2-P5-apispec-07): EmitEvent — the

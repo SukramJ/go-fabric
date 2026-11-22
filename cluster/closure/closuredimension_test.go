@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cd "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // panel is a host device: it records the commands it is handed.

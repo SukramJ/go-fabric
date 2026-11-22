@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // TestReusedRecordTakesTheNewScope is brief BV-1 §4's store fact: a source

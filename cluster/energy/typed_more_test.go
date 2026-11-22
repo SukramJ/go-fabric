@@ -7,12 +7,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
-	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	commtr "thingfabric.dev/go-fabric/cluster/spec/commoditymetering"
+	cp "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	egc "thingfabric.dev/go-fabric/cluster/spec/electricalgridconditions"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func statusOf(err error) im.StatusCode {

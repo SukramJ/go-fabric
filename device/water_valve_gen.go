@@ -6,10 +6,10 @@
 package device
 
 import (
-	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	valveconfigurationandcontroldef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
-	"github.com/SukramJ/go-fabric/schema"
+	flowmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/flowmeasurement"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	valveconfigurationandcontroldef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // WaterValve device type identity: 0x0042, revision 1.

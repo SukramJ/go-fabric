@@ -8,12 +8,12 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	"github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	"github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	"thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestServerDefaults starts a served attribute the host gives no value at

@@ -8,9 +8,9 @@ import (
 	"maps"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/light"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/light"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestColorControlFieldShapes: every command takes its fields as the

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/bridge"
 )
 
 // HealthSample is one verdict of the node's health probe

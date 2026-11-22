@@ -18,9 +18,9 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/internal/clockvar"
-	"github.com/SukramJ/go-fabric/internal/netwatch"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/internal/clockvar"
+	"thingfabric.dev/go-fabric/internal/netwatch"
 )
 
 // Responder is the production [Advertiser]: the module's own mDNS

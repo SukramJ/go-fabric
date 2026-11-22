@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // blockingFailSafe stands in for a SetBlocked on another goroutine after

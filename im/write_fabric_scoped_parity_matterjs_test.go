@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/parity"
 )
 
 // fabricScopedRecorder serves every attribute on endpoint 0 — or answers

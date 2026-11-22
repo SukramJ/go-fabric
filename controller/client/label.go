@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/controller/commissioner"
 )
 
 // nocStatusLabelConflict is NodeOperationalCertStatusEnum LabelConflict

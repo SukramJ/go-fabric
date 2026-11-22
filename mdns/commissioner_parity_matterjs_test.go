@@ -14,7 +14,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // testCommissioner is MdnsTest.ts:549-554: ServiceDescription.Commissioner

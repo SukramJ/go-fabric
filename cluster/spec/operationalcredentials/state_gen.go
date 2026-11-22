@@ -5,7 +5,7 @@
 
 package operationalcredentials
 
-import "github.com/SukramJ/go-fabric/cluster/spec"
+import "thingfabric.dev/go-fabric/cluster/spec"
 
 // State is the typed state of the OperationalCredentials cluster: one field per attribute
 // of [Definition], a nullable one a pointer (nil for null), a list a

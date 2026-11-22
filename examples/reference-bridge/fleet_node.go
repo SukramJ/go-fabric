@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
-	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	actionsdef "thingfabric.dev/go-fabric/cluster/spec/actions"
+	ecodef "thingfabric.dev/go-fabric/cluster/spec/ecosysteminformation"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // The node-level clusters of the reference daemon: Actions on the

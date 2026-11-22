@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // mdnsTestConfig is the smallest configuration New accepts, on its own

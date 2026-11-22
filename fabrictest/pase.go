@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/controller/commissioner"
 )
 
 // PASE establishes a PASE session from the controller to d with d's

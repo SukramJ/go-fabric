@@ -9,10 +9,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // clearAll is the index that names every entry of ClearUser and

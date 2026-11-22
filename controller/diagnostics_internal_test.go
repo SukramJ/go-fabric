@@ -10,14 +10,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/softwareupdate"
-	"github.com/SukramJ/go-fabric/diag"
-	"github.com/SukramJ/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/diag"
+	"thingfabric.dev/go-fabric/diagevent"
 )
 
 // fakeMetrics records the counters and gauges it is given.

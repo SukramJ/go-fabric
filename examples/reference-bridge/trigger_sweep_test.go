@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // sweptTriggers is every TestEventTrigger constant of the daemon;

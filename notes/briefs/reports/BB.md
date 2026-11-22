@@ -17,8 +17,8 @@ or `CLAUDE.md` changed.
 
 ## 1. `ble/bluez`
 
-**Built.** Module `github.com/SukramJ/go-fabric/ble/bluez` (own `go.mod`:
-`require github.com/SukramJ/go-fabric v0.6.0` + `replace => ../..`,
+**Built.** Module `thingfabric.dev/go-fabric/ble/bluez` (own `go.mod`:
+`require thingfabric.dev/go-fabric v0.6.0` + `replace => ../..`,
 `github.com/godbus/dbus/v5 v5.2.4`; README says the release bumps the
 require). `NewCentral(adapter) (ble.Central, error)`, `""` = hci0; the value
 also has `Close`. `bus` seam (Call, Signals, Close) over godbus;

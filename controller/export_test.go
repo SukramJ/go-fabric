@@ -3,7 +3,7 @@
 
 package controller
 
-import "github.com/SukramJ/go-fabric/transport/tcp"
+import "thingfabric.dev/go-fabric/transport/tcp"
 
 // CloseBegun reports whether a Close of c has begun.
 func CloseBegun(c *Controller) bool {

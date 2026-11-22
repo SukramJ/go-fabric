@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // serial runs a command handler under op: a server's commands, and the

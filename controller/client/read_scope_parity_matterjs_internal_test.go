@@ -11,7 +11,7 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func TestReadScopeParity(t *testing.T) {

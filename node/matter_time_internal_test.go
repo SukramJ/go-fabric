@@ -4,8 +4,8 @@
 package node
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/cluster/valve"
 )
 
 // The servers that read the node's Matter time are its participants; a

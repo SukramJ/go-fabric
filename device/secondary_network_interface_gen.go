@@ -6,11 +6,11 @@
 package device
 
 import (
-	ethernetnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
-	networkcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	threadnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	wifinetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/schema"
+	ethernetnetworkdiagnosticsdef "thingfabric.dev/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
+	networkcommissioningdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	threadnetworkdiagnosticsdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	wifinetworkdiagnosticsdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkdiagnostics"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // SecondaryNetworkInterface device type identity: 0x0019, revision 1.

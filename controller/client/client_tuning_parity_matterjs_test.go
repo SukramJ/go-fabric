@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/internal/fabrictestseam"
 )
 
 // onlyPeer is [...controller.env.get(PeerSet)][0].

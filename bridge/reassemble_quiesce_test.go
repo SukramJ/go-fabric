@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/contract"
-	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/contract"
+	endpointpkg "thingfabric.dev/go-fabric/endpoint"
 )
 
 // rearmingServer is an EVSE-shaped server: MatterQuiesce stops its timer,

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/secure/operational"
 )
 
 // TestInitiatedSessionKeepsItsTransport: a session this node established as

@@ -1,13 +1,12 @@
-// Deprecated: moved to thingfabric.dev/go-fabric/ble/esphome; v0.24.1 is the last version under this path.
-module github.com/SukramJ/go-fabric/ble/esphome
+module thingfabric.dev/go-fabric/ble/esphome
 
 go 1.27.4
 
 require (
-	github.com/SukramJ/go-fabric v0.24.0
 	github.com/flynn/noise v1.1.0
 	github.com/miekg/dns v1.1.73
 	golang.org/x/crypto v0.59.0
+	thingfabric.dev/go-fabric v0.24.0
 )
 
 require (
@@ -27,4 +26,4 @@ require (
 
 // In-repo builds use the main module beside this one. A release of this
 // module bumps the require above to the main module's tag it ships with.
-replace github.com/SukramJ/go-fabric => ../..
+replace thingfabric.dev/go-fabric => ../..

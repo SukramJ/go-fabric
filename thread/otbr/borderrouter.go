@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster/threadbr"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // DefaultPollInterval is how often an activation reads /node/state while

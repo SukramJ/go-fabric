@@ -6,7 +6,7 @@ package node_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // TestPASEClosedAfterCommissioningParity pins Matter §11.10.6.6 step 4 end

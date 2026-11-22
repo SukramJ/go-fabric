@@ -6,7 +6,7 @@ package main
 import (
 	"path/filepath"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // attestationConfig is the daemon's --attestation-dir: empty keeps the

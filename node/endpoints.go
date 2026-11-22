@@ -6,9 +6,9 @@ package node
 import (
 	"slices"
 
-	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
+	descdef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // EndpointInfo is one endpoint the node serves, as [Node.Endpoints]

@@ -6,7 +6,7 @@ package spec
 import (
 	"errors"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // ErrUntyped is the error of [DecodeAttribute] for a value without a type

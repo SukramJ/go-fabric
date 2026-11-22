@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/netinfra"
-	wdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/netinfra"
+	wdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkmanagement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The chip cases of src/app/clusters/wifi-network-management-server/tests/

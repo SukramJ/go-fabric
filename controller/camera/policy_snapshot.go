@@ -8,7 +8,7 @@ import (
 	"math"
 	"slices"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // snapshotQuality is the Quality of every SnapshotStreamAllocate, which the

@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/internal/deviceseam"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/internal/deviceseam"
 )
 
 func newTestHost(numbers map[string]uint16) *fakeHost {

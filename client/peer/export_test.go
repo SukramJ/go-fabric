@@ -7,7 +7,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // Probe exposes probe to the external test package, whose node proofs

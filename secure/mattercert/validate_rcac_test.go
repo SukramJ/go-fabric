@@ -12,8 +12,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/mattercert"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // buildRCACWith constructs a self-signed RCAC TLV with configurable

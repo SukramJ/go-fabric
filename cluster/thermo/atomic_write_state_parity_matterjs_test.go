@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
 )
 
 // newParityAtomicState is AtomicWriteStateTest.ts:15-26 createState: peer

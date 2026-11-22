@@ -9,13 +9,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
-	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	swdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
+	switchserver "thingfabric.dev/go-fabric/cluster/switch"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // --- fakes ---

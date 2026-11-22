@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
-	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	commtr "thingfabric.dev/go-fabric/cluster/spec/commoditymetering"
+	cp "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	egc "thingfabric.dev/go-fabric/cluster/spec/electricalgridconditions"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestEnergyMarketWireShapes fires the triggers TC-SETRF-2.2 (step 3) and

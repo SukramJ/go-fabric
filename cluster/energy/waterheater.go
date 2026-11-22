@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	whm "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	whm "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ClusterIDWaterHeaterManagement is the WaterHeaterManagement cluster id.

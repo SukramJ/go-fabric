@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	observerdef "github.com/SukramJ/go-fabric/cluster/spec/contentappobserver"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	observerdef "thingfabric.dev/go-fabric/cluster/spec/contentappobserver"
 )
 
 // ContentAppObserver is the ContentAppObserver host port: ContentAppMessage

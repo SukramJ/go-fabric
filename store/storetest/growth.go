@@ -10,8 +10,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The cases of the port's review II growth (decisions 107 and 109,

@@ -17,9 +17,9 @@ import (
 	"sync"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"github.com/SukramJ/go-fabric/controller/dcl"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"thingfabric.dev/go-fabric/controller/dcl"
 )
 
 // TestDCLFlag: --dcl off (the default) builds no client — nothing reaches

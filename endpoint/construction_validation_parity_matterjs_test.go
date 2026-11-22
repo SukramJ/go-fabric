@@ -29,9 +29,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tcdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tcdef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 const (

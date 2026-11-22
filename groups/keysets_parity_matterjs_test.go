@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 const keySetsHourUs = 60 * 60 * 1000 * 1000 // KeySetsTest.ts:11

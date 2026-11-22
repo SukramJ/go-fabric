@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // TestResumePickupFailureEndsTheAdapter: a resume whose session the host

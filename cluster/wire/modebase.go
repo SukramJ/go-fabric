@@ -4,9 +4,9 @@
 package wire
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lwmdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lwmdef "thingfabric.dev/go-fabric/cluster/spec/laundrywashermode"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The ModeBase derivations this module serves share the wire shapes below

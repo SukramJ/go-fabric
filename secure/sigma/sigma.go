@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // Sizes per Matter Core Spec §4.13.

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // pqcTraditionalPAI is buildChain({ paa: "ECDSA-P256", pai: "ECDSA-P256" })

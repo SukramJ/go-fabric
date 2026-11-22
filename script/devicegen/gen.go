@@ -447,7 +447,7 @@ func (g *generator) generate(name string) (*output, error) {
 		return nil, err
 	}
 	var w bytes.Buffer
-	imports := map[string]string{"github.com/SukramJ/go-fabric/schema": ""}
+	imports := map[string]string{"thingfabric.dev/go-fabric/schema": ""}
 	body, err := g.body(m, imports)
 	if err != nil {
 		return nil, err
@@ -719,7 +719,7 @@ func (g *generator) writeRequirement(w *bytes.Buffer, cr *clusterReq, server boo
 	if server && g.defs[packageName(c.Name)] {
 		pkg := packageName(c.Name)
 		alias := pkg + "def"
-		imports["github.com/SukramJ/go-fabric/cluster/spec/"+pkg] = alias
+		imports["thingfabric.dev/go-fabric/cluster/spec/"+pkg] = alias
 		fmt.Fprintf(w, "\t\t\tDefinition: %s.Definition,\n", alias)
 	}
 	w.WriteString("\t\t},\n")

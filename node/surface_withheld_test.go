@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	closurecontroldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/surface"
+	closurecontroldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // A withheld device has no endpoint, only its record in the surface

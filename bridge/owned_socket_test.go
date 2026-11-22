@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/internal/udpseam"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/internal/udpseam"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // A bridge on Listen ":0" binds the dual-stack wildcard, and the port the

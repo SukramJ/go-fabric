@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	diaglogsdef "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs"
-	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/clock"
+	diaglogsdef "thingfabric.dev/go-fabric/cluster/spec/diagnosticlogs"
+	gendiagdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	tsdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // switchedFaults is a fault port whose hardware list a test sets.

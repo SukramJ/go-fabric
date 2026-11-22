@@ -16,7 +16,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestWriteParity_Handler_TimedRequestMismatch mirrors

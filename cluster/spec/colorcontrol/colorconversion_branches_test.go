@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
 )
 
 // TestColorConversionBranches walks the branches the matter.js vectors of

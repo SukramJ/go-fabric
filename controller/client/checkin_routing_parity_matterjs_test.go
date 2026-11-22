@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/icd/checkin"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd/checkin"
 )
 
 func TestSecureChannelCheckInRoutingParity(t *testing.T) {

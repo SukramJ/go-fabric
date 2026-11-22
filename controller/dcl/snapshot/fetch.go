@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/controller/dcl"
 )
 
 // CDSignerKeyIDs are the key identifiers of the production Certification

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // TestCheckValidityRejectsAWrappingNotBefore guards an ACCEPTANCE, not a

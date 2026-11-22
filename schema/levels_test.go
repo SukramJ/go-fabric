@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/script/levelgen/leveltable"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/script/levelgen/leveltable"
 )
 
 // TestLevelsGeneratedFileIsCurrent regenerates schema/levels_gen.go in

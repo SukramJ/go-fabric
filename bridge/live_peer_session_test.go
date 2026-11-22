@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/internal/sessionseam"
-	"github.com/SukramJ/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/internal/sessionseam"
+	"thingfabric.dev/go-fabric/secure/operational"
 )
 
 // TestLivePeerSessionNewestByPeerActivity: of two live sessions with the

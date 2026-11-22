@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
 )
 
 // TestRegisterPanicsOnADuplicate holds Register to database/sql.Register's

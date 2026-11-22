@@ -5,7 +5,7 @@ release for. A host selects one with `surface.Policies.Level` (the
 reference daemon: `--spec-level`); the built-in level policy then composes
 every device as that revision's model knows it — while the behaviour, and
 every `ClusterRevision`, stay the pin's
-([ADR 0030](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0030-the-served-surface-is-a-value-under-policies.md),
+([ADR 0030](https://github.com/thingfabric/go-fabric/blob/main/docs/adr/0030-the-served-surface-is-a-value-under-policies.md),
 decision 5). The zero value of `Level` is the pin's level and changes
 nothing.
 
@@ -17,7 +17,7 @@ decision like the main snapshot), and `script/levelgen` writes
 `schema/levels_gen.go` and the generated block below. connectedhomeip's
 data model XML is never the source; `internal/chipdm` compares the level
 files with `data_model/<level>` at test time
-([ADR 0015](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0015-chip-data-model-read-at-run-time.md)).
+([ADR 0015](https://github.com/thingfabric/go-fabric/blob/main/docs/adr/0015-chip-data-model-read-at-run-time.md)).
 Levels below 1.4 are out of scope: the device layer's own device types
 start at the pin, and 1.3 predates every bridge this module serves.
 

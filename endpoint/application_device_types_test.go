@@ -8,18 +8,18 @@ import (
 	"slices"
 	"testing"
 
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
 
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/fan"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	"github.com/SukramJ/go-fabric/cluster/pump"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/alarm"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/fan"
+	"thingfabric.dev/go-fabric/cluster/modebase"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	"thingfabric.dev/go-fabric/cluster/pump"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // The application device types the cluster/alarm, cluster/fan,

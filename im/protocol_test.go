@@ -6,7 +6,7 @@ package im_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestIsRequestOpcode_Table verifies IsRequestOpcode against the full set

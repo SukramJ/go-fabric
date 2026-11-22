@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net"
 
-	"github.com/SukramJ/go-fabric/icd/checkin"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/icd/checkin"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // SenderContext is what the Check-In sender needs from its device: the

@@ -14,9 +14,9 @@ import (
 	"context"
 	"testing"
 
-	core "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	core "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // acEntryChangedReport builds an EventReport for the fabric-sensitive

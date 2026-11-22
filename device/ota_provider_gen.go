@@ -6,8 +6,8 @@
 package device
 
 import (
-	otasoftwareupdateproviderdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"github.com/SukramJ/go-fabric/schema"
+	otasoftwareupdateproviderdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // OtaProvider device type identity: 0x0014, revision 1.

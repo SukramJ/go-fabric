@@ -7,8 +7,8 @@
 site_name: go-fabric
 site_description: Matter as an embeddable Go library — the device side and the controller role, a semantic port of matter.js.
 site_url: https://docs.thingfabric.dev/
-repo_url: https://github.com/SukramJ/go-fabric
-repo_name: SukramJ/go-fabric
+repo_url: https://github.com/thingfabric/go-fabric
+repo_name: thingfabric/go-fabric
 edit_uri: edit/main/docs/
 copyright: Apache License 2.0
 
@@ -146,7 +146,7 @@ nav:
       - CHIP data-model cross-check: chip-datamodel-crosscheck.md
       - Ecosystem observations: matter-ecosystem-observations.md
   - Project:
-      - Contributing: https://github.com/SukramJ/go-fabric/blob/main/CONTRIBUTING.md
-      - Contributor licence agreement: https://github.com/SukramJ/go-fabric/blob/main/CLA.md
-      - Changelog: https://github.com/SukramJ/go-fabric/blob/main/CHANGELOG.md
-      - Licence: https://github.com/SukramJ/go-fabric/blob/main/LICENSE
+      - Contributing: https://github.com/thingfabric/go-fabric/blob/main/CONTRIBUTING.md
+      - Contributor licence agreement: https://github.com/thingfabric/go-fabric/blob/main/CLA.md
+      - Changelog: https://github.com/thingfabric/go-fabric/blob/main/CHANGELOG.md
+      - Licence: https://github.com/thingfabric/go-fabric/blob/main/LICENSE

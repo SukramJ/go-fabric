@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestEncodeShapeMatchesTlvSessionParameters pins the wire shape of a

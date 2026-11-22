@@ -11,12 +11,12 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dem "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	evse "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestDEMRefusals walks the remaining refusals of chip's DEM cluster and

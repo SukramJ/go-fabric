@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // matterJSElementsDir returns the standard-elements directory of a sibling

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/secure/aesccm"
 )
 
 // nocSubjectVerifier resolves the NodeID and the CASE Authenticated

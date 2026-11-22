@@ -7,7 +7,7 @@ package device
 
 import (
 	"fmt"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // VideoDoorbell device type identity: 0x0143, revision 1.

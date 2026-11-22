@@ -6,7 +6,7 @@ package im
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The client side of Invoke: the encoder and decoder of every invoke this

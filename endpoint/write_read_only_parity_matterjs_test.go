@@ -10,11 +10,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	matterparity "github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	matterparity "thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // storingServer is a cluster server that refuses nothing: it lists the

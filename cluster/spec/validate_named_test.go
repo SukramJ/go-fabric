@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
 )
 
 // namedEpoch is a named scalar an in-process caller may hand a write.

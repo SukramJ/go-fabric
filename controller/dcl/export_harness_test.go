@@ -7,7 +7,7 @@ import (
 	"net"
 	"testing"
 
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // SetHarnessNode installs the node the commission tests commission

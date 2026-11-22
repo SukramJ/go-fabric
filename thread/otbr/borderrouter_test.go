@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/thread"
-	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
+	"thingfabric.dev/go-fabric/thread"
+	"thingfabric.dev/go-fabric/thread/otbr/otbrtest"
 )
 
 // The adapter against the fake border router, in both key formats:

@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 func TestDoorLockAuthRoundTrip(t *testing.T) {

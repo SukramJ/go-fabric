@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/diag"
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/diag"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // ControllerOptions.Sessions reaches the controller's handshake: the

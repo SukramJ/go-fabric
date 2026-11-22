@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/internal/attestids"
-	"github.com/SukramJ/go-fabric/internal/forward"
+	"thingfabric.dev/go-fabric/internal/attestids"
+	"thingfabric.dev/go-fabric/internal/forward"
 )
 
 // maxDERCertificateSize is matter.js MAX_DER_CERTIFICATE_SIZE

@@ -445,7 +445,7 @@ servers only (`:20-28`). Worth a clause.
 - `docs/guides/testing-in-process.md` lines 1–305: `DefaultWait` 30 s,
   `DefaultSettle` 10 ms, node id 112233, `fe80::n`, TTLs.
 - `mkdocs.yml`: every page in `docs/` but the excluded ones is in the nav,
-  every nav target exists; all absolute `github.com/SukramJ/go-fabric`
+  every nav target exists; all absolute `thingfabric.dev/go-fabric`
   URLs and README/roadmap anchors resolve; no Make target, environment
   variable or CLI flag named in the pages is missing (but
   `sync-matter-schema`, W6-doc-02); no other Matter Go project is cited.

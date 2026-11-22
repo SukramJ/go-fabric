@@ -6,7 +6,7 @@ package fabrictest
 import (
 	"sync"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // Metrics is a recording metrics port (node.Metrics) for a test: a device

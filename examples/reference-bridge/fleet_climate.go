@@ -11,16 +11,16 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acfdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
-	epdef "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	hepadef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acfdef "thingfabric.dev/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	epdef "thingfabric.dev/go-fabric/cluster/spec/energypreference"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	hepadef "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	pumpdef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	tuidef "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // --- device: a ceiling fan -------------------------------------------------

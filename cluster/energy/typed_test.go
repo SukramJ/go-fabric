@@ -8,11 +8,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cp "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	egc "thingfabric.dev/go-fabric/cluster/spec/electricalgridconditions"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 func typedPtr[T any](v T) *T { return &v }

@@ -13,14 +13,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/binding"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/binding"
+	"thingfabric.dev/go-fabric/client/interaction"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	"thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // --light-switch (TESTING ONLY): an On/Off Light Switch for the binding

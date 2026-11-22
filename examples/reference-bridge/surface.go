@@ -17,9 +17,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // surfacePolicies are the daemon's surface policies, the node's and every

@@ -7,9 +7,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	gendiagdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // staticFaults is a fault port whose lists never change.

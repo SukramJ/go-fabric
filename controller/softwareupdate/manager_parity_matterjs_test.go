@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // The manager's queue cases of matter.js's OtaTest

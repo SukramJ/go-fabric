@@ -6,7 +6,7 @@ package wire
 import (
 	"errors"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // WindowCoveringClusterID is the Matter cluster identifier for WindowCovering.

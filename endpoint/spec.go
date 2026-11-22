@@ -6,10 +6,10 @@ package endpoint
 import (
 	"strings"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // AvailabilityProbe reports whether the source behind a bridged

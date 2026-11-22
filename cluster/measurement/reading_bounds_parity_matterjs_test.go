@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // floatReading is a FloatMeasurementSource with one fixed reading.

@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestOTAProviderFlag: with --ota-provider the node serves an OtaProvider

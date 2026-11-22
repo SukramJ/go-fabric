@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/tcp"
+	"thingfabric.dev/go-fabric/transport/tcp"
 )
 
 // TestTCPCloseEvictsSessionBoundByHandlerInFlight: a handler that passed

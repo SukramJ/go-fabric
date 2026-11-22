@@ -12,15 +12,15 @@ import (
 	"math/bits"
 	"slices"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/internal/deviceseam"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	tsdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/internal/deviceseam"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // ErrPolicyMismatch is the refusal of [Aggregator.Add] (or Replace) of an

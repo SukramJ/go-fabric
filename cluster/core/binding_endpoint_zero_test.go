@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
+	"thingfabric.dev/go-fabric/cluster/core"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
 )
 
 // TestBinding_EndpointAndClusterZeroArePresent: a controller's entry naming

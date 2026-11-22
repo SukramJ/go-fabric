@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller"
 )
 
 // TestControllerConfigOnLoopbackLeavesThePortToNew: on a loopback site

@@ -3,7 +3,7 @@
 
 package core
 
-import "github.com/SukramJ/go-fabric/internal/coreseam"
+import "thingfabric.dev/go-fabric/internal/coreseam"
 
 // The one-way seams that set the SpecificationVersion a BasicInformation
 // server reports and hook an ICDManagement server's registration

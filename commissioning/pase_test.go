@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/commissioning"
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/commissioning"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // validPASEConfig returns a minimal valid PASEConfig for positive tests.

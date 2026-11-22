@@ -34,7 +34,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/SukramJ/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/controller/ble"
 )
 
 // Options is what the program that runs the command line supplies.

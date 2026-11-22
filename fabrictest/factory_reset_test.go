@@ -6,7 +6,7 @@ package fabrictest_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // TestDeviceFactoryReset: a running device's factory reset brings a new,

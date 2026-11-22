@@ -27,12 +27,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/im"
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	opcredsdef "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/im"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // attestingDevice answers CertificateChainRequest, AttestationRequest and

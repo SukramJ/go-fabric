@@ -7,10 +7,10 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/controller/dcl"
 )
 
 // The node features a host reaches beside its Config (gate 2, G2-9): the

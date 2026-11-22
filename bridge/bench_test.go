@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Sinks. Package-level so the report cannot be optimised away.

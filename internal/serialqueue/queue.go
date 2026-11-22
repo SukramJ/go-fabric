@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/internal/inflight"
 )
 
 // Queue is a serial goroutine: the `…Async` callbacks run on it, one

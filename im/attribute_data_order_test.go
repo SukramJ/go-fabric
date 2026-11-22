@@ -6,7 +6,7 @@ package im
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestAttributeDataIsDecodedWithTheFinalPath (review II, R2-P6-wire-0505):

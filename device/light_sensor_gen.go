@@ -6,9 +6,9 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	illuminancemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	illuminancemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/illuminancemeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // LightSensor device type identity: 0x0106, revision 4.

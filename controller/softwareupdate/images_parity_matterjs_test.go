@@ -10,8 +10,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	"github.com/SukramJ/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/controller/softwareupdate"
 )
 
 // The image-store cases of matter.js's DclOtaUpdateServiceTest

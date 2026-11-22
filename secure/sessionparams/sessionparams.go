@@ -17,7 +17,7 @@ package sessionparams
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // Transport bits of the SupportedTransports bitmap (tag 8). Mirrors

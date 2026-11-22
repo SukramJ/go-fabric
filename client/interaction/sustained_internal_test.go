@@ -9,7 +9,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd"
 )
 
 // TestRetries: RetrySchedule.ts:28-60 over the sustain schedule — the base

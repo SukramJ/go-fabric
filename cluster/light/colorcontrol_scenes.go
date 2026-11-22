@@ -6,7 +6,7 @@ package light
 import (
 	"context"
 
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
 )
 
 // MatterApplySceneValues recalls a scene's ColorControl values: matter.js

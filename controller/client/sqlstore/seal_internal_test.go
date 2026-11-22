@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/sealseam"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/internal/sealseam"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func internalDB(t *testing.T) (db *sql.DB, path string) {

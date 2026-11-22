@@ -9,7 +9,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller"
 )
 
 // pumpEnded reports whether the box's pump has ended.

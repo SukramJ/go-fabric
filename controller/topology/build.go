@@ -13,10 +13,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	generaldiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/thread/brdiscovery"
+	generaldiagdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	threaddiagdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/thread/brdiscovery"
 )
 
 // Build derives the graph of images and the border routers the registry

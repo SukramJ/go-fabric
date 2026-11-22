@@ -14,9 +14,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tcmdef "github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
-	"github.com/SukramJ/go-fabric/cluster/tls"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tcmdef "thingfabric.dev/go-fabric/cluster/spec/tlscertificatemanagement"
+	"thingfabric.dev/go-fabric/cluster/tls"
 )
 
 func FuzzCertificateUpserts(f *testing.F) {

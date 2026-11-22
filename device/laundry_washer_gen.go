@@ -6,13 +6,13 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	laundrywashercontrolsdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
-	laundrywashermodedef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	operationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	temperaturecontroldef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	laundrywashercontrolsdef "thingfabric.dev/go-fabric/cluster/spec/laundrywashercontrols"
+	laundrywashermodedef "thingfabric.dev/go-fabric/cluster/spec/laundrywashermode"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	operationalstatedef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	temperaturecontroldef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // LaundryWasher device type identity: 0x0073, revision 2.

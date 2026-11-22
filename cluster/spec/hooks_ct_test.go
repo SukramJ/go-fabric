@@ -9,13 +9,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	"github.com/SukramJ/go-fabric/cluster/spec/identify"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	tcdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gendiagdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	"thingfabric.dev/go-fabric/cluster/spec/identify"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	tcdef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The unit cases of brief CT's hooks beside their ports: MarkChanged's

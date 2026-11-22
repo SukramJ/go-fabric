@@ -31,12 +31,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // key is the host's stable key of a device: the device keeps its endpoint
@@ -178,9 +178,9 @@ directory.
 
 `booleanstatedef`, `levelcontroldef` and `onoffdef` are the typed packages
 of the three clusters the host states something about
-(`github.com/SukramJ/go-fabric/cluster/spec/<cluster>`, imported as
+(`thingfabric.dev/go-fabric/cluster/spec/<cluster>`, imported as
 `<cluster>def`). Each has a `Declare`, a `State`, a `Patch` and a typed
-`Server`. `go doc github.com/SukramJ/go-fabric/device` lists all of them.
+`Server`. `go doc thingfabric.dev/go-fabric/device` lists all of them.
 `contract` is for the change's origin; `device` and `node` are the facade.
 
 ### `key`

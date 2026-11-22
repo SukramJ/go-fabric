@@ -17,8 +17,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // fakeChannel is a connected TCP channel to remote.

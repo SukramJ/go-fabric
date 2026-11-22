@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestBDXExchangeCarriesATransfer: an exchange opened on the BDX protocol

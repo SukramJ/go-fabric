@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	airqualitydef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
+	airqualitydef "thingfabric.dev/go-fabric/cluster/spec/airquality"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // TestRegistryUnreachable (R2-P5-apidev-03): every accessor hands out a

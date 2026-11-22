@@ -35,7 +35,7 @@ s = s[:h0] + s[h1:]
 s = s.rstrip("\n") + "\n"
 while "\n\n\n" in s:
     s = s.replace("\n\n\n", "\n\n")
-for imp, use in (('\t"os"\n', "os."), ('\t"github.com/SukramJ/go-fabric/tlv"\n', "tlv.")):
+for imp, use in (('\t"os"\n', "os."), ('\t"thingfabric.dev/go-fabric/tlv"\n', "tlv.")):
     body = s.replace(imp, "")
     if use not in body and imp in s:
         s = body

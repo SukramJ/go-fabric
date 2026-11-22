@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // boundPort returns the port the bridge's UDP listener actually bound.

@@ -14,8 +14,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 func faNOCSubject(t *testing.T, f *Fabric) mattercert.DistinguishedName {

@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	tbrm "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	"thingfabric.dev/go-fabric/cluster/threadbr"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The cases of connectedhomeip's

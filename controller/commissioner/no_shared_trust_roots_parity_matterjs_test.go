@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 func TestPeerConnectionErrorHandlerNoSharedTrustRoots(t *testing.T) {

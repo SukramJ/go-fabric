@@ -14,7 +14,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestParityDiscovery_RecordKeys pins the cache identity of a record:

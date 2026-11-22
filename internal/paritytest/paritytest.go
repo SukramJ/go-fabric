@@ -18,7 +18,7 @@ import (
 	"sync"
 	"testing"
 
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	matterparity "thingfabric.dev/go-fabric/parity"
 )
 
 // Element is an attribute, command or event of a cluster entry in the

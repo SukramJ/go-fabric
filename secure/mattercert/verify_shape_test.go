@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // nocChain builds root → ICAC → NOC with the given tweaks applied to the

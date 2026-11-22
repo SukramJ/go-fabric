@@ -6,8 +6,8 @@ package fabrictest_test
 import (
 	"testing"
 
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/fabrictest"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 func TestDeviceOpenWindow(t *testing.T) {

@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/wire"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	gddef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	gddef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // HeldConfig carries the construction parameters of [New]: a LevelControl

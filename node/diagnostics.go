@@ -3,7 +3,7 @@
 
 package node
 
-import "github.com/SukramJ/go-fabric/diag"
+import "thingfabric.dev/go-fabric/diag"
 
 // Diagnostics is the type of [Config].Diagnostics: the node's diagnostic
 // trace, a bounded in-memory ring of the moments that explain a failed

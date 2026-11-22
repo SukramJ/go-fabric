@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // WriteChanges records, for one write interaction, which written

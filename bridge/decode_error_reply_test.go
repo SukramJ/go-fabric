@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestUndecodableRequestIsAnsweredWithAStatusResponse pins that an IM

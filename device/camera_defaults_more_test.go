@@ -8,13 +8,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/netinfra"
-	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
-	tdirdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/netinfra"
+	avdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
+	tdirdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/device"
 )
 
 type requestorPort struct{}

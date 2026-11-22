@@ -15,14 +15,14 @@ Specification section for each; nothing here claims certification
 each a single grant of a privilege to a subject on targets; the
 AccessControl cluster exposes it on the root endpoint and on no other.
 In go-fabric: the dispatcher checks it on every request
-([`endpoint`](https://github.com/SukramJ/go-fabric/tree/main/endpoint), the
+([`endpoint`](https://github.com/thingfabric/go-fabric/tree/main/endpoint), the
 request path on [Architecture](../architecture.md#the-device-side-request-path));
-[`store`](https://github.com/SukramJ/go-fabric/tree/main/store) persists it.
+[`store`](https://github.com/thingfabric/go-fabric/tree/main/store) persists it.
 
 **Aggregator** — A device type (`0x000E`) that aggregates a collection of
 endpoints listed in its Descriptor's PartsList; a bridge lists its bridged
 devices under one. In go-fabric: `node.Aggregator`, the endpoint a host adds
-its bridged devices to ([`node`](https://github.com/SukramJ/go-fabric/tree/main/node)).
+its bridged devices to ([`node`](https://github.com/thingfabric/go-fabric/tree/main/node)).
 
 **Attestation (DAC, PAI, PAA, Certification Declaration)** — The proof a
 device gives a commissioner that it is a genuine product: the Device
@@ -30,9 +30,9 @@ Attestation Certificate (DAC) chains through a Product Attestation
 Intermediate (PAI) to a Product Attestation Authority (PAA), and the
 Certification Declaration (CD) states the product's certification. In
 go-fabric: the device side presents the chain from
-[`secure/attestation`](https://github.com/SukramJ/go-fabric/tree/main/secure/attestation)
+[`secure/attestation`](https://github.com/thingfabric/go-fabric/tree/main/secure/attestation)
 (the CSA test PAA by default); the commissioner checks it in
-[`controller/attestation`](https://github.com/SukramJ/go-fabric/tree/main/controller/attestation).
+[`controller/attestation`](https://github.com/thingfabric/go-fabric/tree/main/controller/attestation).
 
 **Attribute** — A cluster's property: a value a client reads, writes or
 subscribes to. An attribute is state with a current value; an **event** is
@@ -41,7 +41,7 @@ a record that something happened. In go-fabric: served by the
 
 **BDX (Bulk Data Exchange)** — The protocol that moves a file over one
 exchange in blocks; OTA images and diagnostic logs travel over it. In
-go-fabric: [`bdx`](https://github.com/SukramJ/go-fabric/tree/main/bdx)
+go-fabric: [`bdx`](https://github.com/thingfabric/go-fabric/tree/main/bdx)
 ([ADR 0019](../adr/0019-tcp-bdx-and-the-ota-requestor.md),
 [ADR 0021](../adr/0021-ota-provider-and-diagnosticlogs-over-bdx.md)).
 
@@ -49,7 +49,7 @@ go-fabric: [`bdx`](https://github.com/SukramJ/go-fabric/tree/main/bdx)
 that directs it to a target: one endpoint on one node (unicast) or a group
 (groupcast), optionally one cluster there. A binding says *whom this node
 talks to*; a **subscription** is another node asking *to be told* about
-this one. In go-fabric: [`binding`](https://github.com/SukramJ/go-fabric/tree/main/binding)
+this one. In go-fabric: [`binding`](https://github.com/thingfabric/go-fabric/tree/main/binding)
 resolves the entries into peers.
 
 **Border Router** — A router that connects a Thread network to another IP
@@ -64,7 +64,7 @@ API (`thread/otbr`, `cluster/threadbr`;
 the handshake, segmentation and acknowledgement in a receive window. The
 segment size follows the negotiated ATT_MTU (at least 23 bytes less the
 3-byte ATT header). In go-fabric:
-[`transport/btp`](https://github.com/SukramJ/go-fabric/tree/main/transport/btp),
+[`transport/btp`](https://github.com/thingfabric/go-fabric/tree/main/transport/btp),
 used by the commissioner
 ([ADR 0024](../adr/0024-ble-commissioning-in-the-controller.md)) and by a
 node commissioned over BLE
@@ -79,15 +79,15 @@ in an Aggregator's PartsList. In go-fabric: a device a host adds to
 **CASE (Certificate Authenticated Session Establishment)** — The
 three-message Sigma handshake by which two nodes of one fabric derive an
 operational session key from their NOCs, without a passcode. In go-fabric:
-[`secure/sigma`](https://github.com/SukramJ/go-fabric/tree/main/secure/sigma),
-[`secure/operational`](https://github.com/SukramJ/go-fabric/tree/main/secure/operational),
+[`secure/sigma`](https://github.com/thingfabric/go-fabric/tree/main/secure/sigma),
+[`secure/operational`](https://github.com/thingfabric/go-fabric/tree/main/secure/operational),
 `client/handshake` on the initiator side.
 
 **Cluster (server / client)** — A set of related functionality: attributes,
 commands and events. The server holds the state and executes commands; the
 client reads, writes, subscribes and invokes. A Descriptor lists both per
 endpoint (ServerList, ClientList). In go-fabric: the servers under
-[`cluster`](https://github.com/SukramJ/go-fabric/tree/main/cluster), the
+[`cluster`](https://github.com/thingfabric/go-fabric/tree/main/cluster), the
 definitions in `cluster/spec`, the client side in `client/interaction`.
 
 **Cluster Revision** — The global attribute `0xFFFD` that states which
@@ -101,7 +101,7 @@ contract command handler declared in the cluster's `<cluster>def` package.
 
 **Commissioner** — The node that commissions another: it runs PASE,
 checks attestation, installs the NOC and hands over network credentials.
-In go-fabric: [`controller/commissioner`](https://github.com/SukramJ/go-fabric/tree/main/controller/commissioner)
+In go-fabric: [`controller/commissioner`](https://github.com/thingfabric/go-fabric/tree/main/controller/commissioner)
 ([Getting started: controller](../getting-started/controller.md)).
 
 **Commissioning** — Adding a node to a fabric: PASE, attestation, a CSR,
@@ -109,7 +109,7 @@ the NOC and trusted root installed, then CASE on the new credentials, all
 under an armed fail-safe. **Pairing** is the word apps and go-fabric's API
 use for the same process (`controller.Controller.Pair`); commissioning is
 the specification's. In go-fabric: the device side is
-[`commissioning`](https://github.com/SukramJ/go-fabric/tree/main/commissioning),
+[`commissioning`](https://github.com/thingfabric/go-fabric/tree/main/commissioning),
 the commissioner side `controller/commissioner`.
 
 **Commissioning window** — A period during which a node accepts PASE and
@@ -122,13 +122,13 @@ the node's own passcode) or by the host with fresh credentials
 administrator's OpenCommissioningWindow, which hands the node a PAKE
 passcode verifier, iterations, salt and discriminator (Enhanced
 Commissioning Method). In go-fabric:
-[`node`](https://github.com/SukramJ/go-fabric/tree/main/node) (`node/commissioning.go`).
+[`node`](https://github.com/thingfabric/go-fabric/tree/main/node) (`node/commissioning.go`).
 
 **Controller (administrator)** — A node that discovers, commissions and
 drives other nodes; an administrator is a node granted the Administer
 privilege, which may manage the AccessControl cluster. In go-fabric: the
 controller role,
-[`controller`](https://github.com/SukramJ/go-fabric/tree/main/controller)
+[`controller`](https://github.com/thingfabric/go-fabric/tree/main/controller)
 ([ADR 0020](../adr/0020-commissioner-and-controller-role.md)).
 
 **Data Version** — An unsigned 32-bit number that identifies a version of
@@ -139,32 +139,32 @@ DataVersion of the changed clusters
 
 **DCL (Distributed Compliance Ledger)** — The CSA's ledger of PAAs,
 Certification Declaration signers, revocation points and software
-versions. In go-fabric: [`controller/dcl`](https://github.com/SukramJ/go-fabric/tree/main/controller/dcl),
+versions. In go-fabric: [`controller/dcl`](https://github.com/thingfabric/go-fabric/tree/main/controller/dcl),
 opt-in; nothing reaches the network without a host-built client.
 
 **Device Type** — A defined device (On/Off Light, Thermostat, …) with the
 clusters it requires; an endpoint lists the types it conforms to in the
 Descriptor's DeviceTypeList. In go-fabric: one generated Go type per device
-type in [`device`](https://github.com/SukramJ/go-fabric/tree/main/device)
+type in [`device`](https://github.com/thingfabric/go-fabric/tree/main/device)
 ([Device types](device-types.md)).
 
 **Discriminator** — A 12-bit value in the onboarding payload that tells a
 commissioner which advertising device is the one being set up; a node
 answers `_L<discriminator>` subtype queries. In go-fabric:
-`node.Config.Commissioning`, [`mdns`](https://github.com/SukramJ/go-fabric/tree/main/mdns).
+`node.Config.Commissioning`, [`mdns`](https://github.com/thingfabric/go-fabric/tree/main/mdns).
 
 **DNS-SD / mDNS** — Service discovery on the local link. Matter uses three
 service types: commissionable `_matterc._udp` (a node with an open window),
 operational `_matter._tcp` (a commissioned node, instance
 `<compressed-fabric-id>-<node-id>`) and commissioner `_matterd._udp`. In
-go-fabric: [`mdns`](https://github.com/SukramJ/go-fabric/tree/main/mdns)
+go-fabric: [`mdns`](https://github.com/thingfabric/go-fabric/tree/main/mdns)
 advertises, `client/discovery` browses
 ([Operations](../guides/operations.md#mdns)).
 
 **Endpoint** — A 16-bit endpoint number that indicates an instance of a
 device type on a node. An endpoint is an addressable slot; a **device** may
 span several endpoints (its parts), so the two are not one to one. In
-go-fabric: [`endpoint`](https://github.com/SukramJ/go-fabric/tree/main/endpoint)
+go-fabric: [`endpoint`](https://github.com/thingfabric/go-fabric/tree/main/endpoint)
 allocates and persists the numbers.
 
 **Event** — A cluster record that something happened, triggered by an
@@ -176,8 +176,8 @@ priority's: see **Subscription**.
 **Exchange** — One conversation between two nodes over a session, named by
 the exchange id in the protocol header; MRP acknowledges within it. In
 go-fabric: the exchange id in
-[`transport/message`](https://github.com/SukramJ/go-fabric/tree/main/transport/message),
-[`client/exchange`](https://github.com/SukramJ/go-fabric/tree/main/client/exchange)
+[`transport/message`](https://github.com/thingfabric/go-fabric/tree/main/transport/message),
+[`client/exchange`](https://github.com/thingfabric/go-fabric/tree/main/client/exchange)
 on the client side.
 
 **Fabric** — A set of nodes that share one root of trust (a root CA) and
@@ -187,7 +187,7 @@ fabric; the node's fabrics show on the Fabrics page of go-fabric-ui.
 
 **Fabric ID** — A 64-bit number that identifies a fabric within the scope
 of its root CA. In go-fabric: the controller's own fabric has its root in
-[`controller/ca`](https://github.com/SukramJ/go-fabric/tree/main/controller/ca).
+[`controller/ca`](https://github.com/thingfabric/go-fabric/tree/main/controller/ca).
 
 **Fabric Index** — A number, unique on one node, by which that node refers
 to one of its fabrics; 0 means "no fabric". A Fabric Index is local to the
@@ -200,30 +200,30 @@ changes a node's credentials or network; if it expires before
 CommissioningComplete, the node rolls back what the commissioning changed.
 While it is armed, a new commissioning window is refused as busy. In
 go-fabric: the GeneralCommissioning server in
-[`cluster/core`](https://github.com/SukramJ/go-fabric/tree/main/cluster/core).
+[`cluster/core`](https://github.com/thingfabric/go-fabric/tree/main/cluster/core).
 
 **Feature map** — The global attribute `0xFFFC`, a 32-bit map whose bits
 select a cluster server's optional features. In go-fabric: chosen per
 declaration in the `<cluster>def` packages and judged by the surface
-policies ([`surface`](https://github.com/SukramJ/go-fabric/tree/main/surface)).
+policies ([`surface`](https://github.com/thingfabric/go-fabric/tree/main/surface)).
 
 **Groups and groupcast** — A group is a set of endpoints, on one or more
 nodes, addressed by one group id with one message; the Groups cluster
 manages an endpoint's membership; the newer Groupcast cluster is its
 designated successor. In go-fabric:
-[`groups`](https://github.com/SukramJ/go-fabric/tree/main/groups)
+[`groups`](https://github.com/thingfabric/go-fabric/tree/main/groups)
 ([ADR 0009](../adr/0009-groups-and-group-messaging.md),
 [ADR 0010](../adr/0010-groupcast-and-auxiliary-acl.md)).
 
 **ICD (Intermittently Connected Device)** — A node that sleeps between
 short active windows. It sends Check-In messages to its registered clients;
 a Long Idle Time (LIT) ICD sleeps longer than a Short Idle Time (SIT) one.
-In go-fabric: [`icd`](https://github.com/SukramJ/go-fabric/tree/main/icd),
+In go-fabric: [`icd`](https://github.com/thingfabric/go-fabric/tree/main/icd),
 `node.Config.ICD` ([Intermittently connected devices](../guides/icd.md)).
 
 **Interaction Model** — The application-layer protocol on top of a secure
 session: Read, Write, Invoke, Subscribe, and timed writes and invokes. In
-go-fabric: [`im`](https://github.com/SukramJ/go-fabric/tree/main/im),
+go-fabric: [`im`](https://github.com/thingfabric/go-fabric/tree/main/im),
 `client/interaction` as a client.
 
 **Joint Fabric** — One fabric shared by the administrators of several
@@ -234,7 +234,7 @@ by Joint Commissioning. In go-fabric: `cluster/jointfabric`
 **MRP (Message Reliability Protocol)** — Reliability over UDP: message
 counters, duplicate detection, acknowledgements and a bounded retransmission
 schedule for messages flagged reliable. In go-fabric:
-[`transport/mrp`](https://github.com/SukramJ/go-fabric/tree/main/transport/mrp);
+[`transport/mrp`](https://github.com/thingfabric/go-fabric/tree/main/transport/mrp);
 the controller counts retransmits as `mrp.retransmits`
 ([Observability](../guides/observability.md)).
 
@@ -246,7 +246,7 @@ network steps of `controller/commissioner` (`Options.WiFiNetwork`,
 
 **Node** — An addressable entity on a fabric with its own endpoints,
 identified there by its Node ID. In go-fabric: the device side is
-[`node`](https://github.com/SukramJ/go-fabric/tree/main/node); a remote node
+[`node`](https://github.com/thingfabric/go-fabric/tree/main/node); a remote node
 is a peer of the controller.
 
 **Node ID (operational)** — A 64-bit number that identifies a node, or a
@@ -259,18 +259,18 @@ with the fabric index (`client.Record`).
 or types to commission a device: the QR code carries version, Vendor ID,
 Product ID, commissioning flow, discovery capabilities, discriminator and
 passcode; the manual pairing code is 11 or 21 digits. In go-fabric:
-[`secure/setup`](https://github.com/SukramJ/go-fabric/tree/main/secure/setup).
+[`secure/setup`](https://github.com/thingfabric/go-fabric/tree/main/secure/setup).
 
 **Operational certificate (NOC, RCAC, ICAC)** — A node's identity on a
 fabric: its Node Operational Certificate (NOC), signed by the fabric's
 Root CA Certificate (RCAC) directly or through an Intermediate CA
 Certificate (ICAC). In go-fabric: the OperationalCredentials server,
-[`controller/ca`](https://github.com/SukramJ/go-fabric/tree/main/controller/ca)
+[`controller/ca`](https://github.com/thingfabric/go-fabric/tree/main/controller/ca)
 as the issuer.
 
 **Operational discovery** — A controller finding a commissioned node's
 `_matter._tcp` record and address to open CASE to it. In go-fabric:
-`client/discovery`; [`client/peer`](https://github.com/SukramJ/go-fabric/tree/main/client/peer)
+`client/discovery`; [`client/peer`](https://github.com/thingfabric/go-fabric/tree/main/client/peer)
 follows the address.
 
 **OTA (requestor, provider)** — Software update over the air: a requestor
@@ -287,7 +287,7 @@ endpoint assembler.
 **PASE (Passcode Authenticated Session Establishment)** — The SPAKE2+
 handshake on the setup passcode that gives a commissioner its first secure
 session while a commissioning window is open. In go-fabric:
-[`secure/spake2`](https://github.com/SukramJ/go-fabric/tree/main/secure/spake2);
+[`secure/spake2`](https://github.com/thingfabric/go-fabric/tree/main/secure/spake2);
 the node keeps its configured passcode (for its own window and its
 pairing codes); an enhanced window an administrator opens hands it only a
 verifier.
@@ -295,14 +295,14 @@ verifier.
 **Privilege** — The level an ACL entry grants: View, Operate, Manage,
 Administer (ProxyView is deprecated). Each includes the ones below it;
 Administer alone may manage the AccessControl cluster. In go-fabric:
-checked by the dispatcher in [`endpoint`](https://github.com/SukramJ/go-fabric/tree/main/endpoint).
+checked by the dispatcher in [`endpoint`](https://github.com/thingfabric/go-fabric/tree/main/endpoint).
 
 **Root Node (endpoint 0)** — The "read me first" endpoint that describes
 the node and the other endpoints that make it up; it carries the
 node-scoped clusters, such as AccessControl, which no other endpoint may
 carry. In
 go-fabric: composed by `node` without the host
-([`node`](https://github.com/SukramJ/go-fabric/tree/main/node)).
+([`node`](https://github.com/thingfabric/go-fabric/tree/main/node)).
 
 **Scenes** — Stored values of attributes of clusters on one endpoint,
 recalled together; the ScenesManagement cluster manages them, usually per
@@ -313,13 +313,13 @@ group. In go-fabric: served on the bridged lights
 between two nodes, established by PASE or CASE and named by a session id.
 Resumption lets a returning peer re-open a CASE session with a stored
 resumption id instead of a full handshake. In go-fabric:
-[`secure/operational`](https://github.com/SukramJ/go-fabric/tree/main/secure/operational),
+[`secure/operational`](https://github.com/thingfabric/go-fabric/tree/main/secure/operational),
 reported by session diagnostics.
 
 **Setup passcode / PIN** — The 27-bit number PASE runs on, between 1 and
 99999998, trivial values such as 12345678 excluded. In go-fabric:
 `node.Config.Commissioning`, validated in
-[`secure/setup`](https://github.com/SukramJ/go-fabric/tree/main/secure/setup).
+[`secure/setup`](https://github.com/thingfabric/go-fabric/tree/main/secure/setup).
 
 **Specification revision** — The Matter release a data model describes
 (1.4, 1.5.1, 1.6.1, …). In go-fabric: the pin's revision is 1.6.1; a node
@@ -334,7 +334,7 @@ urgent (`isUrgent`), and that report waits for the min interval too —
 an event of critical priority included. Events and attribute changes due
 together arrive in one report. See
 **Binding** for the difference. In go-fabric:
-[`im/subscription`](https://github.com/SukramJ/go-fabric/tree/main/im/subscription).
+[`im/subscription`](https://github.com/thingfabric/go-fabric/tree/main/im/subscription).
 
 **Thread** — An IEEE 802.15.4 network, one of the network interfaces
 NetworkCommissioning covers. In go-fabric: no Thread radio; a commissioner
@@ -362,20 +362,20 @@ says how they differ.
 endpoint topology: numbers allocated and persisted, the root/aggregator
 scaffolding built, the clusters mounted. A reassembly runs it again after a
 change. In go-fabric: the endpoint assembler in
-[`endpoint`](https://github.com/SukramJ/go-fabric/tree/main/endpoint),
+[`endpoint`](https://github.com/thingfabric/go-fabric/tree/main/endpoint),
 `bridge.Bridge.Reassemble`.
 
 **`bridge` (the package)** — go-fabric's device-side composition root:
 it depends on every device-side package and on no host type, and the facade
 `node` wires it. Not to be confused with a **Matter bridge**, a node that
 represents devices of a foreign network as bridged nodes. In go-fabric:
-[`bridge`](https://github.com/SukramJ/go-fabric/tree/main/bridge)
+[`bridge`](https://github.com/thingfabric/go-fabric/tree/main/bridge)
 ([Architecture](../architecture.md#two-rules-that-explain-the-layout)).
 
 **Capacity** — The number of diagnostic events the trace keeps
 (`diag.Diagnostics.Capacity`, 256 when 0); a session snapshot's
 `Occupancy.Capacity` is, separately, the size of the session-id space. In
-go-fabric: [`diag`](https://github.com/SukramJ/go-fabric/tree/main/diag).
+go-fabric: [`diag`](https://github.com/thingfabric/go-fabric/tree/main/diag).
 
 **Contract (go-fabric-ui's)** — The REST and event-stream API between
 go-fabric-ui's handlers and its pages, in one OpenAPI file with golden
@@ -444,7 +444,7 @@ host's `contract.Metrics` port (`node.Config.Metrics`,
 **mDNS diagnosis / findings** — `mdns.Diagnose` inspects the records a
 node or controller advertises and returns `mdns.Finding`s, each with a
 severity, a stable code and a message for the operator. In go-fabric:
-[`mdns`](https://github.com/SukramJ/go-fabric/tree/main/mdns),
+[`mdns`](https://github.com/thingfabric/go-fabric/tree/main/mdns),
 `Controller.DiagnoseMDNS`.
 
 **Network (go-fabric-ui)** — The controller family's tab in the node list:
@@ -455,14 +455,14 @@ commissioned. In go-fabric: `controller/topology`.
 
 **Parity** — The rule that every behaviour mirrors matter.js and cites it,
 every deliberate divergence is catalogued in
-[`by_design.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/by_design.md),
+[`by_design.md`](https://github.com/thingfabric/go-fabric/blob/main/notes/parity/by_design.md),
 and standing guards fail the build on drift. See the
 [parity contract](../matter-parity-contract.md).
 
 **Peer** — The controller's view of one node on its fabrics: its sessions,
 the process that opens CASE when none is live, and the monitor that
 follows its operational address. In go-fabric:
-[`client/peer`](https://github.com/SukramJ/go-fabric/tree/main/client/peer).
+[`client/peer`](https://github.com/thingfabric/go-fabric/tree/main/client/peer).
 
 **Pin** — The matter.js commit go-fabric's data model is extracted from
 (`parity/schema.json`, `matter.sourceCommit`); "at the pin" means at that
@@ -481,7 +481,7 @@ is given up; concurrent callers join one run. In go-fabric:
 **Record (`client.Record`)** — A commissioned node's commissioning record
 on the controller: who the node is on the controller's fabric, where it
 was found and what it announced. In go-fabric:
-[`controller/client`](https://github.com/SukramJ/go-fabric/tree/main/controller/client).
+[`controller/client`](https://github.com/thingfabric/go-fabric/tree/main/controller/client).
 
 **Reference daemon** — `examples/reference-bridge`, a runnable bridge built
 only from the public API, the device under test of the certification
@@ -493,7 +493,7 @@ endpoint its device types, per server cluster its revision, FeatureMap,
 attribute, command and event lists) as one value, decided before any server
 is built by node-level policies: extensions, level, controller profiles,
 custom; Refuse over Remove over Warn over Keep. In go-fabric:
-[`surface`](https://github.com/SukramJ/go-fabric/tree/main/surface)
+[`surface`](https://github.com/thingfabric/go-fabric/tree/main/surface)
 ([ADR 0030](../adr/0030-the-served-surface-is-a-value-under-policies.md)).
 
 **Session diagnostics** — A snapshot of every secure session (and, on the

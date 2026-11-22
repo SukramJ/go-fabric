@@ -38,7 +38,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // Keys shared with SQLite's [store.Store], so the two hold the same settings

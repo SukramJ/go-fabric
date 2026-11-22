@@ -8,10 +8,10 @@ import (
 	"crypto/subtle"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func (s *DoorLockServer) handleSetCredential(ctx context.Context, fields any) (any, error) {

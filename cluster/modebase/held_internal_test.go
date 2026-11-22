@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
+	"thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
 )
 
 type heldChanger struct{}

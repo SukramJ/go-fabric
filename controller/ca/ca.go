@@ -19,8 +19,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // Certificate ids. Mirrors matter.js

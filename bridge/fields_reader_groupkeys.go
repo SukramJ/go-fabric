@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	"github.com/SukramJ/go-fabric/tlv"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // skipValue drains el when it opened a container, so a decoder that does

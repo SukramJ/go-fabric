@@ -7,7 +7,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // GroupSubject is the Incoming Subject Descriptor of a group message: the

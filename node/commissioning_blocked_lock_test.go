@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/sqlitestore"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestSetCommissioningBlockedDuringStart pins ADR 0026 P6: a host's call

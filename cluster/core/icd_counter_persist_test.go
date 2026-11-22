@@ -10,12 +10,12 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/internal/inflight"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/core"
+	icddef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // refusingCounterStore refuses the ICDCounter's writes while refuse is set.

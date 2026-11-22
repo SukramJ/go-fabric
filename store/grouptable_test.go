@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 func TestGroupTable_RoundTripReplaceRemove(t *testing.T) {

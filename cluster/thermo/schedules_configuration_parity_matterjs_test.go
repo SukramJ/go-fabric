@@ -31,9 +31,9 @@ import (
 	"strings"
 	"testing"
 
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/im"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // startupRefusal is SchedulesConfigurationTest.ts:30-43: the reason

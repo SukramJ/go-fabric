@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	msgdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
+	"thingfabric.dev/go-fabric/cluster/core"
+	msgdef "thingfabric.dev/go-fabric/cluster/spec/messages"
 )
 
 // The --media player's Messages (cluster/core Messages): a simulation of

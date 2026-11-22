@@ -11,8 +11,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/im"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // endpointSync is a DatastoreSync that holds the member node's Binding

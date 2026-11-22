@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // respMax is RESP_MAX, the maximum length in bytes of AttestationElements

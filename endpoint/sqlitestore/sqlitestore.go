@@ -39,7 +39,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // schemaDDL is embedded rather than left for the host to transcribe: the

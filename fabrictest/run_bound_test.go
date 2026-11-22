@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // TestRunIsBoundedWithoutADeadline (R2-P6-test-2511): Site.Run with a

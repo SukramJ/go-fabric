@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/core"
 )
 
 // addNOCLabel commissions one fabric through cfg and returns the Label

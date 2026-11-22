@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/commissioning"
+	"thingfabric.dev/go-fabric/commissioning"
 )
 
 // TestVerifyChainRefusesTwoCertificateChain pins VerifyChain's chain-length

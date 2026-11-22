@@ -12,13 +12,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bootid"
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/clock"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/bootid"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/clock"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The settings keys the node keeps its state under. They are the

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/channel"
 )
 
 func mustHex(t *testing.T, s string) []byte {

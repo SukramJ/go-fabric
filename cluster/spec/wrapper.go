@@ -3,7 +3,7 @@
 
 package spec
 
-import "github.com/SukramJ/go-fabric/contract"
+import "thingfabric.dev/go-fabric/contract"
 
 // Wrapper holds the server of a generated typed server (<cluster>def.Server
 // embeds it): any [contract.ClusterServer] of the cluster, the generated

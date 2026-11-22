@@ -1,6 +1,6 @@
 # `wifi/wpasupplicant` — the node's Wi-Fi driver on Linux
 
-`github.com/SukramJ/go-fabric/wifi/wpasupplicant` implements
+`thingfabric.dev/go-fabric/wifi/wpasupplicant` implements
 `contract.WiFiDriver` over wpa_supplicant's D-Bus interface
 (`fi.w1.wpa_supplicant1` on the system bus), in pure Go (no cgo). Set it as
 `node.Config.Network.WiFi.Driver`: the node then serves NetworkCommissioning
@@ -39,5 +39,5 @@ call at once ("the driver's bus connection is gone"), the same signal.
 
 `make wpasupplicant-check` builds (Linux and the `!linux` stub), vets, tests
 (over an in-process bus that plays wpa_supplicant) and lints the module; the
-[operations guide](https://github.com/SukramJ/go-fabric/blob/main/docs/guides/operations.md#wi-fi-provisioning)
+[operations guide](https://github.com/thingfabric/go-fabric/blob/main/docs/guides/operations.md#wi-fi-provisioning)
 has the host's checklist.

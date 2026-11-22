@@ -4,7 +4,7 @@
 package camera
 
 import (
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // overlayBounds are the overlay flags of a request or a stream. Mirrors

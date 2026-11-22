@@ -1,11 +1,11 @@
-module github.com/SukramJ/go-fabric/examples/ble-wifi-light
+module thingfabric.dev/go-fabric/examples/ble-wifi-light
 
 go 1.27.4
 
 require (
-	github.com/SukramJ/go-fabric v0.24.0
-	github.com/SukramJ/go-fabric/ble/bluez v0.24.0
-	github.com/SukramJ/go-fabric/wifi/wpasupplicant v0.24.0
+	thingfabric.dev/go-fabric v0.24.0
+	thingfabric.dev/go-fabric/ble/bluez v0.24.0
+	thingfabric.dev/go-fabric/wifi/wpasupplicant v0.24.0
 )
 
 require (
@@ -28,7 +28,7 @@ require (
 // An example is built from a clone: every go-fabric module comes from the
 // repository beside it. The example is not tagged.
 replace (
-	github.com/SukramJ/go-fabric => ../..
-	github.com/SukramJ/go-fabric/ble/bluez => ../../ble/bluez
-	github.com/SukramJ/go-fabric/wifi/wpasupplicant => ../../wifi/wpasupplicant
+	thingfabric.dev/go-fabric => ../..
+	thingfabric.dev/go-fabric/ble/bluez => ../../ble/bluez
+	thingfabric.dev/go-fabric/wifi/wpasupplicant => ../../wifi/wpasupplicant
 )

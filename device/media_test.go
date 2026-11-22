@@ -7,16 +7,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-	basicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
-	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
-	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
-	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
-	keypaddef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
-	inputdef "github.com/SukramJ/go-fabric/cluster/spec/mediainput"
-	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/media"
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	basicdef "thingfabric.dev/go-fabric/cluster/spec/applicationbasic"
+	launcherdef "thingfabric.dev/go-fabric/cluster/spec/applicationlauncher"
+	outputdef "thingfabric.dev/go-fabric/cluster/spec/audiooutput"
+	launchdef "thingfabric.dev/go-fabric/cluster/spec/contentlauncher"
+	keypaddef "thingfabric.dev/go-fabric/cluster/spec/keypadinput"
+	inputdef "thingfabric.dev/go-fabric/cluster/spec/mediainput"
+	mpdef "thingfabric.dev/go-fabric/cluster/spec/mediaplayback"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // mediaPort is one host port for every media server the three device

@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // FuzzUnmarshalSigma1 feeds arbitrary bytes to the Sigma1 decoder — the

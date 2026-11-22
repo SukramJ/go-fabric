@@ -104,11 +104,11 @@ import (
 	"syscall"
 	"time"
 
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/client"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 func main() {
@@ -472,7 +472,7 @@ A `Reconnect` that fails names the device's last report, for example
 `the device reports Thread role=Unassigned …, last networking
 status=NetworkNotFound`. A device that does not answer the probe
 changes nothing. The central on Linux is
-`github.com/SukramJ/go-fabric/ble/bluez`, a module of its own so the main
+`thingfabric.dev/go-fabric/ble/bluez`, a module of its own so the main
 module never pulls its D-Bus dependency; the reference controller's BLE
 build is its `cmd/reference-controller` (`pair --ble`, rights and BlueZ
 version in the reference controller's README).

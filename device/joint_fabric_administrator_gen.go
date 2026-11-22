@@ -6,9 +6,9 @@
 package device
 
 import (
-	jointfabricadministratordef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	jointfabricdatastoredef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/schema"
+	jointfabricadministratordef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	jointfabricdatastoredef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // JointFabricAdministrator device type identity: 0x0130, revision 1.

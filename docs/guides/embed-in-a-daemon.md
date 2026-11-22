@@ -22,7 +22,7 @@ It does the work of go-fabric's `script/archcheck` in one function.
 ## 1. The dependency
 
 ```sh
-go get github.com/SukramJ/go-fabric@latest
+go get thingfabric.dev/go-fabric@latest
 ```
 
 A daemon pins a tag, never a commit: `@latest` resolves to the newest
@@ -30,7 +30,7 @@ release tag, and `go.mod` records it. go-fabric is Apache-2.0. A daemon
 that imports it links four of its direct dependencies —
 `filippo.io/nistec`, `github.com/miekg/dns`, `golang.org/x/net` and
 `modernc.org/sqlite` — and their indirect modules, all permissive (see
-[`THIRD-PARTY-NOTICES.md`](https://github.com/SukramJ/go-fabric/blob/main/THIRD-PARTY-NOTICES.md));
+[`THIRD-PARTY-NOTICES.md`](https://github.com/thingfabric/go-fabric/blob/main/THIRD-PARTY-NOTICES.md));
 the fifth, `golang.org/x/tools`, serves only the repository's own tooling.
 The pure-Go SQLite driver is the largest of them. A daemon with a
 licence gate runs it over the new graph. go-licenses does not classify

@@ -8,9 +8,9 @@ import (
 	"context"
 	"testing"
 
-	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
-	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
-	"github.com/SukramJ/go-fabric/node"
+	actionsdef "thingfabric.dev/go-fabric/cluster/spec/actions"
+	ecodef "thingfabric.dev/go-fabric/cluster/spec/ecosysteminformation"
+	"thingfabric.dev/go-fabric/node"
 )
 
 type routeActions struct{}

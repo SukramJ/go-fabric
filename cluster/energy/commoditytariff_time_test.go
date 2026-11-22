@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
 )
 
 // TestCommodityTariffDeclaredClock (issue 491): with ClockDeclared the

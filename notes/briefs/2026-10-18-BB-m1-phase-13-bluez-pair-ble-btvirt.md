@@ -31,9 +31,9 @@ twice.
 
 ## Items
 
-1. **The sub-module `ble/bluez`** (`github.com/SukramJ/go-fabric/ble/bluez`,
-   own `go.mod`: `require github.com/SukramJ/go-fabric v0.6.0` plus
-   `replace github.com/SukramJ/go-fabric => ../..` for in-repo builds — the
+1. **The sub-module `ble/bluez`** (`thingfabric.dev/go-fabric/ble/bluez`,
+   own `go.mod`: `require thingfabric.dev/go-fabric v0.6.0` plus
+   `replace thingfabric.dev/go-fabric => ../..` for in-repo builds — the
    release bumps the require to the tag it ships with; say so in the
    sub-module's README). Dependency `github.com/godbus/dbus/v5`
    (BSD-2-Clause): the sub-module's own `THIRD-PARTY-NOTICES.md` and

@@ -10,9 +10,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/netinfra"
-	tdir "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/netinfra"
+	tdir "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestThreadDirectoryPreferredRoundTrip: the preferred network is saved

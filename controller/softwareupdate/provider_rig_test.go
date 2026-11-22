@@ -6,8 +6,8 @@ package softwareupdate
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/bdx"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
 )
 
 // providerOf builds the OTA provider the controller builds over the

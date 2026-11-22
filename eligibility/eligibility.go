@@ -27,7 +27,7 @@
 package eligibility
 
 import (
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // Verdict is a re-export of [contract.EligibilityVerdict] for

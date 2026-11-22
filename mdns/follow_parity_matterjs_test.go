@@ -13,7 +13,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/internal/netwatch"
+	"thingfabric.dev/go-fabric/internal/netwatch"
 )
 
 // The cases of matter.js packages/protocol/test/mdns/

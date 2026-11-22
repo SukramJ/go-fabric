@@ -6,7 +6,7 @@ package thermo
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // heldSource answers the reads of the spec.Server a self-held server

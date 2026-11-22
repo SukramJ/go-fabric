@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	matterparity "thingfabric.dev/go-fabric/parity"
 )
 
 // The subset of the matter.js schema snapshot these tests read. The

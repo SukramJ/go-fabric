@@ -7,10 +7,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/appliance"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	mwo "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/appliance"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	mwo "thingfabric.dev/go-fabric/cluster/spec/microwaveovencontrol"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestMicrowaveSetAttributesHoldsEachValueToItsSetterRule: CookTime,

@@ -6,7 +6,7 @@ package ble
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/discovery"
 )
 
 // Transport is the scanner s as a discovery transport — matter.js's

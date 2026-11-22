@@ -14,13 +14,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	commctrldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	commctrldef "thingfabric.dev/go-fabric/cluster/spec/commissionercontrol"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // The window a CommissionNode answer asks the client to open — the

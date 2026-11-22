@@ -26,9 +26,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
-	opcreds "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/client/jcm"
+	opcreds "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // rawSign is a 64-byte r||s P-256 signature over SHA-256(msg).

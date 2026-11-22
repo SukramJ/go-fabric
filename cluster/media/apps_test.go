@@ -9,15 +9,15 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	basicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
-	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/contentcontrol"
-	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/media"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	basicdef "thingfabric.dev/go-fabric/cluster/spec/applicationbasic"
+	launcherdef "thingfabric.dev/go-fabric/cluster/spec/applicationlauncher"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/contentcontrol"
+	launchdef "thingfabric.dev/go-fabric/cluster/spec/contentlauncher"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	woldef "thingfabric.dev/go-fabric/cluster/spec/wakeonlan"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // --- ApplicationLauncher and ApplicationBasic ---------------------------

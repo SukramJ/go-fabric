@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/commissioning"
+	"thingfabric.dev/go-fabric/commissioning"
 )
 
 // TestNewPASEResponderErrorDoesNotRenderThePasscode: the refusal of a

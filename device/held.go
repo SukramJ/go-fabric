@@ -4,10 +4,10 @@
 package device
 
 import (
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	pumpdef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
 )
 
 // HoldsAttribute reports whether the value of clusterID's attrID is the

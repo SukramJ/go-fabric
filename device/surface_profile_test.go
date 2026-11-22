@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/surface"
-	"github.com/SukramJ/go-fabric/surface/surfacetest"
+	"thingfabric.dev/go-fabric/surface"
+	"thingfabric.dev/go-fabric/surface/surfacetest"
 )
 
 // TestSurfaceProfile runs a synthetic profile through the test seam: a

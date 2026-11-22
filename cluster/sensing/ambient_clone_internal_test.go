@@ -6,8 +6,8 @@ package sensing
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	def "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	def "thingfabric.dev/go-fabric/cluster/spec/ambientcontextsensing"
 )
 
 // TestObjectCountConfigIsTheServers holds R2-P6-api-1461: the server keeps

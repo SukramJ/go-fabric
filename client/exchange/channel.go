@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // Channel is a connected carrier a session sends on in place of the

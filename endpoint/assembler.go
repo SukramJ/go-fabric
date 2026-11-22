@@ -11,9 +11,9 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/SukramJ/go-fabric/clock"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/groups"
+	"thingfabric.dev/go-fabric/clock"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/groups"
 )
 
 // Config tunes the assembler. The zero value is *not* valid — a non-zero

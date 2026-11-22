@@ -8,10 +8,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/alarmbase"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dwa "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
-	tma "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
+	"thingfabric.dev/go-fabric/cluster/alarmbase"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dwa "thingfabric.dev/go-fabric/cluster/spec/dishwasheralarm"
+	tma "thingfabric.dev/go-fabric/cluster/spec/temperaturealarm"
 )
 
 // TestTypedSetRefusals: an attribute the server does not serve, a Latch

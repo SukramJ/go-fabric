@@ -7,14 +7,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
-	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	avdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
+	padef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	zmdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
 )
 
 type fakeChime struct{}

@@ -13,10 +13,10 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	icddef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
 )
 
 // litImage is a node whose root serves BasicInformation at version and,

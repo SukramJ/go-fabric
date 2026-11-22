@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 func aliceBobConfigs() (a, b Config) {

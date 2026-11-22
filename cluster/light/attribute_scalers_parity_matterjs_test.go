@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/light"
+	"thingfabric.dev/go-fabric/cluster/light"
 )
 
 // TestHueScalers holds the hue scalers to matter.js ColorControlServer.ts

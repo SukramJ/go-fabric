@@ -3,7 +3,7 @@
 
 package client
 
-import "github.com/SukramJ/go-fabric/im"
+import "thingfabric.dev/go-fabric/im"
 
 // scope tells whether an endpoint and cluster are in scope of a read —
 // matter.js ReadScope (packages/protocol/src/action/client/ReadScope.ts:13-52

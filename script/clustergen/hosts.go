@@ -263,7 +263,7 @@ var hosts = map[string]hostDecl{
 			"// Users returns a copy of the user database.",
 			"Users() []store.DoorLockUser",
 		},
-		imports: []string{"github.com/SukramJ/go-fabric/store"},
+		imports: []string{"thingfabric.dev/go-fabric/store"},
 	},
 	"ThreadNetworkDirectory": {
 		server: "cluster/netinfra ThreadDirectoryServer",

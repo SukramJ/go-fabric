@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/SukramJ/go-fabric/ble/bluez"
-	"github.com/SukramJ/go-fabric/examples/reference-controller/cli"
+	"thingfabric.dev/go-fabric/ble/bluez"
+	"thingfabric.dev/go-fabric/examples/reference-controller/cli"
 )
 
 func main() {

@@ -8,9 +8,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // InvokeRequestMessage tag numbers (Matter Core Spec §10.6.7).

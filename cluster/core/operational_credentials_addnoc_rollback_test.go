@@ -11,8 +11,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	mstore "github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/cluster/core"
+	mstore "thingfabric.dev/go-fabric/store"
 )
 
 // replaceACLFailStore wraps fakeStore and injects a failure on ReplaceACL.

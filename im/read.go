@@ -11,8 +11,8 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // ReadRequestMessage tag numbers (Matter Core Spec §10.6.4).

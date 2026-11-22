@@ -8,8 +8,8 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	swdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
 )
 
 // The typed server's optional interfaces: Handle, Emit and SetBeforeWrite

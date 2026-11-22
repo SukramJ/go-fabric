@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/interaction"
 )
 
 // TestParityConstants: matter.js

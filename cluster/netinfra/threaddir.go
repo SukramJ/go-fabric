@@ -13,12 +13,12 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tdir "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tdir "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // ThreadNetworkDirectory (0x0453) after connectedhomeip

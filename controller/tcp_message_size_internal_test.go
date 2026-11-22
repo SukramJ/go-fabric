@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // TestTCPMaxMessageSizeResolves (review II, R2-P6-par-3209): the TCP

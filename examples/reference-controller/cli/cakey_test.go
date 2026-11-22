@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // caSetting is the CA's record in the tool's database.

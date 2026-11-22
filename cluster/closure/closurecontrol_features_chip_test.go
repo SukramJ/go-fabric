@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	closuredef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The MotionLatching, Instantaneous, Speed and Calibration rules, ported

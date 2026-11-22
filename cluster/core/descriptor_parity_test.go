@@ -19,8 +19,8 @@ package core_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestParityMatterJS_DescriptorServer_ProperlyExtendsEndpointType verifies

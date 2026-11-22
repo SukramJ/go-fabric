@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/controller/ca"
 )
 
 // blackhole is a channel whose peer never answers.

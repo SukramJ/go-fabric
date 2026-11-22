@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // ─── in-memory store fake ─────────────────────────────────────────────

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestMatterQuiesceStopsTheCountdownThrottle (R2-P6-conc-1506): the

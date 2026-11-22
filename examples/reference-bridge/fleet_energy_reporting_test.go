@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
+	epmdef "thingfabric.dev/go-fabric/cluster/spec/electricalpowermeasurement"
 )
 
 // reading is one EnergyReporting reading on one endpoint.

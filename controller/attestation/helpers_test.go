@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 var (

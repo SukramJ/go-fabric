@@ -9,7 +9,7 @@ import (
 	"errors"
 	"testing"
 
-	mstore "github.com/SukramJ/go-fabric/store"
+	mstore "thingfabric.dev/go-fabric/store"
 )
 
 func newResumptionID(seed byte) []byte {

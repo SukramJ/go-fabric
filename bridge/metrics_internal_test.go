@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // recordingMetrics is a contract.Metrics that keeps what it was told.

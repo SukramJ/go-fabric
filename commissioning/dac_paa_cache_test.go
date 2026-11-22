@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/commissioning"
+	"thingfabric.dev/go-fabric/commissioning"
 )
 
 // TestVerifyChain_EmptyPool_RejectsNotSucceeds guards against a

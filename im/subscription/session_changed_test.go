@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestSessionSubscriptionsChangedHook: the hook fires with the session id

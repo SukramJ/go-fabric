@@ -12,8 +12,8 @@ package operational
 import (
 	"errors"
 
-	"github.com/SukramJ/go-fabric/internal/sessionseam"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/internal/sessionseam"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // errSeamManager is the error of a seam hook handed something other than a

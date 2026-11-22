@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // TestPASEDecodersTakeBytesAfterTheMessageEnd pins 5a-3 S-5: every PASE

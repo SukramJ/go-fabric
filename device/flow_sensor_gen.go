@@ -6,9 +6,9 @@
 package device
 
 import (
-	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	flowmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/flowmeasurement"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // FlowSensor device type identity: 0x0306, revision 3.

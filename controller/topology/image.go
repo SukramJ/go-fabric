@@ -7,12 +7,12 @@ import (
 	"net/netip"
 	"slices"
 
-	generaldiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/device"
+	generaldiagdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	threaddiagdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	wifidiagdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkdiagnostics"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // Image is what one commissioned node contributes to the graph: its

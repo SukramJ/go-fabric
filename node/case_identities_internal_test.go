@@ -11,9 +11,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestCaseIdentitiesResolveEveryIPKOfKeySet0: a Sigma1 is resolved under

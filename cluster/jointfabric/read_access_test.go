@@ -6,8 +6,8 @@ package jointfabric
 import (
 	"testing"
 
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/contract"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestDatastoreDeclaresItsReadAccess (decision 152, R2-P6-sec-1103 read

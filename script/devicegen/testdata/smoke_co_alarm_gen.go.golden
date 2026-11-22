@@ -6,13 +6,13 @@
 package device
 
 import (
-	carbonmonoxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	relativehumiditymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
-	smokecoalarmdef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	carbonmonoxideconcentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	relativehumiditymeasurementdef "thingfabric.dev/go-fabric/cluster/spec/relativehumiditymeasurement"
+	smokecoalarmdef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	temperaturemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // SmokeCoAlarm device type identity: 0x0076, revision 2.

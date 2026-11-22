@@ -20,14 +20,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/tls"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/tls"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/parity"
 )
 
-const modulePath = "github.com/SukramJ/go-fabric"
+const modulePath = "thingfabric.dev/go-fabric"
 
 // server is a registry entry: a server type the module builds for a
 // cluster, as a typed nil pointer.

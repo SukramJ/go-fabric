@@ -7,10 +7,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/boolcfg"
-	def "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/cluster/boolcfg"
+	def "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/internal/paritytest"
 )
 
 // TestParityMatterJS_BooleanStateConfigurationServers builds every feature

@@ -15,18 +15,18 @@ import (
 
 	_ "modernc.org/sqlite" // the device's SQLite stores with Options.StoreOnDisk (node.Store.DB)
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/internal/bridgeseam"
-	"github.com/SukramJ/go-fabric/internal/inflight"
-	"github.com/SukramJ/go-fabric/internal/nodeseam"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller/ble/bletest"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/internal/bridgeseam"
+	"thingfabric.dev/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/internal/nodeseam"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // Defaults of a device's commissioning configuration — the passcode and

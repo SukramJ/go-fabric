@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // Errors of the exchange layer. The classes follow matter.js

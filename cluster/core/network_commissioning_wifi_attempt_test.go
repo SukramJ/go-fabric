@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // heldDriver is a contract.WiFiDriver whose joins wait until the test

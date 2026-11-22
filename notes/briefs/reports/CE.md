@@ -5,7 +5,7 @@ go-fabric branch `m4/phase-22-ce`; daemon branch `fabric-projection`.
 
 ## Daemon PR
 
-[SukramJ/go-zendure2mqtt#64](https://github.com/SukramJ/go-zendure2mqtt/pull/64), no auto-merge. It pins `github.com/SukramJ/go-fabric v0.10.8`. The Matter side is off by default.
+[SukramJ/go-zendure2mqtt#64](https://github.com/SukramJ/go-zendure2mqtt/pull/64), no auto-merge. It pins `thingfabric.dev/go-fabric v0.10.8`. The Matter side is off by default.
 
 | Recipe step | Commit |
 | --- | --- |

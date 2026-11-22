@@ -17,9 +17,9 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/SukramJ/go-fabric/controller/ble"
-	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/controller/ble/bletest"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // fakeBus is an in-process org.bluez: an object tree with properties, the

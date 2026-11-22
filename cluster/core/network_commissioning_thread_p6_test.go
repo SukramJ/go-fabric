@@ -10,8 +10,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/im"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // gatedBorderRouter holds the first SetActiveDataset of the dataset hold

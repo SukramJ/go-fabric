@@ -16,7 +16,7 @@ import (
 )
 
 // module is the module path the examples import from.
-const module = "github.com/SukramJ/go-fabric/"
+const module = "thingfabric.dev/go-fabric/"
 
 // allowed are the module packages each small example may import: the
 // facade (node, device, contract), the controller role and its client

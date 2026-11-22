@@ -8,10 +8,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/filter"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	carbon "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/cluster/filter"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	carbon "thingfabric.dev/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
 )
 
 // TestTypedSetRefusalsAndFixedValues: an attribute the server does not

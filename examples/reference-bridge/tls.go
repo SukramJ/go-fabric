@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // --tls-sim (TESTING ONLY): TlsCertificateManagement and TlsClientManagement

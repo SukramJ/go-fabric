@@ -11,10 +11,10 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/cover"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestTravelStaysInsideTheRangeAfterAHostPosition (R2-P6-fsm-1502): a

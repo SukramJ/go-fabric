@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 func TestServerSubscriptions_Lifecycle(t *testing.T) {

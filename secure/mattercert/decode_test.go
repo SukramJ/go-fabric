@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // buildTestCert constructs a minimal valid Matter cert TLV using the supplied

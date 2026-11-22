@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // bdxTestPayload is the mock exchange's payload size: ProtocolMocks'

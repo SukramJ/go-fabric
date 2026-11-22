@@ -9,7 +9,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestDecodeRefusesADNThatIsNotAList re-encodes a certificate's Issuer

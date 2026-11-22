@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/fan"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/cluster/fan"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
 )
 
 // TestServerMatchesTheGeneratedDefinition holds every feature selection

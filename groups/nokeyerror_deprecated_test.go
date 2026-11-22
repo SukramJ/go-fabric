@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/groups"
+	"thingfabric.dev/go-fabric/groups"
 )
 
 // TestDeprecatedNoKeyErrorStillIsErrNoKey: the deprecated NoKeyError, which

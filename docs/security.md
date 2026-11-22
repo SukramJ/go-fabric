@@ -3,7 +3,7 @@
 What the module enforces, what it assumes of the host, and where it
 stops, for both roles. The detailed responder-side record — every
 enforcement point with its source line, including open questions — is
-the [threat model](https://github.com/SukramJ/go-fabric/blob/main/notes/audits/matter-threat-model.md); this page is
+the [threat model](https://github.com/thingfabric/go-fabric/blob/main/notes/audits/matter-threat-model.md); this page is
 the summary an architect needs.
 
 Two facts govern everything below:

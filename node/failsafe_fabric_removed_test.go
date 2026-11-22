@@ -6,10 +6,10 @@ package node_test
 import (
 	"testing"
 
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	opcreds "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	opcreds "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestFailSafeOfARemovedFabricEndsWithIt is R2-P3-admin-06: a fail-safe

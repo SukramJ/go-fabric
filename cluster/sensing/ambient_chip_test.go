@@ -26,12 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	def "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	def "thingfabric.dev/go-fabric/cluster/spec/ambientcontextsensing"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // allFeatures is kFeaturesAllForACSTest (:49-51) without SensorFusion.

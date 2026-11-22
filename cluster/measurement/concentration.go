@@ -13,14 +13,14 @@ package measurement
 // file.
 
 import (
-	codef "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
-	hchodef "github.com/SukramJ/go-fabric/cluster/spec/formaldehydeconcentrationmeasurement"
-	no2def "github.com/SukramJ/go-fabric/cluster/spec/nitrogendioxideconcentrationmeasurement"
-	o3def "github.com/SukramJ/go-fabric/cluster/spec/ozoneconcentrationmeasurement"
-	pm1def "github.com/SukramJ/go-fabric/cluster/spec/pm1concentrationmeasurement"
-	radondef "github.com/SukramJ/go-fabric/cluster/spec/radonconcentrationmeasurement"
-	tvocdef "github.com/SukramJ/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement"
-	"github.com/SukramJ/go-fabric/contract"
+	codef "thingfabric.dev/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
+	hchodef "thingfabric.dev/go-fabric/cluster/spec/formaldehydeconcentrationmeasurement"
+	no2def "thingfabric.dev/go-fabric/cluster/spec/nitrogendioxideconcentrationmeasurement"
+	o3def "thingfabric.dev/go-fabric/cluster/spec/ozoneconcentrationmeasurement"
+	pm1def "thingfabric.dev/go-fabric/cluster/spec/pm1concentrationmeasurement"
+	radondef "thingfabric.dev/go-fabric/cluster/spec/radonconcentrationmeasurement"
+	tvocdef "thingfabric.dev/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // Cluster IDs of the seven further concentration clusters, each its

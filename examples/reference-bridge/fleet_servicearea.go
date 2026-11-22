@@ -9,11 +9,11 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	rvcrdef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
-	sadef "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	rvcrdef "thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
+	sadef "thingfabric.dev/go-fabric/cluster/spec/servicearea"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // --- the robot vacuum's areas ----------------------------------------------

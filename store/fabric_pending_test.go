@@ -14,7 +14,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // insertLegacyFabric inserts newFabricRecord(fabricIndex, seed) with the

@@ -6,10 +6,10 @@ package node
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/jointfabric"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster/jointfabric"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // nodeServicesParticipant is a cluster server of an endpoint that reads

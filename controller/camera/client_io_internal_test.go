@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tsdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
 )
 
 // TestClientIOTimePush: without a host push, the time pushed to a camera

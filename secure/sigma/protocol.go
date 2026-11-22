@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/secure/aesccm"
 )
 
 // ErrFabricIDMismatch is returned by [Responder.ProcessSigma3] when the

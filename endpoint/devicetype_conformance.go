@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Device type validation: the port of matter.js's DeviceTypeConformance

@@ -26,7 +26,7 @@ var (
 	// limitsCellConst is one `Name = value` code span of a Value cell.
 	limitsCellConst = regexp.MustCompile("`([A-Za-z_][A-Za-z0-9_]*) = ([^`]+)`")
 	// limitsCellFile is the repository file a Value cell links.
-	limitsCellFile = regexp.MustCompile(`\]\(https://github\.com/SukramJ/go-fabric/blob/main/([^)#]+\.go)\)`)
+	limitsCellFile = regexp.MustCompile(`\]\(https://github\.com/thingfabric/go-fabric/blob/main/([^)#]+\.go)\)`)
 )
 
 // TestLimitsPage: every `Name = value` in the Value column of the limits

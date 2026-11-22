@@ -3,7 +3,7 @@
 
 package spec
 
-import "github.com/SukramJ/go-fabric/contract"
+import "thingfabric.dev/go-fabric/contract"
 
 var _ contract.FabricScopeDeclarer = (*Instance)(nil)
 

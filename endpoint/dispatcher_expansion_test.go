@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestReadAtEndpointConcatenatesToRead pins that the per-endpoint

@@ -7,9 +7,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	acsdef "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	acsdef "thingfabric.dev/go-fabric/cluster/spec/ambientcontextsensing"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
 )
 
 // acsType is ContactSensor with AmbientContextSensing as an optional

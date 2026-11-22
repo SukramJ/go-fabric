@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
 )
 
 // TestReportDropsListedRawSession (review II, R2-P6-store-2203, decision

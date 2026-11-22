@@ -8,8 +8,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
 )
 
 // withPreset2Schedule adds the unoccupied preset 02 and schedule 01, which

@@ -16,9 +16,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/client/sqlstore"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // openEmptyDB opens a fresh database without the schema, with the module's

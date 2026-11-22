@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // AttributePathIB tag numbers (Matter Core Spec §10.6.2).

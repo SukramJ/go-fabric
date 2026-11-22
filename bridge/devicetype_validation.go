@@ -6,7 +6,7 @@ package bridge
 import (
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // Device type validation of every assembled topology: matter.js's

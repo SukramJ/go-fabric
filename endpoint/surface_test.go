@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 func TestClusterSurfaceReadsAsTheDispatcher(t *testing.T) {

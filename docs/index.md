@@ -16,9 +16,9 @@ Alliance, and nothing built on it may be described as certified.
 | Put your devices on Matter (a bridge, a gateway, a single device) | [Getting started: device](getting-started/device.md), then [Host ports](guides/ports.md) |
 | Pair and control Matter devices from Go | [Getting started: controller](getting-started/controller.md) |
 | Decide whether the module fits your product | [Architecture](architecture.md), [Security model](security.md), [matter.js comparison](matterjs-comparison.md), [Certifiability](certifiability.md), [Roadmap](roadmap.md) |
-| Run it in production | [Concurrency](guides/concurrency.md), [Persistence](guides/persistence.md), the [API stability policy](https://github.com/SukramJ/go-fabric/blob/main/README.md#api-stability) |
+| Run it in production | [Concurrency](guides/concurrency.md), [Persistence](guides/persistence.md), the [API stability policy](https://github.com/thingfabric/go-fabric/blob/main/README.md#api-stability) |
 | Look a term up | [Glossary](reference/glossary.md) |
-| Change it | [CONTRIBUTING](https://github.com/SukramJ/go-fabric/blob/main/CONTRIBUTING.md), the [parity contract](matter-parity-contract.md), the [decision records](adr/README.md) |
+| Change it | [CONTRIBUTING](https://github.com/thingfabric/go-fabric/blob/main/CONTRIBUTING.md), the [parity contract](matter-parity-contract.md), the [decision records](adr/README.md) |
 
 ## At a glance
 
@@ -38,7 +38,7 @@ Alliance, and nothing built on it may be described as certified.
   module's node in-repo. The [certifiability report](certifiability.md)
   lists every family and its status.
 - **Licence:** Apache-2.0 (since `v0.5.0`); see the
-  [NOTICE](https://github.com/SukramJ/go-fabric/blob/main/NOTICE) for the matter.js lineage.
+  [NOTICE](https://github.com/thingfabric/go-fabric/blob/main/NOTICE) for the matter.js lineage.
 
 The Go API reference is on
-[pkg.go.dev](https://pkg.go.dev/github.com/SukramJ/go-fabric).
+[pkg.go.dev](https://pkg.go.dev/thingfabric.dev/go-fabric).

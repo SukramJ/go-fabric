@@ -17,8 +17,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/contract"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The D-Bus names this package speaks: wpa_supplicant's service at its

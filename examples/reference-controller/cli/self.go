@@ -7,11 +7,11 @@ import (
 	"context"
 	"net"
 
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/softwareupdate"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The controller's own identity serves what a node of the fabric serves:

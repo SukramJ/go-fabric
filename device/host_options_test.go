@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestWithServerMountsAClusterTheTypeDoesNotList: a host server for a

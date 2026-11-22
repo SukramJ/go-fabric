@@ -7,9 +7,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // TestDeclareSelectsNoFeatureParityMatterJS ports "drops all features

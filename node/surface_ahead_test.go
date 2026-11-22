@@ -12,17 +12,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/cluster/valve"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/surface"
-	"github.com/SukramJ/go-fabric/surface/surfacetest"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	tsdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/surface"
+	"thingfabric.dev/go-fabric/surface/surfacetest"
 )
 
 const (

@@ -10,17 +10,17 @@ import (
 	"math/bits"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/cluster/valve"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ccldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // Compile-time assertion.

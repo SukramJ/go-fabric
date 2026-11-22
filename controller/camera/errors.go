@@ -7,7 +7,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The typed errors of camera streaming, one per matterjs-server error code

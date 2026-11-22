@@ -6,8 +6,8 @@ package store_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/storetest"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/storetest"
 )
 
 // TestStoreContract holds SQLite's Store to the port's contract, the same

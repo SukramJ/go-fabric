@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // matchDataVersionFilter searches filters for a matching (endpoint, cluster)

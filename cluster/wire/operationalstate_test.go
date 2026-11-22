@@ -6,7 +6,7 @@ package wire_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // TestHasOperationalStateLabel pins the manufacturer-specific range the

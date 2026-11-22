@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // mustHex decodes a fixture constant, failing the test rather than the

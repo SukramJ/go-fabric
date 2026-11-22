@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestMatterSchemaSnapshotHashMatchesEmbedded recomputes the SHA-256 of the

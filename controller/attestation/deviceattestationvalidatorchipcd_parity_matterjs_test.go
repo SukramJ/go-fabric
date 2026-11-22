@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // chipCDValidate is validate (:81-103 at db021da0): the vector's CD in

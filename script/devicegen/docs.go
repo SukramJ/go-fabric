@@ -16,7 +16,7 @@ const (
 	// the device types, published with the documentation site.
 	referenceDir  = "docs/reference"
 	referenceFile = "device-types.md"
-	specImport    = "github.com/SukramJ/go-fabric/cluster/spec/"
+	specImport    = "thingfabric.dev/go-fabric/cluster/spec/"
 )
 
 // typeVar is the unexported variable holding a device type's requirement
@@ -51,7 +51,7 @@ func (g *generator) generatePackageDoc(names []string) (*output, error) {
 	w.WriteString("// # Typed cluster packages\n//\n")
 	w.WriteString("// Every cluster with a generated definition has a typed package — its\n")
 	w.WriteString("// Declare, State, Patch and Server. The package at\n")
-	w.WriteString("// github.com/SukramJ/go-fabric/cluster/spec/<pkg> is imported as <pkg>def\n")
+	w.WriteString("// thingfabric.dev/go-fabric/cluster/spec/<pkg> is imported as <pkg>def\n")
 	w.WriteString("// (onoffdef for .../cluster/spec/onoff):\n//\n")
 	for _, p := range g.typedPackages() {
 		fmt.Fprintf(&w, "//   - %s%s\n", specImport, p)

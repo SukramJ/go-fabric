@@ -357,8 +357,8 @@ var cameraPorts = map[string]portSet{
 			"}",
 		},
 		imports: []string{
-			"github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement",
-			"github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement",
+			"thingfabric.dev/go-fabric/cluster/spec/tlscertificatemanagement",
+			"thingfabric.dev/go-fabric/cluster/spec/tlsclientmanagement",
 		},
 	},
 }

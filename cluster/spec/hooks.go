@@ -6,7 +6,7 @@ package spec
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // Hooks gives a self-held server that keeps its own state — no generated

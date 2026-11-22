@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
 
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
-	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
-	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	ovendef "thingfabric.dev/go-fabric/cluster/spec/ovencavityoperationalstate"
+	pumpdef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	rvcopdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
 )
 
 // Out-of-band test control, the two ways CHIP's own example apps take it:

@@ -4,7 +4,7 @@
 package im
 
 import (
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // SuppressResponseOf reads only the SuppressResponse field (context tag 0)

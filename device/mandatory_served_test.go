@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	tempdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	tempdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // unserved lists, for every committed device type the kit builds with its

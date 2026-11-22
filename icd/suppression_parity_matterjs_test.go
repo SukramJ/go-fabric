@@ -11,7 +11,7 @@ package icd_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd"
 )
 
 func TestIsMonitoredSubjectCovered(t *testing.T) {

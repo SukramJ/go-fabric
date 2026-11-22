@@ -8,8 +8,8 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // Measurement serves clusters of the device from a classified host source

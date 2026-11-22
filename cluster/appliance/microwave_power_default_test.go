@@ -6,8 +6,8 @@ package appliance_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/appliance"
-	mwo "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
+	"thingfabric.dev/go-fabric/cluster/appliance"
+	mwo "thingfabric.dev/go-fabric/cluster/spec/microwaveovencontrol"
 )
 
 // TestZeroPowerSettingStartsAtTheMaximum (R2-P6-api-1592): a zero

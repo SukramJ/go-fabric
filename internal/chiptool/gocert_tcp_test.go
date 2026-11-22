@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	gocontroller "github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/exchange"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	gocontroller "thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The TCP cases: matter.js's TC-SC-8.x run the device as the DUT and a

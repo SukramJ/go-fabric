@@ -22,17 +22,17 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ambient "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
-	occ "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	soil "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ambient "thingfabric.dev/go-fabric/cluster/spec/ambientcontextsensing"
+	occ "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	soil "thingfabric.dev/go-fabric/cluster/spec/soilmeasurement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // holdTimeLimits is HOLD_TIME_LIMITS (DotQualifiedConstraintTest.ts:26).

@@ -32,9 +32,9 @@ package measurement
 import (
 	"fmt"
 
-	switchserver "github.com/SukramJ/go-fabric/cluster/switch"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
+	switchserver "thingfabric.dev/go-fabric/cluster/switch"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 func init() {

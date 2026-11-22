@@ -13,8 +13,8 @@ package client_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/internal/fabrictestseam"
 )
 
 func TestClientNodeInteractionIcdLitRouting(t *testing.T) {

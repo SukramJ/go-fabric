@@ -13,10 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/internal/inflight"
-	"github.com/SukramJ/go-fabric/internal/udpseam"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/internal/udpseam"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // The in-memory network: datagrams between the hosts of a site over
@@ -34,7 +34,7 @@ type NetOptions struct {
 	// Loss is the probability in [0, 1] that a datagram is dropped.
 	Loss float64
 	// Delay is the time a datagram is in flight, on the site's clock: with
-	// a [github.com/SukramJ/go-fabric/clock/clocktest.Fake] it arrives when
+	// a [thingfabric.dev/go-fabric/clock/clocktest.Fake] it arrives when
 	// the test advances the clock past it, so an MRP test steps the
 	// retransmission it provokes. 0 delivers at once.
 	Delay time.Duration

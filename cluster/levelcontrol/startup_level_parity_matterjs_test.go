@@ -6,7 +6,7 @@ package levelcontrol_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
 )
 
 // TestParityMatterJS_StartUpCurrentLevel: the held server with Lighting

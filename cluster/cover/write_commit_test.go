@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/cluster/cover"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
 )
 
 // TestWindowCoveringWriteCommitNamesConfigStatus (F-db021da0-57): a Mode

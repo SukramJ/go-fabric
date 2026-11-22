@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
 )
 
 func closeTo(t *testing.T, what string, got, want, delta float64) {

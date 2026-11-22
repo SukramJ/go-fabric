@@ -8,8 +8,8 @@ import (
 	"expvar"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	expvarmetrics "github.com/SukramJ/go-fabric/node/metrics/expvar"
+	"thingfabric.dev/go-fabric/contract"
+	expvarmetrics "thingfabric.dev/go-fabric/node/metrics/expvar"
 )
 
 // TestRoundTrip: every name of the set is published at zero, a counter

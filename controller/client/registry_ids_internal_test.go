@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/handshake"
 )
 
 // TestCallerChosenIDIsReserved (review II, R2-P1-ctl-01): a local id the

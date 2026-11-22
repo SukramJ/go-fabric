@@ -2,7 +2,7 @@
 
 A Network Infrastructure Manager (device type `0x0090`) and a Thread Border
 Router (`0x0091`) carry two clusters whose rules live in
-[`cluster/netinfra`](https://github.com/SukramJ/go-fabric/tree/main/cluster/netinfra):
+[`cluster/netinfra`](https://github.com/thingfabric/go-fabric/tree/main/cluster/netinfra):
 WiFiNetworkManagement (`0x0451`) and ThreadNetworkDirectory (`0x0453`).
 matter.js serves both as the generated behaviour stub, with no logic, so
 this module follows connectedhomeip's servers at the harness commit

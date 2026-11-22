@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // clientPathJSON is an AttributePathIB / EventPathIB / ClusterPathIB of

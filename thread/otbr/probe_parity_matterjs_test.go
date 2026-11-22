@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
+	"thingfabric.dev/go-fabric/thread/otbr/otbrtest"
 )
 
 // The ten cases of matter.js packages/thread-br-client/test/

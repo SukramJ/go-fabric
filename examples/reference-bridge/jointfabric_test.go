@@ -11,13 +11,13 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/jointfabric"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	jfdsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/cluster/jointfabric"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	jfdsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // The --jointfabric-sim administrator (jointfabric.go) after

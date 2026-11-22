@@ -6,8 +6,8 @@ package fabrictest
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/controller/ble/bletest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // BLE is the device's Bluetooth radio as a peripheral of the in-memory BLE

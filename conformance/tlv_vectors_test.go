@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/conformance"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/conformance"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestTLVCoreVectors pins the Matter TLV codec to a small set of

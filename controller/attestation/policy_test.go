@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/attestation"
 )
 
 // TestPolicyTable: matter.js #resolveAttestationFindings

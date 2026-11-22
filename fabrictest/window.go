@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // OpenWindow opens a basic commissioning window on the device with its own

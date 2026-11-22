@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/core"
 )
 
 // bindingStore is a stored Binding list.

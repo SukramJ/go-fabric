@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/parity"
 )
 
 // No build tag: TestCertifiabilityDocument holds the Go-TH leg's case set

@@ -18,10 +18,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tcldef "github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
-	"github.com/SukramJ/go-fabric/cluster/tls"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tcldef "thingfabric.dev/go-fabric/cluster/spec/tlsclientmanagement"
+	"thingfabric.dev/go-fabric/cluster/tls"
+	"thingfabric.dev/go-fabric/im"
 )
 
 const testMaxProvisioned = 10 // :42

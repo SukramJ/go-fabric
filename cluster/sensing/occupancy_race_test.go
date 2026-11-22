@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
 )
 
 // TestOccupancyHostReportBeatsAFiringHoldTimer: the hold timer firing and

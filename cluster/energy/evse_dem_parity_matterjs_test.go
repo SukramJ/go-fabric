@@ -6,13 +6,13 @@ package energy_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dem "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	evse "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestParityMatterJS_DeviceEnergyManagementServer builds every feature

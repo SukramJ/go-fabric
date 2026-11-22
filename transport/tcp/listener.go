@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // MatterPort is the IANA-registered Matter port (5540). The TCP

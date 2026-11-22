@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	channeldef "thingfabric.dev/go-fabric/cluster/spec/channel"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
 )
 
 // errTunerRefused is the refusal of cloneChannels.

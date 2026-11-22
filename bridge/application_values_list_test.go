@@ -7,10 +7,10 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	epmdef "thingfabric.dev/go-fabric/cluster/spec/electricalpowermeasurement"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestATypedPatchListIsStoredAsItsList: a list of a structure a typed

@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/icd/checkin"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/icd/checkin"
 )
 
 // ErrUnknownPeer reports a peer the table holds no registration of —

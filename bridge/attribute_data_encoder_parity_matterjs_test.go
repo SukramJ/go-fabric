@@ -10,8 +10,8 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestAttributeDataEncoderChunkArray ports "chunk array"

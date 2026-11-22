@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/SukramJ/go-fabric/internal/netwatch"
+	"thingfabric.dev/go-fabric/internal/netwatch"
 )
 
 // Following the host's interfaces. While services are published the

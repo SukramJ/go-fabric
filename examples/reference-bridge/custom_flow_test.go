@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 // flowFlags is a flags value checkFlags accepts, with --custom-flow v.

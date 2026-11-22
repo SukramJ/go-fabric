@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	dem "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
 )
 
 // TestDEMQuiesceStopsItsTimers holds contract.ClusterQuiescer for

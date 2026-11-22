@@ -6,8 +6,8 @@ package measurement_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestParity_ElectricalEnergyMeasurement_DataVersion_NonZero checks that

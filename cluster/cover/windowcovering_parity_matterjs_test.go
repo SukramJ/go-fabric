@@ -10,14 +10,14 @@ import (
 	"slices"
 	"testing"
 
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/cover"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	matterparity "thingfabric.dev/go-fabric/parity"
 )
 
 // matterClusterEntry is a minimal schema entry used by the parity tests.

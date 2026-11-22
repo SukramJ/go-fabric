@@ -7,9 +7,9 @@ import (
 	"context"
 	"math"
 
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // setColorMode is matter.js setColorMode (ColorControlServer.ts:1411-1420

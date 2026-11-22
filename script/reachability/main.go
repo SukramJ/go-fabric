@@ -137,7 +137,7 @@ import (
 // daemon's analyzer spelled its own module path out three times and two of them
 // went stale when the analyzed subtree moved, which silently narrowed the
 // population the tool measured.
-const modulePath = "github.com/SukramJ/go-fabric"
+const modulePath = "thingfabric.dev/go-fabric"
 
 // whitelistMarker is the comment prefix that marks an exported identifier as
 // reachable-by-inspection. See the package doc for its placement rule.

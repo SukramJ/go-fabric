@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	unitdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
 )
 
 // UnitLocalizationConfig carries the construction parameters of a

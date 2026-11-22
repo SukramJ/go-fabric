@@ -18,8 +18,8 @@ package node_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/internal/fabrictestseam"
 )
 
 // SessionIntervals.defaults (SessionIntervals.ts:45-49): idle 500 ms,

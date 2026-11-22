@@ -11,12 +11,12 @@ import (
 	"sort"
 	"testing"
 
-	matterbridge "github.com/SukramJ/go-fabric/bridge"
+	matterbridge "thingfabric.dev/go-fabric/bridge"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/parity"
 )
 
 // writerEncodes reports whether the bridge's attribute value writer

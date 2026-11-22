@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The refusals of a struct or command field's conformance. Each is

@@ -104,7 +104,7 @@ entries of `ble-virtual` and `ble/bluez`. C12 unchanged.
 
 ## Workflow run
 
-**https://github.com/SukramJ/go-fabric/actions/runs/39101585016 — success**
+**https://github.com/thingfabric/go-fabric/actions/runs/39101585016 — success**
 at 7b209e8 (rebased HEAD): "pass: pair --ble over hci0 commissioned the
 matter.js peripheral on hci1 with Wi-Fi credentials; read over the
 operational session; the control leg passed too"; window open ok.

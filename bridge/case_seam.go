@@ -8,7 +8,7 @@ package bridge
 // ([CaseAdapter.completeEstablishment]). It declares no exported identifier
 // on purpose — see the bridgeseam package doc.
 
-import "github.com/SukramJ/go-fabric/internal/bridgeseam"
+import "thingfabric.dev/go-fabric/internal/bridgeseam"
 
 func init() {
 	bridgeseam.SetCaseEstablishmentCompletion = func(adapter any, fn func(sessionID uint16, completed bool) bool) bool {

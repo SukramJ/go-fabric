@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/core"
 )
 
 // TestAccessControlGroupSubjectsAreGroupIDs pins the Group auth mode's

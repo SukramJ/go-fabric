@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	def "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	def "thingfabric.dev/go-fabric/cluster/spec/ambientcontextsensing"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestAmbientContextConfigRefusals: no detection feature (:52-54), a

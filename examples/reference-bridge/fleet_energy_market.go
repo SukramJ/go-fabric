@@ -10,15 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
-	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
-	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
-	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
-	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	commtr "thingfabric.dev/go-fabric/cluster/spec/commoditymetering"
+	cp "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	eemdef "thingfabric.dev/go-fabric/cluster/spec/electricalenergymeasurement"
+	egc "thingfabric.dev/go-fabric/cluster/spec/electricalgridconditions"
+	epmdef "thingfabric.dev/go-fabric/cluster/spec/electricalpowermeasurement"
+	ptdef "thingfabric.dev/go-fabric/cluster/spec/powertopology"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // The energy-market devices: an ElectricalEnergyTariff with CommodityPrice,

@@ -6,7 +6,7 @@ package exchange
 import (
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // MRP constants of the exchange layer.

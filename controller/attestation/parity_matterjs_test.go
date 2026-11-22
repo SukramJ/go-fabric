@@ -6,7 +6,7 @@ package attestation_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/attestation"
 )
 
 // TestParityChecks: the DeviceAttestationCheck values of matter.js

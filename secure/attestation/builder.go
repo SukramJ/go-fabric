@@ -14,8 +14,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/internal/attestids"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/internal/attestids"
 )
 
 // Matter Attestation Certificate Subject DN attributes

@@ -11,15 +11,15 @@ import (
 	"sync"
 	"time"
 
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/wire"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/transition"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/transition"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Transitions turns on the module's transition engine for a LevelControl

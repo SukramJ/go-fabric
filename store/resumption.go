@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // ResumptionRecord is a CASE resumption-id row (Matter §4.13.2.4).

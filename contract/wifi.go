@@ -15,7 +15,7 @@ import "context"
 // With [GATTPeripheral] it is one of the two radios a device-side host
 // supplies: a node commissioned over BLE joins its Wi-Fi network through
 // it. It is set as node.Network.WiFi's Driver; the module
-// github.com/SukramJ/go-fabric/wifi/wpasupplicant implements it over
+// thingfabric.dev/go-fabric/wifi/wpasupplicant implements it over
 // wpa_supplicant's D-Bus interface on Linux, and the reference daemon's
 // --wifi-sim implements it as a simulation.
 type WiFiDriver interface {
@@ -34,7 +34,7 @@ type WiFiDriver interface {
 // which network the radio is on. After a join that did not succeed the
 // cluster asks it, so the Networks attribute and the cluster's rejoin of
 // its committed network agree with the driver — a driver that puts the
-// radio back on the network it was on (github.com/SukramJ/go-fabric/
+// radio back on the network it was on (thingfabric.dev/go-fabric/
 // wifi/wpasupplicant) reports that network, and a working link is
 // neither read as disconnected nor joined again. Without it the cluster
 // reads the radio as on no network after a failed join.

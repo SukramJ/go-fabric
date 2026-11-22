@@ -8,7 +8,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestCommitAndRollbackErasePriors is R2-P2-dr-noc-06 for the in-memory

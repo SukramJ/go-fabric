@@ -27,10 +27,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestTimeFormatLocalizationServerParityMatterJS ports the describe

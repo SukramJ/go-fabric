@@ -6,11 +6,11 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	waterheatermanagementdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
-	waterheatermodedef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	waterheatermanagementdef "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
+	waterheatermodedef "thingfabric.dev/go-fabric/cluster/spec/waterheatermode"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // WaterHeater device type identity: 0x050F, revision 1.

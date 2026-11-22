@@ -24,7 +24,7 @@ import (
 	"errors"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // ─── TestFabricLookup ─────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@
 // ([Device.Act]); the wire helpers [Read], [Write], [Invoke] and
 // [Subscribe] follow the
 // `interaction` namespace of node-helpers.ts; and the site's default clock
-// is a [github.com/SukramJ/go-fabric/clock/clocktest.Fake], matter.js's
+// is a [thingfabric.dev/go-fabric/clock/clocktest.Fake], matter.js's
 // MockTime (packages/testing/src/mocks/time.ts).
 //
 // A test of a device mapping:
@@ -24,8 +24,8 @@
 //		Device: fabrictest.Topology{Bridged: []node.Endpoint{myPlug}},
 //	})
 //	ep, _ := pair.Device.EndpointOf("plug:1")
-//	// onoffdef is github.com/SukramJ/go-fabric/cluster/spec/onoff, client
-//	// github.com/SukramJ/go-fabric/controller/client
+//	// onoffdef is thingfabric.dev/go-fabric/cluster/spec/onoff, client
+//	// thingfabric.dev/go-fabric/controller/client
 //	res, err := fabrictest.Invoke(ctx, pair, client.CommandAt(ep, onoffdef.ClusterID, onoffdef.CmdToggle), nil)
 //
 // What runs:

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/fan"
+	"thingfabric.dev/go-fabric/cluster/fan"
 )
 
 // TestVetoHearsAChangeOnly (R2-P5-apispec-02): a write of every writable

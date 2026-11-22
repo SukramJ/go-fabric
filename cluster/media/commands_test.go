@@ -9,13 +9,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
-	logindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
-	observerdef "github.com/SukramJ/go-fabric/cluster/spec/contentappobserver"
-	keypaddef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
-	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/media"
+	logindef "thingfabric.dev/go-fabric/cluster/spec/accountlogin"
+	observerdef "thingfabric.dev/go-fabric/cluster/spec/contentappobserver"
+	keypaddef "thingfabric.dev/go-fabric/cluster/spec/keypadinput"
+	lowpowerdef "thingfabric.dev/go-fabric/cluster/spec/lowpower"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/im"
 )
 
 type keypad struct {

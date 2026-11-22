@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // The reboot armer's timings (RebootResubscribeArmer.ts:18-30).

@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 
-	modeselectdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
+	modeselectdef "thingfabric.dev/go-fabric/cluster/spec/modeselect"
 )
 
 // TestDefaultServerCommandsUnimplementedUntilHandled: the generated

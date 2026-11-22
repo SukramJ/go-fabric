@@ -14,17 +14,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
-	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	groupcastdef "github.com/SukramJ/go-fabric/cluster/spec/groupcast"
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acldef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
+	descdef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	groupcastdef "thingfabric.dev/go-fabric/cluster/spec/groupcast"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // epochStartTime0 is the key set's EpochStartTime0, the value of

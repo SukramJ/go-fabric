@@ -8,10 +8,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tbrm "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	"thingfabric.dev/go-fabric/cluster/threadbr"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The rules of ThreadBorderRouterManagementCluster.cpp at 6170af84 chip's

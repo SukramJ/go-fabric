@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // parseTCPFlag resolves the --tcp flag the way matter.js resolves its

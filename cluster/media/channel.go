@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	channeldef "thingfabric.dev/go-fabric/cluster/spec/channel"
 )
 
 // ChannelState is the Channel attribute state (channel.element.ts:30-41),

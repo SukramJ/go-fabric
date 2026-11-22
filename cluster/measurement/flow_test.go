@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // flowSrc is a FloatMeasurementSource for the flow tests.

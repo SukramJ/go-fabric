@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestBuiltinMeasurementKindsAnswerUnchanged pins the answer every

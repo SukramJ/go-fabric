@@ -6,7 +6,7 @@ package deepcopy_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/deepcopy"
+	"thingfabric.dev/go-fabric/internal/deepcopy"
 )
 
 type entry struct{ b []byte }

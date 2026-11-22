@@ -8,11 +8,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	closuredef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	cd "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestClosureControlEventsAndHandlerAfterTheHooks (decision 154): with

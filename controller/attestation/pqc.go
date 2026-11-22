@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/internal/forward"
+	"thingfabric.dev/go-fabric/internal/forward"
 )
 
 // PQC Phase 1 of the attestation certificates: a PAA and a PAI may carry

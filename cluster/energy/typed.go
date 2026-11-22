@@ -8,10 +8,10 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cp "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	egc "thingfabric.dev/go-fabric/cluster/spec/electricalgridconditions"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The typed server's optional interfaces of the self-held CommodityPrice

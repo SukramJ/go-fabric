@@ -6,9 +6,9 @@ package node
 import (
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/diag"
-	"github.com/SukramJ/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/diag"
+	"thingfabric.dev/go-fabric/secure/operational"
 )
 
 // SetupPayload is the node's configured commissioning secret with the

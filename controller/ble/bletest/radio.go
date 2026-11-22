@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/ble"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // ErrNoService is a Connect to a [Radio] that serves no Matter GATT

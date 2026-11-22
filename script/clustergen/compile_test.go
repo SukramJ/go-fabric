@@ -36,8 +36,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/tlv"
 %s)
 
 func TestMatterJSFixtures(t *testing.T) {
@@ -151,7 +151,7 @@ func TestEveryClusterGeneratesAndCompiles(t *testing.T) {
 			t.Errorf("%s has no %s: %v", e.Name(), file, err)
 		}
 	}
-	goMod := fmt.Sprintf("module gentest\n\ngo 1.27.2\n\nrequire github.com/SukramJ/go-fabric v0.0.0\n\nreplace github.com/SukramJ/go-fabric => %s\n", root)
+	goMod := fmt.Sprintf("module gentest\n\ngo 1.27.2\n\nrequire thingfabric.dev/go-fabric v0.0.0\n\nreplace thingfabric.dev/go-fabric => %s\n", root)
 	sum, err := os.ReadFile(filepath.Join(root, "go.sum"))
 	if err != nil {
 		t.Fatal(err)

@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // The CHIP test PAAs and their ledger records (DclCertificateServiceTest.ts:28-89).

@@ -7,7 +7,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // fabricsOf returns the distinct fabric indices of entries, ascending: a

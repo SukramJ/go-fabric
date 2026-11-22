@@ -9,7 +9,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The copies below keep the store and its callers apart: what goes in is

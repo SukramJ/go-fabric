@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	tnddef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/thread/otbr"
-	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tbrmdef "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	tnddef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/cluster/threadbr"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/thread/otbr"
+	"thingfabric.dev/go-fabric/thread/otbr/otbrtest"
 )
 
 func fakeBorderRouter(t *testing.T) *otbr.BorderRouter {

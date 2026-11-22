@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // Mode is the device's logical idle/active mode — distinct from the ICD

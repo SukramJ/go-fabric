@@ -35,10 +35,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	swdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // device is a MockEndpoint carrying one Switch server.

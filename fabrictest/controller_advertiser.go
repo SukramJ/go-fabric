@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // controllerAdvertiser records what a controller built on

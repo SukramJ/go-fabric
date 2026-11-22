@@ -6,11 +6,11 @@
 package device
 
 import (
-	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	refrigeratoralarmdef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
-	refrigeratorandtemperaturecontrolledcabinetmodedef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
-	"github.com/SukramJ/go-fabric/schema"
+	activatedcarbonfiltermonitoringdef "thingfabric.dev/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	refrigeratoralarmdef "thingfabric.dev/go-fabric/cluster/spec/refrigeratoralarm"
+	refrigeratorandtemperaturecontrolledcabinetmodedef "thingfabric.dev/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Refrigerator device type identity: 0x0070, revision 3.

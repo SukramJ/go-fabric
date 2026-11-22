@@ -206,6 +206,53 @@ func unannounced(changes []change, text string) []change {
 	return missing
 }
 
+// splitMoves separates the changes that only move the module path from
+// the rest. Across a move (github.com/SukramJ/go-fabric → thingfabric.dev/
+// go-fabric, v0.25.0) every signature that names a type of the module
+// changes its type identity; apidiff reports each as "changed from A to
+// B". Such a change is a move when B is A with every oldRoot replaced by
+// newRoot: no other part of the signature moved. One CHANGELOG line that
+// names the new module path announces all of them; every other change is
+// checked symbol by symbol as before.
+func splitMoves(changes []change, oldRoot, newRoot string) (rest, moves []change) {
+	for _, c := range changes {
+		if moved(c.Line, oldRoot, newRoot) {
+			moves = append(moves, c)
+		} else {
+			rest = append(rest, c)
+		}
+	}
+	return rest, moves
+}
+
+// moved reports whether line ("subject: changed from A to B") changes
+// only oldRoot to newRoot, or prints A and B alike (a type of the
+// symbol's own package, unqualified). A and B are split at each " to " in turn, since
+// a signature may itself contain one.
+func moved(line, oldRoot, newRoot string) bool {
+	if oldRoot == newRoot {
+		return false
+	}
+	_, msg, ok := strings.Cut(line, ": changed from ")
+	if !ok {
+		return false
+	}
+	for i := 0; ; {
+		j := strings.Index(msg[i:], " to ")
+		if j < 0 {
+			return false
+		}
+		from, to := msg[:i+j], msg[i+j+len(" to "):]
+		// A type of the changed symbol's own package prints unqualified,
+		// so its move reads "changed from *T to *T": the same text, only
+		// the package path behind it differs.
+		if from == to || strings.Contains(from, oldRoot) && strings.ReplaceAll(from, oldRoot, newRoot) == to {
+			return true
+		}
+		i += j + 1
+	}
+}
+
 // word matches name as a word of its own.
 func word(name string) *regexp.Regexp {
 	return regexp.MustCompile(`(^|[^\w])` + regexp.QuoteMeta(name) + `($|[^\w])`)

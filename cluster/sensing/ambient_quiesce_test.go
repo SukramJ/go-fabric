@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	def "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	def "thingfabric.dev/go-fabric/cluster/spec/ambientcontextsensing"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestAmbientContextMatterQuiesce: the bridge's MatterQuiesce cancels the

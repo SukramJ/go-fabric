@@ -6,8 +6,8 @@ package measurement_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestPowerServersListNoEvent (review II, R2-P4-nw-05): PowerSource and

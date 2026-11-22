@@ -8,11 +8,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
-	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	fixedlabeldef "thingfabric.dev/go-fabric/cluster/spec/fixedlabel"
+	powersourcedef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // baseOptionalServers are the server clusters the Base device type allows

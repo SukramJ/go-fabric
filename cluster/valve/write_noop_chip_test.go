@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/cluster/valve"
 )
 
 // TestDefaultOpenDurationUnchangedIsNoOp: a write of the current

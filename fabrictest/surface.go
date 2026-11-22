@@ -4,8 +4,8 @@
 package fabrictest
 
 import (
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The wire helpers' vocabulary, owned here (ADR 0025 principle 3). The

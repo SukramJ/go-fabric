@@ -6,9 +6,9 @@ package controller
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/peer"
 )
 
 // ArmerObserver is the reboot armer's test seam (armerObserver, ota.go).

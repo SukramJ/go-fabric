@@ -15,13 +15,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/ble"
-	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/controller/ble/bletest"
+	"thingfabric.dev/go-fabric/transport/btp"
 
-	"github.com/SukramJ/go-fabric/ble/esphome"
-	"github.com/SukramJ/go-fabric/ble/esphome/esphometest"
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome"
+	"thingfabric.dev/go-fabric/ble/esphome/esphometest"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 var testKey = base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32))

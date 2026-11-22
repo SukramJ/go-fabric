@@ -13,7 +13,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // Verifier validates a NOC chain against a fabric root.

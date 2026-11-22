@@ -8,8 +8,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // SessionIntervals are the MRP intervals the node reports in the PASE and

@@ -6,12 +6,12 @@ package device
 import (
 	"testing"
 
-	acdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	gcdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	gddef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	otardef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	"github.com/SukramJ/go-fabric/contract"
+	acdef "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	bidef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	gcdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	gddef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	otardef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The root clusters no generated

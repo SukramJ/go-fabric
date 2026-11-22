@@ -11,9 +11,9 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestNewCAKey: with Config.CAKey the fabric's root of trust is the

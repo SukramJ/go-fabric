@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Test support for device type validation: fake facts over a tree of

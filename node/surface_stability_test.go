@@ -14,15 +14,15 @@ import (
 	"sync"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	closurecontroldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/surface"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	closurecontroldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // The settings the surface announcement reads and writes: the persisted

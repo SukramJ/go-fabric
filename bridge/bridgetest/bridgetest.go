@@ -16,7 +16,7 @@
 // reach the bridge through a module-internal seam.
 //
 // For a device built with node.New,
-// [github.com/SukramJ/go-fabric/fabrictest] runs the device and the
+// [thingfabric.dev/go-fabric/fabrictest] runs the device and the
 // module's controller in process on an in-memory network and a fake
 // clock, commissioned with a Site's CommissionedPair. Commissioner stays
 // the controller for a bridge a host builds itself (bridge.New) and for a
@@ -24,7 +24,7 @@
 //
 // The scaffolding a test also needs to CONSTRUCT a bridge — the in-memory
 // endpoint store and the empty-fleet snapshotter — lives one level down in
-// [github.com/SukramJ/go-fabric/endpoint/endpointtest], because it refers to
+// [thingfabric.dev/go-fabric/endpoint/endpointtest], because it refers to
 // no bridge and so stays importable from the bridge's own white-box tests.
 package bridgetest
 
@@ -33,9 +33,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/internal/bridgeseam"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/internal/bridgeseam"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // Errors reported by this package.

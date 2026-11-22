@@ -6,7 +6,7 @@ package thread_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // Attached is the completion an activation waits for: an attached role,

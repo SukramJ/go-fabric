@@ -19,13 +19,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	netcomm "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // netValue is an attribute value of the scripted network device.

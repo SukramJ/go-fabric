@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // releasedPort binds addr itself, at once, and closes it again: the proof

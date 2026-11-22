@@ -3,11 +3,11 @@
 
 package exchange
 
-import "github.com/SukramJ/go-fabric/clock"
+import "thingfabric.dev/go-fabric/clock"
 
 // Clock is the time source of a [Manager]: the current time and timers.
 // The default is the system clock; a test supplies its own
-// ([github.com/SukramJ/go-fabric/clock/clocktest.Fake]) to step the
+// ([thingfabric.dev/go-fabric/clock/clocktest.Fake]) to step the
 // retransmission and acknowledgement timers deterministically.
 //
 // Clock is the module's one time port, [clock.Clock]; the alias keeps

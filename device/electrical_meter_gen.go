@@ -6,10 +6,10 @@
 package device
 
 import (
-	commoditymeteringdef "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
-	electricalenergymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
-	electricalpowermeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	commoditymeteringdef "thingfabric.dev/go-fabric/cluster/spec/commoditymetering"
+	electricalenergymeasurementdef "thingfabric.dev/go-fabric/cluster/spec/electricalenergymeasurement"
+	electricalpowermeasurementdef "thingfabric.dev/go-fabric/cluster/spec/electricalpowermeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ElectricalMeter device type identity: 0x0514, revision 1.

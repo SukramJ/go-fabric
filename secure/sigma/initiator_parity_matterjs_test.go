@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/secure/aesccm"
 )
 
 // Byte parity for the initiator's half of CASE, against the wire captures in

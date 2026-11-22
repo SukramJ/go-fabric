@@ -7,9 +7,9 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/dcl/snapshot"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/dcl/snapshot"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // OpenDB opens the SQLite database file at path for [Config].DB with the

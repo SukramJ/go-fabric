@@ -3,7 +3,7 @@
 
 package wire
 
-import "github.com/SukramJ/go-fabric/tlv"
+import "thingfabric.dev/go-fabric/tlv"
 
 // FieldlessEvent is the payload of a cluster event that declares no
 // fields — SmokeCoAlarm HardwareFault / EndOfService / SelfTestComplete /

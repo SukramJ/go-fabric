@@ -42,8 +42,8 @@ func TestNestedReleaseCheckUnreachableProxyIsExitTwo(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write("go.mod", "module github.com/SukramJ/go-fabric\n\ngo 1.21\n")
-	write("nested/go.mod", "module github.com/SukramJ/go-fabric/nested\n\ngo 1.21\n\nrequire github.com/SukramJ/go-fabric v0.0.1\n")
+	write("go.mod", "module thingfabric.dev/go-fabric\n\ngo 1.21\n")
+	write("nested/go.mod", "module thingfabric.dev/go-fabric/nested\n\ngo 1.21\n\nrequire thingfabric.dev/go-fabric v0.0.1\n")
 	write("nested/nested.go", "package nested\n")
 	git := func(args ...string) {
 		t.Helper()
@@ -149,13 +149,13 @@ func runNestedReleaseCheck(t *testing.T, repo string, args ...string) (code int,
 // beside it. Nothing is required from the module proxy, so the check runs
 // offline.
 var siblingReleaseFixture = map[string]string{
-	"go.mod":     "module github.com/SukramJ/go-fabric\n\ngo 1.21\n",
-	"lib/go.mod": "module github.com/SukramJ/go-fabric/lib\n\ngo 1.21\n",
+	"go.mod":     "module thingfabric.dev/go-fabric\n\ngo 1.21\n",
+	"lib/go.mod": "module thingfabric.dev/go-fabric/lib\n\ngo 1.21\n",
 	"lib/lib.go": "package lib\n\n// Answer is what the example uses.\nconst Answer = 42\n",
-	"example/go.mod": "module github.com/SukramJ/go-fabric/example\n\ngo 1.21\n\n" +
-		"require github.com/SukramJ/go-fabric/lib v0.0.2\n\n" +
-		"replace github.com/SukramJ/go-fabric/lib => ../lib\n",
-	"example/main.go": "package main\n\nimport \"github.com/SukramJ/go-fabric/lib\"\n\nfunc main() { println(lib.Answer) }\n",
+	"example/go.mod": "module thingfabric.dev/go-fabric/example\n\ngo 1.21\n\n" +
+		"require thingfabric.dev/go-fabric/lib v0.0.2\n\n" +
+		"replace thingfabric.dev/go-fabric/lib => ../lib\n",
+	"example/main.go": "package main\n\nimport \"thingfabric.dev/go-fabric/lib\"\n\nfunc main() { println(lib.Answer) }\n",
 }
 
 // TestNestedReleaseCheckSiblingReleasedBySameChange: a require of a sibling

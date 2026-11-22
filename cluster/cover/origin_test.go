@@ -6,10 +6,10 @@ package cover_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/cover"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestWindowCoveringWriteOrigins is the controller-write row of the

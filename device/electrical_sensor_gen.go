@@ -6,10 +6,10 @@
 package device
 
 import (
-	electricalenergymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
-	electricalpowermeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
-	powertopologydef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
-	"github.com/SukramJ/go-fabric/schema"
+	electricalenergymeasurementdef "thingfabric.dev/go-fabric/cluster/spec/electricalenergymeasurement"
+	electricalpowermeasurementdef "thingfabric.dev/go-fabric/cluster/spec/electricalpowermeasurement"
+	powertopologydef "thingfabric.dev/go-fabric/cluster/spec/powertopology"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ElectricalSensor device type identity: 0x0510, revision 1.

@@ -6,7 +6,7 @@ package lock_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/lock"
+	"thingfabric.dev/go-fabric/cluster/lock"
 )
 
 // notifyingLock is the test source with a change notifier.

@@ -13,8 +13,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 type sessionManagerConn struct{}

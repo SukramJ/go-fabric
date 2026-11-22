@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/controller/ca"
 )
 
 // TestCompressedFabricIDHkdfParityMatterJS mirrors

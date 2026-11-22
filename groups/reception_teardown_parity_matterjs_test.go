@@ -16,7 +16,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func (s *memStore) removeKeySet(idx uint8, id uint16) {

@@ -8,8 +8,8 @@ import (
 	"math"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
 )
 
 // The scripted provider: a test harness has the controller's OTA provider

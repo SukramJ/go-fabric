@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // pausingACLPort is the node's store with one ListACL that, once armed,

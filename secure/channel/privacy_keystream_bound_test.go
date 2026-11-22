@@ -6,7 +6,7 @@ package channel_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/channel"
 )
 
 // TestPrivacyKeystreamRefusesALengthItsCounterCannotCover holds

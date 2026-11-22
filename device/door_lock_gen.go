@@ -6,9 +6,9 @@
 package device
 
 import (
-	doorlockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	doorlockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // DoorLock device type identity: 0x000A, revision 4.
