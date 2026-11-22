@@ -334,3 +334,31 @@ func TestCASEResumeGiveUpClosesByEntryOnly(t *testing.T) {
 		}
 	})
 }
+
+// TestCASEResumeWaitOutlivesStop: a resumed session still waiting for the
+// initiator's Success when the bridge stops is failed by its deadline —
+// the host's completion hook runs (and with it the release of the host's
+// resumption claim, P6-D): Stop does not touch the wait's timer.
+func TestCASEResumeWaitOutlivesStop(t *testing.T) {
+	t.Parallel()
+	rr, sigma1 := newResumeRig(t, false)
+	rec := &completions{}
+	setResumeCompletion(t, rr, false, rec)
+	if err := rr.p.send(mrp.SCOpcodeSigma1, 0x0400, sigma1, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, counter, _ := rr.p.recv(mrp.SCOpcodeSigma2Resume, "Sigma2_Resume")
+	if err := rr.p.send(mrp.StandaloneAckOpcode, 0x0400, nil, &counter); err != nil {
+		t.Fatal(err)
+	}
+	if err := rr.r.b.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec.snapshot(); len(got) != 0 {
+		t.Fatalf("completions %+v at Stop, want none yet", got)
+	}
+	rr.clk.Advance(rr.r.b.caseSigma3Wait(false))
+	if got := rec.snapshot(); len(got) != 1 || got[0].sessionID != 0x2001 || got[0].completed {
+		t.Fatalf("completions %+v after the deadline, want session 0x2001 failed", got)
+	}
+}
