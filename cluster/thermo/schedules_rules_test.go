@@ -14,6 +14,8 @@ package thermo_test
 import (
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
+
 	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/im"
@@ -102,4 +104,39 @@ func TestScheduleWriteRules(t *testing.T) {
 		wantAtomic(t, p.atomic(t, p.pair, commitWrite, presetsAttribute), tdef.StatusFailure,
 			[]tdef.AtomicResponseAttributeStatusEntry{{AttributeId: presetsAttribute, StatusCode: tdef.StatusInvalidInState}}, nil)
 	})
+}
+
+// TestScheduleStagedAsWritten holds the staged Schedules to the value as
+// written: matter.js keeps a written value pending unchanged
+// (AtomicWriteHandler.ts:272 at b25ed960), checks it "not normalized"
+// (ThermostatServer.ts:3004-3007) and resolves a null BuiltIn only when
+// it stores the value (#normalizeSchedules, :3041-3047); the holder's
+// read of its pending list returns the staged value (the schedules
+// getter, :3249-3261).
+func TestScheduleStagedAsWritten(t *testing.T) {
+	builtIn := []byte{1}
+	nullBuiltIn := func(sc *thermo.Schedule) { sc.BuiltIn = spec.NullOf[bool]() }
+	p := schedulesThermostatPair(t, schedulesConfig(5, []thermo.Schedule{
+		newSchedule(scHandle(builtIn), scBuiltIn(true)),
+	}))
+	p.atomic(t, p.pair, beginWrite, schedulesAttribute)
+	statusesAre(t, p.writeSchedulesUnchecked(t, p.pair, []thermo.Schedule{
+		newSchedule(scHandle(builtIn), nullBuiltIn),
+		newSchedule(nullBuiltIn),
+	}), im.StatusSuccess, im.StatusSuccess, im.StatusSuccess)
+
+	// The holder reads its pending list as written: BuiltIn null.
+	pending := p.readSchedules(t, p.pair)
+	if len(pending) != 2 || !pending[0].BuiltIn.Null || !pending[1].BuiltIn.Null {
+		t.Fatalf("pending schedules %+v, want both with BuiltIn null", pending)
+	}
+
+	// The commit resolves it: the stored schedule's BuiltIn, false for a
+	// new one.
+	wantAtomic(t, p.atomic(t, p.pair, commitWrite, schedulesAttribute), tdef.StatusSuccess,
+		[]tdef.AtomicResponseAttributeStatusEntry{{AttributeId: schedulesAttribute, StatusCode: tdef.StatusSuccess}}, nil)
+	stored := p.srv.Schedules()
+	if len(stored) != 2 || stored[0].BuiltIn.Null || !stored[0].BuiltIn.Value || stored[1].BuiltIn.Null || stored[1].BuiltIn.Value {
+		t.Errorf("stored schedules %+v, want BuiltIn true then false", stored)
+	}
 }
