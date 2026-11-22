@@ -215,7 +215,14 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// commissioning channel's implicit Administer serves no request on it
 	// ([Bridge.refuseOnClosingPASE]). A duplicate passes: its ack is sent
 	// below.
+	//
+	// The message is a handler turn on its session from here on, counted
+	// before the closing-session check: a revoke that marks the session
+	// after the check finds the turn and defers, rather than closing the
+	// session under a message it then handles.
 	if !duplicate {
+		turn := b.enterSessionTurn(hdr.SessionID)
+		defer b.exitSessionTurn(hdr.SessionID, turn)
 		if err := b.refuseNewMessage(src, &hdr, proto); err != nil {
 			return err
 		}
@@ -262,13 +269,6 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 			slog.Uint64("counter", uint64(hdr.MessageCounter)))
 		return nil
 	}
-
-	// A non-duplicate message of a secure session is a handler turn on it
-	// until its handling returned: a revoked PASE session does not close
-	// under it, and its end may let one close
-	// ([Bridge.closePASESessionsOnRevoke]).
-	b.enterSessionTurn(hdr.SessionID)
-	defer b.exitSessionTurn(hdr.SessionID)
 
 	// Inbound piggyback ACK: clear the reliable outbound message of this
 	// exchange whose MessageCounter matches AckCounter (Matter §4.12.3) —

@@ -539,6 +539,7 @@ func (b *Bridge) SessionClosed(sessionID uint16) {
 	// A revoked PASE session that closed another way than its deferred
 	// close ([Bridge.closePASESessionsOnRevoke]) has nothing left to close.
 	b.dropPASEClose(sessionID)
+	b.forgetSessionTurns(sessionID)
 	b.purgeSessionState(sessionID)
 	b.unbindSessionRoute(sessionID)
 	b.recordSessionsOpen()
