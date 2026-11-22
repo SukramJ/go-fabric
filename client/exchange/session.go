@@ -696,8 +696,8 @@ func (s *Session) completeEstablishment() bool {
 // eviction it sets off, so whoever onEstablished hands the session to
 // holds it before any effect of the establishment is observable —
 // "established ⇒ adopted" (F-b25ed960-44). matter.js's established event
-// adds the session to the established set, whose added observers adopt it
-// into its peer synchronously, and queues the eviction
+// adds the session to the established set, whose added observer adopts it
+// into its peer, and queues the eviction
 // (packages/protocol/src/session/NodeSession.ts:241-251,
 // packages/protocol/src/session/SessionManager.ts:764-768, :1266-1284,
 // packages/protocol/src/peer/PeerSet.ts:104 at b25ed960).

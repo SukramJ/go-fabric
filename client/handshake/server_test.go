@@ -470,7 +470,7 @@ func TestCASEServerHoldsAtMostFiveSessionsPerPeer(t *testing.T) {
 // session — runs, for a resumed and a full handshake alike: no effect of
 // the establishment is observable while the peer does not hold the
 // session yet. matter.js adopts the session on the established set's
-// added event, synchronously, and queues the eviction
+// added event and queues the eviction
 // (packages/protocol/src/session/SessionManager.ts:764-768, :1266-1284,
 // packages/protocol/src/peer/PeerSet.ts:104 at b25ed960).
 func TestCASEServerHandsTheSessionOverAsItIsEstablished(t *testing.T) {
