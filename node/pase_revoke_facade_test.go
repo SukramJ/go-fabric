@@ -47,19 +47,13 @@ func TestRevokeClosesTheFacadePASESessionWithCloseSession(t *testing.T) {
 		t.Fatalf("PASE sessions after the revoke = %d, want 0", got)
 	}
 	// The commissioner learns it from the CloseSession: its session is
-	// closed, and a call on it fails with ErrSessionClosed instead of
-	// running into its timeout as after a silent close.
+	// closed, so a call on it fails with ErrSessionClosed — at once, or as
+	// soon as the CloseSession arrives — and never answers after a silent
+	// close, which leaves the call to its deadline.
 	basic := im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x0028, Attribute: 0x0000, HasEndpoint: true, HasCluster: true, HasAttribute: true}
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		rctx, rcancel := context.WithTimeout(ctx, 300*time.Millisecond)
-		_, err := s.Read(rctx, basic)
-		rcancel()
-		if errors.Is(err, bridgetest.ErrSessionClosed) {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("the commissioner's PASE session is not closed by a CloseSession: last Read error %v", err)
-		}
+	rctx, rcancel := context.WithTimeout(ctx, 10*time.Second)
+	defer rcancel()
+	if _, err := s.Read(rctx, basic); !errors.Is(err, bridgetest.ErrSessionClosed) {
+		t.Fatalf("Read on the commissioner's PASE session after the revoke: %v, want %v (closed by a CloseSession)", err, bridgetest.ErrSessionClosed)
 	}
 }

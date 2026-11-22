@@ -215,7 +215,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 721,
+    "line": 722,
     "citation": "NodeSession.ts:319-328",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",

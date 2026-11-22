@@ -69,7 +69,7 @@ func newDeferredRevokeRig(t *testing.T) *deferredRevokeRig {
 func (r *deferredRevokeRig) revokeOverPASE(t *testing.T, tracked bool) {
 	t.Helper()
 	b := r.dev.br
-	b.enterSessionTurn(r.sid)
+	turn := b.enterSessionTurn(r.sid)
 	after := &im.AfterResponse{}
 	ctx := im.WithAfterResponse(im.WithAuthModePASE(core.WithInvokeSessionID(context.Background(), r.sid)), after)
 	if err := r.w.RevokeWindow(ctx); err != nil {
@@ -79,7 +79,7 @@ func (r *deferredRevokeRig) revokeOverPASE(t *testing.T, tracked bool) {
 		r.trackResponse(t)
 	}
 	after.Run()
-	b.exitSessionTurn(r.sid)
+	b.exitSessionTurn(r.sid, turn)
 }
 
 // trackResponse puts a message of this node on the PASE session's
@@ -380,4 +380,28 @@ func TestStopEndsDeferredPASECloses(t *testing.T) {
 			t.Fatal("the deferral's cap timer is still armed after Stop")
 		}
 	}
+}
+
+// TestRevokeLeavesAForceClosingPASESessionAlone: a PASE session whose force
+// close waits for an interaction's response (the fail-safe's rollback or
+// CommissioningComplete named it) is closing; a revoke in between does not
+// mark it for a graceful close of its own, as matter.js's initiateClose
+// returns on a closing session
+// (packages/protocol/src/session/Session.ts:305-307 at b25ed960).
+func TestRevokeLeavesAForceClosingPASESessionAlone(t *testing.T) {
+	t.Parallel()
+	r := newDeferredRevokeRig(t)
+	b := r.dev.br
+	closeNow, ids := b.paseSessionsCloser()
+	if closeNow == nil || len(ids) != 1 || ids[0] != r.sid {
+		t.Fatalf("force close named %v, want [%d]", ids, r.sid)
+	}
+	if got := b.markPASECloses([]uint16{r.sid}); len(got) != 0 {
+		t.Fatalf("the revoke marked %v, a session already force-closing", got)
+	}
+	if b.paseCloseDeferred(r.sid) || b.paseDeferredN.Load() != 0 {
+		t.Fatal("a deferred close was recorded for a force-closing session")
+	}
+	closeNow()
+	assertPASEClosed(t, r.dev.sessions, r.sid)
 }

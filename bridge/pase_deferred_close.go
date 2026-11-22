@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/clock"
@@ -88,9 +89,9 @@ func (b *Bridge) closePASESessionsOnRevoke(ctx context.Context) {
 			if invoking != 0 && id != invoking {
 				continue
 			}
-			b.enterSessionTurn(id)
-			if !im.DeferAfterResponse(ctx, func() { b.exitSessionTurn(id) }) {
-				b.exitSessionTurn(id)
+			turn := b.enterSessionTurn(id)
+			if !im.DeferAfterResponse(ctx, func() { b.exitSessionTurn(id, turn) }) {
+				b.exitSessionTurn(id, turn)
 			}
 		}
 	}
@@ -122,7 +123,10 @@ func (b *Bridge) markPASECloses(ids []uint16) []uint16 {
 	}
 	marked := ids[:0:0]
 	for _, id := range ids {
-		if _, taken := b.paseDeferred[id]; taken {
+		// paseClosing holds every deferred id and every id a force close
+		// waits to close (the fail-safe's rollback, CommissioningComplete):
+		// a closing session is not closed again (Session.ts:305-307 at b25ed960).
+		if _, closing := b.paseClosing[id]; closing {
 			continue
 		}
 		b.paseClosing[id] = struct{}{}
@@ -176,10 +180,7 @@ func (b *Bridge) paseCloseDeferred(sessionID uint16) bool {
 // write sweeps it, and a message dropped from the retransmit table
 // outside a turn of the session (an Untrack after a failed send).
 func (b *Bridge) paseSessionActive(sessionID uint16) (active bool, timedUntil time.Time) {
-	b.sessionTurnsMu.Lock()
-	turns := b.sessionTurns[sessionID]
-	b.sessionTurnsMu.Unlock()
-	if turns > 0 {
+	if b.sessionTurnsOf(sessionID) > 0 {
 		return true, time.Time{}
 	}
 	b.mu.RLock()
@@ -260,8 +261,7 @@ func (b *Bridge) finishPASEClose(sessionID uint16, reason string) {
 		return
 	}
 	b.logger.Info("matter.session.pase_close",
-		slog.String("reason", "revoke"),
-		slog.String("when", reason),
+		slog.String("reason", "revoke_"+reason),
 		slog.Int("session_id", int(sessionID)))
 	b.notifySessionsClosing([]uint16{sessionID})
 	b.mu.RLock()
@@ -289,36 +289,48 @@ func (b *Bridge) dropPASEClose(sessionID uint16) {
 
 // enterSessionTurn counts a handler turn on the secure session sessionID:
 // a message of it in dispatch, or an interaction whose response is not
-// out yet. [Bridge.exitSessionTurn] ends it.
-func (b *Bridge) enterSessionTurn(sessionID uint16) {
+// out yet. It returns the counter the turn was counted on, which
+// [Bridge.exitSessionTurn] ends it on — a session id taken again by a
+// later session gets a counter of its own. nil for session 0. One atomic
+// add on the common path; the per-session counter is created once.
+func (b *Bridge) enterSessionTurn(sessionID uint16) *atomic.Int32 {
 	if sessionID == 0 {
-		return
+		return nil
 	}
-	b.sessionTurnsMu.Lock()
-	if b.sessionTurns == nil {
-		b.sessionTurns = make(map[uint16]int)
+	v, ok := b.sessionTurns.Load(sessionID)
+	if !ok {
+		v, _ = b.sessionTurns.LoadOrStore(sessionID, new(atomic.Int32))
 	}
-	b.sessionTurns[sessionID]++
-	b.sessionTurnsMu.Unlock()
+	turn, _ := v.(*atomic.Int32)
+	turn.Add(1)
+	return turn
 }
 
-// exitSessionTurn ends a turn [Bridge.enterSessionTurn] counted, and runs a
-// deferred PASE close the session's last turn held.
-func (b *Bridge) exitSessionTurn(sessionID uint16) {
-	if sessionID == 0 {
+// exitSessionTurn ends a turn [Bridge.enterSessionTurn] counted on turn,
+// and runs a deferred PASE close the session's last turn held.
+func (b *Bridge) exitSessionTurn(sessionID uint16, turn *atomic.Int32) {
+	if turn == nil {
 		return
 	}
-	b.sessionTurnsMu.Lock()
-	n := b.sessionTurns[sessionID] - 1
-	if n <= 0 {
-		delete(b.sessionTurns, sessionID)
-	} else {
-		b.sessionTurns[sessionID] = n
-	}
-	b.sessionTurnsMu.Unlock()
-	if n <= 0 {
+	if turn.Add(-1) <= 0 {
 		b.recheckPASEClose(sessionID)
 	}
+}
+
+// sessionTurnsOf is the number of handler turns running on sessionID.
+func (b *Bridge) sessionTurnsOf(sessionID uint16) int32 {
+	v, ok := b.sessionTurns.Load(sessionID)
+	if !ok {
+		return 0
+	}
+	turn, _ := v.(*atomic.Int32)
+	return turn.Load()
+}
+
+// forgetSessionTurns drops sessionID's turn counter: the session closed.
+// A turn still running on it ends on the counter it holds.
+func (b *Bridge) forgetSessionTurns(sessionID uint16) {
+	b.sessionTurns.Delete(sessionID)
 }
 
 // errNewExchangeOnClosingSession is what the receive path returns for a

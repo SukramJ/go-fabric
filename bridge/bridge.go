@@ -781,9 +781,9 @@ type Bridge struct {
 	paseDeferred  map[uint16]*paseDeferredClose
 	paseDeferredN atomic.Int32
 	// sessionTurns counts the handler turns running per secure session
-	// ([Bridge.enterSessionTurn]). Guarded by sessionTurnsMu.
-	sessionTurnsMu sync.Mutex
-	sessionTurns   map[uint16]int
+	// ([Bridge.enterSessionTurn]): session id → *atomic.Int32, the entry
+	// dropped when the session closes ([Bridge.SessionClosed]).
+	sessionTurns sync.Map
 	// advertiserClosed: [Bridge.Stop] withdrew the advertiser's records and
 	// closed it ([Bridge.closeAdvertiser]); a second Stop does not again.
 	// Guarded by b.mu.
