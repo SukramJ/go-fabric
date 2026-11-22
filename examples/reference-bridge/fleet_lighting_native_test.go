@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // nativeDimmer is a dimmable light whose lamp ramps by itself — a dimmer

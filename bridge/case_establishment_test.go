@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // completions records what the bridge told a CASE adapter's host about the

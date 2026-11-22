@@ -7,9 +7,9 @@ import (
 	"context"
 	"log/slog"
 
-	colorcontroldef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/device"
+	colorcontroldef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // extendedColorFeatures are the ColorControl features of the extended

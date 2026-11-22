@@ -7,7 +7,7 @@ package device
 
 import (
 	"fmt"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // FloodlightCamera device type identity: 0x0144, revision 1.

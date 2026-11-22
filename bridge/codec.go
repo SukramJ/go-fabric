@@ -3,7 +3,7 @@
 
 package bridge
 
-import "github.com/SukramJ/go-fabric/im"
+import "thingfabric.dev/go-fabric/im"
 
 // Codec is the bridge's Interaction Model codec of the endpoint tree it
 // serves: how a command's fields and a written value are read off the wire

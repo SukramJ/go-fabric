@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	mtrid "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	whmgdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
-	whmdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
-	"github.com/SukramJ/go-fabric/device"
+	mtrid "thingfabric.dev/go-fabric/cluster/spec/meteridentification"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	whmgdef "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
+	whmdef "thingfabric.dev/go-fabric/cluster/spec/waterheatermode"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // --- device: a water heater ------------------------------------------------

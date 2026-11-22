@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // silentConn is a DNS-SD socket on which nothing answers.

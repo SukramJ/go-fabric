@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // TestCommittedSnapshot: the committed surface parses, the digest the

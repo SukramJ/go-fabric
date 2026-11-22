@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // TestAttestationConfig: an empty flag keeps the test chain, a directory

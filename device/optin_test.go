@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 const (

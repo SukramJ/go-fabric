@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // AttestationFiles names a vendor attestation chain on disk

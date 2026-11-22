@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // qrPrefix opens every QR onboarding payload. Mirrors matter.js

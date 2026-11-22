@@ -10,12 +10,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/filter"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/filter"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 type host struct {

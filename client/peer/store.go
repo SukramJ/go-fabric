@@ -7,7 +7,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/handshake"
 )
 
 // Store keeps peer descriptors across restarts. A peer saves its

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd"
 )
 
 var scheduleT0 = time.Date(2026, 1, 1, 0, 0, 1, 0, time.UTC)

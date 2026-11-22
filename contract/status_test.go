@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestStatusErrorText: the text names the status, the cluster status when

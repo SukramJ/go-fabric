@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"thingfabric.dev/go-fabric/bridge/bridgetest"
 )
 
 // TestSubscriptionPersistence reads the switch and the former

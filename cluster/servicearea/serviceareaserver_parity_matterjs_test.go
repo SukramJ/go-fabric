@@ -32,15 +32,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/servicearea"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	rvcrundef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
-	sadef "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
-	devicelayer "github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/servicearea"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	rvcopdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	rvcrundef "thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
+	sadef "thingfabric.dev/go-fabric/cluster/spec/servicearea"
+	devicelayer "thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // Common Area Namespace tags (packages/node/src/tags/CommonAreaNamespaceTag.ts

@@ -27,7 +27,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/secure/aesccm"
 )
 
 // The payload's fixed lengths (CheckInMessage.ts:10-13).

@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The wire helpers: a test speaks to a commissioned pair's device over the

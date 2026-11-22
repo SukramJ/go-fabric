@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // OTAUpdateAttempt is one update flow of a requestor: a QueryImage, the

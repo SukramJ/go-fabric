@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // FuzzDecode feeds every BDX message type arbitrary payloads: the decoder

@@ -6,8 +6,8 @@ package node
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // camerasOnline is what Start does for the camera surface: the requestor's

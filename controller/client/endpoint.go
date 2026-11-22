@@ -9,7 +9,7 @@ import (
 	"slices"
 	"sync"
 
-	fabricdevice "github.com/SukramJ/go-fabric/device"
+	fabricdevice "thingfabric.dev/go-fabric/device"
 )
 
 // UnknownDeviceType is the device type of an endpoint whose Descriptor has

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // TestBackgroundCallbacksOutliveClose (review II, R2-P6-conc-2305): the

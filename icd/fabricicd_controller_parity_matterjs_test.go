@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/icd/checkin"
-	"github.com/SukramJ/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd/checkin"
+	"thingfabric.dev/go-fabric/secure/aesccm"
 )
 
 func encodeICD(t *testing.T, key []byte, counter uint32, threshold uint16) []byte {

@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	icddef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestICDTimingsBeyondTheirTypeAreAbsent (review II, R2-P6-bound-2352): a

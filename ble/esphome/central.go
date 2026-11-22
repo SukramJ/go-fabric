@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/controller/ble"
 )
 
 // The central's defaults.

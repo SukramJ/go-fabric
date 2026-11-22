@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestGrantRewritesThePairsFabricOnly (R2-P6-test-2514): a device that

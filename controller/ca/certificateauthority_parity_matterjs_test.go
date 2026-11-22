@@ -23,9 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 func newCA(t *testing.T, cfg ca.Config) *ca.CA {

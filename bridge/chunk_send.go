@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // chunkLeg is how one interaction's chunks go out and how the wait for

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	soildef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
+	soildef "thingfabric.dev/go-fabric/cluster/spec/soilmeasurement"
 )
 
 // reentrantSoil is a source that reads its server from inside its own

@@ -8,15 +8,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/light"
-	"github.com/SukramJ/go-fabric/cluster/lock"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/light"
+	"thingfabric.dev/go-fabric/cluster/lock"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // movingLevelPort is a LevelControl port whose CurrentLevel the device

@@ -60,10 +60,10 @@ import (
 	"slices"
 	"syscall"
 
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
 )
 
 func main() {
@@ -222,7 +222,7 @@ Defaults worth knowing:
 | --- | --- |
 | `Network.Listen` | `:5540` |
 | `Advertiser` | the node's own `mdns.Responder` (`mdns.NewResponder`); `Network.MDNS.Off` makes it `mdns.NewNoop()`, and nothing can discover the node |
-| `Network.MDNS` | the mDNS responder, SRV target from the interface's MAC (on macOS the OS host name instead when mDNSResponder serves it for this host, otherwise the MAC-derived name as everywhere — [`by_design.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/by_design.md) L7-D03), every record 120 s, announced on matter.js's broadcast schedule (1 s doubling to 90 s, until a CASE connection or two days); `Off` publishes nothing, `HostName` sets an SRV target whose address records the OS responder publishes, `Interfaces` restricts it to the named host interfaces (the container filter still applies) |
+| `Network.MDNS` | the mDNS responder, SRV target from the interface's MAC (on macOS the OS host name instead when mDNSResponder serves it for this host, otherwise the MAC-derived name as everywhere — [`by_design.md`](https://github.com/thingfabric/go-fabric/blob/main/notes/parity/by_design.md) L7-D03), every record 120 s, announced on matter.js's broadcast schedule (1 s doubling to 90 s, until a CASE connection or two days); `Off` publishes nothing, `HostName` sets an SRV target whose address records the OS responder publishes, `Interfaces` restricts it to the named host interfaces (the container filter still applies) |
 | `Store.Path` | unused; set, the node opens that SQLite file (modernc.org/sqlite, foreign keys on, 5 s busy timeout) and `Stop` closes it |
 | `Attestation.Files` | unused; set, `New` loads the vendor chain and fails when it does not load (files naming nothing keep the test chain); with `BlockCommissioningOnError` it runs on the test chain instead, commissioning refused, the error in `Node.AttestationError` |
 | `Health` | nil runs no probe; set, it runs from `Start` to `Stop` every `Interval` (0 is 30 s), `Node.OnHealthSample` receives every verdict, `Node.Health` returns the last one |
@@ -344,7 +344,7 @@ A device starts reachable; `Device.SetReachable(ctx, ok)` reports a change.
 
 Declarations passed after `Options` change what the device serves. A
 cluster is declared with `<cluster>def.Declare` of its generated package
-(`github.com/SukramJ/go-fabric/cluster/spec/<cluster>`, imported as
+(`thingfabric.dev/go-fabric/cluster/spec/<cluster>`, imported as
 `<cluster>def`), the one form for everything about it:
 
 | `Declare` field | Effect |
@@ -367,7 +367,7 @@ assembler's. A sensor's measurement cluster is declared the same way —
 it through the accessor's `Set`. Which clusters each device type mandates,
 with the features and attribute constraints it requires, is listed in the
 [device-type reference](../reference/device-types.md); `go doc
-github.com/SukramJ/go-fabric/device` lists every typed cluster package.
+thingfabric.dev/go-fabric/device` lists every typed cluster package.
 
 The device's other options:
 
@@ -406,7 +406,7 @@ calls:
   naming Success answers FAILURE.
 - **Device to controller.** When the lamp is switched at the wall, call
   `light.OnOff().Set(onoffdef.Patch{OnOff: new(on)})` (`onoffdef` is
-  `github.com/SukramJ/go-fabric/cluster/spec/onoff`). The value is stored
+  `thingfabric.dev/go-fabric/cluster/spec/onoff`). The value is stored
   and reported to subscribers, and the sink is not called. An attribute
   Matter marks quieter — LevelControl's `CurrentLevel`, ColorControl's
   current colour — is reported at most once a second with its latest
@@ -556,7 +556,7 @@ has no UTC: suggestions answer INVALID_IN_STATE, and `Aggregator.Add` and
 cluster, as connectedhomeip's valve refuses TimeSync without the cluster.
 Other device-side timestamps (event EpochTimestamp, ResourceMonitoring's
 LastChangedTime, DiagnosticLogs, the energy servers) still read the host
-clock ([issue 445](https://github.com/SukramJ/go-fabric/issues/445)).
+clock ([issue 445](https://github.com/thingfabric/go-fabric/issues/445)).
 
 ## Persistence
 

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Attribute ids (thermostat-cluster.element.ts).

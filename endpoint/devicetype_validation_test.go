@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Device type validation against the snapshot's model: one test per kind

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // PASE wire-format helpers per Matter Core Spec §4.13.5.

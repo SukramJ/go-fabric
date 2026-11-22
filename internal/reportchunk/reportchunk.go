@@ -24,8 +24,8 @@ package reportchunk
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // List is a list attribute value carried as the TLV encodings of its

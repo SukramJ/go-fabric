@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // --wifi-sim (TESTING ONLY): the root's NetworkCommissioning gets the

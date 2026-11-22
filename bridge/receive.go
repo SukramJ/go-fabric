@@ -13,16 +13,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/tlv"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/cluster/core"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // Errors surfaced by the receive pipeline. They are not returned to

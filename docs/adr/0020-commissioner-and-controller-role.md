@@ -6,7 +6,7 @@
   once more, as BX4 was: `client/interaction` serves requests to the
   controller's own endpoints, and `endpoint` lists a bare endpoint; both
   are role-neutral changes below the roles.
-  [`../concept-v2-scope-extension.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-v2-scope-extension.md)
+  [`../concept-v2-scope-extension.md`](https://github.com/thingfabric/go-fabric/blob/main/docs/history/concept-v2-scope-extension.md)
   decision 0.1, phase 7). The non-goal it supersedes is retired; phase 7
   starts with stage 1.
   Note (2026-11-18, review II, R2-P6-doc-3086): decision 4 ("On-network only")
@@ -20,7 +20,7 @@
   [ADR 0018 — device layer and node facade](./0018-device-layer-and-node-facade.md),
   [ADR 0019 — TCP, BDX and the OTA requestor](./0019-tcp-bdx-and-the-ota-requestor.md),
   [`../matterjs-comparison.md`](../matterjs-comparison.md) §1–§3 and §Non-goals,
-  concept v1 [`../concept-matter-1.6.1-and-device-layer.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-matter-1.6.1-and-device-layer.md) §F.1,
+  concept v1 [`../concept-matter-1.6.1-and-device-layer.md`](https://github.com/thingfabric/go-fabric/blob/main/docs/history/concept-matter-1.6.1-and-device-layer.md) §F.1,
   `notes/parity/by_design.md` `BD-Matter-GroupcastNoSender`,
   `BD-Matter-Commissioner-TestCA` (the test commissioner's fixed issuing instant)
 

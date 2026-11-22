@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/bridge/bridgetest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestFailedAddNOCIsNotReportedAsRemoved (review II, rework2): an AddNOC

@@ -6,12 +6,12 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	rvccleanmodedef "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
-	rvcoperationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	rvcrunmodedef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
-	serviceareadef "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	rvccleanmodedef "thingfabric.dev/go-fabric/cluster/spec/rvccleanmode"
+	rvcoperationalstatedef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	rvcrunmodedef "thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
+	serviceareadef "thingfabric.dev/go-fabric/cluster/spec/servicearea"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // RoboticVacuumCleaner device type identity: 0x0074, revision 4.

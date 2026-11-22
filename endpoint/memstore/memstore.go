@@ -28,7 +28,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // The bounds of sqlitestore: a stored number lies in [1, 65534]; fresh

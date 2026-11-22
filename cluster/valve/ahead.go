@@ -3,7 +3,7 @@
 
 package valve
 
-import "github.com/SukramJ/go-fabric/surface"
+import "thingfabric.dev/go-fabric/surface"
 
 // Ahead declares the ValveConfigurationAndControl server's elements that
 // implement rows of the "Ahead of matter.js" register

@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/thread/brdiscovery"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	threaddiagdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/thread/brdiscovery"
 )
 
 // fakeMember is a node with a fixed image; read runs onRead.

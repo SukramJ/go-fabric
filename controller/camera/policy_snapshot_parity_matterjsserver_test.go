@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // The cases of matterjs-server's

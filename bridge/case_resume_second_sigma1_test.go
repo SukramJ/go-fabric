@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/secure/aesccm"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/tlv"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // resumingSigma1 is a Sigma1 resuming from the record (secret, rid) with a

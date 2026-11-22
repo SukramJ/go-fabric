@@ -13,7 +13,7 @@
 // bridge decodes the cluster's request payloads.
 package pm1concentrationmeasurement
 
-import "github.com/SukramJ/go-fabric/cluster/spec"
+import "thingfabric.dev/go-fabric/cluster/spec"
 
 // Cluster identity.
 const (

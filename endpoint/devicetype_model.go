@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Model lookups of device type validation: what every validation reads of

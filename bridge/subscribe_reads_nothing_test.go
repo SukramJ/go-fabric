@@ -19,10 +19,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // readsNothingSubject is the CASE subject of the subscriptions below.

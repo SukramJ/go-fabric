@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // timedSweepInterval bounds how often the expiry sweep walks

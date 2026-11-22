@@ -7,11 +7,11 @@ import (
 	"math"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/internal/valuejson"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	descdef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/internal/valuejson"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 func node(t *testing.T, put func(e *tlv.Encoder)) spec.Node {

@@ -6,8 +6,8 @@ package node
 import (
 	"slices"
 
-	"github.com/SukramJ/go-fabric/internal/netwatch"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/internal/netwatch"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // netwatchDefaultInterval is the interface check interval of a zero

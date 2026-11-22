@@ -19,13 +19,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/clock"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // Stable keys of the two bridged devices.

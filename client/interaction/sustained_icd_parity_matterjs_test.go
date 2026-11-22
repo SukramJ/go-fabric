@@ -27,11 +27,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	clientpeer "github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/exchange"
+	clientpeer "thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // litTimings are SustainedSubscriptionTest.ts:46-50.

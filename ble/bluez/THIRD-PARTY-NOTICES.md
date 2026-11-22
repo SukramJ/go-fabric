@@ -1,8 +1,8 @@
 # Third-Party Notices — `ble/bluez`
 
-`github.com/SukramJ/go-fabric/ble/bluez` is licensed under the Apache License
+`thingfabric.dev/go-fabric/ble/bluez` is licensed under the Apache License
 2.0 (see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE)). It requires the main
-module `github.com/SukramJ/go-fabric`, whose own
+module `thingfabric.dev/go-fabric`, whose own
 [`THIRD-PARTY-NOTICES.md`](../../THIRD-PARTY-NOTICES.md) covers everything that
 module links. This file records only what this module adds to a build.
 

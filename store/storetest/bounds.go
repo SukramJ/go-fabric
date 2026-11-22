@@ -9,7 +9,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // resumptionCap is the port's per-fabric cap on resumption records

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/channel"
 )
 
 // newPrivacyTestConfig returns a Config with EncryptKey != DecryptKey

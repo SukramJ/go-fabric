@@ -3,7 +3,7 @@
 
 package bridge
 
-import "github.com/SukramJ/go-fabric/internal/facadeseam"
+import "thingfabric.dev/go-fabric/internal/facadeseam"
 
 func init() {
 	facadeseam.SetTransitionHook = func(window any, fn func()) bool {

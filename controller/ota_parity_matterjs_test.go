@@ -14,13 +14,13 @@ import (
 	"testing"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	otaprov "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	otareq "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/softwareupdate"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	otaprov "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	otareq "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // The SoftwareUpdateManager cases of matter.js's OtaTest

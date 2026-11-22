@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // HandForm carries a request a hand-written reader decoded into its

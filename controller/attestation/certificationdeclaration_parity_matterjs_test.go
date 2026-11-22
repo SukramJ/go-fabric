@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // The Appendix F test values of CertificationDeclarationTest.ts:16-17.

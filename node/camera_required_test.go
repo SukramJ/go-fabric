@@ -3,7 +3,7 @@
 
 package node_test
 
-import csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+import csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 
 // cameraRequired is the CameraAvStreamManagement state device.New requires
 // of a Camera (decision 17), with the values of matter.js's corpus

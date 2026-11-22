@@ -7,12 +7,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/endpoint"
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/endpoint"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // The store-error rule for the endpoint state (review II, D-store-4,

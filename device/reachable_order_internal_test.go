@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/internal/deviceseam"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/internal/deviceseam"
 )
 
 // slowReachableHost holds the notification of an unreachable device until

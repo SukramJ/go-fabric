@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	boolstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
-	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	pscdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	"github.com/SukramJ/go-fabric/schema"
+	boolstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	fixedlabeldef "thingfabric.dev/go-fabric/cluster/spec/fixedlabel"
+	powersourcedef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	pscdef "thingfabric.dev/go-fabric/cluster/spec/powersourceconfiguration"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestBaseOptionalServers: the Base device type's plain optional server

@@ -13,15 +13,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/clock"
-	generaldiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/thread/brdiscovery"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/clock"
+	generaldiagdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	threaddiagdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	wifidiagdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkdiagnostics"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/thread/brdiscovery"
 )
 
 // The defaults of [Config] — matterjs-server's at 0bd06f22

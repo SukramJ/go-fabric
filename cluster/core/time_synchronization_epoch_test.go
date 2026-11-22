@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/core"
+	tsdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
 )
 
 // TestMatterEpochSeconds holds the server's MatterEpochSeconds to the

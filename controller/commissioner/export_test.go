@@ -7,12 +7,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // NOCUpdateSeam is what the operational certificate update reaches the

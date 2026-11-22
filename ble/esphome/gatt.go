@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/controller/ble"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/transport/btp"
 
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 // The bounds of the GATT operations. aioesphomeapi waits DEFAULT_BLE_TIMEOUT

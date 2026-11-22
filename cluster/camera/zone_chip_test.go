@@ -21,10 +21,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	zmdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The fixture's limits (:31-35).

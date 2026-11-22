@@ -20,12 +20,12 @@ package core_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // configVersionDevice is a fabrictest device serving bridged OnOffLights

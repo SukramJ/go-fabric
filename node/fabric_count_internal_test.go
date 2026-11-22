@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // listCountingStore counts the fabric listings of the store under it.

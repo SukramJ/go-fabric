@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 const groupsTestFabricID uint64 = 0x1122334455667788 // GroupsTest.ts:15

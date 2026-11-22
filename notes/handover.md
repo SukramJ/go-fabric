@@ -89,7 +89,7 @@ commit, and the fix-up commits the fixture runs forced:
 | next | fixtures of run 38159192091: SU/2.2 passes (7 steps), golden entry and the generated block of `docs/certifiability.md` |
 
 **State at 19:40:** fixture run
-[38159192091](https://github.com/SukramJ/go-fabric/actions/runs/38159192091)
+[38159192091](https://github.com/thingfabric/go-fabric/actions/runs/38159192091)
 (families IDM, SU, `update_fixtures=true`, on `089ee12`) is green for every
 case; its golden adds SU/2.2 (1 test, 7 steps, 0 skipped), PICS unchanged.
 The PR run on `089ee12` (38159200594 / 38159200739) failed only on the
@@ -203,7 +203,7 @@ Still open after it:
   design and the job budget is 3 h 40 min. Only one dispatch at a time; a run
   with SU takes about 45 minutes (SU/2.2 alone up to 40).
 - **Logs of a running job are unreadable;** completed ones via
-  `gh api --allow-escape-sequences repos/SukramJ/go-fabric/actions/jobs/<id>/logs`.
+  `gh api --allow-escape-sequences repos/thingfabric/go-fabric/actions/jobs/<id>/logs`.
 - **chip sources at the harness pin**, not at the local checkout:
   `git -C ../connectedhomeip show 6170af8461b10b1766044122ac83332c6d00ab20:<path>`;
   cite the pin's line numbers. The local checkout may sit elsewhere.

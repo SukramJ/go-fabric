@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	logindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	logindef "thingfabric.dev/go-fabric/cluster/spec/accountlogin"
 )
 
 // AccountLogin is the AccountLogin host port (the generated

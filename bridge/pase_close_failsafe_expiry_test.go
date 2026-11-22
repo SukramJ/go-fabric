@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/tlv"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // failSafeRig is a bridge a host wired without the node facade: the root's

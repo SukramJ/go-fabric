@@ -15,13 +15,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/client/sqlstore"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // openClientStore is the SQLite client store on a temporary file, opened

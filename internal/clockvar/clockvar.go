@@ -10,7 +10,7 @@ package clockvar
 import (
 	"sync/atomic"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // Var is a clock.Clock slot; the zero value reads [clock.System].

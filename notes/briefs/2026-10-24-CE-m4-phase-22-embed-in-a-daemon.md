@@ -46,7 +46,7 @@ end on the kit". One Zendure energy store becomes one bridged endpoint
 a Matter controller (Apple Home, Home Assistant) shows with its charge
 level and its power.
 
-- **1.1 Dependency and config.** `go get github.com/SukramJ/go-fabric@v0.10.8`
+- **1.1 Dependency and config.** `go get thingfabric.dev/go-fabric@v0.10.8`
   (the daemon's dependency rules: read its `THIRD-PARTY-NOTICES`/licence
   handling and follow it — go-fabric is Apache-2.0; its transitive
   dependencies are the six of go-fabric's `go.mod`). Config block in

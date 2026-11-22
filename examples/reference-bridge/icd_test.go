@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestICDLITFlag: with --icd-lit the node is a LIT-capable ICD that starts

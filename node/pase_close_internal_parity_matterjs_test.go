@@ -7,10 +7,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // The file keeps its name — the closed-findings register cites it — though

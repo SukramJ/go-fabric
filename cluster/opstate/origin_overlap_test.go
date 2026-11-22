@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // overlapHost answers Stop at once and holds Pause until release; each

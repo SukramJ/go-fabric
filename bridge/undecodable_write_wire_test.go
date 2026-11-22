@@ -6,10 +6,10 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestUndecodableWriteEndsTheInteractionWithFailure (owner decision 161,

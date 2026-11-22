@@ -7,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	swdiagdef "github.com/SukramJ/go-fabric/cluster/spec/softwarediagnostics"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	swdiagdef "thingfabric.dev/go-fabric/cluster/spec/softwarediagnostics"
 )
 
 // HeapReporter is the host port for SoftwareDiagnostics' heap attributes,

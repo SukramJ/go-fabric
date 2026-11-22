@@ -14,9 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/peer"
 )
 
 // Node is the image of one remote node — matter.js ClientNode

@@ -6,10 +6,10 @@
 package device
 
 import (
-	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	operationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	"github.com/SukramJ/go-fabric/schema"
+	flowmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/flowmeasurement"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	operationalstatedef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // IrrigationSystem device type identity: 0x0040, revision 1.

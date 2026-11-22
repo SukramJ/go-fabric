@@ -4,8 +4,8 @@
 package bridge
 
 import (
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im/subscription"
 )
 
 // metricsPort holds the attached [contract.Metrics]; the bridge keeps it

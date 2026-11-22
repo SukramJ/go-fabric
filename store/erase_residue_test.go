@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestStoreEraseLeavesNoResidue: after Erase the erased secret's bytes are

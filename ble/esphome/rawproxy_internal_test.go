@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/controller/ble"
 
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 // rawProxy is a scripted plaintext ESPHome API peer for the package's own

@@ -14,16 +14,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	otadef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 func testOtaImage(t *testing.T, vendor, product uint16, version uint32) []byte {

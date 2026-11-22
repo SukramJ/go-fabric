@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // slowReannouncer is an advertiser whose re-announce blocks until its

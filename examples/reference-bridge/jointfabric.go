@@ -14,11 +14,11 @@ import (
 	"log/slog"
 	"sync"
 
-	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	jfdsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/surface"
+	jfadef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	jfdsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // --jointfabric-sim (TESTING ONLY): a JointFabricAdministrator endpoint

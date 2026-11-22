@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/diagevent"
 )
 
 // TestTraceEscapesControlCharacters (review II, R2-P6-sec-2311): a string

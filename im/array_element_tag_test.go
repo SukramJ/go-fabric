@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // tagFirstElement gives the first element of the array at context tag

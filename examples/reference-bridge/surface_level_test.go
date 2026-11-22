@@ -15,11 +15,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/script/levelgen/leveltable"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/script/levelgen/leveltable"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // levelDump is the daemon's --dump-surface report at level ("" = no

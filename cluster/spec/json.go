@@ -17,7 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The JSON codec turns a value of a generated definition into a [Node] and

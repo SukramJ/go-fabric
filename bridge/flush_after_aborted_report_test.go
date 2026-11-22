@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // doneSpyContext reports the first call of Done: the flush calls it only

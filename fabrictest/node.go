@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // Discover finds the commissionable devices id selects on the site's

@@ -9,9 +9,9 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
-	opcreds "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/client/jcm"
+	opcreds "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // errCommissionerInfo is a commissioner whose administrator data does not

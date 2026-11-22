@@ -21,11 +21,11 @@ import (
 	"context"
 	"testing"
 
-	core "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/contract"
-	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	core "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/contract"
+	endpointpkg "thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // aclStoreFake backs both the AccessControl cluster server's

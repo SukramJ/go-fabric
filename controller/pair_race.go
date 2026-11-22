@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller/ble"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/commissioner"
 )
 
 // The sub-steps of "Discovery" 2.1 a Pair over both transports reports,

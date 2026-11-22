@@ -6,10 +6,10 @@ package endpoint
 import (
 	"slices"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/schema"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // bindingClusterID is the Binding cluster (binding.element.ts, 0x001E).

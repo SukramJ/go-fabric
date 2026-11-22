@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	gocontroller "github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/client/discovery"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/cluster/spec/onoff"
+	gocontroller "thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 // The device-side DD cases: matter.js's TC-DD-3.18, 3.20 and 3.21 have its

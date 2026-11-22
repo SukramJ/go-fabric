@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // plainSubject is a DeviceTypeSubject over plain data — what a client view

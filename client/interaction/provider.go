@@ -9,9 +9,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Path floors of the base exchange provider: the CapabilityMinima

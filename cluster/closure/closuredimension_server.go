@@ -11,12 +11,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cd "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ClosureDimension (0x0105) is built on its generated definition

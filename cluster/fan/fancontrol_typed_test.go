@@ -8,12 +8,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/fan"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/fan"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestTypedFanServer drives fan.Server through its typed server: Get reads

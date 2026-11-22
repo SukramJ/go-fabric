@@ -13,7 +13,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // Issue 507: a Thread node's operational instance is answered, for a

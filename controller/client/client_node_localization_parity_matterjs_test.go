@@ -17,16 +17,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	bscdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
-	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/client/interaction"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	bscdef "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
+	unitdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestClientNodeTemperatureUnitWithoutSupportedListParity ports the

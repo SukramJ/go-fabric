@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // countingAdvertiser counts the node's on-demand re-announcements.

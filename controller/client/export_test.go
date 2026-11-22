@@ -7,11 +7,11 @@ import (
 	"context"
 	"net/netip"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ConnectionStateFor exposes the connection-state decision to the tests.

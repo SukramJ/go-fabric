@@ -184,7 +184,7 @@ way would fail the CSA case — a certifiability fact, not a harness limit.
 
 ### 4.1 Required checks against the workflow jobs
 
-`gh api repos/SukramJ/go-fabric/branches/main/protection --jq '.required_status_checks'`
+`gh api repos/thingfabric/go-fabric/branches/main/protection --jq '.required_status_checks'`
 → `strict: true`, 19 contexts (all `app_id 15368`): build · vet ·
 test (linux, race) · lint · coverage floor · reachability · bench (smoke) ·
 codeql (go) · chip-tool commissions the reference daemon · chip
@@ -192,7 +192,7 @@ certification cases against the reference daemon · chip-tool control leg
 (CHIP app, no go-fabric) · build (32-bit) · apidiff · testparity ·
 matter.js citations · chip data model cross-check · ble/bluez ·
 ble/esphome · chip-tool commissions over BLE onto Wi-Fi (chip's mocks).
-`gh api repos/SukramJ/go-fabric/rulesets` → `[]`.
+`gh api repos/thingfabric/go-fabric/rulesets` → `[]`.
 
 Jobs a pull request triggers (job `name:` read from each file):
 

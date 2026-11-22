@@ -11,8 +11,8 @@ package surfacetest
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/internal/surfaceseam"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/internal/surfaceseam"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // Match selects elements by endpoint, cluster and id. A zero field matches

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/core"
 )
 
 // rollbackInFlight expires gc's fail-safe through a session closer that

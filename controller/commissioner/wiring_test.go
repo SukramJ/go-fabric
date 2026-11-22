@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // loopbackManager is a manager serving a loopback socket.

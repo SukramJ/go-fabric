@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // defaultWindowTimeout is the window "window open" opens without

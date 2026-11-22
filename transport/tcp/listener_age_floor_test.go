@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 )
 
 // TestListenerSparesAFreshConnectionFromReclaim holds R2-P6-bound-0203: a

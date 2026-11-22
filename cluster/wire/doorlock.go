@@ -6,7 +6,7 @@ package wire
 import (
 	"errors"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // DoorLockClusterID is the Matter DoorLock cluster identifier (0x0101).

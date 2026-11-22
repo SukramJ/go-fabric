@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // handlerReturning is an error handler that replaces the delay with d.

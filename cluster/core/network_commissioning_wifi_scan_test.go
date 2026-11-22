@@ -8,9 +8,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // crowdedScanDriver answers a scan with n access points; the i-th has

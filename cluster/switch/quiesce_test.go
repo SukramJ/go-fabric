@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 )
 
 // TestMatterQuiesceStopsTheTimers: MatterQuiesce, which the bridge calls

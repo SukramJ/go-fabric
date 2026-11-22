@@ -10,7 +10,7 @@ carry the reasoning behind each choice; this page is the map.
 | | Device / bridge side | Commissioner / controller side |
 | --- | --- | --- |
 | What it is | a Matter **node**: commissioned by a controller, serves clusters | a Matter **administrator**: discovers, commissions and drives other nodes |
-| Entry point | [`node`](https://github.com/SukramJ/go-fabric/tree/main/node) (facade) or [`bridge`](https://github.com/SukramJ/go-fabric/tree/main/bridge) (composition root) | [`controller/...`](https://github.com/SukramJ/go-fabric/tree/main/controller), driven by e.g. [`examples/reference-controller`](https://github.com/SukramJ/go-fabric/tree/main/examples/reference-controller) |
+| Entry point | [`node`](https://github.com/thingfabric/go-fabric/tree/main/node) (facade) or [`bridge`](https://github.com/thingfabric/go-fabric/tree/main/bridge) (composition root) | [`controller/...`](https://github.com/thingfabric/go-fabric/tree/main/controller), driven by e.g. [`examples/reference-controller`](https://github.com/thingfabric/go-fabric/tree/main/examples/reference-controller) |
 | Typical host | a home-automation gateway that exposes its devices to Apple Home, Google Home, Alexa | a controller daemon, a test harness, a gateway that also pairs devices |
 | Decision | the original scope | [ADR 0020](adr/0020-commissioner-and-controller-role.md) |
 
@@ -23,7 +23,7 @@ small client stack of its own (`node.Config.Client`).
 **Rich model, dumb bridge.** The module owns the Matter wire format and
 nothing about devices. Which data point becomes which attribute, which
 product maps to which device type, lives in the host behind the port
-contracts in [`contract`](https://github.com/SukramJ/go-fabric/tree/main/contract). `contract` imports the standard
+contracts in [`contract`](https://github.com/thingfabric/go-fabric/tree/main/contract). `contract` imports the standard
 library only, so a host's types never leak into the module and the module's
 release cadence never leaks into the host.
 
@@ -33,7 +33,7 @@ the host hands it a topology through a `Snapshotter` callback. Every
 collaborator beyond its constructor arguments arrives through an
 `Attach…`/`Set…` call, and an unattached port is a no-op — a half-wired
 bridge still answers, wrongly. The package doc of
-[`bridge/bridge.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/bridge.go) lists every port in call order,
+[`bridge/bridge.go`](https://github.com/thingfabric/go-fabric/blob/main/bridge/bridge.go) lists every port in call order,
 with what skipping it costs. `node` does that wiring for you from one
 `node.Config`: the root endpoint, the Aggregator, persistence,
 commissioning windows, OTA, the client stack. Start with `node`; drop to
@@ -57,7 +57,7 @@ Handshakes branch off before `im`: PASE (`secure/spake2`) while a
 commissioning window is open, CASE (`secure/sigma`) for operational
 sessions, both into the session registry (`secure/operational`).
 Reports flow the other way through the subscription engine
-([`im/subscription`](https://github.com/SukramJ/go-fabric/tree/main/im/subscription)).
+([`im/subscription`](https://github.com/thingfabric/go-fabric/tree/main/im/subscription)).
 
 ## The controller-side stack
 
@@ -84,17 +84,17 @@ They lived under `controller/` before v0.10.0; the old import paths
 forwarded to them until v0.12.0, which removed them.
 
 The order of `openStack` in
-[`examples/reference-controller/cli/stack.go`](https://github.com/SukramJ/go-fabric/blob/main/examples/reference-controller/cli/stack.go)
+[`examples/reference-controller/cli/stack.go`](https://github.com/thingfabric/go-fabric/blob/main/examples/reference-controller/cli/stack.go)
 is the canonical construction order.
 
 ## Where the data model comes from
 
-- [`parity/schema.json`](https://github.com/SukramJ/go-fabric/blob/main/parity/schema.json): the matter.js element
+- [`parity/schema.json`](https://github.com/thingfabric/go-fabric/blob/main/parity/schema.json): the matter.js element
   model, extracted at a pinned commit and embedded.
-- [`schema`](https://github.com/SukramJ/go-fabric/tree/main/schema), [`cluster/spec`](https://github.com/SukramJ/go-fabric/tree/main/cluster/spec),
-  [`device`](https://github.com/SukramJ/go-fabric/tree/main/device): generated from it — lookups, every cluster
+- [`schema`](https://github.com/thingfabric/go-fabric/tree/main/schema), [`cluster/spec`](https://github.com/thingfabric/go-fabric/tree/main/cluster/spec),
+  [`device`](https://github.com/thingfabric/go-fabric/tree/main/device): generated from it — lookups, every cluster
   definition, every device type. Never hand-edited.
-- [`cluster`](https://github.com/SukramJ/go-fabric/tree/main/cluster): the servers, hand-written where a cluster has
+- [`cluster`](https://github.com/thingfabric/go-fabric/tree/main/cluster): the servers, hand-written where a cluster has
   behaviour, the generated standard server otherwise
   ([ADR 0013](adr/0013-generated-cluster-definitions.md),
   [ADR 0017](adr/0017-generated-default-cluster-server.md)).
@@ -106,7 +106,7 @@ mechanical and guarded by tests that fail on drift.
 
 What a controller sees of a node — per endpoint its device types and per
 server cluster its revision, FeatureMap, AttributeList, AcceptedCommandList,
-GeneratedCommandList and events — is a value: [`surface`](https://github.com/SukramJ/go-fabric/tree/main/surface)'s
+GeneratedCommandList and events — is a value: [`surface`](https://github.com/thingfabric/go-fabric/tree/main/surface)'s
 `Surface`, canonically ordered, hashable and diffable. The device layer
 decides it before it builds a server: it lists the candidate elements with
 their provenance (device type, cluster conformance, host declaration), the
@@ -130,7 +130,7 @@ is generated from matter.js's release tags (`parity/levels/`), never from
 connectedhomeip's XML ([spec levels](reference/spec-levels.md)). The
 third axis is the controller profile (`surface.Policies.Profiles`, the
 daemon's `--profile`), generated from the evidence register
-[`notes/parity/controller_profiles.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/controller_profiles.md):
+[`notes/parity/controller_profiles.md`](https://github.com/thingfabric/go-fabric/blob/main/notes/parity/controller_profiles.md):
 only a row of the confidence *Reproduced* removes an element, every other
 row that names a served element is a warning decision in the report, and a
 profile's level applies when no explicit level is set. The
@@ -167,7 +167,7 @@ records the decision.
 | Test support (public API) | `bridge/bridgetest`, `endpoint/endpointtest`, `surface/surfacetest`, `clock/clocktest`, `fabrictest` (in-process devices and controllers on an in-memory network) |
 
 Everything outside `internal/` is public API under the
-[deprecation window](https://github.com/SukramJ/go-fabric/blob/main/README.md#api-stability),
+[deprecation window](https://github.com/thingfabric/go-fabric/blob/main/README.md#api-stability),
 in force again since 2026-11-18 with four consumers: an identifier
 `v0.23.0` marks is removable in `v0.25.0`, and every removal names its
 replacement in the [migration guide](guides/migrating-to-the-facade.md).
@@ -204,7 +204,7 @@ matter.js is the gold standard for behaviour; connectedhomeip is the
 authority for tool behaviour matter.js does not model. Every behaviour cites
 its matter.js source in a `// Mirrors …` comment, every deliberate
 divergence is catalogued in
-[`by_design.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/by_design.md), and standing guards —
+[`by_design.md`](https://github.com/thingfabric/go-fabric/blob/main/notes/parity/by_design.md), and standing guards —
 schema parity, wire fixtures, the negative-write table, the chip data model
 cross-check, the chip certification families — fail the build when the port
 drifts. The [parity contract](matter-parity-contract.md) lists them.

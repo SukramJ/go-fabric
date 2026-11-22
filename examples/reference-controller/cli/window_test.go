@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 var windowLine = regexp.MustCompile(`(?m)^(discriminator|passcode|manual code|QR code): +(\S+)$`)

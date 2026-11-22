@@ -8,9 +8,9 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	def "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	def "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The typed server's optional interfaces: Handle, Emit and SetBeforeWrite

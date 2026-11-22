@@ -20,8 +20,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/transport/mrp"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // tcpSessionBindingChannel is MockTcpChannel: reliable, named, records

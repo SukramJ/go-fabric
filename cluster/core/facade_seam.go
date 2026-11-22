@@ -6,7 +6,7 @@ package core
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/internal/facadeseam"
+	"thingfabric.dev/go-fabric/internal/facadeseam"
 )
 
 func init() {

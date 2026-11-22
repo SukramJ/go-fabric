@@ -6,14 +6,14 @@ package wire_test
 import (
 	"testing"
 
-	colordef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	rvcdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
-	thdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	colordef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	rvcdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	swdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
+	thdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // TestWireIDsEqualTheGeneratedOnes (review II, R2-P6-par-1262,

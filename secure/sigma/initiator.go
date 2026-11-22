@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/secure/aesccm"
 )
 
 // ErrPeerIdentityMismatch is returned by [Initiator.ProcessSigma2] when the

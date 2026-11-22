@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/core"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestBridgedBasicInfoServesNodeLabelAndSerialNumberOnlyWhenStated (review

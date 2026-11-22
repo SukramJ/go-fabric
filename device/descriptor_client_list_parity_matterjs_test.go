@@ -19,8 +19,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // descriptorList reads one Descriptor list attribute (ServerList 0x0001,

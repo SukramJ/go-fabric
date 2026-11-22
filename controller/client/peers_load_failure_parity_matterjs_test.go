@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestPeersLoadFailureParity ports matter.js's PeersLoadFailureTest

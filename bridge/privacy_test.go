@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestRefuseUnicastPrivacy: a frame without the P bit, or too short to

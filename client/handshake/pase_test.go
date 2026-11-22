@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // TestPASEEstablishesSession: PASE against a node in its commissioning

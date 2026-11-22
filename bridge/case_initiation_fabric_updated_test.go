@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/secure/operational"
 )
 
 // TestFabricUpdateAbortsPendingInitiation: UpdateNOC's session teardown

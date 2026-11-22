@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/fan"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
+	"thingfabric.dev/go-fabric/cluster/fan"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
 )
 
 // laterFan is a host that applies a write later: its state does not show

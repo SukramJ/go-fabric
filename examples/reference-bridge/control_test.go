@@ -16,13 +16,13 @@ import (
 	"testing/synctest"
 	"time"
 
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
 
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/alarm"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	ovendef "thingfabric.dev/go-fabric/cluster/spec/ovencavityoperationalstate"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // TestAppPipeCommandsReachTheDevices drives every app-pipe command the

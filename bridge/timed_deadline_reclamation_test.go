@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // timedDeadlineCount reports how many entries the table currently holds.

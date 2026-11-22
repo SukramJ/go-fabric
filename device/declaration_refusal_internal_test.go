@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/cluster/core"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
 )
 
 // TestTypedNilDeclarationIsRefused (R2-P6-err-2507): a typed nil

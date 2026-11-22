@@ -26,9 +26,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/transport"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // The bridge is threaded through as any because this package must not

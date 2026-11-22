@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/controller/dcl"
 )
 
 // TestUpdateInfoFromURLReadsTheHeaderOnly (review II, R2-P6-bound-1903):

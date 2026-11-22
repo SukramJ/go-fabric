@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // The wire names of the camera cluster enums: every name the capabilities

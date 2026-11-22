@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // answerOf is the status the bridge answers a decode error with: the

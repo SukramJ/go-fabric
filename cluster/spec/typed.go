@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The typed layer: script/clustergen generates, beside each cluster

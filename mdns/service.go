@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // defaultHostName is the SRV target host name when none is configured:

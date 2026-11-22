@@ -12,7 +12,7 @@ package caseauth
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // IsCASE reports whether the request behind ctx arrived over a CASE

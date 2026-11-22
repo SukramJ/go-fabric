@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // FuzzDecodeStatusReport feeds DecodeStatusReport the Secure Channel

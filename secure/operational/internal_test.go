@@ -13,8 +13,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	mstore "github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	mstore "thingfabric.dev/go-fabric/store"
 )
 
 // minimalFakeStore implements ResumptionStore without any data; the whitebox

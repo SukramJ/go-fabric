@@ -325,7 +325,7 @@ Packages with decoders of wire or file input and no fuzz target (candidates by `
 
 ### 4.2 Build, CI, release
 
-- Module: `module github.com/SukramJ/go-fabric`, `go 1.27.2` (go.mod:1,3); CI `GO_VERSION: "1.27.2"` (.github/workflows/ci.yml:18); `CGO_ENABLED: "0"` (ci.yml:17, nightly.yml:16, release.yml:27).
+- Module: `module thingfabric.dev/go-fabric`, `go 1.27.2` (go.mod:1,3); CI `GO_VERSION: "1.27.2"` (.github/workflows/ci.yml:18); `CGO_ENABLED: "0"` (ci.yml:17, nightly.yml:16, release.yml:27).
 - Makefile: `build` compiles every package, "library module — no binaries" (Makefile:58); `build-32bit` (Makefile:65-70): `CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -gcflags=-e ./...` and `GOARCH=386 go vet ./...`; `archcheck` :72-74. No Makefile target builds an example binary or an image (grep `^(image|docker|install|release|cross)` in Makefile: only `chiptool-image`, `chiptool-extract` :221, which pull the CHIP image).
 - ci.yml jobs (names): build, `build (32-bit)` (ci.yml:47-61, runs `make build-32bit`, added for issue 225), vet, `test (linux, race)`, coverage floor, `bench (smoke)`, reachability, testparity, `matter.js citations`, `chip data model cross-check`, lint, `ble/bluez` (ci.yml:34-305). All `runs-on: ubuntu-latest`; no `GOARCH` matrix.
 - Other workflows: chiptool.yml (ubuntu-24.04; pulls the CHIP image; header says the image is multi-arch and jobs run on amd64 runners, chiptool.yml:9), ble-virtual.yml (an arm64 ubuntu-24.04 runner, ble-virtual.yml:34-36), nightly.yml (fuzz extended, macOS race, govulncheck, snapshot staleness), codeql.yml, dependabot-auto-merge.yml, lock.yml, matterjs-pin.yml, pages.yml.

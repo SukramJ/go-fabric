@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // The BDX cases. matter.js's BDX-1.2 and 2.2 run the device as DUT, a

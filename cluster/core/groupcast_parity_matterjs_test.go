@@ -23,16 +23,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/im"
-	matterparity "github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	mstore "github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/im"
+	matterparity "thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/secure/channel"
+	mstore "thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // gcEvent is one event a cluster emitted.

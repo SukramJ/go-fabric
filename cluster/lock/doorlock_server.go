@@ -43,14 +43,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // ClusterID is the DoorLock cluster id (0x0101).

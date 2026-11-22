@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
 )
 
 // TestUnconvertibleInitialIsRefused (R2-P6-err-2506): a declared Initial

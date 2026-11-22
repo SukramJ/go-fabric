@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // maxCommandRef is the highest command reference the batcher hands out

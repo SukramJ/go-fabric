@@ -9,13 +9,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lcfgdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lcfgdef "thingfabric.dev/go-fabric/cluster/spec/localizationconfiguration"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	unitdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestParityMatterJS_LocalizationConfiguration: SupportedLocales defaults

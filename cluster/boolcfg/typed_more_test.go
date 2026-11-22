@@ -7,9 +7,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/boolcfg"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	def "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
+	"thingfabric.dev/go-fabric/cluster/boolcfg"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	def "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
 )
 
 // TestTypedSetRules: every rule of the host's Set — the served attributes,

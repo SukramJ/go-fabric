@@ -4,9 +4,9 @@
 package wire
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // OperationalState (0x0060) and its derived RvcOperationalState (0x0061)

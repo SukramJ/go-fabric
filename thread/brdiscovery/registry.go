@@ -30,9 +30,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // StaleRetention is how long an entry no instance carries any more stays

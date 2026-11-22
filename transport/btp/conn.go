@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/SukramJ/go-fabric/transport"
+	"thingfabric.dev/go-fabric/transport"
 )
 
 // Addr is a BLE peer's address: the peripheral's address as the platform

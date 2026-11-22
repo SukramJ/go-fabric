@@ -58,7 +58,7 @@ afterwards.
 
 ## The example
 
-[`examples/ble-wifi-light`](https://github.com/SukramJ/go-fabric/tree/main/examples/ble-wifi-light)
+[`examples/ble-wifi-light`](https://github.com/thingfabric/go-fabric/tree/main/examples/ble-wifi-light)
 is one on/off light that composes both ports. It is a module of its own,
 built from a clone:
 
@@ -110,7 +110,7 @@ which are manual YAML cases at the harness pin
 the cases that do commission over BLE are listed under
 [Cases that commission over BLE](../certifiability.md#cases-that-commission-over-ble).
 
-*Source: [`examples/ble-wifi-light/main.go`](https://github.com/SukramJ/go-fabric/blob/main/examples/ble-wifi-light/main.go),
-[`node/config.go`](https://github.com/SukramJ/go-fabric/blob/main/node/config.go) (`Network.BLE`, `WiFi.Driver`),
-[`mdns/socket.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/socket.go) (`openSockets`, `joinNew`),
-[`script/ble-virtual-test.sh`](https://github.com/SukramJ/go-fabric/blob/main/script/ble-virtual-test.sh).*
+*Source: [`examples/ble-wifi-light/main.go`](https://github.com/thingfabric/go-fabric/blob/main/examples/ble-wifi-light/main.go),
+[`node/config.go`](https://github.com/thingfabric/go-fabric/blob/main/node/config.go) (`Network.BLE`, `WiFi.Driver`),
+[`mdns/socket.go`](https://github.com/thingfabric/go-fabric/blob/main/mdns/socket.go) (`openSockets`, `joinNew`),
+[`script/ble-virtual-test.sh`](https://github.com/thingfabric/go-fabric/blob/main/script/ble-virtual-test.sh).*

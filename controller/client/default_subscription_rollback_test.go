@@ -9,7 +9,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // TestSetDefaultSubscriptionFailedInitialReadReplacesNothing

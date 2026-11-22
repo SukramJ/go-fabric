@@ -6,9 +6,9 @@ package bridge
 import (
 	"reflect"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // encodeApplicationValue writes the structured values of the application

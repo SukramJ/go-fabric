@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	ctdef "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/internal/deviceseam"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	ctdef "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/internal/deviceseam"
 )
 
 // TestTariffTimeSourceSubscriptionFollowsTheDevice (R2-P6-store-2515): the

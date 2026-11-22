@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // DefaultUserLabelMaxLabels is the LabelList length a UserLabel server

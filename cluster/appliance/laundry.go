@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ldc "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
-	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ldc "thingfabric.dev/go-fabric/cluster/spec/laundrydryercontrols"
+	lwc "thingfabric.dev/go-fabric/cluster/spec/laundrywashercontrols"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Cluster ids.

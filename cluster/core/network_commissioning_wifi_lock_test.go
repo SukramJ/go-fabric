@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestWiFiNetworkCommissioningBreadcrumbOutsideTheLock pins R2-P1-core-07:

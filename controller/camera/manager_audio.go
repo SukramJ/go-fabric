@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"slices"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // trackState is what a request says of one track: declined (no stream),

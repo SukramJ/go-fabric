@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // writeChainFiles writes a fresh test chain for 0xFFF1/0x8002 as DER files.

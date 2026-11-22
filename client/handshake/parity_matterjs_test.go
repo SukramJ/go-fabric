@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // TestParityCASEServerStatusCodes: the codes the responder answers with —

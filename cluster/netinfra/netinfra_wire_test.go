@@ -10,14 +10,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/netinfra"
-	tdir "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	wdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/netinfra"
+	tdir "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	wdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkmanagement"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // octets is a bare octet-string attribute value for a write.

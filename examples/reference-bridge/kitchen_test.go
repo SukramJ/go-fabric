@@ -8,15 +8,15 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/alarmbase"
-	"github.com/SukramJ/go-fabric/cluster/appliance"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	mwo "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
-	tcdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/alarmbase"
+	"thingfabric.dev/go-fabric/cluster/appliance"
+	"thingfabric.dev/go-fabric/cluster/modebase"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	mwo "thingfabric.dev/go-fabric/cluster/spec/microwaveovencontrol"
+	tcdef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestOvenHasItsHeatingCavityPart: the Oven's mandatory

@@ -8,9 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestDeferredReportsPersistInApplyOrder: subscription reports applied

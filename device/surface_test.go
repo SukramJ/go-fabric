@@ -13,15 +13,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
-	"github.com/SukramJ/go-fabric/surface/surfacetest"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
+	"thingfabric.dev/go-fabric/surface/surfacetest"
 )
 
 // onOffID is the OnOff cluster (on-off.element.ts, 0x0006).

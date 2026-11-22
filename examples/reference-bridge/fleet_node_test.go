@@ -9,14 +9,14 @@ import (
 	"slices"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
-	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
-	pscfgdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
-	soildef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
-	"github.com/SukramJ/go-fabric/contract"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	actionsdef "thingfabric.dev/go-fabric/cluster/spec/actions"
+	ecodef "thingfabric.dev/go-fabric/cluster/spec/ecosysteminformation"
+	pscfgdef "thingfabric.dev/go-fabric/cluster/spec/powersourceconfiguration"
+	soildef "thingfabric.dev/go-fabric/cluster/spec/soilmeasurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestSoilSensorEndpoint: the soil sensor is a SoilSensor endpoint whose

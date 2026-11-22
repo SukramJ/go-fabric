@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestContractStatusesAreTheEngines (R2-P5-apidev-15): the statuses and

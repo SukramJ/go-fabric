@@ -10,10 +10,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/core"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // bindingChange is one OnChange call.

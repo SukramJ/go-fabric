@@ -8,11 +8,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // subTargetCount counts the bridge's stored subscription routing targets.

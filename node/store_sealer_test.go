@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestStoreSealerSealsTheBuiltStore (seal round 2): with Store.Sealer the

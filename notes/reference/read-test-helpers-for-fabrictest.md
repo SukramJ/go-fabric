@@ -264,7 +264,7 @@ Also listed by `git grep -l MockTime`: packages/testing/src/{global-declarations
 
 ## 4. Consumers' test needs
 
-Existing under /home/markus/Dokumente/GitHub: `go-daikin2mqtt`, `go-homeconnect2mqtt`, `go-mtec2mqtt`, `go-unifi2mqtt`, `go-zendure2mqtt`, `openccu-loom` (also `go-hamqtt`, `go-ha-catalog`, `go-mqtt`: checked). No go-*2mqtt repo references go-fabric (grep of go.mod and `*.go`: no hits). Only openccu-loom does (go.mod pins `github.com/SukramJ/go-fabric v0.6.0`).
+Existing under /home/markus/Dokumente/GitHub: `go-daikin2mqtt`, `go-homeconnect2mqtt`, `go-mtec2mqtt`, `go-unifi2mqtt`, `go-zendure2mqtt`, `openccu-loom` (also `go-hamqtt`, `go-ha-catalog`, `go-mqtt`: checked). No go-*2mqtt repo references go-fabric (grep of go.mod and `*.go`: no hits). Only openccu-loom does (go.mod pins `thingfabric.dev/go-fabric v0.6.0`).
 
 | file:line | Import / call |
 |---|---|

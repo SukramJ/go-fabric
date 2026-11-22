@@ -11,7 +11,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // TestSettleBoundsItsGiveBacks (review II, R2-P6-conc-2210, decision 207,

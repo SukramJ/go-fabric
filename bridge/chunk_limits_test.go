@@ -8,9 +8,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport"
-	"github.com/SukramJ/go-fabric/transport/tcp"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport"
+	"thingfabric.dev/go-fabric/transport/tcp"
 )
 
 // sizedConn is a reliable connection with a frame size, as *tcp.Conn.

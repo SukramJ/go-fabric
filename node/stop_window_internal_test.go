@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // stopTestSalt is a 16-byte SPAKE2+ salt (spake2.PBKDFMinSaltSize).

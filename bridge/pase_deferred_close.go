@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // paseCloseDeferralCap bounds how long the graceful close of a revoked PASE

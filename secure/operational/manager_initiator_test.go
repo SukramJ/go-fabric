@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestOpenFromSigmaAsInitiatorWithID_TalksToResponderSession: the same CASE

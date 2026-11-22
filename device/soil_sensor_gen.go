@@ -6,10 +6,10 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	soilmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
-	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	soilmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/soilmeasurement"
+	temperaturemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // SoilSensor device type identity: 0x0045, revision 1.

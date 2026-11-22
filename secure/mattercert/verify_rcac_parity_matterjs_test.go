@@ -11,8 +11,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // A verifier built from the root certificate checks the authorityKeyIdentifier

@@ -7,10 +7,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	admdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	admdef "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestAdmComm_Basic_OpenBasicWindow_FieldShapes: OpenBasicCommissioningWindow

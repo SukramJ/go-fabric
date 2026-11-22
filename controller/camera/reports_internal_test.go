@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller"
 )
 
 // countingImage counts the image reads of the service's report path.

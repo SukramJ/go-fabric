@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	closuredef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // TestDeprecatedHooksHandlerAnswersACommand (decision 177): a handler

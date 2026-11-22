@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // TestSessionIntervalsValidate accepts whole milliseconds inside the

@@ -6,7 +6,7 @@ package spec
 import (
 	"strings"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ConformanceFromSchema converts a conformance expression of the schema's

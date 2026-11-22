@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tstatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tstatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
 )
 
 // widgetFlags is WidgetStruct's map8 Flags (ValuePatcherTest.ts:51-58).

@@ -12,12 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/thread"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	netcomm "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/thread"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // The network steps of the flow (steps 16 and 17). Mirrors matter.js

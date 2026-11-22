@@ -16,7 +16,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/internal/clockvar"
+	"thingfabric.dev/go-fabric/internal/clockvar"
 )
 
 func TestIsTimeout_Nil(t *testing.T) {

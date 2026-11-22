@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/lock"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/cluster/lock"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
 )
 
 // enterLockout is DoorLockServerTest.ts:1326-1333.

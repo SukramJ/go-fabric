@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // Top-level certificate field tags (Matter §6.5.1.1).

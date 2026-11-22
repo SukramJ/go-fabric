@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // wantUnreportedRetransmitting asserts that no StatusReport reached the

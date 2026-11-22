@@ -6,9 +6,9 @@ package lock_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/interaction"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestRequestValidationOverTheWire holds the bridge's DoorLock request

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/transport/tcp"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/transport/tcp"
 )
 
 // TestTCPInboundBoundDefaultsToTheDeviceBound: the zero TCPConfig bounds

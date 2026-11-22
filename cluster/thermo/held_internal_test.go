@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tc "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tc "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
 )
 
 // TestHeldServerReadsTheServersState: the spec.Server a self-held server

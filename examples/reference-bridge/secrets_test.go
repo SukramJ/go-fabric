@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestSecretsComeFromAFileOrTheEnvironment holds R2-P6-sec-2615: the

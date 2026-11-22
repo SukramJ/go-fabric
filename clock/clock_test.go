@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // fixed is a clock.Clock whose Now is t and whose timers are the system's.

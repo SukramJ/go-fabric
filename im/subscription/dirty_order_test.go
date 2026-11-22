@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestTakeDirtyOrderFollowsThePrimingReport (review II, R2-P4-imread-10):

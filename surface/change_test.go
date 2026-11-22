@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 func TestReportChangedAndAssembledJSON(t *testing.T) {

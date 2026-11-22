@@ -9,8 +9,8 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tc "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tc "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
 )
 
 // The typed server's optional interfaces: Handle ([spec.SelfHeld]), Emit

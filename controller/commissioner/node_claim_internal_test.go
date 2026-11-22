@@ -9,9 +9,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/peer"
 )
 
 // TestNodeIDIsClaimedForTheCommissioning: the node id a commissioning

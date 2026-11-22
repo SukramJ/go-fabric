@@ -19,16 +19,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster/jointfabric"
-	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/client/jcm"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster/jointfabric"
+	jfadef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 const (

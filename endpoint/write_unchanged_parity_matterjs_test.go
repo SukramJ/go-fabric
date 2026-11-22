@@ -7,13 +7,13 @@ import (
 	"context"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestUnchangedWriteKeepsTheDataVersionParity: on a bridged endpoint, whose

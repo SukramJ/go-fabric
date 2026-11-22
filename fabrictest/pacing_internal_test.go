@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/internal/inflight"
 )
 
 // recordingTB is a testing.TB that keeps what Logf logs.

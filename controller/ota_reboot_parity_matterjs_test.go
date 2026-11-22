@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // The reboot-armer case of matter.js's OtaTest

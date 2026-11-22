@@ -6,7 +6,7 @@ package im
 import (
 	"slices"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // fabricIndexFieldTag is the context tag of the FabricIndex field every

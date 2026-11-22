@@ -15,15 +15,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/ble"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 const defaultTimeout = 60 * time.Second

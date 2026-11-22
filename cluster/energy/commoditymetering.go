@@ -9,12 +9,12 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/internal/deepcopy"
+	"thingfabric.dev/go-fabric/internal/deepcopy"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	commtr "thingfabric.dev/go-fabric/cluster/spec/commoditymetering"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // CommodityMetering (0x0B07). Its chip rules are in

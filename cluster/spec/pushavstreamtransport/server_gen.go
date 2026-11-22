@@ -9,10 +9,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
-	"github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/tlscertificatemanagement"
+	"thingfabric.dev/go-fabric/cluster/spec/tlsclientmanagement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // State is the typed state of the PushAvStreamTransport cluster: one field per attribute

@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cd "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
 )
 
 // latchingPanel records, while it takes a SetTarget or Step, a Latch

@@ -9,13 +9,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/alarmbase"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dwa "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
-	rfa "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
-	tma "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/alarmbase"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dwa "thingfabric.dev/go-fabric/cluster/spec/dishwasheralarm"
+	rfa "thingfabric.dev/go-fabric/cluster/spec/refrigeratoralarm"
+	tma "thingfabric.dev/go-fabric/cluster/spec/temperaturealarm"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // emitter records the events a server emits.

@@ -9,12 +9,12 @@ import (
 	"testing/synctest"
 	"time"
 
-	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
-	"github.com/SukramJ/go-fabric/cluster/valve"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/surface"
+	ccldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	"thingfabric.dev/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // TestGarageAheadFeatures: with closureRow enabled the garage serves

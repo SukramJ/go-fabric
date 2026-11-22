@@ -15,9 +15,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func statusOf(err error) im.StatusCode {

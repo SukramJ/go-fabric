@@ -6,9 +6,9 @@ package energy
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	evse "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The typed server's optional interfaces of the self-held EnergyEvse

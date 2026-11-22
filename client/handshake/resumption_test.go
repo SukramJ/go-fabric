@@ -6,7 +6,7 @@ package handshake_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/handshake"
 )
 
 // TestMemoryResumptionStore_DeleteForgetsThePeer: DeleteResumptionRecord

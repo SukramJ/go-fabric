@@ -6,7 +6,7 @@ package node
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // wifiConnected re-announces the node's DNS-SD records after a successful

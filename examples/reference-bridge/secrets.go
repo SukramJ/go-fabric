@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // passcodeEnv is the environment variable the setup passcode comes from

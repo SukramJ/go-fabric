@@ -9,8 +9,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	whmdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	whmdef "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
 )
 
 // heaterStep is one expectation of a replayed certification sequence.

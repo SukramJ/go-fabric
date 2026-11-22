@@ -6,7 +6,7 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func attrPath(ep *uint16, cluster, attr *uint32) im.ConcreteAttributePath {

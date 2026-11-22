@@ -9,11 +9,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/media"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	mpdef "thingfabric.dev/go-fabric/cluster/spec/mediaplayback"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // transport is a Playback port with every optional command: it records

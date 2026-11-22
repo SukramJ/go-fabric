@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestCredentialChangeCallbackReadsTheServer (R2-P6-conc-1118 a): a

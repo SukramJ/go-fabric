@@ -6,10 +6,10 @@ package device
 import (
 	"time"
 
-	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
-	"github.com/SukramJ/go-fabric/thread/otbr"
-	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
+	tbrmdef "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	"thingfabric.dev/go-fabric/cluster/threadbr"
+	"thingfabric.dev/go-fabric/thread/otbr"
+	"thingfabric.dev/go-fabric/thread/otbr/otbrtest"
 )
 
 // threadbrCases are TestSelfHeldDefaults' cases of the Thread Border

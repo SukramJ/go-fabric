@@ -8,11 +8,11 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // quietMDNS is an mDNS socket that sends nowhere and receives nothing.

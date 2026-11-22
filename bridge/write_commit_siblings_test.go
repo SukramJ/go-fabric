@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	matterfan "github.com/SukramJ/go-fabric/cluster/fan"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/cover"
+	matterfan "thingfabric.dev/go-fabric/cluster/fan"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // stepAll is [clusterWatch.step] for several attributes: how far the

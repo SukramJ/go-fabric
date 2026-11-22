@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // countingWall is the system clock, counting its readings.

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestEachPathClearsThePendingCredentialState (review II, N4-fixex-1,

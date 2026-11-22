@@ -17,7 +17,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
+	"thingfabric.dev/go-fabric/client/jcm"
 )
 
 // progression is ProgressionJCMCommissionee (:102-134).

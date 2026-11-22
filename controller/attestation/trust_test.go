@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // onlineStore is a PAAStore with revocations, recording each question.

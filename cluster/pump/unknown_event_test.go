@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/pump"
+	"thingfabric.dev/go-fabric/cluster/pump"
 )
 
 // TestUnknownEventNamesTheEvent (R2-P6-err-1590): ErrUnknownEvent names

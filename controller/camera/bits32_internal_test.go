@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // returnsWithin runs fn and reports whether it returned before a

@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestBuiltinMaterializersAreInstalled pins which built-in classes carry

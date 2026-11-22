@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Spec is a device as data: its device type by id, its [Options], its

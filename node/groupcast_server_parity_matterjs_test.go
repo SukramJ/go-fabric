@@ -36,13 +36,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec/groupcast"
-	specgroups "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec/groupcast"
+	specgroups "thingfabric.dev/go-fabric/cluster/spec/groups"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // gcTestKey is the file's TEST_KEY, 16 zero bytes.

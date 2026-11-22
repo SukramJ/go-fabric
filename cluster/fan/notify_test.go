@@ -6,7 +6,7 @@ package fan_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/fan"
+	"thingfabric.dev/go-fabric/cluster/fan"
 )
 
 // notifyingDevice is the test source with a change notifier.

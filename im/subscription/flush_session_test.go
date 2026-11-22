@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestFlushSessionFollowsAMovedSubscription locks the invariant that

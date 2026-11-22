@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	closuredef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // TestClosureControlLatchedClosureIsNotDrivenByTheFallback: a MoveTo whose

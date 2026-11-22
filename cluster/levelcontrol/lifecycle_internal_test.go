@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // lcRamp is a device that ramps and never reports arriving; it counts its

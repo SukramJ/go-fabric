@@ -3,7 +3,7 @@
 
 package media
 
-import "github.com/SukramJ/go-fabric/cluster/spec"
+import "thingfabric.dev/go-fabric/cluster/spec"
 
 // typedServer is the typed server's four optional interfaces: every media
 // server embeds the generated store ([spec.Server]), which answers

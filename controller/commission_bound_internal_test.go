@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 )
 
 // TestCommissionBoundNamesOnlyItsOwnEnd (go-fabric#554, Fable's read): an

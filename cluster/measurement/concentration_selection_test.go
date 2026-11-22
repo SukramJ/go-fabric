@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // selectedConc is a concentration source with a selection and, when

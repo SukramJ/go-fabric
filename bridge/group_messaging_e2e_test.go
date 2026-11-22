@@ -24,17 +24,17 @@ import (
 
 	"golang.org/x/net/ipv6"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/secure/aesccm"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/tlv"
-	"github.com/SukramJ/go-fabric/transport/message"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // fakeMulticastMember records the memberships the bridge asks for.

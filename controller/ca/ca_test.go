@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/bridge/bridgetest"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 var issuedAt = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)

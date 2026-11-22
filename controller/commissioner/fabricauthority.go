@@ -13,8 +13,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // FabricAuthority is the authority over the fabrics one CA controls —

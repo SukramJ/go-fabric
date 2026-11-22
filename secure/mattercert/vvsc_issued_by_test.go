@@ -11,7 +11,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // TestVerifyVVSCIssuedBy holds R2-P6-test-0117: VerifyVVSCIssuedBy accepts

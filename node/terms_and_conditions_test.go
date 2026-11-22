@@ -10,15 +10,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // termsRow is the register row GeneralCommissioning's TC feature

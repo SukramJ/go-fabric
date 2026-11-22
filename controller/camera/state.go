@@ -8,9 +8,9 @@ import (
 	"math"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/interaction"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // privacyState is the camera's three privacy switches; a nil switch is one

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	basicdef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	basicdef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestValidateRefusesBasicInformationBeyondItsConstraint (review II,

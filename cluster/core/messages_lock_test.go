@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	messagesdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	messagesdef "thingfabric.dev/go-fabric/cluster/spec/messages"
 )
 
 // readingPresenter reads its server from inside every call, as a host's

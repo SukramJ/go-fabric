@@ -7,10 +7,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/appliance"
-	mwo "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/appliance"
+	mwo "thingfabric.dev/go-fabric/cluster/spec/microwaveovencontrol"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestMicrowaveOvenControlOrigins is the origin audit of the

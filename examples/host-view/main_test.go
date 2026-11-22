@@ -9,11 +9,11 @@ import (
 	"sync"
 	"testing"
 
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 func attr(ep uint16, cluster, id uint32) im.ConcreteAttributePath {

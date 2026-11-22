@@ -6,21 +6,21 @@
 package device
 
 import (
-	airqualitydef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
-	carbondioxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
-	carbonmonoxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
-	formaldehydeconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/formaldehydeconcentrationmeasurement"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	nitrogendioxideconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/nitrogendioxideconcentrationmeasurement"
-	ozoneconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/ozoneconcentrationmeasurement"
-	pm10concentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pm10concentrationmeasurement"
-	pm1concentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pm1concentrationmeasurement"
-	pm25concentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pm25concentrationmeasurement"
-	radonconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/radonconcentrationmeasurement"
-	relativehumiditymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
-	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	totalvolatileorganiccompoundsconcentrationmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	airqualitydef "thingfabric.dev/go-fabric/cluster/spec/airquality"
+	carbondioxideconcentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
+	carbonmonoxideconcentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
+	formaldehydeconcentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/formaldehydeconcentrationmeasurement"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	nitrogendioxideconcentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/nitrogendioxideconcentrationmeasurement"
+	ozoneconcentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/ozoneconcentrationmeasurement"
+	pm10concentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/pm10concentrationmeasurement"
+	pm1concentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/pm1concentrationmeasurement"
+	pm25concentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/pm25concentrationmeasurement"
+	radonconcentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/radonconcentrationmeasurement"
+	relativehumiditymeasurementdef "thingfabric.dev/go-fabric/cluster/spec/relativehumiditymeasurement"
+	temperaturemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	totalvolatileorganiccompoundsconcentrationmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // AirQualitySensor device type identity: 0x002C, revision 1.

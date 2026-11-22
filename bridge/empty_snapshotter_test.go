@@ -4,13 +4,13 @@
 package bridge
 
 // The empty-fleet snapshotter itself lives in
-// [github.com/SukramJ/go-fabric/endpoint/endpointtest]; this name stays in
+// [thingfabric.dev/go-fabric/endpoint/endpointtest]; this name stays in
 // `package bridge` so the tests in this directory and in `package
 // bridge_test` keep reaching it unqualified, and so the [Snapshotter]
 // conversion is written once.
 
 import (
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
 )
 
 // NewEmptySnapshotter returns a [Snapshotter] over an empty fleet — root

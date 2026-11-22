@@ -6,10 +6,10 @@
 package device
 
 import (
-	booleanstateconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	occupancysensingdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	"github.com/SukramJ/go-fabric/schema"
+	booleanstateconfigurationdef "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	occupancysensingdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // OccupancySensor device type identity: 0x0107, revision 4.

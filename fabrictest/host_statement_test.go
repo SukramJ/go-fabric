@@ -10,12 +10,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bridgedinfodef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bridgedinfodef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestHostStatementName is #238: the host's name changes on the host's

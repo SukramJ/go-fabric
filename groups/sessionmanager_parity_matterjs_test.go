@@ -15,7 +15,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // sessionManagerEpochA / B are the epoch keys of SessionManagerTest.ts:607, :670-671.

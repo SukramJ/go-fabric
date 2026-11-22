@@ -6,12 +6,12 @@ package main
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	aqdef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
-	co2def "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster"
+	aqdef "thingfabric.dev/go-fabric/cluster/spec/airquality"
+	co2def "thingfabric.dev/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	descdef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // TestGarageServesTagList: the garage's Closure endpoint opts into the

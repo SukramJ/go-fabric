@@ -4,8 +4,8 @@
 package core
 
 import (
-	timesyncdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	"github.com/SukramJ/go-fabric/surface"
+	timesyncdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // TimeSynchronizationAhead declares the TimeSynchronization server's

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // SubscriptionsConfig configures [NewSubscriptions].

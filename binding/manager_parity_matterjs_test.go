@@ -31,7 +31,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Our node id on fabric 1 and the switch's endpoint, as the cases'

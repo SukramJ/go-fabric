@@ -6,7 +6,7 @@ package thermostat_test
 import (
 	"testing"
 
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
 )
 
 // TestCelsiusToInt16 holds the encoder to its clamp: centi-degrees rounded,

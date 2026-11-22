@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/secure/spake2"
-	mstore "github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/spake2"
+	mstore "thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // newTestVerifier builds a real spake2.Verifier so the nil-guard is not

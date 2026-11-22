@@ -44,11 +44,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/light"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/light"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // The mireds of ColorTemperatureCouplingTest.ts:37-44.

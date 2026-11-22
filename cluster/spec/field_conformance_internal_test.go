@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The branches of the conformance compiler, the response check and the

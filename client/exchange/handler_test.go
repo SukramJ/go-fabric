@@ -11,9 +11,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // handled is one call of a test ProtocolHandler.

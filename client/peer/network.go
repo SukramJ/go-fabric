@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // Network profiles: matter.js packages/protocol/src/peer/NetworkProfile.ts

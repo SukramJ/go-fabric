@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // AwaitResult is what ended an [PeerWakefulness.AwaitAwake].

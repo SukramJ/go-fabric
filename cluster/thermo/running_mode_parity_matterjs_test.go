@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
 )
 
 // TestParityMatterJS_SystemModeDrivesRunningMode: a SystemMode that

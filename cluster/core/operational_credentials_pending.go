@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The two settings keys below are where releases before the fabric row

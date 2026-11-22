@@ -6,7 +6,7 @@ package im
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestInvokeResponse_MarshalTLV_Empty verifies that an InvokeResponse with

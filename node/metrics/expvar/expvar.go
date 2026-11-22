@@ -17,7 +17,7 @@ import (
 	"expvar"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // Metrics publishes the node's counters and gauges on expvar. It is safe

@@ -10,9 +10,9 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	"github.com/SukramJ/go-fabric/controller/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	"thingfabric.dev/go-fabric/controller/camera"
 )
 
 // TestParseICECandidatesParityMatterjsServer ports the ice_candidates

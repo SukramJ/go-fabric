@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestControllerAdvertisesItsCommissionerRecord: Config.Advertise

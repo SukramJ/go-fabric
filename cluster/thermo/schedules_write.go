@@ -10,13 +10,13 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/internal/deepcopy"
+	"thingfabric.dev/go-fabric/internal/deepcopy"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The write rules of Schedules (MSCH) — the atomic write of a controller,

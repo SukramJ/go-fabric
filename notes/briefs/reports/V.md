@@ -58,7 +58,7 @@ after every commit that changed Go code, inventory in the same commit
 - Compare links: the file had **none** at its end. Added all four
   (`[Unreleased]` v0.3.0...HEAD, `[0.3.0]` v0.2.0...v0.3.0, `[0.2.0]`
   v0.1.0...v0.2.0, `[0.1.0]` the v0.1.0 tag page) against
-  `https://github.com/SukramJ/go-fabric` (the `origin` remote). They sit
+  `https://github.com/thingfabric/go-fabric` (the `origin` remote). They sit
   after the `[0.1.0]` section, so `release.yml`'s notes extraction for
   0.3.0 does not pick them up.
 

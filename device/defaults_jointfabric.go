@@ -7,10 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/jointfabric"
-	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/jointfabric"
+	jfadef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The kit's Joint Fabric servers (cluster/jointfabric, brief 26-D): the

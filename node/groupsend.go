@@ -6,8 +6,8 @@ package node
 import (
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // *udp.Listener is the transport group messages leave through.

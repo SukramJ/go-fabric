@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	bidef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	fixedlabeldef "thingfabric.dev/go-fabric/cluster/spec/fixedlabel"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestSubscriptionSnapshot (brief M9-module §3 a): a controller's

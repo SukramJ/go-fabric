@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"unicode/utf16"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 )
 
 // fieldRange is the inclusive range a numeric field takes. Mirrors

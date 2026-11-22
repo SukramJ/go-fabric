@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 // stalledConn is an API connection whose peer reads nothing: every write

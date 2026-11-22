@@ -16,7 +16,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // DefaultTTLGraceFactor is the factor applied to a record's TTL when its

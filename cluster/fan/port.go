@@ -6,8 +6,8 @@ package fan
 import (
 	"context"
 
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // portSource is the host port in the generated types — fandef.StateSource

@@ -14,9 +14,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/lock"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/cluster/lock"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
 )
 
 // pinOne is the seeded user's credential, [{ Pin, 1 }].

@@ -6,10 +6,10 @@
 package device
 
 import (
-	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
-	commissionercontroldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	actionsdef "thingfabric.dev/go-fabric/cluster/spec/actions"
+	commissionercontroldef "thingfabric.dev/go-fabric/cluster/spec/commissionercontrol"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Aggregator device type identity: 0x000E, revision 2.

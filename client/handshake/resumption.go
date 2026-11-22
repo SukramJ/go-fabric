@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // PeerAddress names a peer on one of our fabrics: our fabric index and

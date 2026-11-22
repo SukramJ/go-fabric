@@ -16,10 +16,10 @@ import (
 	"errors"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/sessionseam"
-	"github.com/SukramJ/go-fabric/secure/operational"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/sessionseam"
+	"thingfabric.dev/go-fabric/secure/operational"
 )
 
 func TestFabricRemoveFromSession(t *testing.T) {

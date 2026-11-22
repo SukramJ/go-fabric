@@ -10,11 +10,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // device is a host appliance: it records the commands it receives and

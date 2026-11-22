@@ -10,14 +10,14 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gcdef "github.com/SukramJ/go-fabric/cluster/spec/groupcast"
-	tcldef "github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gcdef "thingfabric.dev/go-fabric/cluster/spec/groupcast"
+	tcldef "thingfabric.dev/go-fabric/cluster/spec/tlsclientmanagement"
+	"thingfabric.dev/go-fabric/contract"
+	endpointpkg "thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // hostListServer is a host's own cluster server for one list attribute: no

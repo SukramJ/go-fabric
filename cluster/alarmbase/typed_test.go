@@ -8,10 +8,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/alarmbase"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dwa "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/alarmbase"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dwa "thingfabric.dev/go-fabric/cluster/spec/dishwasheralarm"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 func alarm[T any](v T) *T { return &v }

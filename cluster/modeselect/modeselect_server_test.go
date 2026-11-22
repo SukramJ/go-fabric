@@ -9,12 +9,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/modeselect"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/modeselect"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // fakeSource is a [modeselect.ModeSource] whose every answer is set by

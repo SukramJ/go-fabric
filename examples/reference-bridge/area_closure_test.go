@@ -8,16 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	"github.com/SukramJ/go-fabric/cluster/servicearea"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cdim "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
-	tsuic "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	"thingfabric.dev/go-fabric/cluster/modebase"
+	"thingfabric.dev/go-fabric/cluster/servicearea"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cdim "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
+	sa "thingfabric.dev/go-fabric/cluster/spec/servicearea"
+	tsuic "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // mountedServer returns the server of clusterID on ep.

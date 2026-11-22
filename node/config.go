@@ -14,21 +14,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	basicdef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/clock"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	basicdef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	fixedlabeldef "thingfabric.dev/go-fabric/cluster/spec/fixedlabel"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	wifidiagdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkdiagnostics"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // Advertiser is the type of [Config].Advertiser: what publishes the node
@@ -287,7 +287,7 @@ type Config struct {
 	// providers, the operational resolver, an advertiser that takes a
 	// clock ([mdns.Responder]), the group sender, the root's cluster
 	// servers, OTA, the store's persist loop and the reopen poll. A test
-	// passes a [github.com/SukramJ/go-fabric/clock/clocktest.Fake].
+	// passes a [thingfabric.dev/go-fabric/clock/clocktest.Fake].
 	Clock clock.Clock
 }
 

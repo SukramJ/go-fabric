@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
+	endpointpkg "thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
 )
 
 // TestInvokeDelayReportDataDefersSubscriptions: an InvokeRequest's

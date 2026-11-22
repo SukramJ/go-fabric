@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Parity with matter.js packages/node/test/endpoint/validation/

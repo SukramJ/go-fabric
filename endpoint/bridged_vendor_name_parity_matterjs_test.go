@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestParityMatterJS_BridgedVendorNameComesFromTheHost pins where a bridged

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/reportchunk"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/reportchunk"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // write encodes strings and []uint32 lists; anything else as null.

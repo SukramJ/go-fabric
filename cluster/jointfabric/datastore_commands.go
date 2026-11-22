@@ -6,9 +6,9 @@ package jointfabric
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The 20 commands, each onto its operation and answered SUCCESS or the

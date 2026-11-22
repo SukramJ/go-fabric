@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/inflight"
-	"github.com/SukramJ/go-fabric/internal/serialqueue"
+	"thingfabric.dev/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/internal/serialqueue"
 )
 
 // TestQueue: a stopped queue drops, a running one runs in order, Stop

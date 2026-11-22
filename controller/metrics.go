@@ -3,7 +3,7 @@
 
 package controller
 
-import "github.com/SukramJ/go-fabric/contract"
+import "thingfabric.dev/go-fabric/contract"
 
 // The named metric set the controller reports to [Config].Metrics — the
 // contract's names, here so a host reads them where it configures the

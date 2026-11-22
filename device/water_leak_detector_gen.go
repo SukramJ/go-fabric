@@ -6,10 +6,10 @@
 package device
 
 import (
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	booleanstateconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	booleanstateconfigurationdef "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // WaterLeakDetector device type identity: 0x0043, revision 2.

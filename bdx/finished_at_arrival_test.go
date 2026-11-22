@@ -12,7 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // arrivalEnd is a [bdx.ReceiveNotifier] the test feeds message by message,

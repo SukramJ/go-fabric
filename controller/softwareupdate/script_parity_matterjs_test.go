@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
 )
 
 // The scripted provider (script.go) against matter.js's cert harness

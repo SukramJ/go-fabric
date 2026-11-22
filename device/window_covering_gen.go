@@ -6,10 +6,10 @@
 package device
 
 import (
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	windowcoveringdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/schema"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	windowcoveringdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // WindowCovering device type identity: 0x0202, revision 7.

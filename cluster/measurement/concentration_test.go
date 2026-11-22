@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestFurtherConcentrationServers covers the seven concentration servers

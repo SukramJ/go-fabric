@@ -6,7 +6,7 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/interaction"
 )
 
 func recorded(numbers ...uint64) []RecordedEvent {

@@ -15,11 +15,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestStepLevel holds StepLevel to matter.js LevelControlServer.ts:471-478

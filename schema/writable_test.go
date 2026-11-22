@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	matterparity "thingfabric.dev/go-fabric/parity"
 )
 
 // snapshotAttribute is one attribute entry in the matter.js HEAD schema

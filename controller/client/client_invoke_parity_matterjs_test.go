@@ -15,9 +15,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func TestClientInvokeParity(t *testing.T) {

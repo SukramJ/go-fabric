@@ -9,11 +9,11 @@ import (
 	"crypto/sha256"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/commissioning"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/secure/spake2"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/commissioning"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestPASEResponderKeysMatchTheOperationalPasePath runs one SPAKE2+

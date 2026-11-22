@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 )
 
 // TestRefusedReOfferRestoresTheOffer (review II, R2-P6-wire-2204): a

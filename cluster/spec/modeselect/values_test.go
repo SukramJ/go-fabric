@@ -6,7 +6,7 @@ package modeselect_test
 import (
 	"testing"
 
-	msdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
+	msdef "thingfabric.dev/go-fabric/cluster/spec/modeselect"
 )
 
 // TestBoundsMatchTheGeneratedDefinition pins each hand-written bound to the

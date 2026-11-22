@@ -6,7 +6,7 @@ package schema_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestDeviceTypeAccessorsReturnCopies holds the device-type accessors to

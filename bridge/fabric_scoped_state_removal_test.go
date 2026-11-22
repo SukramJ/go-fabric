@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // fabricStateServer is a cluster server that holds state by fabric and

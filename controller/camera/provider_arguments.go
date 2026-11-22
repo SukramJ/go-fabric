@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // providerCommandName is a WebRTCTransportProvider command a client may

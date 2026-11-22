@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestDecryptNonceUsesTheSessionPeerNotTheHeaderSourceNodeID pins the

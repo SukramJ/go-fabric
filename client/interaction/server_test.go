@@ -13,14 +13,14 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acdef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec/groups"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acdef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
+	"thingfabric.dev/go-fabric/cluster/spec/groups"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // servedCluster is the manufacturer-specific cluster the fake dispatcher

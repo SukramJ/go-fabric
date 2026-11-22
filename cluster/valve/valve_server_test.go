@@ -8,12 +8,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	"github.com/SukramJ/go-fabric/cluster/lock"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/valve"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	"thingfabric.dev/go-fabric/cluster/lock"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // fakeHost is the host port under test. It records what the server sent

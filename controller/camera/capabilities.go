@@ -7,7 +7,7 @@ import (
 	"context"
 	"slices"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // Capabilities is what a camera endpoint states and holds: its features,

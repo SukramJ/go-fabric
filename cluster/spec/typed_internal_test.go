@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 type typedEnum uint8

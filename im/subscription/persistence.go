@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ReestablishTimeout bounds how long re-establishing the former

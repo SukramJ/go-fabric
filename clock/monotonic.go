@@ -16,7 +16,7 @@ import "time"
 // (packages/protocol/src/session/Session.ts:155-163).
 //
 // [System] implements it with the monotonic reading time.Now carries;
-// [github.com/SukramJ/go-fabric/clock/clocktest.Fake] implements it with
+// [thingfabric.dev/go-fabric/clock/clocktest.Fake] implements it with
 // its advanced time, which [Fake.StepWall] leaves alone.
 type Monotonic interface {
 	// Monotonic is the elapsed reading. Only differences of two readings

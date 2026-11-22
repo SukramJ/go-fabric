@@ -9,7 +9,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/controller/ca"
 )
 
 // mapSettings is a ca.Settings in memory.

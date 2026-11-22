@@ -12,14 +12,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	diaglogsdef "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	diaglogsdef "thingfabric.dev/go-fabric/cluster/spec/diagnosticlogs"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // DiagnosticLogs implements the Matter DiagnosticLogs cluster (0x0032),

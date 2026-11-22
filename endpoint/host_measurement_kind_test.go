@@ -15,10 +15,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/eligibility"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/eligibility"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
 )
 
 // The host's own Matter projection: Flow Sensor (device type 0x0306)

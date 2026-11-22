@@ -9,9 +9,9 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The typed server's optional interfaces ([spec.AttributeSetter],

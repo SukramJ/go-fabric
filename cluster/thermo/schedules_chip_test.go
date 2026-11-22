@@ -33,14 +33,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/fabrictestseam"
 )
 
 // mschConfig is chip's ThermostatSchedulesTestFixture (:84-98) on the

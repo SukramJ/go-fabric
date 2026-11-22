@@ -12,10 +12,10 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // Vectors of SecureSessionTest.ts:28-33.

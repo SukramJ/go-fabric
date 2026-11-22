@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // fabricIndexTag is the context tag of a fabric-scoped struct's

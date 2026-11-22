@@ -10,8 +10,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/cluster/thermo"
 )
 
 // gatedPresetStore records every save; when armed, the next save waits for

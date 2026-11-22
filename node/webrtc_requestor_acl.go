@@ -7,8 +7,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // WebRTCRequestorConfig is the node's part of the WebRtcTransportRequestor

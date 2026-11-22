@@ -14,8 +14,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
 )
 
 // sendDuringClose runs a raw ProvideOffer whose response arrives while

@@ -12,17 +12,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/tlv"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/tcp"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	otadef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/tcp"
 )
 
 // otaProviderPeer is a fake OTA provider in its own UDP endpoint: the CASE

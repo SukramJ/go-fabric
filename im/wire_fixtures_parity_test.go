@@ -38,7 +38,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // fixtureRecord is one entry from im-wire-fixtures.json.

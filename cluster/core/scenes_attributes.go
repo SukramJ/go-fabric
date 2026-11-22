@@ -6,10 +6,10 @@ package core
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The scene-able attributes ("S" quality) of the clusters this module

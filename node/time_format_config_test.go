@@ -11,13 +11,13 @@ import (
 	"strconv"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	"github.com/SukramJ/go-fabric/endpoint"
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	"thingfabric.dev/go-fabric/endpoint"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // tflRead reads one attribute of the root's TimeFormatLocalization as a

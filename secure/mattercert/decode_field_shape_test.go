@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // shapeCert encodes a minimal NOC-shaped certificate. Each member is

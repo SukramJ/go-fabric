@@ -26,12 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // windowPair is addCommissionedPair with subscribedPeer.

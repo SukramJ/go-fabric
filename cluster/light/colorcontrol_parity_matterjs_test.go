@@ -9,10 +9,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/light"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/im"
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/cluster/light"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	"thingfabric.dev/go-fabric/im"
+	matterparity "thingfabric.dev/go-fabric/parity"
 )
 
 type matterSchemaCC struct {

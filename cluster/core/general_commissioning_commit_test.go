@@ -10,12 +10,12 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
-	mstore "github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
+	mstore "thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // clearFailingStore is a memstore whose commit of a pending fabric row

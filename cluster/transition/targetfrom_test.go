@@ -6,7 +6,7 @@ package transition_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/transition"
+	"thingfabric.dev/go-fabric/cluster/transition"
 )
 
 // TestTargetFromReadsTheValueTheEngineReads holds decision 164

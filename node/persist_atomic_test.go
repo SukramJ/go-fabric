@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
-	"github.com/SukramJ/go-fabric/surface"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // refusingKeys is a credential store that refuses, while refuse is set,

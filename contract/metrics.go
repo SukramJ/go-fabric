@@ -6,7 +6,7 @@ package contract
 // Metrics is the port a host implements to receive the module's
 // operational counters and gauges: a Prometheus or OpenTelemetry adapter,
 // the stdlib expvar one the module ships
-// (github.com/SukramJ/go-fabric/node/metrics/expvar), or a test's fake.
+// (thingfabric.dev/go-fabric/node/metrics/expvar), or a test's fake.
 // The module never imports a metrics library (ADR 0025 principle 12).
 //
 // The names are the Metric… constants of this package; each states what

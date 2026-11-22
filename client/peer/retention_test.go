@@ -16,8 +16,8 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // withoutRetention is the harness edit for matter.js's behaviour: no

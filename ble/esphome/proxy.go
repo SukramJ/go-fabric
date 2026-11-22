@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/transport/btp"
 
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 // DefaultPort is the ESPHome API's port (esphome/components/api/__init__.py

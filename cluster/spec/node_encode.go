@@ -6,7 +6,7 @@ package spec
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // EncodeTLV writes the node tree at tag, integers at their minimal width

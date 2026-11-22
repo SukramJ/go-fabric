@@ -6,7 +6,7 @@ package udp
 import (
 	"net"
 
-	"github.com/SukramJ/go-fabric/transport"
+	"thingfabric.dev/go-fabric/transport"
 )
 
 // Conn is the UDP adapter of [transport.Conn]: the listener a datagram

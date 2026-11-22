@@ -275,18 +275,18 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/diagevent"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
-	"github.com/SukramJ/go-fabric/transport/tcp"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/clock"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/tcp"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // Errors.
@@ -383,21 +383,21 @@ type Config struct {
 	// Clock is the bridge's time source: the acknowledgement pump, MRP
 	// stamps, the TimedRequest window, PASE lockout, the subscription
 	// reports' timers and every other interval of the device side. nil is
-	// [clock.System]. A [github.com/SukramJ/go-fabric/node] hands its
+	// [clock.System]. A [thingfabric.dev/go-fabric/node] hands its
 	// own clock in here.
 	Clock clock.Clock
 	// MaxPathsPerInvoke is the most commands one InvokeRequest may carry;
 	// a larger batch is refused with InvalidAction. 0 is
 	// [im.DefaultMaxPathsPerInvoke]. The host advertises the same value
 	// (BasicInformation MaxPathsPerInvoke, the CASE and PASE session
-	// parameters); [github.com/SukramJ/go-fabric/node] sets all three.
+	// parameters); [thingfabric.dev/go-fabric/node] sets all three.
 	// Mirrors matter.js InteractionServer.ts:198, which takes it from the
 	// node's BasicInformation state.
 	MaxPathsPerInvoke uint16
 	// SessionIntervals are the MRP intervals the operational DNS-SD record
 	// advertises (SII, SAI, SAT); a zero field is the Matter default. The
 	// host reports the same values in its session parameters;
-	// [github.com/SukramJ/go-fabric/node] sets both. An ICD's record
+	// [thingfabric.dev/go-fabric/node] sets both. An ICD's record
 	// replaces the threshold and, while LIT, omits SII
 	// ([Bridge.SetICDAdvertisement]). Mirrors matter.js
 	// DeviceAdvertiser.ts:361-364, which advertises the session manager's

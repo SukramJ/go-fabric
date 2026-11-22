@@ -6,8 +6,8 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // TestUnsecuredAckReachesItsOwnHandshakeOnly: on the unsecured session an

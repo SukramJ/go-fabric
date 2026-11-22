@@ -26,10 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tcmdef "github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
-	"github.com/SukramJ/go-fabric/cluster/tls"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tcmdef "thingfabric.dev/go-fabric/cluster/spec/tlscertificatemanagement"
+	"thingfabric.dev/go-fabric/cluster/tls"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The fixture (:42-44, :471).

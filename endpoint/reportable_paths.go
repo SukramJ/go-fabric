@@ -4,7 +4,7 @@
 package endpoint
 
 import (
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ReportablePaths returns the concrete (endpoint, cluster, attribute)

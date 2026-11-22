@@ -62,14 +62,14 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/SukramJ/go-fabric/internal/deepcopy"
+	"thingfabric.dev/go-fabric/internal/deepcopy"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	sa "thingfabric.dev/go-fabric/cluster/spec/servicearea"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ClusterID is the ServiceArea cluster id, from the generated definition.

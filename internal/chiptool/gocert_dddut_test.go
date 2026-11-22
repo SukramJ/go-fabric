@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	gocontroller "github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/client/discovery"
+	gocontroller "thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 // The onboarding-payload DD cases in matter.js's own direction: the

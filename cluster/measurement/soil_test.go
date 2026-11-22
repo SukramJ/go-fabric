@@ -9,10 +9,10 @@ import (
 	"math"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	soildef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	soildef "thingfabric.dev/go-fabric/cluster/spec/soilmeasurement"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // soilStub is a SoilMoistureSource whose reading the test moves.

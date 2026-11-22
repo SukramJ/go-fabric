@@ -6,7 +6,7 @@ package spec_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // features is a FeatureContext over named features.

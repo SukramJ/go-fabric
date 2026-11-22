@@ -134,7 +134,7 @@ Ethernet one.
 | `fabrictest.UseWiFiCommissioning(cfg, driver)` | `cfg.Network.WiFi = &node.WiFi{Driver: driver}`; a test that also has a reporter sets both fields of the one `WiFi` |
 | a `node.Network.WiFi` with only a `Reporter` | unchanged; a `WiFi` with neither `Driver` nor `Reporter` is `ErrInvalidConfig` |
 
-A Linux host uses `github.com/SukramJ/go-fabric/wifi/wpasupplicant` as the
+A Linux host uses `thingfabric.dev/go-fabric/wifi/wpasupplicant` as the
 driver ([Operations](operations.md#wi-fi-provisioning)).
 
 ## Removed in v0.23.0: `SetAttestationChallenge`
@@ -270,7 +270,7 @@ guide lists every `Host`.
 
 | Symbol | Route |
 | --- | --- |
-| `controller/thread` (every identifier: `DecodeDataset`, `DecodeDatasetHex`, `OperationalDataset`, `WalkTLVs`, `EncodeTLVs`, `TLV`, `TLVType` and its constants, `SecurityPolicy`, `DecodeSecurityPolicy`, `ErrThreadTLV`, `ErrThreadDataset`, `ErrInvalidTLV`) | the same identifiers in `github.com/SukramJ/go-fabric/thread`: change the import path, nothing else (ADR 0027 decision 2; removed at once in wave 26a) |
+| `controller/thread` (every identifier: `DecodeDataset`, `DecodeDatasetHex`, `OperationalDataset`, `WalkTLVs`, `EncodeTLVs`, `TLV`, `TLVType` and its constants, `SecurityPolicy`, `DecodeSecurityPolicy`, `ErrThreadTLV`, `ErrThreadDataset`, `ErrInvalidTLV`) | the same identifiers in `thingfabric.dev/go-fabric/thread`: change the import path, nothing else (ADR 0027 decision 2; removed at once in wave 26a) |
 
 ## Changed in v0.13.4: the WebRTC transport structs
 
@@ -732,7 +732,7 @@ host with one source changes nothing.
 
 The device kit has one form for what a host states about a cluster, its
 declaration `<cluster>def.Declare` (the generated package
-`github.com/SukramJ/go-fabric/cluster/spec/<cluster>`, imported as
+`thingfabric.dev/go-fabric/cluster/spec/<cluster>`, imported as
 `<cluster>def`); the per-cluster options it replaces are gone, not
 deprecated, while loom is the only consumer.
 
@@ -784,6 +784,21 @@ other and code written against the old names compiles.
 now end after `Options.Wait` (default `fabrictest.DefaultWait`, 30 s on the
 wall clock) with `fabrictest.ErrWaited` instead of waiting forever.
 
+## Moved in v0.25.0: the module path
+
+From `v0.25.0` on, the module is `thingfabric.dev/go-fabric`; the last version under `github.com/SukramJ/go-fabric` is `v0.24.1`, and `go get` and `go list -m -u` report it as deprecated. Only the prefix moves: every package keeps its name and its API, so rewriting the imports is the whole migration. The nested modules move with the root (`thingfabric.dev/go-fabric/ble/bluez`, `…/ble/esphome`, `…/wifi/wpasupplicant`).
+
+Migrate in a consumer's module root (`perl` instead of `sed` so the one line runs on Linux and macOS; the lookahead leaves `go-fabric-ui` and `go-fabric-server` alone, which have not moved yet):
+
+```sh
+git ls-files -z '*.go' go.mod | xargs -0 perl -pi -e 's#github\.com/SukramJ/go-fabric(?![\w-])#thingfabric.dev/go-fabric#g'
+go get thingfabric.dev/go-fabric@v0.25.0
+go mod tidy
+gofmt -w .   # the import blocks re-sort under the new path
+```
+
+A module that requires both paths at once builds two copies of the stack, with two sets of types that do not convert into each other. `go mod why -m github.com/SukramJ/go-fabric` names what still pulls in the old path.
+
 ## Removed in v0.10.0: the deprecated surface
 
 Owner decision 2026-10-21: while loom is the only consumer and migrates in
@@ -795,7 +810,7 @@ groups follow the deprecation table the README carried until `v0.9.x`.
 
 | Removed | Route |
 | --- | --- |
-| `controller/discovery`, `controller/exchange`, `controller/handshake`, `controller/interaction`, `controller/peer` | the same identifiers in `github.com/SukramJ/go-fabric/client/<name>`: change the import path, nothing else |
+| `controller/discovery`, `controller/exchange`, `controller/handshake`, `controller/interaction`, `controller/peer` | the same identifiers in `thingfabric.dev/go-fabric/client/<name>`: change the import path, nothing else |
 
 ### `cluster/wire` request types (brief BX1) and the switch wrapper (brief BK)
 
@@ -865,7 +880,7 @@ groups follow the deprecation table the README carried until `v0.9.x`.
 The import list of the host's binary, below the facade:
 
 ```sh
-go list -deps ./cmd/openccu-loom | grep '^github.com/SukramJ/go-fabric/'
+go list -deps ./cmd/openccu-loom | grep '^thingfabric.dev/go-fabric/'
 ```
 
 `-deps` lists what the facade imports too; the host's own imports are the

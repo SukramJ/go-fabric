@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lowpowerdef "thingfabric.dev/go-fabric/cluster/spec/lowpower"
 )
 
 // LowPower is the LowPower host port (the generated [lowpowerdef.LowPower],

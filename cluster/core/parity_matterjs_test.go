@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	matterparity "thingfabric.dev/go-fabric/parity"
 )
 
 // matter.js's MatterDefinition tree is the de-facto reference Matter

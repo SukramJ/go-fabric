@@ -7,11 +7,11 @@ import (
 	"context"
 	"testing"
 
-	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	netcomm "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // crowdedWiFi is a Wi-Fi driver whose scan finds n access points with

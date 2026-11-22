@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	tc "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	tc "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestTemperatureControlOrigins is the origin audit of the

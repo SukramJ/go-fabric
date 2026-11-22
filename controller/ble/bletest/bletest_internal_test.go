@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // TestADroppedConnectionStartsNoSession: a connection dropped after

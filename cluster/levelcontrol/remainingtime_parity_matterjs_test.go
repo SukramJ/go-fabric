@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // transitioningLight is

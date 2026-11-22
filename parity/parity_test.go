@@ -6,7 +6,7 @@ package parity_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/parity"
 )
 
 // TestSchemaJSON verifies that SchemaJSON returns a non-empty byte slice

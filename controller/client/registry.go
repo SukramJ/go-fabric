@@ -13,12 +13,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/internal/inflight"
 )
 
 // RegistryConfig is what a [Registry] works with.

@@ -13,16 +13,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	"github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	gocontroller "github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	"thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/cluster/spec/powersource"
+	"thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	gocontroller "thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TC-BR-4 in matter.js's own direction: the module's controller is the

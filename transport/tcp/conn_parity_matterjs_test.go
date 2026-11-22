@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport"
+	"thingfabric.dev/go-fabric/transport"
 )
 
 // tcpChannelPipe is one end of net.Pipe that reports the given remote.

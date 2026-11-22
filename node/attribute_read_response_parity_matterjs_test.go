@@ -30,14 +30,14 @@ package node_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/client/interaction"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // rootFullClusterList is AttributeReadResponseTest.ts:15-25

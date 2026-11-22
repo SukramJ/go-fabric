@@ -6,8 +6,8 @@ package device
 import (
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Type is one device type as the device layer mounts it: the identity

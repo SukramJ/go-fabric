@@ -7,13 +7,13 @@ import (
 	"context"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	opcredsdef "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // answeringServer is a server of cluster id whose every command answers

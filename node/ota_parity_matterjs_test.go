@@ -40,15 +40,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	otadef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // otaTestFile is the test image's file designator.

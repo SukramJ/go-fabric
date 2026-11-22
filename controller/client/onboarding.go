@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The node's onboarding code — the QR or manual pairing code printed on

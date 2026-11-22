@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // streamOnlyBlobs is a backend that opts in to [BlobStreamer] on its own

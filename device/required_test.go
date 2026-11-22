@@ -3,7 +3,7 @@
 
 package device_test
 
-import "github.com/SukramJ/go-fabric/device"
+import "thingfabric.dev/go-fabric/device"
 
 // required is decls with the statements of the attributes New requires of
 // the named type (device.InitialFor).

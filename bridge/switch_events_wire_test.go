@@ -11,11 +11,11 @@ import (
 	"sync"
 	"testing"
 
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
-	"github.com/SukramJ/go-fabric/store"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // pressSource is a host's momentary push button: a MomentarySwitch

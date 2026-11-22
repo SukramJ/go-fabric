@@ -32,7 +32,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/script/levelgen/leveltable"
+	"thingfabric.dev/go-fabric/script/levelgen/leveltable"
 )
 
 const (

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // recordingEnd wraps a pipe end and records the message types it sends

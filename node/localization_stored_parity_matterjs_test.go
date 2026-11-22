@@ -14,15 +14,15 @@ import (
 	"sync"
 	"testing"
 
-	lcfgdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
-	"github.com/SukramJ/go-fabric/tlv"
+	lcfgdef "thingfabric.dev/go-fabric/cluster/spec/localizationconfiguration"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	unitdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The stored-value cases of matter.js's three localization server tests

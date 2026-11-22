@@ -10,9 +10,9 @@ import (
 	"errors"
 	"fmt"
 
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // AuthStore persists a lock's users, credentials and schedules and the

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestControllerAdvertiser: a record published again under its instance

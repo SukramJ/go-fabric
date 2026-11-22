@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestReceptionStateSurvivesForgetAndReload holds the round-3 finding on

@@ -9,10 +9,10 @@ import (
 	"slices"
 	"testing"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	"github.com/SukramJ/go-fabric/controller"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/controller"
 )
 
 // The cases of matterjs-server's

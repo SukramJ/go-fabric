@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	targetdef "thingfabric.dev/go-fabric/cluster/spec/targetnavigator"
 )
 
 // TargetState is the TargetNavigator attribute state

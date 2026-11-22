@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The registry maps a cluster id to its generated definition. A generated

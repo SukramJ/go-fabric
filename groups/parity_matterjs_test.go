@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 //go:embed testdata/group-crypto-fixtures.json

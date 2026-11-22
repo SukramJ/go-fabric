@@ -6,9 +6,9 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	switchclusterdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	switchclusterdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // GenericSwitch device type identity: 0x000F, revision 3.

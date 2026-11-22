@@ -15,8 +15,8 @@ import (
 	"io"
 	"math/big"
 
-	opcreds "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	opcreds "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // FabricBindingVersion1 is the only fabric binding version

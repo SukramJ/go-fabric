@@ -7,7 +7,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TriggerReannounce announces the node's DNS-SD records now — for a host

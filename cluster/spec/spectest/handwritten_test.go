@@ -6,9 +6,9 @@ package spectest_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // featureMapOverride is a server whose FeatureMap read answers what the

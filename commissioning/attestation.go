@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // AttestationElements field tags per Matter §11.18.5.

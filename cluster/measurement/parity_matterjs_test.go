@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/contract"
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/contract"
+	matterparity "thingfabric.dev/go-fabric/parity"
 )
 
 // matter.js's MatterDefinition tree is the de-facto reference Matter

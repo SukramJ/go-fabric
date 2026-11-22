@@ -7,12 +7,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/closure"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/closure"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cd "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestParityMatterJS_DimensionServer builds every FeatureMap the

@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/internal/inflight"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // Message is one message received on an exchange.

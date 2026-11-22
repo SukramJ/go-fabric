@@ -8,10 +8,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	bsdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	bsdef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // stateEvents records the StateChange events emitted.

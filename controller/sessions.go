@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // SessionIntervals are the controller's own session intervals, reported

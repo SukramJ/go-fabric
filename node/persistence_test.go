@@ -15,13 +15,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/sqlitestore"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 const (

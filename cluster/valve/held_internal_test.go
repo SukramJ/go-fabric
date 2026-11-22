@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
 )
 
 // TestHeldServerReadsTheServersState: the spec.Server a self-held server

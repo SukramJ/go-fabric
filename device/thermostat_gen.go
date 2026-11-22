@@ -6,12 +6,12 @@
 package device
 
 import (
-	energypreferencedef "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	thermostatuserinterfaceconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
-	"github.com/SukramJ/go-fabric/schema"
+	energypreferencedef "thingfabric.dev/go-fabric/cluster/spec/energypreference"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	thermostatuserinterfaceconfigurationdef "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Thermostat device type identity: 0x0301, revision 7.

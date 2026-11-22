@@ -11,9 +11,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The node's own commissioning window, matter.js DeviceCommissioner.ts

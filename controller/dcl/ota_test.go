@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
 )
 
 func otaImage(t *testing.T, version uint32) []byte {

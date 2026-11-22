@@ -4,9 +4,9 @@ Map only: file:line per fact, no judgement. Standards read: docs/adr/0025-facade
 
 ## 1 Import graph
 
-`make archcheck` output (exit 0): `go test -count=1 ./script/archcheck/...` -> `ok  github.com/SukramJ/go-fabric/script/archcheck 3.771s`. With -v: TestLayering PASS, TestSpecificity PASS, TestCheckReportsUpwardStaleAndUnassigned PASS (Makefile:65-67). Layers and exceptions are data in script/archcheck/layers.json. Exceptions on the ratchet (layers.json:15-19): binding -> controller/exchange, controller/handshake, controller/interaction, controller/peer (reason: 'resolved at gate 1'); cluster/wire -> cluster/switch (deprecated NewGenericSwitch wrapper, 'may be removed in v0.10.0').
+`make archcheck` output (exit 0): `go test -count=1 ./script/archcheck/...` -> `ok  thingfabric.dev/go-fabric/script/archcheck 3.771s`. With -v: TestLayering PASS, TestSpecificity PASS, TestCheckReportsUpwardStaleAndUnassigned PASS (Makefile:65-67). Layers and exceptions are data in script/archcheck/layers.json. Exceptions on the ratchet (layers.json:15-19): binding -> controller/exchange, controller/handshake, controller/interaction, controller/peer (reason: 'resolved at gate 1'); cluster/wire -> cluster/switch (deprecated NewGenericSwitch wrapper, 'may be removed in v0.10.0').
 
-### 1a cluster/* -> im (non-test files; only packages that import `github.com/SukramJ/go-fabric/im`; no cluster package imports an im/* subpackage)
+### 1a cluster/* -> im (non-test files; only packages that import `thingfabric.dev/go-fabric/im`; no cluster package imports an im/* subpackage)
 
 FILES importing im: 75; 25 cluster packages import im (alarm alarmbase appliance boolcfg closure core cover energy fan levelcontrol light lock media modebase modeselect onoff opstate pump servicearea spec spec/spectest switch thermo valve wire); the cluster packages that do not: cluster (root), filter, measurement, transition.
 Identifiers used, by count (uses/files and first site, format at the end of the block):
@@ -42,7 +42,7 @@ Per package (identifier set):
 ### 1b other named edges (identifier, uses, first site)
 
 - cluster/core -> groups
-  - import github.com/SukramJ/go-fabric/groups
+  - import thingfabric.dev/go-fabric/groups
     - AddEndpointForGroup x2 e.g. cluster/core/groupcast.go:700
     - ErrResourceExhausted x2 e.g. cluster/core/groupcast.go:727
     - Fabrics x1 e.g. cluster/core/group_key_management.go:433
@@ -66,31 +66,31 @@ Per package (identifier set):
     - SetGroupProperties x4 e.g. cluster/core/groupcast.go:599
     - SetMaxGroupsPerFabric x1 e.g. cluster/core/group_key_management.go:162
 - groups -> cluster/spec
-  - import github.com/SukramJ/go-fabric/cluster/spec
+  - import thingfabric.dev/go-fabric/cluster/spec
     - Encodable x3 e.g. groups/request.go:44
     - ListElements x1 e.g. groups/request.go:110
     - Node x1 e.g. groups/request.go:115
 - controller/client -> device
-  - import github.com/SukramJ/go-fabric/device
+  - import thingfabric.dev/go-fabric/device
     - Lookup x1 e.g. controller/client/endpoint.go:79
     - Type x1 e.g. controller/client/endpoint.go:78
 - controller/client -> endpoint
-  - import github.com/SukramJ/go-fabric/endpoint
+  - import thingfabric.dev/go-fabric/endpoint
     - ClusterShape x4 e.g. controller/client/conformance.go:177
     - DeviceTypeTree x1 e.g. controller/client/conformance.go:124
     - DeviceTypeViolation x2 e.g. controller/client/conformance.go:66
 - binding -> controller
-  - import github.com/SukramJ/go-fabric/controller/handshake
+  - import thingfabric.dev/go-fabric/controller/handshake
     - PeerAddress x2 e.g. binding/manager.go:85
-  - import github.com/SukramJ/go-fabric/controller/interaction
+  - import thingfabric.dev/go-fabric/controller/interaction
     - Config x1 e.g. binding/manager.go:143
     - ForPeer x1 e.g. binding/resolve.go:110
     - Interaction x1 e.g. binding/manager.go:67
-  - import github.com/SukramJ/go-fabric/controller/peer
+  - import thingfabric.dev/go-fabric/controller/peer
     - ConnectOptions x1 e.g. binding/resolve.go:485
     - Observer x1 e.g. binding/resolve.go:492
     - Peer x8 e.g. binding/manager.go:64
-  - import github.com/SukramJ/go-fabric/controller/exchange
+  - import thingfabric.dev/go-fabric/controller/exchange
     - Session x1 e.g. binding/resolve.go:492
   (binding rows: the identifiers `connect_failed`/`connecting` the regex also caught are text in log messages, dropped.)
 Import sites: cluster/core imports groups at cluster/core/groupcast.go:18, groups.go:17, group_key_management.go:15; groups imports cluster/spec at groups/request.go:11; controller/client imports device at controller/client/endpoint.go:12 (alias fabricdevice) and endpoint at controller/client/conformance.go:12; binding imports controller/handshake, interaction, peer at binding/manager.go:15-17 and controller/exchange, handshake, interaction, peer at binding/resolve.go:13-16.

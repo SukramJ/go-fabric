@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
 )
 
 // The cases of matterjs-server's

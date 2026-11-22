@@ -6,9 +6,9 @@ package energy
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The typed server's optional interfaces: Handle, Emit and SetBeforeWrite

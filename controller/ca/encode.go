@@ -22,8 +22,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/mattercert"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // Matter TLV certificate tags (secure/mattercert/decode.go:16-28) and the

@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	cdim "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ccldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	cdim "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // garageTravel is how long the simulated drive takes between two stops.

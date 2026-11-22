@@ -23,10 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/lock"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/cluster/lock"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func expiringUserTimeout(minutes uint16) func(*lock.DoorLockConfig) {

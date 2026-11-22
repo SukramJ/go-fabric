@@ -6,8 +6,8 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // BatteryStorage device type identity: 0x0018, revision 2.

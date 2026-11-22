@@ -8,10 +8,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	matterparity "github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/modebase"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	matterparity "thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // snapshotEnums reads a cluster's enum datatypes from the matter.js

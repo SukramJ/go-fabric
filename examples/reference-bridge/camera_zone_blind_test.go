@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	zmdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
 )
 
 // TestZoneTickBlindDurationZero: a trigger whose BlindDuration is 0, which

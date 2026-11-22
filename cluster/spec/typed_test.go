@@ -10,10 +10,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // hepaState and hepaPatch have the shape script/clustergen generates for

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // deviceTypeEvents is the events each device type makes mandatory on a

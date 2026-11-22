@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lcfgdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lcfgdef "thingfabric.dev/go-fabric/cluster/spec/localizationconfiguration"
 )
 
 // ErrLocalizationConfig rejects a localization configuration (of

@@ -12,11 +12,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	eemdef "thingfabric.dev/go-fabric/cluster/spec/electricalenergymeasurement"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The typed half of matter.js packages/types/test/tlv at 862ad75f.

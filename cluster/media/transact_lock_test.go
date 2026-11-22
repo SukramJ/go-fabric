@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
-	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
+	"thingfabric.dev/go-fabric/cluster/media"
+	mpdef "thingfabric.dev/go-fabric/cluster/spec/mediaplayback"
 )
 
 // reportingTransport reports the device's state through SetState from

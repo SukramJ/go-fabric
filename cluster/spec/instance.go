@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // Global attribute ids every server answers (Matter Core §7.13).

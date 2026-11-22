@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/groups"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/groups"
 )
 
 // TestDeclaredClientMountsBinding: an endpoint that declares a bindable

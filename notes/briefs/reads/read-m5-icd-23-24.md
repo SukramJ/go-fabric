@@ -318,7 +318,7 @@ Register entries that mention phase 23/24 in prose but carry no `until`:
 
 - script/clustergen/clusters.go:117 `	"IcdManagement",` (in the `cluster/core` block, lines 105-125 region)
 - script/testparity/register.go:70 `// work of a later phase (the device ICD role of milestone 5), so the`
-- script/coverfloor/floors.go:361 `{pkg: "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement", min: 100},`
+- script/coverfloor/floors.go:361 `{pkg: "thingfabric.dev/go-fabric/cluster/spec/icdmanagement", min: 100},`
 - cluster/core/icd_management.go:17-106 the stub `ICDManagement` (see 4.4)
 - cluster/doc.go:11 `//     GeneralDiagnostics, GroupKeyManagement, IcdManagement, Identify,`
 - cluster/spec/bridgeddevicebasicinformation/definition_gen.go:77 `FeatureBridgedIcdSupport Feature = 1 << 20 // BIS, [Rev >= v4]`

@@ -7,8 +7,8 @@ import (
 	"context"
 	"slices"
 
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/contract"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // undefinedFabricIndex is the index a removed fabric's creator and

@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	otadef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 )
 
 // This file is the requestor's query, download and apply flow:

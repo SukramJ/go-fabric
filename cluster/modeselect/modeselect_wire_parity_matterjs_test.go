@@ -9,10 +9,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/modeselect"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	msdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/modeselect"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	msdef "thingfabric.dev/go-fabric/cluster/spec/modeselect"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // modeselect-wire-fixtures.json holds matter.js's own encodings of

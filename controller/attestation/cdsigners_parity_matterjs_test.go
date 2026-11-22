@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // csaSigningKeyCerts are the chip cd-certs of the CSA signing keys 001 to

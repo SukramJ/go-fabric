@@ -16,11 +16,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	icddef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The IcdManagement ids the node's image watch reads.

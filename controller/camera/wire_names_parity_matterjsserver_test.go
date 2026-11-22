@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	"github.com/SukramJ/go-fabric/controller/camera"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	"thingfabric.dev/go-fabric/controller/camera"
 )
 
 // TestWireNamesParityMatterjsServer holds the exported wire names against

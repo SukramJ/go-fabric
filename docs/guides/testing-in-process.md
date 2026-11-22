@@ -4,7 +4,7 @@ A host maps its own device model onto Matter: which data point becomes
 which attribute, which product becomes which device type. That mapping is
 the host's code, and the place it breaks is the wire — a controller reads
 an attribute the host never fills, or a command the host routes nowhere.
-[`fabrictest`](https://github.com/SukramJ/go-fabric/tree/main/fabrictest)
+[`fabrictest`](https://github.com/thingfabric/go-fabric/tree/main/fabrictest)
 tests it there: it commissions a node of this module with the module's own
 controller, in the test process, and lets the test read, write, invoke and
 subscribe over the wire — with no chip-tool, no radio and no socket.
@@ -288,7 +288,7 @@ err := site.Eventually(ctx, "the report", func() bool { return reported() })
 ```
 
 `plug.OnOff()` is the plug's typed OnOff server (`onoffdef` is
-`github.com/SukramJ/go-fabric/cluster/spec/onoff`); its `Set` is the
+`thingfabric.dev/go-fabric/cluster/spec/onoff`); its `Set` is the
 device's own change, stored and reported.
 
 A test that steps the clock itself calls `site.Step(ctx, d)`: it waits
@@ -452,7 +452,7 @@ wall clock; `Topology.Configure` may set the device's listen address
   (`node.Network.TCP.Incoming`) fails to start on it; use `Loopback`.
 - A device is a `node.Node`. A host that builds a `bridge.Bridge` itself
   tests it with
-  [`bridgetest.Dial`](https://github.com/SukramJ/go-fabric/blob/main/bridge/bridgetest/commissioner.go),
+  [`bridgetest.Dial`](https://github.com/thingfabric/go-fabric/blob/main/bridge/bridgetest/commissioner.go),
   which commissions over loopback UDP on the wall clock.
 - BLE commissioning has its own in-memory pair:
   `controller/ble/bletest` with `bridgetest.ServeConn`.

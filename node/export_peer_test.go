@@ -6,9 +6,9 @@ package node
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // PeerPathClientBuilt reports whether the node built a client stack for its

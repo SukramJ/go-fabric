@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/mdns"
+	bidef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestStopFlushesTheShutDownEventToItsSubscribers (review II,

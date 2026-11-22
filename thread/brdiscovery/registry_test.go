@@ -12,9 +12,9 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/thread/brdiscovery"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/thread/brdiscovery"
 )
 
 // conn is a DNS-SD socket a test speaks for: it records the queries and

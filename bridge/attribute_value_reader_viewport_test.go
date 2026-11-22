@@ -7,10 +7,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 type viewportPorts struct{}

@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/im"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestCompanionsMovedNamesTheWrittenSetpoint: the re-run after the Sink

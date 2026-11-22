@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/softwareupdate"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // updateEvents collects softwareupdate.Manager.Observe's events.

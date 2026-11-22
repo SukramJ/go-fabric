@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	commctrldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	commctrldef "thingfabric.dev/go-fabric/cluster/spec/commissionercontrol"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
 )
 
 // TestCommissionerControlMatchesTheGeneratedDefinition holds the

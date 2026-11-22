@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	otadef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 )
 
 func announce(t *testing.T, h *otaHarness, fabric uint8, node uint64) {

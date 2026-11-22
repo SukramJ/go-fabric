@@ -19,17 +19,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/mdns"
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/mdns"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 type silentMDNS struct{ out chan mdns.QueryResponse }

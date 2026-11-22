@@ -6,9 +6,9 @@ package device
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/netinfra"
-	tdirdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/netinfra"
+	tdirdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The network-infrastructure servers (cluster/netinfra) of a Network

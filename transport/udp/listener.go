@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/internal/udpseam"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/internal/udpseam"
 )
 
 // MatterPort is the IANA-registered Matter operational port (5540).

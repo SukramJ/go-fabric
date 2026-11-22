@@ -6,7 +6,7 @@ package spec
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // HookError is the refusal of a declaration's hook (OnWrite, a

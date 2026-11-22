@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // emFailingPeer is failingPeer (ExchangeManagerTest.ts:94-142): a fabric

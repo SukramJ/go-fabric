@@ -17,10 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tsdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/im"
 )
 
 const tzAll = tsdef.FeatureTimeZone | tsdef.FeatureNtpClient | tsdef.FeatureNtpServer | tsdef.FeatureTimeSyncClient

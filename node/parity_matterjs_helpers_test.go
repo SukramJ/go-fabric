@@ -16,16 +16,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/fabrictestseam"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // mockVendorName is MockServerNode's BasicInformation.vendorName, the value

@@ -10,16 +10,16 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // nvCase is one nonvolatile attribute a controller writes: on the root

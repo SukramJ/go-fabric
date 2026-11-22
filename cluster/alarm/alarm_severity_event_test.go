@@ -7,10 +7,10 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	sdef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/alarm"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	sdef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestAlarmSeverityEventMatchesEveryGeneratedSeverityEvent holds the

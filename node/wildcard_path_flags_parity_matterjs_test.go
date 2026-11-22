@@ -18,12 +18,12 @@ package node_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/client/interaction"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	wifidiagdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkdiagnostics"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // goBasicInformationExtra is what the Go root's BasicInformation serves

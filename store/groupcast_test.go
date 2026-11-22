@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func TestGroupcastGroups_RoundTripAndCascade(t *testing.T) {

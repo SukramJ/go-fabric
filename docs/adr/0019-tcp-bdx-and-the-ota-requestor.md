@@ -1,7 +1,7 @@
 # ADR 0019 — TCP, BDX and the OTA Software Update Requestor enter the scope; DiagnosticLogs stays without BDX
 
 - **Status**: Accepted (2026-10-11; wave 5 of
-  [`../concept-matter-1.6.1-and-device-layer.md`](https://github.com/SukramJ/go-fabric/blob/main/docs/history/concept-matter-1.6.1-and-device-layer.md), phase 3)
+  [`../concept-matter-1.6.1-and-device-layer.md`](https://github.com/thingfabric/go-fabric/blob/main/docs/history/concept-matter-1.6.1-and-device-layer.md), phase 3)
 - **Date**: 2026-10-11
 - **Superseded in part** by [ADR 0021](./0021-ota-provider-and-diagnosticlogs-over-bdx.md) (2026-10-14): the OTA provider enters the scope and DiagnosticLogs serves BDX; the rest stands.
 - **Superseded in part** by [ADR 0032](./0032-the-device-sides-peer-path.md) (2026-11-15): Consequences bullet 1 — the requestor reaches its provider over the node's peer path (a live session of either stack, else one the client stack establishes), no longer through the ADR 0008 initiator; the rest stands.

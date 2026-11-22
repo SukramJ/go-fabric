@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	sa "thingfabric.dev/go-fabric/cluster/spec/servicearea"
 )
 
 // The typed server's optional interfaces: Handle ([spec.SelfHeld]), Emit

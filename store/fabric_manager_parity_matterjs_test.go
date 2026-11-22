@@ -17,7 +17,7 @@ import (
 	"errors"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // fabricManagerTable is a fabric table whose fabrics get distinct keys.

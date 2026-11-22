@@ -20,8 +20,8 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // The peripheral's BlueZ plumbing follows connectedhomeip's Linux

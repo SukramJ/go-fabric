@@ -6,7 +6,7 @@ package sigma
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // Thin wrappers around `tlv` tailored to the

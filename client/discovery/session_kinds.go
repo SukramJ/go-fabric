@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	fabricclock "github.com/SukramJ/go-fabric/clock"
+	fabricclock "thingfabric.dev/go-fabric/clock"
 )
 
 // FindInstance finds one device and returns it — matter.js InstanceDiscovery

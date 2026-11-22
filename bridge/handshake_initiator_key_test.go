@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/secure/spake2"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // A handshake's state belongs to the initiator that began it: matter.js finds

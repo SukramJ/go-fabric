@@ -11,13 +11,13 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/internal/deepcopy"
+	"thingfabric.dev/go-fabric/internal/deepcopy"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	avdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // AvSettingsClusterID is the CameraAvSettingsUserLevelManagement cluster id.

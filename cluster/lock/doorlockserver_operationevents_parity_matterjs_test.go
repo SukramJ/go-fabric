@@ -10,7 +10,7 @@ package lock_test
 import (
 	"testing"
 
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
 )
 
 func TestDoorLockServerLockOperationEventsParity(t *testing.T) {

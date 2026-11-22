@@ -9,9 +9,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/bridge/bridgetest"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestHostHooksAddToTheFacades (R2-P5-apinode-07): a host that sets the

@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	sa "thingfabric.dev/go-fabric/cluster/spec/servicearea"
 )
 
 // definitionWith is the ServiceArea definition with edit applied to a

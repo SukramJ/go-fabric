@@ -10,7 +10,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The check of a controller's written value against the definition, which

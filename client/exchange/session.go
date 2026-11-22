@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // UnsecuredSessionID is the session id of the unsecured session. Mirrors
@@ -347,7 +347,7 @@ func (s *Session) ActiveTimestamp() time.Time {
 }
 
 // ActiveMonotonic is [Session.ActiveTimestamp] on the clock's monotonic
-// reading, the order [github.com/SukramJ/go-fabric/client/peer.Peer.NewestSession]
+// reading, the order [thingfabric.dev/go-fabric/client/peer.Peer.NewestSession]
 // sorts by; false while the peer has not been heard from.
 func (s *Session) ActiveMonotonic() (time.Duration, bool) {
 	s.mu.Lock()

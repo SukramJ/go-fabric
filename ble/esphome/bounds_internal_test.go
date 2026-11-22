@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 // bareCentral is a central with no proxy and no run loop, for driving its

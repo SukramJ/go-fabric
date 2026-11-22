@@ -3,7 +3,7 @@
 
 package energy
 
-import "github.com/SukramJ/go-fabric/cluster/spec"
+import "thingfabric.dev/go-fabric/cluster/spec"
 
 // commodityWireValue is what the four commodity servers' MatterRead hands
 // the bridge for a stored value: a list attribute of structs as its

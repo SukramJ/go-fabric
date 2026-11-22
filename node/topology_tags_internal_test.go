@@ -7,10 +7,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster/core"
+	fixedlabeldef "thingfabric.dev/go-fabric/cluster/spec/fixedlabel"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // TestTagsAndLabelsOfServers: a Descriptor with the TagList feature

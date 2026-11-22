@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"thingfabric.dev/go-fabric/cluster/onoff"
 )
 
 // aggregatorEndpoint is the endpoint the reference daemon's bridged devices

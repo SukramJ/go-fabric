@@ -19,10 +19,10 @@ import (
 	"math"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	aqdef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
-	co2def "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	aqdef "thingfabric.dev/go-fabric/cluster/spec/airquality"
+	co2def "thingfabric.dev/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The concentration attributes the selection gates; the ten clusters

@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	diaglogsdef "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/cluster/core"
+	diaglogsdef "thingfabric.dev/go-fabric/cluster/spec/diagnosticlogs"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The DiagnosticLogs BDX tests follow chip's diagnostic-logs-server at the

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 )
 
 // ceiling is an upper bound an offer may state: a JavaScript number in

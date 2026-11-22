@@ -34,12 +34,12 @@ import (
 	"testing"
 	"time"
 
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/internal/nodeseam"
-	"github.com/SukramJ/go-fabric/node"
+	icddef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/internal/nodeseam"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // icdLITConfig is icd-helpers.ts LIT_CONFIG (threshold 5 s, idle 3600 s,

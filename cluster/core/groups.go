@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Groups cluster (0x0004) identifiers: the generated definition's

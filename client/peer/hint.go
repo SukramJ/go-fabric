@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/netip"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/discovery"
 )
 
 // HintAddresses hands the running connection process addresses learned

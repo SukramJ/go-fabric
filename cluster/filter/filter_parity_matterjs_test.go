@@ -6,13 +6,13 @@ package filter_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/filter"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	carbon "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/filter"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	carbon "thingfabric.dev/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestParityMatterJS_FilterServers builds every feature selection and

@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"reflect"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // attributeReading is one attribute value held for comparison with a later

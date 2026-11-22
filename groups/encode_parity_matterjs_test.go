@@ -10,9 +10,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestGroupEncodeMatchesMatterJS: the send half reproduces matter.js's

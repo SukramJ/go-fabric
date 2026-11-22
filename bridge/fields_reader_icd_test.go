@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	icddef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 func decodeICDTLV(t *testing.T, cmd uint32, v spec.Encodable) (any, error) {

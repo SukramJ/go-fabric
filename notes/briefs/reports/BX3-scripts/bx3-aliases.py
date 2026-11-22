@@ -38,9 +38,9 @@ if BEGIN not in src:
         block.append(f"type {name} = {orig}")
         block.append("")
     src = src.rstrip("\n") + "\n\n" + "\n".join(block).rstrip("\n") + "\n"
-    for imp in ('\t"github.com/SukramJ/go-fabric/cluster/wire"\n', '\t"github.com/SukramJ/go-fabric/secure/attestation"\n'):
+    for imp in ('\t"thingfabric.dev/go-fabric/cluster/wire"\n', '\t"thingfabric.dev/go-fabric/secure/attestation"\n'):
         if imp not in src:
-            src = src.replace('\tmattercore "github.com/SukramJ/go-fabric/cluster/core"\n', '\tmattercore "github.com/SukramJ/go-fabric/cluster/core"\n' + imp, 1) if "cluster/wire" in imp else src.replace('\t"github.com/SukramJ/go-fabric/im/subscription"\n', '\t"github.com/SukramJ/go-fabric/im/subscription"\n' + imp, 1)
+            src = src.replace('\tmattercore "thingfabric.dev/go-fabric/cluster/core"\n', '\tmattercore "thingfabric.dev/go-fabric/cluster/core"\n' + imp, 1) if "cluster/wire" in imp else src.replace('\t"thingfabric.dev/go-fabric/im/subscription"\n', '\t"thingfabric.dev/go-fabric/im/subscription"\n' + imp, 1)
     open(FACADE, "w").write(src)
     print("facade.go: %d aliases" % len(ALIASES))
 

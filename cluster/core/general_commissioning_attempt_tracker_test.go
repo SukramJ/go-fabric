@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // trackerLog records the attempt tracker's calls and the closer's, in order.

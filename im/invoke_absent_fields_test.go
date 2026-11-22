@@ -6,8 +6,8 @@ package im_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // absentFieldsRequest is an InvokeRequestMessage of one CommandDataIB with

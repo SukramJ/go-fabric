@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/surface"
-	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
+	"thingfabric.dev/go-fabric/surface"
+	"thingfabric.dev/go-fabric/thread/otbr/otbrtest"
 )
 
 // The --otbr flag: the URL's host and port, the default port, the

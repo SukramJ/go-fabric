@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // endReasonUnknown is WebRTCEndReasonEnum UnknownReason, the reason a

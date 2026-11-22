@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // MDNS.Interfaces composes the responder's filter: empty is the default

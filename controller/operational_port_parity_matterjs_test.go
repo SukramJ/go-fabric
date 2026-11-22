@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // offlineConn is a DNS-SD connection that sends nowhere and hears

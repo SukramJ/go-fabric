@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/secure/channel"
 )
 
 const establishingPeer uint64 = 0x1234

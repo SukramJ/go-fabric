@@ -31,12 +31,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/fabrictest"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // attestationStore is a trust store of the given roots with the CSA test

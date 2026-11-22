@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
 
-	"github.com/SukramJ/go-fabric/binding"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/binding"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	"thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestLightSwitchEntryKeys: a binding entry's key names every field that

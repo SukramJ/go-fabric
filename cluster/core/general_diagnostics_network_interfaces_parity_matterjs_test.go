@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/internal/netwatch"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/internal/netwatch"
 )
 
 // The cases of matter.js packages/node/test/behaviors/general-diagnostics/

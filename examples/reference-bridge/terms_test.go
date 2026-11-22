@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestTermsAndConditionsFlag: --tc-required enables the register row and

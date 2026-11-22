@@ -12,11 +12,11 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/SukramJ/go-fabric/controller/dcl"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/node"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func init() { dcl.SetHarnessNode(startNode) }

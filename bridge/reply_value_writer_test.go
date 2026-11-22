@@ -13,10 +13,10 @@ import (
 	"bytes"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	mattermeasure "github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	mattermeasure "thingfabric.dev/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // verifyNonEmpty encodes using enc and verifies at least one byte was produced.

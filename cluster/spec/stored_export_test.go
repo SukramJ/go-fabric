@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // TestStoredNarrowsToTheElementsWidth: [spec.Stored] gives the validator's

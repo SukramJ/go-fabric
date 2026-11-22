@@ -10,14 +10,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // fakeHost is the host port under test. It records which method the

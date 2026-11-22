@@ -15,8 +15,8 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // The data-model sweep. It has no table of expected clusters: it reads what

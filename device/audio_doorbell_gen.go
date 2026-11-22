@@ -6,14 +6,14 @@
 package device
 
 import (
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	cameraavstreammanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	pushavstreamtransportdef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	switchclusterdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
-	webrtctransportproviderdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	webrtctransportrequestordef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	"github.com/SukramJ/go-fabric/schema"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	cameraavstreammanagementdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	pushavstreamtransportdef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	switchclusterdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
+	webrtctransportproviderdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	webrtctransportrequestordef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // AudioDoorbell device type identity: 0x0141, revision 2.

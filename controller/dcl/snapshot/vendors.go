@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/controller/dcl"
 )
 
 // VendorsFile is the snapshot's vendor list: the vendor records of the

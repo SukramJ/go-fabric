@@ -10,8 +10,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // TestExchangesAreKeyedBySession: two peers that open an exchange with the

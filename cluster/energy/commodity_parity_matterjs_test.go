@@ -6,14 +6,14 @@ package energy_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
-	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	commtr "thingfabric.dev/go-fabric/cluster/spec/commoditymetering"
+	cp "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	egc "thingfabric.dev/go-fabric/cluster/spec/electricalgridconditions"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestParityMatterJS_CommodityServers builds every feature selection of

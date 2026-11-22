@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestSchemaCreatesEveryTableThePackageQueries is the guard on the reason

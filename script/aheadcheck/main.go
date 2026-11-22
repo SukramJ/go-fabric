@@ -89,7 +89,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/parity"
 )
 
 // registerPath, allowancePath and caughtUpPath are relative to the module

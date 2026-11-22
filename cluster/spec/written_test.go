@@ -10,12 +10,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bscdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	locdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bscdef "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	locdef "thingfabric.dev/go-fabric/cluster/spec/localizationconfiguration"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // unmappedForm is a hand-written form whose declaration leaves a field of

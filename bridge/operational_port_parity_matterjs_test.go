@@ -6,7 +6,7 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestOperationalPortParityMatterJS ports the commissionable-node cases of

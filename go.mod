@@ -1,5 +1,4 @@
-// Deprecated: moved to thingfabric.dev/go-fabric; v0.24.1 is the last version under this path.
-module github.com/SukramJ/go-fabric
+module thingfabric.dev/go-fabric
 
 go 1.27.4
 

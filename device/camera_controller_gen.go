@@ -6,8 +6,8 @@
 package device
 
 import (
-	webrtctransportrequestordef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	"github.com/SukramJ/go-fabric/schema"
+	webrtctransportrequestordef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // CameraController device type identity: 0x0147, revision 1.

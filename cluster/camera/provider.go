@@ -11,13 +11,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/internal/deepcopy"
+	"thingfabric.dev/go-fabric/internal/deepcopy"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ProviderClusterID is the WebRtcTransportProvider cluster id.

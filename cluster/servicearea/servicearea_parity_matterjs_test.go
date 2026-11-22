@@ -6,12 +6,12 @@ package servicearea_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/servicearea"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/servicearea"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	sa "thingfabric.dev/go-fabric/cluster/spec/servicearea"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestParityMatterJS_ServiceAreaServer builds every feature selection with

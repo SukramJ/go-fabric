@@ -6,7 +6,7 @@ package fabrictest_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // Controller.Commission returns only once the device lists the CASE

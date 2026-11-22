@@ -6,9 +6,9 @@
 package device
 
 import (
-	closuredimensiondef "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/schema"
+	closuredimensiondef "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
+	descriptordef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ClosurePanel device type identity: 0x0231, revision 1.

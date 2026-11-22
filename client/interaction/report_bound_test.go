@@ -10,10 +10,10 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/interaction"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestReportAssemblyIsBounded: a peer that keeps MoreChunkedMessages set

@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // ReadRequest is a read — matter.js Read() (action/request/Read.ts:28-91)

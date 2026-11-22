@@ -23,13 +23,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
-	"github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 const skipClaimant = "a host claims no endpoint number in Go: the assembler allocates every number for a StableKey from the persisted counter (endpoint/identity.go Store, endpoint/assembler.go assignOrReuseID), so there is no claimant of a live, root or sibling number to refuse"

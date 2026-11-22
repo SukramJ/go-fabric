@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // DefaultPort is the OTBR REST listener's port (OtbrRestClient.ts:59).

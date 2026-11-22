@@ -13,9 +13,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
 )
 
 // peerKey is matter.js's PeerAddress: (fabric index, node id).

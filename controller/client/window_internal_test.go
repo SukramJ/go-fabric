@@ -6,8 +6,8 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // TestPakePasscodeVerifier: the verifier is w0 ‖ L, 32 + 65 bytes, and

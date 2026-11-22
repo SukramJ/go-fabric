@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/node"
 
-	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	otadef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 )
 
 // otaApplier is the daemon's [node.OTAApplier].

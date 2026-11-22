@@ -13,7 +13,7 @@
 // The package serves two consumers:
 //
 //   - The [Verifier] type implements
-//     [github.com/SukramJ/go-fabric/secure/sigma.PeerVerifier]
+//     [thingfabric.dev/go-fabric/secure/sigma.PeerVerifier]
 //     so the CASE handshake can validate peer NOCs against the local
 //     fabric root.
 //
@@ -21,7 +21,7 @@
 //     bridge's own NOC after AddNOC, and to validate the DAC chain
 //     (DAC → PAI → PAA) supplied by the commissioner during PASE.
 //
-// The package depends on [github.com/SukramJ/go-fabric/tlv] for the wire
+// The package depends on [thingfabric.dev/go-fabric/tlv] for the wire
 // codec and on [crypto/ecdsa] + [crypto/sha256] for signature
 // verification. No CGo, no external X.509 library.
 package mattercert

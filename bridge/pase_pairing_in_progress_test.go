@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/spake2"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // While a commissioner's PASE handshake is in progress, a PASE message of

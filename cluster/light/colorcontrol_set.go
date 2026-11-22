@@ -6,7 +6,7 @@ package light
 import (
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // Set records a colour the device took on itself — a program on the

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 )
 
 // TestQuieterStaleFlushDoesNothing: a deferred report whose timer was

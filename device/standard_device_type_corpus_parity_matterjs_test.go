@@ -37,8 +37,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // standardDeviceTypeNames is STANDARD_DEVICE_TYPE_NAMES

@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/internal/deviceseam"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/internal/deviceseam"
 )
 
 // The lifecycle of a device (ADR 0025 principle 2: add, reachable, rename,

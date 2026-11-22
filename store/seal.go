@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/internal/sealseam"
+	"thingfabric.dev/go-fabric/internal/sealseam"
 )
 
 // Sealer seals the secrets a [Store] made by [NewSealed] keeps at rest.

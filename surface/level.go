@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Level is a specification level ([schema.Level]): a Matter revision

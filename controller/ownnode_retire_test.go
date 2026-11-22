@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // ownNodeSetting is the own-node record a database of the releases before

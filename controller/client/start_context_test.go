@@ -10,7 +10,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // withinItsContext runs call with a context of 50 ms and returns its

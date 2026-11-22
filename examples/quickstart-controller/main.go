@@ -21,11 +21,11 @@ import (
 	"syscall"
 	"time"
 
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/client"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 func main() {

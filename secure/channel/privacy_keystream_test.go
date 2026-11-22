@@ -9,7 +9,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/channel"
 )
 
 // TestPrivacyKeystream_CoversTheWholeProtectedRegion pins the keystream

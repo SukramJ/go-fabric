@@ -68,15 +68,15 @@ import (
 	"sync/atomic"
 	"unicode/utf8"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
-	rvcdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	ovendef "thingfabric.dev/go-fabric/cluster/spec/ovencavityoperationalstate"
+	rvcdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Cluster ids.

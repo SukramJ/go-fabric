@@ -9,10 +9,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/cover"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestServerMatchesTheGeneratedDefinition holds the server against matter.js

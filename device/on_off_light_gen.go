@@ -6,12 +6,12 @@
 package device
 
 import (
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	scenesmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
-	"github.com/SukramJ/go-fabric/schema"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	scenesmanagementdef "thingfabric.dev/go-fabric/cluster/spec/scenesmanagement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // OnOffLight device type identity: 0x0100, revision 4.

@@ -7,11 +7,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/interaction"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestControllerRestart: a controller restarted on its stores keeps its

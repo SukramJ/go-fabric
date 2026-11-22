@@ -12,13 +12,13 @@ import (
 	"strconv"
 	"time"
 
-	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	tnddef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	tdirdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/surface"
-	"github.com/SukramJ/go-fabric/thread/otbr"
+	tbrmdef "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	tnddef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	tdirdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	"thingfabric.dev/go-fabric/cluster/threadbr"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/surface"
+	"thingfabric.dev/go-fabric/thread/otbr"
 )
 
 // --otbr http://[host]:8081 (ADR 0027 decision 6, off by default): one

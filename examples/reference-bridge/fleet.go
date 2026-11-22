@@ -12,15 +12,15 @@ import (
 	"sync"
 	"time"
 
-	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	modeselectdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/surface"
+	fixedlabeldef "thingfabric.dev/go-fabric/cluster/spec/fixedlabel"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	modeselectdef "thingfabric.dev/go-fabric/cluster/spec/modeselect"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // --- the change-notification fan-out the devices share -------------------

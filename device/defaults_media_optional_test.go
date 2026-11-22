@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 
-	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
-	"github.com/SukramJ/go-fabric/im"
+	mpdef "thingfabric.dev/go-fabric/cluster/spec/mediaplayback"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // transportOnly is a MediaPlayback port with the three mandatory commands

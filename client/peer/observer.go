@@ -6,7 +6,7 @@ package peer
 import (
 	"slices"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // Observer receives one peer's signals — what matter.js's node layer

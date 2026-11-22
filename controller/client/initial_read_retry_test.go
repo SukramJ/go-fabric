@@ -8,9 +8,9 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestNewlyCommissionedReadIsMadeAgainAfterAFailure (review II,

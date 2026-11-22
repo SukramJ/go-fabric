@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/core"
 )
 
 // TestWithInvokeSessionLogsADroppedKey (review II, 5b-peer R4-1b): a key

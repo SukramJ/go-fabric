@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func TestTimedWriteParity(t *testing.T) {

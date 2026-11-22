@@ -6,9 +6,9 @@ package bridgetest
 import (
 	"errors"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/internal/bridgeseam"
-	"github.com/SukramJ/go-fabric/transport"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/internal/bridgeseam"
+	"thingfabric.dev/go-fabric/transport"
 )
 
 // ErrNoConn is returned by [ServeConn] for a nil connection.

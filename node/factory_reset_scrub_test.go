@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestFactoryResetWhoseScrubAReaderBlocksStillPins (review II,

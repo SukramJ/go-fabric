@@ -11,8 +11,8 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 var (

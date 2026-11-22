@@ -12,13 +12,13 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	tbrmdef "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // ThreadNetworkCommissioning is the NetworkCommissioning cluster (0x0031)

@@ -9,12 +9,12 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	ovendef "thingfabric.dev/go-fabric/cluster/spec/ovencavityoperationalstate"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 var ovenStates = []opstate.StateEntry{

@@ -4,9 +4,9 @@
 package node
 
 import (
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/internal/nodeseam"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/internal/nodeseam"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 func init() {

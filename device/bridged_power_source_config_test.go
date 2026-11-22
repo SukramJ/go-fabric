@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	pscdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	descriptordef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	psdef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	pscdef "thingfabric.dev/go-fabric/cluster/spec/powersourceconfiguration"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestBridgedPowerSourceConfiguration: an OnOffLight that declares

@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/modebase"
+	"thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // blockingChanger holds its first change until release is closed.

@@ -6,7 +6,7 @@ package client
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/interaction"
 )
 
 // The seams of the cache's fabric filter ports (ClientSubscribeTest.ts

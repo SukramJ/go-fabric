@@ -12,14 +12,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/SukramJ/go-fabric/diagevent"
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	"github.com/SukramJ/go-fabric/secure/spake2"
-	"github.com/SukramJ/go-fabric/transport"
-	"github.com/SukramJ/go-fabric/transport/mrp"
-	"github.com/SukramJ/go-fabric/transport/tcp"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/transport"
+	"thingfabric.dev/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/tcp"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // The receive and reply paths are transport-neutral: a message arrives

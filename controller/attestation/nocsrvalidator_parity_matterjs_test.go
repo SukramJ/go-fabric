@@ -21,8 +21,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // nocsrCSRPublicKeyPrefix is CSR_PUBLIC_KEY_PREFIX (:14-15): the BIT

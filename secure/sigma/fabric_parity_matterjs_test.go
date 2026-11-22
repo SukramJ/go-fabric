@@ -16,7 +16,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 func fabricTestDestinationID(t *testing.T, ipkHex, randomHex, rootPubHex string, fabricID, nodeID uint64) string {

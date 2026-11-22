@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // snapshotRequestAccess is one request command of parity/schema.json with

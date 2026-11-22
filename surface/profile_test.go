@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
-	"github.com/SukramJ/go-fabric/surface/surfacetest"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
+	"thingfabric.dev/go-fabric/surface/surfacetest"
 )
 
 // msch is the Thermostat's MatterScheduleConfiguration feature as a

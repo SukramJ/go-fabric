@@ -15,7 +15,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // discovered is a PeerBehavior.DiscoveredClusterShape as the peer reports

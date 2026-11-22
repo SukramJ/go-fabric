@@ -3,7 +3,7 @@
 
 package thermo
 
-import "github.com/SukramJ/go-fabric/surface"
+import "thingfabric.dev/go-fabric/surface"
 
 // Ahead declares the Thermostat server's elements that implement rows of
 // the "Ahead of matter.js" register (notes/parity/by_design.md): a host

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // FieldError is a request-decode error that names the IM status it

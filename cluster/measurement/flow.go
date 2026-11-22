@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // --- FlowMeasurement (0x0404) ------------------------------------------

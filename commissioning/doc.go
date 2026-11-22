@@ -39,5 +39,5 @@
 //
 // The DAC/PAI/PAA chain is X.509 DER (Matter §6.2/§6.3/§6.4) — not
 // Matter-TLV. The Matter NOC chain is TLV-encoded; that decoder lives
-// in [github.com/SukramJ/go-fabric/secure/mattercert].
+// in [thingfabric.dev/go-fabric/secure/mattercert].
 package commissioning

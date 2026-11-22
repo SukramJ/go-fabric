@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	timesyncdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	timesyncdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The node's UTC as a served time source, and the time client after

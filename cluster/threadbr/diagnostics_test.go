@@ -10,11 +10,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tnd "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tnd "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/cluster/threadbr"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // What each ThreadNetworkDiagnostics attribute reads follows connectedhomeip's

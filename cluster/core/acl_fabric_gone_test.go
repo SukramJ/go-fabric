@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
-	mstore "github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
+	mstore "thingfabric.dev/go-fabric/store"
 )
 
 // An Acl or Extension write whose fabric was removed while the write was

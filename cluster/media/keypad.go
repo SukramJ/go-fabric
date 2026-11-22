@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	keypaddef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	keypaddef "thingfabric.dev/go-fabric/cluster/spec/keypadinput"
 )
 
 // Keypad is the KeypadInput host port (the generated [keypaddef.Keypad],

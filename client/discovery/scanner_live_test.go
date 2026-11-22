@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestScanner_LiveFindsAnAdvertisedNode advertises a commissionable record

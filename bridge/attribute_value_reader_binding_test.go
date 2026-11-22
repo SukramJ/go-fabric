@@ -8,12 +8,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestAttributeValueReader_BindingAppend pins the list-append write of

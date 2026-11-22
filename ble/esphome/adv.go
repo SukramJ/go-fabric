@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // AD types of the advertising data (Bluetooth Core Supplement, Part A, §1).

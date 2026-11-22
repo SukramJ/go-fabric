@@ -20,7 +20,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // ─── Server responds to standard queries ─────────────────────────────────────

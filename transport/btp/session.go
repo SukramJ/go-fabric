@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // maximumSequenceNumber is the last sequence number before the wrap to 0

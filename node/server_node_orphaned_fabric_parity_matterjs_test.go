@@ -6,8 +6,8 @@ package node_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestServerNodeOrphanedFabricDataParityMatterJS ports matter.js

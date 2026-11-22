@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/commissioning"
+	"thingfabric.dev/go-fabric/commissioning"
 )
 
 // TestLoadPAAPoolFromPEM_Valid accepts a self-signed PEM CA certificate.

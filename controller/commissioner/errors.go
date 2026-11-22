@@ -10,9 +10,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/client/interaction"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/controller/attestation"
 )
 
 // The classes of commissioning failure — matter.js CommissioningError

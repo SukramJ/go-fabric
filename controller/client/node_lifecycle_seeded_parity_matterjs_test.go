@@ -14,8 +14,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // warnLog is a slog handler keeping the messages of WARN records.

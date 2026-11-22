@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // timeColumns are the columns whose value is the time a row was written;

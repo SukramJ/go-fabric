@@ -10,16 +10,16 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/caseauth"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/client/jcm"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	jfadef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/caseauth"
+	"thingfabric.dev/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // AdministratorClusterID is the JointFabricAdministrator cluster id.
@@ -269,7 +269,7 @@ func anchorFabric(ctx context.Context, fabrics FabricTable) (store.FabricRecord,
 // AttachCommissionerReach gives the administrator the node's reach of
 // the announcing commissioner when its configuration ([AdministratorConfig].Reach)
 // names none; the node calls it as the endpoint joins the topology, with
-// its client stack ([github.com/SukramJ/go-fabric/node]). A configured
+// its client stack ([thingfabric.dev/go-fabric/node]). A configured
 // reach stays.
 func (a *Administrator) AttachCommissionerReach(r CommissionerReach) {
 	a.mu.Lock()

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // DecodeValue decodes a value of type t from its node, by the type's Kind:

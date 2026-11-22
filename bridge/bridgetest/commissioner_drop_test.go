@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // logRecorder is a testing.TB that keeps what is logged through it.

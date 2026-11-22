@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/diagevent"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestAsyncDiagnosticCallbackPanicIsContained (review II, R2-P6-err-2410):

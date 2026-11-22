@@ -9,7 +9,7 @@ package jcm_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
+	"thingfabric.dev/go-fabric/client/jcm"
 )
 
 // TestEnumToStringError is :55-69: each result's name.

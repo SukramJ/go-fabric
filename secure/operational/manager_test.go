@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/secure/sigma"
-	mstore "github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/secure/sigma"
+	mstore "thingfabric.dev/go-fabric/store"
 )
 
 // --- In-memory fake ResumptionStore ---

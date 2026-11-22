@@ -8,7 +8,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // EndpointExpander is the optional [Dispatcher] interface that lets an

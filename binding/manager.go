@@ -10,13 +10,13 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/peer"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Entry is one Binding entry: the Binding cluster's TargetStruct as the

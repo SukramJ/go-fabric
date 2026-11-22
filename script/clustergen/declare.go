@@ -306,7 +306,7 @@ var ports = map[string]portSet{
 			"LoadDoorLockAuth(ctx context.Context, endpointKey string) (auth store.DoorLockAuth, saved bool, err error)",
 			"SaveDoorLockAuth(ctx context.Context, endpointKey string, auth store.DoorLockAuth) error",
 		},
-	}}, imports: []string{"github.com/SukramJ/go-fabric/store"}},
+	}}, imports: []string{"thingfabric.dev/go-fabric/store"}},
 	"WindowCovering": {ports: []portDecl{{
 		name: "Mover",
 		doc: []string{
@@ -424,7 +424,7 @@ var ports = map[string]portSet{
 			"SetPendingDataset(ctx context.Context, dataset []byte) error",
 			"Diagnostics(ctx context.Context) (thread.NodeDiagnostics, error)",
 		},
-	}}, imports: []string{"github.com/SukramJ/go-fabric/thread"}},
+	}}, imports: []string{"thingfabric.dev/go-fabric/thread"}},
 	"LaundryWasherMode": modeChanger,
 	"DishwasherMode":    modeChanger,
 	"RvcRunMode":        modeChanger,

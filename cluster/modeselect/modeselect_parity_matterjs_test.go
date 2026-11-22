@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/modeselect"
-	msdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/cluster/modeselect"
+	msdef "thingfabric.dev/go-fabric/cluster/spec/modeselect"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
 )
 
 // TestServerMatchesTheGeneratedDefinition holds the server against

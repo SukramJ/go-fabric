@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // readStandaloneAck reads one datagram from the peer socket and returns

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // chipDataset is the dataset of connectedhomeip's

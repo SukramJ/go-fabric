@@ -7,12 +7,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
-	wrdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	avdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/device"
 )
 
 type chimePort struct{}

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // refuseErase makes the client store's erase of a node fail — every

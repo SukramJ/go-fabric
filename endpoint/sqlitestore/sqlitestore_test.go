@@ -15,10 +15,10 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
-	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/endpoint/sqlitestore"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The store must satisfy the port it exists to implement; a signature drift

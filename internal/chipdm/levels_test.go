@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/script/levelgen/leveltable"
+	"thingfabric.dev/go-fabric/script/levelgen/leveltable"
 )
 
 // TestChipDataModelLevels compares every level file with CHIP's

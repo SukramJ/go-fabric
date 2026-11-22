@@ -10,16 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	ep "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
-	whm "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	dem "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	evsedef "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	ep "thingfabric.dev/go-fabric/cluster/spec/energypreference"
+	whm "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // tariffValues is a Tariff as the attribute values SetAttributes takes.

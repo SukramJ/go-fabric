@@ -16,11 +16,11 @@ import (
 	"context"
 	"testing"
 
-	msdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
+	msdef "thingfabric.dev/go-fabric/cluster/spec/modeselect"
 
-	mattermodeselect "github.com/SukramJ/go-fabric/cluster/modeselect"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	mattermodeselect "thingfabric.dev/go-fabric/cluster/modeselect"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // modeListSource is a ModeSource serving a fixed mode list.

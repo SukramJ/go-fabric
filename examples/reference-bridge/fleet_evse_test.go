@@ -10,15 +10,15 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	demdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/modebase"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	demdef "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	evsedef "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	psdef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestEvseHasItsParts: the charger advertises EnergyEvse (0x050C) with

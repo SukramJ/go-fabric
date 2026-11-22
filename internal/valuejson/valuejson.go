@@ -17,8 +17,8 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // AttributeField is the type of an attribute's value: a global attribute's

@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/surfaceseam"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/internal/surfaceseam"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 func TestWithProfiles(t *testing.T) {

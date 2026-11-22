@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/bridge"
 )
 
 // TestStartAfterStopIsRefused (review II, R2-P2-stop-05): a bridge is

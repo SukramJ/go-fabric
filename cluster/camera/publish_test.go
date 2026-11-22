@@ -8,11 +8,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	avdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	avdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestAvSettingsPresetsHeldToMaxPresets: a host's MPTZPresets longer than

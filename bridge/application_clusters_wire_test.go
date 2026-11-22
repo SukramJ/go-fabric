@@ -19,19 +19,19 @@ import (
 	"sync"
 	"testing"
 
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
 
-	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
-	matterfan "github.com/SukramJ/go-fabric/cluster/fan"
-	matterpump "github.com/SukramJ/go-fabric/cluster/pump"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/tlv"
+	matteralarm "thingfabric.dev/go-fabric/cluster/alarm"
+	matterfan "thingfabric.dev/go-fabric/cluster/fan"
+	matterpump "thingfabric.dev/go-fabric/cluster/pump"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // appDevice is a bridged host device: a device type and the long-lived

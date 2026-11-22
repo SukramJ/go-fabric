@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
-	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	commtr "thingfabric.dev/go-fabric/cluster/spec/commoditymetering"
+	cp "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	egc "thingfabric.dev/go-fabric/cluster/spec/electricalgridconditions"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func ptrTo[T any](v T) *T { return &v }

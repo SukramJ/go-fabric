@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	lwmdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/internal/deviceseam"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/modebase"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	lwmdef "thingfabric.dev/go-fabric/cluster/spec/laundrywashermode"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/internal/deviceseam"
 )
 
 // fakeHost is a node as deviceseam sees it.

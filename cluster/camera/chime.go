@@ -11,11 +11,11 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ChimeClusterID is the Chime cluster id.

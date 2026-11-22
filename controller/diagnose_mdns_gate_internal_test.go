@@ -15,14 +15,14 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/diag"
-	"github.com/SukramJ/go-fabric/diagevent"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/diag"
+	"thingfabric.dev/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // queueConn is an mdns.QueryConn that sends nothing and delivers what a

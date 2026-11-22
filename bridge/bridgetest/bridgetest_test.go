@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/bridge/bridgetest"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // newBridge starts a bridge on the loopback interface with an empty fleet.

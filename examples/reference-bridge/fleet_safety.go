@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // --- device: a smoke and CO alarm ---------------------------------------------

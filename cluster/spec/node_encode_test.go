@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // tree is an Encodable writing every TLV element kind.

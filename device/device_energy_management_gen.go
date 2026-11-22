@@ -6,9 +6,9 @@
 package device
 
 import (
-	deviceenergymanagementdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	deviceenergymanagementmodedef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode"
-	"github.com/SukramJ/go-fabric/schema"
+	deviceenergymanagementdef "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	deviceenergymanagementmodedef "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagementmode"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // DeviceEnergyManagement device type identity: 0x050D, revision 3.

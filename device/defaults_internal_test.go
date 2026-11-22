@@ -8,12 +8,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bscdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
-	hepadef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	tuidef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bscdef "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
+	hepadef "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	tuidef "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 func noSiblings(uint32) contract.ClusterServer { return nil }

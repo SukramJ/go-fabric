@@ -12,10 +12,10 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // bridgedUserLabelKeyRoot prefixes the settings key a bridged endpoint's

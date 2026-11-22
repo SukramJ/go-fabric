@@ -23,17 +23,17 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	tbrmdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/surface"
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/cluster/core"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	tbrmdef "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	tsdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/surface"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // declaredRows are the register IDs the servers declare: the device

@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store/memstore"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // TestNoAttributeReadableBelowItsReadPrivilege walks every attribute every

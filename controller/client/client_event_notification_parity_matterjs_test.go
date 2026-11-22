@@ -18,17 +18,17 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
+	"thingfabric.dev/go-fabric/internal/fabrictestseam"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/client/interaction"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	swdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // seenEvent is an event the hook received, with the number the node had

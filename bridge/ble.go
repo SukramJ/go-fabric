@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/transport"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/transport"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // BLE commissioning: the bridge serves the Matter GATT service on the

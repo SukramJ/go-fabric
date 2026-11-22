@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
 )
 
 // cloneLeaf and cloneProbe are a hand-written pair with a correct deep

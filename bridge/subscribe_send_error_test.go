@@ -13,8 +13,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
 )
 
 // oneEventReport is the smallest well-formed event payload the

@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 // NewCommissioningCredentials draws a fresh commissioning secret: a random

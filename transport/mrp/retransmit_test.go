@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // TestBackoffDuration_TransmissionExponent verifies the retransmission

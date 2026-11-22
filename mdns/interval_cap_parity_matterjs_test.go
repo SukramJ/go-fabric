@@ -6,7 +6,7 @@ package mdns_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // txtValue returns the value of key in svc's TXT record, "" when absent.

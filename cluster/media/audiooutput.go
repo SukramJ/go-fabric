@@ -6,8 +6,8 @@ package media
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	outputdef "thingfabric.dev/go-fabric/cluster/spec/audiooutput"
 )
 
 // OutputState is the AudioOutput attribute state (audio-output.element.ts:

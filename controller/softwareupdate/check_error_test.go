@@ -10,7 +10,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // TestProductCheckErrorNamesTheProductAndItsNodes (go-fabric#555): a

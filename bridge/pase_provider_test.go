@@ -10,7 +10,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // TestPerExchangePaseProvider_Reuses verifies that two Resolve calls

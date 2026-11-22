@@ -10,14 +10,14 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	padef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	zmdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // blockFirstChange holds the first change notification of srv until

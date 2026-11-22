@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // scopeSnapshot is the part of parity/schema.json the scope table is

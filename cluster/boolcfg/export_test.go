@@ -6,7 +6,7 @@ package boolcfg
 import (
 	"context"
 
-	def "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
+	def "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
 )
 
 // WriteSensitivityThroughSink hands level to the server's Sink as the

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/endpoint/sqlitestore"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestMigrationsMatchApply: the steps, applied to an empty database, give

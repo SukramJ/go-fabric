@@ -8,15 +8,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	tsuic "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
-	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	tsuic "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	unitdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // recordingSink records the controller writes the server hands over.

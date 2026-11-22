@@ -17,8 +17,8 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // specSource is a minimal [contract.EndpointSource]: enough to

@@ -7,9 +7,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/filter"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/filter"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestNotifyReachesListeners holds the Notify the server exported when it

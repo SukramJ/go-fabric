@@ -11,7 +11,7 @@ package im
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // reportIBFields marshals one report IB through write and returns the

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // opPort is an OperationalState host port: every command succeeds.

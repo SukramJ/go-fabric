@@ -9,11 +9,11 @@ import (
 	"slices"
 	"testing"
 
-	tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	tnd "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/cluster/threadbr"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/thread"
+	tbrm "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	tnd "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/cluster/threadbr"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // failingBorderRouter fails the commit and the revert and answers a

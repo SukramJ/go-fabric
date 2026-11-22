@@ -10,7 +10,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestAdvertisementPrivacyMasking covers AdvertisementTest.ts:53-95. Go

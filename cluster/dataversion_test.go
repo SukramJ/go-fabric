@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster"
 )
 
 // TestDataVersionTracker_StartNonZero verifies that a freshly-initialised

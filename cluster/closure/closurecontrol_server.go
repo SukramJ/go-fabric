@@ -37,12 +37,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	closuredef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ClusterRevision is the ClosureControl cluster revision of the generated
@@ -143,7 +143,7 @@ type Config struct {
 }
 
 // ControlServer implements
-// [github.com/SukramJ/go-fabric/contract.ClusterServer]
+// [thingfabric.dev/go-fabric/contract.ClusterServer]
 // for the Matter ClosureControl cluster (0x0104).
 //
 // The server holds the state a controller reads and forwards commands to

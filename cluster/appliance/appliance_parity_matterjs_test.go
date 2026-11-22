@@ -6,14 +6,14 @@ package appliance_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/appliance"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ldc "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
-	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
-	mwo "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/internal/paritytest"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/appliance"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ldc "thingfabric.dev/go-fabric/cluster/spec/laundrydryercontrols"
+	lwc "thingfabric.dev/go-fabric/cluster/spec/laundrywashercontrols"
+	mwo "thingfabric.dev/go-fabric/cluster/spec/microwaveovencontrol"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/internal/paritytest"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestParityMatterJS_ApplianceServers builds every feature selection and

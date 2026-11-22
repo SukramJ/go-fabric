@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/secure/operational"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // TestAnUnacceptedSigma1ClosesNoLiveSession: with every session id held by

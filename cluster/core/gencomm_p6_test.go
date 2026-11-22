@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/core"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ArmFailSafe with ExpiryLengthSeconds 0 on a fail-safe that is not armed

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // TestMRPBackoffThreshold_Chip pins MRPBackoffThreshold at exactly 1.6.

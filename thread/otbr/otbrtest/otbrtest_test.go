@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
+	"thingfabric.dev/go-fabric/thread/otbr/otbrtest"
 )
 
 func do(t *testing.T, srv *otbrtest.Server, method, path, body string) (status int, text string) {

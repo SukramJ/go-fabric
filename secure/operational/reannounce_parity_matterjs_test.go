@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 func TestDeviceAdvertiserSessionDeletedHandler(t *testing.T) {

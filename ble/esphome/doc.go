@@ -73,7 +73,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 // The errors of the central.

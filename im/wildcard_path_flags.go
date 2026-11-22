@@ -7,7 +7,7 @@ import (
 	"context"
 	"math"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // WildcardPathFlags bits of an AttributePathIB (Matter Core §8.9.2.5): each

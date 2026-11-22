@@ -13,15 +13,15 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/internal/deviceseam"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	powersourcedef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/internal/deviceseam"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // Errors New and AddPart wrap.

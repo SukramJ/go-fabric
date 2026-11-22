@@ -12,12 +12,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/client/jcm"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	jfadef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // AdministratorCmdAnnounce is AnnounceJointFabricAdministrator's id.

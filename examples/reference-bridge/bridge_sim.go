@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	tmdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	descriptordef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	psdef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	tmdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // --bridge-sim (TESTING ONLY): the bridge the bridge-client certification

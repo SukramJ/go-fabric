@@ -6,18 +6,18 @@
 package device
 
 import (
-	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
-	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	hepafiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	relativehumiditymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
-	scenesmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
-	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	thermostatuserinterfaceconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
-	"github.com/SukramJ/go-fabric/schema"
+	activatedcarbonfiltermonitoringdef "thingfabric.dev/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	fancontroldef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	hepafiltermonitoringdef "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	relativehumiditymeasurementdef "thingfabric.dev/go-fabric/cluster/spec/relativehumiditymeasurement"
+	scenesmanagementdef "thingfabric.dev/go-fabric/cluster/spec/scenesmanagement"
+	temperaturemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	thermostatuserinterfaceconfigurationdef "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // RoomAirConditioner device type identity: 0x0072, revision 4.

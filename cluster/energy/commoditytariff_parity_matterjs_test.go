@@ -21,9 +21,9 @@ package energy_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
 )
 
 // smallestTariff is the least tariff the Pricing server accepts around

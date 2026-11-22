@@ -30,11 +30,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
-	matterparity "github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
+	matterparity "thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestParityMatterJS_BasicInfoServer_ClusterID pins 0x0028.

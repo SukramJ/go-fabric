@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // OriginCase is one row of a server's origin audit ([CheckOrigins]): Act

@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // The OTBR /diagnostics record translated into a

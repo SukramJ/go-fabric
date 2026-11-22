@@ -6,12 +6,12 @@
 package device
 
 import (
-	cameraavsettingsuserlevelmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	cameraavstreammanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	webrtctransportproviderdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	webrtctransportrequestordef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	"github.com/SukramJ/go-fabric/schema"
+	cameraavsettingsuserlevelmanagementdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	cameraavstreammanagementdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	webrtctransportproviderdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	webrtctransportrequestordef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Intercom device type identity: 0x0140, revision 2.

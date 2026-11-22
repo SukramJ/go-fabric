@@ -9,9 +9,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // monitored is a peer with a live session at addr1 whose node side the

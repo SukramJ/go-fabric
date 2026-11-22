@@ -16,13 +16,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 
 	// Every generated definition linked, so spec.Lookup knows each.
-	_ "github.com/SukramJ/go-fabric/controller/client"
+	_ "thingfabric.dev/go-fabric/controller/client"
 )
 
 // The redaction rule: the dispatcher scopes every fabric-scoped attribute

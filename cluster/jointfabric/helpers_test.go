@@ -14,13 +14,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
-	opcreds "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/client/jcm"
+	opcreds "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // adminCAT and anchorCAT are version 1 of the Joint Fabric CATs.

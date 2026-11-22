@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // TestNewCounter_SeedsWithin28BitRange verifies that NewCounter's

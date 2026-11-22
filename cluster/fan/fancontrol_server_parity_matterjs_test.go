@@ -13,13 +13,13 @@ import (
 	"slices"
 	"testing"
 
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
 
-	"github.com/SukramJ/go-fabric/cluster/fan"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-	godevice "github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster/fan"
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	godevice "thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // TestFanControlServerParityMatterJS ports the describe "FanControlServer"

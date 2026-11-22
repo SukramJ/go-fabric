@@ -6,9 +6,9 @@
 package device
 
 import (
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	contentappobserverdef "github.com/SukramJ/go-fabric/cluster/spec/contentappobserver"
-	"github.com/SukramJ/go-fabric/schema"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	contentappobserverdef "thingfabric.dev/go-fabric/cluster/spec/contentappobserver"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // CastingVideoClient device type identity: 0x0029, revision 2.

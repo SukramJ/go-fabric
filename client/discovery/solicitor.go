@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // Retries configures a retry schedule, matter.js RetrySchedule.Configuration

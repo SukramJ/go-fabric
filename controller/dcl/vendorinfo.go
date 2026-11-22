@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // VendorInfo is one vendor — matter.js VendorInfo

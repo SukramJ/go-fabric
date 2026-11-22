@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/ble"
-	"github.com/SukramJ/go-fabric/controller/ble/bletest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/btp"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/controller/ble/bletest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/btp"
 )
 
 // bleAdvert is the harness's basic commissioning window.

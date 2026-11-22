@@ -13,13 +13,13 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tbrm "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/caseauth"
-	"github.com/SukramJ/go-fabric/thread"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tbrm "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/caseauth"
+	"thingfabric.dev/go-fabric/thread"
 )
 
 // ThreadBorderRouterManagement (0x0452) after connectedhomeip

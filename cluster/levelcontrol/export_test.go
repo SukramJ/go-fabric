@@ -3,7 +3,7 @@
 
 package levelcontrol
 
-import lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+import lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
 
 // WireOf converts a generated request a LevelSource receives to the
 // cluster/wire struct the tests compare against; any other value is

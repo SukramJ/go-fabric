@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	matterparity "thingfabric.dev/go-fabric/parity"
 )
 
 // matter.js's MatterDefinition is the wire-level reference. The wire

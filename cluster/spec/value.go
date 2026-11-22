@@ -3,7 +3,7 @@
 
 package spec
 
-import "github.com/SukramJ/go-fabric/tlv"
+import "thingfabric.dev/go-fabric/tlv"
 
 // Value is a scalar a controller writes — an attribute value
 // (client.Node.Write, fabrictest.Write) or a command field — as an

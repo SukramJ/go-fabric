@@ -13,13 +13,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gendiag "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	threaddiag "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gendiag "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	netcomm "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	threaddiag "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The reconnect probe (step 18.1): while the operational connection waits

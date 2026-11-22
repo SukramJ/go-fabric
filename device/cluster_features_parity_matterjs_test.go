@@ -20,12 +20,12 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	powersourcedef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/device"
 )
 
 func TestClusterBehaviorFeaturesParityMatterJS(t *testing.T) {

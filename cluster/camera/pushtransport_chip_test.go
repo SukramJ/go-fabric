@@ -18,14 +18,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	tcmdef "github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
-	tcldef "github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
-	zmdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	padef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	tcmdef "thingfabric.dev/go-fabric/cluster/spec/tlscertificatemanagement"
+	tcldef "thingfabric.dev/go-fabric/cluster/spec/tlsclientmanagement"
+	zmdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // mockPush is chip's TestPushAVStreamTransportDelegateImpl: every call

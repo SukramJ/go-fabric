@@ -13,13 +13,13 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/endpoint"
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/endpoint"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // resetStores are a device's stores, held by the test so it can look into

@@ -6,7 +6,7 @@ package mattercert
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // Encode writes c as a Matter TLV operational certificate — the bytes

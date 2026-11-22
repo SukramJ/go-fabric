@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cd "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cd "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
 )
 
 // TestHeldServerReadsTheServersState: the spec.Server a self-held server

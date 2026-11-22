@@ -15,12 +15,12 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/client/sqlstore"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // quietConn is a DNS-SD socket on which nothing answers.

@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/internal/clockvar"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/internal/clockvar"
 )
 
 // PerExchangePaseProvider is a [PaseHandlerProvider] that lazily

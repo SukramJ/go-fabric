@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/peer"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/peer"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
 )
 
 // The BDX-liveness and reboot-armer cases of matter.js's OtaTest

@@ -3,7 +3,7 @@
 
 package measurement
 
-import "github.com/SukramJ/go-fabric/contract"
+import "thingfabric.dev/go-fabric/contract"
 
 // HasBuiltinMaterializer reports whether this package installed a
 // materialiser for the built-in class, for the external tests.

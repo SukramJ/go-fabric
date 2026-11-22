@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 const imProtocolID uint16 = 0x0001

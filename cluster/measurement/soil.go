@@ -9,10 +9,10 @@ import (
 	"math"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	soildef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	soildef "thingfabric.dev/go-fabric/cluster/spec/soilmeasurement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // --- SoilMeasurement (0x0430) ------------------------------------------

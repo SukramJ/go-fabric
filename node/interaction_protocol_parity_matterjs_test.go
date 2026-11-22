@@ -21,15 +21,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
-	admincomm "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acldef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
+	admincomm "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/node"
 )
 
 const (

@@ -6,18 +6,18 @@
 package device
 
 import (
-	audiooutputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
-	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
-	contentcontroldef "github.com/SukramJ/go-fabric/cluster/spec/contentcontrol"
-	keypadinputdef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
-	lowpowerdef "github.com/SukramJ/go-fabric/cluster/spec/lowpower"
-	mediainputdef "github.com/SukramJ/go-fabric/cluster/spec/mediainput"
-	mediaplaybackdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
-	messagesdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	targetnavigatordef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
-	wakeonlandef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
-	"github.com/SukramJ/go-fabric/schema"
+	audiooutputdef "thingfabric.dev/go-fabric/cluster/spec/audiooutput"
+	channeldef "thingfabric.dev/go-fabric/cluster/spec/channel"
+	contentcontroldef "thingfabric.dev/go-fabric/cluster/spec/contentcontrol"
+	keypadinputdef "thingfabric.dev/go-fabric/cluster/spec/keypadinput"
+	lowpowerdef "thingfabric.dev/go-fabric/cluster/spec/lowpower"
+	mediainputdef "thingfabric.dev/go-fabric/cluster/spec/mediainput"
+	mediaplaybackdef "thingfabric.dev/go-fabric/cluster/spec/mediaplayback"
+	messagesdef "thingfabric.dev/go-fabric/cluster/spec/messages"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	targetnavigatordef "thingfabric.dev/go-fabric/cluster/spec/targetnavigator"
+	wakeonlandef "thingfabric.dev/go-fabric/cluster/spec/wakeonlan"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // BasicVideoPlayer device type identity: 0x0028, revision 2.

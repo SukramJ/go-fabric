@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 )
 
 func at(sec int) time.Time { return time.Date(2026, 8, 15, 12, 0, sec, 0, time.UTC) }

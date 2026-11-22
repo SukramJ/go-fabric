@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // Observers are the host's callbacks on the node's fabric and
@@ -112,7 +112,7 @@ type Observers struct {
 	//
 	// Given in [Config] or through [Node.Observe], the hook runs on the
 	// goroutine of the event; for a session replaced under its id by a new one, that is inside the session table's
-	// establishment order ([github.com/SukramJ/go-fabric/secure/operational.Manager.SetOnSessionSuperseded]):
+	// establishment order ([thingfabric.dev/go-fabric/secure/operational.Manager.SetOnSessionSuperseded]):
 	// it must not block on, or take a lock held across, anything that
 	// establishes a CASE session on this node (F-b25ed960-40).
 	// [Node.ObserveAsync] has no such rule.
@@ -125,7 +125,7 @@ type Observers struct {
 	// Given in [Config] or through [Node.Observe], the hook runs on the
 	// goroutine of the event; for a subscription moved by a supersession (a newer session of the
 	// same subject), that is inside the session table's
-	// establishment order ([github.com/SukramJ/go-fabric/secure/operational.Manager.SetOnSessionSuperseded]):
+	// establishment order ([thingfabric.dev/go-fabric/secure/operational.Manager.SetOnSessionSuperseded]):
 	// it must not block on, or take a lock held across, anything that
 	// establishes a CASE session on this node (F-b25ed960-40).
 	// [Node.ObserveAsync] has no such rule.

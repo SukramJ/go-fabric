@@ -22,13 +22,13 @@ import (
 	"sync/atomic"
 	"testing"
 
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/internal/fabrictestseam"
-	"github.com/SukramJ/go-fabric/node"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/internal/fabrictestseam"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // staleFabricIndex is STALE_FABRIC_INDEX (:106): an index the device never

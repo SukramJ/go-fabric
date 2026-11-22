@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/parity"
 )
 
 // The order of a cluster's attributes in every report of this module —

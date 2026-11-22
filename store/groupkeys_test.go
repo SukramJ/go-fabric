@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // epochKey returns a deterministic 16-byte epoch key for test use.

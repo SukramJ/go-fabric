@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-const seamPath = "github.com/SukramJ/go-fabric/internal/sessionseam"
+const seamPath = "thingfabric.dev/go-fabric/internal/sessionseam"
 
 // installer is the one package outside the tests that may name OpenAt: it
 // installs the hook.

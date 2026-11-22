@@ -82,7 +82,7 @@ supply that a library cannot is in
 
 The site (rendered from `docs/`) is at
 <https://docs.thingfabric.dev/>; the API reference is
-[pkg.go.dev](https://pkg.go.dev/github.com/SukramJ/go-fabric).
+[pkg.go.dev](https://pkg.go.dev/thingfabric.dev/go-fabric).
 
 | | |
 | --- | --- |
@@ -319,7 +319,7 @@ A release pull request (head branch `release/*`) is also the gate of the
 certification run: it runs every chip-tool job and certification family the
 nightly run does, checks that the nested modules build against the versions
 they require, and cannot merge with one of them red
-([Certifiability](https://github.com/SukramJ/go-fabric/blob/main/docs/certifiability.md#how-the-status-is-produced)).
+([Certifiability](https://github.com/thingfabric/go-fabric/blob/main/docs/certifiability.md#how-the-status-is-produced)).
 
 A guard holds the rule: `make apidiff` compares every public package with
 the last release tag (`golang.org/x/exp/cmd/apidiff`, a tool dependency of

@@ -7,9 +7,9 @@ import (
 	"net"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // Descriptor is what is known about a peer — a node on one of our

@@ -3,7 +3,7 @@
 
 package bridge
 
-import "github.com/SukramJ/go-fabric/im"
+import "thingfabric.dev/go-fabric/im"
 
 // sendReportChunks is [Bridge.sendReportChunksNotify] without the final
 // wait, for the tests that drive a report's chunks themselves. It has no

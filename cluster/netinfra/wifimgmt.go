@@ -12,13 +12,13 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	wdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/caseauth"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	wdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkmanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/caseauth"
 )
 
 // WiFiNetworkManagement (0x0451) after connectedhomeip

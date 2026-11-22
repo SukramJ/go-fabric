@@ -20,7 +20,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/attestation"
 )
 
 // maxDERCertificateSize is MAX_DER_CERTIFICATE_SIZE (kinds/common.ts:13),

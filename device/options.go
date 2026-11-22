@@ -12,14 +12,14 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/clock"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/clock"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // Options is what the host states about one device beyond its type: the

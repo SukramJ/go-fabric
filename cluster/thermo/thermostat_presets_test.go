@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The behaviour of the Presets and Occupancy features no matter.js test

@@ -8,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/jointfabric"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	opcreds "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/jointfabric"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	jfadef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	opcreds "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // commissionerReach is the node's [jointfabric.CommissionerReach]: it

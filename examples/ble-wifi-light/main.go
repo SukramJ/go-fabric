@@ -30,12 +30,12 @@ import (
 	"slices"
 	"syscall"
 
-	"github.com/SukramJ/go-fabric/ble/bluez"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/wifi/wpasupplicant"
+	"thingfabric.dev/go-fabric/ble/bluez"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/wifi/wpasupplicant"
 )
 
 // options are the command's flags.

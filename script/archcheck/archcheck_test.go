@@ -19,7 +19,7 @@ import (
 
 // modulePath is this module's import path; every edge is reduced to a path
 // relative to it.
-const modulePath = "github.com/SukramJ/go-fabric"
+const modulePath = "thingfabric.dev/go-fabric"
 
 //go:embed layers.json
 var layersJSON []byte

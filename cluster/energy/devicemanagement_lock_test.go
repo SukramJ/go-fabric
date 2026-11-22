@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	dem "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
 )
 
 // settingDemHost reports the device's state through the server's setter

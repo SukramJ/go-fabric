@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // The facade opens and closes the node's window without the bridge's

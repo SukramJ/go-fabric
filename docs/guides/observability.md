@@ -18,7 +18,7 @@ logger of its own: `bridge.New`, `transport/udp.Config`, the
 `client/*` packages (handshake, exchange, interaction, peer) and the
 controller. The module never builds a handler. Only the executables
 under `examples/` do, so the host chooses the format, the level and where
-the lines go ([ADR 0026](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0026-architecture-principles.md)
+the lines go ([ADR 0026](https://github.com/thingfabric/go-fabric/blob/main/docs/adr/0026-architecture-principles.md)
 principle 9).
 
 `fabrictest` is the exception, on purpose. A test site discards its hosts'
@@ -169,7 +169,7 @@ Wi-Fi passphrase — hands it to every client of that handler. Serve the
 variables you mean to serve instead. The reference bridge does: its
 `--metrics-expvar 127.0.0.1:9090` serves the `fabric.` variables only, in
 the same JSON shape
-([`metrics.go`](https://github.com/SukramJ/go-fabric/blob/main/examples/reference-bridge/metrics.go)),
+([`metrics.go`](https://github.com/thingfabric/go-fabric/blob/main/examples/reference-bridge/metrics.go)),
 and belongs on a loopback address.
 
 ## The diagnostic trace

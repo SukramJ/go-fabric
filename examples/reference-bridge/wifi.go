@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"sync"
 
-	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/node"
+	wifidiagdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkdiagnostics"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // --wifi (TESTING ONLY): the root serves WiFiNetworkDiagnostics from a

@@ -23,12 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/im"
-	mstore "github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/cluster/core"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/im"
+	mstore "thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // rowBacking is a store the row tests run on: both the in-memory store

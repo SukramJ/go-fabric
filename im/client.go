@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The client side of the Interaction Model messages: the encoders of the

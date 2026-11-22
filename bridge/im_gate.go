@@ -4,8 +4,8 @@
 package bridge
 
 import (
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // imGateAction is the pre-dispatch routing decision for an inbound IM

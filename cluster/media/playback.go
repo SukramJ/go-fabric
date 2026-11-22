@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	mpdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	mpdef "thingfabric.dev/go-fabric/cluster/spec/mediaplayback"
 )
 
 // PlaybackState is the MediaPlayback attribute state (matter.js

@@ -6,7 +6,7 @@ package jcm_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/jcm"
+	"thingfabric.dev/go-fabric/client/jcm"
 )
 
 // TestMachineRules: TrustVerification.cpp:45-76 — Progress hears every

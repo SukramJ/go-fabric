@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/internal/sealseam"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/internal/sealseam"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // Reseal moves a controller's database from the sealer old to the sealer

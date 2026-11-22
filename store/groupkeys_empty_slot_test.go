@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // TestGroupKey_EmptyOptionalSlotReadsAbsent: an empty epoch key 1 an

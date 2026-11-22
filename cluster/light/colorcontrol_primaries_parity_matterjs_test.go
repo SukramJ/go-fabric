@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/light"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"thingfabric.dev/go-fabric/cluster/light"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
 )
 
 // TestParityMatterJS_ColorControlPrimaries ports matter.js's "accepts a

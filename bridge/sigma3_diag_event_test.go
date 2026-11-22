@@ -6,8 +6,8 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/diagevent"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // TestSigma3RecordsACompletedHandshakeOnlyWhenOneCompleted: the diagnostic

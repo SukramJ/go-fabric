@@ -17,14 +17,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/clock"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/clock"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // Peer is a node's address on our fabric.

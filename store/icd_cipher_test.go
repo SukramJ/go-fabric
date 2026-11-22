@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestICDKeyErrors: Upgrade on a database without registrations creates

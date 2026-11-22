@@ -6,9 +6,9 @@
 package device
 
 import (
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // WindowCoveringController device type identity: 0x0203, revision 5.

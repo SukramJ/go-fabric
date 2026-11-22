@@ -6,10 +6,10 @@
 package device
 
 import (
-	threadborderroutermanagementdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	threadnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	threadnetworkdirectorydef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	"github.com/SukramJ/go-fabric/schema"
+	threadborderroutermanagementdef "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	threadnetworkdiagnosticsdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	threadnetworkdirectorydef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ThreadBorderRouter device type identity: 0x0091, revision 2.

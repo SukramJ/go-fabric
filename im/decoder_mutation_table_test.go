@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The Interaction Model message decoders, request and response side, held

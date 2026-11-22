@@ -17,8 +17,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/filter"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/cluster/filter"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
 )
 
 func conditionConfig(condition uint8) filter.Config {

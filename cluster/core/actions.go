@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/internal/deepcopy"
+	"thingfabric.dev/go-fabric/internal/deepcopy"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	actionsdef "thingfabric.dev/go-fabric/cluster/spec/actions"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // actionsMaxListLength bounds ActionList and EndpointLists: connectedhomeip

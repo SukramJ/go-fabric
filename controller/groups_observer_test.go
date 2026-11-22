@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestSetGroupKeyObserverClosesTheController (review II, R2-P6-conc-2301,

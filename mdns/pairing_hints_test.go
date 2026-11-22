@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestPairingHintsEveryBitAdvertised (R2-P5-apinode-03): each of the 23

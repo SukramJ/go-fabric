@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
 )
 
 // laterHost is a host that applies an Options or OnLevel write later: its

@@ -3,7 +3,7 @@
 
 package node
 
-import "github.com/SukramJ/go-fabric/contract"
+import "thingfabric.dev/go-fabric/contract"
 
 // Metrics is the port [Config].Metrics takes ([contract.Metrics]): the
 // host's counters and gauges. A host's implementation imports contract

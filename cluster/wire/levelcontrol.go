@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // LevelControl command IDs per Matter §1.6.7.

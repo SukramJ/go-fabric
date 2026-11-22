@@ -19,18 +19,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/bridge/bridgetest"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	bidef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/sqlitestore"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // centralKey is a host's composite stable key, the shape a per-central

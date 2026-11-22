@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/tls"
-	epmem "github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/cluster/tls"
+	epmem "thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // TestValidateBoundsTheUncheckedFields (review II, R2-P6-api-2409,

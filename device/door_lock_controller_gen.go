@@ -6,8 +6,8 @@
 package device
 
 import (
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	"github.com/SukramJ/go-fabric/schema"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // DoorLockController device type identity: 0x000B, revision 4.

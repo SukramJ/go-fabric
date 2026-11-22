@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // TestSpecVersion decodes matter.js's example 0x01040200 as 1.4.2 and the

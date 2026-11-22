@@ -16,10 +16,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/inflight"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Errors.

@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/aesccm"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 func groupHeader(privacy bool) message.Header {

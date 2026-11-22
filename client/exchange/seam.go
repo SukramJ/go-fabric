@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/SukramJ/go-fabric/internal/exchangeseam"
+	"thingfabric.dev/go-fabric/internal/exchangeseam"
 )
 
 // The one-way seam for a test outside this package that stands in for

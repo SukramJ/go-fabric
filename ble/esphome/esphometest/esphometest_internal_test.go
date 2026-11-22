@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/ble/bletest"
+	"thingfabric.dev/go-fabric/controller/ble/bletest"
 
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 // eventually waits up to five seconds for cond.

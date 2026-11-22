@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestDecodeMoveToLevelAllFields verifies the full field set decodes

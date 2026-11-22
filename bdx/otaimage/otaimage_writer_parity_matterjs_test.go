@@ -18,7 +18,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
 )
 
 func TestOtaImageWriterCreate(t *testing.T) {

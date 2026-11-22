@@ -8,7 +8,7 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // Advertise is the commissioner record a controller publishes over DNS-SD

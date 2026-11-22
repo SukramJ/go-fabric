@@ -8,9 +8,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/softwareupdate"
 )
 
 // TestOTAForgetsANodeTheRegistryDeleted (review II, R2-P6-bound-1914,

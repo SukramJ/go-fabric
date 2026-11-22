@@ -6,10 +6,10 @@ package device
 import (
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	acsdef "github.com/SukramJ/go-fabric/cluster/spec/ambientcontextsensing"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	acsdef "thingfabric.dev/go-fabric/cluster/spec/ambientcontextsensing"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The kit's AmbientContextSensing server (cluster/sensing, brief 26-C).

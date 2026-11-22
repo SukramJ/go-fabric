@@ -6,12 +6,12 @@
 package device
 
 import (
-	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	microwaveovencontroldef "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
-	microwaveovenmodedef "github.com/SukramJ/go-fabric/cluster/spec/microwaveovenmode"
-	operationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	"github.com/SukramJ/go-fabric/schema"
+	fancontroldef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	microwaveovencontroldef "thingfabric.dev/go-fabric/cluster/spec/microwaveovencontrol"
+	microwaveovenmodedef "thingfabric.dev/go-fabric/cluster/spec/microwaveovenmode"
+	operationalstatedef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // MicrowaveOven device type identity: 0x0079, revision 2.

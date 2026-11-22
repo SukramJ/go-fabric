@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	"github.com/SukramJ/go-fabric/contract"
+	gendiagdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // faultHost is a host's fault port with matter.js's convenience methods:

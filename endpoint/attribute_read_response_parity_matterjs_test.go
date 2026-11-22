@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // wildcardStatusTopology is root (0), aggregator (1) and endpoint 2 serving

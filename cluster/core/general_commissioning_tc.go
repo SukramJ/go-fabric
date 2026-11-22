@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The TermsAndConditions (TC) feature of GeneralCommissioning — ahead of

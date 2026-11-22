@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // Margins are the additive MRP retransmission margins of a network, by

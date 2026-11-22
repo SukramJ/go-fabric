@@ -9,10 +9,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/servicearea"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/servicearea"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	sa "thingfabric.dev/go-fabric/cluster/spec/servicearea"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // statusCodeOf is the IM status an error carries.

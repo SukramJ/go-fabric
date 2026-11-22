@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // The app-pipe commands of the soil sensor and the node clusters, kept

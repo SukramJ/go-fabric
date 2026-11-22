@@ -12,7 +12,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // openWithoutForeignKeys opens path a second time with a DSN that sets no

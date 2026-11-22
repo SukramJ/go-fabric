@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // Provider is the raw route to one camera's WebRtcTransportProvider: the
