@@ -1,15 +1,15 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)
-Entry points: 10274 across 290 test packages, and 369 package initializers.
+Entry points: 10279 across 290 test packages, and 369 package initializers.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 28016 |
+| Total exported | 28021 |
 | Reached by a test | 20958 |
-| Whitelisted | 7036 |
+| Whitelisted | 7041 |
 | **Unreached** | **22** |
 
 ## Top-20 packages by unreached exported identifiers
@@ -34,8 +34,8 @@ Entry points: 10274 across 290 test packages, and 369 package initializers.
 |---|---|---|---|
 | bdx | ServerSession.InitType | bdx/responder.go | 568 |
 | bdx | ServerSession.Scope | bdx/responder.go | 562 |
-| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3284 |
-| bridge | Bridge.SubscriptionFlushReporter | bridge/subscribe.go | 404 |
+| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3302 |
+| bridge | Bridge.SubscriptionFlushReporter | bridge/subscribe.go | 407 |
 | client/exchange | Manager.LocalFixedMrpBackoff | client/exchange/manager.go | 254 |
 | cluster/core | OperationalCredentials.RolledBackUpdates | cluster/core/operational_credentials.go | 736 |
 | cluster/core | ScenesState.ForgetFabric | cluster/core/scenes_management.go | 540 |
