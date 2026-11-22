@@ -51,7 +51,7 @@
 // # The harness
 //
 // By default the suite runs chip-tool and the Python harness inside the
-// module's own harness image (ghcr.io/sukramj/go-fabric-chip, amd64: matter.js's
+// module's own harness image (ghcr.io/thingfabric/go-fabric-chip, amd64: matter.js's
 // CHIP image plus chip's jf-admin-app, jf-control-app and Push AV server,
 // internal/chiptool/image), pinned by digest in the Makefile's
 // CHIP_TEST_IMAGE; the CHIP commit it was built from is logged with every

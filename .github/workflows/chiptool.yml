@@ -3,7 +3,7 @@
 # commissioner and the CSA certification harness on the other side of the
 # wire, against the reference daemon in examples/reference-bridge.
 #
-# Everything runs in the module's harness image (ghcr.io/sukramj/go-fabric-chip,
+# Everything runs in the module's harness image (ghcr.io/thingfabric/go-fabric-chip,
 # matter.js's CHIP image plus chip's joint-fabric apps and Push AV server),
 # pinned by digest in the Makefile (CHIP_TEST_IMAGE) — the single source for
 # the commissioner, the harness and the CHIP reference apps, at one CHIP
