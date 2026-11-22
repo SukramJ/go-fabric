@@ -42,7 +42,7 @@ still held there. Each row names the facade route, or the section of
 | `cluster/core` | `SoftwareVersionFromString` (`daemon_matter.go:527`) | `node.SoftwareVersionFromString` |
 | `cluster/core` | `RegulatoryIndoorOutdoor` (`daemon_matter.go:506`) | `node.RegulatoryIndoorOutdoor` for `Commissioning.LocationCapability` |
 
-## Deprecated in the next release, removable in v0.26.0: the OTA provider's hooks
+## Deprecated in v0.24.0, removable in v0.26.0: the OTA provider's hooks
 
 The OTA provider's requestors now have update attempts, owned by the
 provider's manager: `OTAProviderConfig.Manager` (`cluster/core`, `node`,
@@ -76,7 +76,7 @@ then closes the gap only for the manager's queued update, not for an
 offer the default manager made — and `ProviderConfig()` no longer fills
 the hooks such a host copied.
 
-## Changed in the next release: the update queue's phases and the NOC rotation
+## Changed in v0.24.0: the update queue's phases and the NOC rotation
 
 `controller/softwareupdate.Manager` follows matter.js's update phases
 (decision 292). No signature changed; what a host observes did:
@@ -226,7 +226,7 @@ func (r myReach) ReadFabrics(ctx context.Context, peer jfadef.Peer) ([]opcreds.F
 A node with `Config.Client` on needs no reach of its own: it mounts one
 over its client stack where the declaration names none.
 
-## Changed in the next release: the resumption record's role (schema v12)
+## Changed in v0.24.0: the resumption record's role (schema v12)
 
 The per-fabric cap of 16 resumption records counts only the CASE
 responder's records; the records the CASE client writes have a per-fabric
