@@ -1475,14 +1475,21 @@ func (s *caseEstablishment) save(p *pendingCASE) {
 	s.ids.claims.release(p.presented)
 }
 
-// put records p's session as establishing.
+// put records p's session as establishing. A unit still pending under
+// the same id — its session closed and the id handed out again before its
+// handshake's completion — ends as a failed handshake ends: its presented
+// id goes back and nothing is saved (F-b25ed960-58).
 func (s *caseEstablishment) put(p *pendingCASE) {
 	s.mu.Lock()
 	if s.entries == nil {
 		s.entries = map[uint16]*pendingCASE{}
 	}
+	replaced := s.entries[p.entry.SessionID]
 	s.entries[p.entry.SessionID] = p
 	s.mu.Unlock()
+	if replaced != nil && replaced != p {
+		replaced.discard(&s.ids.claims)
+	}
 	if s.afterPut != nil {
 		s.afterPut()
 	}
