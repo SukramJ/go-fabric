@@ -6,7 +6,7 @@ require (
 	github.com/flynn/noise v1.1.0
 	github.com/miekg/dns v1.1.73
 	golang.org/x/crypto v0.59.0
-	thingfabric.dev/go-fabric v0.24.0
+	thingfabric.dev/go-fabric v0.25.0
 )
 
 require (

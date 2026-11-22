@@ -3,9 +3,9 @@ module thingfabric.dev/go-fabric/examples/ble-wifi-light
 go 1.27.4
 
 require (
-	thingfabric.dev/go-fabric v0.24.0
-	thingfabric.dev/go-fabric/ble/bluez v0.24.0
-	thingfabric.dev/go-fabric/wifi/wpasupplicant v0.24.0
+	thingfabric.dev/go-fabric v0.25.0
+	thingfabric.dev/go-fabric/ble/bluez v0.25.0
+	thingfabric.dev/go-fabric/wifi/wpasupplicant v0.25.0
 )
 
 require (

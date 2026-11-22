@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/godbus/dbus/v5 v5.2.4
-	thingfabric.dev/go-fabric v0.24.0
+	thingfabric.dev/go-fabric v0.25.0
 )
 
 require golang.org/x/sys v0.49.0 // indirect

@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules move with the root to `thingfabric.dev/go-fabric/ble/bluez`, `thingfabric.dev/go-fabric/ble/esphome` and `thingfabric.dev/go-fabric/wifi/wpasupplicant`, require go-fabric `v0.25.0` (before `github.com/SukramJ/go-fabric v0.24.0`) and are tagged `ble/bluez/v0.25.0`, `ble/esphome/v0.25.0` and `wifi/wpasupplicant/v0.25.0` at this commit; `examples/ble-wifi-light` requires the three at `v0.25.0`. No code change beyond the import paths.
+
 ## [0.25.0] — 2026-11-22
 
 The module moves to the GitHub organisation `thingfabric` and to the import path `thingfabric.dev/go-fabric`. No behaviour and no identifier changes; upgrading requires a source change: the imports (migration below). The nested modules follow with `ble/bluez/v0.25.0`, `ble/esphome/v0.25.0` and `wifi/wpasupplicant/v0.25.0` in a release of their own that requires `v0.25.0`.
