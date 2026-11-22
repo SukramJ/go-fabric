@@ -432,15 +432,37 @@ func issueScheduleHandles(list []Schedule) error {
 	return nil
 }
 
+// resolveScheduleBuiltIns gives every schedule of list with a null BuiltIn
+// the BuiltIn of the stored schedule with its handle, false without one.
+// Mirrors matter.js
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:3041-3047 at
+// b25ed960
+// (#normalizeSchedules), after the handles are issued.
+func resolveScheduleBuiltIns(stored, list []Schedule) {
+	for i := range list {
+		if !list[i].BuiltIn.Null {
+			continue
+		}
+		list[i].BuiltIn = spec.ValueOf(false)
+		if list[i].ScheduleHandle.Null {
+			continue
+		}
+		if match, ok := scheduleWithHandle(stored, list[i].ScheduleHandle.Value); ok && !match.BuiltIn.Null {
+			list[i].BuiltIn = match.BuiltIn
+		}
+	}
+}
+
 // writeSchedules is a controller's write of Schedules: only the peer
 // holding an atomic write of it may write, another peer's write is
 // INVALID_IN_STATE where Presets answers BUSY (AtomicWriteHandler.ts:54-56,
 // :474-479 at b25ed960); no atomic write is INVALID_IN_STATE (:467-469).
 // The list is validated against the stored schedules and the peer's own
 // pending Presets — schedules$AtomicChanging (ThermostatServer.ts:2581-2591)
-// — and staged with its null BuiltIn resolved, which is Go's own: matter.js
-// stages the value as written and resolves it at pre-commit (:3004-3007,
-// :3041-3047; findings register, F3).
+// — and staged as written, a null BuiltIn kept null: matter.js keeps the
+// written value pending unchanged (AtomicWriteHandler.ts:272 at b25ed960),
+// checked, not normalized (ThermostatServer.ts:3004-3007), and resolves
+// it when it stores the value ([ThermostatServer.commitSchedules]).
 func (s *ThermostatServer) writeSchedules(ctx context.Context, v any) error {
 	list, err := schedulesValue(v)
 	if err != nil {
@@ -456,7 +478,10 @@ func (s *ThermostatServer) writeSchedules(ctx context.Context, v any) error {
 		}
 		stored, rules := s.schedules, s.scheduleRules(presets)
 		s.mu.RUnlock()
-		return rules.validateSchedules(stored, list)
+		if _, err := rules.validateSchedules(stored, list); err != nil {
+			return nil, err
+		}
+		return deepcopy.Each(list), nil
 	})
 }
 
@@ -473,15 +498,21 @@ func schedulesTLVEqual(a, b []Schedule) bool {
 
 // commitSchedules stores the schedules an atomic write staged, after
 // precommitAtomic passed: every new schedule gets a handle
-// ([issueScheduleHandles]), the [SchedulePort] stores the list — its
-// error fails the commit — and the list is stored and reported. The port
-// may confirm the list through [ThermostatServer.SetSchedules], the
-// host's replace. The caller holds s.op.
+// ([issueScheduleHandles]) and a null BuiltIn is resolved against the
+// stored schedules ([resolveScheduleBuiltIns]) — matter.js
+// #normalizeSchedules at pre-commit (ThermostatServer.ts:3028-3049 at
+// b25ed960) —, the [SchedulePort] stores the list — its error fails the
+// commit — and the list is stored and reported. The port may confirm the
+// list through [ThermostatServer.SetSchedules], the host's replace. The
+// caller holds s.op.
 func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedule) error {
 	list := deepcopy.Each(staged)
 	if err := issueScheduleHandles(list); err != nil {
 		return err
 	}
+	s.mu.RLock()
+	resolveScheduleBuiltIns(s.schedules, list)
+	s.mu.RUnlock()
 	if s.schedulePort != nil {
 		if err := s.schedulePort.CommitSchedules(ctx, deepcopy.Each(list)); err != nil {
 			return err
