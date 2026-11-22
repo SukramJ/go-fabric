@@ -694,8 +694,10 @@ func (s *Session) completeEstablishment() bool {
 // onEstablished, when not nil, in the call that establishes the session:
 // after the session became established and before the per-peer cap's
 // eviction it sets off, so whoever onEstablished hands the session to
-// holds it before any effect of the establishment is observable —
-// "established ⇒ adopted" (F-b25ed960-44). matter.js's established event
+// holds it before the establishment's eviction and before the
+// establishing call returns (F-b25ed960-44) — an order inside that call,
+// not a state other goroutines can rely on: the session reads as
+// established before onEstablished ran. matter.js's established event
 // adds the session to the established set, whose added observer adopts it
 // into its peer, and queues the eviction
 // (packages/protocol/src/session/NodeSession.ts:241-251,

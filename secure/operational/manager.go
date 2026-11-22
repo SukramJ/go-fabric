@@ -1320,8 +1320,8 @@ func (m *Manager) openFromSigma(id uint16, stake *Stake, fabricIndex uint8, loca
 	}
 	// An establishing install supersedes nothing yet: only an
 	// establishment takes the establishment order ([Manager.establishMu]).
-	// The occupant's close hooks below then run inside it too, and must
-	// not establish on this manager either.
+	// The occupant's close hooks below — and its CloseSession — then run
+	// inside it too; the hooks must not establish on this manager either.
 	ordered := !entry.establishing
 	if ordered {
 		m.establishMu.Lock()
