@@ -9,11 +9,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/levelcontrol"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
 
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // TestNativeDimmerTakesTheHandOffPath: the native dimmer's lamp ramps by

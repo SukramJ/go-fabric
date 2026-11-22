@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // Scanner constants. Mirrors matter.js 0ceb202d

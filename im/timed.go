@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TimedRequestMessage tag numbers per Matter Core Spec §10.6.10.

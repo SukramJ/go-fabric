@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	"thingfabric.dev/go-fabric/cluster/alarm"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
 )
 
 // laterAlarm is a host that applies a write later: its state does not

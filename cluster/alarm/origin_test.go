@@ -9,10 +9,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/alarm"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestSmokeCoAlarmOrigins is the origin audit of the pull SmokeCoAlarm

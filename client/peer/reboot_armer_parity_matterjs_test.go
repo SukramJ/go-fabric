@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/clock/clocktest"
 )
 
 var armerPeer = exchange.PeerAddress{FabricIndex: 0, NodeID: 0x44c}

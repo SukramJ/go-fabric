@@ -7,10 +7,10 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	descdef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // writeValue runs the attribute writer over v under context tag 2.

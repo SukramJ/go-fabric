@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/controller/ca"
 )
 
 // TestGenerateNOCValidatesTheCATList mirrors matter.js

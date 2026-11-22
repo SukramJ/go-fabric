@@ -120,6 +120,6 @@ formatters:
         group-params: true
     goimports:
       local-prefixes:
-        - github.com/SukramJ/go-fabric
+        - thingfabric.dev/go-fabric
   exclusions:
     generated: lax

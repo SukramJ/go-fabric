@@ -8,10 +8,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lcfg "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
-	tfl "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lcfg "thingfabric.dev/go-fabric/cluster/spec/localizationconfiguration"
+	tfl "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // countingSink counts the writes that reach it.

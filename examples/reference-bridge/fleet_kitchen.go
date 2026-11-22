@@ -8,15 +8,15 @@ import (
 	"log/slog"
 	"sync"
 
-	dwadef "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
-	ldcdef "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
-	mwocdef "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
-	mwomdef "github.com/SukramJ/go-fabric/cluster/spec/microwaveovenmode"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
-	ovenmdef "github.com/SukramJ/go-fabric/cluster/spec/ovenmode"
-	tcdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/device"
+	dwadef "thingfabric.dev/go-fabric/cluster/spec/dishwasheralarm"
+	ldcdef "thingfabric.dev/go-fabric/cluster/spec/laundrydryercontrols"
+	mwocdef "thingfabric.dev/go-fabric/cluster/spec/microwaveovencontrol"
+	mwomdef "thingfabric.dev/go-fabric/cluster/spec/microwaveovenmode"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	ovendef "thingfabric.dev/go-fabric/cluster/spec/ovencavityoperationalstate"
+	ovenmdef "thingfabric.dev/go-fabric/cluster/spec/ovenmode"
+	tcdef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // The kitchen appliances: a dishwasher with its alarm, an oven with a

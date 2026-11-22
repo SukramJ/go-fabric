@@ -13,10 +13,10 @@ package lock_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/lock"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/cluster/lock"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func TestDoorLockServerScheduleRestrictedAccessParity(t *testing.T) {

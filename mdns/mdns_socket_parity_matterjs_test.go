@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestMdnsSocketQuerySplittingParityMatterJS mirrors

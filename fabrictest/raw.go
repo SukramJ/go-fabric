@@ -6,9 +6,9 @@ package fabrictest
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // rawExchange (internal/fabrictestseam.Exchange) sends one Interaction Model message — opcode and its TLV

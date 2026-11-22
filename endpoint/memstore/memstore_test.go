@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/memstore"
 )
 
 var ctx = context.Background()

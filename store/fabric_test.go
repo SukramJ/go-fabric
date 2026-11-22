@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // newFabricRecord builds a minimal FabricRecord for the given index and seed.

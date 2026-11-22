@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // renderings is every way v, and ptr pointing at it, reach a log or a

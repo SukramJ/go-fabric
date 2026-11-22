@@ -30,12 +30,12 @@ import (
 	"sync"
 	"time"
 
-	clustercamera "github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	wpdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/im"
+	clustercamera "thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // AllocatedVideoStream is the id of the live-view video stream the camera

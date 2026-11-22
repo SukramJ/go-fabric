@@ -6,7 +6,7 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/cluster/spec/descriptor"
 )
 
 // TestImageQuotaChargesTheStructureADescriptorListCreates (review II,

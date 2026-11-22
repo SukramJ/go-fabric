@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/internal/sealseam"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/internal/sealseam"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func init() {

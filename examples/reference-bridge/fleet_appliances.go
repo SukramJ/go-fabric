@@ -10,17 +10,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lwcdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
-	lwmdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	rfadef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
-	rtccdef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
-	rvccdef "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
-	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	rvcrdef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
-	tcdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lwcdef "thingfabric.dev/go-fabric/cluster/spec/laundrywashercontrols"
+	lwmdef "thingfabric.dev/go-fabric/cluster/spec/laundrywashermode"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	rfadef "thingfabric.dev/go-fabric/cluster/spec/refrigeratoralarm"
+	rtccdef "thingfabric.dev/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
+	rvccdef "thingfabric.dev/go-fabric/cluster/spec/rvccleanmode"
+	rvcopdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	rvcrdef "thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
+	tcdef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // The two appliances below run a programme: the device kit's

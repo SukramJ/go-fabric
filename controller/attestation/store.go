@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // PAA is one trusted Product Attestation Authority — what matter.js's

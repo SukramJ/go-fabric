@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"testing"
 
-	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	netcomm "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
 )
 
 func TestScanNetworksRejectionParity_ThreadScanRejected(t *testing.T) {

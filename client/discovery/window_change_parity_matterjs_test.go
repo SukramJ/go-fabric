@@ -24,7 +24,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // The constants of CommissionableMdnsScannerWindowChangeTest.ts:37-50.

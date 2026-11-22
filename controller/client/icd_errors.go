@@ -11,7 +11,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/SukramJ/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd"
 )
 
 // TrustedEcosystemVendors are the administrators an ICD registration's

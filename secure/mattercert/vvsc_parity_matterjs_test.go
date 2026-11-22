@@ -18,7 +18,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // vvscCert is matter.js's vvscCert (:160-178): issuer rcac-id 1, subject

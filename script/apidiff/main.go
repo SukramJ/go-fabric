@@ -33,6 +33,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -43,7 +44,7 @@ import (
 	"strings"
 )
 
-const module = "github.com/SukramJ/go-fabric"
+const module = "thingfabric.dev/go-fabric"
 
 func main() {
 	check := flag.Bool("check", false, "fail when an incompatible change has no CHANGELOG line under [Unreleased]")
@@ -178,7 +179,17 @@ func compare(t target, base, head, tmp, tool string, check bool, changelog strin
 		return false, err
 	}
 	oldExport, newExport := filepath.Join(tmp, "old.export"), filepath.Join(tmp, "new.export")
-	if err := runIn(filepath.Join(old, t.Dir), tool, "-m", "-w", oldExport, t.Path); err != nil {
+	// The tag is exported under the module path its own go.mod declares,
+	// which differs from t.Path across a move (v0.24.1 is
+	// github.com/SukramJ/go-fabric, v0.25.0 thingfabric.dev/go-fabric).
+	// apidiff's ModuleChanges pairs packages by their path relative to the
+	// module (golang.org/x/exp apidiff.go, relativePath), so a moved
+	// module is compared package by package, not reported as removed.
+	oldPath, err := modulePath(filepath.Join(old, t.Dir))
+	if err != nil {
+		return false, fmt.Errorf("tag %s: %w", base, err)
+	}
+	if err := runIn(filepath.Join(old, t.Dir), tool, "-m", "-w", oldExport, oldPath); err != nil {
 		return false, fmt.Errorf("export %s: %w", base, err)
 	}
 	if err := runIn(t.Dir, tool, "-m", "-w", newExport, t.Path); err != nil {
@@ -188,7 +199,24 @@ func compare(t target, base, head, tmp, tool string, check bool, changelog strin
 	if err != nil {
 		return false, fmt.Errorf("compare: %w", err)
 	}
-	changes := parse(out, t)
+	oldRoot, err := modulePath(old)
+	if err != nil {
+		return false, fmt.Errorf("tag %s: %w", base, err)
+	}
+	changes, moves := splitMoves(parse(out, t), oldRoot, module)
+	if len(moves) > 0 {
+		fmt.Printf("apidiff: %s: %d change(s) against %s only move the module path %s → %s\n", t.Path, len(moves), base, oldRoot, module)
+		if check {
+			text, err := unreleased(changelog, base)
+			if err != nil {
+				return false, err
+			}
+			if !word(module).MatchString(text) {
+				fmt.Printf("apidiff: %s: the move to %s is not named under [Unreleased] or a release newer than %s (### Changed, ### Removed or ### Deprecated) in CHANGELOG.md\n", t.Path, module, base)
+				return false, nil
+			}
+		}
+	}
 	if len(changes) == 0 {
 		fmt.Printf("apidiff: %s: no incompatible change against %s\n", t.Path, base)
 		return true, nil
@@ -251,6 +279,25 @@ func output(name string, args ...string) (string, error) {
 		return "", fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// modulePath is the module path the go.mod in dir declares.
+func modulePath(dir string) (string, error) {
+	cmd := exec.CommandContext(context.Background(), "go", "mod", "edit", "-json") //nolint:gosec // as output
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("go mod edit -json in %s: %w", dir, err)
+	}
+	var mod struct{ Module struct{ Path string } }
+	if err := json.Unmarshal(out, &mod); err != nil {
+		return "", fmt.Errorf("go mod edit -json in %s: %w", dir, err)
+	}
+	if mod.Module.Path == "" {
+		return "", fmt.Errorf("go mod edit -json in %s: no module path", dir)
+	}
+	return mod.Module.Path, nil
 }
 
 func runIn(dir, name string, args ...string) error {

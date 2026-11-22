@@ -8,7 +8,7 @@
 // commissioning channel that runs PASE over a BTP session to one
 // peripheral ([Dial], [Channel]). It carries no dependency and opens no
 // radio: the BlueZ implementation is the separate module
-// github.com/SukramJ/go-fabric/ble/bluez (ADR 0024, decision 3), an
+// thingfabric.dev/go-fabric/ble/bluez (ADR 0024, decision 3), an
 // in-memory one is in ble/bletest.
 //
 // A port of matter.js at 0ceb202d: the scanner of

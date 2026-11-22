@@ -15,8 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/transport"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/transport"
 )
 
 // Handler handles one message of a connection. release hands the

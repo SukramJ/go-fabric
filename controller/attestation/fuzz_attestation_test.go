@@ -7,9 +7,9 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The harnesses below cover the decoders of a commissionee's attestation

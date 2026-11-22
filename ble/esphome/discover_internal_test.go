@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/discovery"
 )
 
 // staticBrowser answers every browse with the same instances.

@@ -6,15 +6,15 @@
 package device
 
 import (
-	cameraavsettingsuserlevelmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	cameraavstreammanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	occupancysensingdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	pushavstreamtransportdef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	webrtctransportproviderdef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportprovider"
-	webrtctransportrequestordef "github.com/SukramJ/go-fabric/cluster/spec/webrtctransportrequestor"
-	zonemanagementdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
-	"github.com/SukramJ/go-fabric/schema"
+	cameraavsettingsuserlevelmanagementdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	cameraavstreammanagementdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	occupancysensingdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	pushavstreamtransportdef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	webrtctransportproviderdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	webrtctransportrequestordef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	zonemanagementdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Camera device type identity: 0x0142, revision 1.

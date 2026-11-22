@@ -6,9 +6,9 @@ package media_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
-	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/media"
+	targetdef "thingfabric.dev/go-fabric/cluster/spec/targetnavigator"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestMediaServersStayEndpointReceivers: the servers that embed a

@@ -29,8 +29,8 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // Store is a [client.Store] over a database the schema was applied to. It

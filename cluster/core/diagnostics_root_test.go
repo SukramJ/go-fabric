@@ -9,10 +9,10 @@ import (
 	"slices"
 	"testing"
 
-	ethdiagdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
-	swdiagdef "github.com/SukramJ/go-fabric/cluster/spec/softwarediagnostics"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/im"
+	ethdiagdef "thingfabric.dev/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
+	swdiagdef "thingfabric.dev/go-fabric/cluster/spec/softwarediagnostics"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/im"
 )
 
 type heap struct {

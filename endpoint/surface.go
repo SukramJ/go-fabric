@@ -7,10 +7,10 @@ import (
 	"cmp"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/cluster"
+	descdef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // descriptorClusterID is the Descriptor cluster (descriptor.element.ts,

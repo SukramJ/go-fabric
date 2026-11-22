@@ -6,7 +6,7 @@ package handshake
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // HoldProvers records the SPAKE2+ prover of every PASE handshake started

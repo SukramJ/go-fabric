@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestConfigRefusesPairsOneOfWhichWouldBeDropped (R2-P5-apinode-17,

@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/internal/caseauth"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/caseauth"
 )
 
 // TestIsCASE (R2-P6-sec-1111): a group message has a fabric and is not

@@ -13,7 +13,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/channel"
 )
 
 // newFabricSessionOfPeer is newFabricSession with another peer node id.

@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // lightParity is what a matter.js light device file states, transcribed

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/controller/client/sqlstore"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestReseal (R2-P6-store-2302, decision 195): sqlstore.Reseal moves every

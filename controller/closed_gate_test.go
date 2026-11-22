@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/diag"
-	"github.com/SukramJ/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/diag"
+	"thingfabric.dev/go-fabric/fabrictest"
 )
 
 // TestMethodsAfterClose (review II, R2-P2-stop-01): every method that

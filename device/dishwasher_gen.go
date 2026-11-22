@@ -6,13 +6,13 @@
 package device
 
 import (
-	dishwasheralarmdef "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
-	dishwashermodedef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	operationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	temperaturecontroldef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/schema"
+	dishwasheralarmdef "thingfabric.dev/go-fabric/cluster/spec/dishwasheralarm"
+	dishwashermodedef "thingfabric.dev/go-fabric/cluster/spec/dishwashermode"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	operationalstatedef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	temperaturecontroldef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Dishwasher device type identity: 0x0075, revision 2.

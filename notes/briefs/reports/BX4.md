@@ -35,7 +35,7 @@ downward edges; `node` and `binding` import no `controller/*` package any more (
 
 `script/bx4-forward` (generator plus test, in the tree; removable with the window) writes
 `controller/<name>/forward.go` from the type-checked new package: SPDX header, `// Code generated … DO NOT EDIT.`,
-the package doc with `Deprecated: moved to github.com/SukramJ/go-fabric/client/<name> (brief BX4, v0.10.0);
+the package doc with `Deprecated: moved to thingfabric.dev/go-fabric/client/<name> (brief BX4, v0.10.0);
 removable in v0.12.0.`, then a type alias per type, `const` per constant, `var` per variable and per function (no
 moved identifier has type parameters; the generator fails on one instead of writing a wrapper). The value blocks carry
 `fabric:reachable:reason=…` (tests reach the identifiers through the new path; aliases are whitelisted by

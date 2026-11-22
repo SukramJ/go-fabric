@@ -221,7 +221,7 @@ Skipped: chip-tool (no device-side change, as the brief says).
 **ADR 0024, amendment** (decision 3):
 
 > *Amended 2026-10-27 (owner decision, brief BP1): a second platform module,
-> `github.com/SukramJ/go-fabric/ble/esphome`, reaches BLE through ESPHome
+> `thingfabric.dev/go-fabric/ble/esphome`, reaches BLE through ESPHome
 > Bluetooth proxies (`bluetooth_proxy: active: true`) over the ESPHome native
 > API on TCP — plaintext, or Noise_NNpsk0_25519_ChaChaPoly_SHA256 with the
 > device's API key through `github.com/flynn/noise` (BSD-3-Clause), its one

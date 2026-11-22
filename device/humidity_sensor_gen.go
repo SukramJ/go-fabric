@@ -6,9 +6,9 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	relativehumiditymeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	relativehumiditymeasurementdef "thingfabric.dev/go-fabric/cluster/spec/relativehumiditymeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // HumiditySensor device type identity: 0x0307, revision 3.

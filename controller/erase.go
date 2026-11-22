@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/internal/sealseam"
+	"thingfabric.dev/go-fabric/internal/sealseam"
 )
 
 // Erase is the controller's factory reset: it closes the controller and

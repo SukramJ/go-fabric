@@ -6,11 +6,11 @@ package camera_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	padef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // pushWire is req as the server receives it from the wire: encoded, then

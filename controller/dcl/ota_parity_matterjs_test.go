@@ -28,7 +28,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
 )
 
 // dclOtaMock is one MockFetch response (MockFetch.ts:68-80).

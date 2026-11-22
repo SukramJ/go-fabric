@@ -11,12 +11,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	admincommdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	"github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	admincommdef "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	"thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // Commissioning window parameters, as matter.js chooses them at 862ad75f.

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // corruptCommissionedAt stores a commissionedAt (field 5 of the record,

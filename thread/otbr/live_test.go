@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/thread"
-	"github.com/SukramJ/go-fabric/thread/otbr"
+	"thingfabric.dev/go-fabric/thread"
+	"thingfabric.dev/go-fabric/thread/otbr"
 )
 
 // liveDataset is the dataset of connectedhomeip's

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/schema"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // TestWithheldSynthesisedClusterMarshals holds every report Evaluate

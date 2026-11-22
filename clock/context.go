@@ -16,7 +16,7 @@ import (
 // clock sees no change.
 //
 // On any other clock the deadline is a timer of c: a
-// [github.com/SukramJ/go-fabric/clock/clocktest.Fake] ends the context
+// [thingfabric.dev/go-fabric/clock/clocktest.Fake] ends the context
 // when it is advanced past d, never on the machine's time, so a deadline
 // in code a test paces on a fake clock cannot expire while the test's
 // clock stands. Such a context reports no Deadline of its own (a

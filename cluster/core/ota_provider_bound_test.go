@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"github.com/SukramJ/go-fabric/im"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestOTAProvider_InProgressBoundedPerFabric (review II, R2-P6-bound-1206,

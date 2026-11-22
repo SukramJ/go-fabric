@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	basicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	basicdef "thingfabric.dev/go-fabric/cluster/spec/applicationbasic"
 )
 
 // AppBasicState is the ApplicationBasic attribute state

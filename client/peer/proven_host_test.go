@@ -8,7 +8,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/discovery"
 )
 
 // The two hosts of issue 478: the node's own (its SRP host) and a border

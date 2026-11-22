@@ -11,15 +11,15 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/cluster/valve"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	pumpdef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // vetoedServer is a self-held server whose writes run the host's veto.

@@ -6,7 +6,7 @@ package spec_test
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // admit holds the request fields of cmd to srv's definition as a wire

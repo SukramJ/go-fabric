@@ -13,7 +13,7 @@
 //
 // Direction of the edge: package client/exchange installs the hook from
 // its init; a test reads it. It mirrors
-// [github.com/SukramJ/go-fabric/internal/channelseam]: exposing the stamp
+// [thingfabric.dev/go-fabric/internal/channelseam]: exposing the stamp
 // on exchange.Session would make it a production affordance every consumer
 // sees, when the only honest caller is a test. The seam is
 // module-internal, so it cannot become a consumer-visible surface.

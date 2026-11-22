@@ -10,10 +10,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"thingfabric.dev/go-fabric/endpoint/endpointtest"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestDropReasons: every entry the manager cannot use is dropped with

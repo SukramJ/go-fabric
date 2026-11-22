@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	launchdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	launchdef "thingfabric.dev/go-fabric/cluster/spec/contentlauncher"
 )
 
 // ContentLauncherState is the ContentLauncher attribute state

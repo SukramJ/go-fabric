@@ -10,14 +10,14 @@ import (
 	"strings"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	tmdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	descriptordef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	psdef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	tmdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // bridgeSimCommands are the five backchannel names

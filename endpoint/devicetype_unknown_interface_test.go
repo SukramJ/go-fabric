@@ -6,7 +6,7 @@ package endpoint
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestUnknownNetworkCommissioningFeaturesLeaveInterfacesUnknown: a client

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 )
 
 // TestBridgedBasicInformationDeclaration (review II, R2-P5-apidev-02,

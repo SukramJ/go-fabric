@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 // cmdDiscover searches DNS-SD for the commissionable devices a code or a

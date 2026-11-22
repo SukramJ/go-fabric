@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/secure/setup"
 )
 
 // TestReferenceControllerTrust: --trust production (the DCL snapshot

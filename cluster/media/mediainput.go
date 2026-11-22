@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	inputdef "github.com/SukramJ/go-fabric/cluster/spec/mediainput"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	inputdef "thingfabric.dev/go-fabric/cluster/spec/mediainput"
 )
 
 // InputState is the MediaInput attribute state (media-input.element.ts:

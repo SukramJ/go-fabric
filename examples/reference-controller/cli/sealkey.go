@@ -13,7 +13,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // sealKeySize is the AES-256 key store.NewAESGCMSealer takes.

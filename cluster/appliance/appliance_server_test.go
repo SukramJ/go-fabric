@@ -9,15 +9,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/appliance"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ldc "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
-	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
-	mwo "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/appliance"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ldc "thingfabric.dev/go-fabric/cluster/spec/laundrydryercontrols"
+	lwc "thingfabric.dev/go-fabric/cluster/spec/laundrywashercontrols"
+	mwo "thingfabric.dev/go-fabric/cluster/spec/microwaveovencontrol"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // oven is a host microwave: state, modes and the calls it received.

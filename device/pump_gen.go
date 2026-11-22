@@ -6,16 +6,16 @@
 package device
 
 import (
-	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	pressuremeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
-	pumpconfigurationandcontroldef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
-	scenesmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
-	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	flowmeasurementdef "thingfabric.dev/go-fabric/cluster/spec/flowmeasurement"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	levelcontroldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	pressuremeasurementdef "thingfabric.dev/go-fabric/cluster/spec/pressuremeasurement"
+	pumpconfigurationandcontroldef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	scenesmanagementdef "thingfabric.dev/go-fabric/cluster/spec/scenesmanagement"
+	temperaturemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Pump device type identity: 0x0303, revision 4.

@@ -6,9 +6,9 @@ package spec_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestDeprecatedNotificationsKeepTheirBehaviour: the four notifications

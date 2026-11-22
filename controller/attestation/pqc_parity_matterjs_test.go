@@ -34,8 +34,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/internal/forward"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/internal/forward"
 )
 
 // annexH reads one Annex H certificate of testdata/pqc-annex-h.

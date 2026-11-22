@@ -6,8 +6,8 @@
 package device
 
 import (
-	modeselectdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
-	"github.com/SukramJ/go-fabric/schema"
+	modeselectdef "thingfabric.dev/go-fabric/cluster/spec/modeselect"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ModeSelect device type identity: 0x0027, revision 1.

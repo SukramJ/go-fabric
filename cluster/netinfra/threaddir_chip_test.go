@@ -9,10 +9,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/netinfra"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tdir "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/netinfra"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tdir "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The chip cases of src/app/clusters/thread-network-directory-server/tests/

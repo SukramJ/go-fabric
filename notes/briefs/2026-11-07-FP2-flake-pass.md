@@ -31,7 +31,7 @@ map; verify against the code before acting.
 Three red `test (linux, race)` jobs on `main` and the pin branch, each under
 `TestReferenceControllerOTA`: runs 42132618300 (2026-11-05), 42243831605
 (2026-11-06), 42355859229 (2026-11-07; attempt-1 job 128353690338, fetched via
-`gh api repos/SukramJ/go-fabric/actions/jobs/<id>/logs`). Report:
+`gh api repos/thingfabric/go-fabric/actions/jobs/<id>/logs`). Report:
 
 - Write: `(*OTAProvider).updateInProgress` :750 `d.lastState = state` under `p.mu`,
   from `ApplyUpdateRequest` :632 (the invoke path).

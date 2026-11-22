@@ -160,7 +160,7 @@ RUN set -e; \
 FROM ${CHIP_TEST_IMAGE} AS chip
 ARG CHIP_COMMIT=6170af8461b10b1766044122ac83332c6d00ab20
 LABEL org.opencontainers.image.title="go-fabric CHIP certification harness"
-LABEL org.opencontainers.image.source=https://github.com/SukramJ/go-fabric/tree/main/internal/chiptool/image
+LABEL org.opencontainers.image.source=https://github.com/thingfabric/go-fabric/tree/main/internal/chiptool/image
 LABEL org.opencontainers.image.revision=${CHIP_COMMIT}
 COPY --from=bins /dist/bin/jfa-app /dist/bin/jfc-app /dist/bin/chip-tool-ble /dist/bin/all-clusters-app-ble /bin/
 COPY --from=pyble /opt/matter-ble /opt/matter-ble

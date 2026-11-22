@@ -9,7 +9,7 @@ import (
 	"errors"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // addTestFabric is a convenience wrapper that inserts a minimal fabric and

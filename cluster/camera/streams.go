@@ -6,8 +6,8 @@ package camera
 import (
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // StreamSource is the camera's stream state the transports validate a

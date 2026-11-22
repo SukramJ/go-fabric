@@ -16,7 +16,7 @@ for d, dirs, files in os.walk(root):
         p = os.path.join(d, f)
         with open(p, encoding='utf-8') as fh:
             s = fh.read()
-        n, k = pat.subn(r'"github.com/SukramJ/go-fabric/client/\1"', s)
+        n, k = pat.subn(r'"thingfabric.dev/go-fabric/client/\1"', s)
         if k:
             with open(p, 'w', encoding='utf-8') as fh:
                 fh.write(n)

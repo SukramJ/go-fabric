@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // TestLocalOperateEntrySkipsAFabricAnAddNOCHasNotCommitted: a fabric whose

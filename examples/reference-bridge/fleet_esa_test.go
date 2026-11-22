@@ -8,10 +8,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/modebase"
-	demdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/modebase"
+	demdef "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // TestStateForecastEsa: the second ESA is a bridged DeviceEnergyManagement

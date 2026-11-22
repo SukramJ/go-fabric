@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TestIsTimedInvoke covers the timed-required (cluster, command) pairs

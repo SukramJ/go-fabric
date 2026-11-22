@@ -11,10 +11,10 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	evse "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // evseHost is an EvseHost with a settable meter that records the changes

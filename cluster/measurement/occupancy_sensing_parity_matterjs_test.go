@@ -22,10 +22,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestOccupancySensingServerParityMatterJS ports the describe

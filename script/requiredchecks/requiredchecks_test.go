@@ -19,12 +19,12 @@
 // GitHub (it runs offline and without a token that may read the
 // protection), so the file is only as true as its last refresh:
 //
-//	gh api repos/SukramJ/go-fabric/branches/main/protection \
+//	gh api repos/thingfabric/go-fabric/branches/main/protection \
 //	    --jq '.required_status_checks.contexts[]' > script/requiredchecks/required.txt
 //
 // Last refreshed 2026-11-13: 20 contexts (wifi/wpasupplicant added that
 // day, owner decision 12 of review II), strict, and no ruleset
-// (`gh api repos/SukramJ/go-fabric/rulesets` answers []). Refresh it in the
+// (`gh api repos/thingfabric/go-fabric/rulesets` answers []). Refresh it in the
 // commit that follows a change of the protection; a context is never added
 // to the file by hand ahead of the protection.
 //

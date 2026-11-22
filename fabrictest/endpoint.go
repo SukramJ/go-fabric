@@ -6,9 +6,9 @@ package fabrictest
 import (
 	"slices"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // Endpoint is a bridged endpoint for [Topology].Bridged that serves the

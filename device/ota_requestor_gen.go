@@ -6,8 +6,8 @@
 package device
 
 import (
-	otasoftwareupdaterequestordef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	"github.com/SukramJ/go-fabric/schema"
+	otasoftwareupdaterequestordef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // OtaRequestor device type identity: 0x0012, revision 1.

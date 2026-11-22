@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // hostOwnValue is a host server's own struct without EncodeTLV.

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // profileDump is the daemon's --dump-surface report with --profile

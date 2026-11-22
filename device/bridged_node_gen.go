@@ -6,12 +6,12 @@
 package device
 
 import (
-	administratorcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	bridgeddevicebasicinformationdef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
-	ecosysteminformationdef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
-	powersourcedef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	powersourceconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
-	"github.com/SukramJ/go-fabric/schema"
+	administratorcommissioningdef "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	bridgeddevicebasicinformationdef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	ecosysteminformationdef "thingfabric.dev/go-fabric/cluster/spec/ecosysteminformation"
+	powersourcedef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	powersourceconfigurationdef "thingfabric.dev/go-fabric/cluster/spec/powersourceconfiguration"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // BridgedNode device type identity: 0x0013, revision 3.

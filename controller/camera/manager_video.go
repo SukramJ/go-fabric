@@ -9,8 +9,8 @@ import (
 	"slices"
 	"sync"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	"github.com/SukramJ/go-fabric/im"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // resolvedStream is the stream a track got: its id, what it delivers and

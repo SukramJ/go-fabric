@@ -10,8 +10,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestGroupMessageOutcomes pins the reports matter.js derives from a group

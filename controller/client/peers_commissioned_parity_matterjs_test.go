@@ -6,7 +6,7 @@ package client_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // TestPeersCommissionedParity ports matter.js's PeersCommissionedTest

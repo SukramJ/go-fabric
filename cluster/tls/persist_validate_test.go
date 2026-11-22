@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/tls"
+	"thingfabric.dev/go-fabric/cluster/tls"
 )
 
 // TestLoadRefusesARecordTheServerCannotWrite (R2-P6-store-1119 a): a

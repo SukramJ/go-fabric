@@ -8,7 +8,7 @@
 //
 // Direction of the edge: package secure/channel installs the hook below from
 // its init; package bridge reads it. It mirrors
-// [github.com/SukramJ/go-fabric/internal/bridgeseam] and exists for the same
+// [thingfabric.dev/go-fabric/internal/bridgeseam] and exists for the same
 // reason — a session's receive window is anchored by the first message that
 // decrypts under it, so a consumer that never sends that message has no way
 // to reach the state it would have left. Exposing an anchor method on

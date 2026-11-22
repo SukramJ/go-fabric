@@ -8,10 +8,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // FuzzFanStepFieldsReader feeds arbitrary command fields to the FanControl

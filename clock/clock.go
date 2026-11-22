@@ -12,11 +12,11 @@
 // time.NewTicker, time.Sleep, time.After, time.Tick, time.Since or
 // time.Until in production code (clock/noraw_test.go fails the build on
 // one). [System] is the standard library and the default of every owner;
-// [github.com/SukramJ/go-fabric/clock/clocktest.Fake] is the test clock.
+// [thingfabric.dev/go-fabric/clock/clocktest.Fake] is the test clock.
 //
 // A host injects a clock through the owner's configuration — the
-// `Clock clock.Clock` field of [github.com/SukramJ/go-fabric/node.Config],
-// [github.com/SukramJ/go-fabric/bridge.Config] and the other owners. A nil
+// `Clock clock.Clock` field of [thingfabric.dev/go-fabric/node.Config],
+// [thingfabric.dev/go-fabric/bridge.Config] and the other owners. A nil
 // clock is [System]. A node hands its clock on to the bridge, the store's
 // persist loop, OTA and mDNS, so one field moves the whole device side.
 //

@@ -15,8 +15,8 @@ package deviceseam
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // Host is what a node gives a device it adds: its clock, and the bridge

@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // TestLifecycle: New needs an interaction; a disabled node does not start

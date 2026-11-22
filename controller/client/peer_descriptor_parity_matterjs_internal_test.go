@@ -13,9 +13,9 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // storedRecord is rec through its store encoding.

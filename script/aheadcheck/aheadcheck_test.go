@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
+	"thingfabric.dev/go-fabric/parity"
 )
 
 // fixtureRepo is a git repository with three commits: the markers present

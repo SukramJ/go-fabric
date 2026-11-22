@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // StoreResumption is a [ResumptionStore] over the store's resumption

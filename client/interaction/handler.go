@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Register installs the registry's handler of the reports peers push on

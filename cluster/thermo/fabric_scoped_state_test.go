@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/cluster/thermo"
-	"github.com/SukramJ/go-fabric/contract"
+	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/cluster/thermo"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestThermostatAtomicWritesAreFabricScopedState (R2-P5-apidev-09): the

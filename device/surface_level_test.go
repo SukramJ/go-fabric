@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/surface"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // TestLevelRemovesAnOptionalFeature: Thermostat Events (TEVT, bit 9) is in

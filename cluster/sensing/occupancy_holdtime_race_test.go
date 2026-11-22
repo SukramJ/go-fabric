@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
 )
 
 // TestOccupancyHoldTimeWriteAndHostSetAgree: a controller's HoldTime write

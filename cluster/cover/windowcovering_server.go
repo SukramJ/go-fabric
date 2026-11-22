@@ -39,12 +39,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ClusterRevision is the WindowCovering cluster revision of the generated
@@ -232,7 +232,7 @@ type Config struct {
 const moveSteps = 6
 
 // WindowCoveringServer implements
-// [github.com/SukramJ/go-fabric/contract.ClusterServer]
+// [thingfabric.dev/go-fabric/contract.ClusterServer]
 // for the Matter WindowCovering cluster (0x0102), position-aware lift
 // and/or tilt feature profile. Without a [Mover] the state is
 // self-contained: commands update internal fields and return Success, so

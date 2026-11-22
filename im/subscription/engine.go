@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/internal/inflight"
 )
 
 // run is the engine's tick loop. Iterates the live subscription set

@@ -9,16 +9,16 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ethdiagdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
-	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
-	lcfgdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
-	swdiagdef "github.com/SukramJ/go-fabric/cluster/spec/softwarediagnostics"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ethdiagdef "thingfabric.dev/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
+	fixedlabeldef "thingfabric.dev/go-fabric/cluster/spec/fixedlabel"
+	lcfgdef "thingfabric.dev/go-fabric/cluster/spec/localizationconfiguration"
+	swdiagdef "thingfabric.dev/go-fabric/cluster/spec/softwarediagnostics"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	unitdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestRootMountsLabelsLocalizationAndDiagnostics: the root serves the seven

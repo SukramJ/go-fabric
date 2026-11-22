@@ -9,7 +9,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // TestParityMatterJS_OTAProviderTransferKeepsEntryAlive ports OtaTest.ts:

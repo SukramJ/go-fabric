@@ -20,10 +20,10 @@ import (
 	"testing"
 	"time"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/surface"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 func openTestStore(t *testing.T) *store.Store {

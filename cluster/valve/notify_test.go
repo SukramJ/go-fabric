@@ -6,7 +6,7 @@ package valve_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/valve"
+	"thingfabric.dev/go-fabric/cluster/valve"
 )
 
 // notifyingHost is the test source with a change notifier.

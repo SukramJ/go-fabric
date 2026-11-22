@@ -12,7 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/transition"
+	"thingfabric.dev/go-fabric/cluster/transition"
 )
 
 // attr is one transitionable attribute the tests own, with a log of what

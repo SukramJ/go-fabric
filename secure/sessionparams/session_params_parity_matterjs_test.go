@@ -10,8 +10,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // contextFields lists the context-tagged unsigned fields of the

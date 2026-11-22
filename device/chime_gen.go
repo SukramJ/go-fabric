@@ -6,9 +6,9 @@
 package device
 
 import (
-	chimedef "github.com/SukramJ/go-fabric/cluster/spec/chime"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Chime device type identity: 0x0146, revision 2.

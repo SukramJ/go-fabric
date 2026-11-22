@@ -10,7 +10,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // Parity with matter.js packages/general/test/codec/DnsCodecTest.ts at

@@ -6,7 +6,7 @@ package operational_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // TestEntryIsPASE_SurvivesAdoptFabricIndex pins the accessor the bridge

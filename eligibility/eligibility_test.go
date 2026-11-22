@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/eligibility"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/eligibility"
 )
 
 // ---------------------------------------------------------------------------

@@ -4,14 +4,16 @@
 package main
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 )
 
 // report is apidiff's module-mode output as it prints it.
-const report = `Ignoring internal package github.com/SukramJ/go-fabric/internal/udpseam
+const report = `Ignoring internal package thingfabric.dev/go-fabric/internal/udpseam
 Incompatible changes:
 - ./cluster/spec.Bool: removed
 - ./controller/client.(*Cluster).Decoded: changed from func(uint32) (any, error) to func(uint32) any
@@ -166,5 +168,44 @@ func TestLastTagSkipsNestedTags(t *testing.T) {
 		if err != nil || got != want {
 			t.Errorf("lastTag(%q) = %q, %v; want %q", dir, got, err, want)
 		}
+	}
+}
+
+// TestSplitMoves: a change that only replaces the old module path by the
+// new one is a move; a change that moves the path and also changes the
+// signature, or one that names neither path, stays a change of its own.
+func TestSplitMoves(t *testing.T) {
+	const oldRoot, newRoot = "github.com/SukramJ/go-fabric", "thingfabric.dev/go-fabric"
+	in := []change{
+		{Line: "Options.Clock: changed from github.com/SukramJ/go-fabric/clock.Clock to thingfabric.dev/go-fabric/clock.Clock"},
+		{Line: "Browser.Browse: changed from func(context.Context, string) ([]github.com/SukramJ/go-fabric/client/discovery.Instance, error) to func(context.Context, string) ([]thingfabric.dev/go-fabric/client/discovery.Instance, error)"},
+		{Line: "Driver.Scan: changed from func() []github.com/SukramJ/go-fabric/contract.WiFiScanResult to func(int) []thingfabric.dev/go-fabric/contract.WiFiScanResult"},
+		{Line: "./secure/sigma.Sigma2.SessionParams: changed from *SessionParameters to *SessionParameters"},
+		{Line: "spec.Bool: removed"},
+		{Line: "Config.Timeout: changed from int to int64"},
+	}
+	rest, moves := splitMoves(in, oldRoot, newRoot)
+	if len(moves) != 3 || len(rest) != 3 {
+		t.Fatalf("moves %d, rest %d; want 3 and 3: %+v", len(moves), len(rest), rest)
+	}
+	if rest, moves := splitMoves(in, newRoot, newRoot); len(moves) != 0 || len(rest) != len(in) {
+		t.Errorf("unmoved module: moves %d, want 0", len(moves))
+	}
+}
+
+// TestModulePath: the base is exported under the path its own go.mod
+// declares, not the working tree's; a directory without a module path is
+// an error, not an empty path.
+func TestModulePath(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/SukramJ/go-fabric\n\ngo 1.27\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := modulePath(dir)
+	if err != nil || got != "github.com/SukramJ/go-fabric" {
+		t.Errorf("modulePath = %q, %v; want github.com/SukramJ/go-fabric", got, err)
+	}
+	if _, err := modulePath(t.TempDir()); err == nil {
+		t.Error("modulePath of a directory without go.mod: no error")
 	}
 }

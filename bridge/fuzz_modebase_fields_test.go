@@ -7,9 +7,9 @@ import (
 	"encoding/hex"
 	"testing"
 
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // FuzzChangeToModeFieldsReader feeds arbitrary command fields to the

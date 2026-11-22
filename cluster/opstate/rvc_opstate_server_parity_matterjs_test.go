@@ -18,8 +18,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestRvcOperationalStateServerParityMatterJS ports the describe

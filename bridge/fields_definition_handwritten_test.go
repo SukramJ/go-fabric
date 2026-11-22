@@ -6,12 +6,12 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acdef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	ocdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acdef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	ocdef "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestDecodeByDefinitionSkipsHandWrittenServers: a linked definition-only

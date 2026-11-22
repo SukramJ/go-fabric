@@ -18,7 +18,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // currentNetworkWait bounds the wait for the network a failed join selected

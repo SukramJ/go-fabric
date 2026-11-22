@@ -4,7 +4,7 @@ A Thread Border Router endpoint (device type `0x0091`) lets a controller
 form or join a Thread network through a border router the host already
 runs: an OpenThread Border Router (`ot-br-posix`), typically a Raspberry
 Pi with a radio co-processor. The module never joins the Thread mesh
-itself ([ADR 0027](https://github.com/SukramJ/go-fabric/blob/main/docs/adr/0027-thread-border-router-over-otbr-rest.md)).
+itself ([ADR 0027](https://github.com/thingfabric/go-fabric/blob/main/docs/adr/0027-thread-border-router-over-otbr-rest.md)).
 The REST link is plaintext HTTP, as ot-br-posix serves it: the operational
 dataset, network key included, crosses it in clear, so keep the border
 router on the host's own trusted LAN segment.
@@ -26,10 +26,10 @@ follow connectedhomeip. ThreadBorderRouterManagement is an entry of the
 
 | Package | Layer | Role |
 | --- | --- | --- |
-| [`thread`](https://github.com/SukramJ/go-fabric/tree/main/thread) | foundation | the operational dataset codec after matter.js (`DecodeDataset`), chip's dataset view (`DatasetView`), the diagnostics records |
-| [`thread/otbr`](https://github.com/SukramJ/go-fabric/tree/main/thread/otbr) | support | the REST client after matter.js `OtbrRestClient.ts`, and `otbr.BorderRouter`, which adapts it to the servers' port |
-| [`thread/otbr/otbrtest`](https://github.com/SukramJ/go-fabric/tree/main/thread/otbr/otbrtest) | support | an in-process fake border router for tests |
-| [`cluster/threadbr`](https://github.com/SukramJ/go-fabric/tree/main/cluster/threadbr) | servers | the management and diagnostics servers and the `BorderRouter` port |
+| [`thread`](https://github.com/thingfabric/go-fabric/tree/main/thread) | foundation | the operational dataset codec after matter.js (`DecodeDataset`), chip's dataset view (`DatasetView`), the diagnostics records |
+| [`thread/otbr`](https://github.com/thingfabric/go-fabric/tree/main/thread/otbr) | support | the REST client after matter.js `OtbrRestClient.ts`, and `otbr.BorderRouter`, which adapts it to the servers' port |
+| [`thread/otbr/otbrtest`](https://github.com/thingfabric/go-fabric/tree/main/thread/otbr/otbrtest) | support | an in-process fake border router for tests |
+| [`cluster/threadbr`](https://github.com/thingfabric/go-fabric/tree/main/cluster/threadbr) | servers | the management and diagnostics servers and the `BorderRouter` port |
 
 The port is `threadbr.BorderRouter`, generated as
 `threadborderroutermanagementdef.BorderRouter`. It is chip's

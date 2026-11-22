@@ -14,7 +14,7 @@ package diag
 import (
 	"time"
 
-	"github.com/SukramJ/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/diagevent"
 )
 
 // Event is one entry of a diagnostic trace ([diagevent.Event]): the

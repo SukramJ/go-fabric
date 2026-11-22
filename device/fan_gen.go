@@ -6,11 +6,11 @@
 package device
 
 import (
-	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/schema"
+	fancontroldef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Fan device type identity: 0x002B, revision 5.

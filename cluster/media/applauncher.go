@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	launcherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	launcherdef "thingfabric.dev/go-fabric/cluster/spec/applicationlauncher"
 )
 
 // AppLauncherState is the ApplicationLauncher attribute state

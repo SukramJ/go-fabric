@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
 )
 
 // FuzzReadHeader feeds ReadHeader, and DecodeHeader on the bytes after

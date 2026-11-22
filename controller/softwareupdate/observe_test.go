@@ -12,7 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
 )
 
 // eventLog collects what Manager.Observe delivers.

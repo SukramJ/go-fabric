@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/clock"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im/subscription"
 )
 
 // Limits are the capacity limits a host may set: the ones matter.js keeps

@@ -194,7 +194,7 @@ matter.js read at `4633bfd7` (HEAD).
 --- PASS: TestChipCertificationFamilies/IDM   (2223.75s)  65 pass, 0 fail, 13 skip (incl. IDM/10.4 per endpoint)
 --- PASS: TestChipCertificationFamilies/LVL    (283.77s)   8 pass, 0 fail, 2 skip
 --- PASS: TestChipCertificationFamilies/S      (292.91s)   5 pass, 0 fail, 2 skip
-ok  github.com/SukramJ/go-fabric/internal/chiptool  2938.673s
+ok  thingfabric.dev/go-fabric/internal/chiptool  2938.673s
 ```
 
 Every skip is a gap declared in the family table (not run). The run was

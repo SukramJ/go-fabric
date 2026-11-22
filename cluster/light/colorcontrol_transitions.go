@@ -9,9 +9,9 @@ import (
 	"math"
 	"slices"
 
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
-	"github.com/SukramJ/go-fabric/cluster/transition"
-	"github.com/SukramJ/go-fabric/contract"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
+	"thingfabric.dev/go-fabric/cluster/transition"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The transitionable properties, named as matter.js names them in its

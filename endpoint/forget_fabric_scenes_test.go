@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
 )
 
 // memScenesStore is a [ScenesStore] holding one table per key.

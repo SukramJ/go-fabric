@@ -23,11 +23,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	cp "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // CommodityPrice (0x0095). One chip source carries its rules, cited below

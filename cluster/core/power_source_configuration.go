@@ -8,8 +8,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	pscfgdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	pscfgdef "thingfabric.dev/go-fabric/cluster/spec/powersourceconfiguration"
 )
 
 // PowerSourceConfigurationMaxSources is the most endpoints Sources lists:

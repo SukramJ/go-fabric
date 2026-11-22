@@ -6,11 +6,11 @@
 package device
 
 import (
-	energyevsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	energyevsemodedef "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	energyevsedef "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	energyevsemodedef "thingfabric.dev/go-fabric/cluster/spec/energyevsemode"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	temperaturemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // EnergyEvse device type identity: 0x050C, revision 2.

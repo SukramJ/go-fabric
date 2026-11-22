@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // TestDefaultOTAProviders_FabricScoped: a replace touches only its own

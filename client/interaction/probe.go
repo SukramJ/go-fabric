@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ProbeOptions configure [Interaction.Probe] — matter.js

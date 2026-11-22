@@ -12,7 +12,7 @@ import (
 	"context"
 	"testing"
 
-	mstore "github.com/SukramJ/go-fabric/store"
+	mstore "thingfabric.dev/go-fabric/store"
 )
 
 // closedStore opens a fresh DB, immediately closes it, and wraps it in a Store.

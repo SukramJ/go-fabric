@@ -8,7 +8,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // DefaultProbeTimeout is the probe's per-request timeout

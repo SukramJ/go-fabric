@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func ptr[T any](v T) *T { return &v }

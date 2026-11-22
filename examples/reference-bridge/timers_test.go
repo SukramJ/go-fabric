@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	ccldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
+	ccldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
 )
 
 // heldTimers is a latestTimer schedule that never fires by itself: the

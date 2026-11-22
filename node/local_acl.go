@@ -8,8 +8,8 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/internal/facadeseam"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/internal/facadeseam"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // errACLWriteLock is logged when the root's AccessControl server offers no

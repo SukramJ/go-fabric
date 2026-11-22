@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	"github.com/SukramJ/go-fabric/contract"
+	gendiagdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // lateFaultHost is a fault port whose faults change while the server

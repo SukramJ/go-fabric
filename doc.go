@@ -36,6 +36,6 @@
 // Architecture: rich model, dumb bridge — this module owns the Matter
 // wire format only. Per-device cluster projection lives on the host's
 // own types, which reach the bridge through the source-surface
-// interfaces in [github.com/SukramJ/go-fabric/contract]. See
+// interfaces in [thingfabric.dev/go-fabric/contract]. See
 // docs/architecture.md.
 package fabric

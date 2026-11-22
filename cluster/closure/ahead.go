@@ -4,8 +4,8 @@
 package closure
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // Ahead declares the ClosureControl server's elements that implement rows

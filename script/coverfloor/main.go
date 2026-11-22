@@ -68,7 +68,7 @@ import (
 // modulePath is the import-path prefix every package of this module shares.
 // Report lines are recognised by it, so unrelated build chatter that happens
 // to carry a percentage cannot be mistaken for a measurement.
-const modulePath = "github.com/SukramJ/go-fabric"
+const modulePath = "thingfabric.dev/go-fabric"
 
 // staleFloorSlack is how far a measurement may sit above its floor. Beyond
 // it the floor has stopped detecting anything — a regression of that many

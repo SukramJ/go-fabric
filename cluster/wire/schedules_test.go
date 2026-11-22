@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // stubSchedulesSource is a test-double [wire.SchedulesSource] that returns a

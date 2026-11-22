@@ -53,7 +53,7 @@ import (
 const repoRoot = "../.."
 
 // modulePath is the import path of the module root.
-const modulePath = "github.com/SukramJ/go-fabric/"
+const modulePath = "thingfabric.dev/go-fabric/"
 
 // exceptions are the types under cluster/ that run timers and have no
 // MatterQuiesce, keyed "dir.Type" ("dir.(func)" for a package's functions

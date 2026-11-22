@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // AttributeChanges is the listener set behind

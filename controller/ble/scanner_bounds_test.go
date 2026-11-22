@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/discovery"
 )
 
 // TestScanner_RecordsAreBoundedDuringADiscovery: the scanner holds at most

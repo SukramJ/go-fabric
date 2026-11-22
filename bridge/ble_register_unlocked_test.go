@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/ble/bletest"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/controller/ble/bletest"
 )
 
 // slowGATT is a GATT peripheral whose platform takes its time to register

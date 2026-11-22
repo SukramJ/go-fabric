@@ -12,7 +12,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
 )
 
 func image(t *testing.T, digest uint8) []byte {

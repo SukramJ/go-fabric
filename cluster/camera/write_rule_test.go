@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	"github.com/SukramJ/go-fabric/im"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestAvStreamViewportRuleSurvivesHostVeto: the server's own Viewport rule

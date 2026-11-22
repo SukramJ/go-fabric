@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tfldef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TimeFormatLocalizationConfig carries the construction parameters of a

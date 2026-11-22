@@ -6,9 +6,9 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestKeepSubscriptionsFalseTearsDownOnlyWithAFabric: a SubscribeRequest

@@ -3,7 +3,7 @@
 The commissioner reaches a device that is still on BLE through a
 `controller/ble.Central` ([ADR 0024](../adr/0024-ble-commissioning-in-the-controller.md)).
 Besides the BlueZ platform, the sub-module
-[`ble/esphome`](https://github.com/SukramJ/go-fabric/tree/main/ble/esphome)
+[`ble/esphome`](https://github.com/thingfabric/go-fabric/tree/main/ble/esphome)
 provides one whose radios are **ESPHome Bluetooth proxies**: ESP32 boards on
 the network that scan and hold GATT connections on the host's behalf, reached
 over the ESPHome native API on TCP. The host needs no Bluetooth adapter and

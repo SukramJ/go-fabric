@@ -9,12 +9,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ep "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
-	whm "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ep "thingfabric.dev/go-fabric/cluster/spec/energypreference"
+	whm "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // booster is a host that records the commands and fails on request.

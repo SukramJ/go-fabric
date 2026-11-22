@@ -6,7 +6,7 @@ package discovery
 import (
 	"errors"
 
-	fabricclock "github.com/SukramJ/go-fabric/clock"
+	fabricclock "thingfabric.dev/go-fabric/clock"
 )
 
 // ErrClosed is returned by an operation on a [Names] that has been closed.
@@ -14,7 +14,7 @@ var ErrClosed = errors.New("discovery: closed")
 
 // clock is the time source of a [Names], the module's port
 // ([fabricclock.Clock]). Production uses the wall clock; tests substitute
-// a [github.com/SukramJ/go-fabric/clock/clocktest.Fake] that fires timers
+// a [thingfabric.dev/go-fabric/clock/clocktest.Fake] that fires timers
 // on demand.
 type clock = fabricclock.Clock
 

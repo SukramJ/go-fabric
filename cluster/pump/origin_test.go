@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/pump"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	"thingfabric.dev/go-fabric/cluster/pump"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	pumpdef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
 )
 
 // TestPumpOrigins is the origin audit of the pull PumpConfigurationAndControl

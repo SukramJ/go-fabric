@@ -10,7 +10,7 @@ import (
 	"net"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // MulticastAddrPolicyEnum values of the Groupcast cluster

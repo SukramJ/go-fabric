@@ -7,9 +7,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	pushav "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	zm "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	pushav "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	zm "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
 )
 
 // TestConformanceNamesAnEnumMemberAsMatterJS holds a field conformance

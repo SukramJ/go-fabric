@@ -13,7 +13,7 @@ package subscription
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func TestServerSubscriptionParity(t *testing.T) {

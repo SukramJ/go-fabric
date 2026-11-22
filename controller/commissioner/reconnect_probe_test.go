@@ -15,15 +15,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/handshake"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/client/peer"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gendiag "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	threaddiag "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/handshake"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/client/peer"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gendiag "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	netcomm "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	threaddiag "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // probeState is what a probedDevice reports on one read: nil fields are

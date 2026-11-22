@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
 )
 
 // closingStep is matter.js's "Leave the commissioning channel": it leaves

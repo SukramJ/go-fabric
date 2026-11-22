@@ -6,9 +6,9 @@ package commissioner
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	netcomm "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The harnesses below cover the decoders of a commissionee's command

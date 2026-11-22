@@ -7,14 +7,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	ep "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	whm "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	ct "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	dem "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	evse "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	ep "thingfabric.dev/go-fabric/cluster/spec/energypreference"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	whm "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestWaterHeaterManagementOrigins is the origin audit of the

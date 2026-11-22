@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
 )
 
 // TestUnitScaling holds LevelFromUnit / UnitFromLevel to the CurrentLevel

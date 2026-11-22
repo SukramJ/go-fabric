@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/SukramJ/go-fabric/thread/brdiscovery"
+	"thingfabric.dev/go-fabric/thread/brdiscovery"
 
-	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	threaddiagdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
 )
 
 // threadMaps resolve a neighbour-table entry to a commissioned node: by

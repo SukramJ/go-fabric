@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // fieldError is a command field the hand-written decoders refuse: it

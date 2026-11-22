@@ -4,12 +4,12 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The values of a generated default server that neither the device type,

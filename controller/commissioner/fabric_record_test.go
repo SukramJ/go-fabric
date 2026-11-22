@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/controller/ca"
 )
 
 // TestStoredFabricIdentityIsChecked: a stored fabric record whose NOC is

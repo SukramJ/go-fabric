@@ -16,9 +16,9 @@ package device_test
 import (
 	"testing"
 
-	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/device"
+	psdef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // TestPowerSourceSelectionsParityMatterJS: each selection builds on a

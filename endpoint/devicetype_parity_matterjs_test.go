@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Parity with matter.js's own device type validation tests,

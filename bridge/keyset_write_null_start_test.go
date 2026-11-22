@@ -6,9 +6,9 @@ package bridge
 import (
 	"testing"
 
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestKeySetWriteKeepsANullStartTimeApartFromZero (R2-P6-par-1013, the

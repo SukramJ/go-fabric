@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im/subscription"
 )
 
 // SubscriptionStore is the durable home of the subscriptions of the

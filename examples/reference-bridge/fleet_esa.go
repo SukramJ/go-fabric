@@ -6,8 +6,8 @@ package main
 import (
 	"sync"
 
-	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	"github.com/SukramJ/go-fabric/device"
+	dem "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // --- device: a state-forecast ESA ----------------------------------------------

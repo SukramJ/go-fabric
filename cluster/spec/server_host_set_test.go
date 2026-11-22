@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	eem "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
-	tm "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	eem "thingfabric.dev/go-fabric/cluster/spec/electricalenergymeasurement"
+	tm "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
 )
 
 // TestSetAttributesJudgesBoundsAgainstItsOwnPatch holds a host's

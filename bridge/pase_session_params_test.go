@@ -6,8 +6,8 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 // TestPaseAdapterAdvertisesDefaultSessionParameters: with nothing

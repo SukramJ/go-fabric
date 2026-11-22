@@ -3,7 +3,7 @@
 
 package spec
 
-import "github.com/SukramJ/go-fabric/contract"
+import "thingfabric.dev/go-fabric/contract"
 
 // The four notifications below shadow the ones [Server] would promote from
 // its embedded cluster.AttributeChanges. Each keeps that behaviour exactly:

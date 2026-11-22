@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/node"
 
-	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
+	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
 )
 
 // --dcl prod|testnet|off (default off) lets the daemon ask the CSA

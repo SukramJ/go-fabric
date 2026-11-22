@@ -21,5 +21,5 @@ type serverType struct {
 // mounts, the generated spec.Server or a self-held one (onoff.Server,
 // core.Binding, core.EcosystemInformation).
 func typedServer(pkg string) serverType {
-	return serverType{Type: "*" + pkg + "def.Server", Import: "github.com/SukramJ/go-fabric/cluster/spec/" + pkg, Alias: pkg + "def"}
+	return serverType{Type: "*" + pkg + "def.Server", Import: "thingfabric.dev/go-fabric/cluster/spec/" + pkg, Alias: pkg + "def"}
 }

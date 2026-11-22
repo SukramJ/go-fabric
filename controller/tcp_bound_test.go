@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	"github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/transport/tcp"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	"thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/transport/tcp"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // TestControllerTCPListenerHoldsTheConfiguredInboundBound: a controller

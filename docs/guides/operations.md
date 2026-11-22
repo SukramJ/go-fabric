@@ -60,9 +60,9 @@ So the operator's rules are the persistence guide's
 - run one copy at a time: a restored file is the same node, and two running
   copies answer as one node under one identity.
 
-*Source: [`node/config.go`](https://github.com/SukramJ/go-fabric/blob/main/node/config.go) (`Store`),
-[`store/sqlite.go`](https://github.com/SukramJ/go-fabric/blob/main/store/sqlite.go) (`sqlitePragmas`, `OpenSQLite`), [`node/store_path.go`](https://github.com/SukramJ/go-fabric/blob/main/node/store_path.go) (`openStorePath`),
-[`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go) (`Start`: the own window of a node without a fabric).*
+*Source: [`node/config.go`](https://github.com/thingfabric/go-fabric/blob/main/node/config.go) (`Store`),
+[`store/sqlite.go`](https://github.com/thingfabric/go-fabric/blob/main/store/sqlite.go) (`sqlitePragmas`, `OpenSQLite`), [`node/store_path.go`](https://github.com/thingfabric/go-fabric/blob/main/node/store_path.go) (`openStorePath`),
+[`node/node.go`](https://github.com/thingfabric/go-fabric/blob/main/node/node.go) (`Start`: the own window of a node without a fabric).*
 
 ## Ports and addresses
 
@@ -77,8 +77,8 @@ A firewall in front of the node lets in UDP 5540 (and TCP 5540 with TCP on)
 and mDNS from the controllers' LAN. A container sees the LAN's multicast
 only with host networking or an equivalent.
 
-*Source: [`node/config.go`](https://github.com/SukramJ/go-fabric/blob/main/node/config.go) (`Network`),
-[`bridge/tcp_listen.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/tcp_listen.go) (`TCPConfig`, `openTransports`).*
+*Source: [`node/config.go`](https://github.com/thingfabric/go-fabric/blob/main/node/config.go) (`Network`),
+[`bridge/tcp_listen.go`](https://github.com/thingfabric/go-fabric/blob/main/bridge/tcp_listen.go) (`TCPConfig`, `openTransports`).*
 
 ## BLE commissioning
 
@@ -131,11 +131,11 @@ bluetoothd. It needs the system-bus rights its central needs (the
 The reference daemon has no BLE flag: `examples/ble-wifi-light` is the
 example node with BLE and Wi-Fi.
 
-*Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `commissioningHost.withdrawBLE`),
-[`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go) (`Node.leaveRadioWhenCommissioned`),
-[`bridge/ble.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/ble.go) (`StartBLE`, `WithdrawBLE`, `StopBLE`, `advertiseBLE`),
-[`transport/btp/accept.go`](https://github.com/SukramJ/go-fabric/blob/main/transport/btp/accept.go) (`Accept`),
-[`ble/bluez/peripheral_linux.go`](https://github.com/SukramJ/go-fabric/blob/main/ble/bluez/peripheral_linux.go) (`NewPeripheral`).*
+*Source: [`node/commissioning.go`](https://github.com/thingfabric/go-fabric/blob/main/node/commissioning.go) (`followOnBLE`, `commissioningHost.withdrawBLE`),
+[`node/node.go`](https://github.com/thingfabric/go-fabric/blob/main/node/node.go) (`Node.leaveRadioWhenCommissioned`),
+[`bridge/ble.go`](https://github.com/thingfabric/go-fabric/blob/main/bridge/ble.go) (`StartBLE`, `WithdrawBLE`, `StopBLE`, `advertiseBLE`),
+[`transport/btp/accept.go`](https://github.com/thingfabric/go-fabric/blob/main/transport/btp/accept.go) (`Accept`),
+[`ble/bluez/peripheral_linux.go`](https://github.com/thingfabric/go-fabric/blob/main/ble/bluez/peripheral_linux.go) (`NewPeripheral`).*
 
 ## Wi-Fi provisioning
 
@@ -225,9 +225,9 @@ finds every optional port it implements — `contract.WiFiLinkWatcher` and
 records after each successful join through the server's `OnConnected`
 hook.
 
-*Source: [`node/wifi_driver.go`](https://github.com/SukramJ/go-fabric/blob/main/node/wifi_driver.go) (`wifiDriver`, `wifiConnected`),
-[`cluster/core/network_commissioning_wifi.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
-[`wifi/wpasupplicant/driver.go`](https://github.com/SukramJ/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`, `CurrentNetwork`).*
+*Source: [`node/wifi_driver.go`](https://github.com/thingfabric/go-fabric/blob/main/node/wifi_driver.go) (`wifiDriver`, `wifiConnected`),
+[`cluster/core/network_commissioning_wifi.go`](https://github.com/thingfabric/go-fabric/blob/main/cluster/core/network_commissioning_wifi.go) (`Start`, `connect`),
+[`wifi/wpasupplicant/driver.go`](https://github.com/thingfabric/go-fabric/blob/main/wifi/wpasupplicant/driver.go) (`New`, `ScanNetworks`, `ConnectNetwork`, `CurrentNetwork`).*
 
 ## mDNS
 
@@ -313,13 +313,13 @@ interface, or on the one interface it is given by name; the allow-list is
 this module's, a recorded divergence
 (`BD-matterjs-mdns-interface-allowlist`).
 
-*Source: [`mdns/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/doc.go),
-[`mdns/responder.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/responder.go) (`Responder`),
-[`mdns/answer.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/answer.go) (`onLink`; `TestResponder_AnswersOnlyOnLinkSources`),
-[`node/mdns.go`](https://github.com/SukramJ/go-fabric/blob/main/node/mdns.go) (`MDNS`, `MDNSServices`, `DiagnoseMDNS`),
-[`mdns/interface_filter.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/interface_filter.go) (`DefaultInterfaceFilter`),
-[`mdns/diagnose_interfaces.go`](https://github.com/SukramJ/go-fabric/blob/main/mdns/diagnose_interfaces.go) (`DiagnoseInterfaces`),
-[`internal/chiptool/doc.go`](https://github.com/SukramJ/go-fabric/blob/main/internal/chiptool/doc.go) (the harness).*
+*Source: [`mdns/doc.go`](https://github.com/thingfabric/go-fabric/blob/main/mdns/doc.go),
+[`mdns/responder.go`](https://github.com/thingfabric/go-fabric/blob/main/mdns/responder.go) (`Responder`),
+[`mdns/answer.go`](https://github.com/thingfabric/go-fabric/blob/main/mdns/answer.go) (`onLink`; `TestResponder_AnswersOnlyOnLinkSources`),
+[`node/mdns.go`](https://github.com/thingfabric/go-fabric/blob/main/node/mdns.go) (`MDNS`, `MDNSServices`, `DiagnoseMDNS`),
+[`mdns/interface_filter.go`](https://github.com/thingfabric/go-fabric/blob/main/mdns/interface_filter.go) (`DefaultInterfaceFilter`),
+[`mdns/diagnose_interfaces.go`](https://github.com/thingfabric/go-fabric/blob/main/mdns/diagnose_interfaces.go) (`DiagnoseInterfaces`),
+[`internal/chiptool/doc.go`](https://github.com/thingfabric/go-fabric/blob/main/internal/chiptool/doc.go) (the harness).*
 
 ## Logs
 
@@ -343,10 +343,10 @@ A host that wants the pairing events as calls rather than lines sets
 `OnFabricUpdated`). `node.Config.Metrics` counts sessions, subscriptions,
 PASE failures and lockouts for a dashboard.
 
-*Source: [`node/commissioning.go`](https://github.com/SukramJ/go-fabric/blob/main/node/commissioning.go),
-[`cluster/core/operational_credentials.go`](https://github.com/SukramJ/go-fabric/blob/main/cluster/core/operational_credentials.go),
-[`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go),
-[`node/observers.go`](https://github.com/SukramJ/go-fabric/blob/main/node/observers.go).*
+*Source: [`node/commissioning.go`](https://github.com/thingfabric/go-fabric/blob/main/node/commissioning.go),
+[`cluster/core/operational_credentials.go`](https://github.com/thingfabric/go-fabric/blob/main/cluster/core/operational_credentials.go),
+[`node/node.go`](https://github.com/thingfabric/go-fabric/blob/main/node/node.go),
+[`node/observers.go`](https://github.com/thingfabric/go-fabric/blob/main/node/observers.go).*
 
 ## Health
 
@@ -358,7 +358,7 @@ is bound and hands the verdict to the callbacks `Node.OnHealthSample`
 `Healthy == false`, or no sample at all with the probe configured, as
 failing. The zero value runs no probe.
 
-*Source: [`node/health.go`](https://github.com/SukramJ/go-fabric/blob/main/node/health.go).*
+*Source: [`node/health.go`](https://github.com/thingfabric/go-fabric/blob/main/node/health.go).*
 
 ## Limits
 
@@ -390,7 +390,7 @@ the code match?), it separates the three usual causes: the controller never
 found the node, the code was wrong, or the commissioning steps after PASE
 failed.
 
-*Source: [`node/diagnostics.go`](https://github.com/SukramJ/go-fabric/blob/main/node/diagnostics.go), the
+*Source: [`node/diagnostics.go`](https://github.com/thingfabric/go-fabric/blob/main/node/diagnostics.go), the
 [observability guide](observability.md#the-diagnostic-trace).*
 
 ## Factory reset
@@ -419,7 +419,7 @@ Two lesser steps reach part of it:
 The host's own state — its configuration, its devices — is untouched by
 any of the three.
 
-*Source: [`node/factory_reset.go`](https://github.com/SukramJ/go-fabric/blob/main/node/factory_reset.go) (`FactoryReset`), [`node/node.go`](https://github.com/SukramJ/go-fabric/blob/main/node/node.go) (`RemoveFabric`), the
+*Source: [`node/factory_reset.go`](https://github.com/thingfabric/go-fabric/blob/main/node/factory_reset.go) (`FactoryReset`), [`node/node.go`](https://github.com/thingfabric/go-fabric/blob/main/node/node.go) (`RemoveFabric`), the
 [persistence guide](persistence.md#what-survives-a-restart).*
 
 ## Upgrading
@@ -437,11 +437,11 @@ A new go-fabric release can move three things a running daemon notices:
   [persistence guide](persistence.md#schema-changes) describes the versioned
   migrations and the fingerprint for a host that runs its own tool. Back
   the file up before an upgrade.
-- **The API.** [`CHANGELOG.md`](https://github.com/SukramJ/go-fabric/blob/main/CHANGELOG.md)
+- **The API.** [`CHANGELOG.md`](https://github.com/thingfabric/go-fabric/blob/main/CHANGELOG.md)
   is the single place a break is announced: every `**Break:**` line names
   what moved and its replacement, and the
   [migration guide](migrating-to-the-facade.md) has a section per release
   that changed the facade. Read both before a bump.
 
-*Source: [`schema/schema_provenance_gen.go`](https://github.com/SukramJ/go-fabric/blob/main/schema/schema_provenance_gen.go),
-[`README.md`](https://github.com/SukramJ/go-fabric/blob/main/README.md) (API stability).*
+*Source: [`schema/schema_provenance_gen.go`](https://github.com/thingfabric/go-fabric/blob/main/schema/schema_provenance_gen.go),
+[`README.md`](https://github.com/thingfabric/go-fabric/blob/main/README.md) (API stability).*

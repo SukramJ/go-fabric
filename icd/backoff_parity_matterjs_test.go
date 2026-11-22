@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd"
 )
 
 var (

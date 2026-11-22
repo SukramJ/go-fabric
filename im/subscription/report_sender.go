@@ -6,7 +6,7 @@ package subscription
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Report is one report of a subscription: what the engine hands the

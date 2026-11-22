@@ -6,8 +6,8 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/im/subscription"
 )
 
 // TestHeldChangeAdvancesOncePerAttributeData (review II, F-db021da0-56,

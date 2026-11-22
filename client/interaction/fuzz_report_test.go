@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // FuzzDecodeReport feeds arbitrary bytes to the controller's two decoders

@@ -8,9 +8,9 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ldc "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
-	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ldc "thingfabric.dev/go-fabric/cluster/spec/laundrydryercontrols"
+	lwc "thingfabric.dev/go-fabric/cluster/spec/laundrywashercontrols"
 )
 
 // The typed server's optional interfaces: Handle, Emit and SetBeforeWrite

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Privilege is an access level, numbered as matter.js's AccessLevel

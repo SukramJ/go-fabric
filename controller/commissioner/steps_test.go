@@ -9,13 +9,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	netcomm "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
-	opcredsdef "github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	netcomm "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	opcredsdef "thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // uintValue encodes an unsigned attribute value.

@@ -6,11 +6,11 @@ package opstate_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/opstate"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	rvcdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/cluster/opstate"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	rvcdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
 )
 
 // TestServerMatchesTheGeneratedDefinition holds both derivations, bare

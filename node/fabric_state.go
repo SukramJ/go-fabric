@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"reflect"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // fabricStateServers returns every server of the node that holds state

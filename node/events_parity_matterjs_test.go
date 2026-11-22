@@ -16,8 +16,8 @@ package node_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // basicInformationEvents is basicInformationEvents (:12-24): the root's

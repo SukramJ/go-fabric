@@ -6,7 +6,7 @@ package cli
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // The global attributes resolve by name for any cluster, generated

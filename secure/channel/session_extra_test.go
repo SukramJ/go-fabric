@@ -6,7 +6,7 @@ package channel
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestSessionGetters verifies PeerSessionID, LocalNodeID, and PeerNodeID

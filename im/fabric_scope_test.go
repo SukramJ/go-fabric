@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // scopeEntry is a fabric-scoped list entry: fields 1 (a nested list) and 2,

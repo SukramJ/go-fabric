@@ -24,7 +24,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/measurement"
+	"thingfabric.dev/go-fabric/cluster/measurement"
 )
 
 // All tests use fakeFloat from measurement_test.go (same package, visible

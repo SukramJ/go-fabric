@@ -6,7 +6,7 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/inflight"
+	"thingfabric.dev/go-fabric/internal/inflight"
 )
 
 // TestGoWorkCountsAsRegistryReaction: a reaction the registry runs in the

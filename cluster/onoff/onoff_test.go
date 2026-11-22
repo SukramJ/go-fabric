@@ -6,8 +6,8 @@ package onoff_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/onoff"
 )
 
 // TestRevisionIsWhatTheServerAnswers: the exported Revision is the

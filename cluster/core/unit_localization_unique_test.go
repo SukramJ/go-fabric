@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
+	"thingfabric.dev/go-fabric/cluster/core"
+	unitdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
 )
 
 // TestUnitLocalizationRefusesADuplicateUnit (review II, R2-P6-err-1268):

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/node"
+	"thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // --icd-lit (TESTING ONLY) makes the daemon a Long Idle Time ICD after

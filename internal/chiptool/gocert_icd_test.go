@@ -15,12 +15,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	"github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	gocontroller "github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	"thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	gocontroller "thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/client"
 )
 
 // The ICD client cases in matter.js's own direction: the module's

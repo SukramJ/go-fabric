@@ -10,8 +10,8 @@ package bridge
 import (
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/im"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // ─── ADR-0013 Decision #4: ArmFailSafe response command-ID rewrite ──────────

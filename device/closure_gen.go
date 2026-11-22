@@ -6,10 +6,10 @@
 package device
 
 import (
-	closurecontroldef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	closurecontroldef "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	descriptordef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Closure device type identity: 0x0230, revision 1.

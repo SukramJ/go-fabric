@@ -8,11 +8,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/appliance"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ldc "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols"
-	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/appliance"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ldc "thingfabric.dev/go-fabric/cluster/spec/laundrydryercontrols"
+	lwc "thingfabric.dev/go-fabric/cluster/spec/laundrywashercontrols"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 func ptrTo[T any](v T) *T { return &v }

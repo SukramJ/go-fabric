@@ -174,8 +174,8 @@ func (g *generator) server() ([]byte, error) {
 	w.p("\t\"context\"")
 	w.p("\t\"errors\"")
 	w.p("")
-	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
-	w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
+	w.p("\t\"thingfabric.dev/go-fabric/cluster/spec\"")
+	w.p("\t\"thingfabric.dev/go-fabric/contract\"")
 	for _, imp := range hostImports(c.Name) {
 		w.p("\t%q", imp)
 	}
@@ -395,7 +395,7 @@ func (g *generator) stateOnly(fields []hullField, omitted []hullOmitted, nullabl
 	w.WriteString(header)
 	w.p("package %s", g.pkg)
 	w.p("")
-	w.p("import \"github.com/SukramJ/go-fabric/cluster/spec\"")
+	w.p("import \"thingfabric.dev/go-fabric/cluster/spec\"")
 	w.p("")
 	g.stateTypes(w, fields, omitted, nullable)
 	out, err := format.Source(w.Bytes())

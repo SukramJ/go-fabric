@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/channel"
 )
 
 // Key-derivation labels, Matter §4.17.2. Mirrors matter.js

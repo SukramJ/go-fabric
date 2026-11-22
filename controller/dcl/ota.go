@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
 )
 
 // DefaultDownloadTimeout bounds an image download — OTA_DOWNLOAD_TIMEOUT,

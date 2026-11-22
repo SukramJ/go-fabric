@@ -10,11 +10,11 @@ import (
 	"slices"
 	"testing"
 
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/surface"
-	"github.com/SukramJ/go-fabric/surface/surfacetest"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/surface"
+	"thingfabric.dev/go-fabric/surface/surfacetest"
 )
 
 func TestNodeRejectsAnUnknownProfile(t *testing.T) {

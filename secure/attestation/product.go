@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/internal/attestids"
+	"thingfabric.dev/go-fabric/internal/attestids"
 )
 
 // ErrProductMismatch is returned by [ValidateProduct] when the DAC's or

@@ -6,7 +6,7 @@ package endpoint_test
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // fakeStore is an in-memory, non-thread-safe implementation of the

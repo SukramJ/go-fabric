@@ -9,10 +9,10 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/clock"
-	tsdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/clock"
+	tsdef "thingfabric.dev/go-fabric/cluster/spec/timesynchronization"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // matterTimeParticipant is a cluster server of an endpoint that reads the

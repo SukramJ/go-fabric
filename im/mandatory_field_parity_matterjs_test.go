@@ -13,7 +13,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 func TestMandatoryFieldParity(t *testing.T) {

@@ -25,7 +25,7 @@ import (
 	"hash"
 	"io"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // FileIdentifier opens every OTA image (OtaImageReader.ts:178).

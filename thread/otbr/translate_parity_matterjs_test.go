@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/thread"
-	"github.com/SukramJ/go-fabric/thread/otbr/otbrtest"
+	"thingfabric.dev/go-fabric/thread"
+	"thingfabric.dev/go-fabric/thread/otbr/otbrtest"
 )
 
 // The cases of matter.js packages/thread-br-client/test/TranslationTest.ts

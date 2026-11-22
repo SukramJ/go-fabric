@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	scenesdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	scenesdef "thingfabric.dev/go-fabric/cluster/spec/scenesmanagement"
 )
 
 // Parity with matter.js

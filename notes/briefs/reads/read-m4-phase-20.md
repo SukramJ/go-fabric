@@ -6,7 +6,7 @@ Roadmap row: docs/roadmap.md:192 (phase 20), :194-209 (Value :196, Done when :20
 
 ## §1 loom's imports
 
-Loom checkout EXISTS. go.mod:36 pins `github.com/SukramJ/go-fabric v0.6.0` (no replace directive), so loom's code is read against v0.6.0, go-fabric is at v0.8.8. loom CHANGELOG.md:11 and :35 describe the v0.5.4/v0.6.0 bumps.
+Loom checkout EXISTS. go.mod:36 pins `thingfabric.dev/go-fabric v0.6.0` (no replace directive), so loom's code is read against v0.6.0, go-fabric is at v0.8.8. loom CHANGELOG.md:11 and :35 describe the v0.5.4/v0.6.0 bumps.
 Count (my script, scratchpad/imp.py, output scratchpad/loom-usage.txt): 45 distinct go-fabric packages imported across loom's .go files; 32 in non-test code, 13 test-only. roadmap.md:32 says 20 (stale or counts differently).
 Non-test packages (32): bootid bridge cluster/alarm cluster/closure cluster/core cluster/cover cluster/levelcontrol cluster/light cluster/lock cluster/measurement cluster/modeselect cluster/onoff cluster/spec/thermostat cluster/spec/windowcovering cluster/thermo cluster/wire contract device diagevent eligibility endpoint endpoint/sqlitestore groups im/subscription mdns node schema secure/attestation secure/operational secure/setup secure/spake2 store.
 Test-only (13): bridge/bridgetest cluster cluster/spec cluster/spec/colorcontrol cluster/spec/onoff endpoint/endpointtest im parity secure/channel secure/sigma tlv transport/message transport/mrp.

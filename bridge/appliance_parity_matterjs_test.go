@@ -18,14 +18,14 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
-	"github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
-	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
-	"github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
-	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec/dishwashermode"
+	"thingfabric.dev/go-fabric/cluster/spec/laundrywashermode"
+	opdef "thingfabric.dev/go-fabric/cluster/spec/operationalstate"
+	"thingfabric.dev/go-fabric/cluster/spec/rvccleanmode"
+	rvcopdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	"thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // applianceClusters are the clusters this file checks; the generic

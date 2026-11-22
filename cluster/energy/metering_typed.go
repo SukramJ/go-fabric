@@ -6,9 +6,9 @@ package energy
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	commtr "thingfabric.dev/go-fabric/cluster/spec/commoditymetering"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The CommodityMetering server embeds the generated server, which gives it

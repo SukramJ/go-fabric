@@ -6,18 +6,18 @@ package measurement
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	booldef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
-	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
-	flowdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
-	illdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
-	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
-	prsdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
-	rhdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
-	tmpdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	booldef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	eemdef "thingfabric.dev/go-fabric/cluster/spec/electricalenergymeasurement"
+	epmdef "thingfabric.dev/go-fabric/cluster/spec/electricalpowermeasurement"
+	flowdef "thingfabric.dev/go-fabric/cluster/spec/flowmeasurement"
+	illdef "thingfabric.dev/go-fabric/cluster/spec/illuminancemeasurement"
+	psdef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	ptdef "thingfabric.dev/go-fabric/cluster/spec/powertopology"
+	prsdef "thingfabric.dev/go-fabric/cluster/spec/pressuremeasurement"
+	rhdef "thingfabric.dev/go-fabric/cluster/spec/relativehumiditymeasurement"
+	tmpdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The servers' cluster identity is their generated definition

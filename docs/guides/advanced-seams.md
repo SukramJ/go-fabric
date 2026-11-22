@@ -93,7 +93,7 @@ cluster servers, `NotifyDeviceReachable` for a host that assembles its own
 endpoints behind `Config.Snapshotter`. The facade's own ports are listed in
 [Host ports](ports.md); the bridge's package doc lists every port in call
 order with what a skip costs
-([`bridge/bridge.go`](https://github.com/SukramJ/go-fabric/blob/main/bridge/bridge.go)).
+([`bridge/bridge.go`](https://github.com/thingfabric/go-fabric/blob/main/bridge/bridge.go)).
 
 **Costs.** The facade attaches every port in the documented order. An
 `Attach…` call replaces what the facade attached for that port, and with

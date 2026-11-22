@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/SukramJ/go-fabric/transport/tcp"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/transport/tcp"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // TCPConfig selects the Matter TCP transport (ADR 0019). Incoming opens

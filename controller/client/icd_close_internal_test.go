@@ -9,9 +9,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/icd"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/icd"
 )
 
 func icdTestClient(t *testing.T, st Store, table *icd.PeerTable) *ICDClient {

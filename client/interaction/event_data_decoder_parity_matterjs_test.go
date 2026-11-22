@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // edEvent is one EventDataIB of the test: data is the startUp payload

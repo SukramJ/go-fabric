@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 // mxConn records every datagram and lets a test hook into a transmission;

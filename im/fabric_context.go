@@ -6,7 +6,7 @@ package im
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // The FabricFiltered flag + the operational FabricIndex travel through

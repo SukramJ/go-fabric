@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	threaddiagdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	threaddiagdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
 )
 
 // records counts the messages logged.

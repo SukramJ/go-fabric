@@ -20,7 +20,7 @@ permissions: {}
 jobs:
   lock:
     # Keeps forks from locking their own threads on this repository's cadence.
-    if: github.repository_owner == 'SukramJ'
+    if: github.repository_owner == 'thingfabric'
     runs-on: ubuntu-latest
     permissions:
       issues: write

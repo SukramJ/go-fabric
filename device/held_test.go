@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
 )
 
 // nullSink is a Thermostat Sink that takes every change.

@@ -17,10 +17,10 @@ package node_test
 import (
 	"testing"
 
-	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	basicinfo "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 func TestSetRegulatoryConfigSideEffectParity(t *testing.T) {

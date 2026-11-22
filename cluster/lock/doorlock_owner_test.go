@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
 )
 
 // TestDoorLockQuiesceWaitsForTheTimerAction pins the server as the owner

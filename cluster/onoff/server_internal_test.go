@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
 )
 
 // raceClock is the test clock, a [clocktest.Fake], that also keeps the

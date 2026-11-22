@@ -6,10 +6,10 @@
 package device
 
 import (
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	temperaturecontroldef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	temperaturecontroldef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	temperaturemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // CookSurface device type identity: 0x0077, revision 2.

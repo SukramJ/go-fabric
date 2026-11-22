@@ -7,12 +7,12 @@ import (
 	"context"
 	"testing"
 
-	cctl "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
-	cdim "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
-	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
+	cctl "thingfabric.dev/go-fabric/cluster/spec/closurecontrol"
+	cdim "thingfabric.dev/go-fabric/cluster/spec/closuredimension"
+	evse "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestTimedCommandsFromTheModel drives the fleet's real EVSE, closure panel

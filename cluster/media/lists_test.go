@@ -9,14 +9,14 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/media"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	outputdef "github.com/SukramJ/go-fabric/cluster/spec/audiooutput"
-	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
-	inputdef "github.com/SukramJ/go-fabric/cluster/spec/mediainput"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	targetdef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/media"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	outputdef "thingfabric.dev/go-fabric/cluster/spec/audiooutput"
+	channeldef "thingfabric.dev/go-fabric/cluster/spec/channel"
+	inputdef "thingfabric.dev/go-fabric/cluster/spec/mediainput"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	targetdef "thingfabric.dev/go-fabric/cluster/spec/targetnavigator"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // --- AudioOutput -------------------------------------------------------

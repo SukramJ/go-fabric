@@ -6,7 +6,7 @@ package energy
 import (
 	"sync/atomic"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // nodeTime is the Matter time an energy server reads its epoch-s times

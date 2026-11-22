@@ -18,9 +18,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/clock"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // The production verifier must keep exposing the optional fabric-id

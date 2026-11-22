@@ -6,7 +6,7 @@ package subscription
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestMarkDirtyAfterCloseIsIgnored: a change that reaches a subscription

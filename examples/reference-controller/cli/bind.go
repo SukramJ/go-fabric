@@ -11,14 +11,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acldef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // entryNode is v, an entry of a fabric-scoped list in its generated

@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/exchange"
 )
 
 // TestPeerConnectionKickTiming is the describe "PeerTimingParameters"

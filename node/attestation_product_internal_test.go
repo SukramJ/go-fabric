@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/secure/attestation"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // productChain is a CSA test chain for VendorID 0xFFF1 and pid.

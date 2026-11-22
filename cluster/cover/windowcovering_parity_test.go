@@ -6,8 +6,8 @@ package cover_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
+	"thingfabric.dev/go-fabric/cluster/cover"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
 )
 
 // TestParity_WindowCovering_ConfigStatus_Bitmap verifies that

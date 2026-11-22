@@ -31,7 +31,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // Open returns a fresh, empty store for one case. It may register cleanups

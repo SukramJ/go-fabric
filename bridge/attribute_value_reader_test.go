@@ -11,10 +11,10 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
 )
 
 // advanceToContent advances dec past the first element and returns the element.

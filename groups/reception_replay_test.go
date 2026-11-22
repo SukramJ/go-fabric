@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // receptionEntries is how many source node ids the Manager holds a

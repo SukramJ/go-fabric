@@ -11,7 +11,7 @@ package channel
 // be production API that exists solely to serve tests. See the channelseam
 // package doc.
 
-import "github.com/SukramJ/go-fabric/internal/channelseam"
+import "thingfabric.dev/go-fabric/internal/channelseam"
 
 func init() {
 	channelseam.AnchorPeerCounter = func(sess any, counter uint32) bool {

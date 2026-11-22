@@ -11,9 +11,9 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // The settings keys an endpoint's effective surface is kept under, next to

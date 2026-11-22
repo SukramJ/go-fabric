@@ -13,8 +13,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/controller/ca"
-	"github.com/SukramJ/go-fabric/controller/ca/keyfile"
+	"thingfabric.dev/go-fabric/controller/ca"
+	"thingfabric.dev/go-fabric/controller/ca/keyfile"
 )
 
 // passphraseEnv is the environment variable --ca-key file: reads the key

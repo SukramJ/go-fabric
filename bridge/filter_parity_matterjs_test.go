@@ -8,9 +8,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/filter"
-	carbon "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/cluster/filter"
+	carbon "thingfabric.dev/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
 )
 
 // filter-wire-fixtures.json holds matter.js's own encodings of the

@@ -6,8 +6,8 @@ package bridge
 import (
 	"testing"
 
-	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/im"
+	endpointpkg "thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestHeldWriteKeepsOnePathPerNotification (R2-P6-bound-0409): N host

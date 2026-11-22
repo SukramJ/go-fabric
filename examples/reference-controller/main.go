@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/SukramJ/go-fabric/examples/reference-controller/cli"
+	"thingfabric.dev/go-fabric/examples/reference-controller/cli"
 )
 
 func main() {

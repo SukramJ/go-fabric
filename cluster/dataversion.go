@@ -4,7 +4,7 @@
 package cluster
 
 import (
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // DataVersionTracker is a per-cluster monotonic counter that cluster

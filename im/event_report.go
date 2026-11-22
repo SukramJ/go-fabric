@@ -6,7 +6,7 @@ package im
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // EventPathIB tag numbers (Matter Core Spec §10.6.6 EventPathIB).

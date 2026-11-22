@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/secure/mattercert"
 )
 
 // countingTime is a TimeSource that counts how often it is read.

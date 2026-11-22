@@ -10,8 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TestOwedFabricRemovalReachesObserveAsync (review II, R2-P6-err-2402):

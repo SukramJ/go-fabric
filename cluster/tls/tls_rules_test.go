@@ -14,11 +14,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tcmdef "github.com/SukramJ/go-fabric/cluster/spec/tlscertificatemanagement"
-	tcldef "github.com/SukramJ/go-fabric/cluster/spec/tlsclientmanagement"
-	"github.com/SukramJ/go-fabric/cluster/tls"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tcmdef "thingfabric.dev/go-fabric/cluster/spec/tlscertificatemanagement"
+	tcldef "thingfabric.dev/go-fabric/cluster/spec/tlsclientmanagement"
+	"thingfabric.dev/go-fabric/cluster/tls"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // mapStore is a Store in memory.

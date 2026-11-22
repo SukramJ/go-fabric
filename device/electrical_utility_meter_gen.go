@@ -6,8 +6,8 @@
 package device
 
 import (
-	meteridentificationdef "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
-	"github.com/SukramJ/go-fabric/schema"
+	meteridentificationdef "thingfabric.dev/go-fabric/cluster/spec/meteridentification"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ElectricalUtilityMeter device type identity: 0x0511, revision 1.

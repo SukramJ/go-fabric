@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/secure/aesccm"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/secure/aesccm"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // The send half of a group session: the AEAD seal of a group message and

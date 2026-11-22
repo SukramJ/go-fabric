@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/diagevent"
 )
 
 // TestDiagnosticRingAttachIsSafeWhileTheReceivePathRecords pins that the

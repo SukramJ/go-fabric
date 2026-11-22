@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	carbon "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
-	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	carbon "thingfabric.dev/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	hepa "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
 )
 
 // The typed server's optional interfaces: Handle, Emit and SetBeforeWrite

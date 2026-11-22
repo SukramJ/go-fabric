@@ -24,7 +24,7 @@
 // install under a chosen id lives here, out of every consumer's reach.
 package sessionseam
 
-import "github.com/SukramJ/go-fabric/secure/sigma"
+import "thingfabric.dev/go-fabric/secure/sigma"
 
 // OpenAt installs a CASE session under id in m (a
 // *operational.Manager) exactly as the deprecated

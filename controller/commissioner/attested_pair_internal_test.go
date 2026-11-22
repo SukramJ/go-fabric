@@ -9,9 +9,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/exchange"
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/client/exchange"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/controller/attestation"
 )
 
 // TestAttestedPairWithheld: an attestation that returned no error records

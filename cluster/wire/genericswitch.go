@@ -4,7 +4,7 @@
 package wire
 
 import (
-	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
+	swdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
 )
 
 // The Switch cluster (0x003B): the server is cluster/switch

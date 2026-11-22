@@ -6,7 +6,7 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // unsecuredHeader builds a minimal SessionID==0 (PASE / unsecured) message

@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	fabricclock "github.com/SukramJ/go-fabric/clock"
+	fabricclock "thingfabric.dev/go-fabric/clock"
 )
 
 // TransportKind names a discovery transport — matter.js ChannelType of a

@@ -6,10 +6,10 @@ package boolcfg_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/boolcfg"
-	bcdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/boolcfg"
+	bcdef "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestBooleanStateConfigurationWriteOrigins is the controller-write row of

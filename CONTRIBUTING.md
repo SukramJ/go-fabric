@@ -30,7 +30,7 @@ to your work.
 ## Local setup
 
 ```sh
-git clone https://github.com/SukramJ/go-fabric
+git clone https://github.com/thingfabric/go-fabric
 cd go-fabric
 go build ./...
 go test ./...
@@ -132,7 +132,7 @@ decision, not a convenience:
 
 The module has an independent SemVer lane; `v0.1.0` is its first tag. A
 merge to `main` is still immediately consumable by anyone who runs
-`go get github.com/SukramJ/go-fabric@main`, so treat `main` accordingly. A
+`go get thingfabric.dev/go-fabric@main`, so treat `main` accordingly. A
 release is a commit that turns `## [Unreleased]` into a dated
 `## [x.y.z]` section, followed by the `vx.y.z` tag on that commit; the
 release workflow refuses a tag without its CHANGELOG section, and a tag

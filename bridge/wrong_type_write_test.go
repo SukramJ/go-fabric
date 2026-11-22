@@ -6,10 +6,10 @@ package bridge
 import (
 	"testing"
 
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestScalarOfAnotherTypeIsUndecodable (gate round 4, decision 161): a

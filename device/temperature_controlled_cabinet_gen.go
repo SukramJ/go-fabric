@@ -6,13 +6,13 @@
 package device
 
 import (
-	ovencavityoperationalstatedef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
-	ovenmodedef "github.com/SukramJ/go-fabric/cluster/spec/ovenmode"
-	refrigeratorandtemperaturecontrolledcabinetmodedef "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
-	temperaturealarmdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
-	temperaturecontroldef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	temperaturemeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	ovencavityoperationalstatedef "thingfabric.dev/go-fabric/cluster/spec/ovencavityoperationalstate"
+	ovenmodedef "thingfabric.dev/go-fabric/cluster/spec/ovenmode"
+	refrigeratorandtemperaturecontrolledcabinetmodedef "thingfabric.dev/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
+	temperaturealarmdef "thingfabric.dev/go-fabric/cluster/spec/temperaturealarm"
+	temperaturecontroldef "thingfabric.dev/go-fabric/cluster/spec/temperaturecontrol"
+	temperaturemeasurementdef "thingfabric.dev/go-fabric/cluster/spec/temperaturemeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // TemperatureControlledCabinet device type identity: 0x0071, revision 6.

@@ -35,8 +35,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/internal/chipdm"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/internal/chipdm"
 )
 
 // confField is a Fields entry (validation-test-utils.ts:21-40) or a

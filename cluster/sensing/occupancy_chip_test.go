@@ -24,10 +24,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/sensing"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/sensing"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // occLimits is a HoldTimeLimits value.

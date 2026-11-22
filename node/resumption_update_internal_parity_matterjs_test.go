@@ -10,11 +10,11 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/bridge"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // TestUpdateNOCDropsResumptionRecordsParity pins that UpdateNOC's

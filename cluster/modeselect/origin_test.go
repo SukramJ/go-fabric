@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/modeselect"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	msdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
+	"thingfabric.dev/go-fabric/cluster/modeselect"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	msdef "thingfabric.dev/go-fabric/cluster/spec/modeselect"
 )
 
 // TestModeSelectOrigins is the origin audit of the pull ModeSelect

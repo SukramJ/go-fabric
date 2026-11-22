@@ -10,7 +10,7 @@ package mdns_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 func serviceDescriptionTXT(svc mdns.Service) map[string]string {

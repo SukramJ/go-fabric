@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // Instance is one instance of a DNS-SD service type that [Names.Browse]

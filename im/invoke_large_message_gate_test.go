@@ -17,7 +17,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 const (

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
 )
 
 // bdx-wire-fixtures.json is matter.js's own encoding of every BDX message,

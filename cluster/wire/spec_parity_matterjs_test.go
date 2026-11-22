@@ -8,11 +8,11 @@ import (
 	"errors"
 	"testing"
 
-	admdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
-	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
-	swdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
+	admdef "thingfabric.dev/go-fabric/cluster/spec/administratorcommissioning"
+	"thingfabric.dev/go-fabric/cluster/spec/spectest"
+	swdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestServersMatchTheGeneratedDefinitions holds AdministratorCommissioning

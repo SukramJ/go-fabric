@@ -130,7 +130,7 @@ order, with parts depth-first:
 --- PASS: TestChipCertificationFamilies/BRBINFO  (22.74s)    1 pass, 0 fail, 4 skip
 --- PASS: TestChipCertificationFamilies/DESC      (46.28s)    2 pass, 0 fail, 1 skip
 --- PASS: TestChipCertificationFamilies/IDM    (1631.27s)   65 pass, 0 fail, 13 skip (incl. IDM/10.4 per endpoint, 45 slices)
-ok  github.com/SukramJ/go-fabric/internal/chiptool  2515.230s
+ok  thingfabric.dev/go-fabric/internal/chiptool  2515.230s
 ```
 
 Every skip is a gap declared in the family table (0.00 s, not run). The PICS

@@ -10,7 +10,22 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-11-22
+
+The module moves to the GitHub organisation `thingfabric` and to the import path `thingfabric.dev/go-fabric`. No behaviour and no identifier changes; upgrading requires a source change: the imports (migration below). The nested modules follow with `ble/bluez/v0.25.0`, `ble/esphome/v0.25.0` and `wifi/wpasupplicant/v0.25.0` in a release of their own that requires `v0.25.0`.
+
 ### Changed
+
+- **Breaking: the module path is `thingfabric.dev/go-fabric`** (before `github.com/SukramJ/go-fabric`), and the repository is `github.com/thingfabric/go-fabric` (GitHub redirects the old URL). The nested modules move with it: `thingfabric.dev/go-fabric/ble/bluez`, `thingfabric.dev/go-fabric/ble/esphome`, `thingfabric.dev/go-fabric/wifi/wpasupplicant`. `thingfabric.dev` is a vanity path (the `go-import` tags are served by `thingfabric/thingfabric.github.io`), so a later move of the repository no longer changes an import. No identifier changes: every package keeps its name and API under the new prefix. `github.com/SukramJ/go-fabric` ends at `v0.24.1`, which is marked deprecated. Migration: the guide's section [Moved in v0.25.0: the module path](docs/guides/migrating-to-the-facade.md#moved-in-v0250-the-module-path).
+
+Migrate in a consumer's module root (`perl` instead of `sed` so the one line runs on Linux and macOS; the lookahead leaves `go-fabric-ui` and `go-fabric-server` alone, which have not moved yet):
+
+```sh
+git ls-files -z '*.go' go.mod | xargs -0 perl -pi -e 's#github\.com/SukramJ/go-fabric(?![\w-])#thingfabric.dev/go-fabric#g'
+go get thingfabric.dev/go-fabric@v0.25.0
+go mod tidy
+gofmt -w .   # the import blocks re-sort under the new path
+```
 
 - The documentation site moves from `sukramj.github.io/go-fabric` to <https://docs.thingfabric.dev/>, published by the repository `thingfabric/docs` (hourly, when `main` moved); `.github/workflows/pages.yml` keeps `mkdocs build --strict` on pull requests and no longer deploys. `mkdocs.yml` `site_url` follows.
 

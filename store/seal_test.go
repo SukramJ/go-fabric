@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
-	"github.com/SukramJ/go-fabric/store/storetest"
+	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/store/storetest"
 )
 
 // testSealer is an AES-GCM sealer under a key derived from seed.

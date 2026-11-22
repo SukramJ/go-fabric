@@ -10,7 +10,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/im/subscription"
 )
 
 // TestStart_SecondCallStartsNoSecondEngine pins the "Idempotent" the

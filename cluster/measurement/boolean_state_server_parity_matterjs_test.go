@@ -15,10 +15,10 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/measurement"
-	booldef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/measurement"
+	booldef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestBooleanStateServerParityMatterJS ports :12-17.

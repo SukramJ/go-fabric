@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/commissioning"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/commissioning"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // minimalAttestationInput returns a valid AttestationInput using the test chain's DAC key.

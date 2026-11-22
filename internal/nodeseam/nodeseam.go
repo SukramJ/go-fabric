@@ -17,8 +17,8 @@
 package nodeseam
 
 import (
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 // UseClientListener makes the node built from cfg (a *node.Config, as any:

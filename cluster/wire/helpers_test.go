@@ -6,7 +6,7 @@ package wire_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // buildPayload wraps a set of context-tagged fields inside an anonymous

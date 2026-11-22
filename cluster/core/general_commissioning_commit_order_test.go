@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store/memstore"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store/memstore"
 )
 
 // failedUpdateThenAdd is the state of review II R2-P1-rw-06 and

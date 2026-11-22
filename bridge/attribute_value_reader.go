@@ -7,16 +7,16 @@ import (
 	"errors"
 	"fmt"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
-	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
-	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acldef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	otadef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // attributeValueReader is the [im.AttributeValueReader] the bridge

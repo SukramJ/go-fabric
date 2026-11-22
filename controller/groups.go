@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/groups"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/groups"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The controller's group sender on its one identity. A group message is

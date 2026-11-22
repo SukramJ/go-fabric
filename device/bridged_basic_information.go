@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 )
 
 // bridgedInfoAssembler are the BridgedDeviceBasicInformation attributes a

@@ -19,9 +19,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/bdx"
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
-	"github.com/SukramJ/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/controller/dcl"
 )
 
 // The image store: the storage half of matter.js's DclOtaUpdateService

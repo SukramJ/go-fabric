@@ -9,9 +9,9 @@ import (
 	"slices"
 	"testing"
 
-	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	matteralarm "thingfabric.dev/go-fabric/cluster/alarm"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
 )
 
 // application-wire-fixtures.json holds matter.js's own encodings of the

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // Grant replaces the device's access control list on the pair's fabric with

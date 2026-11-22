@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
-	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
-	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/fabrictest"
-	"github.com/SukramJ/go-fabric/node"
+	descriptordef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	epmdef "thingfabric.dev/go-fabric/cluster/spec/electricalpowermeasurement"
+	psdef "thingfabric.dev/go-fabric/cluster/spec/powersource"
+	ptdef "thingfabric.dev/go-fabric/cluster/spec/powertopology"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 )
 
 // TestBridgedDeviceDeclaresPowerSource: a device whose type does not list

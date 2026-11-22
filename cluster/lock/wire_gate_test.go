@@ -6,9 +6,9 @@ package lock_test
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // wireInvoke invokes cmd on srv as a command over the wire reaches it: the

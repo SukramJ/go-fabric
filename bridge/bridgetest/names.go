@@ -12,8 +12,8 @@ package bridgetest
 import (
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // deviceHost is the host name the injected records give the device.

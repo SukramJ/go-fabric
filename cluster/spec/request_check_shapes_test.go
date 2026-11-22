@@ -8,10 +8,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	bsdef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	"github.com/SukramJ/go-fabric/cluster/spec/powersource"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	bsdef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	"thingfabric.dev/go-fabric/cluster/spec/powersource"
+	"thingfabric.dev/go-fabric/im"
 )
 
 type listReq struct {

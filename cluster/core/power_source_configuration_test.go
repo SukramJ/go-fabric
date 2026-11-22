@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	pscfgdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
+	pscfgdef "thingfabric.dev/go-fabric/cluster/spec/powersourceconfiguration"
 )
 
 // TestPowerSourceConfigurationSources pins the list rules: the host's

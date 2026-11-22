@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/boolcfg"
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	mtrid "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
+	"thingfabric.dev/go-fabric/cluster/boolcfg"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	mtrid "thingfabric.dev/go-fabric/cluster/spec/meteridentification"
 )
 
 // TestBoolCfgTestEventTriggers replays CHIP's all-clusters handler

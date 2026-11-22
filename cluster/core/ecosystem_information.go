@@ -10,11 +10,11 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ecodef "thingfabric.dev/go-fabric/cluster/spec/ecosysteminformation"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The bounds connectedhomeip holds an EcosystemInformation entry to

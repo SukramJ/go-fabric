@@ -6,8 +6,8 @@ package exchange
 import (
 	"time"
 
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // Fallbacks for session parameters a peer did not report. Mirrors matter.js

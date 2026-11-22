@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // BDXExchange is an exchange of this stack as a [bdx.Exchange]: a BDX

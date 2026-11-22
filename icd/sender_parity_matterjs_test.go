@@ -14,9 +14,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/icd/checkin"
-	"github.com/SukramJ/go-fabric/transport/mrp"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd/checkin"
+	"thingfabric.dev/go-fabric/transport/mrp"
 )
 
 var senderKey, _ = hex.DecodeString("5a6b7c8d9e0f00112233445566778899")

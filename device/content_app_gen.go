@@ -6,15 +6,15 @@
 package device
 
 import (
-	accountlogindef "github.com/SukramJ/go-fabric/cluster/spec/accountlogin"
-	applicationbasicdef "github.com/SukramJ/go-fabric/cluster/spec/applicationbasic"
-	applicationlauncherdef "github.com/SukramJ/go-fabric/cluster/spec/applicationlauncher"
-	channeldef "github.com/SukramJ/go-fabric/cluster/spec/channel"
-	contentlauncherdef "github.com/SukramJ/go-fabric/cluster/spec/contentlauncher"
-	keypadinputdef "github.com/SukramJ/go-fabric/cluster/spec/keypadinput"
-	mediaplaybackdef "github.com/SukramJ/go-fabric/cluster/spec/mediaplayback"
-	targetnavigatordef "github.com/SukramJ/go-fabric/cluster/spec/targetnavigator"
-	"github.com/SukramJ/go-fabric/schema"
+	accountlogindef "thingfabric.dev/go-fabric/cluster/spec/accountlogin"
+	applicationbasicdef "thingfabric.dev/go-fabric/cluster/spec/applicationbasic"
+	applicationlauncherdef "thingfabric.dev/go-fabric/cluster/spec/applicationlauncher"
+	channeldef "thingfabric.dev/go-fabric/cluster/spec/channel"
+	contentlauncherdef "thingfabric.dev/go-fabric/cluster/spec/contentlauncher"
+	keypadinputdef "thingfabric.dev/go-fabric/cluster/spec/keypadinput"
+	mediaplaybackdef "thingfabric.dev/go-fabric/cluster/spec/mediaplayback"
+	targetnavigatordef "thingfabric.dev/go-fabric/cluster/spec/targetnavigator"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ContentApp device type identity: 0x0024, revision 2.

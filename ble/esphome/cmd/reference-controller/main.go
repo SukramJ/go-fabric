@@ -15,11 +15,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
-	"github.com/SukramJ/go-fabric/controller/ble"
-	"github.com/SukramJ/go-fabric/examples/reference-controller/cli"
+	"thingfabric.dev/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/controller/ble"
+	"thingfabric.dev/go-fabric/examples/reference-controller/cli"
 
-	"github.com/SukramJ/go-fabric/ble/esphome"
+	"thingfabric.dev/go-fabric/ble/esphome"
 )
 
 // discovering is a central over discovered proxies: closing it closes its

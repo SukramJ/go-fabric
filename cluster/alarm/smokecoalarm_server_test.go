@@ -10,13 +10,13 @@ import (
 	"sync"
 	"testing"
 
-	smokedef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/alarm"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/alarm"
+	clusterwire "thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // device is a host alarm: its state, and the two capabilities.

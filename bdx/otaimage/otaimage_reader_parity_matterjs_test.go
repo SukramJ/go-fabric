@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"thingfabric.dev/go-fabric/bdx/otaimage"
 )
 
 // otaCreate is OtaImageWriter.create: the image and its full-file checksum.

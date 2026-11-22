@@ -7,7 +7,7 @@ import (
 	"errors"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // listedDeviceTypes returns the device-type ids ep's Descriptor

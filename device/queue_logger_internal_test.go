@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/serialqueue"
+	"thingfabric.dev/go-fabric/internal/serialqueue"
 )
 
 // TestQueueWarnsThroughTheDevicesLogger (review II, R2-P6-bound-0209): a

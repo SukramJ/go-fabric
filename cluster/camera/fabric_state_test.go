@@ -8,9 +8,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/camera"
-	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/camera"
+	padef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestProviderDropFabricEndsItsSessions: a removed fabric's WebRTC

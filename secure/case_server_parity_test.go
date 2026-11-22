@@ -22,7 +22,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // mustDecodeHex decodes a hex string; fatal on error.

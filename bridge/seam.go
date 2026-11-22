@@ -4,7 +4,7 @@
 package bridge
 
 // This file installs the module-internal seam that
-// [github.com/SukramJ/go-fabric/bridge/bridgetest] reads. It declares no
+// [thingfabric.dev/go-fabric/bridge/bridgetest] reads. It declares no
 // exported identifier on purpose: the affordances an external test needs —
 // establishing a subscription's reply route without wire traffic, anchoring
 // the peer's receive window on the handshake it never sent, driving one pump
@@ -17,12 +17,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/SukramJ/go-fabric/transport"
+	"thingfabric.dev/go-fabric/transport"
 
-	"github.com/SukramJ/go-fabric/internal/bridgeseam"
-	"github.com/SukramJ/go-fabric/internal/channelseam"
-	"github.com/SukramJ/go-fabric/transport/message"
-	"github.com/SukramJ/go-fabric/transport/udp"
+	"thingfabric.dev/go-fabric/internal/bridgeseam"
+	"thingfabric.dev/go-fabric/internal/channelseam"
+	"thingfabric.dev/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/transport/udp"
 )
 
 func init() {

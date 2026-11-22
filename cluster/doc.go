@@ -32,7 +32,7 @@
 // a host mounts on its own types mirror them.
 //
 // Each cluster type implements
-// [github.com/SukramJ/go-fabric/contract.ClusterServer]
+// [thingfabric.dev/go-fabric/contract.ClusterServer]
 // so the bridge dispatches reads / writes / invokes uniformly,
 // regardless of whether the cluster is system or application.
 package cluster

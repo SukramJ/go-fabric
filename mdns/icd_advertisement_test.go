@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/mdns"
+	"thingfabric.dev/go-fabric/mdns"
 )
 
 // TestBuildOperationalService_ICD holds the operational record of an ICD:

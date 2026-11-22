@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
+	wcdef "thingfabric.dev/go-fabric/cluster/spec/windowcovering"
 
-	"github.com/SukramJ/go-fabric/cluster/cover"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/cover"
+	"thingfabric.dev/go-fabric/im"
 )
 
 func newLiftServer() *cover.WindowCoveringServer {

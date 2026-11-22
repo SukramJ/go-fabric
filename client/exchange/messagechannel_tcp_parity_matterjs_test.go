@@ -20,8 +20,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 )
 
 // sizedChannel is a fake TCP channel with its own message limit.

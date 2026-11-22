@@ -6,8 +6,8 @@ package client
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	"github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	"thingfabric.dev/go-fabric/cluster/spec/onoff"
 )
 
 // The package's tests check the running total against the structure at

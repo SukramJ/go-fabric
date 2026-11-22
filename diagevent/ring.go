@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // Kind buckets an event so a reader can filter without parsing prose.

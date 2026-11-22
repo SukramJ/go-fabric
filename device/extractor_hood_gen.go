@@ -6,11 +6,11 @@
 package device
 
 import (
-	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
-	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
-	hepafiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	"github.com/SukramJ/go-fabric/schema"
+	activatedcarbonfiltermonitoringdef "thingfabric.dev/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
+	fancontroldef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
+	hepafiltermonitoringdef "thingfabric.dev/go-fabric/cluster/spec/hepafiltermonitoring"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ExtractorHood device type identity: 0x007A, revision 1.

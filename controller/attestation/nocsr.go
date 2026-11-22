@@ -13,8 +13,8 @@ import (
 	"math"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // NOCSRCheck names a check of [ValidateNOCSR] — matter.js NocsrCheck

@@ -6,8 +6,8 @@ package node
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/jointfabric"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/jointfabric"
 )
 
 // RemoveFabricBindings is the node's removal of a fabric's server state —

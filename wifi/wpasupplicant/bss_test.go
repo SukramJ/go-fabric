@@ -8,7 +8,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
+	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
 )
 
 // TestBandAndChannel: connectedhomeip's frequency table, branch by

@@ -10,10 +10,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	messagesdef "github.com/SukramJ/go-fabric/cluster/spec/messages"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	messagesdef "thingfabric.dev/go-fabric/cluster/spec/messages"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestMessagesRefusesAnotherFabricsID (review II, R2-P6-sec-1201, decision

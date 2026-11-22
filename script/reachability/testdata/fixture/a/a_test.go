@@ -6,7 +6,7 @@ package a_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/a"
+	"thingfabric.dev/go-fabric/a"
 )
 
 func TestA(t *testing.T) {

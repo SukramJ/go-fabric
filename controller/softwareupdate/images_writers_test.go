@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/controller/dcl"
 )
 
 // TestImagesOneWriterPerName (review II, R2-P6-conc-1901, carried

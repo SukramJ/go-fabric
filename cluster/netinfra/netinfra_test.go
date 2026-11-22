@@ -9,11 +9,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/netinfra"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	tdir "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	wdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/netinfra"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	tdir "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	wdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkmanagement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // failingStore is a ThreadNetworkStore whose calls fail.

@@ -20,11 +20,11 @@ import (
 // sampleReport carries one line of each shape go emits: a covered package,
 // a package with no statements, a package with no test files, and a package
 // that compiled but ran nothing.
-const sampleReport = `ok  	github.com/SukramJ/go-fabric	0.666s	coverage: [no statements]
-ok  	github.com/SukramJ/go-fabric/tlv	3.908s	coverage: 91.9% of statements
-	github.com/SukramJ/go-fabric/endpoint/endpointtest		coverage: 0.0% of statements
-?   	github.com/SukramJ/go-fabric/internal/bridgeseam	[no test files]
-ok  	github.com/SukramJ/go-fabric/transport/message	4.400s	coverage: 100.0% of statements
+const sampleReport = `ok  	thingfabric.dev/go-fabric	0.666s	coverage: [no statements]
+ok  	thingfabric.dev/go-fabric/tlv	3.908s	coverage: 91.9% of statements
+	thingfabric.dev/go-fabric/endpoint/endpointtest		coverage: 0.0% of statements
+?   	thingfabric.dev/go-fabric/internal/bridgeseam	[no test files]
+ok  	thingfabric.dev/go-fabric/transport/message	4.400s	coverage: 100.0% of statements
 `
 
 // TestParseReportReadsEveryLineShape pins the parse of the four summary
@@ -43,19 +43,19 @@ func TestParseReportReadsEveryLineShape(t *testing.T) {
 	for _, m := range got {
 		byPkg[m.pkg] = m
 	}
-	if m := byPkg["github.com/SukramJ/go-fabric/tlv"]; !m.measurable || m.pct != 91.9 {
+	if m := byPkg["thingfabric.dev/go-fabric/tlv"]; !m.measurable || m.pct != 91.9 {
 		t.Errorf("tlv = %+v, want measurable 91.9%%", m)
 	}
-	if m := byPkg["github.com/SukramJ/go-fabric/transport/message"]; !m.measurable || m.pct != 100 {
+	if m := byPkg["thingfabric.dev/go-fabric/transport/message"]; !m.measurable || m.pct != 100 {
 		t.Errorf("transport/message = %+v, want measurable 100%%", m)
 	}
-	if m := byPkg["github.com/SukramJ/go-fabric/endpoint/endpointtest"]; !m.measurable || m.pct != 0 {
+	if m := byPkg["thingfabric.dev/go-fabric/endpoint/endpointtest"]; !m.measurable || m.pct != 0 {
 		t.Errorf("endpointtest = %+v, want a measurable 0.0%%", m)
 	}
-	if m := byPkg["github.com/SukramJ/go-fabric"]; m.measurable || m.note != "no statements" {
+	if m := byPkg["thingfabric.dev/go-fabric"]; m.measurable || m.note != "no statements" {
 		t.Errorf("root = %+v, want unmeasurable with note %q", m, "no statements")
 	}
-	if m := byPkg["github.com/SukramJ/go-fabric/internal/bridgeseam"]; m.measurable || m.note != "no test files" {
+	if m := byPkg["thingfabric.dev/go-fabric/internal/bridgeseam"]; m.measurable || m.note != "no test files" {
 		t.Errorf("bridgeseam = %+v, want unmeasurable with note %q", m, "no test files")
 	}
 }
@@ -66,8 +66,8 @@ func TestParseReportReadsEveryLineShape(t *testing.T) {
 // bake a partial number into the floors.
 func TestParseReportRejectsAFailedRun(t *testing.T) {
 	t.Parallel()
-	const report = `ok  	github.com/SukramJ/go-fabric/tlv	3.9s	coverage: 91.9% of statements
-FAIL	github.com/SukramJ/go-fabric/bridge	2.8s
+	const report = `ok  	thingfabric.dev/go-fabric/tlv	3.9s	coverage: 91.9% of statements
+FAIL	thingfabric.dev/go-fabric/bridge	2.8s
 `
 	if _, err := parseReport(strings.NewReader(report)); err == nil {
 		t.Fatal("parseReport accepted a report with a FAIL line; want an error")

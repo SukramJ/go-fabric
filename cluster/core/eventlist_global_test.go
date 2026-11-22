@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestCoreServersDoNotServeEventList pins EventList (0xFFFA) out of the three

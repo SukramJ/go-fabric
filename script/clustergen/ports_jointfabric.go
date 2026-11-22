@@ -127,7 +127,7 @@ var jointFabricPorts = map[string]portSet{
 		"\tFabricIndex uint8",
 		"\tNodeID      uint64",
 		"}",
-	}, imports: []string{"github.com/SukramJ/go-fabric/cluster/spec/operationalcredentials"}},
+	}, imports: []string{"thingfabric.dev/go-fabric/cluster/spec/operationalcredentials"}},
 }
 
 func init() {

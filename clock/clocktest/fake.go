@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // Fake is a [clock.Clock] driven by the test. Its zero value is not

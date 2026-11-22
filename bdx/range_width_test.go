@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/bdx"
+	"thingfabric.dev/go-fabric/bdx"
 )
 
 // TestRangeFieldsNeverTruncate (review II, R2-P6-wire-1909) is the

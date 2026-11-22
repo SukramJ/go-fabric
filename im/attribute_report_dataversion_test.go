@@ -11,7 +11,7 @@ package im
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // TestAttributeReport_DataVersionPresent is an ADR-0013 "earlier-catch" test

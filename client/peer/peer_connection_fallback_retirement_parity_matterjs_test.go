@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/discovery"
 )
 
 const addrAlt = "[fd00::5]:5540" // the discovered alternative, :116

@@ -8,9 +8,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/netinfra"
-	tdirdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	"github.com/SukramJ/go-fabric/device"
+	"thingfabric.dev/go-fabric/cluster/netinfra"
+	tdirdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	"thingfabric.dev/go-fabric/device"
 )
 
 // netinfraDataset is chip's kDataset1 (TestThreadNetworkDirectoryCluster.cpp:

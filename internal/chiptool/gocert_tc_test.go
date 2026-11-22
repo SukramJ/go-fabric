@@ -11,12 +11,12 @@ import (
 	"fmt"
 	"time"
 
-	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	gocontroller "github.com/SukramJ/go-fabric/controller"
-	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/client"
-	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/im"
+	gencomm "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	gocontroller "thingfabric.dev/go-fabric/controller"
+	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/controller/client"
+	"thingfabric.dev/go-fabric/controller/commissioner"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // The terms-and-conditions acceptance of issue 449: the module's

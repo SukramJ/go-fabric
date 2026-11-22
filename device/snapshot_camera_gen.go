@@ -6,12 +6,12 @@
 package device
 
 import (
-	cameraavsettingsuserlevelmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
-	cameraavstreammanagementdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	occupancysensingdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	zonemanagementdef "github.com/SukramJ/go-fabric/cluster/spec/zonemanagement"
-	"github.com/SukramJ/go-fabric/schema"
+	cameraavsettingsuserlevelmanagementdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
+	cameraavstreammanagementdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	occupancysensingdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	zonemanagementdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // SnapshotCamera device type identity: 0x0145, revision 1.

@@ -7,8 +7,8 @@ import (
 	"context"
 	"sync"
 
-	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
-	"github.com/SukramJ/go-fabric/endpoint"
+	gencommdef "thingfabric.dev/go-fabric/cluster/spec/generalcommissioning"
+	"thingfabric.dev/go-fabric/endpoint"
 )
 
 // failSafeParticipant is a cluster server of an endpoint whose commands

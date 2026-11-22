@@ -11,11 +11,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	"github.com/SukramJ/go-fabric/icd"
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/bridge"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	icddef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	"thingfabric.dev/go-fabric/icd"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // ICDOperatingMode is an ICD's operating mode: a Short Idle Time or a Long

@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/controller/softwareupdate"
 )
 
 // otaHandoffs are the update manager's NodeDeleted calls the node hooks

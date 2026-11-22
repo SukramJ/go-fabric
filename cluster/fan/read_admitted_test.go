@@ -6,8 +6,8 @@ package fan_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/fan"
-	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
+	"thingfabric.dev/go-fabric/cluster/fan"
+	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
 )
 
 // TestReadServesOnlyAdmittedFanModeAndAirflow (R2-P6-wire-1564): a

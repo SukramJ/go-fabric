@@ -9,10 +9,10 @@ import (
 	"errors"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	bidef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // A NodeLabel write is bounded by the length it arrived with before the

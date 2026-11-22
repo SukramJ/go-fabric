@@ -6,8 +6,8 @@ package media
 import (
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	woldef "github.com/SukramJ/go-fabric/cluster/spec/wakeonlan"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	woldef "thingfabric.dev/go-fabric/cluster/spec/wakeonlan"
 )
 
 // WakeOnLanState is the WakeOnLan attribute state (wake-on-lan.element.ts:

@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 
-	padef "github.com/SukramJ/go-fabric/cluster/spec/pushavstreamtransport"
-	"github.com/SukramJ/go-fabric/cluster/tls"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/store"
+	padef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
+	"thingfabric.dev/go-fabric/cluster/tls"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // TLSConfig mounts TlsCertificateManagement and TlsClientManagement on

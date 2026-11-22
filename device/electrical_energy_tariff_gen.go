@@ -6,11 +6,11 @@
 package device
 
 import (
-	commoditypricedef "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
-	commoditytariffdef "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	descriptordef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
-	electricalgridconditionsdef "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
-	"github.com/SukramJ/go-fabric/schema"
+	commoditypricedef "thingfabric.dev/go-fabric/cluster/spec/commodityprice"
+	commoditytariffdef "thingfabric.dev/go-fabric/cluster/spec/commoditytariff"
+	descriptordef "thingfabric.dev/go-fabric/cluster/spec/descriptor"
+	electricalgridconditionsdef "thingfabric.dev/go-fabric/cluster/spec/electricalgridconditions"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // ElectricalEnergyTariff device type identity: 0x0513, revision 1.

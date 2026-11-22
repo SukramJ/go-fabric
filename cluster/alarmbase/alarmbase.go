@@ -46,13 +46,13 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dwa "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
-	rfa "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
-	tma "github.com/SukramJ/go-fabric/cluster/spec/temperaturealarm"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dwa "thingfabric.dev/go-fabric/cluster/spec/dishwasheralarm"
+	rfa "thingfabric.dev/go-fabric/cluster/spec/refrigeratoralarm"
+	tma "thingfabric.dev/go-fabric/cluster/spec/temperaturealarm"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // Cluster ids.

@@ -8,16 +8,16 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	dwmdef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
-	lwmdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
-	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
-	rcmdef "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
-	rvcdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
-	rrmdef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
-	scadef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	dwmdef "thingfabric.dev/go-fabric/cluster/spec/dishwashermode"
+	lwmdef "thingfabric.dev/go-fabric/cluster/spec/laundrywashermode"
+	pumpdef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	rcmdef "thingfabric.dev/go-fabric/cluster/spec/rvccleanmode"
+	rvcdef "thingfabric.dev/go-fabric/cluster/spec/rvcoperationalstate"
+	rrmdef "thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
+	scadef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 func encodeBytes(t *testing.T, v spec.Encodable) []byte {

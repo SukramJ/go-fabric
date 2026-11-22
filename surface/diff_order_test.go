@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/surface"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // TestDiffNamesADeviceTypeOrderOrDuplicateChange holds Diff to the digest:

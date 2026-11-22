@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	commctrldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	commctrldef "thingfabric.dev/go-fabric/cluster/spec/commissionercontrol"
 )
 
 // CommissionerControlConfig mounts the CommissionerControl server (0x0751)

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	ecodef "thingfabric.dev/go-fabric/cluster/spec/ecosysteminformation"
 )
 
 // TestFabricScopedDefaults: Binding and EcosystemInformation, whose

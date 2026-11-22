@@ -34,11 +34,11 @@ started — it closes the store file `Store.Path` opened.
 
 Every cadence in the table runs on one clock: `node.Config.Clock`
 (`bridge.Config.Clock` for a host that builds the bridge itself), a
-[`clock.Clock`](https://github.com/SukramJ/go-fabric/blob/main/clock/clock.go)
+[`clock.Clock`](https://github.com/thingfabric/go-fabric/blob/main/clock/clock.go)
 — the module's one time port, `clock.System` when unset. No production
 code outside the `clock` package reads the time package's clock
 (`clock/noraw_test.go` fails the build on one), so a test that passes a
-[`clocktest.Fake`](https://github.com/SukramJ/go-fabric/blob/main/clock/clocktest/fake.go)
+[`clocktest.Fake`](https://github.com/thingfabric/go-fabric/blob/main/clock/clocktest/fake.go)
 moves the ACK pump, the engine tick, the reapers, the commissioning window
 and the cluster timers only when it calls `Advance`. `AfterFunc` callbacks
 run in their own goroutine on either clock. The node's assembler hands the
@@ -46,7 +46,7 @@ same clock to the Identify server of every bridged endpoint
 (`endpoint.Config.Clock`) and to the Aggregator's; a device the host builds
 with the device layer takes it when the Aggregator adds the device.
 
-[`fabrictest`](https://github.com/SukramJ/go-fabric/tree/main/fabrictest)
+[`fabrictest`](https://github.com/thingfabric/go-fabric/tree/main/fabrictest)
 runs whole nodes and the module's controller on one `clocktest.Fake` and an
 in-memory network, and moves the clock only while no datagram is in flight,
 no host holds counted work in hand and no goroutine of the process is

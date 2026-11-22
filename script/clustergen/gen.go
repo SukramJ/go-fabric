@@ -575,18 +575,18 @@ func (g *generator) source() ([]byte, error) {
 		w.p("import (")
 		w.p("\t\"time\"")
 		w.p("")
-		w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
+		w.p("\t\"thingfabric.dev/go-fabric/cluster/spec\"")
 		if g.encodes() {
-			w.p("\t\"github.com/SukramJ/go-fabric/tlv\"")
+			w.p("\t\"thingfabric.dev/go-fabric/tlv\"")
 		}
 		w.p(")")
 	case g.encodes():
 		w.p("import (")
-		w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
-		w.p("\t\"github.com/SukramJ/go-fabric/tlv\"")
+		w.p("\t\"thingfabric.dev/go-fabric/cluster/spec\"")
+		w.p("\t\"thingfabric.dev/go-fabric/tlv\"")
 		w.p(")")
 	default:
-		w.p("import \"github.com/SukramJ/go-fabric/cluster/spec\"")
+		w.p("import \"thingfabric.dev/go-fabric/cluster/spec\"")
 	}
 	w.p("")
 	w.p("// Cluster identity.")
@@ -2035,10 +2035,10 @@ func (g *generator) test() ([]byte, error) {
 	}
 	w.p("\t\"testing\"")
 	w.p("")
-	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec\"")
-	w.p("\t\"github.com/SukramJ/go-fabric/cluster/spec/spectest\"")
+	w.p("\t\"thingfabric.dev/go-fabric/cluster/spec\"")
+	w.p("\t\"thingfabric.dev/go-fabric/cluster/spec/spectest\"")
 	if !g.definitionOnly {
-		w.p("\t\"github.com/SukramJ/go-fabric/contract\"")
+		w.p("\t\"thingfabric.dev/go-fabric/contract\"")
 	}
 	w.p(")")
 	w.p("")

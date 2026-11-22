@@ -6,10 +6,10 @@ package levelcontrol
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/onoff"
-	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	lvldef "thingfabric.dev/go-fabric/cluster/spec/levelcontrol"
+	"thingfabric.dev/go-fabric/cluster/wire"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // scenesRef boxes the scenes port for the atomic pointer.

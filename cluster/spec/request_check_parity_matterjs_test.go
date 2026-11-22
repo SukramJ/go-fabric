@@ -6,14 +6,14 @@ package spec_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	csdef "github.com/SukramJ/go-fabric/cluster/spec/cameraavstreammanagement"
-	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
-	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
-	lwc "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
+	lockdef "thingfabric.dev/go-fabric/cluster/spec/doorlock"
+	evsedef "thingfabric.dev/go-fabric/cluster/spec/energyevse"
+	lwc "thingfabric.dev/go-fabric/cluster/spec/laundrywashercontrols"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // decodeRequest is req as the definition's request check answers it:

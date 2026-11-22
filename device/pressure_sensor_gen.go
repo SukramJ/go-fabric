@@ -6,9 +6,9 @@
 package device
 
 import (
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	pressuremeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
-	"github.com/SukramJ/go-fabric/schema"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	pressuremeasurementdef "thingfabric.dev/go-fabric/cluster/spec/pressuremeasurement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // PressureSensor device type identity: 0x0305, revision 3.

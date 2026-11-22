@@ -13,7 +13,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // NOCSR Elements field tags per Matter §11.18.7.6.

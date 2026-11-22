@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/energy"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
+	"thingfabric.dev/go-fabric/cluster/energy"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	evse "thingfabric.dev/go-fabric/cluster/spec/energyevse"
 )
 
 // TestEnergyStateIsHandedOutAsDeepCopies is the package's guard of

@@ -11,8 +11,8 @@ package bridge
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/secure/sigma"
 )
 
 // ─── CaseAdapter.SetResponder / SnapshotResponder ────────────────────────────

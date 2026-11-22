@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SukramJ/go-fabric/node"
-	expvarmetrics "github.com/SukramJ/go-fabric/node/metrics/expvar"
+	"thingfabric.dev/go-fabric/node"
+	expvarmetrics "thingfabric.dev/go-fabric/node/metrics/expvar"
 )
 
 // metricsPrefix is the expvar name prefix of the node's metrics:

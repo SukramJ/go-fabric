@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/binding"
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/binding"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // switchTopology is the node of the case: our node 100 on fabric 1 and

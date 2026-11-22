@@ -67,7 +67,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // DefaultStepInterval is the time between two steps of a gradual

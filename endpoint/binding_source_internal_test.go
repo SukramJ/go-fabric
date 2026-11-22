@@ -6,8 +6,8 @@ package endpoint
 import (
 	"context"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/store"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // everyFabricSource lists every fabric index: the package's tests whose

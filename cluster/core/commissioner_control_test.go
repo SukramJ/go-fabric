@@ -12,12 +12,12 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock/clocktest"
-	commctrldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/secure/spake2"
+	"thingfabric.dev/go-fabric/clock/clocktest"
+	commctrldef "thingfabric.dev/go-fabric/cluster/spec/commissionercontrol"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/secure/setup"
+	"thingfabric.dev/go-fabric/secure/spake2"
 )
 
 type approverFunc func(context.Context, CommissioningApprovalRequest) (bool, error)

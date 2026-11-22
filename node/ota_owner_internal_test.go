@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
 )
 
 // TestOtaApplierCloseWaitsForTheRestart pins the default OTA applier as

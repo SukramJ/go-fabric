@@ -8,8 +8,8 @@ import (
 	"math"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
+	"thingfabric.dev/go-fabric/cluster"
+	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
 )
 
 // A command's fields reach the server in one of three shapes: the

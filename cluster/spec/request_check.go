@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // CheckRequest holds a decoded request payload of the request command

@@ -21,10 +21,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	lcfgdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
-	"github.com/SukramJ/go-fabric/im"
+	"thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	lcfgdef "thingfabric.dev/go-fabric/cluster/spec/localizationconfiguration"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // TestLocalizationConfigurationServerParityMatterJS ports the describe

@@ -17,11 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/discovery"
 
-	"github.com/SukramJ/go-fabric/ble/esphome"
-	"github.com/SukramJ/go-fabric/ble/esphome/esphometest"
-	"github.com/SukramJ/go-fabric/ble/esphome/internal/wire"
+	"thingfabric.dev/go-fabric/ble/esphome"
+	"thingfabric.dev/go-fabric/ble/esphome/esphometest"
+	"thingfabric.dev/go-fabric/ble/esphome/internal/wire"
 )
 
 // browseWindow is the tests' browse time: the in-memory network answers

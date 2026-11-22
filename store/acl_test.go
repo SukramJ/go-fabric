@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	store "github.com/SukramJ/go-fabric/store"
+	store "thingfabric.dev/go-fabric/store"
 )
 
 // TestACL_ListEmpty verifies that ListACL on a fresh fabric returns an empty

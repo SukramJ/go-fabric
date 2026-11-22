@@ -9,7 +9,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/transition"
+	"thingfabric.dev/go-fabric/cluster/transition"
 )
 
 // TestRateFromReadsTheValueTheEngineReads holds the fix for the race a

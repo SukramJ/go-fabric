@@ -13,7 +13,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/icd"
+	"thingfabric.dev/go-fabric/icd"
 )
 
 // bootBump derives the bump from a zero seed, as IcdCounterTest.ts:10-13 does.

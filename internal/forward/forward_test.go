@@ -6,7 +6,7 @@ package forward_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/forward"
+	"thingfabric.dev/go-fabric/internal/forward"
 )
 
 // TestEnable: a feature is off until enabled, stays on while any enabler

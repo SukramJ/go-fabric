@@ -6,7 +6,7 @@ package discovery_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/client/discovery"
+	"thingfabric.dev/go-fabric/client/discovery"
 )
 
 // TestCommissioningIdentityParity ports matter.js's CommissioningIdentityTest

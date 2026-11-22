@@ -23,10 +23,10 @@ import (
 	"strconv"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/memstore"
-	"github.com/SukramJ/go-fabric/store"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/endpoint"
+	"thingfabric.dev/go-fabric/endpoint/memstore"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // AssertDeviceTypeConformance fails tb for every device type violation

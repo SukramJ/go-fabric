@@ -6,7 +6,7 @@ package core_test
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/core"
 )
 
 // TestDiagLogsBDX_QuiesceEndsTheTransfer pins DiagnosticLogs as the owner

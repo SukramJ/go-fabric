@@ -8,15 +8,15 @@ import (
 	"strings"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	acldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
-	basicdef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
-	gkmdef "github.com/SukramJ/go-fabric/cluster/spec/groupkeymanagement"
-	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
-	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	acldef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
+	basicdef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	gkmdef "thingfabric.dev/go-fabric/cluster/spec/groupkeymanagement"
+	occdef "thingfabric.dev/go-fabric/cluster/spec/occupancysensing"
+	onoffdef "thingfabric.dev/go-fabric/cluster/spec/onoff"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // heldStub is a hand-written cluster server that accepts every write: what

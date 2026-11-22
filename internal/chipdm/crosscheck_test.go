@@ -13,8 +13,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/schema"
+	"thingfabric.dev/go-fabric/parity"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // No build tag: the cross-check is part of every `go test ./...`. It reads

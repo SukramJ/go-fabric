@@ -6,16 +6,16 @@ package device
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster"
-	accesscontroldef "github.com/SukramJ/go-fabric/cluster/spec/accesscontrol"
-	booleanstatedef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
-	generaldiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
-	groupcastdef "github.com/SukramJ/go-fabric/cluster/spec/groupcast"
-	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
-	icdmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
-	scenesmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
-	timeformatlocalizationdef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	unitlocalizationdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
+	"thingfabric.dev/go-fabric/cluster"
+	accesscontroldef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
+	booleanstatedef "thingfabric.dev/go-fabric/cluster/spec/booleanstate"
+	generaldiagnosticsdef "thingfabric.dev/go-fabric/cluster/spec/generaldiagnostics"
+	groupcastdef "thingfabric.dev/go-fabric/cluster/spec/groupcast"
+	groupsdef "thingfabric.dev/go-fabric/cluster/spec/groups"
+	icdmanagementdef "thingfabric.dev/go-fabric/cluster/spec/icdmanagement"
+	scenesmanagementdef "thingfabric.dev/go-fabric/cluster/spec/scenesmanagement"
+	timeformatlocalizationdef "thingfabric.dev/go-fabric/cluster/spec/timeformatlocalization"
+	unitlocalizationdef "thingfabric.dev/go-fabric/cluster/spec/unitlocalization"
 )
 
 // intentionallyEnabled are the clusters of matter.js's INTENTIONALLY_ENABLED

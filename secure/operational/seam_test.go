@@ -6,7 +6,7 @@ package operational
 import (
 	"testing"
 
-	"github.com/SukramJ/go-fabric/internal/sessionseam"
+	"thingfabric.dev/go-fabric/internal/sessionseam"
 )
 
 // TestSessionSeamOpenAtInstallsUnderTheChosenID: the fixture install puts

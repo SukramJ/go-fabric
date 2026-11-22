@@ -8,11 +8,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	demdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
-	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
-	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
-	"github.com/SukramJ/go-fabric/contract"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	demdef "thingfabric.dev/go-fabric/cluster/spec/deviceenergymanagement"
+	pumpdef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
+	"thingfabric.dev/go-fabric/cluster/spec/rvcrunmode"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // testCluster exercises every resolution rule: a mandatory, an optional, a

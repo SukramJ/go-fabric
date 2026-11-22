@@ -28,7 +28,7 @@ import (
 	"fmt"
 	"strings"
 
-	secattestation "github.com/SukramJ/go-fabric/secure/attestation"
+	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 
 // csaCDRootSKID is the subject key identifier of the CSA "Matter

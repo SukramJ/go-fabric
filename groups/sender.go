@@ -15,8 +15,8 @@ import (
 	"slices"
 	"sync/atomic"
 
-	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/secure/channel"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // The send half of group communication: outbound group sessions, framed,

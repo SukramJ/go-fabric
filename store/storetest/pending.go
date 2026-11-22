@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/store"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // The cases of a fabric row's commit state (store.FabricPending): an

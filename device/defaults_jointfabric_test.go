@@ -7,9 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/jointfabric"
-	jfadef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricadministrator"
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
+	"thingfabric.dev/go-fabric/cluster/jointfabric"
+	jfadef "thingfabric.dev/go-fabric/cluster/spec/jointfabricadministrator"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
 )
 
 // fakeDatastoreSync answers every push and fetch empty.

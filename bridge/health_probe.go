@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SukramJ/go-fabric/clock"
+	"thingfabric.dev/go-fabric/clock"
 )
 
 // HealthComponentName is the tracker component the Matter bridge

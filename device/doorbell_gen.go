@@ -6,10 +6,10 @@
 package device
 
 import (
-	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
-	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
-	switchclusterdef "github.com/SukramJ/go-fabric/cluster/spec/switchcluster"
-	"github.com/SukramJ/go-fabric/schema"
+	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	identifydef "thingfabric.dev/go-fabric/cluster/spec/identify"
+	switchclusterdef "thingfabric.dev/go-fabric/cluster/spec/switchcluster"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // Doorbell device type identity: 0x0148, revision 2.

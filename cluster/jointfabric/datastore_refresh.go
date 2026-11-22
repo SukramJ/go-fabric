@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"slices"
 
-	dsdef "github.com/SukramJ/go-fabric/cluster/spec/jointfabricdatastore"
+	dsdef "thingfabric.dev/go-fabric/cluster/spec/jointfabricdatastore"
 )
 
 // rootEndpoint is the node's root endpoint (kRootEndpointId).

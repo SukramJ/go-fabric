@@ -6,11 +6,11 @@
 package device
 
 import (
-	threadborderroutermanagementdef "github.com/SukramJ/go-fabric/cluster/spec/threadborderroutermanagement"
-	threadnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdiagnostics"
-	threadnetworkdirectorydef "github.com/SukramJ/go-fabric/cluster/spec/threadnetworkdirectory"
-	wifinetworkmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkmanagement"
-	"github.com/SukramJ/go-fabric/schema"
+	threadborderroutermanagementdef "thingfabric.dev/go-fabric/cluster/spec/threadborderroutermanagement"
+	threadnetworkdiagnosticsdef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdiagnostics"
+	threadnetworkdirectorydef "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
+	wifinetworkmanagementdef "thingfabric.dev/go-fabric/cluster/spec/wifinetworkmanagement"
+	"thingfabric.dev/go-fabric/schema"
 )
 
 // NetworkInfrastructureManager device type identity: 0x0090, revision 2.

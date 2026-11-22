@@ -11,10 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SukramJ/go-fabric/client/interaction"
-	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/internal/valuejson"
-	"github.com/SukramJ/go-fabric/tlv"
+	"thingfabric.dev/go-fabric/client/interaction"
+	"thingfabric.dev/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/internal/valuejson"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // The JSON value route: a value of the image, a report, an event or a

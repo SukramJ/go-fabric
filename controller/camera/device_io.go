@@ -6,7 +6,7 @@ package camera
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"thingfabric.dev/go-fabric/cluster/spec"
 )
 
 // target is one camera endpoint: the camera's operational node id and the

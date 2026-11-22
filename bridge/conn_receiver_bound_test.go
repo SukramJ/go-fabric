@@ -7,8 +7,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/transport/message"
+	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/transport/message"
 )
 
 // TestConnReceiverBoundsTheMessagesInFlight: a connection of a transport
