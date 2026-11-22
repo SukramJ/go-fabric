@@ -134,3 +134,114 @@ func TestLocalStoreRefusesUndefinedEnumValues(t *testing.T) {
 		}
 	})
 }
+
+// wantDisallowedEnum asserts err is the store's refusal of a defined
+// member whose conformance the lock's features do not meet: the message
+// of matter.js's EnumValueConformanceError (conformance-compiler.ts:734-746
+// at b25ed960), CONSTRAINT_ERROR wrapping ErrEnumValueConformance.
+func wantDisallowedEnum(t *testing.T, err error, member string) {
+	t.Helper()
+	want := "Matter does not allow enum value " + member + " here"
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("%v, want %q", err, want)
+	}
+	var se *spec.StatusError
+	if !errors.As(err, &se) || se.Status != im.StatusConstraintError || !errors.Is(err, spec.ErrEnumValueConformance) {
+		t.Errorf("%v, want CONSTRAINT_ERROR wrapping ErrEnumValueConformance", err)
+	}
+}
+
+// A defined value whose member conformance the lock's features do not
+// meet is refused at the store as well, as matter.js's store validation
+// refuses it (addEnumMemberValidation, conformance-compiler.ts:762-862 at
+// b25ed960); the request gate does the same for a peer's request.
+func TestLocalStoreRefusesFeatureDisallowedEnumValues(t *testing.T) {
+	t.Parallel()
+	noCOTA := func(c *lock.DoorLockConfig) { c.Features &^= lock.FeatureCOTA }
+
+	t.Run("SetUser Add of RemoteOnlyUser without COTA", func(t *testing.T) {
+		t.Parallel()
+		srv, em := newLocal(t, noCOTA)
+		req := setUserReq(lockdef.DataOperationTypeAdd, 2)
+		req.UserType = spec.ValueOf(lockdef.UserTypeRemoteOnlyUser)
+		_, err := srv.MatterInvoke(withPairFabric(), lockdef.CmdSetUser, req)
+		wantDisallowedEnum(t, err, "RemoteOnlyUser (ID 9)")
+		if got := localUser(t, srv, 2); !got.UserStatus.Null {
+			t.Errorf("user 2 stored with status %d", got.UserStatus.Value)
+		}
+		if n := len(em.calls); n != 0 {
+			t.Errorf("%d events, want none", n)
+		}
+	})
+
+	t.Run("SetUser Modify to RemoteOnlyUser without COTA changes nothing", func(t *testing.T) {
+		t.Parallel()
+		srv, _ := newLocal(t, noCOTA)
+		req := setUserReq(lockdef.DataOperationTypeModify, 1)
+		req.UserName = spec.ValueOf("renamed")
+		req.UserType = spec.ValueOf(lockdef.UserTypeRemoteOnlyUser)
+		_, err := srv.MatterInvoke(withPairFabric(), lockdef.CmdSetUser, req)
+		wantDisallowedEnum(t, err, "RemoteOnlyUser (ID 9)")
+		got := localUser(t, srv, 1)
+		if got.UserType.Value != lockdef.UserTypeUnrestrictedUser || got.UserName.Value != "" {
+			t.Errorf("user 1 changed: type %d, name %q", got.UserType.Value, got.UserName.Value)
+		}
+	})
+
+	t.Run("SetCredential Add of a Fingerprint without FGP", func(t *testing.T) {
+		t.Parallel()
+		srv, em := newLocal(t, nil)
+		req := addPin(1, "5678", noUser)
+		req.Credential = credential(lockdef.CredentialTypeFingerprint, 1)
+		_, err := srv.MatterInvoke(withPairFabric(), lockdef.CmdSetCredential, req)
+		wantDisallowedEnum(t, err, "Fingerprint (ID 3)")
+		res, err := srv.MatterInvoke(withPairFabric(), lockdef.CmdGetCredentialStatus,
+			lockdef.GetCredentialStatusRequest{Credential: credential(lockdef.CredentialTypeFingerprint, 1)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.(lockdef.GetCredentialStatusResponse).CredentialExists {
+			t.Error("fingerprint 1 stored")
+		}
+		if got := localUser(t, srv, 2); !got.UserStatus.Null {
+			t.Errorf("user 2 stored with status %d", got.UserStatus.Value)
+		}
+		if n := len(em.calls); n != 0 {
+			t.Errorf("%d events, want none", n)
+		}
+	})
+
+	t.Run("SetUser Add of ScheduleRestrictedUser without WDSCH and YDSCH", func(t *testing.T) {
+		t.Parallel()
+		srv, _ := newLocal(t, func(c *lock.DoorLockConfig) { c.Features &^= lock.FeatureWDSCH | lock.FeatureYDSCH })
+		req := setUserReq(lockdef.DataOperationTypeAdd, 2)
+		req.UserType = spec.ValueOf(lockdef.UserTypeScheduleRestrictedUser)
+		_, err := srv.MatterInvoke(withPairFabric(), lockdef.CmdSetUser, req)
+		wantDisallowedEnum(t, err, "ScheduleRestrictedUser (ID 8)")
+	})
+
+	t.Run("the member is stored when the features allow it", func(t *testing.T) {
+		t.Parallel()
+		srv, _ := newLocal(t, nil)
+		for idx, typ := range map[uint16]lockdef.UserTypeEnum{2: lockdef.UserTypeRemoteOnlyUser, 3: lockdef.UserTypeExpiringUser} {
+			req := setUserReq(lockdef.DataOperationTypeAdd, idx)
+			req.UserType = spec.ValueOf(typ)
+			if _, err := srv.MatterInvoke(withPairFabric(), lockdef.CmdSetUser, req); err != nil {
+				t.Fatalf("user type %d: %v", typ, err)
+			}
+			if got := localUser(t, srv, idx); got.UserType.Value != typ {
+				t.Errorf("user %d type %v, want %d", idx, got.UserType, typ)
+			}
+		}
+		fgp, _ := newLocal(t, func(c *lock.DoorLockConfig) { c.Features |= lock.FeatureFGP })
+		req := addPin(1, "5678", noUser)
+		req.Credential = credential(lockdef.CredentialTypeFingerprint, 1)
+		res, err := fgp.MatterInvoke(withPairFabric(), lockdef.CmdSetCredential, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if st := res.(lockdef.SetCredentialResponse).Status; st != lockdef.StatusSuccess {
+			t.Errorf("fingerprint status %d, want SUCCESS", st)
+		}
+	})
+}
