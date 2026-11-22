@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- The documentation site moves from `sukramj.github.io/go-fabric` to <https://docs.thingfabric.dev/>, published by the repository `thingfabric/docs` (hourly, when `main` moved); `.github/workflows/pages.yml` keeps `mkdocs build --strict` on pull requests and no longer deploys. `mkdocs.yml` `site_url` follows.
+
 ## [0.24.1] — 2026-11-22
 
 The last version under `github.com/SukramJ/go-fabric`. The module moves to the GitHub organisation `thingfabric` and to the import path `thingfabric.dev/go-fabric`, from `v0.25.0` on; the nested modules move with it (`thingfabric.dev/go-fabric/ble/bluez`, `…/ble/esphome`, `…/wifi/wpasupplicant`). No code change since `v0.24.0`.

@@ -527,8 +527,9 @@ are what keeps that from doubling.
 ## Documentation
 
 `docs/` is the developer and architect documentation and is published as
-the GitHub Pages site (`mkdocs.yml`, `.github/workflows/pages.yml`;
-`mkdocs build --strict` runs on every pull request that touches it).
+<https://docs.thingfabric.dev/> (`mkdocs.yml`; `.github/workflows/pages.yml`
+runs `mkdocs build --strict` on every pull request that touches it, and
+`thingfabric/docs` builds `main` hourly when it moved and deploys it).
 Write it for someone who embeds or evaluates the module: what it does,
 how to wire it, what it guarantees — every behavioural claim checkable
 against the code. A link from a page to a file outside `docs/` may be

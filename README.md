@@ -81,7 +81,7 @@ supply that a library cannot is in
 ## Documentation
 
 The site (rendered from `docs/`) is at
-<https://sukramj.github.io/go-fabric/>; the API reference is
+<https://docs.thingfabric.dev/>; the API reference is
 [pkg.go.dev](https://pkg.go.dev/github.com/SukramJ/go-fabric).
 
 | | |

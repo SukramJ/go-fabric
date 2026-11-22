@@ -1,11 +1,12 @@
-# The documentation site, published to GitHub Pages by
-# .github/workflows/pages.yml. Build it locally with
+# The documentation site at docs.thingfabric.dev, checked in pull requests
+# by .github/workflows/pages.yml and published by thingfabric/docs. Build it
+# locally with
 #   pip install -r docs/requirements.txt && mkdocs build --strict
 # strict turns every warning (a broken link, a missing nav target, a
 # snippet path that does not exist) into a failed build.
 site_name: go-fabric
 site_description: Matter as an embeddable Go library — the device side and the controller role, a semantic port of matter.js.
-site_url: https://sukramj.github.io/go-fabric/
+site_url: https://docs.thingfabric.dev/
 repo_url: https://github.com/SukramJ/go-fabric
 repo_name: SukramJ/go-fabric
 edit_uri: edit/main/docs/

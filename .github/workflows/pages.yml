@@ -2,19 +2,13 @@ name: pages
 
 # The documentation site (mkdocs.yml). A pull request that touches it is
 # built with --strict, which is the link check: a broken link, a missing
-# nav target or a quickstart snippet that moved fails the build. A push to
-# main builds the same way and deploys to GitHub Pages.
+# nav target or a quickstart snippet that moved fails the build. Publishing
+# is not done here: thingfabric/docs (its publish.yml) builds this
+# repository's main once an hour when it moved and deploys it to
+# docs.thingfabric.dev, so this repository carries no Pages deployment and
+# no credential (owner decision of 2026-11-22, the move to thingfabric).
 on:
   pull_request:
-    branches: [main]
-    paths:
-      - "docs/**"
-      - "mkdocs.yml"
-      - "script/mkdocs/**"
-      - "examples/quickstart-device/main.go"
-      - "examples/quickstart-controller/main.go"
-      - ".github/workflows/pages.yml"
-  push:
     branches: [main]
     paths:
       - "docs/**"
@@ -51,24 +45,3 @@ jobs:
         run: pip install --require-hashes -r docs/requirements.txt
       - name: mkdocs build --strict
         run: mkdocs build --strict --site-dir _site
-      - name: upload
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: _site
-
-  deploy:
-    name: deploy
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: deploy
-        id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
