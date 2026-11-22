@@ -162,7 +162,7 @@ at b25ed960. No marker caught up; opened: F-b25ed960-C5 (the NOC update's
 force-close cause, not exported).
 
 Wave P6 (2026-11-22, the close-out) closed the remaining rows (decisions
-486–505). P6-A: a Schedules write staged as written, its BuiltIn resolved at
+486–509). P6-A: a Schedules write staged as written, its BuiltIn resolved at
 commit (F-b25ed960-46); -47 not reachable, a peer holding one atomic write per
 endpoint and cluster (`AtomicWriteHandler.ts:178-185`). P6-B: the closing
 subscription's flush session not a gap (F-b25ed960-43,
