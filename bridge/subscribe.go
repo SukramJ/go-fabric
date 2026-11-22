@@ -237,6 +237,9 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		// has no announced service left and starts nothing either.
 		m.SetOnSubscriptionTerminated(func(subID uint32, fabricIndex uint8) {
 			b.forgetPersistedSubscription(subID)
+			if _, quiet := b.quietTerminations.Load(subID); quiet {
+				return
+			}
 			b.triggerSessionReannounce(fabricIndex)
 		})
 		// A subscription owes events as a number; its report reads
@@ -1109,14 +1112,23 @@ func (b *Bridge) subscriptionAttributeReports(ctx context.Context, dispatcher im
 // are — in one ReportData on a fresh exchange, and waits for the peer's
 // answer ([Bridge.awaitFlushedReport]) so the CloseSession that follows
 // cannot overtake it. Mirrors matter.js
-// packages/node/src/node/server/ServerSubscription.ts:753-763 at db021da0
-// (#flush: one #triggerSendUpdate), :534-556 (#sendUpdate takes the
-// attribute filter and the events' minimum number together) and :926-936
+// packages/node/src/node/server/ServerSubscription.ts:773-783 at b25ed960
+// (#flush: one #triggerSendUpdate), :538-556 (#sendUpdate takes the
+// attribute filter and the events' minimum number together) and :931-975
 // (#sendUpdateMessage: one DataReport carrying both, suppressed when
-// empty, :935 suppressEmptyReport), reached from Fabric.ts:447-457
-// (leave) through NodeSession.ts:312-323 (closeSubscriptions(true)). A
+// empty, :973 suppressEmptyReport), reached from Fabric.ts:456-466
+// (leave) through NodeSession.ts:383-395 (closeSubscriptions(true)). A
 // failed send owes the events and attributes again, as the ongoing paths
 // do; the subscription closes with its session right after.
+//
+// An error status the peer answers to any chunk of the flush report
+// terminates the subscription — its persisted record forgotten — also
+// during the shutdown flush ([Bridge.closeRefusedFlush]): matter.js
+// ServerSubscription.ts:976-989 at b25ed960 ("The peer refused the report,
+// which ends the subscription even during a shutdown close"), every
+// chunk's answer awaited (InteractionMessenger.ts:509-510, :794-796). A
+// flush report left unanswered for [flushStatusResponseTimeout] ends
+// nothing (ServerSubscription.ts:980, :564-567).
 func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.Subscription, events []im.EventReport, paths []im.ConcreteAttributePath) {
 	if sub == nil {
 		return
@@ -1146,6 +1158,10 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 	target.abort = ctx.Done()
 	_, freshExch, wait, err := b.sendInitiatedReportArmed(target, report, true)
 	if err != nil {
+		if errors.Is(err, errChunkRejected) {
+			b.closeRefusedFlush(sub.ID, 0, err)
+			return
+		}
 		aborted := errors.Is(err, errChunkWaitAborted)
 		if len(events) > 0 {
 			if aborted {
@@ -1181,7 +1197,24 @@ func (b *Bridge) reportSubscriptionFlush(ctx context.Context, sub *subscription.
 		slog.Int("events", len(report.EventReports)),
 		slog.Int("reports", len(report.Reports)),
 		slog.Int("exchange_id", int(freshExch)))
-	b.awaitFlushedReport(ctx, "subscribe.flush", target.sessionID, freshExch, wait)
+	answer, answered := b.awaitFlushedReport(ctx, "subscribe.flush", target.sessionID, freshExch, wait)
+	if answered && !answer.undecodable && !answer.status.IsSuccess() {
+		b.closeRefusedFlush(sub.ID, freshExch, fmt.Errorf("%w: %s", errChunkRejected, answer.status))
+	}
+}
+
+// closeRefusedFlush terminates subID, whose flush report the peer answered
+// with an error status, as [Bridge.closeRefusedSubscription] does — its
+// persisted record is forgotten — but starts no re-announce: a flush runs
+// while its session closes, and matter.js drops the subscriptionsChanged
+// emit of a closing session (packages/protocol/src/session/SessionManager.ts
+// :316-319 at b25ed960); at shutdown its advertiser is closed before the
+// flush (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts
+// :449-459, DeviceAdvertiser.ts:331-332, :356-357).
+func (b *Bridge) closeRefusedFlush(subID uint32, exchangeID uint16, cause error) {
+	b.quietTerminations.Store(subID, struct{}{})
+	defer b.quietTerminations.Delete(subID)
+	b.closeRefusedSubscription(subID, exchangeID, cause)
 }
 
 // sendErrorRetryLimit is how many consecutive failed updates an ongoing
@@ -1856,12 +1889,12 @@ func (b *Bridge) sendInitiatedReportArmed(target subTarget, report im.ReportData
 // flushStatusResponseTimeout bounds the wait for the peer's answer to a
 // report flushed while its fabric leaves — each chunk and the report as a
 // whole. matter.js's flushing subscription is already closed
-// (ServerSubscription.ts:776-788 #close: :800-809 #markClosed sets
-// #isClosed, then :816-825 #cancel flushes), so its DataReport goes out
-// with `waitForAck: !this.#isClosed` = false (:919, :934 at db021da0),
+// (ServerSubscription.ts:796-808 #close: :837-846 #markClosed sets
+// #isClosed, then :853-873 #cancel flushes), so its DataReport goes out
+// with `waitForAck: !this.#isClosed` = false (:957, :972 at b25ed960),
 // and sendDataReportMessage then waits `Millis(500)` for the Success
-// instead of the MRP-derived bound (InteractionMessenger.ts:799-844, the
-// timeout at :844). The bound does not depend on the transport, as
+// instead of the MRP-derived bound (InteractionMessenger.ts:799-846, the
+// timeout at :844 at b25ed960). The bound does not depend on the transport, as
 // matter.js's does not.
 const flushStatusResponseTimeout = 500 * time.Millisecond
 
@@ -1871,20 +1904,21 @@ const flushStatusResponseTimeout = 500 * time.Millisecond
 // CloseSession follows it: a CloseSession overtaking the report leaves
 // the report on a session the peer no longer knows, and the Leave in it
 // never arrives. matter.js's flush awaits the update it triggered
-// (ServerSubscription.ts:753-763 at db021da0, #flush awaits
+// (ServerSubscription.ts:773-783 at b25ed960, #flush awaits
 // #currentUpdatePromise) and the update awaits the answer to each
-// DataReport (InteractionMessenger.ts:799-844, sendDataReportMessage
+// DataReport (InteractionMessenger.ts:799-846, sendDataReportMessage
 // ends in waitForSuccess). The wait ends with the answer, with ctx, or
 // after [flushStatusResponseTimeout]; the answer's standalone ack goes
 // out at once, as for a StatusResponse no chunk loop waited for
-// (receive_dispatch's absorbStatusResponse).
-func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan statusAnswer) {
+// (receive_dispatch's absorbStatusResponse). It returns the answer and
+// whether one came.
+func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, exchangeID uint16, wait <-chan statusAnswer) (answer statusAnswer, answered bool) {
 	timeout := flushStatusResponseTimeout
 	timer := b.clk().NewTimer(timeout)
 	defer timer.Stop()
 	defer b.disarmStatusResponseWait(sessionID, exchangeID, true)
 	select {
-	case answer := <-wait:
+	case answer, answered = <-wait:
 		b.expediteDuplicateAck(sessionID, exchangeID, true)
 		b.RunAckPumpOnce(b.clk().Now())
 		b.logger.Debug("matter.tx."+op+".flush_answered",
@@ -1900,6 +1934,7 @@ func (b *Bridge) awaitFlushedReport(ctx context.Context, op string, sessionID, e
 			slog.Int("exchange_id", int(exchangeID)),
 			slog.String("timeout", timeout.String()))
 	}
+	return answer, answered
 }
 
 // piggybackOwedAck returns target with the ack the bridge owes the peer on
