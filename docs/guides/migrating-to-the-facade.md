@@ -122,7 +122,7 @@ calls nothing.
 | `Bridge.ConnectOtaProvider(ctx, fabricIndex, nodeID)` | inside a node: nothing, the OTA requestor uses the peer path; a bridge run without a node attaches its own `core.OtaProviderConnector` |
 | a camera signal over UDP | refused before sending with `camera.ErrNoLargeMessageTransport`: give the node the TCP client role (`Network.TCP.Outgoing`) |
 
-## Removed in the next release: `fabrictest.UseWiFiCommissioning`
+## Removed in v0.22.0: `fabrictest.UseWiFiCommissioning`
 
 Wi-Fi commissioning is part of the facade since milestone 7 (wave 28b):
 `node.Network.WiFi` is the node's Wi-Fi interface, and its `Driver`
@@ -150,7 +150,7 @@ request came from.
 | `(*core.OperationalCredentials).SetAttestationChallenge(challenge)` | nothing to call: the bridge stamps the invoking session's challenge on every invoke (`core.WithInvokeAttestationChallenge`), read from a session table that has `AttestationChallengeFor(sessionID uint16) ([]byte, bool)`, as `operational.Manager` does ([ports](ports.md)) |
 | a direct `MatterInvoke` of one of the three commands (a host's own test) | `core.WithInvokeAttestationChallenge(ctx, challenge)` on the context; without it the command answers FAILURE |
 
-## Removed in the next release: the controller's own node
+## Removed in v0.18.0: the controller's own node
 
 Phase 37 (issue 410) serves the OTA provider, the group sender and the
 camera controller's requestor from the controller's one operational
@@ -168,7 +168,7 @@ start whose erase of the former own node fails in the database logs
 `controller.ota.own_node.forget`, keeps the record and migrates at the
 next start.
 
-## Removed or changed in the next release: the facade review
+## Removed or changed in v0.16.0: the facade review
 
 The review of 2026-11 (`notes/review/2026-11/wave-5-api.md`) made the
 facade one shape. Each row names what a host writes now.
@@ -194,7 +194,7 @@ facade one shape. Each row names what a host writes now.
 | `fabrictest.Device.Bridge`, `.Store`, `.Peers`, `.Advertiser`, `.Endpoints`; `fabrictest.Controller.Exchanges`, `.Names`, `.Peers`, `.Resumption`, `.Subscriptions`; the fields `fabrictest.Pair.Peer`, `.Interaction`, `.PASESession`; `fabrictest.Connect`, `fabrictest.Exchange`; the aliases `fabrictest.Peer`, `Interaction`, `Session`, `Message` | a host's test drives the facade: `pair.Device.Node()` (its `Bridge()`, `Store()` and `Peers()` are the node's own seams), the wire helpers (`fabrictest.Read`, `Write`, `Invoke`, `Subscribe`, `Send`) and the pair's client node `pair.Node()`; the client machinery below `controller/client` and a pair's transport have no public route — they are the module's own test seam (`internal/fabrictestseam`) |
 | `otbr.Probe(ctx, host, port, timeout, httpClient)`, `esphome.Discover(ctx, browser, keys, timeout)` | `otbr.Probe(ctx, otbr.Config{Host, Port, Timeout, HTTPClient, Clock})`; `esphome.Discover(ctx, esphome.Options{Logger, Clock, Discover: &esphome.DiscoverOptions{Browser, Keys, Timeout}})` |
 
-## Removed or changed in the next release: the mDNS responder
+## Removed or changed in v0.17.0: the mDNS responder
 
 The module answers DNS-SD with its own responder, modelled on matter.js's
 `MdnsServer`, in place of `github.com/grandcat/zeroconf` (issue #362). Every
@@ -211,7 +211,7 @@ schedule instead of a periodic re-announce loop.
 | `operational.Manager.SetReannounceTrigger(func())` | `SetReannounceTrigger(func(fabricIndex uint8))`: fired once per (fabric, peer) pair a sweep leaves without a session, 0 for a PASE session |
 | `subscription.Manager.SetOnSubscriptionTerminated(func(subID uint32))` | `SetOnSubscriptionTerminated(func(subID uint32, fabricIndex uint8))`: the subscription's fabric |
 
-## Changed in the next release: `CommissionerReach` takes the peer
+## Changed in v0.13.12: `CommissionerReach` takes the peer
 
 Every method of `jfadef.CommissionerReach` (`jointfabric.CommissionerReach`)
 takes the commissioner as its second argument, a `jfadef.Peer{FabricIndex,
@@ -266,7 +266,7 @@ Two signatures change with it (breaks):
 The [Host ports](ports.md#clusterdefhost-the-kit-servers-host-methods)
 guide lists every `Host`.
 
-## Removed in the next release: `controller/thread`
+## Removed in v0.13.7: `controller/thread`
 
 | Symbol | Route |
 | --- | --- |
