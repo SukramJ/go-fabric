@@ -18,6 +18,8 @@ import (
 	"thingfabric.dev/go-fabric/client/exchange"
 	"thingfabric.dev/go-fabric/client/handshake"
 	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/node"
 	"thingfabric.dev/go-fabric/secure/mattercert"
 	"thingfabric.dev/go-fabric/secure/sigma"
 )
@@ -41,7 +43,16 @@ func commissionedFabric(t *testing.T) (*net.UDPAddr, handshake.Fabric) {
 // deviceCats at b25ed960.
 func commissionedFabricWithDeviceCATs(t *testing.T, deviceCATs []uint32) (*net.UDPAddr, handshake.Fabric) {
 	t.Helper()
-	n, addr := startNode(t)
+	_, addr, fabric := commissionedNode(t, deviceCATs)
+	return addr, fabric
+}
+
+// commissionedNode is [commissionedFabricWithDeviceCATs] that also returns
+// the node with its site, for a test that waits for the responder's record
+// ([awaitNodeRecord]).
+func commissionedNode(t *testing.T, deviceCATs []uint32) (onSite, *net.UDPAddr, handshake.Fabric) {
+	t.Helper()
+	site, n, addr := startNodeOnSite(t)
 	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), bridgetest.Options{
 		Passcode: testPasscode, Discriminator: 3840, FabricID: testFabricID, NodeID: testNodeID, Seed: 7,
 		DeviceCAT: deviceCATs,
@@ -59,7 +70,31 @@ func commissionedFabricWithDeviceCATs(t *testing.T, deviceCATs []uint32) (*net.U
 	if err != nil {
 		t.Fatal(err)
 	}
-	return addr, handshake.Fabric{Identity: &id, RootPublicKey: c.RootPublicKey(), Verifier: verifier}
+	return onSite{site: site, n: n}, addr, handshake.Fabric{Identity: &id, RootPublicKey: c.RootPublicKey(), Verifier: verifier}
+}
+
+// awaitNodeRecord waits until n holds the resumption record with id. The
+// initiator saves its record before CASE returns, the responder after the
+// establishment — in matter.js only after the Success's acknowledgement
+// wait (CaseServer.ts:331, :356-357 at b25ed960), while the initiator waits
+// for nothing after the Success (CaseClient.ts:336-384) — so a test that
+// resumes right away waits for the node's record first (#578).
+func awaitNodeRecord(t *testing.T, n onSite, id []byte) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := n.site.Eventually(ctx, "the node's resumption record", func() bool {
+		_, err := n.n.Store().GetResumptionByID(ctx, id)
+		return err == nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// onSite is a node with the site it runs on.
+type onSite struct {
+	site *fabrictest.Site
+	n    *node.Node
 }
 
 // TestCASEAndResumption: a full CASE handshake with a commissioned node,
@@ -67,7 +102,7 @@ func commissionedFabricWithDeviceCATs(t *testing.T, deviceCATs []uint32) (*net.U
 // sessions carry IM traffic.
 func TestCASEAndResumption(t *testing.T) {
 	t.Parallel()
-	addr, fabric := commissionedFabric(t)
+	n, addr, fabric := commissionedNode(t, nil)
 	m, rec := newManager(t)
 	store := &handshake.MemoryResumptionStore{}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -102,6 +137,7 @@ func TestCASEAndResumption(t *testing.T) {
 	if !ok || len(record.ResumptionID) != 16 || len(record.SharedSecret) == 0 || record.SessionParameters.SessionIdleInterval == 0 {
 		t.Fatalf("resumption record %+v (%v)", record, ok)
 	}
+	awaitNodeRecord(t, n, record.ResumptionID)
 
 	s2, resumed, err := handshake.CASE(ctx, m, addr, fabric, testNodeID, handshake.CASEOptions{Resumption: store})
 	if err != nil {
@@ -135,7 +171,7 @@ func TestCASEStaleRecordFallsBackToFullHandshake(t *testing.T) {
 	for _, deviceCATs := range [][]uint32{{0x0002_0001}, nil} {
 		t.Run(fmt.Sprintf("device CATs %v", deviceCATs), func(t *testing.T) {
 			t.Parallel()
-			addr, fabric := commissionedFabricWithDeviceCATs(t, deviceCATs)
+			n, addr, fabric := commissionedNode(t, deviceCATs)
 			m, _ := newManager(t)
 			store := &handshake.MemoryResumptionStore{}
 			stale := handshake.ResumptionRecord{
@@ -167,6 +203,7 @@ func TestCASEStaleRecordFallsBackToFullHandshake(t *testing.T) {
 				t.Fatalf("record CATs %v, want the peer's NOC's %v", rec.CaseAuthenticatedTags, deviceCATs)
 			}
 			readNodeLabel(t, m, s)
+			awaitNodeRecord(t, n, rec.ResumptionID)
 			s2, resumed, err := handshake.CASE(ctx, m, addr, fabric, testNodeID, handshake.CASEOptions{Resumption: store})
 			if err != nil {
 				t.Fatalf("second CASE: %v", err)

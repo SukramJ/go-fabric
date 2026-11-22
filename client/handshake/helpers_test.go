@@ -30,6 +30,14 @@ const testPasscode uint32 = 20202021
 // address.
 func startNode(t *testing.T) (*node.Node, *net.UDPAddr) {
 	t.Helper()
+	_, n, addr := startNodeOnSite(t)
+	return n, addr
+}
+
+// startNodeOnSite is [startNode] that also returns the node's site, whose
+// [fabrictest.Site.Eventually] a test waits on.
+func startNodeOnSite(t *testing.T) (*fabrictest.Site, *node.Node, *net.UDPAddr) {
+	t.Helper()
 	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true, Clock: clock.System{}})
 	d := site.AddDevice(fabrictest.Topology{Configure: func(c *node.Config) {
 		c.Network = node.Network{Listen: "127.0.0.1:0", PreferIPv4: true}
@@ -39,7 +47,7 @@ func startNode(t *testing.T) (*node.Node, *net.UDPAddr) {
 			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
 		}
 	}})
-	return d.Node(), d.Addr()
+	return site, d.Node(), d.Addr()
 }
 
 // recorder is the manager's socket: a udp.Listener whose sends are kept
