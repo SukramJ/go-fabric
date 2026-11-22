@@ -239,9 +239,14 @@ const testparityPlannedRatchet = 3
 // rows), completes DclOtaUpdateServiceTest.ts (P5-A2, findApplicable's skip of
 // a stored local image under isProduction) and ports
 // OperationalCertificateUpdateTest.ts (P5-B): 179 ported, 1016 missing.
+// Pin lift b25ed960 wave P6 takes seven cases out of missing: DoorLockServerTest.ts's
+// local user-type refusal (P6-F, the store check), ServerSubscriptionTest.ts's
+// refused shutdown flush (P6-C) and its flush on a given session (left, P6-B),
+// and ServerSubscriptionSessionTest.ts's four record cases on the node's
+// responder (P6-D): 179 ported, 1009 missing.
 const (
 	testparityPortedRatchet  = 179
-	testparityMissingRatchet = 1016
+	testparityMissingRatchet = 1009
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -345,7 +350,10 @@ const (
 // Pin lift b25ed960 wave P5 leaves OperationalCertificateUpdateTest.ts's two
 // cases that wait for matter.js's commissioning-state transaction
 // (js-runtime-only, P5-B): 772.
-const testparityLeftRatchet = 772
+// Pin lift b25ed960 wave P6 leaves ServerSubscriptionTest.ts's flush on a
+// given session (by design, BD-Matter-Subscription-FlushOnOwnSessionOnly,
+// P6-B): 773.
+const testparityLeftRatchet = 773
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

@@ -3679,10 +3679,9 @@
         "cluster/lock:TestDoorLockServerFaceCredentialParity"
       ],
       "missing": [
-        "measures the lockout on the monotonic clock",
-        "refuses to store a user type Matter does not define"
+        "measures the lockout on the monotonic clock"
       ],
-      "reason": "69 of 71 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The file names no face credential; since phase 36 serves FACE (DoorLockServer.ts:86-98), four SetCredential cases of describe(\"DoorLockServer\") run once more with the Face type (doorlockserver_face_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System). Pin lift b25ed960: the three request-validation cases of #5012 are ported (doorlockserver_server_parity_matterjs_test.go, doorlockserver_schedulerestricted_parity_matterjs_test.go); the gate's refusal before a host handler is held by cluster/lock request_gate_test.go. Pin lift b25ed960, P2-H: \"refuses to store a user type Matter does not define\" asserts the wire answer only (INVALID_COMMAND through the dispatcher's gate); matter.js's refusal of the local call (DoorLockServerTest.ts:823-845 at b25ed960) has no Go subject since the request check moved to the wire path (decision 339), findings F-b25ed960-36.",
+      "reason": "70 of 71 cases ported onto a commissioned fabrictest pair, one Go file per describe (cluster/lock/doorlockserver_*_parity_matterjs_test.go). The file names no face credential; since phase 36 serves FACE (DoorLockServer.ts:86-98), four SetCredential cases of describe(\"DoorLockServer\") run once more with the Face type (doorlockserver_face_parity_matterjs_test.go). Missing, M4: findings entry \"clock.Clock has no monotonic reading\": the monotonic-lockout case steps MockTime's wall clock apart from its timers; clocktest.Fake has one reading, so the step moves the lockout deadline's reading too (the server compares time.Time, monotonic under clock.System). Pin lift b25ed960: the three request-validation cases of #5012 are ported (doorlockserver_server_parity_matterjs_test.go, doorlockserver_schedulerestricted_parity_matterjs_test.go); the gate's refusal before a host handler is held by cluster/lock request_gate_test.go. Pin lift b25ed960, P6-F: \"refuses to store a user type Matter does not define\" calls the server's MatterInvoke directly, as matter.js calls the local agent, and asserts the store's refusal (CONSTRAINT_ERROR, \"does not define the enum value 99\", nothing stored); the wire answer (INVALID_COMMAND through the dispatcher's gate) stays asserted.",
       "snapshotSha": "978448f0403d2851b727a867901fe956f70a8d64"
     },
     {
@@ -6923,24 +6922,21 @@
       "path": "packages/node/test/node/ServerSubscriptionSessionTest.ts",
       "status": "partial",
       "go": [
-        "fabrictest:TestServerSubscriptionSessionSupersessionOverTheWire"
+        "fabrictest:TestServerSubscriptionSessionSupersessionOverTheWire",
+        "node:TestCASEResponderSavesTheRecordOfAnEstablishedSessionOnly"
       ],
       "missing": [
         "closes a resumed session the controller does not confirm and leaves the subscriptions on their session",
         "closes a resumed session when Sigma2Resume cannot be sent",
         "closes a resumed session when its Sigma2Resume cannot be built",
-        "does not complete a resumption whose session closed during the handshake",
         "moves to a new full CASE session once SigmaFinished went out, before its ack",
-        "keeps a new full CASE session whose SigmaFinished went out but was not acknowledged",
-        "keeps a new full CASE session and saves its record when SigmaFinished fails after it went out for another reason",
-        "does not complete a new full CASE session that closed before SigmaFinished went out",
         "serves a subscribe that arrives on a resumed session before the controller confirms it",
         "closes a new full CASE session whose SigmaFinished cannot be sent",
         "adds a resumed session to its peer only once the controller confirms it",
         "moves a subscription restored on a session the device initiated to a later session the controller opens",
         "does not mark its peer connected by a session whose handshake fails"
       ],
-      "reason": "The reports on its own session beside a dropped one, the move to each new session and the eviction it survives run over the site's wire (fabrictest:TestServerSubscriptionSessionSupersessionOverTheWire; pin lift b25ed960, P2b-B). Missing: the cases that intercept the CASE server over the wire — a resumption the controller does not confirm, Sigma2Resume not sent or not built, SigmaFinished sent but not acknowledged, a subscribe on a session still establishing, a session the device initiated.",
+      "reason": "The reports on its own session beside a dropped one, the move to each new session and the eviction it survives run over the site's wire (fabrictest:TestServerSubscriptionSessionSupersessionOverTheWire; pin lift b25ed960, P2b-B). Missing: the cases that intercept the CASE server over the wire — a resumption the controller does not confirm, Sigma2Resume not sent or not built, SigmaFinished sent but not acknowledged, a subscribe on a session still establishing, a session the device initiated. The record half of the four CASE-server cases (saved only for an established session; the bridge's completion stands for the CASE server's) runs on the node's responder (node:TestCASEResponderSavesTheRecordOfAnEstablishedSessionOnly; P6-D).",
       "snapshotSha": "221d0abfacf7b1bde7012f019404b8763d932cec"
     },
     {
@@ -6961,10 +6957,11 @@
         "im/subscription:TestServerSubscriptionSupersession",
         "bridge:TestServerSubscriptionSupersessionReporter",
         "fabrictest:TestServerSubscriptionSessionSupersessionOverTheWire",
-        "secure/operational:TestSessionManagerSupersession"
+        "secure/operational:TestSessionManagerSupersession",
+        "im/subscription:TestFlushSessionFollowsAMovedSubscription",
+        "bridge:TestServerSubscriptionShutdownFlushRefused"
       ],
       "missing": [
-        "terminates when the peer refuses a report sent during a shutdown close",
         "terminates when the peer answers a report with an error status",
         "ends the subscription when the peer answers INVALID_SUBSCRIPTION on a session without MRP",
         "waits for the status and keeps the subscription when the peer answers SUCCESS on a session without MRP",
@@ -6972,8 +6969,7 @@
         "completes a flushing close triggered from inside an in-flight update",
         "flushes a report queued behind a report being sent on close despite a deferral",
         "completes session force-close triggered from inside an in-flight update",
-        "suppresses peer loss on the exchanges it opens to push subscription reports",
-        "flushes on the session it is given when it closes (characterization)"
+        "suppresses peer loss on the exchanges it opens to push subscription reports"
       ],
       "left": [
         {
@@ -7035,9 +7031,14 @@
           "it": "moves its lifetime with it while a report is being sent",
           "class": "js-runtime-only",
           "reason": "observer and lifetime bookkeeping of a JavaScript subscription object; a Go subscription is a manager entry moved by id (im/subscription Manager.MoveSession)"
+        },
+        {
+          "it": "flushes on the session it is given when it closes (characterization)",
+          "class": "by-design",
+          "reason": "BD-Matter-Subscription-FlushOnOwnSessionOnly: Go offers no per-call flush session; production matter.js passes the subscription's own session (NodeSession.ts:383-395, :386 at b25ed960; set membership ServerSubscription.ts:425, #follow :820-834), which Manager.FlushSession selects by (im/subscription:TestFlushSessionFollowsAMovedSubscription)"
         }
       ],
-      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION (over the wire, with the SUCCESS answer that keeps the subscription, in bridge:TestKeepAliveStatusParity), endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go), and repeated MRP exhaustion as one failed update each, the subscription ended at the third and the sessions kept (bridge/subscribe_send_error_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges. Pin lift b25ed960: the session supersession cases of describe \"on superseded sessions\" (e3551a69d, #4882) are ported (im/subscription, bridge, fabrictest; P2b-B): \"does not move to a session of the same node on another fabric\" by meaning on the device table (secure/operational:TestSessionManagerSupersession), the two cases of a subscription closed before it could move (on a closing session, a failed subscribe response) by meaning under \"ignores a newer session once closed\" (a closed subscription is out of the manager and MoveSession moves nothing for it). Missing: \"flushes on the session it is given when it closes\" (Go flushes on the subscription's own session only, findings F-b25ed960-43).",
+      "reason": "Peer cancel, the send-interval bounds, the negotiated MaxInterval (fix: a floor above the publisher limit raises the ceiling instead of refusing the subscription), a report of only the changed attribute, the keep-alive answered INVALID_SUBSCRIPTION (over the wire, with the SUCCESS answer that keeps the subscription, in bridge:TestKeepAliveStatusParity), endpoint selection by event paths and close against release are ported (im/subscription, and over the wire on fabrictest), and so is the LIT ICD publisher granting its IdleModeDuration as MaxInterval (node/server_subscription_lit_parity_matterjs_test.go), and repeated MRP exhaustion as one failed update each, the subscription ended at the third and the sessions kept (bridge/subscribe_send_error_parity_matterjs_test.go). Missing: the engine's handling of mocked exchanges that block, throw or answer late — shutdown closes with a report in flight, a peer refusing a report with an error status, keep-alives on a session without MRP, slow and queued reports against deferrals and close; wall-clock steps (a Go time.Time carries a monotonic reading, so the engine's intervals do not see a wall-clock step, and the fake clock has no separate wall clock); session force-close from inside an update and peer-loss suppression on the report exchanges. Pin lift b25ed960: the session supersession cases of describe \"on superseded sessions\" (e3551a69d, #4882) are ported (im/subscription, bridge, fabrictest; P2b-B): \"does not move to a session of the same node on another fabric\" by meaning on the device table (secure/operational:TestSessionManagerSupersession), the two cases of a subscription closed before it could move (on a closing session, a failed subscribe response) by meaning under \"ignores a newer session once closed\" (a closed subscription is out of the manager and MoveSession moves nothing for it). \"flushes on the session it is given when it closes\" is left (by-design, BD-Matter-Subscription-FlushOnOwnSessionOnly: the per-call session argument; production passes the own session, which Go's FlushSession selects by, im/subscription:TestFlushSessionFollowsAMovedSubscription; P6-B). Pin lift b25ed960, P6-C: \"terminates when the peer refuses a report sent during a shutdown close\" is ported by meaning (bridge:TestServerSubscriptionShutdownFlushRefused): matter.js refuses a report in flight and asserts isTerminated; the port refuses the flush's own report and asserts the subscription closed and its record dropped.",
       "snapshotSha": "dcbced15be4acf1ed7686c0a1ee2d399850259b3"
     },
     {
