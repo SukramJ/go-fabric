@@ -118,7 +118,7 @@ func (s *DoorLockServer) setUserLocked(ctx context.Context, req lockdef.SetUserR
 		if !req.CredentialRule.Null {
 			user.CredentialRule = uint8(req.CredentialRule.Value)
 		}
-		if err := checkUserRecord(&user); err != nil {
+		if err := s.checkUserRecord(&user); err != nil {
 			return err
 		}
 		s.addUserLocked(user)
@@ -163,7 +163,7 @@ func (s *DoorLockServer) modifyUserLocked(ctx context.Context, req lockdef.SetUs
 	// PIN's next use or a restart; here a refused command changes nothing
 	// (by_design BD-Matter-DoorLock-RefusedModifyKeepsExpiryTimer). commit
 	// could not undo it either: it restores the records, not the timers.
-	if err := checkUserRecord(&candidate); err != nil {
+	if err := s.checkUserRecord(&candidate); err != nil {
 		return err
 	}
 	// A status or type change starts a new ExpiringUser cycle; the
@@ -445,10 +445,12 @@ func (s *DoorLockServer) findUserIndexForCredential(credType uint8, index uint16
 // a local MatterInvoke — which no request gate judges — is held to the
 // same values a peer's request is.
 //
-// Only membership is checked. matter.js's validation at the store also
-// refuses a defined value whose conformance the lock's features do not
-// meet (findings: DoorLock store enum member conformance); the request
-// gate does that for a peer's request.
+// A defined value whose own conformance the lock's features do not meet
+// is refused as well (checkEnumValue), as matter.js's store validation
+// refuses it. Only the record being stored is checked: a record a host
+// loaded through the configuration or the store is not checked at load,
+// so a later Modify of such a user — a peer's too — is refused until the
+// value is changed.
 //
 // Mirrors matter.js
 // packages/node/src/behavior/state/managed/values/StructManager.ts:278-297
@@ -483,18 +485,18 @@ func (s *DoorLockServer) findUserIndexForCredential(credType uint8, index uint16
 // b25ed960, resolve). Here every invoke is one
 // commit, so a refused user always takes the credential added before it
 // with it — this module's transaction boundary, not a matter.js line.
-func checkUserRecord(u *store.DoorLockUser) error {
-	if err := checkEnumValue("UserStatus", lockdef.UserStatusEnumDef, u.UserStatus); err != nil {
+func (s *DoorLockServer) checkUserRecord(u *store.DoorLockUser) error {
+	if err := s.checkEnumValue("UserStatus", lockdef.UserStatusEnumDef, u.UserStatus); err != nil {
 		return err
 	}
-	if err := checkEnumValue("UserType", lockdef.UserTypeEnumDef, u.UserType); err != nil {
+	if err := s.checkEnumValue("UserType", lockdef.UserTypeEnumDef, u.UserType); err != nil {
 		return err
 	}
-	if err := checkEnumValue("CredentialRule", lockdef.CredentialRuleEnumDef, u.CredentialRule); err != nil {
+	if err := s.checkEnumValue("CredentialRule", lockdef.CredentialRuleEnumDef, u.CredentialRule); err != nil {
 		return err
 	}
 	for _, c := range u.Credentials {
-		if err := checkEnumValue("Credentials.CredentialType", lockdef.CredentialTypeEnumDef, c.Type); err != nil {
+		if err := s.checkEnumValue("Credentials.CredentialType", lockdef.CredentialTypeEnumDef, c.Type); err != nil {
 			return err
 		}
 	}
@@ -503,28 +505,50 @@ func checkUserRecord(u *store.DoorLockUser) error {
 
 // checkEnumValue refuses v when the enum e has members and none of them
 // is v: no value's id and in no range member. An enum without members
-// admits every value of its width.
+// admits every value of its width. A member v is refused too when its
+// own conformance the server's features do not meet (UserType
+// RemoteOnlyUser without COTA, CredentialType Fingerprint without FGP),
+// judged by [spec.Instance.EnumSupported] as the request gate judges it.
 //
 // Mirrors matter.js
 // packages/node/src/behavior/state/validation/ValueValidator.ts:162-185
 // at b25ed960 (createEnumValidator: definesValues, the valid ids and the
-// range members; the message's stem).
-func checkEnumValue(field string, e *spec.Enum, v uint8) error {
+// range members; the message's stem). The member conformance follows
+// packages/node/src/behavior/state/validation/ValueValidator.ts:137 at
+// b25ed960 (every validator wrapped by the conformance validator) and
+// packages/node/src/behavior/state/validation/conformance-compiler.ts:215-217
+// at b25ed960 (an enum's members get member validation), and
+// packages/node/src/behavior/state/validation/conformance-compiler.ts:762-862
+// at b25ed960 (addEnumMemberValidation: a Nonconformant or Disallowed
+// member is refused), with the message of
+// packages/node/src/behavior/state/validation/conformance-compiler.ts:734-746
+// at b25ed960 (disallowEnumValue) and the status of
+// packages/protocol/src/action/errors.ts:108-123 at b25ed960
+// (EnumValueConformanceError: CONSTRAINT_ERROR).
+func (s *DoorLockServer) checkEnumValue(field string, e *spec.Enum, v uint8) error {
 	if len(e.Values) == 0 && len(e.Ranges) == 0 {
 		return nil
 	}
 	n := uint64(v)
+	name, what, text, found := "", "", "", false
 	for i := range e.Values {
-		if e.Values[i].Value == n {
-			return nil
+		if m := &e.Values[i]; m.Value == n {
+			name, what, text, found = m.Name, fmt.Sprintf("ID %d", n), m.Conformance.Text, true
+			break
 		}
 	}
-	for i := range e.Ranges {
-		if e.Ranges[i].Contains(n) {
-			return nil
+	for i := 0; !found && i < len(e.Ranges); i++ {
+		if r := &e.Ranges[i]; r.Contains(n) {
+			name, what, text, found = r.Name, fmt.Sprintf("range %d to %d", r.Min, r.Max), r.Conformance.Text, true
 		}
 	}
-	return spec.Errorf(im.StatusConstraintError, "lock: %s: Matter does not define the enum value %d for %s: %w", field, v, e.Name, spec.ErrUnknownEnumValue)
+	if !found {
+		return spec.Errorf(im.StatusConstraintError, "lock: %s: Matter does not define the enum value %d for %s: %w", field, v, e.Name, spec.ErrUnknownEnumValue)
+	}
+	if !s.EnumSupported(e, n) {
+		return spec.Errorf(im.StatusConstraintError, "lock: %s: Conformance %q: Matter does not allow enum value %s (%s) here: %w", field, text, name, what, spec.ErrEnumValueConformance)
+	}
+	return nil
 }
 
 func (s *DoorLockServer) addUserLocked(u store.DoorLockUser) {
