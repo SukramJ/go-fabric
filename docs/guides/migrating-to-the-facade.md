@@ -76,6 +76,37 @@ then closes the gap only for the manager's queued update, not for an
 offer the default manager made — and `ProviderConfig()` no longer fills
 the hooks such a host copied.
 
+## Changed in the next release: the update queue's phases and the NOC rotation
+
+`controller/softwareupdate.Manager` follows matter.js's update phases
+(decision 292). No signature changed; what a host observes did:
+
+| Call | Before | Now |
+| --- | --- | --- |
+| `AddUpdateConsent` for an address no node has | the consent was stored, `false` | `ErrNoNode` (also an `ErrNotApplicable`); nothing stored |
+| `AddUpdateConsent` for a version at or below the one the node runs | stored | `false, nil`, nothing stored |
+| `ForceUpdate` for an address no node has | `ErrNotApplicable`, the consent stored | `ErrNoNode` (`errors.Is(err, ErrNotApplicable)` still holds) |
+| `QueuedUpdates` | a failed update listed until it left the queue | a failed update is not listed for 24 hours unless the node retries it; an update whose announcement runs is `in-progress` |
+| `Observe` (`UpdateFailed`) | on a node's deletion and on each failure | once per consent; none on a node's deletion or a failed consent's 24-hour expiry |
+| `Observe` (`UpdateConsentChanged`) | on a consent change | also on a failed consent's expiry and when a node is deleted or found gone by the update check |
+
+A host that maps the manager's errors to its own answers maps `ErrNoNode`
+to "node not found" with `errors.Is(err, softwareupdate.ErrNoNode)` before
+it tests `ErrNotApplicable`. go-fabric-ui (`792d15b`) meets this in
+`fabricui/gofabric/updates.go`: `:204` (`AddUpdateConsent`, which tests
+`ErrMismatch` only, so `ErrNoNode` would surface as a 500 — map it to
+`fabricui.ErrNodeNotFound`), `:62` (`QueuedUpdates`) and `:172` (the
+`Observe` events it passes through: fewer `failed`, `consent_changed` also
+on expiry and node deletion).
+
+`client/interaction.Interaction.Close` closes only the subscriptions that
+interaction established, as matter.js's `ClientInteraction.close`; a caller
+that relied on it ending every subscription of the peer calls
+`CloseSubscriptions` first. `controller/client.Registry.UpdateOperationalCertificate`
+is new and additive; while it runs, a `Commission` or `Decommission` of the
+same node answers `ErrFabricOperationInProgress`, whose text now names the
+certificate update — a caller that tests it with `errors.Is` is unaffected.
+
 ## Deprecated in v0.23.0, removable in v0.25.0: `Bridge.ConnectPeer` and `Bridge.ConnectOtaProvider`
 
 A node reaches the peers its device-side servers talk to — the OTA

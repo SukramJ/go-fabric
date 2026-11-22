@@ -1,7 +1,7 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10247,
-  "initializers": 368,
+  "entry_points": 10274,
+  "initializers": 369,
   "entry_packages": [
     ".",
     "bdx",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 27971,
-    "reachable": 20938,
-    "whitelisted": 7011,
+    "total_exported": 28016,
+    "reachable": 20958,
+    "whitelisted": 7036,
     "unreachable": 22
   },
   "by_package": [
@@ -2273,21 +2273,21 @@
       "identifier": "TestCloseFabricSessionsAfterUpdate_ClosesTheInvokingSessionToo",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_session_close_test.go",
-      "line": 172
+      "line": 173
     },
     {
       "package": "bridge",
       "identifier": "TestCloseFabricSessionsExcept_TellsEachOtherSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_session_close_test.go",
-      "line": 46
+      "line": 47
     },
     {
       "package": "bridge",
       "identifier": "TestCloseFabricSessionsExcept_WithoutCapability",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_session_close_test.go",
-      "line": 154
+      "line": 155
     },
     {
       "package": "bridge",
@@ -2511,7 +2511,7 @@
       "identifier": "TestCommissioningCompleteClearsThePASESessionAtOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_at_once_test.go",
-      "line": 103
+      "line": 104
     },
     {
       "package": "bridge",
@@ -4037,7 +4037,7 @@
       "identifier": "TestEmitFabricRemovedContext_InvokingSessionLast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_session_close_test.go",
-      "line": 98
+      "line": 99
     },
     {
       "package": "bridge",
@@ -7023,6 +7023,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRevokeWindowSendsCloseSessionOnThePASESession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_close_revoke_test.go",
+      "line": 134
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRevokeWindowThroughTheBridgeClosesThePASESessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_close_failsafe_expiry_test.go",
@@ -7474,7 +7481,7 @@
       "identifier": "TestSettleHandshake_BindsUDPSessionAtEstablishment",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_session_close_test.go",
-      "line": 216
+      "line": 217
     },
     {
       "package": "bridge",
@@ -10215,6 +10222,13 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "EstablishedCount",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 152
+    },
+    {
+      "package": "client/interaction",
       "identifier": "FlushingBatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
@@ -10261,6 +10275,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/export_test.go",
       "line": 78
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "RegisterPeerSubscription",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/export_test.go",
+      "line": 161
     },
     {
       "package": "client/interaction",
@@ -31530,6 +31551,27 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "NOCUpdateSeam",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/export_test.go",
+      "line": 23
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "PatchNOCUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/export_test.go",
+      "line": 35
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "SetForgetDisconnectBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/export_test.go",
+      "line": 51
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestAcceptedFailedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
@@ -33332,7 +33374,7 @@
       "identifier": "ConsentState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 161
+      "line": 180
     },
     {
       "package": "controller/softwareupdate",
@@ -33346,7 +33388,7 @@
       "identifier": "QueryImageRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/softwareupdate/manager.go",
-      "line": 592
+      "line": 955
     },
     {
       "package": "controller/softwareupdate",
@@ -33497,24 +33539,24 @@
     },
     {
       "package": "controller/softwareupdate",
-      "identifier": "TestManagerAdmissionCancelFailsParity",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 427
-    },
-    {
-      "package": "controller/softwareupdate",
       "identifier": "TestManagerAdmissionFailsAnAppliedUpdateParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 201
+      "line": 203
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerAdmitsANewQueryOfANodeWithARunningAttemptParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1005
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerAppliedUpdateAfterResubscriptionParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-      "line": 195
+      "line": 231
     },
     {
       "package": "controller/softwareupdate",
@@ -33528,14 +33570,28 @@
       "identifier": "TestManagerApplyFailureOnStartUpParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-      "line": 137
+      "line": 173
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerApplyOfTheTokenParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 667
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerAttemptsUnderTheManagerLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 343
+      "line": 345
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerBDXCancelOfRemovedConsentsParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1115
     },
     {
       "package": "controller/softwareupdate",
@@ -33549,14 +33605,28 @@
       "identifier": "TestManagerCancelledResetsForRetryParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-      "line": 93
+      "line": 129
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerChangeEmitsItsOwnEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1358
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerCleanupPurgesTestImagesParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-      "line": 235
+      "line": 271
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerCloseAbortsTheAnnouncement",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 460
     },
     {
       "package": "controller/softwareupdate",
@@ -33567,24 +33637,52 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestManagerConsentParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 284
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestManagerConsentRemovalEndsTheApplyRightParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 161
+      "line": 160
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerConsentRemovalKeepsALegacyApplyingUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 525
+      "line": 493
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerConsentRequiredOverrideParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1273
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerDelegatedOfferParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1178
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerDelegatesConsentOnlyWhenOnParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 547
+      "line": 515
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerErrNoNodeIsNotApplicable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1472
     },
     {
       "package": "controller/softwareupdate",
@@ -33595,10 +33693,31 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestManagerFailedUpdateParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 345
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerForceRunsTheQueueFirstParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1449
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestManagerForgetsNodesThatLeft",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_lifecycle_test.go",
       "line": 125
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerGoneNodeConsentReported",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1486
     },
     {
       "package": "controller/softwareupdate",
@@ -33619,7 +33738,14 @@
       "identifier": "TestManagerNodeDeletedDisarmsWithoutAQueuedUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_lifecycle_test.go",
-      "line": 296
+      "line": 297
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerOfferParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 110
     },
     {
       "package": "controller/softwareupdate",
@@ -33630,52 +33756,101 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestManagerPresenceAsOfTheRun",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1323
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerProductCheckQueuesParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1389
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerQueueEndsParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 376
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerQueuePhasesParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 728
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestManagerQueueRunWithAnUpdateInProgress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 385
+      "line": 387
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerRemovedConsentDisarmsParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 1150
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerRestartQuerySuppressesOnlyAQueuedUpdateParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 242
+      "line": 244
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerScriptedDiscontinueParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 423
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerSettersReadUnderTheLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_lifecycle_test.go",
-      "line": 166
+      "line": 164
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerStalledAfterApplyDelayParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-      "line": 111
+      "line": 147
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerStartUpBelowTargetFailsTheAppliedAttemptParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 466
+      "line": 434
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestManagerStoredImageSelectionParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/manager_reconcile_parity_matterjs_test.go",
+      "line": 223
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerSuppressNextStartUpParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_parity_matterjs_test.go",
-      "line": 155
+      "line": 191
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestManagerUpdateAppliedBranchesParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/provider_attempts_parity_matterjs_test.go",
-      "line": 286
+      "line": 288
     },
     {
       "package": "controller/softwareupdate",
@@ -33696,49 +33871,49 @@
       "identifier": "TestObserveAppliedUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 65
+      "line": 88
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveCheckFinished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 194
+      "line": 217
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveFailedApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 178
+      "line": 201
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveQueuedTargetReplaced",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 128
+      "line": 151
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveQueuedUpdateSequence",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 93
+      "line": 116
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveRemovedConsent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 155
+      "line": 178
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestObserveUnsubscribe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 212
+      "line": 235
     },
     {
       "package": "controller/softwareupdate",
@@ -33766,14 +33941,14 @@
       "identifier": "TestQueryUpdatesReturnsTheProductFailures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/manager_lifecycle_test.go",
-      "line": 231
+      "line": 229
     },
     {
       "package": "controller/softwareupdate",
       "identifier": "TestScriptedApplyUpdate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/script_parity_matterjs_test.go",
-      "line": 145
+      "line": 147
     },
     {
       "package": "controller/softwareupdate",
@@ -33794,7 +33969,7 @@
       "identifier": "TestUpdateEventKindNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/observe_test.go",
-      "line": 242
+      "line": 265
     },
     {
       "package": "controller/softwareupdate",

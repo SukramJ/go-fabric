@@ -19,10 +19,13 @@ import (
 // (cluster/core.OTAProvider) — what matter.js's
 // OtaSoftwareUpdateProviderServer asks its SoftwareUpdateManager
 // (packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts
-// at b25ed960): checkUpdateAvailable → updateExistsFor (:395-414), the
-// consent hook (:382-393) and the update attempts (beginQuery …
-// updateApplied, :152-379), which the manager owns under its lock with
-// its queue (SoftwareUpdateManager.ts:1739-2089 at b25ed960).
+// at b25ed960): checkUpdateAvailable → updateExistsFor
+// (OtaSoftwareUpdateProviderServer.ts:395-414 at b25ed960), the consent
+// hook (OtaSoftwareUpdateProviderServer.ts:383-393 at b25ed960) and the
+// update attempts (beginQuery … updateApplied,
+// OtaSoftwareUpdateProviderServer.ts:152-379 at b25ed960), which the
+// manager owns under its lock with its queue
+// (SoftwareUpdateManager.ts:1733-2089 at b25ed960).
 
 // ProviderConfig is what the OTA provider that serves the manager's
 // updates runs with: the ports and hooks of node/'s provider
@@ -107,11 +110,17 @@ var (
 )
 
 // QueryImage implements mattercore.OTAImageSource: checkUpdateAvailable
-// (OtaSoftwareUpdateProviderServer.ts:402-414 at b25ed960) over
-// [Manager.UpdateExistsFor].
+// over [Manager.UpdateExistsFor]; when that offers nothing, the update
+// queued for the node fails if it cannot be delivered
+// (dropUndeliverableUpdate, C-5). A host's own image source decides itself
+// whether to call the latter.
+//
+// Mirrors matter.js packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts:395-414 at b25ed960
+// (checkUpdateAvailable).
 func (s providerPorts) QueryImage(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest) (mattercore.OTAImage, bool, error) {
 	d, ok := s.m.UpdateExistsFor(ctx, peerOf(p), req)
 	if !ok {
+		s.m.dropUndeliverableUpdate(peerOf(p), req.SoftwareVersion)
 		return mattercore.OTAImage{}, false, nil
 	}
 	return mattercore.OTAImage{
@@ -126,7 +135,8 @@ func (s providerPorts) Open(ctx context.Context, file string) (bdx.Blob, error) 
 }
 
 // RequestConsent implements mattercore.OTAConsent:
-// requestUserConsentForUpdate (:382-393), Unknown without a hook.
+// requestUserConsentForUpdate (OtaSoftwareUpdateProviderServer.ts:383-393
+// at b25ed960), Unknown without a hook.
 func (s providerPorts) RequestConsent(ctx context.Context, p mattercore.OTAPeer, req provdef.QueryImageRequest, img mattercore.OTAImage) (mattercore.OTAConsentState, time.Duration, error) {
 	if s.m.cfg.RequestConsent == nil {
 		return mattercore.OTAConsentUnknown, 0, nil
@@ -144,10 +154,12 @@ func (s providerPorts) RequestConsent(ctx context.Context, p mattercore.OTAPeer,
 func (s providerPorts) BeginQuery(p mattercore.OTAPeer) *mattercore.OTAUpdateAttempt {
 	s.m.mu.Lock()
 	defer s.m.unlock()
+	s.m.touchLocked(peerOf(p))
 	return s.m.attempts.Begin(p)
 }
 
-// EndQuery implements mattercore.OTAUpdateManager (endQuery, :1782-1791).
+// EndQuery implements mattercore.OTAUpdateManager (endQuery,
+// SoftwareUpdateManager.ts:1782-1791 at b25ed960).
 func (s providerPorts) EndQuery(a *mattercore.OTAUpdateAttempt) {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -190,9 +202,10 @@ func (s providerPorts) AdmitQuery(_ context.Context, op mattercore.OTAPeer, sess
 	m.mu.Lock()
 	m.attempts.EndAttempt(running)
 	// The node may have lost its queued update while the transfer was
-	// cancelled (:1875-1878).
+	// cancelled (SoftwareUpdateManager.ts:1875-1878 at b25ed960).
 	if m.indexOfLocked(p) >= 0 {
 		m.startUpSuppress[p] = sessionID
+		m.touchLocked(p)
 	}
 	m.unlock()
 	return true
@@ -216,7 +229,7 @@ func (m *Manager) admissionTransferOf(p Peer) admissionTransfer {
 }
 
 // cancelTransferForRestart cancels the node's transfer for its restart
-// (:1863-1872), outside m.mu.
+// (SoftwareUpdateManager.ts:1863-1872 at b25ed960), outside m.mu.
 func (m *Manager) cancelTransferForRestart(p Peer) error {
 	if m.disableTransfer != nil {
 		return m.disableTransfer(p)
@@ -229,12 +242,12 @@ func (m *Manager) cancelTransferForRestart(p Peer) error {
 
 // MayDelegateConsentTo implements mattercore.OTAUpdateManager
 // ([Manager.mayDelegateConsentTo]).
-func (s providerPorts) MayDelegateConsentTo(_ mattercore.OTAPeer, req provdef.QueryImageRequest) bool {
-	return s.m.mayDelegateConsentTo(req)
+func (s providerPorts) MayDelegateConsentTo(p mattercore.OTAPeer, req provdef.QueryImageRequest) bool {
+	return s.m.mayDelegateConsentTo(peerOf(p), req)
 }
 
 // ReportAttemptStatus implements mattercore.OTAUpdateManager
-// (reportAttemptStatus, :2006-2019 at b25ed960).
+// (reportAttemptStatus, SoftwareUpdateManager.ts:2006-2019 at b25ed960).
 func (s providerPorts) ReportAttemptStatus(a *mattercore.OTAUpdateAttempt, status mattercore.OTAUpdateStatus, unless ...mattercore.OTAUpdateStatus) bool {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -246,7 +259,7 @@ func (s providerPorts) ReportAttemptStatus(a *mattercore.OTAUpdateAttempt, statu
 }
 
 // OfferUpdate implements mattercore.OTAUpdateManager (offerUpdate,
-// :1743-1761 at b25ed960).
+// SoftwareUpdateManager.ts:1743-1761 at b25ed960).
 func (s providerPorts) OfferUpdate(a *mattercore.OTAUpdateAttempt, token []byte, version uint32) bool {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -273,7 +286,7 @@ func (s providerPorts) OfferAnswered(a *mattercore.OTAUpdateAttempt) {
 }
 
 // AttemptFor implements mattercore.OTAUpdateManager (attemptFor,
-// :1793-1800 at b25ed960).
+// SoftwareUpdateManager.ts:1793-1800 at b25ed960).
 func (s providerPorts) AttemptFor(p mattercore.OTAPeer, token []byte) *mattercore.OTAUpdateAttempt {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -282,10 +295,8 @@ func (s providerPorts) AttemptFor(p mattercore.OTAPeer, token []byte) *mattercor
 
 // ApplyUpdate implements mattercore.OTAUpdateManager: the apply table, and
 // the status it records — Applying with the delay, or Cancelled — moves
-// the queued update linked to the attempt. A scripted ApplyUpdateRequest
-// (script.go) arrives in ctx: a scripted Discontinue refuses as the table
-// refuses an update without its apply right, the attempt of the token
-// Cancelled; a scripted Proceed's delay replaces the provider's.
+// the queued update linked to the attempt. A scripted Proceed's delay
+// (script.go) arrives in ctx and replaces the provider's.
 //
 // Mirrors matter.js packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts:1921-1943 at b25ed960
 // (applyUpdate).
@@ -293,16 +304,9 @@ func (s providerPorts) ApplyUpdate(ctx context.Context, p mattercore.OTAPeer, to
 	m := s.m
 	m.mu.Lock()
 	defer m.unlock()
-	if o, ok := applyOverrideFrom(ctx); ok {
-		if o.refuse {
-			if a := m.attempts.Find(p, token); a != nil {
-				m.reportAttemptStatusLocked(a, mattercore.OTAUpdateCancelled, 0) //nolint:contextcheck // the queue's work runs on the manager's lifetime
-			}
-			return false
-		}
-		if o.set {
-			applyDelay = wholeSeconds(o.delay)
-		}
+	m.touchLocked(peerOf(p)) // an unknown token begins an attempt
+	if o, ok := applyOverrideFrom(ctx); ok && o.set {
+		applyDelay = wholeSeconds(o.delay)
 	}
 	a, allowed := m.attempts.ApplyUpdate(p, token, newVersion)
 	switch {
@@ -317,7 +321,7 @@ func (s providerPorts) ApplyUpdate(ctx context.Context, p mattercore.OTAPeer, to
 }
 
 // UpdateApplied implements mattercore.OTAUpdateManager (updateApplied,
-// :1958-1968 at b25ed960).
+// SoftwareUpdateManager.ts:1958-1968 at b25ed960).
 func (s providerPorts) UpdateApplied(p mattercore.OTAPeer, token []byte, softwareVersion uint32) {
 	s.m.mu.Lock()
 	defer s.m.unlock()
@@ -326,7 +330,7 @@ func (s providerPorts) UpdateApplied(p mattercore.OTAPeer, token []byte, softwar
 
 // BDXTransferOptionsFor implements mattercore.OTAUpdateManager: the
 // options [Manager.TransferOptionsFor] names (bdxTransferOptionsFor,
-// :1530-1536 at b25ed960).
+// SoftwareUpdateManager.ts:1526-1536 at b25ed960).
 func (s providerPorts) BDXTransferOptionsFor(p mattercore.OTAPeer) bdx.ScopeConfig {
 	o := s.m.TransferOptionsFor(peerOf(p))
 	out := bdx.ScopeConfig{AdditionalMrpDelay: o.AdditionalMrpDelay}

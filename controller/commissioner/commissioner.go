@@ -16,6 +16,7 @@ import (
 	"net/netip"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/client/discovery"
@@ -264,6 +265,11 @@ type Commissioner struct {
 	// watch during PASE ended, before the channel's close is checked
 	// (establishOverChannel); nil in production.
 	afterPASE func()
+
+	// nocSeamOverride, a test's, replaces what the operational
+	// certificate update reaches the peer through (nocUpdateSeam); nil in
+	// production.
+	nocSeamOverride atomic.Pointer[nocUpdateSeam]
 }
 
 // New returns a commissioner over c.

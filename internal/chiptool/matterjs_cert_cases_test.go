@@ -261,11 +261,11 @@ var matterJSCasesNotRun = map[string]gap{
 	"DA/1.3": notPorted(classHarness, "TC-DA-1.3.test.ts:101", "needs, with the Go controller as DUT commissioning the daemon "+
 		"twice, each AttestationNonce observable: matter.js reads it from its TH's log; the daemon logs none, and the "+
 		"controller's nonce reaches only controller/attestation's validation input (validate.go:40-41)"),
-	"OPCREDS/3.3": notPorted(classHarness, "TC-OPCREDS-3.3.test.ts:455", "needs, with the Go controller as DUT, the controller's UpdateNOC for a "+
-		"node it commissioned (step 11, :703-758, controller capability `noc-update`; the controller rotates only its own fabric's key, "+
-		"`DefaultFabric` in `controller/commissioner/fabricauthority.go`) and the CSRResponse and AddNOC fields observable on the TH "+
-		"(steps 5b and 7b, :510, :543): matter.js reads them from its TH's log; the daemon logs the command names only "+
-		"(`matter.opcreds.cmd` in `cluster/core/operational_credentials.go`)"),
+	"OPCREDS/3.3": notPorted(classHarness, "TC-OPCREDS-3.3.test.ts:455", "needs, with the Go controller as DUT, the CSRResponse and AddNOC "+
+		"fields observable on the TH (steps 5b and 7b, :510, :543): matter.js reads them from its TH's log; the daemon logs the command "+
+		"names only (`matter.opcreds.cmd` in `cluster/core/operational_credentials.go`). The controller's UpdateNOC for a node it "+
+		"commissioned (step 11, :703-758) exists: `client.Registry.UpdateOperationalCertificate` over "+
+		"`controller/commissioner/noc_update.go`"),
 	"DA/1.4": daDUT("TC-DA-1.4.test.ts:458", ":279"),
 	"DA/1.8": daDUT("TC-DA-1.8.test.ts:200", ":105"),
 }

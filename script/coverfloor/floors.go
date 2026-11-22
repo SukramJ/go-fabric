@@ -125,8 +125,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 92},
 	{
 		pkg: "github.com/SukramJ/go-fabric/controller/softwareupdate",
-		min: 71,
-		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2; phase 32 (the image store and BDX liveness ports): 54.9; review II 5b (the blob streamer and the attested-identity line): 57.9; review II 6b dcl (writers per name, header read, the manager's life): 63.1; pin lift b25ed960 P4b-C (the update attempts driven through the provider, provider_attempts_parity_matterjs_test.go): 68.8; P4b-C2 and P4b-REG (the delegation switch, the StartUp table): 71.5. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
+		min: 78,
+		why: "brief CM §1: measured 29.4; review 2026-11 W6-test-05: 40.3; phase 29a-2 (the scripted provider, script_parity_matterjs_test.go): 44.2; phase 32 (the image store and BDX liveness ports): 54.9; review II 5b (the blob streamer and the attested-identity line): 57.9; review II 6b dcl (writers per name, header read, the manager's life): 63.1; pin lift b25ed960 P4b-C (the update attempts driven through the provider, provider_attempts_parity_matterjs_test.go): 68.8; P4b-C2 and P4b-REG (the delegation switch, the StartUp table): 71.5; pin lift b25ed960 P5-A and P5-A2 (the queue phases, the OtaTest ports, the stored-image selection): 78.5-78.7 over three runs. The manager runs against a controller and a device: its end-to-end and OtaTest cases are the controller package's (controller:TestOTA*), which a per-package profile does not count; the package's own tests set the queue's state as matter.js's do",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/controller/topology", min: 95},

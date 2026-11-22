@@ -15,7 +15,7 @@ package bridge
 //     handleInitialStatusReport — an inbound CloseSession closes the
 //     session ("Closed by peer"); any other initial StatusReport is
 //     ignored with a debug log.
-//   - packages/protocol/src/protocol/ExchangeManager.ts:758/:781-787 —
+//   - packages/protocol/src/protocol/ExchangeManager.ts:767/:790-800 at b25ed960 —
 //     gracefulClose observer ships the report on a fresh exchange.
 //   - packages/node/src/behavior/system/network/ServerNetworkRuntime.ts
 //     :410-447 — shutdown closes sessions before transport teardown.
@@ -99,7 +99,7 @@ func closeSessionStatusReportBody() []byte {
 
 // TestAttachSessionRegistry_SelfWiresManagerHooks verifies the attach
 // call installs both reverse hooks on a registry that supports them —
-// the Go translation of matter.js ExchangeManager.ts:758 observing
+// the Go translation of matter.js ExchangeManager.ts:767 at b25ed960 observing
 // session.gracefulClose at session-add time.
 func TestAttachSessionRegistry_SelfWiresManagerHooks(t *testing.T) {
 	t.Parallel()
@@ -164,9 +164,9 @@ func TestInboundCloseSessionStatusReport_ClosesSession(t *testing.T) {
 
 // TestSendCloseSessionReport_WireShapeMatchesMatterJS decrypts the
 // farewell datagram with the peer's half of the session and pins the
-// wire shape to matter.js SecureChannelMessenger.ts:193-195 sendCloseSession
-// → #sendStatusReport(Success, CloseSession, requiresAck=false) on a
-// fresh bridge-initiated exchange (ExchangeManager.ts:781-791 at db021da0).
+// wire shape to matter.js SecureChannelMessenger.ts:199-204 at b25ed960 (sendCloseSession
+// → #sendStatusReport(Success, CloseSession, suppressAck: true)) on a
+// fresh bridge-initiated exchange (ExchangeManager.ts:790-800 at b25ed960).
 func TestSendCloseSessionReport_WireShapeMatchesMatterJS(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)

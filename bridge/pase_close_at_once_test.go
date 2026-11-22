@@ -53,6 +53,7 @@ func (a caseAdministerACL) ListACL(_ context.Context, fabric uint8) ([]store.ACL
 type peerDatagram struct {
 	sessionID uint16
 	proto     message.ProtocolHeader
+	body      []byte // the plaintext after the protocol header
 }
 
 // readPeerDatagrams reads what reaches conn until wait passes without a
@@ -81,11 +82,11 @@ func readPeerDatagrams(t *testing.T, conn *net.UDPConn, wait time.Duration, peer
 		if err != nil {
 			t.Fatalf("Decrypt on session %d: %v", hdr.SessionID, err)
 		}
-		proto, _, err := message.UnmarshalProtocolHeader(plain)
+		proto, protoLen, err := message.UnmarshalProtocolHeader(plain)
 		if err != nil {
 			t.Fatalf("UnmarshalProtocolHeader: %v", err)
 		}
-		got = append(got, peerDatagram{sessionID: hdr.SessionID, proto: proto})
+		got = append(got, peerDatagram{sessionID: hdr.SessionID, proto: proto, body: plain[protoLen:]})
 	}
 }
 

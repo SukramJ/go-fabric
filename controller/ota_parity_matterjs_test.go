@@ -106,8 +106,11 @@ func TestOTAConsentChangesQueuedOptionsParity(t *testing.T) {
 		}
 		expect(step.maxBlock, step.delay)
 	}
-	if q := r.c.SoftwareUpdates().QueuedUpdates(); len(q) != 1 || q[0].Status != softwareupdate.PendingQueued {
-		t.Errorf("queue %+v, want the one queued entry", q)
+	// The one entry: queued, or announcing already — an announcing entry
+	// lists in-progress (queuedUpdates, SoftwareUpdateManager.ts:401-407 at
+	// b25ed960).
+	if q := r.c.SoftwareUpdates().QueuedUpdates(); len(q) != 1 || q[0].Status == softwareupdate.PendingStalled {
+		t.Errorf("queue %+v, want the one entry", q)
 	}
 }
 

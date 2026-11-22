@@ -30,7 +30,6 @@ func TestBackgroundContextsAreNamed(t *testing.T) {
 		"dcl/vendorinfo.go NewVendorInfoService":            "the root of the periodic context Close cancels",
 		"softwareupdate/manager.go New":                     "the root of the manager's life Close cancels",
 		"softwareupdate/announcements.go processQueueEntry": "an announcement, bounded by the node's own timeouts; announcements.close stops the queue",
-		"softwareupdate/manager.go triggerUpdateOnNode":     "an announcement, bounded by the node's own timeouts",
 	}
 	seen := map[string]bool{}
 	fset := token.NewFileSet()

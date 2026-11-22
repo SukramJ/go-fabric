@@ -145,6 +145,22 @@ lines of `controller/attestation` re-read at b25ed960, the package doc naming
 (same membership), not a behaviour change. Opened for P4b: F-b25ed960-57
 (an ApplyUpdateRequest after `RemoveConsent` passes).
 
+Wave P5 (2026-11-22) closed the last two PR rows of the lift and one protocol
+residual. P5-A (decision 292): the update queue's phases, the failed consent
+with its 24-hour expiry, `#retarget`, the abortable announcement, the consent
+tables and the exact offer (#4826; F-b25ed960-21, -C3, -C4 closed); the
+deferred queue run, the announcement's log classification and the legacy
+status view are `by_design` rows (`BD-Matter-OTAManager-*`). P5-A2: the update
+check and QueryImage select stored images through one helper as
+`findApplicable` (`DclOtaUpdateService.ts:394-407`; decision 482). P5-B
+(decision 293): the controller rotates a commissioned node's NOC (#4874;
+F-b25ed960-20 closed), its outcome a value (*Ahead of matter.js* row
+`BD-Matter-CertificateUpdate-TypedOutcome`, owner decision W2). P5-C: a revoke
+of the commissioning window sends the CloseSession (F-b25ed960-56 (ii); (iv)
+and (v) stay open). P5-S: `images.go` and `interaction.go` citations re-read
+at b25ed960. No marker caught up; opened: F-b25ed960-C5 (the NOC update's
+force-close cause, not exported).
+
 ### Protocol, sessions, security
 
 | PR | Fix | Verdict | Where |
@@ -200,9 +216,9 @@ lines of `controller/attestation` re-read at b25ed960, the package doc naming
 | #4939 (0bbd48704) | a CD vendor_id / product_id_array mismatch with BasicInformation is an error-level finding, also when the device reported neither (DAV:579-595, at b25ed960) | **gap (low) → closed in P2-D** (decision 295) — the CD/BasicInformation VendorID/ProductID mismatch, an unreported value included, is the error finding `CertificationDeclarationFieldMismatch` (`validate.go` checkDeclaration); a policy rejection names the error findings; the attr-status debug log of commissioning reads (CCF:477-482, :776-781) not adopted, log only; before, ours failed hard and compared an unreported value as 0 | `controller/attestation/validate.go`, `controller/commissioner/flow.go`; before P2-D `validate.go:52`, `:357-364` |
 | #4940 (65269302a) | a hard attestation failure carries the findings collected before it (DAV:283-293, at b25ed960) | **gap (low) → closed in P2-D** — `attestation.Error.PrecedingFindings`; the flow hands the policy the preceding findings, then the failure (CCF:1332-1336) | `controller/attestation/check.go`, `controller/commissioner/flow.go`; before P2-D `check.go:85-95`, `flow.go:1174-1181` |
 | #4938 (05b729727) | the CSRResponse validated in one validator: missing, empty, NOCSRElements over RESP_MAX 900, signature, decode, CSRNonce, CSR; the DAC key required (`NocsrValidator.ts:82-126`, at b25ed960) | **caught up** (`BD-chip-Commissioner-CsrNonceEchoed`), **reconciled in P2-D**, the row retired — `attestation.ValidateNOCSR` (FieldMissing, ResponseEmpty, ElementsTooLong at RESP_MAX 900, AttestationSignatureInvalid, ElementsUnparseable, CsrNonceMismatch, CsrInvalid, in matter.js's order), every failure `ErrCommissioning` (decision 302); AttestationElements over RESP_MAX as the hard failure `AttestationElementsTooLong` the policy judges; the CSR step requires the DAC key, its absence an internal error as matter.js's InternalError (CCF:1450-1452; coordinator decision C-19) | `controller/attestation/nocsr.go` (`ValidateNOCSR`), `controller/commissioner/flow.go` (`certificates`) |
-| #4874 (80db76155) | a new controller operation: rotate a commissioned node's NOC (UpdateNOC on one CASE session, CommissioningComplete on a new one), with cert case TC-OPCREDS-3.3 (`OperationalCertificateUpdate.ts:158-243`, at b25ed960) | **gap (medium, a feature) → P5-B** (decision 293) | no controller-side UpdateNOC (grep); the device side serves it (`cluster/core/operational_credentials.go:2644-2680`) |
+| #4874 (80db76155) | a new controller operation: rotate a commissioned node's NOC (UpdateNOC on one CASE session, CommissioningComplete on a new one), with cert case TC-OPCREDS-3.3 (`OperationalCertificateUpdate.ts:158-243`, at b25ed960) | **gap (medium, a feature) → closed in P5-B** (decision 293; F-b25ed960-20) — `client.Registry.UpdateOperationalCertificate` over `commissioner.Commissioner.UpdateOperationalCertificate`, a mirror of `OperationalCertificateUpdate.update`; the outcome of a failure a value (`BD-Matter-CertificateUpdate-TypedOutcome`, owner decision W2) | `controller/commissioner/noc_update.go`, `controller/client/fabricops.go`; the device side serves it (`cluster/core/operational_credentials.go:2644-2680`) |
 | #5003 (f783b219a) | the nodejs-shell's JSON input accepts omitted optional and null nullable struct values | **not applicable** (JS shell) | — |
-| #4826 (2ae4f2b99) | the OTA provider and manager rewritten around update attempts the manager owns: query admission, apply decision table, one consent per peer with 24 h failed-update retention, delegation opt-in, candidate order, phases and linking, undeliverable updates ended (`OtaUpdateAttempts.ts:23-181`, at b25ed960) | **gap (medium) → P4b (unit C), then P5-A** (decision 292, 14 differences; option (b), the attempts owned by the manager, decision 435; the consent gap F-b25ed960-57 fixed with it, decision 436); `BD-Matter-OTAProvider-InProgressPerFabric` partly caught up | `cluster/core/ota_provider.go:385-484`, `:601-701`; `controller/softwareupdate/manager.go:811-871`, `:1261-1432`, `:1502-1596` |
+| #4826 (2ae4f2b99) | the OTA provider and manager rewritten around update attempts the manager owns: query admission, apply decision table, one consent per peer with 24 h failed-update retention, delegation opt-in, candidate order, phases and linking, undeliverable updates ended (`OtaUpdateAttempts.ts:23-181`, at b25ed960) | **gap (medium) → closed in P4b (unit C) and P5-A** (decision 292, 14 differences; option (b), the attempts owned by the manager, decision 435; the consent gap F-b25ed960-57 fixed with it, decision 436; the queue's phases, the failed consent and the offer in P5-A, F-b25ed960-21 closed; the stored-image selection in P5-A2, decision 482); `BD-Matter-OTAProvider-InProgressPerFabric` partly caught up | `cluster/core/ota_provider.go:385-484`, `:601-701`; `controller/softwareupdate/manager.go:811-871`, `:1261-1432`, `:1502-1596` |
 
 ### Harness
 

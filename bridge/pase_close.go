@@ -126,16 +126,59 @@ func (b *Bridge) wireFailSafeExpiry(servers []contract.ClusterServer) {
 
 // closePASESessionsOnRevoke is what a [CommissioningWindow] attached to
 // the bridge runs when it is revoked: the PASE sessions open at that
-// moment are closed, the ones AddNOC adopted onto a fabric included. The
-// window decides when (after the response, when the revoke arrived over
-// the PASE session itself). Mirrors matter.js
+// moment are closed gracefully, the ones AddNOC adopted onto a fabric
+// included — each peer the bridge has a route to is told with a
+// CloseSession on its session while the keys are live, then hostClose
+// runs the host's [PaseSessionCloser] (nil-safe), then the sessions close.
+// The window decides when (after the response, when the revoke arrived
+// over the PASE session itself).
+//
+// The farewell is sent here, before hostClose, because a host's closer
+// closes silently and before the bridge's own close (the node facade's
+// is CloseFabric(0), which takes the un-adopted PASE session away): sent
+// after it, there would be no live session to send on. This one site
+// serves the bare bridge and the facade alike. Unlike CommissioningComplete
+// and the fail-safe expiry (force closes, [Bridge.closePASESessions]),
+// the revoke's close is matter.js's graceful one.
+//
+// Mirrors matter.js
 // packages/node/src/behaviors/administrator-commissioning/AdministratorCommissioningServer.ts:143-147
 // at b25ed960 (revokeCommissioning, "Step 1: Regardless of window state —
 // terminate PASE sessions and expire PASE-held fail-safe":
 // `SessionManager.getPaseSession()` → `paseSession.initiateClose()`).
-func (b *Bridge) closePASESessionsOnRevoke() {
-	if closeNow, _ := b.paseSessionsCloser(); closeNow != nil {
+// The graceful close's event is observed by
+// packages/protocol/src/protocol/ExchangeManager.ts:757-768 at b25ed960 (gracefulClose)
+// and answered with a CloseSession on the closing session by
+// packages/protocol/src/protocol/ExchangeManager.ts:790-800 at b25ed960 (#sendCloseSession)
+// (F-b25ed960-56 (ii)).
+func (b *Bridge) closePASESessionsOnRevoke(hostClose func()) {
+	closeNow, ids := b.paseSessionsCloser()
+	b.notifySessionsClosing(ids)
+	if hostClose != nil {
+		hostClose()
+	}
+	if closeNow != nil {
 		closeNow()
+	}
+}
+
+// notifySessionsClosing sends a CloseSession on each of ids that is still
+// live and that the bridge has a route for ([Bridge.sendCloseSessionReport],
+// best-effort); one without either closes silently.
+func (b *Bridge) notifySessionsClosing(ids []uint16) {
+	if len(ids) == 0 {
+		return
+	}
+	b.mu.RLock()
+	lookup := b.sessions
+	b.mu.RUnlock()
+	if lookup == nil {
+		return
+	}
+	for _, sid := range ids {
+		if sess, live := lookup.Lookup(sid); live && sess != nil {
+			b.sendCloseSessionReport(sid, sess)
+		}
 	}
 }
 

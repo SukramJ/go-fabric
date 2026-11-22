@@ -709,9 +709,9 @@ func (n *Node) Disable(ctx context.Context) error {
 	}
 	// Every subscription of the node goes, not only the default one:
 	// ClientNode.disable cancels the node's interaction, which closes the
-	// subscriptions it owns (ClientNode.ts:239-253, ClientInteraction.ts:270-282
-	// at db021da0; ClientConnectivityTest "closes a non-sustained
-	// subscription when the node is disabled").
+	// subscriptions it established (packages/node/src/node/ClientNode.ts:274-288,
+	// :326-340, ClientInteraction.ts:293-298 at b25ed960; ClientConnectivityTest
+	// "closes a non-sustained subscription when the node is disabled").
 	if ia, err := n.interaction(); err == nil {
 		ia.CloseSubscriptions()
 	}

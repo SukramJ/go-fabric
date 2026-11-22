@@ -155,7 +155,12 @@ import (
 // (measured by make cite-report). 423 after P4b-C. 422 after P4b-REG:
 // script.go's scripted applyDelay re-cited to InProcessControllerAdapter.ts
 // :775-789 at b25ed960 leaves the list (measured by make cite-report).
-const citecheckDriftRatchet = 422
+// 420 after P5-C: the CloseSession cites of
+// securechannel_close_parity_test.go and fabric_session_close_test.go
+// re-read at b25ed960 leave two rows (measured by make cite-report).
+// 415 after P5-A: controller/softwareupdate's cites re-pointed at b25ed960.
+// 412 after P5-S: client/interaction/interaction.go's #network, #interactions and ClosedError cites re-read at b25ed960.
+const citecheckDriftRatchet = 412
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -209,8 +214,15 @@ const citecheckDriftRatchet = 422
 // D 3). Wave P3c relabelled 27 more (units A, E, F and the register pass).
 // Wave P4-S relabelled 12 more at b25ed960: bridge/conn.go's eight
 // ExchangeManager.ts citations and four in controller/attestation
-// (validate.go 3, policy.go 1).
-const citecheckOffPinRatchet = 2712
+// (validate.go 3, policy.go 1). Wave P5-C relabelled 3 more at b25ed960
+// (bridge/securechannel.go's CloseSession sender), its fix round 8 more
+// (securechannel.go #deleteSession, bridge.go's two ExchangeManager.ts
+// cites, the CloseSession tests, commissioning_window.go's
+// PaseSessionCloser). Wave P5-B relabelled 3 more (controller/client
+// fabricops.go, client/interaction/interaction.go, controller/client/node.go). Wave P5-A re-pointed controller/softwareupdate's
+// cites at b25ed960. Wave P5-S re-pointed images.go's and interaction.go's remaining cites at b25ed960 (2675; images.go's checkForUpdate cite labelled at db021da0, its selection not yet the pin's).
+// Wave P5-A2 moved checkForUpdate onto the pin's findApplicable selection and its cite to b25ed960 (2674).
+const citecheckOffPinRatchet = 2674
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

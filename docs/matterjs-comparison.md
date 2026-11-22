@@ -80,6 +80,7 @@ it — a `by_design` entry, an ADR or a later milestone of the
 | DCL vendor information (`DclVendorInfoService`, `DclBehavior.vendorInfoService`) | `controller/dcl.VendorInfoService`, `controller.Controller.VendorInfo` (`Config.DCL`) | ✅ | — | Wave 27-A: seeded from the snapshot, refreshed daily, offline mode, product information. |
 | PQC Phase 1 attestation (`MlDsa`, ML-DSA PAA/PAI, forward feature `pqc-phase-1`) | `controller/attestation` (`pqc.go`) over `crypto/mldsa` | ✅ | — | Wave 27-A, off as in matter.js (`internal/forward`); the ledger stores and the device's own chain files stay traditional. |
 | Controller fabric authority, NOC key rotation (`FabricAuthority`) | `controller/commissioner.FabricAuthority` | ✅ | — | Wave 27-A: the controller rotates its operational key once per start. |
+| Operational certificate update of a commissioned node (`OperationalCertificateUpdate`, `ClientNode.updateOperationalCertificate`) | `controller/client.Registry.UpdateOperationalCertificate` over `controller/commissioner` (`noc_update.go`) | ✅ | — | Pin lift b25ed960, wave P5: UpdateNOC under a fail-safe, CommissioningComplete on a new CASE session, roll-back and recovery as matter.js; the outcome of a failure is a value (`BD-Matter-CertificateUpdate-TypedOutcome`). |
 | Controller discovery (`Discovery`, `InstanceDiscovery`, `ContinuousDiscovery`, `ParallelPaseDiscovery`) | `client/discovery` sessions (`FindInstance`, `FindAll`, `Race`, `CommissioningRace`, `PASERace`) | ✅ | — | Wave 27-A: `controller.Pair` races BLE and IP. |
 
 ## 4. Interaction Model

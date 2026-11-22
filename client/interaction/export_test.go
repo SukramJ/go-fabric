@@ -146,3 +146,21 @@ func ReportStatusUnacknowledged(s *Subscription, chunk bool) {
 	}
 	s.reportStatusUnacknowledged(s.nextReportNumber(), status)
 }
+
+// EstablishedCount is the number of subscriptions c established that
+// have not closed (#established).
+func EstablishedCount(c *Interaction) int {
+	c.estMu.Lock()
+	defer c.estMu.Unlock()
+	return len(c.established)
+}
+
+// RegisterPeerSubscription registers a fresh peer subscription of id
+// through c as subscribeOnce does once the SubscribeResponse arrived: the
+// window in which Close may already have run.
+func RegisterPeerSubscription(c *Interaction, id uint32) (*Subscription, error) {
+	peer, _ := c.provider.PeerAddress()
+	s := c.subs.newSubscription(peer, SubscribeRequest{}, c.log)
+	s.id = id
+	return s, c.register(s, c.subs.AddPeer)
+}

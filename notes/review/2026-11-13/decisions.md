@@ -765,3 +765,49 @@ C's questions and the Opus review (439–452). Sources: `p4b/coordinator.md`,
 | 450 | Coordinator (unit C2's Q1): the controller's manager could not delegate consent | **`controller.OTAConfig.DelegateConsentToRequestor`** in this wave, handed to the manager (`0d7e7088`) |
 | 451 | Coordinator (C-31, on the Fable post-read of unit C2): a StartUp below the target failed an update also while its attempt waited for its apply (`manager.go:660`); matter.js fails it only while it applies (`SoftwareUpdateManager.ts:1063` at `b25ed960`) | **Aligned with matter.js**, red first: one that waits for its apply is reset and stays queued, its attempt left running, no `updateFailed` (`3559e6c6`) |
 | 452 | Coordinator (C-32, on the Fable post-read of unit C2): a scripted Discontinue refuses an apply also under an unknown token, where matter.js's harness lets it proceed | **Findings row, not fixed in P4b** (F-b25ed960-C3, Low): a test-harness seam only, pre-existing |
+
+## 2026-11-22, the pin lift db021da0 → b25ed960, wave P5
+
+Units A (the OTA queue's phases, decision 292), A2 (the stored-image
+selection), B (the controller's NOC rotation, decision 293), C (the revoke's
+CloseSession, F-b25ed960-56 (ii)), S (the cite remainder) and REG. The owner's
+wizard (W1–W3, the cut) and the coordinator's decisions C-1 … C-26 (453–482),
+then the units' own choices (483–485). Sources: `p5/plan.md` §5,
+`p5/decisions-pending.md`, the fix notes `p5/fix-{a,a2,b,c,s}.md` and the
+Fable post-reads `p5/fable-post-{a,b,c,s}.md`.
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 453 | Owner (W1, wizard): where the NOC rotation sits on the public surface | **`(*client.Registry).UpdateOperationalCertificate`** beside `Commission` and `Decommission`, under the fabric-operation lock with the kind "certificate update" — matter.js's cut of its three fabric operations (`Peers.ts:80` at `b25ed960`) |
+| 454 | Owner (W2, wizard): how a caller learns what the node holds after a failed rotation | **One typed error**, `commissioner.CertificateUpdateError` with `Outcome` (previous kept, reverted, new in place, unknown) and `FabricIndexOnPeer`, `errors.Is` for `ErrCertificateUpdateBusy` and `ErrCertificateUpdateRefused`; an *Ahead of matter.js* register row (`BD-Matter-CertificateUpdate-TypedOutcome`) |
+| 455 | Owner (wizard): the cut of the wave | **A ‖ B ‖ C in one wave, then S, then REG**; C dropped first, then B to a P5b, if the budget or the disk tightens (neither happened) |
+| 456 | Owner (W3, wizard): the `ctx` of `UpdateOperationalCertificate` | **As matter.js's abort**: it gates the CASE waits and the recovery decision; the invokes, reads and the disarm run under `context.WithoutCancel` with their response timeouts (`OperationalCertificateUpdate.ts:136-137`, `:302-304`, `:347` at `b25ed960`) |
+| 457 | Coordinator (C-1): the cut | §4 of the plan; C first to drop, then B (293's cut line) — the budget decides, not the architecture |
+| 458 | Coordinator (C-2): F-b25ed960-56 | **Joins as unit C**, measured before changed — its row targeted P5 and its paths were free |
+| 459 | Coordinator (C-3): A's surface | **Every exported signature kept**; the breaks are behaviour, under `### Changed` with a migration note for go-fabric-ui |
+| 460 | Coordinator (C-4): a consent or a forced update for an address no node has | **A new error value** (`softwareupdate.ErrNoNode`, matter.js's `OtaUpdateError`) instead of a stored consent and `false` — mirror, additive |
+| 461 | Coordinator (C-5): the seat of `dropUndeliverableUpdate` | **The image lookup of `providerPorts`** (`controller/softwareupdate/provider.go`), no new `cluster/core` port — matter.js calls it from the provider's default lookup and leaves an override to decide itself |
+| 462 | Coordinator (C-6): `OPCREDS/3.3` | **Stays `notPorted`, reason revised**: step 11 (the controller's UpdateNOC) exists; steps 5b and 7b still need the CSRResponse and AddNOC fields observable on the TH; building that observation is a backlog row, not unit B |
+| 463 | Coordinator (C-7): F-b25ed960-C3 | **Fixed in A** (same files, plan item #17); decision 452's "not in P4b" is closed with it |
+| 464 | Coordinator (C-8): the equal-version order of stored images | **matter.js's order (local, test, prod) in the manager's candidates only**; `Images.Find`'s own order unchanged (other callers) |
+| 465 | Coordinator (C-9): the fabric index of the announcement record | **No change, no findings row**: the record carries the controller's fabric index and filters by it |
+| 466 | Coordinator (C-10): the deprecated `Manager.OnStatusChange` and `SuppressNextStartUp` | **Kept through their window**; the phase type carries their legacy status (decision 472) |
+| 467 | Coordinator (C-11): `Interaction.Close`'s narrowing | **A mirror of the pin** (`ClientInteraction.ts:285-315` at `b25ed960`) → `### Changed`; a behaviour cannot be deprecated; the note names `CloseSubscriptions` for callers of the old sweep |
+| 468 | Coordinator (C-12): the generated snapshots | **Regenerated once, in `p5-int`**: reachability, cover floors, testparity, cite constants |
+| 469 | Coordinator (C-13): the scope of unit C | **F-b25ed960-56 part (ii) only** (the CloseSession on the revoke's close); (i) and (iii) hold; (iv) stays a residual in the row |
+| 470 | Coordinator (C-14): a bend for unit C | `node/commissioning.go` allowed (the host's closer runs first) — **not used**: the bridge orders the close itself (decision 485) |
+| 471 | Coordinator (C-15): `NodeDeleted` before `Start` | **matter.js's suppress guard** (`SoftwareUpdateManager.ts:319-342` at `b25ed960`): it does nothing before `Start` and after `Close`; no `by_design` row |
+| 472 | Coordinator (C-16): the deprecated status view | `OnStatusChange`, the entry status and `applyDelay` are derived from the phase through their window — no reference, a legacy view only (`BD-Matter-OTAManager-LegacyStatusPhase`) |
+| 473 | Coordinator (C-17): `NodeDeleted` without an event, one `UpdateFailed` per consent | **Behaviour changes** → `### Changed` and the go-fabric-ui migration note |
+| 474 | Coordinator (C-18): the outcome of Busy and Refused, and of the failures before the session | **Busy and Refused carry `PreviousKept`**; the failures before the session stay plain errors; a failed start read gives the typed error without an index |
+| 475 | Coordinator (C-19): the marker of the W2 register row | **`OperationalCertificateUpdate.ts:281-284`, `:329-352` at `b25ed960`** (fable-pre-b correction 3) |
+| 476 | Coordinator (C-20): the `Interaction.Close` narrowing | **Stays in B** (mirror, OCUT `:2255`), the first piece to move out had B's budget tightened — it is not a prerequisite (it did not move) |
+| 477 | Coordinator (C-21): bends for unit A | `controller/ota_node_deleted_test.go`, `controller/ota_handoff_close_test.go` (C-17 forces them) and the doc of `controller/ota_handoff.go` — **accepted** (`a4396734`) |
+| 478 | Coordinator (C-22, Fable post-read F1): the product check's queueing | **Fixed in A as matter.js**: the check queues for any consent of the product, asks for consent when none is held or one below the found version, and skips a node removed during the check (`SoftwareUpdateManager.ts:905-908`, `:926-934` at `b25ed960`; `a4396734`, `0a412b15`) |
+| 479 | Coordinator (C-23, review M1 and L1, Fable F2): the deferred queue run | **Fixed in A**: presence as of the run (a change sequence), each change emits only its own events (`SoftwareUpdateManager.ts:550-561`), the queue run before the forced announcement (`:1291` before `:1521`); then the deferred run is a `by_design` row (`BD-Matter-OTAManager-QueueRunAfterChange`) |
+| 480 | Coordinator (C-24, Fable F3): `ErrNoNode` and `ErrNotApplicable` | **`ErrNoNode` is an `ErrNotApplicable`** (matter.js has one `OtaUpdateError`); `ForceUpdate` keeps its earlier `errors.Is` result |
+| 481 | Coordinator (C-25): the announcement's log classification and the legacy status view | **Two short `by_design` rows**: `BD-Matter-OTAManager-AnnouncementLog`, `BD-Matter-OTAManager-LegacyStatusPhase` (closes at v0.26.0) |
+| 482 | Coordinator (C-26, Fable post-read of S §1): a stored local image reported by the update check under `IsProduction` | **Fixed in P5 as unit A2**: one unexported `(*Images).applicable` mirroring `findApplicable` (`DclOtaUpdateService.ts:394-407`, called `:318-324` at `b25ed960`), used by `Images.CheckForUpdate` and the manager's candidates; `Images.Find`'s order untouched (decision 464); `### Changed` (`ac6dc393`) |
+| 483 | Unit A: the error values and the Go-only events | `ForceUpdate`'s "runs at or above the target" and "transfers another or an unknown version" wrap `ErrNotApplicable`; `UpdateFailed` carries `ErrNotApplied` for every failed update (also `dropUndeliverableUpdate`) and `ErrUpdateCancelled` for `RemoveConsent` and a retarget without a consent; **`UpdateQueued` also when a retarget moves a target, `UpdateConsentChanged` also on the 24-hour expiry, `NodeDeleted` and a node the update check finds gone** (matter.js has no consent events) |
+| 484 | Unit B: the error shape of the inner steps | The step causes matter.js builds as `OperationalCertificateUpdateError` without an outcome carry the **zero `Outcome` (unset)**; messages are matter.js's after a `commissioner: ` prefix, the cause appended; the peer address as `@<fabric index hex>:<node id hex>` |
+| 485 | Unit C: who orders the revoke's close | **The bridge**: the window's session-owner hook takes the host's closer as an argument, so one bridge function sends the CloseSession, runs the host's `PaseSessionCloser`, then closes; `SetPaseSessionCloser`'s contract ("called at the start of RevokeWindow", before any close) holds; no `node/` bend |

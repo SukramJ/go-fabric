@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/controller/client"
 )
 
@@ -34,6 +35,13 @@ type managerRig struct {
 	mu     sync.Mutex
 	failed []Peer
 	done   []Peer
+	// gone and basic are testPeer's node (nodeOf).
+	gone  bool
+	basic basicinfo.State
+	// extra are further present peers with testPeer's node.
+	extra map[Peer]bool
+	// notApplicable has the nodes present but not applicable for updates.
+	notApplicable bool
 }
 
 func newManagerRig(t *testing.T, edit func(*Config)) *managerRig {
@@ -53,27 +61,55 @@ func newManagerRig(t *testing.T, edit func(*Config)) *managerRig {
 		t.Fatal(err)
 	}
 	// The manager online without its timers (#nodeOnline's suppressUpdates
-	// lifted); no node to announce to.
+	// lifted); no announcements to send.
 	m.mu.Lock()
 	m.suppress = false
 	m.mu.Unlock()
+	// testPeer's node: present, applicable on endpoint 0, the test product
+	// at version 0, as OtaTest's device (initSiteWithoutTestImages).
+	r.basic = basicinfo.State{VendorId: 0xFFF1, ProductId: 0x8001}
+	m.node = r.nodeOf
 	t.Cleanup(m.Close)
 	r.m = m
 	return r
 }
 
-// queue adds the consent and the queued entry addUpdateConsent leaves for
-// an applicable node (:1153-1196), in status at the current time.
+// nodeOf is the rig's node seam: testPeer's node unless gone.
+func (r *managerRig) nodeOf(p Peer) (nodeView, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if (p != testPeer || r.gone) && !r.extra[p] {
+		return nodeView{}, false
+	}
+	basic, endpoint := r.basic, uint16(0)
+	if r.notApplicable {
+		return nodeView{basic: &basic}, true
+	}
+	return nodeView{basic: &basic, endpoint: &endpoint}, true
+}
+
+// setNode changes testPeer's node: gone, and its cached Basic Information.
+func (r *managerRig) setNode(gone bool, edit func(*basicinfo.State)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.gone = gone
+	if edit != nil {
+		edit(&r.basic)
+	}
+}
+
+// queue adds the consent and the queued entry #storeConsent leaves for
+// an applicable node (SoftwareUpdateManager.ts:1590-1625 at b25ed960),
+// without the queue run; with status, the entry is in progress with that
+// status at the current time, as the deprecated OnStatusChange leaves it.
 func (r *managerRig) queue(target uint32, status *Status) *queueEntry {
 	t := Target{VendorID: 0xFFF1, ProductID: 0x8001, TargetSoftwareVersion: target}
-	e := &queueEntry{consent: consent{Target: t, peer: testPeer}, endpoint: 0}
+	e := &queueEntry{Target: t, peer: testPeer, phase: &updatePhase{state: phaseQueued}}
 	if status != nil {
-		s := *status
-		e.status = &s
-		e.started = r.clock.Now()
+		e.phase = &updatePhase{state: phaseProgress, legacy: &legacyProgress{status: *status, since: r.clock.Now()}}
 	}
 	r.m.mu.Lock()
-	r.m.consents = append(r.m.consents, consent{Target: t, peer: testPeer})
+	r.m.consents[testPeer] = &consent{Target: t, peer: testPeer}
 	r.m.queue = append(r.m.queue, e)
 	r.m.mu.Unlock()
 	return e

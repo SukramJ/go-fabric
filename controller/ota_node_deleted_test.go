@@ -15,11 +15,13 @@ import (
 
 // TestOTAForgetsANodeTheRegistryDeleted (review II, R2-P6-bound-1914,
 // decision 219): a node the registry deletes is forgotten by the update
-// manager at once — its queued update is reported failed through the
-// host's OnUpdateFailed and leaves the queue. Erase deletes the node inside
-// the registry's fabric operation; OnUpdateFailed runs after it, so a host
+// manager at once — its queued update leaves the queue without an event,
+// as matter.js's #forgetPeer and #dequeueIfGone end it
+// (SoftwareUpdateManager.ts:312-341, :1342-1353, the contract :2303-2308
+// at b25ed960; C-17). Erase deletes the node inside the registry's fabric
+// operation; the manager reaches no host callback from there, so a host
 // callback that starts a registry operation (here ForDevice, which takes
-// the operation lock) returns. Before, nothing told the manager.
+// the operation lock) could not hang it either.
 func TestOTAForgetsANodeTheRegistryDeleted(t *testing.T) {
 	t.Parallel()
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -68,13 +70,20 @@ func TestOTAForgetsANodeTheRegistryDeleted(t *testing.T) {
 		t.Fatal("no queued update before the erase: the test shows nothing")
 	}
 	r.run(t, func(ctx context.Context) error { reg.Erase(ctx); return nil })
-	r.eventually(t, "the deleted node's queued update reported failed", func() bool { return len(failed) > 0 })
-	if got := <-failed; got != peer {
-		t.Fatalf("OnUpdateFailed for %v, want %v", got, peer)
-	}
-	for _, u := range r.c.SoftwareUpdates().QueuedUpdates() {
-		if u.Peer == peer {
-			t.Fatalf("the deleted node's update is still queued: %+v", u)
+	r.eventually(t, "the deleted node's queued update left the queue", func() bool {
+		for _, u := range r.c.SoftwareUpdates().QueuedUpdates() {
+			if u.Peer == peer {
+				return false
+			}
 		}
+		return true
+	})
+	if r.c.SoftwareUpdates().HasConsent(peer, 0) {
+		t.Fatal("the deleted node keeps its consent")
+	}
+	select {
+	case got := <-failed:
+		t.Fatalf("OnUpdateFailed for %v: the deleted node's update ends without an event", got)
+	default:
 	}
 }
