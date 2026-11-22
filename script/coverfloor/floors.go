@@ -303,7 +303,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/schema", min: 100},
 	{pkg: "thingfabric.dev/go-fabric/script/aheadcheck", min: 93, why: "the parser, the check and run against a fixture git repository built in the test; main (flags, the exit) is exercised by make ahead-check"},
 	{pkg: "thingfabric.dev/go-fabric/script/archcheck", min: 0, unmeasurable: true, why: "doc and test only, no statements to cover"},
-	{pkg: "thingfabric.dev/go-fabric/script/apidiff", min: 45, why: "review II 6b wave 3: measured 45.8 with the base, heading and nested-module checks tested; the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check"},
+	{pkg: "thingfabric.dev/go-fabric/script/apidiff", min: 48, why: "review II 6b wave 3: measured 45.8 with the base, heading and nested-module checks tested; the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check; org move step 4 (v0.25.0): 48.7 with the module-move split and modulePath tested"},
 	// BX4's forward generator; main() only writes the files its test compares.
 	{
 		pkg: "thingfabric.dev/go-fabric/script/citecheck",

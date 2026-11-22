@@ -4,7 +4,9 @@
 package main
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -188,5 +190,22 @@ func TestSplitMoves(t *testing.T) {
 	}
 	if rest, moves := splitMoves(in, newRoot, newRoot); len(moves) != 0 || len(rest) != len(in) {
 		t.Errorf("unmoved module: moves %d, want 0", len(moves))
+	}
+}
+
+// TestModulePath: the base is exported under the path its own go.mod
+// declares, not the working tree's; a directory without a module path is
+// an error, not an empty path.
+func TestModulePath(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/SukramJ/go-fabric\n\ngo 1.27\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := modulePath(dir)
+	if err != nil || got != "github.com/SukramJ/go-fabric" {
+		t.Errorf("modulePath = %q, %v; want github.com/SukramJ/go-fabric", got, err)
+	}
+	if _, err := modulePath(t.TempDir()); err == nil {
+		t.Error("modulePath of a directory without go.mod: no error")
 	}
 }
