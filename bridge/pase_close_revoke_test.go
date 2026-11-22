@@ -38,7 +38,14 @@ func (p revokePeer) read(t *testing.T) []peerDatagram {
 // bridge has a route to, and a window attached to the bridge.
 func revokePASEDevice(t *testing.T) (dev *resumeDevice, w *CommissioningWindow, sid, peerSID uint16, peer revokePeer) {
 	t.Helper()
-	dev = startResumeDevice(t, newMemSubscriptionStore(), nil)
+	return revokePASEDeviceWith(t, nil)
+}
+
+// revokePASEDeviceWith is [revokePASEDevice] with configure run before the
+// device starts.
+func revokePASEDeviceWith(t *testing.T, configure func(*Bridge, *operational.Manager)) (dev *resumeDevice, w *CommissioningWindow, sid, peerSID uint16, peer revokePeer) {
+	t.Helper()
+	dev = startResumeDevice(t, newMemSubscriptionStore(), configure)
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
 		t.Fatal(err)

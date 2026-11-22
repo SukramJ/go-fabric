@@ -774,6 +774,16 @@ type Bridge struct {
 	// closing, and do not keep a new PASE exchange out
 	// ([Bridge.paseSessionExists]). Guarded by b.mu.
 	paseClosing map[uint16]struct{}
+	// paseDeferred holds the graceful close of each revoked PASE session
+	// that waits for the session to become idle
+	// ([Bridge.closePASESessionsOnRevoke]); paseDeferredN counts it for the
+	// receive path's fast check. Guarded by b.mu.
+	paseDeferred  map[uint16]*paseDeferredClose
+	paseDeferredN atomic.Int32
+	// sessionTurns counts the handler turns running per secure session
+	// ([Bridge.enterSessionTurn]). Guarded by sessionTurnsMu.
+	sessionTurnsMu sync.Mutex
+	sessionTurns   map[uint16]int
 	// advertiserClosed: [Bridge.Stop] withdrew the advertiser's records and
 	// closed it ([Bridge.closeAdvertiser]); a second Stop does not again.
 	// Guarded by b.mu.

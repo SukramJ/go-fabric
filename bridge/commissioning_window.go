@@ -221,7 +221,7 @@ type CommissioningWindow struct {
 	// paseSessionCloser (hostClose), which it calls after it told the
 	// sessions' peers with a CloseSession and before it closes them
 	// itself. Set by [Bridge.AttachCommissioningWindow].
-	sessionOwner func(hostClose func())
+	sessionOwner func(ctx context.Context, hostClose func())
 
 	// paseVerifierInstaller, when non-nil, installs a window-lifetime PASE
 	// acceptor from a commissioner-supplied PAKE verifier on the Enhanced
@@ -286,7 +286,7 @@ func (w *CommissioningWindow) SetPaseSessionCloser(c PaseSessionCloser) {
 
 // setSessionOwner wires (or clears, when nil) the bridge's own close of
 // its PASE sessions; see the sessionOwner field.
-func (w *CommissioningWindow) setSessionOwner(closePASE func(hostClose func())) {
+func (w *CommissioningWindow) setSessionOwner(closePASE func(ctx context.Context, hostClose func())) {
 	w.mu.Lock()
 	w.sessionOwner = closePASE
 	w.mu.Unlock()
@@ -859,32 +859,32 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	// at b25ed960 (revokeCommissioning, step 1: getPaseSession() →
 	// paseSession.initiateClose()).
 	//
-	// Revoked over the PASE session itself, the close waits for the
-	// command's response, as matter.js's paseSession.initiateClose defers
-	// the close until the session's exchanges end (NodeSession
-	// deferredClose): closing first left the RevokeCommissioning
-	// unanswered (TC-CADMIN-1.10 step 9).
-	//
-	// The bridge the window is attached to runs the host's closer: it
+	// The bridge the window is attached to closes each PASE session once
+	// it is idle, as matter.js's paseSession.initiateClose defers the close
+	// until the session's exchanges end (NodeSession deferredClose) —
+	// revoked over the PASE session itself, after the command's response
+	// is acknowledged (closing first left the RevokeCommissioning
+	// unanswered, TC-CADMIN-1.10 step 9) — and runs the host's closer: it
 	// tells the PASE sessions' peers with a CloseSession first, while the
 	// sessions are live, since a host's closer closes silently (the node
 	// facade's is CloseFabric(0)) — see [Bridge.closePASESessionsOnRevoke].
+	// A window without a bridge runs the host's closer alone, after the
+	// response when revoked over PASE.
 	w.mu.RLock()
 	closer := w.paseSessionCloser
 	owner := w.sessionOwner
 	w.mu.RUnlock()
-	if closer != nil || owner != nil {
-		hostClose := func() {
-			if closer != nil {
-				_ = closer.ClosePaseSessions(context.WithoutCancel(ctx))
-			}
+	hostClose := func() {
+		if closer != nil {
+			_ = closer.ClosePaseSessions(context.WithoutCancel(ctx))
 		}
-		closeNow := hostClose
-		if owner != nil {
-			closeNow = func() { owner(hostClose) }
-		}
-		if !im.IsPASEFromContext(ctx) || !im.DeferAfterResponse(ctx, closeNow) {
-			closeNow()
+	}
+	switch {
+	case owner != nil:
+		owner(ctx, hostClose)
+	case closer != nil:
+		if !im.IsPASEFromContext(ctx) || !im.DeferAfterResponse(ctx, hostClose) {
+			hostClose()
 		}
 	}
 

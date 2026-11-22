@@ -536,6 +536,9 @@ func (b *Bridge) sessionHoldsSubscription(sessionID uint16) bool {
 // matter.js ExchangeManager.ts:748-755 at b25ed960). Calling it for a session the
 // bridge never routed, or twice, is a no-op.
 func (b *Bridge) SessionClosed(sessionID uint16) {
+	// A revoked PASE session that closed another way than its deferred
+	// close ([Bridge.closePASESessionsOnRevoke]) has nothing left to close.
+	b.dropPASEClose(sessionID)
 	b.purgeSessionState(sessionID)
 	b.unbindSessionRoute(sessionID)
 	b.recordSessionsOpen()
