@@ -186,7 +186,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2844,
+    "line": 2847,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
@@ -206,7 +206,7 @@
   },
   {
     "file": "bridge/commissioning_window.go",
-    "line": 1154,
+    "line": 1152,
     "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:524",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "randomBytes",
@@ -340,7 +340,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2445,
+    "line": 2447,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -3085,7 +3085,7 @@
   },
   {
     "file": "node/commissioning.go",
-    "line": 674,
+    "line": 662,
     "citation": "packages/protocol/src/protocol/DeviceCommissioner.ts:236-256",
     "resolved": "packages/protocol/src/protocol/DeviceCommissioner.ts",
     "identifier": "commissioningConfig",
