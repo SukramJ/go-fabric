@@ -97,14 +97,47 @@ func (b *Bridge) sessionLive(sessionID uint16) bool {
 // node are those of every subscription on olderID. The session registry
 // established newerID as a session of the same subject, but the hook names
 // both by id outside its lock: an id freed and allocated again in between
-// would name another subject's session, and nothing moves onto it. A
-// session the bridge cannot resolve — closed, or no resolver wired — is
-// not judged here.
+// would name another subject's session, and nothing moves onto it.
+//
+// A newerID the session lookup still holds is judged: it takes nothing when
+// it is a PASE session, resolves to no fabric, or resolves to subject node
+// 0 — matter.js supersedes only with a CASE session of the same peer
+// (packages/protocol/src/session/SessionManager.ts:1242-1250 at b25ed960:
+// !newer.isPase && newer.peerIs(older.peerAddress)), and a PASE session
+// adopted onto a fabric by AddNOC keeps peer node 0. Only what the bridge
+// cannot judge passes: a newerID the lookup no longer holds (what moves
+// onto it is closed by [Bridge.SessionSuperseded]), a lookup without a
+// fabric resolver, and a subject resolver that is not wired.
 func (b *Bridge) supersedingSubjectMatches(m *subscription.Manager, olderID, newerID uint16) bool {
-	fabricIndex := b.resolveSessionFabric(newerID)
-	nodeID, _ := b.resolveSessionSubject(newerID)
-	if fabricIndex == 0 || fabricIndex == endpoint.FabricIndexUnresolvable || nodeID == 0 {
+	if !b.sessionLive(newerID) {
 		return true
+	}
+	if b.resolveSessionPASE(newerID) {
+		b.logSupersessionRefused(olderID, newerID, "pase")
+		return false
+	}
+	fabricIndex := b.resolveSessionFabric(newerID)
+	if fabricIndex == endpoint.FabricIndexUnresolvable {
+		return true
+	}
+	if fabricIndex == 0 {
+		b.logSupersessionRefused(olderID, newerID, "no_fabric")
+		return false
+	}
+	b.mu.RLock()
+	sessions := b.sessions
+	b.mu.RUnlock()
+	resolver, wired := sessions.(SessionSubjectResolver)
+	if !wired {
+		return true
+	}
+	nodeID, _, ok := resolver.SubjectFor(newerID)
+	if !ok {
+		return true
+	}
+	if nodeID == 0 {
+		b.logSupersessionRefused(olderID, newerID, "no_subject")
+		return false
 	}
 	for _, info := range m.Snapshot() {
 		if info.SessionID == olderID && (info.FabricIndex != fabricIndex || info.PeerNodeID != nodeID) {
@@ -118,6 +151,17 @@ func (b *Bridge) supersedingSubjectMatches(m *subscription.Manager, olderID, new
 		}
 	}
 	return true
+}
+
+// logSupersessionRefused records a supersession whose newer session
+// cannot take a subscription.
+func (b *Bridge) logSupersessionRefused(olderID, newerID uint16, reason string) {
+	if b.logger != nil {
+		b.logger.Warn("matter.subscribe.session_superseded.refused",
+			slog.Int("from_session_id", int(olderID)),
+			slog.Int("to_session_id", int(newerID)),
+			slog.String("reason", reason))
+	}
 }
 
 // supersededTarget is target re-pointed at newerID. The subject — fabric,
