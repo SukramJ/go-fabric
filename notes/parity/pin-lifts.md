@@ -181,13 +181,12 @@ invoke (-36, `BD-Matter-DoorLock-RefusedModifyKeepsExpiryTimer`). -33 is
 `BD-Matter-RelaxedEnum-HeldToWireWidth` (owner W5); -10 was stale (P4-B). No
 marker caught up.
 
-**Lift b25ed960 closed** (decision 505, by decision 287): every gap of the
-lift's delta is closed before the release. Carried past the lift, each with
-its reason in the findings register: F-b25ed960-32 (doc-only, nothing differs
-at the pin), -34 (a gap of matter.js's own, mirrored), -45, -48 and -C7 (test
-watches, no reproduction); and two low residuals of wave P6's own
-implementations, -58 (a pending CASE unit replaced under a re-used id keeps its
-claim) and -59 (the deferred PASE close's waits for its cap).
+**Lift b25ed960 closed** (decisions 505, 509, by decision 287): every gap of
+the lift's delta is closed before the release, and the wave left no residual
+of its own (F-b25ed960-58 fixed, -59 no gap, decisions 506, 507). Carried past
+the lift, each with its reason in the findings register: F-b25ed960-32
+(doc-only, nothing differs at the pin), -34 (a gap of matter.js's own,
+mirrored), -45, -48 and -C7 (test watches, no reproduction).
 
 ### Protocol, sessions, security
 
