@@ -203,9 +203,8 @@ func armRefusal(err error) bool {
 // ErrFabricChanged reports that the fabric associated with the peer's session has
 // changed — the cause an operational certificate update force-closes the
 // peer's sessions with (forgetSessions). A request pending on one of
-// them, or started on one before it closes, fails with an error that
-// matches it under errors.Is; the error's text carries the update's
-// reason. It is not transient: it does not match exchange.ErrTransient.
+// them fails with an error that matches it under errors.Is; the error's
+// text carries the update's reason. It is not transient: it does not match exchange.ErrTransient.
 // Mirrors matter.js FabricChangedError, which extends PeerCommunicationError,
 // not TransientPeerCommunicationError:
 // packages/protocol/src/peer/PeerCommunicationError.ts:105-112 at b25ed960 (FabricChangedError)

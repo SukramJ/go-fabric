@@ -271,7 +271,9 @@ func (w *PeerWakefulness) SetRequiresAwait(v bool) {
 // and recreates in-window without a not-live dip. Two calls would let a
 // recreate run between them and park on a peer it then sees asleep.
 // Observers get the events in matter.js's order: the flip's, the mode
-// change, then the activity's.
+// change, then the activity's. In Go they are delivered after both
+// changes, so an observer of the mode change already reads the activity
+// (Awake reports true for a peer flipped into LIT with active true).
 //
 // Mirrors matter.js, at b25ed960, requiresAwait then noteActive in one synchronous step:
 // packages/node/src/behavior/system/icd/IcdClient.ts:166-178 (#onOperatingModeChanged, LIT and online)
