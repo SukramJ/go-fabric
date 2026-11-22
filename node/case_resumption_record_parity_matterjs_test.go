@@ -293,3 +293,38 @@ func TestCASEResumeRecordReplacedOnlyOnceConfirmed(t *testing.T) {
 		}
 	})
 }
+
+// TestCASEPendingUnitReplacedUnderItsIDReleasesItsClaim (F-b25ed960-58): a
+// session installed establishing whose id is handed out again before its
+// handshake's completion — closed meanwhile, its id re-used — leaves its
+// pending unit to the newer one under that id. The replaced unit ends as a
+// failed or closed handshake ends ([caseEstablishment.complete]): its
+// presented id goes back, its record's secret copy is cleared, nothing is
+// saved. The re-used id is constructed directly (no wrap of the id space).
+func TestCASEPendingUnitReplacedUnderItsIDReleasesItsClaim(t *testing.T) {
+	t.Parallel()
+	r := newRecordRig(t)
+	_, est := r.adapter(t)
+	presented := bytes.Repeat([]byte{0x5a}, 16)
+	if !r.fx.ids.claims.claim(presented) {
+		t.Fatal("the presented id is claimed already")
+	}
+	secret := bytes.Repeat([]byte{0x33}, 32)
+	older := &pendingCASE{
+		entry:     &operational.Entry{SessionID: 0x2001},
+		rec:       store.ResumptionRecord{FabricIndex: 1, PeerNodeID: r.fx.peer.NodeID, ResumptionID: bytes.Repeat([]byte{0x11}, 16), SharedSecret: secret},
+		hasRec:    true,
+		presented: presented,
+	}
+	est.put(older)
+	est.put(&pendingCASE{entry: &operational.Entry{SessionID: 0x2001}})
+	if !r.fx.ids.claims.claim(presented) {
+		t.Fatal("the replaced unit's presented id is still claimed")
+	}
+	if !bytes.Equal(secret, make([]byte, 32)) {
+		t.Fatal("the replaced unit's secret copy was not cleared")
+	}
+	if _, ok := r.record(t); ok {
+		t.Fatal("a record was saved for the replaced unit")
+	}
+}
