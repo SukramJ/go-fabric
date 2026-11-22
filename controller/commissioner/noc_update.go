@@ -200,7 +200,7 @@ func armRefusal(err error) bool {
 	return errors.As(err, &e) && (e.kind == ErrCertificateUpdateBusy || e.kind == ErrCertificateUpdateRefused) //nolint:errorlint // the identity of the kind
 }
 
-// ErrFabricChanged: the fabric associated with the peer's session has
+// ErrFabricChanged reports that the fabric associated with the peer's session has
 // changed — the cause an operational certificate update force-closes the
 // peer's sessions with (forgetSessions). A request pending on one of
 // them, or started on one before it closes, fails with an error that
