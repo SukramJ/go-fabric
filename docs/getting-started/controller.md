@@ -937,8 +937,8 @@ goroutine of the manager's that holds none of its locks, so `fn` may call
 back into the manager. The returned function unsubscribes and is
 idempotent. The `OTAConfig.OnUpdate…` callbacks remain.
 
-The queue follows matter.js's phases: an update is queued, announcing, in
-progress or failed. An announcement the node does not answer is aborted
+The queue follows matter.js's phases: an update is queued, announcing,
+announced or in progress; a failed update stays queued. An announcement the node does not answer is aborted
 after 15 minutes, and a failed one is retried by the queue run every five
 minutes. A failed update keeps its consent and its queue entry for 24
 hours and is not announced again; `QueuedUpdates` does not list it, and

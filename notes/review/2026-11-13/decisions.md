@@ -778,7 +778,7 @@ Fable post-reads `p5/fable-post-{a,b,c,s}.md`.
 
 | # | Subject | Decision |
 | --- | --- | --- |
-| 453 | Owner (W1, wizard): where the NOC rotation sits on the public surface | **`(*client.Registry).UpdateOperationalCertificate`** beside `Commission` and `Decommission`, under the fabric-operation lock with the kind "certificate update" — matter.js's cut of its three fabric operations (`Peers.ts:76` at `b25ed960`) |
+| 453 | Owner (W1, wizard): where the NOC rotation sits on the public surface | **`(*client.Registry).UpdateOperationalCertificate`** beside `Commission` and `Decommission`, under the fabric-operation lock with the kind "certificate update" — matter.js's cut of its three fabric operations (`Peers.ts:80` at `b25ed960`) |
 | 454 | Owner (W2, wizard): how a caller learns what the node holds after a failed rotation | **One typed error**, `commissioner.CertificateUpdateError` with `Outcome` (previous kept, reverted, new in place, unknown) and `FabricIndexOnPeer`, `errors.Is` for `ErrCertificateUpdateBusy` and `ErrCertificateUpdateRefused`; an *Ahead of matter.js* register row (`BD-Matter-CertificateUpdate-TypedOutcome`) |
 | 455 | Owner (wizard): the cut of the wave | **A ‖ B ‖ C in one wave, then S, then REG**; C dropped first, then B to a P5b, if the budget or the disk tightens (neither happened) |
 | 456 | Owner (W3, wizard): the `ctx` of `UpdateOperationalCertificate` | **As matter.js's abort**: it gates the CASE waits and the recovery decision; the invokes, reads and the disarm run under `context.WithoutCancel` with their response timeouts (`OperationalCertificateUpdate.ts:136-137`, `:302-304`, `:347` at `b25ed960`) |
