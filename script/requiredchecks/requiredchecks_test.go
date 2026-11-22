@@ -138,11 +138,6 @@ var notRequired = []decision{
 			"runs of one required name is unverified (review II, phase 0, W6 §4.1).",
 	},
 	{
-		"pages.yml", "deploy", advisory,
-		"does not run on a pull request: its condition is `github.event_name != 'pull_request' && github.ref == " +
-			"'refs/heads/main'` (pages.yml).",
-	},
-	{
 		"dependabot-auto-merge.yml", "auto-merge", unrecorded,
 		"no recorded reason. The workflow starts on pull_request_target; its header records what the job does (it " +
 			"queues Dependabot's minor and patch pull requests for auto-merge), not a decision about the required list.",
