@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10283,
+  "entry_points": 10284,
   "initializers": 369,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28024,
+    "total_exported": 28025,
     "reachable": 20958,
-    "whitelisted": 7044,
+    "whitelisted": 7045,
     "unreachable": 22
   },
   "by_package": [
@@ -7055,6 +7055,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_deferred_close_test.go",
       "line": 308
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRevokeLeavesAForceClosingPASESessionAlone",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_deferred_close_test.go",
+      "line": 391
     },
     {
       "package": "bridge",
