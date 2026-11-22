@@ -575,9 +575,13 @@ func atomicAttributeName(attr uint32) string {
 // it removes a built-in or the active preset (#validatePresetCommit
 // :2032-2080, which matter.js runs in presets$AtomicChanged, :1983-1985);
 // Schedules held to the attribute's schema and validated again against
-// the stored schedules and the peer's pending Presets, here the Presets
-// staged in the same unit (schedules$AtomicChanging, :2581-2591; the
-// presets getter, :3196-3222). st is the unit's state.
+// the stored schedules and the peer's pending Presets (schedules$AtomicChanging,
+// :2581-2591; the presets getter, :3196-3222), which are the Presets staged
+// in st: a peer holds at most one atomic write on the cluster
+// (AtomicWriteHandler.ts:178-185 at b25ed960, in beginWrite),
+// so the pending value matter.js's getter finds for it
+// (pendingValueForAttributeAndPeer, :433-458) is this unit's. st is the
+// unit's state.
 func (s *ThermostatServer) precommitAtomic(st *atomicWriteState, attr uint32, v any) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
