@@ -260,9 +260,38 @@ func (w *PeerWakefulness) RequiresAwait() bool {
 // emits the operating-mode change. Mirrors IcdPeerWakefulness.ts:123-138.
 func (w *PeerWakefulness) SetRequiresAwait(v bool) {
 	w.mu.Lock()
+	w.deliver(w.setRequiresAwaitLocked(v))
+}
+
+// SetOperatingMode is SetRequiresAwait followed, when active is true, by
+// NoteActive — as one step: a consumer woken by ModeSignal finds the
+// activity already recorded. A live flip into LIT is proof the peer is
+// awake, and matter.js sets requiresAwait and notes the peer active with no
+// await between, so its sustained subscription re-checks awake after both
+// and recreates in-window without a not-live dip. Two calls would let a
+// recreate run between them and park on a peer it then sees asleep.
+// Observers get the events in matter.js's order: the flip's, the mode
+// change, then the activity's.
+//
+// Mirrors matter.js, at b25ed960, requiresAwait then noteActive in one synchronous step:
+// packages/node/src/behavior/system/icd/IcdClient.ts:166-178 (#onOperatingModeChanged, LIT and online)
+// packages/node/src/behavior/system/icd/IcdClient.ts:784-788 (#feedFabricIcd, on seed)
+func (w *PeerWakefulness) SetOperatingMode(requiresAwait, active bool) {
+	w.mu.Lock()
+	evs := w.setRequiresAwaitLocked(requiresAwait)
+	if active {
+		w.schedule.NoteActive(w.now())
+		evs = append(evs, w.refreshLocked(true)...)
+	}
+	w.deliver(evs)
+}
+
+// setRequiresAwaitLocked is SetRequiresAwait's change under w.mu; it
+// returns the events to deliver, none for a no-op set
+// (IcdPeerWakefulness.ts:124-126).
+func (w *PeerWakefulness) setRequiresAwaitLocked(v bool) []event {
 	if v == w.requiresAwait {
-		w.mu.Unlock()
-		return
+		return nil
 	}
 	w.requiresAwait = v
 	var evs []event
@@ -274,8 +303,7 @@ func (w *PeerWakefulness) SetRequiresAwait(v bool) {
 	}
 	close(w.modeEdge)
 	w.modeEdge = make(chan struct{})
-	evs = append(evs, event{kind: 2, value: v})
-	w.deliver(evs)
+	return append(evs, event{kind: 2, value: v})
 }
 
 // SetTimings replaces the peer's timings (IcdPeerWakefulness.ts:141-144).

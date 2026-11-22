@@ -570,8 +570,7 @@ func TestSustainedSubscriptionICD(t *testing.T) {
 				w := sitWakefulness(r.fake)
 				r.start(fixed(w), nil)
 				r.wantAttempts(1)
-				w.SetRequiresAwait(true)
-				w.NoteActive()
+				w.SetOperatingMode(true, true)
 				r.wantAttempts(2)
 				r.lose()
 				r.wantAttempts(3)
@@ -589,8 +588,9 @@ func TestSustainedSubscriptionICD(t *testing.T) {
 				r.wantAttempts(1)
 				r.wantActive(true)
 				r.resetEmissions()
-				w.SetRequiresAwait(true)
-				w.NoteActive()
+				// IcdClient's order as one step (F-b25ed960-C6): the flip and
+				// the activity, with no recreate between them.
+				w.SetOperatingMode(true, true)
 				r.wantAttempts(2)
 				if got := r.networks(); !got[1] || !r.sub.Active() || r.dips() {
 					t.Fatalf("priority %v active %v dips %v", got, r.sub.Active(), r.dips())
