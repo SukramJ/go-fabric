@@ -1,3 +1,4 @@
+// Deprecated: moved to thingfabric.dev/go-fabric/wifi/wpasupplicant; v0.24.1 is the last version under this path.
 module github.com/SukramJ/go-fabric/wifi/wpasupplicant
 
 go 1.27.4
