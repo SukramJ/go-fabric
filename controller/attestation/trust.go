@@ -72,8 +72,8 @@ func Trust(mode TrustMode, snapshot, online PAAStore) PAAStore {
 
 // Layered is a [PAAStore] over several: a root or CD signer is the first
 // layer's that has it; test certificates are accepted when a layer
-// accepts them. It is [Revocations] through the first layer that is one —
-// a layer that is none (a snapshot, a static store) never answers a
+// accepts them. It is [Revocations] through every layer that is one — a
+// layer that is none (a snapshot, a static store) never answers a
 // revocation question, so a root found in it is still checked against the
 // online store's CRLs.
 type Layered []PAAStore
@@ -113,13 +113,26 @@ func (l Layered) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 	return nil, false
 }
 
-// IsRevoked implements [Revocations]: the first layer that is
-// [Revocations] answers; without one nothing is revoked.
+// IsRevoked implements [Revocations]: every layer that is [Revocations]
+// is asked — a nested Layered included, whether or not it holds a revoker
+// itself. The certificate is revoked when any layer says so; otherwise a
+// lookup that failed in any layer is the answer (the first such error), so
+// a composition never turns a failed or unasked revocation check into
+// "not revoked". Without a revoking layer nothing is revoked.
 func (l Layered) IsRevoked(akid, serial []byte, issuerDN string) (bool, error) {
+	var firstErr error
 	for _, s := range l {
-		if r, ok := s.(Revocations); ok {
-			return r.IsRevoked(akid, serial, issuerDN)
+		r, ok := s.(Revocations)
+		if !ok {
+			continue
+		}
+		revoked, err := r.IsRevoked(akid, serial, issuerDN)
+		if revoked {
+			return true, nil
+		}
+		if err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
-	return false, nil
+	return false, firstErr
 }
