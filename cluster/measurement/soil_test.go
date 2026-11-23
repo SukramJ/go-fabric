@@ -148,3 +148,29 @@ func TestSoilMoistureMaterializes(t *testing.T) {
 		t.Errorf("a source without limits materialised %v", got)
 	}
 }
+
+// TestSoilMaterializedReadKeepsNoPreviousReading pins the contract the
+// server's doc states (R2-C2-store-1453): the materialiser builds a new
+// server per call, so a reading outside the limits reads null through a
+// fresh materialisation, while one kept instance answers the previous
+// reading inside them.
+func TestSoilMaterializedReadKeepsNoPreviousReading(t *testing.T) {
+	t.Parallel()
+	m := builtinMaterializers[contract.MeasurementSoilMoisture]
+	src := &soilStub{value: 40, observed: true, limits: demoSoilLimits()}
+	kept := m(src, contract.MeasurementContext{EndpointID: 3})[0]
+	read := func(srv contract.ClusterServer) any {
+		v, _ := srv.MatterRead(soildef.AttrSoilMoistureMeasuredValue)
+		return v
+	}
+	if v := read(kept); v != uint8(40) {
+		t.Fatalf("in limits: %v, want 40", v)
+	}
+	src.value = 95
+	if v := read(m(src, contract.MeasurementContext{EndpointID: 3})[0]); v != nil {
+		t.Errorf("out of limits through a fresh materialisation: %v, want null", v)
+	}
+	if v := read(kept); v != uint8(40) {
+		t.Errorf("out of limits through the kept instance: %v, want 40", v)
+	}
+}
