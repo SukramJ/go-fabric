@@ -64,7 +64,7 @@ type FabricConfig struct {
 	// (Fabric.ts:50-76 keeps #keyPair).
 	OperationalSigner crypto.Signer
 	// Logger receives the fabric's load warnings — a stored label cut to
-	// [MaxLabelLength] bytes; nil discards them, as [Config.Logger] and
+	// [MaxLabelLength] bytes, a failed save of the cut; nil discards them, as [Config.Logger] and
 	// [NewFabricAuthority]. In [FabricAuthority.DefaultFabric] nil is the
 	// authority's logger.
 	Logger *slog.Logger
@@ -143,12 +143,16 @@ func validLabel(label string) error {
 // discards it), as
 // cluster/core BasicInformation.RestoreNodeLabel cuts a stored NodeLabel
 // (cluster/core/basic_information.go:969, shortenStored :990, the cut
-// truncateUTF8 in cluster/core/utf8.go). The cut stays in memory; the
-// next save of the record (a re-save at load, a NOC rotation, SetLabel)
-// stores it (go-fabric #587, decision 557).
-func storedLabel(label string, log *slog.Logger) string {
+// truncateUTF8 in cluster/core/utf8.go) (go-fabric #587, decision 557).
+// shortened reports whether it was cut; loadFabric then saves the
+// record once with the cut label (saveCutLabel, decision 597).
+//
+// Mirrors matter.js packages/protocol/src/fabric/FabricManager.ts:39-48
+// (shortenStoredLabel): the stored label truncated to
+// Fabric.MAX_LABEL_BYTES in UTF-8 and the cut warned naming both values.
+func storedLabel(label string, log *slog.Logger) (_ string, shortened bool) {
 	if len(label) <= MaxLabelLength {
-		return label
+		return label, false
 	}
 	cut := MaxLabelLength
 	for cut > 0 && !utf8.RuneStart(label[cut]) {
@@ -159,7 +163,27 @@ func storedLabel(label string, log *slog.Logger) string {
 	}
 	log.Warn("matter.controller.fabric.stored_label_shortened",
 		slog.Int("max_bytes", MaxLabelLength), slog.String("stored", label), slog.String("label", label[:cut]))
-	return label[:cut]
+	return label[:cut], true
+}
+
+// saveCutLabel saves the stored record rec with its label replaced by the
+// cut one, every other field as stored, so the next load neither cuts nor
+// warns again (R4-par-4403, decision 597). A failed save is warned
+// through log (nil discards it) and the load goes on with the cut label;
+// the record keeps the stored label, cut again at the next load.
+//
+// Mirrors matter.js packages/protocol/src/fabric/FabricManager.ts:93-101:
+// the shortened configs are written back at once when any changed, and a
+// failed write is warned — "they are shortened again at the next start".
+func saveCutLabel(store ca.FabricStore, rec ca.FabricRecord, label string, log *slog.Logger) {
+	rec.Label = label
+	if err := store.SaveFabric(rec); err != nil {
+		if log == nil {
+			log = slog.New(slog.DiscardHandler)
+		}
+		log.Warn("matter.controller.fabric.stored_label_save_failed",
+			slog.String("label", label), slog.String("error", err.Error()))
+	}
 }
 
 // CurrentLabel is the fabric's label: the one it was built with, or the
@@ -212,8 +236,10 @@ func (f *Fabric) SetLabel(label string) error {
 //
 // A stored label longer than [MaxLabelLength] bytes is not refused: the
 // load cuts it to the bound between two characters and warns through
-// cfg.Logger (nil discards the warning); the cut is stored with the record's
-// next save. cfg.Label itself is still [ErrLabel] when longer.
+// cfg.Logger (nil discards the warning), and the record is saved once with
+// the cut label; a failed save is warned and the load goes on, the cut
+// repeated at the next load. cfg.Label itself is still [ErrLabel] when
+// longer.
 func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 	f, err := newFabric(c, cfg)
 	if err != nil {
@@ -306,7 +332,10 @@ func newFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 // matter.js FabricManager's construction (FabricManager.ts:66-69,
 // Fabric.create over each stored Fabric.Config), for the one fabric a
 // controller owns. A stored label over [MaxLabelLength] bytes is cut
-// (storedLabel), warned through cfg.Logger.
+// (storedLabel), warned through cfg.Logger, and the record saved once
+// with the cut label after the fabric is built: by the save a path does
+// anyway (a minted identity, a signer record re-saved), else by
+// saveCutLabel (decision 597).
 func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error) {
 	if cfg.FabricID != 0 && cfg.FabricID != rec.FabricID {
 		return nil, fmt.Errorf("%w: fabric id 0x%016X, stored 0x%016X", ErrFabricMismatch, cfg.FabricID, rec.FabricID)
@@ -320,7 +349,9 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 	if rec.FabricID == 0 || !isOperationalNodeID(rec.RootNodeID) || len(rec.IPK) != 16 {
 		return nil, fmt.Errorf("%w: stored record is incomplete", ErrFabricMismatch)
 	}
-	rec.Label = storedLabel(rec.Label, cfg.Logger)
+	stored := rec
+	var cut bool
+	rec.Label, cut = storedLabel(rec.Label, cfg.Logger)
 	if rec.FabricIndex == 0 {
 		rec.FabricIndex = 1
 	}
@@ -335,7 +366,11 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 		return nil, fmt.Errorf("%w: %w: the stored fabric holds its operational key pair or its NOC without the other", ErrFabricMismatch, ca.ErrConfig)
 	}
 	if cfg.OperationalSigner != nil {
-		return loadSignerFabric(c, cfg, rec)
+		f, saved, err := loadSignerFabric(c, cfg, rec)
+		if err == nil && cut && !saved {
+			saveCutLabel(cfg.Store, stored, rec.Label, cfg.Logger)
+		}
+		return f, err
 	}
 	if rec.KeyRef != "" && (rec.KeyPair == nil || len(rec.KeyPair.PrivateKey) == 0) {
 		return nil, fmt.Errorf("%w: the operational key %q is not configured (FabricConfig.OperationalSigner)", ErrFabricMismatch, rec.KeyRef)
@@ -361,7 +396,14 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 	if err := checkStoredNOC(c, rec, &key.PublicKey); err != nil {
 		return nil, err
 	}
-	return buildFabric(c, cfg, rec.IPK, key, rec.NOC)
+	f, err := buildFabric(c, cfg, rec.IPK, key, rec.NOC)
+	if err != nil {
+		return nil, err
+	}
+	if cut {
+		saveCutLabel(cfg.Store, stored, rec.Label, cfg.Logger)
+	}
+	return f, nil
 }
 
 // checkStoredNOC holds a stored NOC to the record it is stored in: it
@@ -397,49 +439,51 @@ func checkStoredNOC(c *ca.CA, rec ca.FabricRecord, key *ecdsa.PublicKey) error {
 // the signer is held to the stored certificate as the CA holds its
 // signers (ca.Config.RootSigner). A record without a NOC gets one minted
 // under the stored ids; a record that still holds the private key the
-// signer now keeps is saved again without it.
-func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error) {
+// signer now keeps is saved again without it. saved reports whether the
+// record was saved.
+func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (_ *Fabric, saved bool, _ error) {
 	pub, err := ca.P256PublicKey(cfg.OperationalSigner)
 	if err != nil {
-		return nil, fmt.Errorf("commissioner: operational signer: %w", err)
+		return nil, false, fmt.Errorf("commissioner: operational signer: %w", err)
 	}
 	store := cfg.Store
 	keep := false
 	if len(rec.NOC) > 0 {
 		noc, err := mattercert.Decode(rec.NOC)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %w: the stored NOC: %w", ErrFabricMismatch, ca.ErrConfig, err)
+			return nil, false, fmt.Errorf("%w: %w: the stored NOC: %w", ErrFabricMismatch, ca.ErrConfig, err)
 		}
 		if !bytes.Equal(noc.PublicKey, pub) {
-			return nil, fmt.Errorf("%w: %w: the operational signer's key is not the stored NOC's", ErrFabricMismatch, ca.ErrConfig)
+			return nil, false, fmt.Errorf("%w: %w: the operational signer's key is not the stored NOC's", ErrFabricMismatch, ca.ErrConfig)
 		}
 		// The key path's rule holds the signer path too (R2-C2-store-1801):
 		// the NOC verifies under the CA and names the record's node and
 		// fabric, or the record is refused and left as it is.
 		signerKey, _ := cfg.OperationalSigner.Public().(*ecdsa.PublicKey) // P-256 ECDSA: ca.P256PublicKey above
 		if err := checkStoredNOC(c, rec, signerKey); err != nil {
-			return nil, fmt.Errorf("%w: %w", ca.ErrConfig, err)
+			return nil, false, fmt.Errorf("%w: %w", ca.ErrConfig, err)
 		}
 		keep = true
 	}
 	var f *Fabric
 	if keep {
 		if f, err = buildFabric(c, cfg, rec.IPK, nil, rec.NOC); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	} else {
 		cfg.IPK = rec.IPK
 		cfg.Store = nil
 		if f, err = newFabric(c, cfg); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if fresh := fabricRecord(f, c); !keep || rec.KeyRef != fresh.KeyRef || (rec.KeyPair != nil && len(rec.KeyPair.PrivateKey) > 0) {
 		if err := store.SaveFabric(fresh); err != nil {
-			return nil, fmt.Errorf("commissioner: save fabric: %w", err)
+			return nil, false, fmt.Errorf("commissioner: save fabric: %w", err)
 		}
+		return f, true, nil
 	}
-	return f, nil
+	return f, false, nil
 }
 
 // fabricRecord is the record of f, its key and NOC included — the public
