@@ -126,9 +126,11 @@ const maxRaceAttempts = 16
 // starts in a free place, or ends the oldest unanswered attempt and takes
 // its place, so a device found behind any number of candidates still
 // starts within raceStaggerCeiling while a place holds an unanswered
-// attempt. Only when no place can be given — every place holds an
-// answered attempt or one already ending for an earlier candidate — does
-// it leave the queue unattempted. Each waiting candidate holds an entry
+// attempt not already ending for an earlier candidate; a sender announcing
+// faster than ended attempts return can still have it dropped. Only when
+// no place can be given — every place holds an answered attempt or one
+// already ending for an earlier candidate — does it leave the queue
+// unattempted. Each waiting candidate holds an entry
 // and a goroutine until the race is decided, so a sender announcing
 // ever-new matching instances would otherwise grow both for the race's
 // length; the queue holds at most maxRaceWaiting + maxRaceAttempts. This

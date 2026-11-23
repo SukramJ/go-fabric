@@ -381,11 +381,13 @@ func TestRace_WaitingCandidatesAreBounded(t *testing.T) {
 
 // TestRace_DeviceFoundBehindAStreamOfCandidatesStartsWithinItsCeiling:
 // a device found while every place holds an attempt without an answer
-// starts within RaceStaggerCeiling of being found however fast further
+// starts within RaceStaggerCeiling of being found while further
 // candidates arrive after it — the overflow of the waiting candidates
-// makes the one found longest ago take a place at once, never drops it
-// while a place holds an unanswered attempt (review II, R3-bound-3501,
-// owner decisions 55 and 552).
+// makes the one found longest ago take a place at once, and does not drop
+// it while a place holds an unanswered attempt not already ending for an
+// earlier candidate; a sender announcing faster than ended attempts
+// return can still have it dropped, which this test does not cover
+// (review II, R3-bound-3501, owner decisions 55 and 552).
 func TestRace_DeviceFoundBehindAStreamOfCandidatesStartsWithinItsCeiling(t *testing.T) {
 	t.Parallel()
 	for _, every := range []time.Duration{100 * time.Millisecond, 500 * time.Millisecond, 900 * time.Millisecond} {
