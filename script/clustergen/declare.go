@@ -77,6 +77,18 @@ type portSet struct {
 	// imports are the packages the ports name beyond the generated ones
 	// (a store's record type).
 	imports []string
+	// options are the settings of the kit's server a declaration carries
+	// beside its ports, a Declare field each after the ports'.
+	options []kitOption
+}
+
+// kitOption is one setting of the kit's server a declaration carries: a
+// plain Declare field the device layer passes into the server's
+// configuration, its zero value the server's default.
+type kitOption struct {
+	name string   // the Declare field
+	typ  string   // its Go type
+	doc  []string // its doc
 }
 
 // modeChanger is the port of every ModeBase derivation that accepts
@@ -517,6 +529,12 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 			w.p("\t// %s is the host port the kit's server runs on ([%s]).", p.fieldName(), p.name)
 		}
 		w.p("\t%s %s", p.fieldName(), p.name)
+	}
+	for _, o := range ps.options {
+		for _, line := range o.doc {
+			w.p("\t// %s", line)
+		}
+		w.p("\t%s %s", o.name, o.typ)
 	}
 	w.p("\t// HostServer is the host's own server for the cluster, mounted in")
 	w.p("\t// place of the kit's — also for a cluster the device type does not")

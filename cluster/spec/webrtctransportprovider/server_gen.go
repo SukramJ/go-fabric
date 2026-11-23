@@ -251,8 +251,9 @@ type OfferArgs struct {
 // not stored and the command answers FAILURE; the port has then
 // started a session the server does not list, and ends it itself.
 // The server bounds sessions by the
-// id space alone; a per-fabric or total bound is the port's
-// (RESOURCE_EXHAUSTED), and so is ending a session whose requestor
+// id space and by Declare's MaxSessions and MaxSessionsPerFabric;
+// a further bound is the port's (RESOURCE_EXHAUSTED), and so is
+// ending a session whose requestor
 // is gone: the server ends sessions on EndSession, on the host's
 // RemoveSession and with their fabric, not when a CASE session
 // closes. The host counts the streams a session uses (the
@@ -309,6 +310,32 @@ type Declare struct {
 	HandleEndSession func(ctx context.Context, req EndSessionRequest) (struct{}, error)
 	// ProviderPort is the host port the kit's server runs on ([ProviderPort]).
 	ProviderPort ProviderPort
+	// MaxSessions bounds the kit server's sessions, every
+	// CurrentSessions entry counted, the host's included
+	// (cluster/camera ProviderConfig.MaxSessions; connectedhomeip's
+	// camera app holds kMaxConcurrentWebRTCSessions, 5,
+	// webrtc-provider-manager.cpp:39 at 6170af84). A new session over it
+	// is refused before a session id is taken and the port is asked:
+	// ProvideOffer answers RESOURCE_EXHAUSTED; SolicitOffer is answered
+	// with a session id and DeferredOffer false, the session is not
+	// entered in CurrentSessions, and the requestor is then sent End
+	// with OutOfResources. That End has no deadline of its own — the
+	// PeerConnector's response timeouts bound it — and the Ends wait
+	// behind one sender in a queue of at most the bound: while it is
+	// full, or without a PeerConnector, an over-bound SolicitOffer
+	// answers RESOURCE_EXHAUSTED instead; at worst a send that never
+	// returns holds the sender, and every later over-bound SolicitOffer
+	// answers RESOURCE_EXHAUSTED. 0 is no bound; a negative bound is
+	// refused when the device builds the kit's server.
+	MaxSessions int
+	// MaxSessionsPerFabric bounds the sessions of the accessing fabric,
+	// counted over that fabric's CurrentSessions entries, the host's
+	// included, and refused as MaxSessions is (cluster/camera
+	// ProviderConfig.MaxSessionsPerFabric): this module's own bound, so
+	// one fabric cannot take every session of the camera. 0 is no
+	// bound; a negative bound is refused when the device builds the
+	// kit's server.
+	MaxSessionsPerFabric int
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features and the ports are

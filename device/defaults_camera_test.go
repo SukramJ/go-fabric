@@ -5,9 +5,11 @@ package device
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"thingfabric.dev/go-fabric/cluster/camera"
+	"thingfabric.dev/go-fabric/cluster/spec"
 	avdef "thingfabric.dev/go-fabric/cluster/spec/cameraavsettingsuserlevelmanagement"
 	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
@@ -15,6 +17,7 @@ import (
 	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
 	zmdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
+	"thingfabric.dev/go-fabric/im"
 )
 
 type fakeChime struct{}
@@ -176,5 +179,98 @@ func cameraCases() []struct {
 		{padef.ClusterID, func() (*Device, error) {
 			return newWith(CameraType(), testOptions("push"), padef.Declare{PushTransportPort: fakePush{}})
 		}, (*camera.PushTransport)(nil)},
+	}
+}
+
+// boundStreams is a camera's four stream ports for the session-bound
+// test.
+type boundStreams struct{ fakeAudio }
+
+func (boundStreams) VideoStreamAllocate(context.Context, csdef.VideoStreamStruct) (uint16, error) {
+	return 1, nil
+}
+
+func (boundStreams) VideoStreamAllocated(context.Context, csdef.VideoStreamStruct, csdef.StreamAllocationAction) {
+}
+func (boundStreams) VideoStreamModify(context.Context, uint16, *bool, *bool) error { return nil }
+func (boundStreams) VideoStreamDeallocate(context.Context, uint16) error           { return nil }
+func (boundStreams) SnapshotStreamAllocate(context.Context, csdef.SnapshotStreamStruct) (uint16, error) {
+	return 1, nil
+}
+func (boundStreams) SnapshotStreamModify(context.Context, uint16, *bool, *bool) error { return nil }
+func (boundStreams) SnapshotStreamDeallocate(context.Context, uint16) error           { return nil }
+func (boundStreams) CaptureSnapshot(context.Context, *uint16, csdef.VideoResolutionStruct) (csdef.CaptureSnapshotResponse, error) {
+	return csdef.CaptureSnapshotResponse{}, nil
+}
+
+// boundProvider is a ProviderPort that returns the session it is offered.
+type boundProvider struct{ fakeProvider }
+
+func (boundProvider) ProvideOffer(_ context.Context, a wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
+	return wpdef.WebRTCSessionStruct{
+		Id: a.SessionID, PeerNodeId: a.PeerNodeID, PeerEndpointId: a.OriginatingEndpointID,
+		StreamUsage: a.StreamUsage, FabricIndex: a.FabricIndex, VideoStreams: a.VideoStreams,
+	}, nil
+}
+
+// TestProviderSessionBoundsThroughTheFacade (issue #590, decision 619):
+// wpdef.Declare's MaxSessions and MaxSessionsPerFabric reach the kit's
+// WebRtcTransportProvider — a device declared with a bound of one refuses
+// the second ProvideOffer with RESOURCE_EXHAUSTED — and a negative bound
+// is refused when the device is built. Before the fields, the facade
+// built every provider unbounded.
+func TestProviderSessionBoundsThroughTheFacade(t *testing.T) {
+	t.Parallel()
+	usages := []csdef.StreamUsageEnum{csdef.StreamUsageLiveView}
+	res := csdef.VideoResolutionStruct{Width: 640, Height: 480}
+	videos := []csdef.VideoStreamStruct{{
+		VideoStreamId: 1, StreamUsage: csdef.StreamUsageLiveView, VideoCodec: csdef.VideoCodecH264,
+		MinFrameRate: 30, MaxFrameRate: 30, MinResolution: res, MaxResolution: res,
+		MinBitRate: 10000, MaxBitRate: 10000, KeyFrameInterval: 4000,
+	}}
+	streams := func() csdef.Declare {
+		return csdef.Declare{
+			Initial:         csdef.Patch{SupportedStreamUsages: &usages, StreamUsagePriorities: &usages, AllocatedVideoStreams: &videos},
+			VideoStreamPort: boundStreams{}, AudioStreamPort: boundStreams{}, SnapshotStreamPort: boundStreams{}, SnapshotCapturePort: boundStreams{},
+		}
+	}
+	ctx := im.WithSubject(im.WithFabricFilter(context.Background(), false, 1), 0x77, nil)
+	offer := func(p *camera.Provider) error {
+		u, ep, null := wpdef.StreamUsageLiveView, uint16(1), spec.NullOf[uint16]()
+		_, err := p.MatterInvoke(ctx, wpdef.CmdProvideOffer, wpdef.ProvideOfferRequest{
+			WebRtcSessionId: spec.NullOf[uint16](), Sdp: "v=0", StreamUsage: &u, OriginatingEndpointId: &ep, VideoStreamId: &null,
+		})
+		return err
+	}
+	for _, tc := range []struct {
+		name string
+		decl wpdef.Declare
+	}{
+		{"MaxSessions", wpdef.Declare{ProviderPort: boundProvider{}, MaxSessions: 1}},
+		{"MaxSessionsPerFabric", wpdef.Declare{ProviderPort: boundProvider{}, MaxSessionsPerFabric: 1}},
+	} {
+		d, err := newWith(CameraType(), testOptions("bounded-"+tc.name), streams(), tc.decl)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		p, ok := d.Server(wpdef.ClusterID).(*camera.Provider)
+		if !ok {
+			t.Fatalf("%s: WebRtcTransportProvider is %T", tc.name, d.Server(wpdef.ClusterID))
+		}
+		if err := offer(p); err != nil {
+			t.Fatalf("%s: the first ProvideOffer: %v", tc.name, err)
+		}
+		var sc im.StatusCodeError
+		if err := offer(p); !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusResourceExhausted {
+			t.Fatalf("%s: the second ProvideOffer = %v, want RESOURCE_EXHAUSTED", tc.name, err)
+		}
+	}
+	for _, decl := range []wpdef.Declare{
+		{ProviderPort: boundProvider{}, MaxSessions: -1},
+		{ProviderPort: boundProvider{}, MaxSessionsPerFabric: -1},
+	} {
+		if _, err := newWith(CameraType(), testOptions("negative"), streams(), decl); !errors.Is(err, camera.ErrNegativeMaxSessions) {
+			t.Fatalf("%+v: %v, want ErrNegativeMaxSessions", decl, err)
+		}
 	}
 }

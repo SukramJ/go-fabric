@@ -140,13 +140,15 @@ func newZonesServer(b defaultBuild) (contract.ClusterServer, error) {
 
 // newProviderServer is the module's WebRtcTransportProvider server
 // ([camera.NewProvider]) on the declared ProviderPort, against the
-// device's CameraAvStreamManagement server.
+// device's CameraAvStreamManagement server, with the declared session
+// bounds (issue #590, decision 619); a negative bound is the server's
+// [camera.ErrNegativeMaxSessions] and fails the build.
 func newProviderServer(b defaultBuild) (contract.ClusterServer, error) {
 	d, _ := b.ports.(wpdef.Declare)
 	if d.ProviderPort == nil {
 		return nil, notServed(fmt.Errorf("webrtc transport provider: %w", errNoPort))
 	}
-	cfg := camera.ProviderConfig{Port: d.ProviderPort}
+	cfg := camera.ProviderConfig{Port: d.ProviderPort, MaxSessions: d.MaxSessions, MaxSessionsPerFabric: d.MaxSessionsPerFabric}
 	if av, ok := b.sibling(csdef.ClusterID).(*camera.AvStream); ok {
 		cfg.Streams = av
 	}
