@@ -37,11 +37,65 @@ func TestFacadeErrorsAreTheBridges(t *testing.T) {
 		{"CommissioningWindowNotConfigured", node.ErrCommissioningWindowNotConfigured, bridge.ErrCommissioningWindowNotConfigured},
 		{"ScrubIncomplete", node.ErrScrubIncomplete, store.ErrScrubIncomplete},
 		{"FabricNotFound", node.ErrFabricNotFound, store.ErrFabricNotFound},
+		{"Unseal", node.ErrUnseal, store.ErrUnseal},
+		{"NoSealer", node.ErrNoSealer, store.ErrNoSealer},
 		{"OTAImageTooLarge", node.ErrOTAImageTooLarge, dcl.ErrOTAImageTooLarge},
 	} {
 		if c.facade == nil || !errors.Is(c.facade, c.base) || !errors.Is(c.base, c.facade) {
 			t.Errorf("%s: node's %v is not bridge's %v", c.name, c.facade, c.base)
 		}
+	}
+}
+
+// node.NewAESGCMSealer is the store's sealer (decision 551, #584): what it
+// seals the store's own sealer opens, a key of the wrong size is refused,
+// and a node store sealed through the facade route reopens with it and
+// refuses another key with node.ErrUnseal.
+func TestFacadeAESGCMSealerIsTheStores(t *testing.T) {
+	key := bytes.Repeat([]byte{7}, 32)
+	s, err := node.NewAESGCMSealer(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var _ store.Sealer = s
+	base, err := store.NewAESGCMSealer(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := s.Seal([]byte("secret"), []byte("aad"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain, err := base.Open(sealed, []byte("aad")); err != nil || string(plain) != "secret" {
+		t.Fatalf("store sealer opens the facade's value: %q, %v", plain, err)
+	}
+	if _, err := node.NewAESGCMSealer(key[:16]); err == nil {
+		t.Fatal("a 16-byte key was accepted")
+	}
+
+	ctx := context.Background()
+	db := openDB(t, filepath.Join(t.TempDir(), "sealed.db"))
+	open := func(sealer store.Sealer) error {
+		cfg := minimalConfig(db)
+		cfg.Store.Sealer = sealer
+		n, err := node.New(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		return n.Stop(ctx)
+	}
+	if err := open(s); err != nil {
+		t.Fatalf("New with the facade's sealer: %v", err)
+	}
+	if err := open(s); err != nil {
+		t.Fatalf("New again under the same key: %v", err)
+	}
+	other, err := node.NewAESGCMSealer(bytes.Repeat([]byte{9}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := open(other); !errors.Is(err, node.ErrUnseal) {
+		t.Fatalf("New under another key: %v, want node.ErrUnseal", err)
 	}
 }
 
