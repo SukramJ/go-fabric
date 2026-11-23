@@ -45,6 +45,7 @@ import (
 	pumpdef "thingfabric.dev/go-fabric/cluster/spec/pumpconfigurationandcontrol"
 	smokedef "thingfabric.dev/go-fabric/cluster/spec/smokecoalarm"
 	tdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
+	tsuicdef "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
 	tdir "thingfabric.dev/go-fabric/cluster/spec/threadnetworkdirectory"
 	userlabeldef "thingfabric.dev/go-fabric/cluster/spec/userlabel"
 	valvedef "thingfabric.dev/go-fabric/cluster/spec/valveconfigurationandcontrol"
@@ -152,6 +153,11 @@ func verdictCases() []verdictCase {
 				Features: thermo.ThermostatFeatureHEAT, AbsMinHeatSetpointLimit: 700, AbsMaxHeatSetpointLimit: 3000, InitialHeatingSetpoint: 2000,
 			})
 		}, tdef.AttrOccupiedHeatingSetpoint, int16(2100)},
+		{"thermo.ThermostatUIServer", false, func(t *testing.T) contract.ClusterServer {
+			t.Helper()
+			s, err := thermo.NewThermostatUserInterfaceConfiguration(thermo.ThermostatUIConfig{})
+			return must(t, s, err)
+		}, tsuicdef.AttrKeypadLockout, uint8(1)},
 		{"valve.Server", false, func(*testing.T) contract.ClusterServer {
 			return valve.NewServer(valve.Config{Source: &heldValve{}})
 		}, valvedef.AttrDefaultOpenDuration, uint32(30)},
