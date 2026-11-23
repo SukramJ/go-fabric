@@ -253,3 +253,121 @@ func TestPeripheralAdapterAddedWhileSilent(t *testing.T) {
 		t.Fatalf("registrations without an advertisement or a service: %q", b.called())
 	}
 }
+
+// partialAdded is an InterfacesAdded of the adapter object at path that
+// names iface alone.
+func partialAdded(path dbus.ObjectPath, iface string) *dbus.Signal {
+	return &dbus.Signal{Path: "/", Name: sigIfacesAdded, Body: []any{path, map[string]map[string]dbus.Variant{iface: {}}}}
+}
+
+// lostWithTheAdapter makes bluetoothd forget the application and the
+// advertisement, as a bluetoothd that ended without InterfacesRemoved.
+func lostWithTheAdapter(b *fakeBus) {
+	b.mu.Lock()
+	b.app, b.adv = nil, nil
+	b.mu.Unlock()
+}
+
+// TestPeripheralAdvertisingOnlySignalKeepsTheApplicationOwed holds
+// R4-fsm-4301 (a): a full InterfacesAdded, then one that names
+// LEAdvertisingManager1 alone before the first one's work ran. The
+// application owed by the first is registered all the same, before the
+// advertisement.
+func TestPeripheralAdvertisingOnlySignalKeepsTheApplicationOwed(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	advertiseAndServe(t, p, b)
+	lostWithTheAdapter(b)
+
+	// advMu held: the first signal's work cannot run before the second
+	// signal is handled.
+	p.advMu.Lock()
+	p.handle(addedSignal(testAdapter))
+	p.handle(partialAdded(testAdapter, ifaceAdvertising))
+	p.advMu.Unlock()
+	p.readvertising.Wait()
+
+	app, adv := heldByBluetoothd(b)
+	p.mu.Lock()
+	lost := p.appLost
+	p.mu.Unlock()
+	if !app || !adv || lost {
+		t.Fatalf("bluetoothd holds application %v, advertisement %v; appLost %v; calls %q", app, adv, lost, b.called())
+	}
+	if lastCall(b, regApp) > lastCall(b, regAdv) {
+		t.Fatalf("the advertisement was registered before the application: %q", b.called())
+	}
+}
+
+// TestPeripheralGattOnlySignalKeepsTheAdvertisementOwed holds
+// R4-fsm-4301 (b): a full InterfacesAdded that followed no
+// InterfacesRemoved, then one that names GattManager1 alone. The
+// advertisement owed by the first is registered again, after the
+// application.
+func TestPeripheralGattOnlySignalKeepsTheAdvertisementOwed(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	advertiseAndServe(t, p, b)
+	lostWithTheAdapter(b)
+
+	p.advMu.Lock()
+	p.handle(addedSignal(testAdapter))
+	p.handle(partialAdded(testAdapter, ifaceGattManager))
+	p.advMu.Unlock()
+	p.readvertising.Wait()
+
+	app, adv := heldByBluetoothd(b)
+	if !app || !adv || !advertised(p, b) {
+		t.Fatalf("bluetoothd holds application %v, advertisement %v; peripheral advertised %v; calls %q", app, adv, advertised(p, b), b.called())
+	}
+	if lastCall(b, regApp) > lastCall(b, regAdv) {
+		t.Fatalf("the advertisement was registered before the application: %q", b.called())
+	}
+}
+
+// TestPeripheralTwoFullAdapterSignals: two full InterfacesAdded back to
+// back restore both, once each (the control of the two above).
+func TestPeripheralTwoFullAdapterSignals(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	advertiseAndServe(t, p, b)
+	lostWithTheAdapter(b)
+
+	p.advMu.Lock()
+	p.handle(addedSignal(testAdapter))
+	p.handle(addedSignal(testAdapter))
+	p.advMu.Unlock()
+	p.readvertising.Wait()
+
+	if app, adv := heldByBluetoothd(b); !app || !adv || !advertised(p, b) {
+		t.Fatalf("application %v, advertisement %v; calls %q", app, adv, b.called())
+	}
+	if n, m := callsOf(b, regApp), callsOf(b, regAdv); n != 2 || m != 2 {
+		t.Fatalf("RegisterApplication calls %d, RegisterAdvertisement calls %d, want 2 each", n, m)
+	}
+}
+
+// TestPeripheralAdvertisingOnlySignalDuringTheRetry holds R4-fsm-4301 in
+// the retry case: the first RegisterApplication on the returned adapter
+// fails, a signal naming LEAdvertisingManager1 alone arrives during the
+// pause, and no advertisement is registered before the application, which
+// is registered once bluetoothd accepts it.
+func TestPeripheralAdvertisingOnlySignalDuringTheRetry(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	advertiseAndServe(t, p, b)
+	lostWithTheAdapter(b)
+
+	b.failWith(regApp, dbus.Error{Name: "org.bluez.Error.Failed"})
+	b.emit(addedSignal(testAdapter))
+	waitUntil(t, "a refused RegisterApplication", func() bool { return callsOf(b, regApp) >= 2 })
+	b.emit(partialAdded(testAdapter, ifaceAdvertising))
+	waitUntil(t, "the application tried again after the advertising-only signal", func() bool { return callsOf(b, regApp) >= 3 })
+	if _, adv := heldByBluetoothd(b); adv {
+		t.Fatalf("the advertisement was registered while the application was not: %q", b.called())
+	}
+	b.clearErr(regApp)
+	waitUntil(t, "the application and the advertisement registered again", func() bool {
+		app, adv := heldByBluetoothd(b)
+		return app && adv && advertised(p, b)
+	})
+	if lastCall(b, regApp) > lastCall(b, regAdv) {
+		t.Fatalf("the advertisement was registered before the application: %q", b.called())
+	}
+}

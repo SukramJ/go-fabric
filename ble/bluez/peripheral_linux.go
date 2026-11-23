@@ -164,8 +164,17 @@ type peripheral struct {
 	// appLost is set when the adapter, or its GattManager1, left or came
 	// back while a service was registered: the application is registered
 	// again by followAdapter, and no advertisement is registered before it
-	// (appMissing).
+	// (appMissing). It is cleared only when that registration held, so a
+	// later adapter signal that names the advertising side alone still
+	// owes it (R4-fsm-4301).
 	appLost bool
+	// advLost is set when the adapter, or its LEAdvertisingManager1, left
+	// or came back: followAdapter settles the advertisement the peripheral
+	// believes held — marked unregistered on a removal, unregistered on an
+	// addition — and clears it then, whichever signal's work does it, so a
+	// later signal that names GattManager1 alone does not drop it
+	// (R4-fsm-4301).
+	advLost bool
 }
 
 var (
@@ -601,8 +610,10 @@ func (p *peripheral) readvertise(gen uint64) {
 
 // adapterChanged starts followAdapter for an InterfacesAdded (added) or
 // InterfacesRemoved of the adapter's object: app when the adapter or its
-// GattManager1 is among the interfaces, adv when the adapter or its
-// LEAdvertisingManager1 is. It runs on the signal loop, so the work —
+// GattManager1 is among the interfaces (appLost), adv when the adapter or
+// its LEAdvertisingManager1 is (advLost). What a signal owes is recorded as
+// state, not handed to its work: a later signal supersedes the work, never
+// what is owed (R4-fsm-4301). It runs on the signal loop, so the work —
 // which waits for advMu and calls BlueZ — runs on a goroutine of its own.
 func (p *peripheral) adapterChanged(added, app, adv bool) {
 	if !app && !adv {
@@ -618,9 +629,12 @@ func (p *peripheral) adapterChanged(added, app, adv bool) {
 	if app && p.serviceLive() {
 		p.appLost = true
 	}
+	if adv {
+		p.advLost = true
+	}
 	p.readvertising.Add(1)
 	p.mu.Unlock()
-	go p.followAdapter(gen, added, app, adv)
+	go p.followAdapter(gen, added, adv)
 }
 
 // serviceLive reports whether a service is registered or served; the
@@ -656,10 +670,14 @@ func (p *peripheral) appMissing() bool {
 // this signal was handled is held. A failed registration is retried with
 // the pause of readvertise, until it holds, a later adapter signal
 // supersedes this one, or the peripheral closes.
-func (p *peripheral) followAdapter(gen uint64, added, app, adv bool) {
+//
+// What an addition owes is read at every iteration from appLost and
+// advLost, not from the signal that started the work: a later signal that
+// names one manager alone supersedes this work but takes over what it had
+// not done yet (R4-fsm-4301).
+func (p *peripheral) followAdapter(gen uint64, added, adv bool) {
 	defer p.readvertising.Done()
 	pause := readvertiseFirst
-	appReset, advReset := app, adv
 	for {
 		p.advMu.Lock()
 		p.mu.Lock()
@@ -669,7 +687,14 @@ func (p *peripheral) followAdapter(gen uint64, added, app, adv bool) {
 			return
 		}
 		if !added {
+			// A removal settles the advertisement only when it named the
+			// advertising side: then nothing is held, and advLost is
+			// settled with it. A removal of GattManager1 alone leaves an
+			// addition's owed reset to the next addition.
 			drop := adv && p.registered
+			if adv {
+				p.advLost = false
+			}
 			if drop {
 				p.registered = false
 				if p.advOwed {
@@ -687,14 +712,14 @@ func (p *peripheral) followAdapter(gen uint64, added, app, adv bool) {
 		if !live {
 			p.appLost = false
 		}
+		appReset, advReset := p.appLost, p.advLost
+		p.advLost = false
 		p.mu.Unlock()
 		if advReset {
 			p.dropAdvertisement()
-			advReset = false
 		}
-		err := p.restoreApplication(appReset && live, s)
+		err := p.restoreApplication(appReset, s)
 		if err == nil {
-			appReset = false
 			err = p.restoreAdvertisement()
 			if err == nil {
 				p.advMu.Unlock()
@@ -767,10 +792,12 @@ func (p *peripheral) dropAdvertisement() {
 // restoreAdvertisement registers the advertisement the host last asked
 // for, unless it is registered (followAdapter); the caller holds advMu.
 // Nothing is registered after StopAdvertising (adv nil, or an unregister
-// owed).
+// owed), nor while the application of a live service is missing: the
+// work that registers it registers the advertisement after it
+// (R4-fsm-4301).
 func (p *peripheral) restoreAdvertisement() error {
 	p.mu.Lock()
-	register := p.adv != nil && !p.advOwed && !p.registered
+	register := p.adv != nil && !p.advOwed && !p.registered && !p.appMissing()
 	p.mu.Unlock()
 	if !register {
 		return nil
