@@ -121,8 +121,10 @@ type SessionOptions struct {
 	// "not discovered" outcome (:404-430). The discovery ends only after
 	// every preparation finished (:303-331). At most 16 devices are
 	// prepared at once; while 16 are, the transport that found the next
-	// one waits until a preparation has finished, and no device is dropped
-	// for it.
+	// one waits until a preparation has finished. No device is dropped
+	// while the search runs; one still waiting when the search stops is
+	// not prepared, so the discovery ends at most one Prepare time after
+	// its search.
 	Prepare func(ctx context.Context, c Candidate) error
 	// Clock times Timeout and the race's stagger; nil is the system clock.
 	Clock fabricclock.Clock
@@ -369,10 +371,23 @@ const maxConcurrentPreparations = 16
 
 // prepare readies a found device, then hands it to the kind (#prepare,
 // #tryFound, #found, :303-357). It waits for one of the
-// maxConcurrentPreparations slots first, on the transport's goroutine, and
-// drops nothing.
+// maxConcurrentPreparations slots first, on the transport's goroutine. No
+// device is dropped while the search runs; one still waiting when the
+// search stops is not prepared — a transport may hand over a batch after
+// the search ended (Scanner.find's deliver), and a backlog held to the
+// slots would otherwise outlast Timeout, Stop and Cancel by its length
+// times the Prepare time (review II, R3-bound-3552, Fable diff read).
 func (s *Session[T]) prepare(c Candidate) {
-	s.prepareSlots <- struct{}{}
+	select {
+	case <-s.scan.Done():
+		return
+	default:
+	}
+	select {
+	case s.prepareSlots <- struct{}{}:
+	case <-s.scan.Done():
+		return
+	}
 	s.preparing.Go(func() {
 		defer func() { <-s.prepareSlots }()
 		if s.opts.Prepare != nil {
