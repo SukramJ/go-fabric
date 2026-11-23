@@ -807,7 +807,7 @@ N4-rwsub-2, DR5b-c1-06 and 5a-2 A1-d below — each is a row and is fixed.
 | N4-rwsub-4 | sec | still true | fixed `b1877b49` |
 | N3-findev-1 | sec | still true | fixed `b1877b49`, `cb93477c`, `ad33fa1d` (decision 153: the session install takes a stake) |
 | N3-finnet-3 | net | still true, without effect today | struck as a defect, as the unit recommended; a doc line on `Dialer` `d42a72d0` |
-| N-net-1 (b) | — | — | held back until its fix merges (owner decision 25) — phase 6a |
+| N-net-1 (b) | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | N3-finnet-4 | net, hs | still true | fixed `3cf0cda2`, `3b59af49`, `a85a91b6`, `c66ba650`, `118a5f86`, `d46b360f`: `tcp.Conn.NoteSessionTraffic`, noted by the bridge and the controller |
 | N5b-guard-3 | hs | the test's, not the code's | fixed `705ce831`: the unsecured test peers skip a datagram that is not the bridge's reply |
 | R2-P2-ctr-03 rest | hs | still true | fixed `c08287a5`, `2255574e`: a node-opened exchange skips an id an open exchange of the session holds |
@@ -822,17 +822,17 @@ N4-rwsub-2, DR5b-c1-06 and 5a-2 A1-d below — each is a row and is fixed.
 | N4-bdnotes-2 | hs | still true | fixed `eb883a62`: a bound per operational key (decision 133); `BD-Matter-GroupReceptionBoundedPerKey` (`f01e3589`) |
 | R2-P4-nw-07b rest = F-db021da0-35 | hs | still true | open: findings row `F-db021da0-35`, a decision-127 verdict line (`add65564`) |
 | U-ctr-1 rest | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| N-rw3req-3 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| N-bridge2-3 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
+| N-rw3req-3 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| N-bridge2-3 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | TM R3b.1 | hs | the premise struck | the premise struck (verify); what stays is N4-bdnotes-2, fixed (decision 133) |
-| TM R3b.2 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| TM R3b.4 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
+| TM R3b.2 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3b.4 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | TM R3.7 (slots) | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| U-alloc-1 (device parts) | — | — | held back until its fix merges (owner decision 25) — phase 6a |
+| U-alloc-1 (device parts) | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | N3-fixrrdev-1 | hs | still true | fixed `e9de94db`, `de53e745`: the Sigma3 abandon runs after the handler, for a Sigma3 it took |
 | N3-coord-1 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| U3-lan-dev-1 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| N4-f3-2 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
+| U3-lan-dev-1 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| N4-f3-2 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | N4-rwsub-3 | hs | still true | fixed `e9de94db`, `de53e745` with N3-fixrrdev-1 |
 | U4-fr-sec-1 | hs | still true, all three | fixed `ada293fd`, `684207e8`, `652b1159` |
 | N-findev-2 | gate | still true | fixed `95747f09`: the invoke's changes are compared without a subscription manager too |
@@ -850,7 +850,7 @@ N4-rwsub-2, DR5b-c1-06 and 5a-2 A1-d below — each is a row and is fixed.
 | N4-x3-1 | sub | still true | fixed `5d60f284`, `fc835146` |
 | N5-fxdocs-2 | sub | still true | fixed `2fb5de6f`: the event log's docs |
 | N4-rrim-1 | sub | fixed by `0ed3dbf3` (#534, decision 95) | closed before this phase: `0ed3dbf3` (#534); the verify confirmed it |
-| U3-admin-1 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
+| U3-admin-1 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | N-ctr-5 | life | still true | fixed `6ac78c21`, `06b48533`, `088ae151`: deprecated (decisions 140, 172) |
 | F-db021da0-3 | par-im | still true — gap | fixed `bc31e6ff`: a failed update is owed and leaves with the next pass; the row closed (`1fe78eee`) |
 | F-db021da0-4 | par-im | still true — gap | parity: a recorded divergence `BD-chip-SubscriptionFloorAfterPriming` (decision 144, `add65564`); the row closed |
@@ -885,16 +885,16 @@ N4-rwsub-2, DR5b-c1-06 and 5a-2 A1-d below — each is a row and is fixed.
 | N4-d4wifi-1 | coresec | still true | open: findings row `N4-d4wifi-1` (`309f38b9`) |
 | N4-w3core-1 | coresec | still true | fixed `b41a4a7d` |
 | TM R3.1 | coresec | touched by R2-P6-fsm-1001 and -err-1002 | fixed with R2-P6-fsm-1001 and R2-P6-err-1002 |
-| TM R3.2 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| TM R3.6 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| TM R3.3 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
+| TM R3.2 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3.6 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3.3 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | N4-notesE-1 | coresec | still true | fixed with R2-P6-store-1010 `b41a4a7d`, `4ad184df`, `5a5abfc5`, `20075e20`, `2da11bc8`, `9dafb9f7` |
 | R2-P5-apidev-02 | coresys | still true | fixed `09c32c85` (step 15, decision 143) |
 | F-db021da0-28 | coresys | still true | fixed in part `09c32c85` (decisions 143, 166): NodeLabel and SerialNumber served only when stated; the row narrowed (`d3616158`) |
 | 5b-peer R4-1b | coresys | still true (documented) | fixed `823865ab`: a key of another type is logged |
 | N4-l1-3 | coresys | still true | fixed `442af48b` |
-| TM R3.5 first half | — | — | held back until its fix merges (owner decision 25) — phase 6a |
-| U3-net-1 | — | — | held back until its fix merges (owner decision 25) — phase 6a |
+| TM R3.5 first half | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| U3-net-1 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | DR5b-c2-06 | spec | still true | fixed with R2-P6-api-1307 (decision 154) |
 | F-db021da0-46 | applight | still true | decided (decision 165): the unserved trackers deprecated, with R2-P6-par-1405; the row keeps a verdict line (`9d325ca8`) |
 | N-clumisc-4 | appclim, appinfra | partly still true | fixed with R2-P6-conc-1506, -1507, -1605, -1606 |

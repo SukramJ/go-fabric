@@ -1039,12 +1039,12 @@ rows.
 | N3-finctl-2 | chs | still true: `sentToAck` set before the send | phase 7 (the register editor's judgement): no fix note names it |
 | N3-fixrrctl-1 | chs | still true; what `Delete` waits for is `cpeer`'s | phase 7 (the register editor's judgement): no fix note names it |
 | U-dr-ctl-1 rest | chs | partly not performable: the UDP and TCP entries read whole, no finding beyond 1801/1802; the BLE feed not traced | phase 7 (the register editor's judgement): the BLE feed |
-| R2-P3-rr-ctl-02 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
+| R2-P3-rr-ctl-02 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | N3-rwrace-1 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
 | N3-rwrace-2 | chs, ctl | not performable in `chs`; this unit's side still true | fixed `5b0b1865`, `91d8df6e`: the post-dial half in wave 2; `ble.Dial` marks the race attempt answered once the peripheral accepted the connection (unit `fxo-ctl`); a clause of `BD-Matter-Controller-CommissioningRaceBounded` (`361102dd`) |
-| N3-ctl-3 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
+| N3-ctl-3 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | U3-ctl-dev-1 first half | chs | still true | fixed with R2-P6-bound-1807 `b73efc62` |
-| U3-ctl-dev-1 second half | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
+| U3-ctl-dev-1 second half | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | DR5b-c3-07 | dcl | still true, measured by a probe | fixed with R2-P6-conc-1901 `9d8805f5`, `28b0a9d7`, `21ec388c` |
 | N5b-fctl-1 | dcl | still true | fixed with R2-P6-bound-1903 `315546c6` |
 | decision 105 refusal rule | dcl | read done; the rule to the wizard | decided: decisions 192, 214 (R2-P6-sec-1803) |
@@ -1067,7 +1067,7 @@ rows.
 | N3-disc-2 | cpeer | still true | fixed `106a1359`: the staged-name order is a map with a linked list, every operation O(1) |
 | TM R3.4 (Binding) | cpeer | still true in part: the kept peers → R2-P6-bound-2104 | fixed with R2-P6-bound-2104 `cf30ba2c`, `ef064f8a`, `3b2d7c1d`, `a732ad22`: the binding manager releases the peers it created |
 | U3-ctl-lan-1 (1), (2) | cpeer | still true for the two parts in this cut | fixed `a8878106`, `10f1149b`: a resolution resolves at most four SRV target hosts at once; past the record bound the cache evicts the records of names no resolution observes first (decision 240); `BD-Matter-Controller-HostDiscoveriesBounded` and the eviction rule of `BD-Matter-Controller-DnssdCacheBounded` (`361102dd`) |
-| U3-ctl-lan-1 (3)–(5) | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
+| U3-ctl-lan-1 (3)–(5) | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | N6a-im-1 | cpeer | needs a reference read | phase 7 (the register editor's judgement): the reference question was not put to a read; no note after the review names it |
 | N6a-im-2 | cpeer | needs a reference read of the `im/decode_later.go` comment | phase 7 (the register editor's judgement): the reference question was not put to a read; no note after the review names it |
 | N6a-im-3 | cpeer | needs a reference read | phase 7 (the register editor's judgement): the reference question was not put to a read; no note after the review names it |
@@ -1204,21 +1204,21 @@ rows.
 | F-28 + apidev-02 (fx-bdbi) | — | — | closed before this phase: done in 6a (the coordinator, plan-6b §6) |
 | N-ctr-5 | — | — | decided: no longer needed (the coordinator, decisions 140, 172) |
 | N3-coord-1 | hs (6a) | still true | fixed `7a991263`, `c12f72af`: an unsecured message is ordered by its initiator's node id (decision 199) |
-| N-net-1 (b) | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| N-rw3req-3 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| N-bridge2-3 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| TM R3b.2 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| TM R3b.4 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
+| N-net-1 (b) | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| N-rw3req-3 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| N-bridge2-3 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3b.2 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3b.4 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | TM R3.7 (slots) | hs (6a) | read, not run | fixed `47c804df`, `53c3dbc6`, `b769fd59`: `Bridge.SetFabricCounter`; a fabric holding more than its share of the chunk waits is answered Busy from half the dispatch budget (decision 245); `BD-Matter-ChunkWaitsSharedByFabric` (`361102dd`) |
-| U-alloc-1 (device parts) | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| U3-lan-dev-1 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| N4-f3-2 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| U3-admin-1 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| TM R3.2 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| TM R3.6 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| TM R3.3 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| TM R3.5 first half | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
-| U3-net-1 | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
+| U-alloc-1 (device parts) | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| U3-lan-dev-1 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| N4-f3-2 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| U3-admin-1 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3.2 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3.6 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3.3 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| TM R3.5 first half | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
+| U3-net-1 | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | R2-P6-par-1360 | spec (6a) | open findings row (6a) | open: findings row `R2-P6-par-1360`, no code; a verdict line (unit `fxo-node`) `fd633cc8` (the register editor's judgement) |
 | R2-P6-fsm-1401 | applight (6a) | open findings row (6a) | fixed `147a8f46` (decision 209) |
 | R2-P6-fsm-1402 | applight (6a) | open findings row (6a) | fixed `f65e9899`, `62fe5078` (decision 209) |
@@ -1234,7 +1234,7 @@ rows.
 | F-db021da0-55 | — | open findings row (6a) | fixed `e0b17ea3`, `217ee3da`: a MEI helper exported from `cluster/spec`, used by the dispatcher (decision 246) |
 | F-db021da0-59 | — | open findings row (6a) | fixed `31fa3cc9` |
 | R2-P5-tmut-18 rest | — | open (6a) | fixed in part `34b0a737`, `1e9eac1b`, `115fff1f`, `f3fd05fa`, `6904065a`, `649a2637`: 73 of 101 mutants killed, 28 recorded; pin lift b25ed960, P3c: the wide run of the 28 at `c8348b35` — 28 survived, the recorded reasons stand (decision 403) |
-| TM R3.8 rest | — | — | held back until its fix merges (owner decisions 25, 126) — phase 7 |
+| TM R3.8 rest | — | — | released with the review's close-out (C1): `phase-7-register.md` § "Close-out C1: the held rows" |
 | N4-d4wifi-1 | — | open findings row (6a) | fixed `f1f92c87`; the findings row closed |
 | "cover/fan change naming" | — | open, as F-db021da0-57 (6a) | fixed with F-db021da0-57 `e30c2b06`, `6f02028e` |
 | F-db021da0-9 | — | open findings row (6a) | fixed `34c52911`, `62fe5078` |
