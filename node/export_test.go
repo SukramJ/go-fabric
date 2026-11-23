@@ -91,3 +91,11 @@ func HasCASEIdentity(n *Node, fabricIndex uint8) bool {
 func FabricUpdated(ctx context.Context, n *Node, fabricIndex uint8) {
 	n.fabricUpdated(ctx, fabricIndex)
 }
+
+// BeforeStartBindingSync makes fn run in Start's attach of the Binding
+// servers, after reassemblies began to sync and before Start's own sync.
+func BeforeStartBindingSync(n *Node, fn func()) { n.bindSync.testBeforeStartSync = fn }
+
+// AttachedBindings is the endpoints whose Binding server the binding
+// manager listens to.
+func AttachedBindings(n *Node) []uint16 { return n.bindings.Attached() }

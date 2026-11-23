@@ -485,11 +485,19 @@ type bindingSync struct {
 	mu      sync.Mutex
 	topo    *endpoint.Topology
 	running bool
+	// syncMu serialises the syncs to the binding manager; each reads topo
+	// under it, so the last sync is of the newest topology (review II,
+	// R3-conc-3752).
+	syncMu sync.Mutex
 
 	// persistMu guards persisted: the Binding servers whose list the store
 	// keeps (persistBindings).
 	persistMu sync.Mutex
 	persisted map[*mattercore.Binding]bool
+
+	// testBeforeStartSync, a test seam, runs in startBindings once the
+	// sync is running, before its first sync; nil outside tests.
+	testBeforeStartSync func()
 }
 
 // observeTopology wraps the bridge's Snapshotter: every topology it hands
@@ -528,7 +536,6 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		n.attachNodeServices(t)
 		n.bindSync.mu.Lock()
 		n.bindSync.topo = t
-		running := n.bindSync.running
 		n.bindSync.mu.Unlock()
 		// Once more, now that a removal's fan-out walks t: a fabric
 		// removed after the reconcile above read the table had its
@@ -536,9 +543,7 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 		// of the table finds it gone (review II, R2-P2-dr-node-03). A
 		// removal whose row goes after this read fans out over t.
 		n.reconcileFabricState(ctx, t)
-		if running {
-			n.syncBindings(t)
-		}
+		n.syncNewestBindings()
 		return t, nil
 	}
 }
@@ -548,8 +553,27 @@ func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, 
 func (n *Node) startBindings() {
 	n.bindSync.mu.Lock()
 	n.bindSync.running = true
-	t := n.bindSync.topo
 	n.bindSync.mu.Unlock()
+	if n.bindSync.testBeforeStartSync != nil {
+		n.bindSync.testBeforeStartSync()
+	}
+	n.syncNewestBindings()
+}
+
+// syncNewestBindings syncs the newest topology to the binding manager once
+// the sync runs (startBindings). The syncs run one at a time, each on the
+// topology read under syncMu: of a reassembly's sync and Start's, the one
+// that runs last syncs the newest topology, never an older one read
+// before the other's (review II, R3-conc-3752).
+func (n *Node) syncNewestBindings() {
+	n.bindSync.syncMu.Lock()
+	defer n.bindSync.syncMu.Unlock()
+	n.bindSync.mu.Lock()
+	t, running := n.bindSync.topo, n.bindSync.running
+	n.bindSync.mu.Unlock()
+	if !running {
+		return
+	}
 	if t == nil {
 		t = n.br.Topology()
 	}
