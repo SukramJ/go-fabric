@@ -655,20 +655,11 @@ func BuildEventReports(paths []ConcreteEventPath, log *EventLog, filters []Event
 	seen := make(map[uint64]struct{})
 	var out []EventReport
 	for _, path := range paths {
-		// Resolve wildcard values for the EventLog.Query call.
-		var ep uint16 = 0xFFFF
-		if path.HasEndpoint {
-			ep = path.Endpoint
-		}
-		var cl uint32 = 0xFFFFFFFF
-		if path.HasCluster {
-			cl = path.Cluster
-		}
-		var ev uint32 = 0xFFFFFFFF
-		if path.HasEvent {
-			ev = path.Event
-		}
-		records := log.Query(ep, cl, ev, minNumber)
+		// The path's wildcards are its absent fields: a concrete
+		// 0xFFFF / 0xFFFFFFFF names that id and selects no other
+		// (R2-C2-wire-0553), where [EventLog.Query]'s sentinels would
+		// read it as "any".
+		records := log.queryPath(path, minNumber)
 		for _, rec := range records {
 			if _, dup := seen[rec.Number]; dup {
 				continue

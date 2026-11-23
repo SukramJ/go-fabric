@@ -163,6 +163,10 @@ type CommandInvocation struct {
 	// CommandInvokeResponse.ts:484-487 at db021da0, the failure the
 	// command's status :509-546).
 	DecodeStatus StatusCode
+	// fieldsNotStructure records that CommandFields was no structure —
+	// DecodeStatus is INVALID_COMMAND then, the reader not called: a
+	// client decoding a response refuses it ([readInvokeResponseIB]).
+	fieldsNotStructure bool
 }
 
 // CommandFieldsReader extracts the cluster-native fields struct from
@@ -404,7 +408,7 @@ func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFie
 		if err != nil {
 			return err
 		}
-		inv.Fields, inv.DecodeStatus = nil, StatusInvalidCommand
+		inv.Fields, inv.DecodeStatus, inv.fieldsNotStructure = nil, StatusInvalidCommand, true
 		return nil
 	}
 	f, err := fieldsReader(inv.Path, dec, el)
