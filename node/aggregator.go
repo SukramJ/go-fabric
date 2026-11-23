@@ -37,7 +37,8 @@ var (
 	// its endpoint number and is refused.
 	ErrNoStableKey = errors.New("node: endpoint without a StableKey")
 	// ErrDuplicateKey: an endpoint with the key of one already added, in
-	// any partition.
+	// any partition, or with a key — its own or a part's — that another
+	// endpoint serves, itself or as a part (decision 580).
 	ErrDuplicateKey = errors.New("node: an endpoint with this StableKey is already added")
 	// ErrUnknownKey: no endpoint with this key is added (to the partition
 	// asked).
@@ -261,7 +262,9 @@ func (a *Aggregator) RetirePartition(ctx context.Context, name string) error {
 // Add adds ep under the Aggregator — matter.js `aggregator.add(endpoint)`
 // (endpoint/Endpoint.ts:755-770) — and binds a device to the node; a running node
 // reassembles. A device another node holds is refused
-// ([device.ErrAddedElsewhere]). It adds to the default partition.
+// ([device.ErrAddedElsewhere]), and so is one whose key, or a part's, an
+// endpoint of any partition already serves ([ErrDuplicateKey]). It adds
+// to the default partition.
 func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 	return a.Partition(Scope).Add(ctx, ep)
 }
@@ -277,7 +280,8 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // where `delete()` would erase it, endpoint/Endpoint.ts:987-992) and the new endpoint
 // with the same id is assigned it (ServerEndpointInitializer.ts:34-42).
 // A replacement that fails validation ([ErrKeyMismatch],
-// [ErrPolicyMismatch], …) changes nothing. A replacement the
+// [ErrPolicyMismatch], a part key another endpoint serves:
+// [ErrDuplicateKey], …) changes nothing. A replacement the
 // specification level withholds (ep's report lists withheld elements)
 // takes the endpoint off the wire as [Aggregator.Remove] does — the key
 // keeps its endpoint number, and its parts theirs — records ep as
@@ -473,6 +477,9 @@ func (b *Batch) Add(ep Endpoint) error {
 	if p, _ := a.findLocked(key); p != nil {
 		return fmt.Errorf("%w: %s", ErrDuplicateKey, key)
 	}
+	if k, ok := a.servedOfLocked(entries, nil); ok {
+		return fmt.Errorf("%w: %s", ErrDuplicateKey, k)
+	}
 	// Withheld only once the set takes the key, and never for a key it
 	// serves (review II, R2-P6-store-2414).
 	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
@@ -494,7 +501,9 @@ func (b *Batch) Add(ep Endpoint) error {
 
 // Replace replaces the endpoint with key in the batch's partition; see
 // [Aggregator.Replace]. The old endpoint is unbound after the batch's
-// reassembly.
+// reassembly. A replacement with a part key another endpoint serves is
+// refused ([ErrDuplicateKey]) and changes nothing (decision 580); the
+// replaced endpoint's own parts are not another's.
 func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	if key == nil {
 		return ErrNoStableKey
@@ -523,8 +532,11 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	if part.eps[i] == ep {
 		return nil
 	}
-	if withheld := withheldKeys(entries); len(withheld) > 0 {
-		return b.replaceWithheldLocked(part, i, newKey, entries, withheld)
+	if k, ok := a.servedOfLocked(entries, part.eps[i]); ok {
+		return fmt.Errorf("%w: %s", ErrDuplicateKey, k)
+	}
+	if len(withheldKeys(entries)) > 0 {
+		return b.replaceWithheldLocked(part, i, newKey, entries)
 	}
 	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
 		return err
@@ -547,17 +559,15 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 // level withholds (decision 550, #585): the served endpoint at i is
 // dropped as [Batch.Remove] drops it — its number and its parts' kept for
 // the key's return — and the declaration recorded as withheld for
-// [Node.Surface], in one step. A withheld key another endpoint serves
-// refuses the call and changes nothing (review II, R2-P6-store-2414).
-// It returns the *surface.WithheldError; a.mu is held.
-func (b *Batch) replaceWithheldLocked(part *partition, i int, key string, entries []surfaceEntry, withheld []string) error {
+// [Node.Surface], in one step. A key another endpoint serves, withheld or
+// not, never reaches it: [Batch.Replace] refused it up front with
+// [ErrDuplicateKey] (decision 580; before, a withheld one refused here,
+// review II, R2-P6-store-2414). It returns the *surface.WithheldError;
+// a.mu is held.
+func (b *Batch) replaceWithheldLocked(part *partition, i int, key string, entries []surfaceEntry) error {
 	a := b.a
 	old := part.eps[i]
-	servedElsewhere := func(k string) bool { return a.servesExceptLocked(k, old) }
-	if slices.ContainsFunc(withheld, servedElsewhere) {
-		return a.n.recordWithheld(b.ctx, entries, a.servesLocked)
-	}
-	err := a.n.recordWithheld(b.ctx, entries, servedElsewhere)
+	err := a.n.recordWithheld(b.ctx, entries, func(k string) bool { return a.servesExceptLocked(k, old) })
 	b.dropLocked(part, i, key)
 	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key, tree: reservationTree(old.Spec())})
 	return err
@@ -628,6 +638,21 @@ func (a *Aggregator) servesLocked(key string) bool {
 		}
 	}
 	return false
+}
+
+// servedOfLocked returns the first key of entries — an endpoint and its
+// parts — that an endpoint of the set serves, itself or as a part, with
+// except and its parts left out (nil: none). A set that took such an
+// endpoint would assemble two Specs under one key, and that assembly and
+// every later one would fail until the endpoint went (decision 580).
+// a.mu is held.
+func (a *Aggregator) servedOfLocked(entries []surfaceEntry, except Endpoint) (string, bool) {
+	for i := range entries {
+		if a.servesExceptLocked(entries[i].key, except) {
+			return entries[i].key, true
+		}
+	}
+	return "", false
 }
 
 // servesExceptLocked is servesLocked with the endpoint except (and its
