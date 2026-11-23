@@ -40,6 +40,7 @@ func TestScenesRecallOfASceneRemovedDuringTheApplyLeavesItInvalid(t *testing.T) 
 		recall func(t *testing.T, s *core.ScenesManagement)
 	}{
 		"RecallScene": {0x0101, 1, func(t *testing.T, s *core.ScenesManagement) {
+			t.Helper()
 			invoke(t, s, 0x05, core.RecallSceneRequest{GroupID: 0x0101, SceneID: 1})
 		}},
 		"RecallGlobalScene": {0, 0, func(_ *testing.T, s *core.ScenesManagement) { s.RecallGlobalScene(fabric1, 1) }},
