@@ -33,7 +33,9 @@ const rootEndpoint uint16 = 0
 // (ErrStore, R2-P6-err-1120); a wipe of the datastore while the refresh
 // runs ends it before its next step commits (R2-P6-conc-1107); a node
 // that lists more entries in one list than a command lets that list hold
-// ends it with ErrNoMemory before anything is pushed (R2-P6-bound-1113).
+// ends it with ErrNoMemory before anything is pushed (R2-P6-bound-1113), as
+// does one that lists more than maxEndpointsPerNode endpoints, before its
+// endpoints are taken over (R2-C2-bound-1102).
 func (d *Datastore) RefreshNode(ctx context.Context, nodeID uint64) error {
 	rctx, err := d.beginRefresh(ctx, nodeID)
 	if err != nil {
@@ -84,6 +86,9 @@ func (d *Datastore) runRefresh(ctx context.Context, nodeID uint64) (err error) {
 	endpoints, err := d.sync.FetchEndpointList(ctx, nodeID) // :269-295
 	if err != nil {
 		return fmt.Errorf("%w: FetchEndpointList: %w", ErrSync, err)
+	}
+	if len(endpoints) > maxEndpointsPerNode { // before anything changes, as the merges below (R2-C2-bound-1102)
+		return fmt.Errorf("%w: node %d lists %d endpoints", ErrNoMemory, nodeID, len(endpoints))
 	}
 	var refreshing []uint16
 	if err := d.commit(ctx, func() { refreshing = d.refreshEndpointsLocked(nodeID, endpoints) }); err != nil {

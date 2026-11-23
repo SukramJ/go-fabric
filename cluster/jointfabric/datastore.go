@@ -80,6 +80,10 @@ const (
 	// connectedhomeip keeps no capacity (R2-C2-bound-1101): as many entries
 	// as the datastore holds key sets.
 	maxNodeKeySets = MaxGroupKeySet
+	// maxEndpointsPerNode bounds the endpoint list a refresh takes from a
+	// node, the module's own bound where connectedhomeip keeps no
+	// capacity (R2-C2-bound-1102).
+	maxEndpointsPerNode = 256
 	// maxDERCertLength bounds AnchorRootCA (Credentials::kMaxDERCertLength,
 	// CHIPCert.h:57).
 	maxDERCertLength = 600
