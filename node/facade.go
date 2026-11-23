@@ -4,6 +4,8 @@
 package node
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 
 	"thingfabric.dev/go-fabric/bdx"
@@ -120,6 +122,29 @@ var (
 // kept outside the database (docs/security.md, "Sealing at rest").
 func NewAESGCMSealer(key []byte) (*store.AESGCMSealer, error) {
 	return store.NewAESGCMSealer(key)
+}
+
+// Reseal moves a node's sealed database from the sealer old to the sealer
+// next — the rotation of [Store].Sealer's key, for a host that imports the
+// facade only (decision 561). It is store.Reseal: one transaction opens
+// the seal canary under old (the key check), seals every secret under
+// next and writes the canary last, then scrubs the file. A wrong old key,
+// a value that does not open under it and a secret in clear are
+// [ErrUnseal] and leave the database as it was; an error after the commit
+// wraps [ErrScrubIncomplete] — the values are sealed under next, and the
+// next [New] under next runs the scrub again. A start without a sealer on
+// the resealed database reads a secret as [ErrNoSealer]; New under old
+// fails with ErrUnseal. old and next are [NewAESGCMSealer]'s or the host's
+// own store.Sealer; neither may be nil.
+//
+// db is the node's SQLite file — [Store].DB, or [Store].Path opened with
+// database/sql under the "sqlite" driver the node registers — and no node
+// may run on it while Reseal does: a running node holds the old sealer.
+// It carries the schema a New applied.
+// A controller's database moves with controller.Reseal, which also
+// reseals its node registry.
+func Reseal(ctx context.Context, db *sql.DB, old, next store.Sealer) error {
+	return store.Reseal(ctx, db, old, next)
 }
 
 // The commissioning bounds [Config.Validate] and [Node.OpenBasicWindow]
