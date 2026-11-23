@@ -1346,20 +1346,19 @@ const ElectricalEnergyEventCumulativeMeasured = eemdef.EventCumulativeEnergyMeas
 // cumulative energy imported (the server binds no ExportedEnergy).
 type CumulativeEnergyMeasuredEvent = eemdef.CumulativeEnergyMeasuredEvent
 
+// maxEnergyMilliWattHours is the Energy field's upper bound, "0 to 2^62"
+// (cluster/spec/electricalenergymeasurement EnergyMeasurementStruct).
+const maxEnergyMilliWattHours = 1 << 62
+
 // whToMilliWattHours converts a reading in Wh to the attribute's mWh,
-// saturated at int64's bounds. float64(math.MaxInt64) is 2^63, one above
-// the bound, so the upper check is >= (R2-P6-wire-1417); converting 2^63
-// is implementation-defined. A NaN reading is the caller's: it reads
-// null.
+// held to the Energy field's constraint "0 to 2^62" (R2-C2-wire-1454): a
+// negative reading serves 0, one above the bound the bound, so the
+// attribute and the bridge's CumulativeEnergyMeasured event (which reads
+// the attribute) never carry a value outside it. The bounds are exact in
+// float64, so nothing beyond int64 is converted (R2-P6-wire-1417). A NaN
+// reading is the caller's: it reads null.
 func whToMilliWattHours(wh float64) int64 {
-	v := math.Round(wh * 1000)
-	if v >= math.MaxInt64 {
-		return math.MaxInt64
-	}
-	if v <= math.MinInt64 {
-		return math.MinInt64
-	}
-	return int64(v)
+	return boundedInt64(wh*1000, 0, maxEnergyMilliWattHours)
 }
 
 // --- AirQuality (0x005B) ----------------------------------------------

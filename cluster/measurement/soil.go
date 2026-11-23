@@ -56,8 +56,15 @@ type SoilMoistureSource interface {
 //     with CONSTRAINT_ERROR and the attribute keeps its previous value
 //     (SetSoilMoistureMeasuredValue :58-71). The reading here is pulled
 //     from the source on every read, so a refused reading is never
-//     stored: the read answers the last reading that was inside the
-//     limits, or null when there was none.
+//     stored: the read answers the last reading inside the limits that
+//     this server instance saw, or null when it saw none.
+//
+// The last reading lives in the server instance. The measurement
+// materialiser (endpoint.ClusterServers) builds a new instance on every
+// call, so on a materialised endpoint each read starts without one: a
+// reading outside the limits reads null there, not the previous reading
+// (R2-C2-store-1453). A host that constructs the server once and keeps it
+// gets the previous reading.
 //
 // Model unit: percent. The reading is rounded to the attribute's whole
 // percent (type "percent", uint8).

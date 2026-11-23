@@ -119,6 +119,10 @@ type WaterHeaterManagementServer struct {
 	srv     *spec.Server
 	booster Booster
 
+	// op serialises Boost and CancelBoost, their host calls included, so
+	// a cancel's end cannot overwrite a boost another session started
+	// while the cancel was at the host (R2-C2-conc-1604).
+	op sync.Mutex
 	// mu serialises the BoostState transitions and their events; it is
 	// never held across a host call.
 	mu       sync.Mutex
@@ -304,6 +308,8 @@ func (s *WaterHeaterManagementServer) boost(ctx context.Context, fields any) (an
 	if err := s.checkBoost(info); err != nil {
 		return nil, err
 	}
+	s.op.Lock()
+	defer s.op.Unlock()
 	if err := s.booster.Boost(ctx, info); err != nil {
 		return nil, fmt.Errorf("energy: Boost: %w", err)
 	}
@@ -346,6 +352,8 @@ func (s *WaterHeaterManagementServer) checkBoost(info BoostInfo) error {
 // it; on success BoostState is Inactive and BoostEnded is emitted
 // (:272, :287).
 func (s *WaterHeaterManagementServer) cancelBoost(ctx context.Context, _ any) (any, error) {
+	s.op.Lock()
+	defer s.op.Unlock()
 	if s.BoostState() != BoostStateActive {
 		return nil, nil
 	}

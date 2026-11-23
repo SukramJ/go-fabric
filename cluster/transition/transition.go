@@ -244,16 +244,28 @@ func (e *Engine) Start(t Transition) error { return e.StartAll(t) }
 func (e *Engine) StartAll(ts ...Transition) error {
 	e.op.Lock()
 	defer e.op.Unlock()
-	var changes []Change
+	var (
+		changes []Change
+		settle  []string
+	)
 	for _, t := range ts {
-		if c, ok := e.startLocked(t); ok {
+		c, ok, ended := e.startLocked(t)
+		if ok {
 			changes = append(changes, c)
 		}
+		if ended {
+			settle = append(settle, t.Name)
+		}
 	}
-	if len(changes) == 0 {
-		return nil
+	var err error
+	if len(changes) > 0 {
+		err = e.cfg.Apply(changes)
 	}
-	return e.cfg.Apply(changes)
+	// The replaced names settle after the command's values are applied, so
+	// a Settled hook that flushes the attribute puts the command's value
+	// on the wire, not the stopped transition's last step (R2-C2-fsm-1401).
+	e.settle(settle)
+	return err
 }
 
 // startLocked is one transition of [StartAll]: it registers a gradual
@@ -268,20 +280,24 @@ func (e *Engine) StartAll(ts ...Transition) error {
 // 6170af84) — cancel's rule reports 0 where something was reported, the
 // same effect; matter.js's replace stops it silently
 // (Transitions.ts:124, :263-284 at db021da0; R2-P6-fsm-1402). A replace by
-// a gradual transition reports its own RemainingTime. The caller holds op.
-func (e *Engine) startLocked(t Transition) (Change, bool) {
+// a gradual transition reports its own RemainingTime. The RemainingTime
+// part runs here; ended reports that the name was ended this way, and the
+// caller runs its Settled after applying the command's changes. The caller
+// holds op.
+func (e *Engine) startLocked(t Transition) (c Change, ok, ended bool) {
 	previous := e.RemainingTime()
 	replaced := e.stopLocked(t.Name)
-	c, ok := e.beginLocked(t)
+	c, ok = e.beginLocked(t)
 	if replaced {
 		e.mu.Lock()
 		_, gradual := e.states[t.Name]
 		e.mu.Unlock()
 		if !gradual {
-			e.endedLocked([]string{t.Name}, previous)
+			e.remainingAfterEndLocked(previous)
+			ended = true
 		}
 	}
-	return c, ok
+	return c, ok, ended
 }
 
 // beginLocked is startLocked after the name's running transition was
@@ -537,11 +553,23 @@ func (e *Engine) cancelLocked(names []string) {
 // any runs, else 0, reported where something was reported before. The
 // caller holds op.
 func (e *Engine) endedLocked(names []string, previous int) {
-	if e.cfg.Settled != nil {
-		for _, name := range names {
-			e.cfg.Settled(name)
-		}
+	e.settle(names)
+	e.remainingAfterEndLocked(previous)
+}
+
+// settle calls Settled for each of names.
+func (e *Engine) settle(names []string) {
+	if e.cfg.Settled == nil {
+		return
 	}
+	for _, name := range names {
+		e.cfg.Settled(name)
+	}
+}
+
+// remainingAfterEndLocked is endedLocked's RemainingTime part. The caller
+// holds op.
+func (e *Engine) remainingAfterEndLocked(previous int) {
 	if !e.idle() {
 		// Ending the longest of several transitions shortens the remaining
 		// time, which a command may report.

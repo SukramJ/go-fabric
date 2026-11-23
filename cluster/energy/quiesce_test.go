@@ -114,3 +114,50 @@ func TestTariffRemountResumesTheTimeSync(t *testing.T) {
 		t.Errorf("armed timers = %d after a second SetEndpoint", n)
 	}
 }
+
+// TestDEMCommandAfterQuiesceArmsNoTimer (R2-P6-conc-1606 follow-on): a
+// command in flight across MatterQuiesce — here one that arms after it —
+// keeps its deadline but arms no timer; the SetEndpoint of a reassembly
+// arms it for the time left. Before, the PowerAdjustRequest and
+// PauseRequest armed their timers on the quiesced server.
+func TestDEMCommandAfterQuiesceArmsNoTimer(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1700000000, 0))
+	srv, err := energy.NewDeviceEnergyManagement(energy.DeviceEnergyConfig{
+		Features: demPFRSet, EsaType: dem.ESATypeEvse, EsaState: energy.EsaStateOnline,
+		AbsMinPower: 1200000, AbsMaxPower: 7600000, Manager: &demHost{}, Clock: clk,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev := &energyEvents{}
+	srv.SetMatterEventEmitter(ev)
+	srv.SetEndpoint(3)
+	t.Cleanup(srv.Close)
+	if err := srv.SetPowerAdjustmentCapability(triggerCapability()); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.SetForecast(triggerForecast(demEpoch(clk.Now()))); err != nil {
+		t.Fatal(err)
+	}
+	srv.MatterQuiesce()
+	if err := demInvoke(srv, dem.CmdPowerAdjustRequest, dem.PowerAdjustRequestRequest{Power: 10000000, Duration: 20, Cause: dem.AdjustmentCauseLocalOptimization}); err != nil {
+		t.Fatal(err)
+	}
+	if err := demInvoke(srv, dem.CmdPauseRequest, dem.PauseRequestRequest{Duration: 20, Cause: dem.AdjustmentCauseLocalOptimization}); err != nil {
+		t.Fatal(err)
+	}
+	if n := clk.Pending(); n != 0 {
+		t.Fatalf("%d timers armed on the quiesced server", n)
+	}
+	clk.Advance(5 * time.Second)
+	ev.take()
+	srv.SetEndpoint(3)
+	if n := clk.Pending(); n != 2 {
+		t.Fatalf("%d timers armed after the remount, want 2", n)
+	}
+	clk.Advance(15 * time.Second)
+	if ids := ev.ids(); len(ids) != 2 || srv.EsaState() != energy.EsaStateOnline {
+		t.Fatalf("after the time left: events %v, ESAState %d", ids, srv.EsaState())
+	}
+}
