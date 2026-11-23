@@ -74,6 +74,7 @@ func TestGrantedACLListFailureIsLogged(t *testing.T) {
 			return nil
 		}},
 		{"webrtc requestor", "node.(*Node).ensureRequestorACL(", "webrtc.requestor.acl_list_failed", func(t *testing.T, cfg *node.Config) []node.Endpoint {
+			t.Helper()
 			cfg.WebRTCRequestor = &node.WebRTCRequestorConfig{GrantFabric: grantAll}
 			ctl, err := device.NewCameraController(device.Options{StableKey: endpoint.StringKey("ctl:1"), Name: "ctl"})
 			if err != nil {

@@ -158,8 +158,12 @@ func TestForgetAndAddFormerPartKeyInOneBatch(t *testing.T) {
 		name  string
 		build func(t *testing.T) node.Endpoint
 	}{
-		{"own key", func(t *testing.T) node.Endpoint { return kitLight(t, partKey) }},
+		{"own key", func(t *testing.T) node.Endpoint {
+			t.Helper()
+			return kitLight(t, partKey)
+		}},
 		{"part key", func(t *testing.T) node.Endpoint {
+			t.Helper()
 			nd, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("fresh"), Name: "fresh"})
 			if err != nil {
 				t.Fatal(err)
@@ -229,9 +233,10 @@ func TestForgetAndAddFormerPartKeyInOneBatch(t *testing.T) {
 
 // servedNumberOf returns the endpoint number n serves key at, a part's key too.
 func servedNumberOf(n *node.Node, key string) (uint16, bool) {
-	for _, e := range n.Endpoints() {
-		if e.Key != nil && e.Key.String() == key {
-			return e.Endpoint, true
+	eps := n.Endpoints()
+	for i := range eps {
+		if eps[i].Key != nil && eps[i].Key.String() == key {
+			return eps[i].Endpoint, true
 		}
 	}
 	return 0, false
