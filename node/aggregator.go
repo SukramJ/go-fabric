@@ -618,7 +618,7 @@ func (b *Batch) Add(ep Endpoint) error {
 	// A key the set holds is judged at the end like a key another
 	// endpoint serves: a Remove or Forget of it in the batch, before or
 	// after, lets the device in (decision 585).
-	if p, _ := a.findLocked(key); p != nil || b.collidesLocked(entries, nil) {
+	if p, _ := a.findLocked(key); p != nil || b.collidesLocked(entries, nil, -1) {
 		b.pending = append(b.pending, pendingCall{kind: heldAdd, seq: b.nextSeq(), key: key, ep: ep, entries: entries})
 		return nil
 	}
@@ -702,10 +702,10 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	if !inSet {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
-	if part.eps[i] == ep {
+	if sameInstance(part.eps[i], ep) {
 		return nil
 	}
-	if b.collidesLocked(entries, part.eps[i]) {
+	if b.collidesLocked(entries, part, i) {
 		b.pending = append(b.pending, pendingCall{kind: heldReplace, seq: b.nextSeq(), key: newKey, ep: ep, entries: entries})
 		return nil
 	}
@@ -752,7 +752,7 @@ func (b *Batch) replaceLocked(seq int, part *partition, i int, newKey string, ep
 func (b *Batch) replaceWithheldLocked(part *partition, i int, key string, entries []surfaceEntry) error {
 	a := b.a
 	old := part.eps[i]
-	err := a.n.recordWithheld(b.ctx, entries, func(k string) bool { return a.servesExceptLocked(k, old) })
+	err := a.n.recordWithheld(b.ctx, entries, func(k string) bool { return a.servesExceptAtLocked(k, part, i) })
 	b.dropLocked(part, i, key)
 	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key, tree: reservationTree(old.Spec())})
 	return err
@@ -870,11 +870,12 @@ func (b *Batch) isDone() bool {
 }
 
 // collidesLocked reports whether a key of entries — an endpoint and its
-// parts — is served by an endpoint of the set other than except (and its
-// parts), or declared by a take the batch holds: such a take is held to
-// the end of the batch (decision 582). a.mu is held.
-func (b *Batch) collidesLocked(entries []surfaceEntry, except Endpoint) bool {
-	if _, ok := b.a.servedOfLocked(entries, except); ok {
+// parts — is served by an endpoint of the set other than the one at i of
+// part (and its parts; part nil: none), or declared by a take the batch
+// holds: such a take is held to the end of the batch (decision 582). a.mu
+// is held.
+func (b *Batch) collidesLocked(entries []surfaceEntry, part *partition, i int) bool {
+	if _, ok := b.a.servedOfLocked(entries, part, i); ok {
 		return true
 	}
 	for _, t := range b.pending {
@@ -972,7 +973,7 @@ func (b *Batch) judgeLocked(t pendingCall) (blocked bool, err error) {
 		if p, _ := a.findLocked(t.key); p != nil {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, t.key)
 		}
-		if k, ok := a.servedOfLocked(entries, nil); ok {
+		if k, ok := a.servedOfLocked(entries, nil, -1); ok {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
 		return false, b.addLocked(t.seq, t.key, t.ep, entries)
@@ -981,14 +982,14 @@ func (b *Batch) judgeLocked(t pendingCall) (blocked bool, err error) {
 		if part == nil || part.scope != b.scope {
 			return false, fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
 		}
-		if part.eps[i] == t.ep {
+		if sameInstance(part.eps[i], t.ep) {
 			return false, nil
 		}
 		entries, err := b.recheckLocked(t.ep)
 		if err != nil {
 			return false, err
 		}
-		if k, ok := a.servedOfLocked(entries, part.eps[i]); ok {
+		if k, ok := a.servedOfLocked(entries, part, i); ok {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
 		return false, b.replaceLocked(t.seq, part, i, t.key, t.ep, entries)
@@ -1029,7 +1030,7 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 		if part == nil || !sameEndpoint(part.eps[i], t.ep) {
 			continue
 		}
-		k, ok := a.servedOfExceptAtLocked(surfaceEntries(t.ep), part, i)
+		k, ok := a.servedOfLocked(surfaceEntries(t.ep), part, i)
 		if !ok {
 			continue
 		}
@@ -1081,11 +1082,38 @@ func (b *Batch) recheckLocked(ep Endpoint) ([]surfaceEntry, error) {
 // servesLocked reports whether the set holds an endpoint, or a part of
 // one, under key; a.mu is held.
 func (a *Aggregator) servesLocked(key string) bool {
+	return a.servesExceptAtLocked(key, nil, -1)
+}
+
+// servedOfLocked returns the first key of entries — an endpoint and its
+// parts — that an endpoint of the set serves, itself or as a part, with
+// the endpoint at i of part and its parts left out (part nil: none). A
+// set that took such an endpoint would assemble two Specs under one key,
+// and that assembly and every later one would fail until the endpoint
+// went (decision 580). a.mu is held.
+func (a *Aggregator) servedOfLocked(entries []surfaceEntry, part *partition, i int) (string, bool) {
+	for e := range entries {
+		if a.servesExceptAtLocked(entries[e].key, part, i) {
+			return entries[e].key, true
+		}
+	}
+	return "", false
+}
+
+// servesExceptAtLocked is servesLocked with the endpoint at i of part
+// (and its parts) left out, part nil: none. The endpoint left out is named
+// by its place, never compared, so an endpoint of an uncomparable type is
+// judged as any other, and another endpoint of its type is not left out
+// with it (review II, R4-api-4703); a.mu is held.
+func (a *Aggregator) servesExceptAtLocked(key string, part *partition, i int) bool {
 	for _, p := range a.parts {
-		for _, ep := range p.eps {
-			entries := surfaceEntries(ep)
-			for i := range entries {
-				if entries[i].key == key {
+		for j, ep := range p.eps {
+			if p == part && j == i {
+				continue
+			}
+			served := surfaceEntries(ep)
+			for s := range served {
+				if served[s].key == key {
 					return true
 				}
 			}
@@ -1094,47 +1122,10 @@ func (a *Aggregator) servesLocked(key string) bool {
 	return false
 }
 
-// servedOfLocked returns the first key of entries — an endpoint and its
-// parts — that an endpoint of the set serves, itself or as a part, with
-// except and its parts left out (nil: none). A set that took such an
-// endpoint would assemble two Specs under one key, and that assembly and
-// every later one would fail until the endpoint went (decision 580).
-// a.mu is held.
-func (a *Aggregator) servedOfLocked(entries []surfaceEntry, except Endpoint) (string, bool) {
-	for i := range entries {
-		if a.servesExceptLocked(entries[i].key, except) {
-			return entries[i].key, true
-		}
-	}
-	return "", false
-}
-
-// servedOfExceptAtLocked is servedOfLocked with the endpoint at i of part
-// (and its parts) left out, named by its place rather than compared, so
-// an endpoint of an uncomparable type is judged as any other; a.mu is
-// held.
-func (a *Aggregator) servedOfExceptAtLocked(entries []surfaceEntry, part *partition, i int) (string, bool) {
-	for e := range entries {
-		for _, p := range a.parts {
-			for j, ep := range p.eps {
-				if p == part && j == i {
-					continue
-				}
-				served := surfaceEntries(ep)
-				for s := range served {
-					if served[s].key == entries[e].key {
-						return entries[e].key, true
-					}
-				}
-			}
-		}
-	}
-	return "", false
-}
-
-// sameEndpoint reports whether x and y are the same endpoint. An
-// endpoint of an uncomparable type cannot be told from another of its
-// type and counts as the same: the caller has matched it by its key.
+// sameEndpoint reports whether x and y are the same endpoint, for a
+// caller that matched both by one key. An endpoint of an uncomparable
+// type cannot be told from another of its type and counts as the same:
+// the key matched it.
 func sameEndpoint(x, y Endpoint) bool {
 	tx := reflect.TypeOf(x)
 	if tx != reflect.TypeOf(y) {
@@ -1146,23 +1137,18 @@ func sameEndpoint(x, y Endpoint) bool {
 	return x == y
 }
 
-// servesExceptLocked is servesLocked with the endpoint except (and its
-// parts) left out; a.mu is held.
-func (a *Aggregator) servesExceptLocked(key string, except Endpoint) bool {
-	for _, p := range a.parts {
-		for _, ep := range p.eps {
-			if ep == except {
-				continue
-			}
-			entries := surfaceEntries(ep)
-			for i := range entries {
-				if entries[i].key == key {
-					return true
-				}
-			}
-		}
+// sameInstance reports whether y is the very endpoint x — the one
+// instance, so a Replace by it changes nothing the set serves. An
+// endpoint of an uncomparable type cannot be shown to be the instance it
+// replaces and never is: a Replace by one is applied, as a Replace by a
+// new pointer is (review II, R4-api-4703). [Batch.Replace]'s no-op and a
+// held Replace's are judged by it.
+func sameInstance(x, y Endpoint) bool {
+	tx := reflect.TypeOf(x)
+	if tx == nil || tx != reflect.TypeOf(y) || !tx.Comparable() {
+		return false
 	}
-	return false
+	return x == y
 }
 
 // attach binds ep to the node when it is a device; the returned detach is
