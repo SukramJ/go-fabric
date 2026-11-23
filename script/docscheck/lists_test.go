@@ -230,9 +230,9 @@ var variableKeySites = map[string][]string{
 	},
 	// settingPrefix + DatastoreConfig.Key, set by the constructor
 	"cluster/jointfabric/datastore.go:Datastore.persistLocked": {"jointfabric.datastore:<key>"},
-	// ThermostatUIConfig.SettingKey, DefaultKeypadLockoutSetting when empty
-	"cluster/thermo/thermostatuserinterfaceconfiguration.go:persistingSink.MatterWriteAttribute": {"thermostat_user_interface_configuration.keypad_lockout"},
-	"cluster/thermo/thermostatuserinterfaceconfiguration.go:ThermostatUIServer.SetAttributes":    {"thermostat_user_interface_configuration.keypad_lockout"},
+	// keypadSaves.key: ThermostatUIConfig.SettingKey, DefaultKeypadLockoutSetting
+	// when empty; the host's and the controller's saves both go through it
+	"cluster/thermo/thermostatuserinterfaceconfiguration.go:keypadSaves.save": {"thermostat_user_interface_configuration.keypad_lockout"},
 	// settingCertificates + Key and settingEndpoints + Key, set by the two constructors
 	"cluster/tls/persist.go:save": {"tls.certificates:<key>", "tls.endpoints:<key>"},
 	// SettingStore.Key, DefaultSettingKey when empty, and FabricKey
