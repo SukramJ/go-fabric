@@ -57,7 +57,11 @@ type Observers struct {
 	// ran (store.OwedFabricEvent), so it reaches the host at least once:
 	// after a crash between the rollback and this hook — or in the
 	// moment after the hook — the next Start runs it, and a host may hear
-	// the same removal twice. One residual: a store upgraded from a release
+	// the same removal twice. A hook registered with [Node.ObserveAsync]
+	// counts as run once its queued call ran: the event is acknowledged
+	// behind it on the callback queue, and one whose call the queue may
+	// have dropped at its bound stays owed for the next Start (decision
+	// 600, review II R4-err-4751). One residual: a store upgraded from a release
 	// before schema v8 that went down inside a fail-safe window owes the
 	// removal of that window's AddNOC in memory only — it reaches the host
 	// only if the first process on the upgraded store starts.

@@ -68,5 +68,6 @@ func contain(logger *slog.Logger, event string, fn func()) {
 // queued wraps fn to run on the node's callback goroutine, one call after
 // the other, while the node runs; Stop returns once every queued call ran.
 func (n *Node) queued(event string, fn func()) {
+	n.queuedCalls.Add(1)
 	n.callbacks.Enqueue(func() { contain(n.logger, event, fn) })
 }
