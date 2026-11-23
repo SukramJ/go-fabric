@@ -143,3 +143,46 @@ func TestQueueReportsWhatAnOverflowCost(t *testing.T) {
 		}
 	}
 }
+
+// TestQueueExemptCallbacksAreNeverDropped (review II, R4-err-4751,
+// decision 615): a callback queued with EnqueueExempt survives a full
+// queue — it is not dropped at the bound, not counted against it, and
+// runs in its place in the order, the droppable callbacks around it
+// dropped and counted as before.
+func TestQueueExemptCallbacksAreNeverDropped(t *testing.T) {
+	g := inflight.New("device 1")
+	q := serialqueue.New()
+	q.CountIn(func() *inflight.Group { return g })
+	q.Start()
+	release, running := make(chan struct{}), make(chan struct{})
+	q.Enqueue(func() {
+		close(running)
+		<-release
+	})
+	<-running
+	var ran []int
+	q.Enqueue(func() { ran = append(ran, -1) }) // the oldest droppable: dropped
+	q.EnqueueExempt(func() { ran = append(ran, -2) })
+	q.EnqueueExempt(nil) // a no-op
+	const extra = 10
+	for i := range serialqueue.Bound + extra {
+		q.Enqueue(func() { ran = append(ran, i) })
+	}
+	q.EnqueueExempt(func() { ran = append(ran, -3) })
+	if got := q.Len(); got != serialqueue.Bound+2 {
+		t.Fatalf("queued %d callbacks, want the bound %d and the 2 exempt", got, serialqueue.Bound)
+	}
+	if got := q.Dropped(); got != extra+1 {
+		t.Fatalf("dropped %d, want %d", got, extra+1)
+	}
+	close(release)
+	q.Stop()
+	if len(ran) != serialqueue.Bound+2 || ran[0] != -2 || ran[1] != extra || ran[len(ran)-1] != -3 {
+		t.Fatalf("ran %d callbacks, first %v, %v, last %v; want the exempt -2 first, the newest %d droppable from %d, the exempt -3 last",
+			len(ran), ran[0], ran[1], ran[len(ran)-1], serialqueue.Bound, extra)
+	}
+	if g.Busy() {
+		t.Fatalf("counted %v after the queue drained", g.Snapshot())
+	}
+	q.EnqueueExempt(func() { t.Error("an exempt callback ran on a stopped queue") })
+}
