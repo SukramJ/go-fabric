@@ -7,4 +7,17 @@ package discovery
 const (
 	RaceStaggerCeiling = raceStaggerCeiling
 	MaxRaceAttempts    = maxRaceAttempts
+	MaxRaceWaiting     = maxRaceWaiting
 )
+
+// RaceWaiting is how many candidates of the race s wait, found and not
+// yet released.
+func RaceWaiting[W any](s *Session[W]) int {
+	k, ok := s.kind.(*raceKind[W])
+	if !ok {
+		return -1
+	}
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return len(k.waiting)
+}
