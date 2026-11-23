@@ -29,7 +29,7 @@ func TestStringBoundsCountBytes(t *testing.T) {
 	// The standing guard: every string field with a length ceiling of
 	// every provider command and of the ICE candidate struct, by the
 	// converter the contract builds for it.
-	fields := []spec.Field{}
+	fields := make([]spec.Field, 0, len(wpdef.ICECandidateStructDef.Fields))
 	for _, name := range providerCommandNames {
 		fields = append(fields, requestFields(name)...)
 	}
