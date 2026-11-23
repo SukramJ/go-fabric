@@ -469,16 +469,27 @@ func TestRedactShapes(t *testing.T) {
 	inner := &spec.Struct{Name: "S", Fields: []spec.Field{{ID: 0, Name: "Key", Type: octstr, Secret: true}}}
 	structField := &spec.Field{Name: "s", Type: spec.Type{Name: "S", Kind: spec.KindStruct, Struct: inner}}
 	listField := &spec.Field{Name: "l", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: structField}}
+	// A secret-bearing list or struct whose node is another type than its
+	// model is redacted whole — fail closed, ahead of matter.js, whose
+	// redactValue returns such a value unchanged (review II,
+	// R2-C2-sec-1303, owner decision 525).
 	scalar := encode(t, nil, `5`)
+	key := spec.Node{El: tlv.Element{Tag: tlv.ContextTag(0), Type: tlv.TypeOctetStr1, Octets: []byte{0xAA}}}
+	structAsList := spec.Node{El: tlv.Element{Type: tlv.TypeList, IsContainer: true}, Children: []spec.Node{key}}
+	listAsStruct := spec.Node{El: tlv.Element{Type: tlv.TypeStructure, IsContainer: true}, Children: []spec.Node{
+		{El: tlv.Element{Type: tlv.TypeStructure, IsContainer: true}, Children: []spec.Node{key}},
+	}}
 	for name, c := range map[string]struct {
 		f *spec.Field
 		n spec.Node
 	}{
-		"a list model over a scalar":   {listField, scalar},
-		"a struct model over a scalar": {structField, scalar},
+		"a list model over a scalar":        {listField, scalar},
+		"a struct model over a scalar":      {structField, scalar},
+		"a struct model over a TLV list":    {structField, structAsList},
+		"a list model over a TLV structure": {listField, listAsStruct},
 	} {
-		if out := spec.Redact(c.f, c.n); !sameNode(c.n, out) || untyped(t, out) != "5" {
-			t.Errorf("%s: got %s, want the input", name, untyped(t, out))
+		if out := spec.Redact(c.f, c.n); untyped(t, out) != `"(redacted)"` || out.El.Tag != c.n.El.Tag {
+			t.Errorf("%s: got %s, want the node redacted whole under its tag", name, untyped(t, out))
 		}
 	}
 	// A member without a context tag is not a field the model names: kept.

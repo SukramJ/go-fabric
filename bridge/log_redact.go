@@ -30,7 +30,9 @@ const redactedValue = "(redacted)"
 // untyped JSON form of [spec.DecodeJSON] — struct members keyed by field
 // id. It fails closed: a value the writer cannot encode (it writes null
 // for a Go type it does not know) or a form that does not read back is
-// logged as "(redacted)", never raw. A null stays null.
+// logged as "(redacted)", never raw, and a secret-bearing list or struct
+// whose wire form is another type than its model is redacted whole
+// ([spec.Redact]; review II, R2-C2-sec-1303). A null stays null.
 type loggedAttributeValue struct {
 	cluster, attribute uint32
 	v                  im.AttributeValue

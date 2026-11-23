@@ -32,15 +32,16 @@ const redactedText = "(redacted)"
 // model, or without a secret in it ([ContainsSecret]), n comes back as it
 // is.
 //
-// Redact does not fail closed on a shape the model does not describe: a
-// list or struct that holds a secret, whose node is another container
-// type than its model (a struct read as a TLV list, a list as a
-// structure), comes back as it is, unredacted — matter.js's redactValue
-// returns the value unchanged for an array model whose value is not an
-// array and for an object model whose value is not a plain object
-// (matter.js packages/model/src/logic/SecretRedaction.ts:107-108, :114-115
-// at b25ed960). A caller that logs a value it did not encode by the model
-// itself holds the shape to the model first (review II, R2-C2-sec-1303).
+// Redact fails closed on a shape the model does not describe: a list or
+// struct that holds a secret, whose node is another type than its model
+// (a struct read as a TLV list, a list as a structure, either as a
+// scalar), is replaced whole by "(redacted)" under its tag. This is ahead
+// of matter.js, whose redactValue returns the value unchanged for an
+// array model whose value is not an array and for an object model whose
+// value is not a plain object (matter.js
+// packages/model/src/logic/SecretRedaction.ts:107-108, :114-115 at
+// b25ed960): a value whose shape the model cannot walk may hold the
+// secret anywhere (review II, R2-C2-sec-1303, owner decision 525).
 //
 // Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:32-37 at b25ed960
 // (redact), without the Logger.redactSecrets switch.
@@ -108,7 +109,8 @@ func searchSecret(f *Field, visiting map[*Struct]bool) bool {
 
 // redactValue redacts n by f: null first, then the mark, then the walk.
 // Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:91-122 at b25ed960
-// (redactValue).
+// (redactValue), except that a secret-bearing node of another type than
+// its model is redacted whole ([Redact]).
 func redactValue(f *Field, n Node) Node {
 	if isNull(n) {
 		return n
@@ -121,8 +123,8 @@ func redactValue(f *Field, n Node) Node {
 	}
 	switch f.Type.Kind {
 	case KindList:
-		if f.Type.Entry == nil || n.El.Type != tlv.TypeArray {
-			return n
+		if n.El.Type != tlv.TypeArray {
+			return redactedNode(n.El.Tag)
 		}
 		out := Node{El: n.El, Children: make([]Node, len(n.Children))}
 		for i, c := range n.Children {
@@ -130,8 +132,8 @@ func redactValue(f *Field, n Node) Node {
 		}
 		return out
 	case KindStruct:
-		if f.Type.Struct == nil || n.El.Type != tlv.TypeStructure {
-			return n
+		if n.El.Type != tlv.TypeStructure {
+			return redactedNode(n.El.Tag)
 		}
 		return redactMembers(f.Type.Struct, n)
 	default:
