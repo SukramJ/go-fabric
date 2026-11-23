@@ -17,9 +17,9 @@ import (
 	"testing"
 )
 
-// deprecated is one exported identifier whose doc comment carries a
+// deprecatedIdent is one exported identifier whose doc comment carries a
 // paragraph beginning "Deprecated:".
-type deprecated struct {
+type deprecatedIdent struct {
 	name    string // qualified: module-relative package dir + "." + Name[.Member]
 	kind    string // "const", "var", "type", "func", "method", "field"
 	release string // from the paragraph's own "Removable in vX.Y.Z"; "" when it states none
@@ -46,14 +46,14 @@ func deprecationParagraph(doc *ast.CommentGroup) (string, bool) {
 
 // deprecatedIn returns the deprecated exported identifiers one parsed file
 // declares; dir is its module-relative package directory.
-func deprecatedIn(fset *token.FileSet, f *ast.File, dir, rel string) []deprecated {
-	var out []deprecated
+func deprecatedIn(fset *token.FileSet, f *ast.File, dir, rel string) []deprecatedIdent {
+	var out []deprecatedIdent
 	add := func(doc *ast.CommentGroup, name, kind string, at token.Pos) {
 		p, ok := deprecationParagraph(doc)
 		if !ok {
 			return
 		}
-		d := deprecated{name: dir + "." + name, kind: kind, pos: fmt.Sprintf("%s:%d", rel, fset.Position(at).Line)}
+		d := deprecatedIdent{name: dir + "." + name, kind: kind, pos: fmt.Sprintf("%s:%d", rel, fset.Position(at).Line)}
 		if m := removableIn.FindStringSubmatch(p); m != nil {
 			d.release = m[1]
 		}
@@ -177,14 +177,14 @@ var skippedDirs = map[string]bool{"internal": true, "script": true, "examples": 
 // the root and walked with it), outside internal/, script/, examples/,
 // testdata and hidden directories, and returns the deprecated exported
 // identifiers, sorted by name.
-func treeDeprecations(t *testing.T) []deprecated {
+func treeDeprecations(t *testing.T) []deprecatedIdent {
 	t.Helper()
 	root, err := filepath.Abs(repoRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
 	fset := token.NewFileSet()
-	var out []deprecated
+	var out []deprecatedIdent
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -358,9 +358,9 @@ var releaseNotStated = map[string]bool{
 
 // checkDeprecatedTable holds the table to the tree's deprecated
 // identifiers, both directions, and returns one line per difference.
-func checkDeprecatedTable(idents []deprecated, rows []tableRow, groups map[string]int, noRelease map[string]bool) []string {
+func checkDeprecatedTable(idents []deprecatedIdent, rows []tableRow, groups map[string]int, noRelease map[string]bool) []string {
 	var out []string
-	byName := map[string]deprecated{}
+	byName := map[string]deprecatedIdent{}
 	for _, d := range idents {
 		byName[d.name] = d
 	}
@@ -374,7 +374,7 @@ func checkDeprecatedTable(idents []deprecated, rows []tableRow, groups map[strin
 			out = append(out, fmt.Sprintf("README.md:%d: the first column names nothing", r.line))
 		}
 		for _, n := range r.names {
-			var matched []deprecated
+			var matched []deprecatedIdent
 			switch {
 			case isGroupPattern(n):
 				want, ok := groups[n]
@@ -402,7 +402,7 @@ func checkDeprecatedTable(idents []deprecated, rows []tableRow, groups map[strin
 					out = append(out, fmt.Sprintf("README.md:%d: `%s` is not a deprecated identifier of the tree (removed, renamed, or the paragraph lost its Deprecated:)", r.line, n))
 					continue
 				}
-				matched = []deprecated{d}
+				matched = []deprecatedIdent{d}
 			default:
 				out = append(out, fmt.Sprintf("README.md:%d: `%s` is neither a qualified name (pkg/path.Name[.Member]) nor a group pattern", r.line, n))
 				continue
@@ -479,42 +479,45 @@ func TestReadmeDeprecatedTable(t *testing.T) {
 // unexported name, an embedded interface and an undeprecated member are
 // not.
 func TestDeprecatedInReadsEveryDeclarationKind(t *testing.T) {
+	// The markers are spelled DEP here and replaced below, so the module's
+	// own marker scan (deprecation_policy_test.go) does not read this
+	// fixture as a deprecation of the module.
 	src := `package demo
 
 // F does a thing.
 //
-// Deprecated: use G. Removable in v0.9.0.
+// DEP use G. Removable in v0.9.0.
 func F() {}
 
-// Deprecated: use N.
+// DEP use N.
 // Removable in
 // v0.9.1.
 func (s *S[T]) M() {}
 
-// Deprecated: gone. Removable in v0.9.2.
+// DEP gone. Removable in v0.9.2.
 type T struct{}
 
 // S holds.
 type S[T any] struct {
-	// Deprecated: use B. removable in v0.9.3.
+	// DEP use B. removable in v0.9.3.
 	A int
-	// Deprecated: embedded. Removable in v0.9.4.
+	// DEP embedded. Removable in v0.9.4.
 	*T
 	// B says Deprecated: in a sentence, which is no marker.
 	B int
-	// Deprecated: unexported. Removable in v0.9.5.
+	// DEP unexported. Removable in v0.9.5.
 	c int
 }
 
 // I is an interface.
 type I interface {
-	// Deprecated: use N. Removable in v0.9.6.
+	// DEP use N. Removable in v0.9.6.
 	Old()
-	// Deprecated: an embedded interface is no method. Removable in v0.9.9.
+	// DEP an embedded interface is no method. Removable in v0.9.9.
 	Base
 }
 
-// Deprecated: the group. Removable in v0.9.7.
+// DEP the group. Removable in v0.9.7.
 const (
 	C1 = 1
 	C2, c3 = 2, 3
@@ -522,13 +525,14 @@ const (
 
 var (
 	V1 = 1
-	// Deprecated: one spec.
+	// DEP one spec.
 	V2 = 2
 )
 
-// Deprecated: unexported. Removable in v0.9.8.
+// DEP unexported. Removable in v0.9.8.
 func h() {}
 `
+	src = strings.ReplaceAll(src, "// DEP ", "// "+"Deprecated: ")
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "demo.go", src, parser.ParseComments)
 	if err != nil {
@@ -561,7 +565,7 @@ func h() {}
 // that differs from the paragraph's, a paragraph without a release that
 // releaseNotStated does not list, and a stale list entry.
 func TestCheckDeprecatedTableBothDirections(t *testing.T) {
-	idents := []deprecated{
+	idents := []deprecatedIdent{
 		{name: "a.F", release: "v0.3.0", pos: "a/f.go:1"},
 		{name: "a.T.M", release: "v0.3.0", pos: "a/f.go:2"},
 		{name: "g/one.Feature", release: "v0.4.0", pos: "g/one/f.go:1"},
@@ -580,7 +584,7 @@ func TestCheckDeprecatedTableBothDirections(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name      string
-		idents    []deprecated
+		idents    []deprecatedIdent
 		rows      []tableRow
 		groups    map[string]int
 		noRelease map[string]bool
