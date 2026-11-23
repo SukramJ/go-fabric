@@ -700,11 +700,29 @@ func (n *Node) AutoSubscribe() bool {
 
 // Disable takes the node offline and keeps it so, persisted
 // (NetworkClient.ts:344-349) — ClientNode.disable (ClientNode.ts:236-250).
+//
+// The node is marked disabled, and the mark saved, before it is stopped:
+// a Start that runs while the stop is under way — the registry's
+// AutoStart, a host's Enable or Start on another goroutine, a hook — is
+// refused with [ErrDisabled] instead of bringing back online a node that
+// is persisted as disabled (review II, R2-C2-conc-2353). A Stop that fails
+// takes the mark back and returns its error, so a failed Disable leaves
+// the node enabled as before.
 func (n *Node) Disable(ctx context.Context) error {
-	if n.Disabled() {
+	n.mu.Lock()
+	if n.settings.disabled {
+		n.mu.Unlock()
 		return nil
 	}
+	n.settings.disabled = true
+	n.saveSettingsLocked()
+	n.mu.Unlock()
 	if err := n.Stop(ctx); err != nil {
+		n.mu.Lock()
+		n.settings.disabled = false
+		n.saveSettingsLocked()
+		n.mu.Unlock()
+		n.recompute()
 		return err
 	}
 	// Every subscription of the node goes, not only the default one:
@@ -715,10 +733,6 @@ func (n *Node) Disable(ctx context.Context) error {
 	if ia, err := n.interaction(); err == nil {
 		ia.CloseSubscriptions()
 	}
-	n.mu.Lock()
-	n.settings.disabled = true
-	n.saveSettingsLocked()
-	n.mu.Unlock()
 	n.recompute()
 	return nil
 }
