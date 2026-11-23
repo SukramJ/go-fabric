@@ -78,9 +78,12 @@ type OTASoftwareUpdateRequestor struct {
 	// mu guards the emitter, the endpoint, the attribute state, the
 	// persisted state and the query state: every field below it up to
 	// stopped, wg aside (a WaitGroup).
-	mu       sync.Mutex
-	emitter  contract.EventEmitter
-	endpoint uint16
+	mu sync.Mutex
+	// persistMu serialises persist: snapshot and save are one step
+	// (R2-C2-store-1203). Taken before mu, never under it.
+	persistMu sync.Mutex
+	emitter   contract.EventEmitter
+	endpoint  uint16
 
 	// Attribute state.
 	defaults       []otadef.ProviderLocation
@@ -1176,11 +1179,16 @@ func (r *OTASoftwareUpdateRequestor) load(ctx context.Context) error {
 	return nil
 }
 
-// persist stores the active providers and the update in progress.
+// persist stores the active providers and the update in progress. The
+// snapshot and its save are one step under persistMu: two persists store
+// in the order of their snapshots, so an older one held up in the store
+// never lands after a newer one (review II, R2-C2-store-1203).
 func (r *OTASoftwareUpdateRequestor) persist(ctx context.Context) {
 	if r.cfg.Store == nil {
 		return
 	}
+	r.persistMu.Lock()
+	defer r.persistMu.Unlock()
 	r.mu.Lock()
 	st := persistedState{}
 	for _, a := range r.active {
