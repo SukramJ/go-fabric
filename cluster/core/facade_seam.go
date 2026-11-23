@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"thingfabric.dev/go-fabric/internal/facadeseam"
+	"thingfabric.dev/go-fabric/store"
 )
 
 func init() {
@@ -40,6 +41,16 @@ func init() {
 		o.mu.Unlock()
 		return true
 	}
+	facadeseam.SetOwedFabricEvent = func(server any, fn func(context.Context, func(context.Context), func(context.Context))) bool {
+		o, ok := server.(*OperationalCredentials)
+		if !ok || o == nil {
+			return false
+		}
+		o.mu.Lock()
+		o.facadeOwedFabricEvent = fn
+		o.mu.Unlock()
+		return true
+	}
 	facadeseam.WithACLWriteLock = func(server any, fn func()) bool {
 		a, ok := server.(*AccessControl)
 		if !ok || a == nil {
@@ -65,4 +76,24 @@ func chainFabricHooks(facade, host func(context.Context, uint8)) func(context.Co
 		facade(ctx, fabricIndex)
 		host(ctx, fabricIndex)
 	}
+}
+
+// deliverOwedFabricEvent runs hooks, the fan-out of a rollback that
+// landed, and then acknowledges the owed events of kind the store holds
+// for fabricIndex (ackOwedFabricEvents) — through the node facade's slot
+// when it is set (internal/facadeseam.SetOwedFabricEvent), which
+// acknowledges only once the ObserveAsync hooks hooks queued ran (review
+// II, R4-err-4751b, decisions 616, 622); directly otherwise. nocMu is not
+// held.
+func (o *OperationalCredentials) deliverOwedFabricEvent(ctx context.Context, kind store.FabricPending, fabricIndex uint8, hooks func(context.Context)) {
+	o.mu.RLock()
+	deliver := o.facadeOwedFabricEvent
+	o.mu.RUnlock()
+	ack := func(ctx context.Context) { o.ackOwedFabricEvents(ctx, kind, fabricIndex) }
+	if deliver == nil {
+		hooks(ctx)
+		ack(ctx)
+		return
+	}
+	deliver(ctx, hooks, ack)
 }
