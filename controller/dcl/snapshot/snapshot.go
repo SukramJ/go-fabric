@@ -11,7 +11,7 @@
 // packages/protocol/src/dcl/DclCertificateService.ts:344-348, :1466-1536
 // at db021da0; the manifest's fields are SeedTypes.ts SeedSource and
 // CertSeedEntry), as a [attestation.PAAStore] of its own that
-// attestation.Trust layers with the online ctldcl.CertificateStore.
+// attestation.Trust layers with the online controller/dcl.CertificateStore.
 //
 // The snapshot holds trust anchors only. Revocation stays online (a relying
 // party's duty under the Matter PKI Certificate Policy, §1.4.5, §4.9.6):
