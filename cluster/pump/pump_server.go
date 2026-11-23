@@ -32,9 +32,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"thingfabric.dev/go-fabric/cluster"
 	"thingfabric.dev/go-fabric/cluster/spec"
@@ -302,6 +304,12 @@ type Server struct {
 	emitter  contract.EventEmitter
 	endpoint uint16
 	mounted  bool // the endpoint is known ([Server.SetEndpoint])
+
+	// admitted holds, per mode attribute, the last value the host
+	// reported that the selection admits, served in place of one it does
+	// not (R2-C2-wire-1553); before any, the first value of the enum the
+	// selection admits.
+	admitted map[uint32]*atomic.Uint32
 }
 
 // Compile-time assertions.
@@ -363,7 +371,17 @@ func NewServer(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pump: %w", err)
 	}
-	return &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg, inst: inst}, nil
+	s := &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg, inst: inst, admitted: map[uint32]*atomic.Uint32{}}
+	for id, def := range modeEnums {
+		s.admitted[id] = new(atomic.Uint32)
+		for _, ev := range def.Values {
+			if _, err := inst.CheckValue(id, ev.Value, nil); err == nil {
+				s.admitted[id].Store(uint32(ev.Value)) //nolint:gosec // an enum8 value
+				break
+			}
+		}
+	}
+	return s, nil
 }
 
 func implements[T any](v any) bool {
@@ -445,7 +463,11 @@ func (s *Server) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, valu
 	s.veto.Set(fn)
 }
 
-// MatterRead resolves an attribute.
+// MatterRead resolves an attribute. Host values are held to the
+// attribute on the way out: PumpStatus is masked to its defined bits, the
+// nullable ranges are capped, and an OperationMode, ControlMode or their
+// Effective twin the selection does not admit is logged and the last
+// admitted one served instead (R2-C2-wire-1553).
 func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	if v, ok := s.inst.ReadGlobal(attrID); ok {
 		return v, true
@@ -462,9 +484,9 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 		// A bitmap carries only its defined bits.
 		return uint16(st.PumpStatus) & uint16(pumpdef.PumpStatusBitmapDef.Defined()), true //nolint:gosec // a map16's bits
 	case AttrEffectiveOperationMode:
-		return uint8(st.EffectiveOperationMode), true
+		return s.admit(attrID, uint8(st.EffectiveOperationMode)), true
 	case AttrEffectiveControlMode:
-		return uint8(st.EffectiveControlMode), true
+		return s.admit(attrID, uint8(st.EffectiveControlMode)), true
 	case AttrCapacity:
 		return nullableInt16(st.Capacity), true
 	case AttrSpeed:
@@ -476,10 +498,38 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	case AttrLifetimeEnergyConsumed:
 		return nullableUint32(st.LifetimeEnergyConsumed, maxUint32), true
 	case AttrOperationMode:
-		return uint8(st.OperationMode), true
+		return s.admit(attrID, uint8(st.OperationMode)), true
 	default: // AttrControlMode, the last one MatterAttributes can list
-		return uint8(st.ControlMode), true
+		return s.admit(attrID, uint8(st.ControlMode)), true
 	}
+}
+
+// logger is the server's logger: the process default (Config carries
+// none).
+func (*Server) logger() *slog.Logger { return slog.Default() }
+
+// modeEnums are the enum attributes [Server.MatterRead] holds to the
+// selection on the way out.
+var modeEnums = map[uint32]*spec.Enum{
+	AttrEffectiveOperationMode: pumpdef.OperationModeEnumDef,
+	AttrOperationMode:          pumpdef.OperationModeEnumDef,
+	AttrEffectiveControlMode:   pumpdef.ControlModeEnumDef,
+	AttrControlMode:            pumpdef.ControlModeEnumDef,
+}
+
+// admit is the host's enum value v of attrID when the selection admits
+// it, remembered as the last admitted one; the last admitted one
+// otherwise, with a warning (R2-C2-wire-1553).
+func (s *Server) admit(attrID uint32, v uint8) uint8 {
+	last := s.admitted[attrID]
+	if _, err := s.inst.CheckValue(attrID, uint64(v), nil); err == nil {
+		last.Store(uint32(v))
+		return v
+	}
+	served := uint8(last.Load()) //nolint:gosec // a stored uint8
+	s.logger().Warn("matter.pump.inbound_value_not_admitted",
+		slog.Int("attribute", int(attrID)), slog.Int("value", int(v)), slog.Int("served", int(served)))
+	return served
 }
 
 // signedLimits and unsignedLimits read the fixed limit attributes of
