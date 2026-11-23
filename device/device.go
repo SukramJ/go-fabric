@@ -805,85 +805,22 @@ var errRebound = errors.New("device: rebound during AddPart")
 // (R2-C2-fsm-2506: one AddPart per component moved the earlier
 // components into a device the constructor then discarded).
 func (d *Device) addParts(parts ...*Device) error {
-	for _, p := range parts {
-		if p == nil {
-			return fmt.Errorf("%w: %s: nil part", ErrComposition, d.typ.Name)
-		}
-		if p.bridgedPowerSource {
-			return fmt.Errorf("%w: %s: the part %s declares PowerSource, which BridgedNode allows on a bridged device under BridgedPowerSourceInfo; a part is no bridged node",
-				ErrComposition, d.typ.Name, p.typ.Name)
-		}
-		if !composes(d.typ, p.typ) {
-			return fmt.Errorf("%w: %s (%s) states no component device type %s; its parts must be device types its requirements name",
-				ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
-		}
-	}
-	type move struct {
-		tree  []*Device
-		bound bool
+	if err := d.partTypeRefusal(parts); err != nil {
+		return err
 	}
 	var (
-		moves []move
+		moves []partMove
 		h     deviceseam.Host
 	)
 	for {
 		via := d.hostOf()
-		// section is the check and the move, one step under composeMu;
-		// on a bound device it runs inside the node's AdmitParts, which
-		// checks the keys against the node's set (check nil: unbound).
+		// The check and the move are one step under composeMu; on a bound
+		// device inside the node's AdmitParts, which checks the keys
+		// against the node's set (check nil: unbound).
 		section := func(check func(endpoint.SourceKey) error) error {
-			composeMu.Lock()
-			defer composeMu.Unlock()
-			if d.hostOf() != via {
-				return errRebound
-			}
-			for _, p := range parts {
-				if err := d.moveRefusalLocked(p); err != nil {
-					return err
-				}
-			}
-			if check != nil {
-				for _, p := range parts {
-					// A part of d's already, or one this node holds,
-					// serves its keys as itself.
-					if p.owner.Load() == d || p.hostOf() == via {
-						continue
-					}
-					for _, x := range p.treeLocked() {
-						if x.opts.StableKey == nil {
-							continue
-						}
-						if err := check(x.opts.StableKey); err != nil {
-							return fmt.Errorf("%s: the part %s: %w", d.typ.Name, x.opts.StableKey, err)
-						}
-					}
-				}
-			}
-			moves, h = nil, nil
-			for _, p := range parts {
-				former := p.owner.Load()
-				if former == d {
-					continue
-				}
-				// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
-				if former != nil {
-					former.mu.Lock()
-					former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
-					former.mu.Unlock()
-				}
-				p.owner.Store(d)
-				d.mu.Lock()
-				d.parts = append(d.parts, p)
-				h = d.host
-				d.mu.Unlock()
-				tree := p.treeLocked()
-				bound := p.hostOf() != nil
-				for _, x := range tree {
-					x.setHost(h)
-				}
-				moves = append(moves, move{tree, bound})
-			}
-			return nil
+			var err error
+			moves, h, err = d.composeLocked(parts, via, check)
+			return err
 		}
 		var err error
 		if via == nil {
@@ -908,6 +845,103 @@ func (d *Device) addParts(parts ...*Device) error {
 		if h != nil {
 			for _, x := range m.tree {
 				x.start()
+			}
+		}
+	}
+	return nil
+}
+
+// partTypeRefusal is the refusal of parts that reads no device tree: a
+// nil part, a bridged power source, a device type d does not compose.
+func (d *Device) partTypeRefusal(parts []*Device) error {
+	for _, p := range parts {
+		if p == nil {
+			return fmt.Errorf("%w: %s: nil part", ErrComposition, d.typ.Name)
+		}
+		if p.bridgedPowerSource {
+			return fmt.Errorf("%w: %s: the part %s declares PowerSource, which BridgedNode allows on a bridged device under BridgedPowerSourceInfo; a part is no bridged node",
+				ErrComposition, d.typ.Name, p.typ.Name)
+		}
+		if !composes(d.typ, p.typ) {
+			return fmt.Errorf("%w: %s (%s) states no component device type %s; its parts must be device types its requirements name",
+				ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
+		}
+	}
+	return nil
+}
+
+// partMove is one part's tree moved into a device, and whether it was
+// bound to a node before.
+type partMove struct {
+	tree  []*Device
+	bound bool
+}
+
+// composeLocked takes composeMu and, when d is still bound to via, runs
+// every refusal of parts and then moves them into d; it returns the moves
+// and the node d is bound to. check (nil on an unbound d) is the node's
+// refusal of a key it serves already. errRebound: d's node changed since
+// via was read.
+func (d *Device) composeLocked(parts []*Device, via deviceseam.Host, check func(endpoint.SourceKey) error) ([]partMove, deviceseam.Host, error) {
+	composeMu.Lock()
+	defer composeMu.Unlock()
+	if d.hostOf() != via {
+		return nil, nil, errRebound
+	}
+	for _, p := range parts {
+		if err := d.moveRefusalLocked(p); err != nil {
+			return nil, nil, err
+		}
+	}
+	if check != nil {
+		if err := d.keyRefusalLocked(parts, via, check); err != nil {
+			return nil, nil, err
+		}
+	}
+	var (
+		moves []partMove
+		h     deviceseam.Host
+	)
+	for _, p := range parts {
+		former := p.owner.Load()
+		if former == d {
+			continue
+		}
+		// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
+		if former != nil {
+			former.mu.Lock()
+			former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
+			former.mu.Unlock()
+		}
+		p.owner.Store(d)
+		d.mu.Lock()
+		d.parts = append(d.parts, p)
+		h = d.host
+		d.mu.Unlock()
+		tree := p.treeLocked()
+		bound := p.hostOf() != nil
+		for _, x := range tree {
+			x.setHost(h)
+		}
+		moves = append(moves, partMove{tree, bound})
+	}
+	return moves, h, nil
+}
+
+// keyRefusalLocked is check's refusal of a key of a part's tree that
+// d's node, via, serves already (R4-err-4704); a part of d's already, or
+// one via holds, serves its keys as itself. composeMu is held.
+func (d *Device) keyRefusalLocked(parts []*Device, via deviceseam.Host, check func(endpoint.SourceKey) error) error {
+	for _, p := range parts {
+		if p.owner.Load() == d || p.hostOf() == via {
+			continue
+		}
+		for _, x := range p.treeLocked() {
+			if x.opts.StableKey == nil {
+				continue
+			}
+			if err := check(x.opts.StableKey); err != nil {
+				return fmt.Errorf("%s: the part %s: %w", d.typ.Name, x.opts.StableKey, err)
 			}
 		}
 	}
