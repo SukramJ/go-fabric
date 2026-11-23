@@ -171,3 +171,41 @@ func TestSustainedRetryAfterAnOutageIsNotCarriedOver(t *testing.T) {
 		r.wantAttempts(failures + 2)
 	})
 }
+
+// TestSustainRetriesMergeOverTheDefault: a request's Retries is merged
+// field by field over the default sustained schedule — a zero field takes
+// the default's field, as matter.js RetrySchedule.Configuration does — and
+// NoMaximumInterval / NoJitter say "none" where a zero field cannot
+// (review II, R3-api-3580, owner decision 566).
+func TestSustainRetriesMergeOverTheDefault(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		in   RetrySchedule
+		want RetrySchedule
+	}{
+		{"zero", RetrySchedule{}, DefaultSustainRetries},
+		{"initial only", RetrySchedule{InitialInterval: 5 * time.Second}, RetrySchedule{InitialInterval: 5 * time.Second, BackoffFactor: 2, MaximumInterval: time.Hour, JitterFactor: 0.25}},
+		{"maximum only", RetrySchedule{MaximumInterval: 10 * time.Minute}, RetrySchedule{InitialInterval: 15 * time.Second, BackoffFactor: 2, MaximumInterval: 10 * time.Minute, JitterFactor: 0.25}},
+		{"backoff and jitter", RetrySchedule{BackoffFactor: 3, JitterFactor: 0.5}, RetrySchedule{InitialInterval: 15 * time.Second, BackoffFactor: 3, MaximumInterval: time.Hour, JitterFactor: 0.5}},
+		{"none", RetrySchedule{MaximumInterval: NoMaximumInterval, JitterFactor: NoJitter}, RetrySchedule{InitialInterval: 15 * time.Second, BackoffFactor: 2, MaximumInterval: NoMaximumInterval, JitterFactor: NoJitter}},
+	} {
+		if got := sustainRetries(SubscribeRequest{Retries: tc.in}); got != tc.want {
+			t.Errorf("%s: %+v, want %+v", tc.name, got, tc.want)
+		}
+	}
+
+	// "None" reaches the schedule: no cap at the default's hour, no
+	// jitter at a draw near 1.
+	r := newRetries(sustainRetries(SubscribeRequest{Retries: RetrySchedule{
+		InitialInterval: 40 * time.Minute, MaximumInterval: NoMaximumInterval, JitterFactor: NoJitter,
+	}}), func() float64 { return 0.9999 })
+	if a, b := r.next(), r.next(); a != 40*time.Minute || b != 80*time.Minute {
+		t.Fatalf("no maximum, no jitter: %v, %v", a, b)
+	}
+	// Without them the default's hour and quarter of jitter hold.
+	m := newRetries(sustainRetries(SubscribeRequest{Retries: RetrySchedule{InitialInterval: 40 * time.Minute}}), func() float64 { return 0.5 })
+	if a, b := m.next(), m.next(); a != 45*time.Minute || b != time.Hour {
+		t.Fatalf("merged: %v, %v", a, b)
+	}
+}

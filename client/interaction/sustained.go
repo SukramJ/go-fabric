@@ -27,6 +27,12 @@ import (
 // below 1 (or NaN) as 1, a maximum interval below 0 as none and a jitter
 // factor outside [0, 1] (or NaN) as the bound it passed (0 for NaN) — this
 // module's hardening (review II, R3-api-3580).
+//
+// As a [SubscribeRequest].Retries it is merged field by field over the
+// default sustained schedule ([DefaultSustainRetries]): a zero field takes
+// the default's field. "None" therefore has its own values there:
+// [NoMaximumInterval] and [NoJitter] (review II, R3-api-3580, owner
+// decision 566).
 type RetrySchedule struct {
 	InitialInterval time.Duration
 	BackoffFactor   float64
@@ -35,15 +41,16 @@ type RetrySchedule struct {
 }
 
 // DefaultSustainRetries is the schedule a sustained subscription whose
-// [SubscribeRequest].Retries is the zero value retries on: 15 s, doubling,
+// [SubscribeRequest].Retries is the zero value retries on, and the one a
+// set Retries is merged over field by field: 15 s, doubling,
 // at most an hour, a quarter of jitter, no timeout. Such a subscription
 // reads it unsynchronised when it starts a schedule: a host that changes
 // it does so before its first subscription. Its fields are taken as
 // [RetrySchedule] says, an initial interval of 0 as 1 s.
 //
 // Deprecated: set [SubscribeRequest].Retries, a schedule of the
-// subscription's own; while this variable is kept, the field's zero value
-// reads it as before. Removable in v0.28.0 (review II, R3-api-3580, owner
+// subscription's own; while this variable is kept, the field's zero
+// fields read it. Removable in v0.28.0 (review II, R3-api-3580, owner
 // decision 562).
 //
 // Mirrors matter.js
@@ -56,13 +63,40 @@ var DefaultSustainRetries = RetrySchedule{
 	JitterFactor:    0.25,
 }
 
+// NoMaximumInterval, as the MaximumInterval of a [SubscribeRequest].Retries,
+// leaves the schedule without a maximum interval, where a zero field takes
+// the default schedule's hour. Any negative MaximumInterval means the same.
+const NoMaximumInterval time.Duration = -1
+
+// NoJitter, as the JitterFactor of a [SubscribeRequest].Retries, leaves the
+// schedule without jitter, where a zero field takes the default schedule's
+// quarter. Any negative JitterFactor means the same.
+const NoJitter float64 = -1
+
 // sustainRetries is the schedule req's sustained subscription retries on:
-// its own Retries, or DefaultSustainRetries for the zero value.
+// its Retries merged field by field over DefaultSustainRetries, a zero
+// field taking the default's — matter.js
+// "RetrySchedule.Configuration(SustainedSubscription.DefaultRetrySchedule,
+// sustainRetries)" (packages/protocol/src/action/client/ClientInteraction.ts:266-269),
+// "{ ...defaults, ...config }" (packages/general/src/net/RetrySchedule.ts:114-119)
+// at b25ed960. matter.js sets that configuration per ClientInteraction
+// (ClientInteraction.ts:178, :1175), this module per request (review II,
+// R3-api-3580, owner decision 566).
 func sustainRetries(req SubscribeRequest) RetrySchedule {
-	if req.Retries == (RetrySchedule{}) {
-		return DefaultSustainRetries
+	cfg, o := DefaultSustainRetries, req.Retries
+	if o.InitialInterval != 0 {
+		cfg.InitialInterval = o.InitialInterval
 	}
-	return req.Retries
+	if o.BackoffFactor != 0 {
+		cfg.BackoffFactor = o.BackoffFactor
+	}
+	if o.MaximumInterval != 0 {
+		cfg.MaximumInterval = o.MaximumInterval
+	}
+	if o.JitterFactor != 0 {
+		cfg.JitterFactor = o.JitterFactor
+	}
+	return cfg
 }
 
 // retries yields the intervals of a schedule without timeout or count

@@ -58,3 +58,30 @@ func TestSustainedRetriesPerSubscription(t *testing.T) {
 		<-sub.Done()
 	})
 }
+
+// TestSustainedRetriesMergeOverTheDefault: a request that sets only the
+// initial interval keeps the default schedule's quarter of jitter — the
+// first refused attempt waits 2 s + floor(0.25 × 2000 × 0.5) ms — as
+// matter.js merges RetrySchedule.Configuration field by field (review II,
+// R3-api-3580, owner decision 566).
+func TestSustainedRetriesMergeOverTheDefault(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s := newScripted(t)
+		reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+		c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg, Clock: s.clock, Rand: func() float64 { return 0.5 }})
+		sub, err := c.Subscribe(context.Background(), interaction.SubscribeRequest{
+			Attributes: []im.ConcreteAttributePath{onOff},
+			Sustain:    true,
+			Retries:    interaction.RetrySchedule{InitialInterval: 2 * time.Second},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := s.next(t)
+		s.reply(t, r, im.InteractionModelProtocolID, im.OpcodeStatusResponse, statusResponse(t, im.StatusBusy))
+		s.clock.waitTimer(t, 2250*time.Millisecond)
+		sub.Close()
+		<-sub.Done()
+	})
+}
