@@ -67,6 +67,9 @@ type WiFiNetworkCommissioning struct {
 	loadErr error
 	logger  *slog.Logger
 	clk     clock.Clock
+	// blindWarned logs, once, that only the deprecated fabric-blind port
+	// answers the gate (armedFor).
+	blindWarned sync.Once
 
 	interfaceEnabled bool
 	// networks is the staged list, committed the list a CommissioningComplete
@@ -140,7 +143,15 @@ type WiFiNetworkCommissioningConfig struct {
 	FailSafe func() (fabricIndex uint8, armed bool)
 	// IsFailSafeArmed is the fabric-blind port (armed for any fabric,
 	// GeneralCommissioning.FailSafeArmed); consulted only while FailSafe
-	// is nil. Both nil reads as disarmed.
+	// is nil. Both nil reads as disarmed. While it alone answers,
+	// AddOrUpdateWiFiNetwork, RemoveNetwork and ConnectNetwork pass in any
+	// fabric's fail-safe window, and the server logs that once
+	// (netcomm.failsafe_blind_port).
+	//
+	// Deprecated: wire FailSafe, the fabric-aware port
+	// ([GeneralCommissioning.FailSafeFabric]), instead; this field keeps
+	// its behaviour until it goes and is removable in the next minor
+	// release (review II, R2-C2-sec-1006).
 	IsFailSafeArmed func() bool
 	// SetBreadcrumb writes GeneralCommissioning's Breadcrumb
 	// (UpdateBreadcrumb, :589-593); nil writes none.
@@ -1231,13 +1242,28 @@ func validCredentials(c []byte) bool {
 // :380, :568, :609 at 6170af84): the window must be armed, and armed for
 // the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
 // ([WiFiNetworkCommissioningConfig.IsFailSafeArmed]) answers for any
-// fabric, as before.
+// fabric, as before, and is logged once (R2-C2-sec-1006).
 func (w *WiFiNetworkCommissioning) armedFor(ctx context.Context) bool {
 	if w.failSafe != nil {
 		_, accessing := im.FabricFilterFromContext(ctx)
 		return FailSafeArmedFor(w.failSafe, accessing)
 	}
-	return w.failSafeArmed != nil && w.failSafeArmed()
+	if w.failSafeArmed == nil {
+		return false
+	}
+	w.blindWarned.Do(func() { warnBlindFailSafePort(w.log(), "wifi") })
+	return w.failSafeArmed()
+}
+
+// warnBlindFailSafePort logs that a NetworkCommissioning server gates its
+// network commands on the deprecated fabric-blind fail-safe port alone
+// (R2-C2-sec-1006, decision 515).
+func warnBlindFailSafePort(l *slog.Logger, server string) {
+	l.Warn("netcomm.failsafe_blind_port",
+		slog.String("server", server),
+		slog.String("detail", "only the deprecated fabric-blind IsFailSafeArmed port is wired: "+
+			"the network commands pass in any fabric's fail-safe window; wire FailSafe "+
+			"(GeneralCommissioning.FailSafeFabric)"))
 }
 
 // addOrUpdate is HandleAddOrUpdateWiFiNetwork (:373-451) over the Linux
