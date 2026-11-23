@@ -5,9 +5,11 @@ package discovery
 
 // The race's bounds, for the race tests of package discovery_test.
 const (
-	RaceStaggerCeiling = raceStaggerCeiling
-	MaxRaceAttempts    = maxRaceAttempts
-	MaxRaceWaiting     = maxRaceWaiting
+	RaceStaggerCeiling        = raceStaggerCeiling
+	MaxRaceAttempts           = maxRaceAttempts
+	MaxRaceWaiting            = maxRaceWaiting
+	MaxRaceUnwinding          = maxRaceUnwinding
+	MaxConcurrentPreparations = maxConcurrentPreparations
 )
 
 // RaceWaiting is how many candidates of the race s wait, found and not

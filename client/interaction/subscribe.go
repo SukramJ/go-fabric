@@ -88,6 +88,14 @@ type SubscribeRequest struct {
 	// subscription is lost it is re-established, the peer's reachability
 	// verified first (ClientSubscribe.ts:14-19, SustainedSubscription.ts).
 	Sustain bool
+	// Retries, for a sustained subscription, is the schedule it retries on:
+	// the attempts of one establishment, and the pause before it replaces
+	// a subscription the peer dropped before it lasted the current
+	// interval. The zero value is the default schedule —
+	// [DefaultSustainRetries] while that variable is kept; any other value
+	// is taken as [RetrySchedule] says, a zero field at the schedule's own
+	// default (review II, R3-api-3580, owner decision 562).
+	Retries RetrySchedule
 	// BootstrapRead, for a sustained subscription, runs before an attempt
 	// until it succeeds — the hook of bootstrapWithRead
 	// (SustainedSubscription.ts:187-204), which the node layer fills; an
