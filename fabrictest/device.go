@@ -471,7 +471,9 @@ func (d *Device) stopNode(ctx context.Context, n *node.Node) error {
 // erased store and the same address — matter.js ServerNode.erase, which
 // comes back online when the node was (ServerNode.ts:159-200). A Stop
 // called meanwhile waits for it and takes the device offline after it. A
-// device that is stopped has its store erased and stays stopped.
+// device that is stopped has its store erased and stays stopped. A reset
+// of a running device that fails leaves the device running: the next
+// FactoryReset finishes the reset and brings it back.
 func (d *Device) FactoryReset(ctx context.Context) error {
 	d.actMu.Lock()
 	defer d.actMu.Unlock()
@@ -486,6 +488,14 @@ func (d *Device) FactoryReset(ctx context.Context) error {
 		return n.FactoryReset(ctx)
 	}
 	if err := d.site.Run(ctx, n.FactoryReset); err != nil {
+		// The reset did not finish (node.FactoryReset: a later
+		// FactoryReset finishes it): the device stays running, so the
+		// next FactoryReset brings it back and the next Stop and the
+		// site's closer still reach it (review II, decision 532, the
+		// class of R2-C2-test-2502).
+		d.mu.Lock()
+		d.running = true
+		d.mu.Unlock()
 		return err
 	}
 	if err := d.site.drain(ctx, d.group); err != nil {
