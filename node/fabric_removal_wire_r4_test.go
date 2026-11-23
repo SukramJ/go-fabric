@@ -82,6 +82,13 @@ func TestFabricRemovalReachesAnotherFabricsSubscription(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if err := site.Eventually(ctx, "the report after the removal", func() bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return reports > primed
+			}); err != nil {
+				t.Fatal(err)
+			}
 			if err := site.Step(ctx, 30*time.Second); err != nil {
 				t.Fatal(err)
 			}

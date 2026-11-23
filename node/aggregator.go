@@ -307,7 +307,8 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // after the reassembly. ep is a new instance unless it is the endpoint
 // the key serves (a Replace by that one changes nothing): every cluster of
 // the endpoint starts at a new random DataVersion, and every readable
-// attribute is reported to the running subscriptions, as matter.js
+// attribute but the changes-omitted ones is reported to the running
+// subscriptions, as matter.js
 // announces a re-added endpoint (Datasource.ts:763, ProtocolService.ts:
 // 290-296 at b25ed960; issue #589, decision 592). What a controller wrote
 // under the key — the NodeLabel, the scene table, the Binding, a running
