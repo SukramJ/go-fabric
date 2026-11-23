@@ -121,13 +121,21 @@ const CrossDeviceStagger = time.Second
 const maxRaceAttempts = 16
 
 // maxRaceWaiting is how many of a race's candidates wait, found and not
-// yet released; past it the candidate found longest ago leaves the queue
-// and is not attempted, as the oldest unanswered attempt gives its place
-// to a later candidate. Each waiting candidate holds an entry and a
-// goroutine until the race is decided, so a sender announcing ever-new
-// matching instances would otherwise grow both for the race's length.
-// This module's own bound (review II, R2-C2-bound-2153), at the number of
-// places.
+// yet released, beside those an attempt is already ending for. Past it the
+// candidate found longest ago is treated as at its ceiling at once: it
+// starts in a free place, or ends the oldest unanswered attempt and takes
+// its place, so a device found behind any number of candidates still
+// starts within raceStaggerCeiling while a place holds an unanswered
+// attempt not already ending for an earlier candidate; a sender announcing
+// faster than ended attempts return can still have it dropped. Only when
+// no place can be given — every place holds an answered attempt or one
+// already ending for an earlier candidate — does it leave the queue
+// unattempted. Each waiting candidate holds an entry
+// and a goroutine until the race is decided, so a sender announcing
+// ever-new matching instances would otherwise grow both for the race's
+// length; the queue holds at most maxRaceWaiting + maxRaceAttempts. This
+// module's own bound (review II, R2-C2-bound-2153, R3-bound-3501, owner
+// decision 552), at the number of places.
 const maxRaceWaiting = maxRaceAttempts
 
 // raceStaggerCeiling is the longest a candidate's start waits after it
@@ -256,6 +264,7 @@ type raceKind[W any] struct {
 	// is when the latest was released, and staggerTimer the wait for the
 	// next release.
 	waiting      []*raceAttempt
+	forced       int // the first forced of waiting are treated as at their ceiling
 	active       []*raceAttempt
 	lastRelease  time.Time
 	staggerTimer fabricclock.Timer
@@ -286,6 +295,7 @@ func (k *raceKind[W]) decideLocked() {
 	k.isDecided = true
 	close(k.decided)
 	k.waiting = nil
+	k.forced = 0
 	if k.staggerTimer != nil {
 		k.staggerTimer.Stop()
 		k.staggerTimer = nil
@@ -312,27 +322,82 @@ func (k *raceKind[W]) onDiscovered(s *Session[W], c Candidate) {
 	k.attemptCount++
 	if !k.isDecided {
 		k.waiting = append(k.waiting, a)
-		if len(k.waiting) > maxRaceWaiting {
-			oldest := k.waiting[0]
-			k.waiting = slices.Delete(k.waiting, 0, 1)
-			close(oldest.dropped)
-			s.log.Info("matter.controller.discovery.candidate_dropped", slog.String("discovery", s.description),
-				slog.String("device", oldest.device), slog.String("candidate", a.device), slog.Int("max", maxRaceWaiting))
-		}
 		k.releaseLocked(s)
+		k.overflowLocked(s, a)
 	}
 	k.mu.Unlock()
 	k.pending.Go(func() { k.run(s, c, a) })
 }
 
+// overflowLocked keeps the waiting candidates bounded after a has been
+// found: past maxRaceWaiting beside those an attempt is already ending
+// for, the one found longest ago of the rest is treated as at its ceiling
+// at once when a place can be given to it — a free one, or that of an
+// unanswered attempt not yet ending — and leaves the queue unattempted
+// only when none can. The caller holds k.mu.
+func (k *raceKind[W]) overflowLocked(s *Session[W], a *raceAttempt) {
+	covered := min(k.replacingLocked(), k.dueLocked(s.clock.Now()))
+	if k.isDecided || len(k.waiting)-covered <= maxRaceWaiting {
+		return
+	}
+	if len(k.active) < maxRaceAttempts || k.spareLocked() != nil {
+		k.forced = max(k.forced, covered+1)
+		k.releaseLocked(s)
+		return
+	}
+	oldest := k.waiting[covered]
+	k.waiting = slices.Delete(k.waiting, covered, covered+1)
+	if covered < k.forced {
+		k.forced--
+	}
+	close(oldest.dropped)
+	s.log.Info("matter.controller.discovery.candidate_dropped", slog.String("discovery", s.description),
+		slog.String("device", oldest.device), slog.String("candidate", a.device), slog.Int("max", maxRaceWaiting))
+}
+
+// dueLocked is how many of the first waiting candidates are due a place:
+// the forced ones and those whose ceiling has come. The ceilings follow
+// the order found, so they are a prefix. The caller holds k.mu.
+func (k *raceKind[W]) dueLocked(now time.Time) int {
+	n := k.forced
+	for n < len(k.waiting) && !now.Before(k.waiting[n].foundAt.Add(raceStaggerCeiling)) {
+		n++
+	}
+	return min(n, len(k.waiting))
+}
+
+// replacingLocked is how many running attempts are ending for a later
+// candidate and have not returned. The caller holds k.mu.
+func (k *raceKind[W]) replacingLocked() int {
+	n := 0
+	for _, a := range k.active {
+		if a.replaced {
+			n++
+		}
+	}
+	return n
+}
+
+// spareLocked is the oldest running attempt that has had no answer and is
+// not already ending for a later candidate, or nil. The caller holds k.mu.
+func (k *raceKind[W]) spareLocked() *raceAttempt {
+	for _, a := range k.active {
+		if !a.answered && !a.replaced {
+			return a
+		}
+	}
+	return nil
+}
+
 // releaseLocked releases the waiting attempts whose start has come. The
 // first waiting one starts at once when no attempt runs, else one
 // [CrossDeviceStagger] after the latest release, and at the latest
-// raceStaggerCeiling after it was found. A start needs a place: with
-// maxRaceAttempts running it waits for its ceiling and then ends the
-// oldest running attempt that has had no answer, whose place it takes
-// once that attempt has returned; while every running attempt has had an
-// answer it waits for an attempt to end. The caller holds k.mu.
+// raceStaggerCeiling after it was found; a forced one (overflowLocked)
+// as at its ceiling. A start needs a place: with maxRaceAttempts running
+// each waiting candidate due a place ends the oldest running attempt that
+// has had no answer, whose place goes to the first waiting once it has
+// returned; while every running attempt has had an answer or is already
+// ending they wait for an attempt to end. The caller holds k.mu.
 func (k *raceKind[W]) releaseLocked(s *Session[W]) {
 	if k.staggerTimer != nil {
 		k.staggerTimer.Stop()
@@ -342,6 +407,9 @@ func (k *raceKind[W]) releaseLocked(s *Session[W]) {
 		now := s.clock.Now()
 		next := k.waiting[0]
 		ceiling := next.foundAt.Add(raceStaggerCeiling)
+		if k.forced > 0 {
+			ceiling = now
+		}
 		due := now
 		if len(k.active) > 0 {
 			due = k.lastRelease.Add(CrossDeviceStagger)
@@ -350,17 +418,17 @@ func (k *raceKind[W]) releaseLocked(s *Session[W]) {
 			due = ceiling
 		}
 		if len(k.active) >= maxRaceAttempts {
-			due = ceiling
+			k.replaceLocked(s, now)
+			return
 		}
 		if now.Before(due) {
 			k.armLocked(s, due.Sub(now))
 			return
 		}
-		if len(k.active) >= maxRaceAttempts {
-			k.replaceLocked(s, next)
-			return
-		}
 		k.waiting = k.waiting[1:]
+		if k.forced > 0 {
+			k.forced--
+		}
 		mark := &attemptMark{answered: func() {
 			k.mu.Lock()
 			next.answered = true
@@ -389,27 +457,27 @@ func (k *raceKind[W]) armLocked(s *Session[W], wait time.Duration) {
 	k.staggerTimer = t
 }
 
-// replaceLocked ends the oldest running attempt that has had no answer,
-// for next to take its place when it has returned ([raceKind.ended]) — one
-// at a time: while an attempt so ended has not returned, it does nothing.
-// The caller holds k.mu.
-func (k *raceKind[W]) replaceLocked(s *Session[W], next *raceAttempt) {
-	var oldest *raceAttempt
-	for _, a := range k.active {
-		if a.replaced {
-			return
+// replaceLocked, with every place taken, ends one running attempt for
+// each waiting candidate due a place beyond those already ending — the
+// oldest that has had no answer each time — for the first waiting to take
+// its place when it has returned ([raceKind.ended]); an attempt ends for
+// one candidate only. It then arms the stagger timer for the ceiling of
+// the first candidate not yet due. The caller holds k.mu.
+func (k *raceKind[W]) replaceLocked(s *Session[W], now time.Time) {
+	due := k.dueLocked(now)
+	for ending := k.replacingLocked(); ending < due; ending++ {
+		oldest := k.spareLocked()
+		if oldest == nil {
+			break
 		}
-		if oldest == nil && !a.answered {
-			oldest = a
-		}
+		oldest.replaced = true
+		oldest.cancel()
+		s.log.Info("matter.controller.discovery.attempt_replaced", slog.String("discovery", s.description),
+			slog.String("device", oldest.device), slog.String("candidate", k.waiting[ending].device))
 	}
-	if oldest == nil {
-		return
+	if due < len(k.waiting) {
+		k.armLocked(s, k.waiting[due].foundAt.Add(raceStaggerCeiling).Sub(now))
 	}
-	oldest.replaced = true
-	oldest.cancel()
-	s.log.Info("matter.controller.discovery.attempt_replaced", slog.String("discovery", s.description),
-		slog.String("device", oldest.device), slog.String("candidate", next.device))
 }
 
 // ended is an attempt's end: its place is free, so the next waiting one
