@@ -237,7 +237,19 @@ func (d *Device) startLocked(ctx context.Context) error {
 		if started {
 			return
 		}
-		_ = n.Stop(context.WithoutCancel(ctx))
+		// Under the site's pacing and bounded, as Stop and the site's
+		// closer stop a node: a Start Site.Run gave up on may still be in
+		// flight, and the node's Stop waits for it and runs the started
+		// node's timers on the site's clock — unpaced and unbounded it
+		// would never return (review II, R2-C2-test-2501). The node.build
+		// count ends first, or it would hold the clock without a budget.
+		if building {
+			building = false
+			d.group.Leave(inflight.NodeBuild)
+		}
+		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
+		defer cancel()
+		d.site.logTeardown(fmt.Sprintf("device %d: stop after a failed start", d.index), d.site.Run(stopCtx, n.Stop))
 		if operational != nil {
 			_ = operational.Close()
 		}
