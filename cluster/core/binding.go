@@ -525,7 +525,7 @@ func (b *Binding) replace(origin contract.Origin, build func(before []TargetStru
 		// Nothing to commit; a save a drop owes is made now. Its failure
 		// keeps it owed and is not this write's: the write changed
 		// nothing (R3-store-3052).
-		b.settleOwedLocked(before)
+		_ = b.settleOwedLocked(before)
 		b.writeMu.Unlock()
 		return false, nil
 	}
