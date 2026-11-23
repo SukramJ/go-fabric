@@ -282,7 +282,7 @@ func (g *GroupKeyManagement) loadHeld(ctx context.Context) {
 	for i := range recs {
 		f := recs[i].FabricIndex
 		if rows, err := g.store.ListGroupKeyMappings(ctx, f); err == nil {
-			g.markHeld(&g.mapHeld, f, len(rows) > 0)
+			g.markHeld(false, f, len(rows) > 0)
 		}
 		g.markTableHeld(ctx, f)
 	}
@@ -298,7 +298,7 @@ func (g *GroupKeyManagement) markTableHeld(ctx context.Context, fabric uint8) {
 	}
 	n, ok := g.tableRows(ctx, fabric)
 	if ok {
-		g.markHeld(&g.tableHeld, fabric, n > 0)
+		g.markHeld(true, fabric, n > 0)
 	}
 }
 
@@ -316,10 +316,15 @@ func (g *GroupKeyManagement) tableRows(ctx context.Context, fabric uint8) (int, 
 	return len(rows), true
 }
 
-// markHeld sets or clears fabric's mark in *held, under mu.
-func (g *GroupKeyManagement) markHeld(held *map[uint8]bool, fabric uint8, on bool) {
+// markHeld sets or clears fabric's mark in tableHeld (table) or mapHeld,
+// under mu.
+func (g *GroupKeyManagement) markHeld(table bool, fabric uint8, on bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	held := &g.mapHeld
+	if table {
+		held = &g.tableHeld
+	}
 	if !on {
 		delete(*held, fabric)
 		return
@@ -359,13 +364,13 @@ func (g *GroupKeyManagement) MatterDropFabric(ctx context.Context, fabricIndex u
 	if mapHad {
 		// A list that fails keeps the mark, so a later drop asks again.
 		if rows, err := g.store.ListGroupKeyMappings(ctx, fabricIndex); err == nil && len(rows) == 0 {
-			g.markHeld(&g.mapHeld, fabricIndex, false)
+			g.markHeld(false, fabricIndex, false)
 			moved = append(moved, groupKeyMgmtAttrGroupKeyMap)
 		}
 	}
 	if tableHad {
 		if n, ok := g.tableRows(ctx, fabricIndex); ok && n == 0 {
-			g.markHeld(&g.tableHeld, fabricIndex, false)
+			g.markHeld(true, fabricIndex, false)
 			moved = append(moved, groupKeyMgmtAttrGroupTable)
 		}
 	}
@@ -762,7 +767,7 @@ func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint3
 				return nil, false
 			}
 			if len(mappings) > 0 {
-				g.markHeld(&g.mapHeld, fabric, true)
+				g.markHeld(false, fabric, true)
 			}
 			for _, m := range mappings {
 				out = append(out, GroupKeyMapStruct{
@@ -999,7 +1004,7 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	if err := g.store.ReplaceGroupKeyMappings(ctx, fabric, mappings); err != nil {
 		return false, fmt.Errorf("core: GroupKeyMap write: %w", err)
 	}
-	g.markHeld(&g.mapHeld, fabric, len(mappings) > 0)
+	g.markHeld(false, fabric, len(mappings) > 0)
 	// A GroupKeyMap that changed advances DataVersion so DataVersionFilter
 	// evaluation detects the cluster changed; one written as it was held
 	// returned above.
@@ -1634,7 +1639,7 @@ func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint
 	if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: fabric, GroupID: groupID, GroupKeySetID: keySetID}); err != nil {
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
-	g.markHeld(&g.mapHeld, fabric, true)
+	g.markHeld(false, fabric, true)
 	g.dataVersion.Bump()
 	g.syncGroups(ctx, fabric)
 	return nil
