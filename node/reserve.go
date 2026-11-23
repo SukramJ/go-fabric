@@ -415,7 +415,8 @@ func splitErasures(ops []reservationOp) (pre, erase []reservationOp) {
 // [Aggregator.cancelForget]; keep is cancel without the forgotten keys
 // marked fresh, the keys whose endpoint records the erasure leaves, so a
 // held endpoint is served again at the number it had (decision 560) while
-// a forgotten key added again in the batch starts new. It only reads the partition list: a
+// a forgotten key added again in the batch starts new, and every key of
+// its endpoint's tree with it. It only reads the partition list: a
 // partition retired meanwhile stays retired (R3-store-3701). Run after the
 // batch's pre ops: a re-added key's release has then dropped the
 // reservation it shared.
@@ -449,7 +450,17 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp)
 				continue
 			}
 			hit := false
-			for _, k := range reservationTree(spec) {
+			tree := reservationTree(spec)
+			if fresh[key] {
+				// A forgotten device the batch adds again starts new
+				// with its parts: none of its keys keeps a record, so
+				// a part is not served at the forgotten part's number
+				// either (R3-store-3702 repair, decision 560).
+				for _, k := range tree {
+					fresh[k] = true
+				}
+			}
+			for _, k := range tree {
 				if forgotten[k] {
 					hit = true
 					if !slices.Contains(cancel, k) {
