@@ -21,6 +21,7 @@ package diagevent
 import (
 	"maps"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -83,6 +84,7 @@ const (
 	// resolve carry none. The node's DiagnosticLogs provider serves a
 	// controller [DetailPeer] and [DetailSessionID] only for an event of
 	// its own fabric (review II, R2-C2-sec-2451, decision 524).
+	// [Ring.ForgetFabric] removes it when its fabric is removed.
 	DetailFabricIndex = "fabric_index"
 )
 
@@ -219,6 +221,40 @@ func (r *Ring) Record(e Event) {
 	r.obsMu.Unlock()
 	for _, fn := range fns {
 		fn(cloneEvent(e))
+	}
+}
+
+// ForgetFabric removes fabricIndex from the events the ring holds: an
+// event whose [DetailFabricIndex] names it loses that key and keeps the
+// rest. A host calls it when the fabric is removed. The index is
+// allocated again later to another fabric, and a reader that serves an
+// event's own-fabric details ([DetailPeer], [DetailSessionID]) to the
+// fabric the index names — the node's DiagnosticLogs provider does —
+// would otherwise hand the removed fabric's peer and session to the
+// index's next holder (review II, R3-sec-3403, decision 578).
+//
+// The key is removed rather than the event: an event without
+// [DetailFabricIndex] is one no fabric reads as its own, so nothing the
+// removed fabric alone could read stays readable to a fabric, and the
+// host's trace keeps the moment it explains. An event recorded after the
+// call is not touched. Index 0 names no fabric and changes nothing.
+//
+// Safe on a nil receiver and concurrently with [Ring.Record] and
+// [Ring.Snapshot]; an observer already handed an event keeps its copy.
+func (r *Ring) ForgetFabric(fabricIndex uint8) {
+	if r == nil || fabricIndex == 0 {
+		return
+	}
+	idx := strconv.Itoa(int(fabricIndex))
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.events {
+		if r.events[i].Detail[DetailFabricIndex] != idx {
+			continue
+		}
+		// The ring's own map: Record and Snapshot copy it, so no
+		// caller or observer shares it.
+		delete(r.events[i].Detail, DetailFabricIndex)
 	}
 }
 

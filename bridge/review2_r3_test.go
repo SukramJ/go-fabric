@@ -149,3 +149,48 @@ func TestSigma3EventNamesTheSessionItsStepEstablished(t *testing.T) {
 		t.Errorf("the Sigma3's event names fabric %q, want the established session's fabric 3", got)
 	}
 }
+
+// TestRemovedFabricsEventsAreNotServedToItsIndexsNextHolder
+// (R3-sec-3403, decision 578): a ring event keeps the fabric index of the
+// session it names. When that fabric is removed and its index is later
+// given to another fabric, the next holder's DiagnosticLogs read must not
+// count the removed fabric's events as its own — the node's reader
+// (node/node.go ringLogs) serves peer and session_id for an event whose
+// fabric_index equals the accessing fabric's. After the removal no held
+// event carries the removed index; another fabric's event keeps its own.
+func TestRemovedFabricsEventsAreNotServedToItsIndexsNextHolder(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
+	ring := diagevent.NewRing(16)
+	b.AttachDiagnosticEvents(ring)
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "fabric A's session", Detail: map[string]string{
+		diagevent.DetailPeer: "[fd00::a]:5540", diagevent.DetailSessionID: "17", diagevent.DetailFabricIndex: "2",
+	}})
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "fabric C's session", Detail: map[string]string{
+		diagevent.DetailPeer: "[fd00::c]:5540", diagevent.DetailSessionID: "18", diagevent.DetailFabricIndex: "3",
+	}})
+
+	b.EmitFabricRemoved(2) // fabric A goes; index 2 is free for reuse
+
+	// Fabric B is given index 2 and records its own session.
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "fabric B's session", Detail: map[string]string{
+		diagevent.DetailPeer: "[fd00::b]:5540", diagevent.DetailSessionID: "19", diagevent.DetailFabricIndex: "2",
+	}})
+
+	var own []string
+	keptC := false
+	for _, e := range ring.Snapshot() {
+		if e.Detail[diagevent.DetailFabricIndex] == "2" {
+			own = append(own, e.Message+" peer="+e.Detail[diagevent.DetailPeer])
+		}
+		if e.Message == "fabric C's session" && e.Detail[diagevent.DetailFabricIndex] == "3" {
+			keptC = true
+		}
+	}
+	if len(own) != 1 || own[0] != "fabric B's session peer=[fd00::b]:5540" {
+		t.Fatalf("fabric B (index 2) reads as its own %q, want only its own session", own)
+	}
+	if !keptC {
+		t.Fatal("removing fabric 2 changed fabric 3's event")
+	}
+}
