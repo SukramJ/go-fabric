@@ -344,7 +344,7 @@ func (n *Node) establishDefaultSubscription(ctx context.Context, req SubscribePa
 	sreq := req
 	sreq.Sustain = true
 	n.mu.RLock()
-	sreq.EventFilters = []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
+	sreq.EventFilters = []EventMinimumNumber{{EventMin: n.settings.nextEventMin()}}
 	n.mu.RUnlock()
 	// Mirrors matter.js NetworkClient.ts:164-173: the default subscription
 	// emits events (and raises the cursor) only while it is current.
@@ -528,7 +528,7 @@ func (n *Node) bootstrapRead(ctx context.Context, req SubscribePaths, emitEvents
 	n.mu.RLock()
 	r := ReadPaths{
 		Attributes: req.Attributes, Events: req.Events, NoFabricFilter: req.NoFabricFilter,
-		EventFilters:       []EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}},
+		EventFilters:       []EventMinimumNumber{{EventMin: n.settings.nextEventMin()}},
 		DataVersionFilters: n.s.withKnownVersions(sc, nil, false),
 	}
 	in := n.s.epoch
