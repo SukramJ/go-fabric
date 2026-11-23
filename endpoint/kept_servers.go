@@ -9,29 +9,6 @@ import (
 	"thingfabric.dev/go-fabric/contract"
 )
 
-// StatefulServer is implemented by a materialised cluster server that
-// holds state of its own between reads — SoilMeasurement's last reading
-// inside its limits is the case. The endpoint materialises its measurement
-// and battery servers on every [ClusterServers] call; a server that
-// implements StatefulServer is built once and kept instead: the endpoint
-// hands out the same instance on every later call, and across every
-// [Assembler.Assemble], for as long as the endpoint stays in the topology
-// and its materialisation source is the same value. A removed endpoint
-// drops it with the rest of its state; a new source (a different value
-// under the same [SourceKey]) gets a new instance, because the kept one
-// reads the source it was built on (R2-C2-store-1453, decision 526).
-//
-// Only the servers a measurement kind's materialiser builds are kept: a
-// [contract.EndpointSource]'s own servers are the source's to keep. A
-// host-registered measurement kind opts in by implementing the method on
-// the servers its materialiser returns.
-type StatefulServer interface {
-	contract.ClusterServer
-	// MatterKeepInstance marks the server as kept across
-	// materialisations; it is never called.
-	MatterKeepInstance()
-}
-
 // keptSlot names which of the endpoint's materialisation sources a kept
 // server was built from.
 type keptSlot uint8
@@ -53,7 +30,7 @@ type keptServer struct {
 	srv contract.ClusterServer
 }
 
-// keepStateful replaces every [StatefulServer] in built — what the
+// keepStateful replaces every [contract.StatefulServer] in built — what the
 // materialiser of slot just built from src — by the instance the endpoint
 // keeps for that slot and cluster when it was built from the same source,
 // and keeps the new one otherwise. A kept server of the slot whose cluster
@@ -65,7 +42,7 @@ func (e *Endpoint) keepStateful(slot keptSlot, src any, built []contract.Cluster
 	defer st.mu.Unlock()
 	seen := map[uint32]struct{}{}
 	for i, s := range built {
-		if _, ok := s.(StatefulServer); !ok {
+		if _, ok := s.(contract.StatefulServer); !ok {
 			continue
 		}
 		key := keptKey{slot: slot, cluster: s.MatterClusterID()}

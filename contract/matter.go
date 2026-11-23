@@ -110,6 +110,31 @@ type ClusterServer interface {
 	MatterReportable() []uint32
 }
 
+// StatefulServer is implemented by a cluster server that an endpoint
+// materialises and that holds state of its own between reads —
+// SoilMeasurement's last reading inside its limits is the case. The
+// endpoint materialises its measurement and battery servers on every
+// endpoint.ClusterServers call; a server that implements StatefulServer
+// is built once and kept instead: the endpoint hands out the same
+// instance on every later call, and across every endpoint
+// Assembler.Assemble, for as long as the endpoint stays in the topology
+// and its materialisation source is the same value. A removed endpoint
+// drops it with the rest of its state; a new source (a different value
+// under the same endpoint.SourceKey) gets a new instance, because the
+// kept one reads the source it was built on (R2-C2-store-1453,
+// decisions 526 and 540).
+//
+// Only the servers a measurement kind's materialiser builds are kept: an
+// [EndpointSource]'s own servers are the source's to keep. A
+// host-registered measurement kind opts in by implementing the method on
+// the servers its materialiser returns.
+type StatefulServer interface {
+	ClusterServer
+	// MatterKeepInstance marks the server as kept across
+	// materialisations; it is never called.
+	MatterKeepInstance()
+}
+
 // FabricScopedReader is the optional capability a [ClusterServer]
 // can implement when one or more of its attributes are fabric-sensitive
 // (Matter §7.5.2 — fabric-scoped fields). When a cluster server

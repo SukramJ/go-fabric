@@ -175,7 +175,12 @@ func TestSoilMaterializedReadKeepsNoPreviousReading(t *testing.T) {
 	if v := read(kept); v != uint8(40) {
 		t.Errorf("out of limits through the kept instance: %v, want 40", v)
 	}
-	if _, ok := kept.(interface{ MatterKeepInstance() }); !ok {
-		t.Error("SoilMeasurementServer does not opt into the endpoint's kept servers (MatterKeepInstance)")
+	stateful, ok := kept.(contract.StatefulServer)
+	if !ok {
+		t.Fatal("SoilMeasurementServer does not opt into the endpoint's kept servers (contract.StatefulServer)")
+	}
+	stateful.MatterKeepInstance() // the marker is a no-op: the reading stands
+	if v := read(kept); v != uint8(40) {
+		t.Errorf("after MatterKeepInstance: %v, want 40", v)
 	}
 }

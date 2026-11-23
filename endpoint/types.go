@@ -419,7 +419,7 @@ type endpointState struct {
 	// binding is the Binding server [mountBinding] mounts, created on first
 	// use.
 	binding *mattercore.Binding
-	// kept holds the [StatefulServer] instances the endpoint's
+	// kept holds the [contract.StatefulServer] instances the endpoint's
 	// materialisers built, kept across materialisations
 	// ([Endpoint.keepStateful]); it goes with the state.
 	kept map[keptKey]keptServer

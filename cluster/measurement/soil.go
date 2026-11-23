@@ -62,7 +62,7 @@ type SoilMoistureSource interface {
 // The last reading lives in the server instance. The materialiser builds
 // a new instance on every call; the server opts into the endpoint's kept
 // servers ([SoilMeasurementServer.MatterKeepInstance], the
-// endpoint.StatefulServer interface), so a materialised endpoint hands out
+// contract.StatefulServer interface), so a materialised endpoint hands out
 // the same instance for as long as the endpoint and its source stay, and a
 // reading outside the limits reads the previous one there too
 // (R2-C2-store-1453, decision 526). A host that constructs the server
@@ -98,7 +98,7 @@ func NewSoilMeasurementServer(src SoilMoistureSource) *SoilMeasurementServer {
 }
 
 // MatterKeepInstance marks the server as one the endpoint keeps across
-// materialisations (endpoint.StatefulServer): its last reading inside the
+// materialisations (contract.StatefulServer): its last reading inside the
 // limits is state of its own (R2-C2-store-1453).
 func (*SoilMeasurementServer) MatterKeepInstance() {}
 

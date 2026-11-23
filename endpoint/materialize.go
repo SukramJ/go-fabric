@@ -351,7 +351,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 // source's own, and the device's battery — riding on this endpoint when
 // attachPowerSource picked it — follows them, so the primary function
 // stays first in the ServerList. Nil entries are left in; the caller drops
-// them. A [StatefulServer] among them is the instance the endpoint keeps
+// them. A [contract.StatefulServer] among them is the instance the endpoint keeps
 // ([Endpoint.keepStateful], R2-C2-store-1453).
 func (ep *Endpoint) materializedServers() []contract.ClusterServer {
 	measured, battery := ep.materialize()
