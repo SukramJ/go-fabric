@@ -665,7 +665,9 @@ func (n *Node) saveICD(values map[uint32][]byte) error {
 // options in flight, no active subscription (the peer's operating mode
 // would be stale), a peer that is not online or lacks CheckInProtocolSupport;
 // with [*ICDMultiAdminError] a multi-admin peer; with [ErrICDAbandoned] when
-// Unregister, Forget, decommission or Close abandoned it. Mirrors matter.js
+// Unregister, Forget, decommission or Close abandoned it. A store that
+// refuses the new registration is the call's error; the registration then
+// stays committed in memory and with the peer. Mirrors matter.js
 // IcdClient.ts:499-592 (register, #registerOnPeer; Core §9.16.7.1).
 func (c *ICDClient) Register(ctx context.Context, opts ICDRegisterOptions) error {
 	c.mu.Lock()
@@ -805,15 +807,21 @@ func (c *ICDClient) registerOnPeer(op *icdOperation, opts ICDRegisterOptions) er
 	if err != nil {
 		return c.abandoned(op, err)
 	}
+	var stored error
 	if !c.commitIfOwned(op, func() {
 		reg := &ICDRegistration{Key: key, CounterStart: counter, MonitoredSubject: subject, ClientType: o.ClientType}
-		_ = c.persist(reg)
+		stored = c.persist(reg)
 		// The peer just answered: it is reachable; seed its window.
 		c.feed(table, addr, reg, true)
 	}) {
 		return fmt.Errorf("%w: ICD registration was abandoned", ErrICDAbandoned)
 	}
-	return nil
+	// A store that refused the registration fails the call; the
+	// registration stays committed in memory (review II, R2-C2-store-2350;
+	// matter.js: #commitIfOwned "on failure follows the committed
+	// registration again and rethrows; register awaits it",
+	// IcdClient.ts:356-372, :576-591 at b25ed960).
+	return stored
 }
 
 // abandoned maps an error of an abandoned operation to ErrICDAbandoned.
