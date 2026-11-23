@@ -44,7 +44,7 @@ func (s *Server) initQuiet(clk clock.Clock) {
 // quietReport is a throttle's emit: the report listeners — the wire's —
 // learn of the change, and for a Source-computed change
 // ([Server.MarkQuietChanged]) the data version advances now; a stored
-// change advanced it when it was stored ([Server.store]). Mirrors matter.js
+// change advanced it when it was stored ([Server.storeWith]). Mirrors matter.js
 // packages/node/src/behavior/internal/ServerBehaviorBacking.ts:230-262 at
 // db021da0: a quieter property's change is not broadcast at the commit
 // (:163-168, :242) but on the quiet event's emit (:258-261), where

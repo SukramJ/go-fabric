@@ -613,7 +613,7 @@ func (s *Server) runWriteHooks(ctx context.Context, attrID uint32, v any) error 
 }
 
 // holds reports whether the server holds v for attrID: its stored value
-// is v (the comparison [Server.store] makes) and, when a Source answers
+// is v (the comparison [Server.storeWith] makes) and, when a Source answers
 // the attribute, the Source's answer is v too.
 func (s *Server) holds(attrID uint32, v any) bool {
 	s.mu.Lock()
@@ -816,17 +816,10 @@ func defaultOf(t Type, d any) (any, bool) {
 	return nil, false
 }
 
-// store keeps values and reports the ones that changed, from origin; it
-// returns the ids of those that changed, sorted, empty when none did
-// ([Server.storeWith] without an earlier list).
-func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
-	all, notify, _ := s.storeWith(origin, values, nil, nil)
-	s.told(notify)
-	return all
-}
-
-// storeAt is store for values judged against the state of generation at:
-// false, with nothing stored, when a change was stored since.
+// storeAt keeps values a Set judged against the state of generation at
+// and reports the ones that changed, from origin ([Server.storeWith]
+// without an earlier list); false, with nothing stored, when a change was
+// stored since.
 func (s *Server) storeAt(origin contract.Origin, values map[uint32]any, at uint64) bool {
 	_, notify, stale := s.storeWith(origin, values, nil, &at)
 	if stale {
