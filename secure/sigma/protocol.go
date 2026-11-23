@@ -120,7 +120,7 @@ type ResumptionRecord struct {
 	ResumptionID []byte
 	// FabricIndex scopes the record to the fabric the original CASE
 	// session was established under. The resumed session is registered
-	// under this fabric — matter.js CaseServer.ts:151 destructures
+	// under this fabric — matter.js CaseServer.ts:155 destructures
 	// `fabric` straight from the record; there is no Sigma3 on the
 	// resume path, so the fabric can come from nowhere else.
 	FabricIndex uint8
@@ -131,7 +131,7 @@ type ResumptionRecord struct {
 	PeerNodeID uint64
 	// PeerCATs carries the CASE Authenticated Tags from the peer's NOC
 	// captured at the original Sigma3. The resume path re-grants them
-	// without re-validating the NOC — matter.js CaseServer.ts:151
+	// without re-validating the NOC — matter.js CaseServer.ts:155
 	// `caseAuthenticatedTags` from the record.
 	PeerCATs []uint32
 }
@@ -686,12 +686,13 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 
 	// Resolve the responder identity by the record's FabricIndex. The
 	// resume path has no Sigma3 (no NOC exchange), so the fabric is
-	// authoritative from the record alone — matter.js CaseServer.ts:151
+	// authoritative from the record alone — matter.js CaseServer.ts:155
 	// `const { sharedSecret, fabric, peerNodeId, caseAuthenticatedTags }
 	// = cx.resumptionRecord`. A resolver miss means the fabric was
 	// removed after the record was written; treat like an unknown id
 	// and fall through to Full Sigma.
 	identity, verifier := r.identity, r.verifier
+	byIndex := false
 	if r.identityResolver != nil {
 		if fir, ok := r.identityResolver.(FabricIndexResolver); ok {
 			id, ver, found := fir.ResolveFabricIndex(rec.FabricIndex)
@@ -699,7 +700,17 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 				return Sigma1ProcessResult{}, false, nil
 			}
 			identity, verifier = id, ver
+			byIndex = true
 		}
+	}
+	// Without the lookup by fabric index the baseline identity stands in
+	// only for a record of its own fabric: a record naming another fabric
+	// would resume that fabric's peer under the baseline's fabric
+	// (SessionIdentity) — fail closed, a miss (R2-C2-sec-0101). A zero
+	// on either side is "not stamped" (SessionIdentity's doc), the same
+	// unknown a full handshake reports, and is not compared.
+	if !byIndex && rec.FabricIndex != 0 && identity != nil && identity.FabricIndex != 0 && identity.FabricIndex != rec.FabricIndex {
+		return Sigma1ProcessResult{}, false, nil
 	}
 
 	// Generate a fresh 16-byte local resumption id for the response.
