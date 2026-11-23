@@ -31,7 +31,10 @@ type fakeGATT struct {
 	indications [][]byte
 	hold        chan struct{}
 	disconnects int
-	gone        chan struct{}
+	// disconnectErr, when set, is what Disconnect returns — the platform
+	// failed to drop the link, and gone stays open.
+	disconnectErr error
+	gone          chan struct{}
 	goneOnce    sync.Once
 }
 
@@ -66,7 +69,11 @@ func (f *fakeGATT) Indicate(ctx context.Context, value []byte) error {
 func (f *fakeGATT) Disconnect() error {
 	f.mu.Lock()
 	f.disconnects++
+	err := f.disconnectErr
 	f.mu.Unlock()
+	if err != nil {
+		return err
+	}
 	f.goneOnce.Do(func() { close(f.gone) })
 	return nil
 }

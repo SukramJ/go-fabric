@@ -4,6 +4,7 @@
 package btp
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -110,6 +111,44 @@ func TestAcceptUnconfirmedResponseIsDisconnected(t *testing.T) {
 	case <-subscribed:
 	case <-deadline(t).Done():
 		t.Fatal("the subscription kept waiting after the connection dropped")
+	}
+	if o.count() != 0 {
+		t.Fatal("an unconfirmed response opened a session")
+	}
+}
+
+// TestAcceptUnconfirmedResponseEndsWhenDisconnectFails holds
+// R2-C2-fsm-0205: when the accept timer ends a central that never confirms
+// the handshake response and the platform's Disconnect fails, the server's
+// own close still ends the indication's wait, so the subscription call
+// (the platform's C2 callback) returns instead of waiting for the central
+// to drop.
+func TestAcceptUnconfirmedResponseEndsWhenDisconnectFails(t *testing.T) {
+	clk := newFakeClock()
+	f, o := acceptFake(t, clk)
+	f.mu.Lock()
+	f.hold = make(chan struct{}) // never closed: the central never confirms
+	f.disconnectErr = errors.New("fake: disconnect failed")
+	f.mu.Unlock()
+	t.Cleanup(func() { f.goneOnce.Do(func() { close(f.gone) }) })
+	f.write(handshakeRequest(100))
+	subscribed := make(chan struct{})
+	go func() {
+		defer close(subscribed)
+		f.subscribe(100)
+	}()
+	waitFor(t, func() bool { return len(f.indicated()) == 1 })
+	clk.Advance(ConnRspTimeout)
+	select {
+	case <-subscribed:
+	case <-deadline(t).Done():
+		t.Fatal("the subscription kept waiting on the indication after the server closed")
+	}
+	f.mu.Lock()
+	n := f.disconnects
+	f.mu.Unlock()
+	if n == 0 {
+		t.Fatal("the accept timer did not ask the platform to disconnect")
 	}
 	if o.count() != 0 {
 		t.Fatal("an unconfirmed response opened a session")
