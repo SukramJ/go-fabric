@@ -393,7 +393,8 @@ type ThermostatServer struct {
 	persist chan struct{}
 	// presetsBehind, guarded by persist, marks a pair memory holds that
 	// the PresetStore refused: a direct setpoint change ended the active
-	// preset in memory and its save failed. The next save of the pair
+	// preset in memory, or revertAtomic restored the presets in memory,
+	// and its save failed (decision 570). The next save of the pair
 	// clears it; a direct change that ends nothing saves the pair again
 	// while it is set (R3-store-3253).
 	presetsBehind bool

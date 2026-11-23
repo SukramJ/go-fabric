@@ -561,6 +561,11 @@ func (s *ThermostatServer) revertAtomic(ctx context.Context, attr uint32, preset
 		active := bytes.Clone(s.activePresetHandle)
 		s.mu.RUnlock()
 		err = s.savePresets(ctx, presets, active)
+		if err != nil {
+			// Memory is restored whatever the store answers; the pair is
+			// behind and its next save retries (R3-store-3253, decision 570).
+			s.presetsBehind = true
+		}
 		s.mu.Lock()
 		s.presets = presets
 		s.mu.Unlock()
