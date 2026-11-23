@@ -54,6 +54,12 @@ func (t *latestTimer) stopLocked() {
 // device's lock.
 func (t *latestTimer) armedLocked() bool { return t.stop != nil }
 
+// latestLocked reports whether gen is still the latest arming, taken or
+// not: no arming and no stop came after it. A callback that took gen and
+// released the lock for a while asks it before it acts. The caller holds
+// the device's lock.
+func (t *latestTimer) latestLocked(gen uint64) bool { return gen == t.gen }
+
 // takeLocked reports whether gen is the pending arming and, if so, marks
 // it fired; a stale callback (false) does nothing. The caller holds the
 // device's lock.
