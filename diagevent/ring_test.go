@@ -320,4 +320,20 @@ func TestForgetFabricUnderConcurrentRecording(t *testing.T) {
 		})
 	}
 	wg.Wait()
+	// After the race, a last ForgetFabric must still strip every entry
+	// and keep the events themselves: the ring is full (8 of ~267
+	// records) and no entry may carry the forgotten index.
+	r.ForgetFabric(2)
+	snap := r.Snapshot()
+	if len(snap) != 8 {
+		t.Fatalf("Snapshot holds %d events, want the ring's 8", len(snap))
+	}
+	for i, e := range snap {
+		if e.Message != "x" {
+			t.Errorf("event %d message %q, want %q", i, e.Message, "x")
+		}
+		if v, ok := e.Detail[DetailFabricIndex]; ok {
+			t.Errorf("event %d still carries %s=%q after ForgetFabric(2)", i, DetailFabricIndex, v)
+		}
+	}
 }
