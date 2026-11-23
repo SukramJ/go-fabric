@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,6 +34,42 @@ func (c *capture) sameDeviceSkips() int {
 	return n
 }
 
+// pacedBrowser counts the browses it hands to its inner browser and wakes a
+// waiter at the start of each. The discovery loop browses, joins what it
+// found and browses again in one goroutine, so the start of browse n+1 marks
+// the end of rescan n: a test paces itself by browses, not by the wall clock.
+type pacedBrowser struct {
+	inner esphome.Browser
+	n     atomic.Int64
+	wake  chan struct{}
+}
+
+func paced(inner esphome.Browser) *pacedBrowser {
+	return &pacedBrowser{inner: inner, wake: make(chan struct{}, 1)}
+}
+
+func (b *pacedBrowser) Browse(ctx context.Context, svc string) ([]discovery.Instance, error) {
+	b.n.Add(1)
+	select {
+	case b.wake <- struct{}{}:
+	default:
+	}
+	return b.inner.Browse(ctx, svc)
+}
+
+// until reports whether cond held at the start of some browse before ctx
+// ended; cond is checked once at once and then at every browse.
+func (b *pacedBrowser) until(ctx context.Context, cond func() bool) bool {
+	for !cond() {
+		select {
+		case <-b.wake:
+		case <-ctx.Done():
+			return cond()
+		}
+	}
+	return true
+}
+
 // TestSameDeviceAliasesAreDialledOnce holds R3-bound-3302 (a regression of
 // R2-C2-bound-2003's fix): an alias found to be a device of the set is
 // remembered, so a rescan does not dial it again, and a remembered alias
@@ -43,28 +80,30 @@ func TestSameDeviceAliasesAreDialledOnce(t *testing.T) {
 	x := fake(t, esphometest.Options{Name: "x", MAC: "AABBCCDDEE31", Key: testKey})
 	y := fake(t, esphometest.Options{Name: "y", MAC: "AABBCCDDEE32", Key: testKey})
 	xa, ya := netip.MustParseAddrPort(x.Addr()), netip.MustParseAddrPort(y.Addr())
-	b := make(listBrowser, 0, aliases+2)
-	b = append(b, instanceAt("x-proxy", "aabbccddee31", xa))
+	list := make(listBrowser, 0, aliases+2)
+	list = append(list, instanceAt("x-proxy", "aabbccddee31", xa))
 	for i := range aliases {
-		b = append(b, instanceAt(fmt.Sprintf("x-alias-%03d", i), "aabbccddee31", xa))
+		list = append(list, instanceAt(fmt.Sprintf("x-alias-%03d", i), "aabbccddee31", xa))
 	}
-	b = append(b, instanceAt("y-proxy", "aabbccddee32", ya))
+	list = append(list, instanceAt("y-proxy", "aabbccddee32", ya))
+	b := paced(list)
 	log := &capture{}
 	central(t, esphome.Options{Logger: slog.New(log), Discover: &esphome.DiscoverOptions{
 		Browser: b, Keys: esphome.Keys{"AA:BB:CC:DD:EE:31": testKey, "AA:BB:CC:DD:EE:32": testKey},
 		Rescan: 40 * time.Millisecond, Timeout: 20 * time.Millisecond,
 	}})
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		if _, ok := log.find("ble.esphome.proxy_discovered", "y-proxy"); ok {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("the second device never joined behind %d aliases (%d same-device dials)", aliases, log.sameDeviceSkips())
-		}
-		time.Sleep(10 * time.Millisecond)
+	// The deadline only bounds a failure; the waits are counted in browses.
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	if !b.until(ctx, func() bool { _, ok := log.find("ble.esphome.proxy_discovered", "y-proxy"); return ok }) {
+		t.Fatalf("the second device never joined behind %d aliases (%d same-device dials)", aliases, log.sameDeviceSkips())
 	}
-	time.Sleep(300 * time.Millisecond) // several more browses
+	// Several more complete rescans: each would dial every alias again
+	// were the aliases not remembered.
+	more := b.n.Load() + 6
+	if !b.until(ctx, func() bool { return b.n.Load() >= more }) {
+		t.Fatalf("the discovery loop stopped browsing (%d browses, want %d)", b.n.Load(), more)
+	}
 	if got := log.sameDeviceSkips(); got > aliases {
 		t.Errorf("%d same-device dials for %d aliases, want each alias dialled at most once", got, aliases)
 	}
@@ -108,10 +147,10 @@ func TestPlaintextMACDoesNotShadowAKeyedProxy(t *testing.T) {
 		Addresses:  []discovery.Address{{IP: netip.MustParseAddrPort(hostile.Addr()).Addr(), Port: netip.MustParseAddrPort(hostile.Addr()).Port()}},
 		Parameters: discovery.Parameters{"mac": []byte("112233445566")},
 	}
-	b := &stagedBrowser{
+	b := paced(&stagedBrowser{
 		first: []discovery.Instance{plain},
 		then:  []discovery.Instance{instanceAt("keyed-proxy", "aabbccddee41", netip.MustParseAddrPort(keyed.Addr()))},
-	}
+	})
 	log := &capture{}
 	central(t, esphome.Options{Logger: slog.New(log), Discover: &esphome.DiscoverOptions{
 		Browser: b, Keys: esphome.Keys{"keyed-proxy": testKey}, AllowPlaintext: true,
@@ -120,16 +159,12 @@ func TestPlaintextMACDoesNotShadowAKeyedProxy(t *testing.T) {
 	if _, ok := log.find("ble.esphome.proxy_discovered", "hostile"); !ok {
 		t.Fatal("the plaintext device did not join first")
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		if _, ok := log.find("ble.esphome.proxy_discovered", "keyed-proxy"); ok {
-			break
-		}
-		if time.Now().After(deadline) {
-			r, _ := log.find("ble.esphome.proxy_skipped", "keyed-proxy")
-			t.Fatalf("the keyed proxy was kept out by a plaintext device stating its MAC (%q)", r.reason)
-		}
-		time.Sleep(10 * time.Millisecond)
+	// The deadline only bounds a failure; the wait is counted in browses.
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+	defer cancel()
+	if !b.until(ctx, func() bool { _, ok := log.find("ble.esphome.proxy_discovered", "keyed-proxy"); return ok }) {
+		r, _ := log.find("ble.esphome.proxy_skipped", "keyed-proxy")
+		t.Fatalf("the keyed proxy was kept out by a plaintext device stating its MAC (%q)", r.reason)
 	}
 }
 
