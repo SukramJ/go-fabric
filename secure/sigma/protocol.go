@@ -783,7 +783,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	// handshake established, and announcing it again would hand the peer
 	// a slot whose keys are the old ones. It takes a fresh id, as the
 	// full path does for its second handshake and as matter.js
-	// CaseServer.ts:173 does per Sigma1 (getNextAvailableSessionId).
+	// CaseServer.ts:175 does per Sigma1 (getNextAvailableSessionId).
 	sessionID, err := r.nextSessionIDLocked(r.idPending || r.state == responderStateFinished)
 	if err != nil {
 		release()

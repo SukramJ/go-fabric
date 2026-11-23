@@ -101,9 +101,12 @@ const (
 //   - ECDSA self-signature verification: the RCAC must be signed by its own key.
 //
 // Follows connectedhomeip/src/credentials/CHIPCert.cpp:1116-1144
-// ValidateChipRCAC, with one difference: the self-signed test compares
+// ValidateChipRCAC, with these differences: the self-signed test compares
 // the subject's and issuer's RCAC-IDs, where chip compares the whole
-// subject and issuer DN (:1131). The previous "PathLen must be present AND > 0"
+// subject and issuer DN (:1131); and the certificate-type test is IsRoot
+// (an rcac-id and no node-id), where chip's (:1129, ChipDN::GetCertType
+// :606-687) also refuses a root subject with an icac-id or a
+// firmware-signing-id, a fabric id of 0 or CATs. The previous "PathLen must be present AND > 0"
 // guards were stricter than chip and rejected the chip-tool / openssl
 // commissioner default RCAC (Path­LenConstraint absent), breaking
 // commissioning at SendTrustedRootCert with `BasicConstraints
@@ -158,7 +161,7 @@ func ValidateRCAC(c *Certificate) error {
 	// ECDSA self-signature: the RCAC must be signed by its own public key.
 	// A commissioner that submits a foreign or unsigned root could later
 	// break the CASE chain if the bridge accepts it silently.
-	// Mirrors chip CHIPCert.cpp:1144 VerifyCertSignature(certData, certData).
+	// Mirrors chip CHIPCert.cpp:1143 VerifyCertSignature(certData, certData).
 	selfKey, err := c.PublicKeyECDSA()
 	if err != nil {
 		return fmt.Errorf("%w: cannot decode RCAC public key: %w", ErrInvalidRCAC, err)
