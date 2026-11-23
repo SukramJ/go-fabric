@@ -32,6 +32,16 @@ const redactedText = "(redacted)"
 // model, or without a secret in it ([ContainsSecret]), n comes back as it
 // is.
 //
+// Redact does not fail closed on a shape the model does not describe: a
+// list or struct that holds a secret, whose node is another container
+// type than its model (a struct read as a TLV list, a list as a
+// structure), comes back as it is, unredacted — matter.js's redactValue
+// returns the value unchanged for an array model whose value is not an
+// array and for an object model whose value is not a plain object
+// (matter.js packages/model/src/logic/SecretRedaction.ts:107-108, :114-115
+// at b25ed960). A caller that logs a value it did not encode by the model
+// itself holds the shape to the model first (review II, R2-C2-sec-1303).
+//
 // Mirrors matter.js packages/model/src/logic/SecretRedaction.ts:32-37 at b25ed960
 // (redact), without the Logger.redactSecrets switch.
 func Redact(model *Field, n Node) Node {

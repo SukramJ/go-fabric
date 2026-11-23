@@ -16,3 +16,10 @@ func SetWindowHooksForTests(s *Server, stored, left func()) {
 func RequestErrorsForTests(i *Instance, cmdID uint32, fields any) []error {
 	return i.requestErrors(cmdID, fields, nil, true)
 }
+
+// SetJudgedHookForTests installs judged, which runs in a Set after its
+// values were judged against the state and before they are stored. Call
+// it before s is used.
+func SetJudgedHookForTests(s *Server, judged func()) {
+	s.judgedForTests = judged
+}
