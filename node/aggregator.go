@@ -929,7 +929,7 @@ func (b *Batch) commitPending() error {
 					continue
 				}
 				b.pending = slices.Delete(b.pending, j, j+1)
-				err, blocked := b.judgeLocked(t)
+				blocked, err := b.judgeLocked(t)
 				if blocked {
 					b.pending = slices.Insert(b.pending, j, t)
 					continue
@@ -946,7 +946,7 @@ func (b *Batch) commitPending() error {
 		}
 	}
 	for _, t := range b.pending {
-		err, _ := b.judgeLocked(t)
+		_, err := b.judgeLocked(t)
 		errs = append(errs, err)
 	}
 	b.pending = nil
@@ -959,7 +959,7 @@ func (b *Batch) commitPending() error {
 // (the error), or blocked — another endpoint serves one of its keys
 // now, the refusal it would get returned with blocked set, nothing
 // changed; a.mu is held.
-func (b *Batch) judgeLocked(t pendingCall) (err error, blocked bool) {
+func (b *Batch) judgeLocked(t pendingCall) (blocked bool, err error) {
 	a := b.a
 	switch t.kind {
 	case heldForget:
@@ -967,33 +967,33 @@ func (b *Batch) judgeLocked(t pendingCall) (err error, blocked bool) {
 	case heldAdd:
 		entries, err := b.recheckLocked(t.ep)
 		if err != nil {
-			return err, false
+			return false, err
 		}
 		if p, _ := a.findLocked(t.key); p != nil {
-			return fmt.Errorf("%w: %s", ErrDuplicateKey, t.key), true
+			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, t.key)
 		}
 		if k, ok := a.servedOfLocked(entries, nil); ok {
-			return fmt.Errorf("%w: %s", ErrDuplicateKey, k), true
+			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
-		return b.addLocked(t.seq, t.key, t.ep, entries), false
+		return false, b.addLocked(t.seq, t.key, t.ep, entries)
 	case heldReplace:
 		part, i := a.findLocked(t.key)
 		if part == nil || part.scope != b.scope {
-			return fmt.Errorf("%w: %s", ErrUnknownKey, t.key), false
+			return false, fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
 		}
 		if part.eps[i] == t.ep {
-			return nil, false
+			return false, nil
 		}
 		entries, err := b.recheckLocked(t.ep)
 		if err != nil {
-			return err, false
+			return false, err
 		}
 		if k, ok := a.servedOfLocked(entries, part.eps[i]); ok {
-			return fmt.Errorf("%w: %s", ErrDuplicateKey, k), true
+			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
-		return b.replaceLocked(t.seq, part, i, t.key, t.ep, entries), false
+		return false, b.replaceLocked(t.seq, part, i, t.key, t.ep, entries)
 	}
-	return nil, false
+	return false, nil
 }
 
 // addedLocked reports whether ep, the set's endpoint under key, is one

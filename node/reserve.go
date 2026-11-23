@@ -448,21 +448,21 @@ func (b *Batch) Forget(key device.SourceKey) error {
 // it is: blocked ([ErrUnknownKey], blocked set) while another endpoint
 // serves its key, refused for good when another partition holds it,
 // applied as at its call otherwise; a.mu is held.
-func (b *Batch) commitForgetLocked(t pendingCall) (err error, blocked bool) {
+func (b *Batch) commitForgetLocked(t pendingCall) (blocked bool, err error) {
 	a := b.a
 	part, i := a.findLocked(t.key)
 	if part != nil && part.scope != b.scope {
-		return fmt.Errorf("%w: %s", ErrUnknownKey, t.key), false
+		return false, fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
 	}
 	var removed Endpoint
 	if part != nil {
 		removed = part.eps[i]
 	}
 	if b.servesOtherLocked(t.key, removed) {
-		return fmt.Errorf("%w: %s", ErrUnknownKey, t.key), true
+		return true, fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
 	}
 	b.forgetLocked(t.seq, t.key, t.reserved, part, i)
-	return nil, false
+	return false, nil
 }
 
 // servesOtherLocked reports whether an endpoint of the set other than
