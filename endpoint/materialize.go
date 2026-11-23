@@ -17,7 +17,6 @@ import (
 	"thingfabric.dev/go-fabric/cluster/onoff"
 	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"thingfabric.dev/go-fabric/contract"
-	"thingfabric.dev/go-fabric/im"
 	"thingfabric.dev/go-fabric/schema"
 )
 
@@ -588,20 +587,16 @@ func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.Cluste
 			return err == nil && ok
 		},
 		// A store error while listing the fabrics is not a node without
-		// fabrics: the read then serves what it serves without a fabric
-		// source — the accessing fabric's own entry — rather than Success
-		// with an empty list (R2-C2-err-0455).
-		Fabrics: func(ctx context.Context) []uint8 {
+		// fabrics: ListFabrics hands it on, and FabricSceneInfo answers
+		// FAILURE (R2-C2-err-0455, decision 527).
+		ListFabrics: func(ctx context.Context) ([]uint8, error) {
 			f, err := gm.StoredFabrics(ctx)
 			if err != nil {
-				ep.logger().Warn("endpoint: FabricSceneInfo: listing the fabrics failed; serving the accessing fabric's entry",
+				ep.logger().Warn("endpoint: FabricSceneInfo: listing the fabrics failed; the read answers FAILURE",
 					"endpoint", ep.ID, "err", err)
-				if _, fabric, _ := im.LookupFabricFilter(ctx); fabric != 0 {
-					return []uint8{fabric}
-				}
-				return nil
+				return nil, err
 			}
-			return f
+			return f, nil
 		},
 	})
 	if err != nil {
