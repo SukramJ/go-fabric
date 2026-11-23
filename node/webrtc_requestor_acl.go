@@ -76,7 +76,14 @@ func (n *Node) ensureRequestorACL(ctx context.Context) {
 		return
 	}
 	fabrics, err := n.st.ListFabrics(ctx)
-	if err != nil || len(fabrics) == 0 { // :59-62
+	if err != nil {
+		// No entry is written until the next Start or
+		// CommissioningComplete: a granted camera refused meanwhile is
+		// refused for this (review II, R2-C2-err-2456).
+		n.logger.Warn("webrtc.requestor.acl_list_failed", slog.Any("err", err))
+		return
+	}
+	if len(fabrics) == 0 { // :59-62
 		return
 	}
 	for i := range fabrics {

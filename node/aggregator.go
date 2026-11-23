@@ -390,9 +390,14 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	// host makes in between stores under an erased key again (review II,
 	// R2-P6-conc-2405, N-finp-3). A key forgotten and added again in the
 	// batch is held out of the first reassembly and served by a second
-	// one, after the erasure, so it starts as a new device would.
-	pre, erase, readded := splitErasures(b.ops)
+	// one, after the erasure, so it starts as a new device would — and so
+	// is a device the batch added whose own key or a part key the erasure
+	// reaches, a part of the forgotten device among them (review II,
+	// R2-C2-store-2401).
+	pre, erase := splitErasures(b.ops)
 	resErr := p.a.applyReservations(ctx, pre)
+	readded, cancel, findErr := p.a.readdedInErasure(ctx, b.scope, b.ops, erase)
+	resErr = errors.Join(resErr, findErr)
 	p.a.mu.Lock()
 	started := p.a.started
 	p.a.mu.Unlock()
@@ -410,7 +415,7 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	// A key forgotten and added again in this batch is the new device's
 	// once served: an erasure that did not finish must not take it at the
 	// next New.
-	for _, k := range readded {
+	for _, k := range cancel {
 		resErr = errors.Join(resErr, p.a.cancelForget(ctx, k))
 	}
 	if restore != nil && restore() {

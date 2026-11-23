@@ -5,13 +5,17 @@ package fabrictest_test
 
 import (
 	"context"
+	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/fabrictest"
 	"thingfabric.dev/go-fabric/node"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // flakyEndpoint is a bridged endpoint whose Spec loses its StableKey while
@@ -53,5 +57,95 @@ func TestFailedStartLeavesNothingBound(t *testing.T) {
 	broken.Store(false)
 	if err := d.Start(ctx); err != nil {
 		t.Fatalf("Start after a failed Start: %v", err)
+	}
+}
+
+// stallingStore is a device's credential store whose ListFabrics, once
+// armed and called from the node's Start, outlives the Start's context:
+// it waits for that context to end and then on a timer of the host's
+// clock, as a started node's step waits on the site's clock.
+type stallingStore struct {
+	store.Port
+	clk   clock.Clock
+	armed atomic.Bool
+}
+
+func (s *stallingStore) ListFabrics(ctx context.Context) ([]store.FabricRecord, error) {
+	buf := make([]byte, 16<<10)
+	if strings.Contains(string(buf[:runtime.Stack(buf, false)]), "node.(*Node).Start(") && s.armed.CompareAndSwap(true, false) {
+		<-ctx.Done()
+		<-clock.After(s.clk, time.Hour)
+		return nil, ctx.Err()
+	}
+	return s.Port.ListFabrics(ctx)
+}
+
+// TestFailedStartStopsTheNodeOnTheSitesClock (review II, R2-C2-test-2501):
+// a Start whose context ends while the node's own Start still waits on the
+// site's clock stops that node under the site's pacing, bounded: the
+// failed Start returns its error instead of waiting on a clock nobody
+// moves, and the next Start succeeds.
+func TestFailedStartStopsTheNodeOnTheSitesClock(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	st := &stallingStore{}
+	d := site.AddDevice(fabrictest.Topology{
+		Bridged: []node.Endpoint{newPlug(t)},
+		Configure: func(cfg *node.Config) {
+			if st.Port == nil {
+				st.Port, st.clk = cfg.Store.Credentials, cfg.Clock
+			}
+			cfg.Store.Credentials = st
+		},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := d.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	st.armed.Store(true)
+	short, cancelShort := context.WithTimeout(ctx, 2*time.Second)
+	defer cancelShort()
+	done := make(chan error, 1)
+	go func() { done <- d.Start(short) }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("Start whose context ended during the node's start succeeded")
+		}
+	case <-time.After(45 * time.Second):
+		t.Fatal("the failed Start did not return: its stop of the node waits on a clock nobody moves")
+	}
+	if err := d.Start(ctx); err != nil {
+		t.Fatalf("Start after the failed Start: %v", err)
+	}
+}
+
+// TestFailedStopIsFinishedByTheNext (review II, R2-C2-test-2502): a Stop
+// that fails — here its context ended before it began — leaves the device
+// running, so the next Stop (or the site's closer) stops the node, and a
+// Start after it succeeds.
+func TestFailedStopIsFinishedByTheNext(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	d := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{newPlug(t)}})
+	ended, cancelEnded := context.WithCancel(context.Background())
+	cancelEnded()
+	if err := d.Stop(ended); err == nil {
+		t.Fatal("Stop with an ended context succeeded")
+	}
+	if !d.Running() {
+		t.Error("the device reads stopped after a Stop that failed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := d.Stop(ctx); err != nil {
+		t.Fatalf("Stop after the failed Stop: %v", err)
+	}
+	if d.Running() {
+		t.Error("the device reads running after its Stop")
+	}
+	if err := d.Start(ctx); err != nil {
+		t.Fatalf("Start after the failed and the finished Stop: %v", err)
 	}
 }

@@ -257,9 +257,11 @@ func (v *nonVolatile) PersistWrite(ctx context.Context, ep *endpoint.Endpoint, s
 	// server holds under a key never stored: a write of the held value
 	// changes nothing, which matter.js neither notes nor stores
 	// (Datasource.ts:1446-1452, :1476-1481 at db021da0; F-db021da0-47) —
-	// a restart serves the same value from the declaration.
+	// a restart serves the same value from the declaration. An owed key
+	// is not skipped: the server holds a change the store refused, which
+	// a restart would not serve (review II, R2-C2-store-2402).
 	wrote := !had || prev != stored
-	if err == nil && !had && !k.label {
+	if err == nil && !had && !k.label && !k.owed {
 		if held, ok := v.heldForm(k); ok && held == stored {
 			wrote = false
 		}
