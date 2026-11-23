@@ -79,6 +79,17 @@ type AccessControl struct {
 	// so a fabric on the reused index does not load it as its own at the
 	// next start (review II, R2-C2-store-1004).
 	extOwedClear map[uint8]bool
+	// aclHeld names each fabric whose Acl rows the server last saw
+	// non-empty in the store: at construction, at a read or a write of the
+	// fabric's list and at a new fabric's default admin entry. The store's
+	// fabric cascade removes a fabric's rows before the drop runs, so the
+	// drop asks the store only for a fabric named here, and an empty answer
+	// is the Acl shrinking (review II, R4-par-4051).
+	aclHeld map[uint8]bool
+	// changes reports what moves outside a write of this cluster: a
+	// fabric drop's removal of Acl rows and of an Extension entry
+	// ([AccessControl.OnAttributeChange]).
+	changes cluster.AttributeChanges
 
 	// Event surface — wired by the bridge during topology assembly via
 	// [SetMatterEventEmitter] + [SetEndpoint] so [MatterWrite] can fire
@@ -323,7 +334,42 @@ func NewAccessControl(s ACLStoreFacade) (*AccessControl, error) {
 	}
 	a := &AccessControl{store: s}
 	a.loadExtensions(context.Background())
+	a.loadACLHeld(context.Background())
 	return a, nil
+}
+
+// loadACLHeld marks every fabric the store lists whose Acl rows are not
+// empty (aclHeld). A store that cannot list fabrics, or a list that fails,
+// marks nothing: such a fabric is marked at its next read or write.
+func (a *AccessControl) loadACLHeld(ctx context.Context) {
+	lister, ok := a.store.(fabricLister)
+	if !ok {
+		return
+	}
+	recs, err := lister.ListFabrics(ctx)
+	if err != nil {
+		return
+	}
+	for i := range recs {
+		f := recs[i].FabricIndex
+		if rows, err := a.store.ListACL(ctx, f); err == nil {
+			a.markACLHeld(f, len(rows) > 0)
+		}
+	}
+}
+
+// markACLHeld records whether the store holds Acl rows of fabric.
+func (a *AccessControl) markACLHeld(fabric uint8, held bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !held {
+		delete(a.aclHeld, fabric)
+		return
+	}
+	if a.aclHeld == nil {
+		a.aclHeld = map[uint8]bool{}
+	}
+	a.aclHeld[fabric] = true
 }
 
 // ACLExtensionPersistence is the optional key-value side of the store an
@@ -423,7 +469,19 @@ var (
 	_ contract.ClusterAttributeReadPrivilege  = (*AccessControl)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*AccessControl)(nil)
 	_ contract.FabricScopedState              = (*AccessControl)(nil)
+	_ contract.AttributeChangeNotifier        = (*AccessControl)(nil)
 )
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: a
+// fabric's removal ([AccessControl.MatterDropFabric]) that takes the
+// fabric's Acl rows or its Extension entry out of the attributes advances
+// the DataVersion once and tells the listeners of the attributes that
+// shrank, after its locks are released; no AccessControlEntryChanged or
+// AccessControlExtensionChanged event is emitted for it. A controller's
+// write is reported by the bridge itself (review II, R4-par-4051).
+func (a *AccessControl) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return a.changes.OnAttributeChange(cb)
+}
 
 // MatterClusterID implements [contract.ClusterServer].
 func (a *AccessControl) MatterClusterID() uint32 { return accessControlClusterID }
@@ -509,13 +567,42 @@ func (a *AccessControl) RemoveFabricExtension(fabricIndex uint8) {
 // It holds writeMu, as a write of the Extension does: the entry's removal
 // from memory and from its setting is one step against such a write, so
 // none in flight leaves the removed fabric's entry behind in either.
+//
+// A drop that takes Acl rows (a fabric the server saw rows of, whose rows
+// the store no longer holds) or the Extension entry out of the attributes
+// advances the DataVersion once and reports the attributes that shrank
+// ([AccessControl.OnAttributeChange]); a drop that removes nothing — the
+// second drop of a fabric, the drop at a new fabric's index whose rows
+// the store holds — moves and reports nothing (review II, R4-par-4051).
 func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	moved, err := a.dropFabric(ctx, fabricIndex)
+	if len(moved) > 0 {
+		a.changes.Notify(moved...)
+	}
+	return err
+}
+
+// dropFabric is MatterDropFabric under writeMu; moved names the attributes
+// that shrank, reported once the lock is released.
+func (a *AccessControl) dropFabric(ctx context.Context, fabricIndex uint8) (moved []uint32, err error) {
 	a.writeMu.Lock()
 	defer a.writeMu.Unlock()
+	a.mu.Lock()
+	aclHad := a.aclHeld[fabricIndex]
+	a.mu.Unlock()
+	if aclHad {
+		// The store is asked under writeMu, as a write asks it; a list that
+		// fails keeps the mark, so a later drop asks again.
+		if rows, lerr := a.store.ListACL(ctx, fabricIndex); lerr == nil && len(rows) == 0 {
+			a.markACLHeld(fabricIndex, false)
+			moved = append(moved, accessControlAttrACL)
+		}
+	}
 	a.mu.Lock()
 	_, had := a.extensions[fabricIndex]
 	if had {
 		delete(a.extensions, fabricIndex)
+		moved = append(moved, accessControlAttrExtension)
 	}
 	// A setting that could not be read at construction is not in memory
 	// but may still be stored: it is cleared as well, or the next
@@ -526,11 +613,11 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 	delete(a.extLoadErr, fabricIndex)
 	owed := a.extOwedClear[fabricIndex]
 	a.mu.Unlock()
-	if !had && !unread && !owed {
-		return nil
-	}
-	if had {
+	if len(moved) > 0 {
 		a.dataVersion.Bump()
+	}
+	if !had && !unread && !owed {
+		return moved, nil
 	}
 	if err := a.persistExtension(ctx, fabricIndex, nil); err != nil {
 		a.mu.Lock()
@@ -546,12 +633,12 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 			a.oweClearLocked(fabricIndex)
 		}
 		a.mu.Unlock()
-		return fmt.Errorf("core: AccessControl: clear the Extension of fabric %d: %w", fabricIndex, err)
+		return moved, fmt.Errorf("core: AccessControl: clear the Extension of fabric %d: %w", fabricIndex, err)
 	}
 	a.mu.Lock()
 	delete(a.extOwedClear, fabricIndex)
 	a.mu.Unlock()
-	return nil
+	return moved, nil
 }
 
 // oweClearLocked records that fabric's stored Extension is owed a clear.
@@ -723,6 +810,9 @@ func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []u
 		entries, err := a.store.ListACL(ctx, fabric)
 		if err != nil {
 			return nil, false
+		}
+		if len(entries) > 0 {
+			a.markACLHeld(fabric, true)
 		}
 		for _, e := range entries {
 			out = append(out, aclEntryStruct(e))
@@ -1045,6 +1135,7 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 		if err := a.store.ReplaceACL(ctx, fabric, out); err != nil {
 			return false, fmt.Errorf("core: AccessControl.ACL write: %w", err)
 		}
+		a.markACLHeld(fabric, len(out) > 0)
 		// Bump DataVersion after a successful mutation so DataVersionFilter
 		// evaluation correctly detects the cluster changed. Must happen
 		// AFTER the store write succeeds per DataVersionTracker contract.
@@ -1456,6 +1547,7 @@ func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 		a.logger().Warn("matter.access_control.extension_owed_clear_failed",
 			slog.Int("fabric_index", int(entry.FabricIndex)), slog.Any("err", err))
 	}
+	a.markACLHeld(entry.FabricIndex, true)
 	a.dataVersion.Bump()
 	a.mu.RLock()
 	emitter := a.emitter
