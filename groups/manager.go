@@ -186,14 +186,18 @@ type Manager struct {
 	counterRandom func() (uint32, error)
 
 	// The send side (sender.go): the outbound group sessions, the
-	// socket they leave through, the exchange id counter and the clock
-	// that selects the current epoch key.
+	// socket they leave through and the exchange id counter. senderMu is
+	// never held across a store call nor taken while mu is held (review
+	// II, R2-C2-conc-0304).
 	senderMu       sync.Mutex
 	senders        map[senderKey]*Sender
 	transport      MulticastTransport
 	exchangeID     uint16
 	exchangeSeeded bool
-	clock          clock.Clock
+	// clock selects the current epoch key of a send and paces the owed
+	// reload; clockMu guards it alone, so reading it waits for no send.
+	clockMu sync.Mutex
+	clock   clock.Clock
 }
 
 // SetClock sets the clock that selects the current epoch key of a group
@@ -201,8 +205,8 @@ type Manager struct {
 // owed; nil is [clock.System]. Call it before the first send and before
 // the first forget.
 func (m *Manager) SetClock(c clock.Clock) {
-	m.senderMu.Lock()
-	defer m.senderMu.Unlock()
+	m.clockMu.Lock()
+	defer m.clockMu.Unlock()
 	m.clock = clock.Or(c)
 }
 
@@ -731,8 +735,8 @@ func (m *Manager) noteOwedResult(err error) {
 
 // monotonic is the send clock's monotonic reading.
 func (m *Manager) monotonic() time.Duration {
-	m.senderMu.Lock()
-	defer m.senderMu.Unlock()
+	m.clockMu.Lock()
+	defer m.clockMu.Unlock()
 	return clock.MonotonicOf(m.clock)
 }
 
@@ -1226,7 +1230,7 @@ func (m *Manager) Memberships(ctx context.Context) ([]Membership, error) {
 
 // sendClock is the time that selects a send's epoch key.
 func (m *Manager) sendClock() time.Time {
-	m.senderMu.Lock()
-	defer m.senderMu.Unlock()
+	m.clockMu.Lock()
+	defer m.clockMu.Unlock()
 	return m.clock.Now()
 }
