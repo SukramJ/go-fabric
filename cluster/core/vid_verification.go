@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"thingfabric.dev/go-fabric/cluster/spec"
@@ -130,8 +131,20 @@ func (o *OperationalCredentials) handleSignVidVerificationRequest(ctx context.Co
 		return nil, err
 	}
 	fabric, err := o.store.GetFabric(ctx, req.FabricIndex)
-	if err != nil {
+	switch {
+	case errors.Is(err, store.ErrFabricNotFound):
+		// ConstraintError only for a fabric that does not exist: matter.js
+		// OperationalCredentialsServer.ts:485-488 at b25ed960
+		// (!fabrics.has(fabricIndex)); chip FabricTable.cpp:2228-2229 and
+		// OperationalCredentialsCluster.cpp:922-925 at 6170af84.
 		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: SignVIDVerificationRequest: fabric %d does not exist", req.FabricIndex)}
+	case err != nil:
+		// Any other store error — the read failed, the fabric may exist —
+		// is the command's FAILURE, as chip reports every other failure
+		// (OperationalCredentialsCluster.cpp:927-931 at 6170af84) and as
+		// UpdateNOC and UpdateFabricLabel answer it (opcredsFabricReadFailure;
+		// R3-err-3053).
+		return nil, spec.Errorf(im.StatusFailure, "core: SignVIDVerificationRequest on fabric %d: %v", req.FabricIndex, err)
 	}
 	id, err := o.store.GetIdentity(ctx, req.FabricIndex)
 	if err != nil {
