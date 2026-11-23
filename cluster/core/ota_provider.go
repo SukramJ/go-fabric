@@ -56,6 +56,13 @@ type OTAProvider struct {
 	// same requestor enabled (review II, R2-C2-conc-1202).
 	scopeMu    sync.Mutex
 	scopeOwner map[OTAPeer]*OTAUpdateAttempt
+	// scoped holds every requestor whose BDX scope this provider enabled
+	// and has not withdrawn since, whatever ended its attempt — an
+	// eviction by the per-fabric share, a newer query, an attempt that
+	// ended after settleScope: the fabric's drop withdraws them all
+	// (withdrawScopes; owner decision 167, review II, R3-conc-3103).
+	// Guarded by scopeMu.
+	scoped map[OTAPeer]struct{}
 }
 
 // OTAPeer is the requestor a provider talks to: matter.js PeerAddress, its
@@ -596,8 +603,10 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAtt
 	}
 	if p.scopeOwner == nil {
 		p.scopeOwner = make(map[OTAPeer]*OTAUpdateAttempt)
+		p.scoped = make(map[OTAPeer]struct{})
 	}
 	p.scopeOwner[peer] = attempt
+	p.scoped[peer] = struct{}{}
 	p.scopeMu.Unlock()
 	defer p.settleScope(peer, attempt)
 	off := responder.OnSessionStarted(func(s *bdx.ServerSession, scope string) {
@@ -634,8 +643,10 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAtt
 // before the scope existed, so its withdrawal missed it — and no newer
 // query of the requestor enabled the scope since, the scope is withdrawn,
 // or a later fabric on the index with the same node id could fetch from
-// it (owner decision 167; review II, R2-C2-conc-1202). An attempt that
-// ends later has its scope withdrawn by the fabric's drop.
+// it (owner decision 167; review II, R2-C2-conc-1202). A scope this
+// leaves enabled — the attempt ends later, for any reason — stays in
+// scoped, and the fabric's drop withdraws it (withdrawScopes;
+// R3-conc-3103).
 func (p *OTAProvider) settleScope(peer OTAPeer, attempt *OTAUpdateAttempt) {
 	p.scopeMu.Lock()
 	defer p.scopeMu.Unlock()
@@ -646,8 +657,33 @@ func (p *OTAProvider) settleScope(peer OTAPeer, attempt *OTAUpdateAttempt) {
 	if !attempt.Ended() {
 		return
 	}
-	if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, true); err != nil {
+	p.disableScopeLocked(peer, true)
+}
+
+// disableScopeLocked withdraws peer's BDX scope — a transfer of it that
+// runs is closed when force — and forgets peer in scoped once the
+// responder took it. Caller holds scopeMu.
+func (p *OTAProvider) disableScopeLocked(peer OTAPeer, force bool) {
+	if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, force); err != nil {
 		p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
+		return
+	}
+	delete(p.scoped, peer)
+}
+
+// withdrawScopes withdraws the BDX scope of every requestor of
+// fabricIndex this provider enabled and has not withdrawn since, a
+// running transfer closed (owner decision 167; R3-conc-3103).
+func (p *OTAProvider) withdrawScopes(fabricIndex uint8) {
+	if p.cfg.BDX == nil {
+		return
+	}
+	p.scopeMu.Lock()
+	defer p.scopeMu.Unlock()
+	for peer := range p.scoped {
+		if peer.FabricIndex == fabricIndex {
+			p.disableScopeLocked(peer, true)
+		}
 	}
 }
 
@@ -670,9 +706,11 @@ func (p *OTAProvider) ApplyUpdateRequest(ctx context.Context, req provdef.ApplyU
 		// WaitForApply — at its arrival, before the receive path took the
 		// ApplyUpdateRequest sent after it.
 		force := attempt == nil || attempt.Status() != OTAUpdateWaitForApply
-		if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, force); err != nil {
-			p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
-		}
+		// Under scopeMu, so a query's enable of the scope does not fall
+		// between the withdrawal and scoped's update (R3-conc-3103).
+		p.scopeMu.Lock()
+		p.disableScopeLocked(peer, force)
+		p.scopeMu.Unlock()
 	}
 	delay := p.cfg.ApplyDelay
 	if p.cfg.ApplyPolicy != nil {
@@ -759,21 +797,37 @@ func (p *OTAProvider) observe(peer OTAPeer, status OTAUpdateStatus, version uint
 // forgets the removed fabric's update attempts and withdraws its
 // requestors' transfer scope, so a later fabric that receives the index
 // inherits none of it (review II, R2-P6-bound-1206, owner decision 167).
-// matter.js ends nothing at a fabric's removal.
+// matter.js ends nothing at a fabric's removal. The provider then
+// withdraws the scope of every requestor of the fabric it enabled and has
+// not withdrawn since, whatever manager runs and whatever ended the
+// requestor's attempt (R3-conc-3103).
 func (p *OTAProvider) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	var err error
 	if fs, ok := p.mgr.(contract.FabricScopedState); ok {
-		return fs.MatterDropFabric(ctx, fabricIndex)
+		err = fs.MatterDropFabric(ctx, fabricIndex)
 	}
-	return nil
+	p.withdrawScopes(fabricIndex)
+	return err
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
-// the manager holds update attempts of, when it reports them.
+// the manager holds update attempts of, when it reports them, and those
+// of the requestors whose BDX scope the provider holds enabled.
 func (p *OTAProvider) MatterHeldFabrics() []uint8 {
+	var out []uint8
 	if fs, ok := p.mgr.(contract.FabricScopedState); ok {
-		return fs.MatterHeldFabrics()
+		out = fs.MatterHeldFabrics()
 	}
-	return nil
+	p.scopeMu.Lock()
+	for peer := range p.scoped {
+		out = append(out, peer.FabricIndex)
+	}
+	p.scopeMu.Unlock()
+	if len(out) == 0 {
+		return nil
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 // MatterAcceptedCommands implements contract.ClusterCommandLister.
