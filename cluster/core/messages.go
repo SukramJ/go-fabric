@@ -6,6 +6,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -796,8 +797,8 @@ func (m *Messages) takeDownRemoved() {
 		m.mu.Unlock()
 		for _, f := range td.flights {
 			if err := m.cancelRemoved(td.ctx, f.id); err != nil {
-				slog.Default().Warn("matter.messages.take_down_refused",
-					slog.Int("fabric_index", int(td.fabric)), slog.String("message_id", fmt.Sprintf("%x", f.id)), slog.Any("err", err))
+				m.logger().Warn("matter.messages.take_down_refused",
+					slog.Int("fabric_index", int(td.fabric)), slog.String("message_id", hex.EncodeToString(f.id)), slog.Any("err", err))
 			}
 			m.mu.Lock()
 			m.endFlightLocked(f)
@@ -806,6 +807,10 @@ func (m *Messages) takeDownRemoved() {
 		}
 	}
 }
+
+// logger is the server's logger: slog.Default(), as Messages takes none
+// from its config.
+func (m *Messages) logger() *slog.Logger { return slog.Default() }
 
 // cancelRemoved is the presenter's CancelMessage of a removed fabric's
 // message, a panic answered as an error.
