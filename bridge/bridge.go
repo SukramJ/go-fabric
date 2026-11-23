@@ -1952,7 +1952,14 @@ func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8
 	}
 	invoking := mattercore.InvokeSessionIDFromContext(ctx)
 	b.closeFabricSessionsGracefully(reg, fabricIndex, invoking)
-	closeNow := func() { closer.CloseFabric(fabricIndex) }
+	closeNow := func() {
+		closer.CloseFabric(fabricIndex)
+		// An event of a session that closed itself while the response
+		// was out (the peer's CloseSession, a TCP drop) was recorded
+		// with the removed index after emitFabricRemoved forgot it
+		// (review II, R3-sec-3403, decision 578).
+		b.diagRing().ForgetFabric(fabricIndex)
+	}
 	if !im.DeferAfterResponse(ctx, closeNow) {
 		closeNow()
 	}

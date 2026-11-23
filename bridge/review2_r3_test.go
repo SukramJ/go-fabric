@@ -4,10 +4,12 @@
 package bridge
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 
 	"thingfabric.dev/go-fabric/diagevent"
+	"thingfabric.dev/go-fabric/im"
 	"thingfabric.dev/go-fabric/transport/message"
 	"thingfabric.dev/go-fabric/transport/mrp"
 )
@@ -192,5 +194,31 @@ func TestRemovedFabricsEventsAreNotServedToItsIndexsNextHolder(t *testing.T) {
 	}
 	if !keptC {
 		t.Fatal("removing fabric 2 changed fabric 3's event")
+	}
+}
+
+// TestFabricEventsRecordedBeforeTheDeferredCloseLeaveTheRing (R3-sec-3403,
+// decision 578): inside RemoveFabric the fabric's sessions close only
+// once the response is out, so an event of one of them — the peer's own
+// CloseSession, a TCP drop — can still be recorded with the removed index
+// after emitFabricRemoved ran. The close forgets the index again.
+func TestFabricEventsRecordedBeforeTheDeferredCloseLeaveTheRing(t *testing.T) {
+	t.Parallel()
+	b := newUnstartedBridge(t)
+	reg := &fabricClosingRegistry{}
+	b.AttachSessionRegistry(reg)
+	ring := diagevent.NewRing(8)
+	b.AttachDiagnosticEvents(ring)
+
+	after := &im.AfterResponse{}
+	b.EmitFabricRemovedContext(im.WithAfterResponse(context.Background(), after), 2)
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "closed before the response went", Detail: map[string]string{
+		diagevent.DetailPeer: "[fd00::a]:5540", diagevent.DetailFabricIndex: "2",
+	}})
+	after.Run()
+	for _, e := range ring.Snapshot() {
+		if e.Detail[diagevent.DetailFabricIndex] == "2" {
+			t.Fatalf("event %q still names the removed fabric after its sessions closed", e.Message)
+		}
 	}
 }
