@@ -167,6 +167,11 @@ type CommandInvocation struct {
 	// DecodeStatus is INVALID_COMMAND then, the reader not called: a
 	// client decoding a response refuses it ([readInvokeResponseIB]).
 	fieldsNotStructure bool
+	// fieldsReject is the reader's typed reject of CommandFields the
+	// CommandDataIB carries (DecodeStatus is its status): a client decoding
+	// a response refuses it ([readInvokeResponseIB]). Nil for absent
+	// CommandFields read as {}.
+	fieldsReject error
 }
 
 // CommandFieldsReader extracts the cluster-native fields struct from
@@ -340,6 +345,10 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 				if err := readAbsentFields(fieldsReader, &inv); err != nil {
 					return CommandInvocation{}, err
 				}
+				// Absent fields are not a payload that failed to decode
+				// (R2-C2-wire-0551 is about the latter); the reject stays
+				// the DecodeStatus a server answers with.
+				inv.fieldsReject = nil
 			}
 			return inv, nil
 		}
@@ -428,6 +437,7 @@ func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFie
 		}
 		inv.Fields = nil
 		inv.DecodeStatus = sce.MatterStatusCode()
+		inv.fieldsReject = err
 		return nil
 	}
 	inv.Fields = f

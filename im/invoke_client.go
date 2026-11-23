@@ -57,6 +57,10 @@ func MarshalInvokeRequestTLV(enc *tlv.Encoder, req InvokeRequest, fieldsWriter C
 
 // UnmarshalInvokeResponseTLV decodes an InvokeResponseMessage, each
 // command response's fields through fieldsReader (nil skips them).
+// CommandFields that is no structure, and any error of fieldsReader — a
+// typed [StatusCodeError] reject included — fails the whole response with
+// an error wrapping [ErrInvalidInvokeRequest] and the reader's error; it is
+// never an entry without fields nor a per-command status.
 func UnmarshalInvokeResponseTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (InvokeResponse, error) {
 	open, err := dec.Next()
 	if err != nil {
@@ -171,6 +175,18 @@ func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (I
 			if inv.fieldsNotStructure {
 				return InvokeResponseEntry{}, fmt.Errorf("%w: command response %v: CommandFields is not a structure",
 					ErrInvalidInvokeRequest, inv.Path)
+			}
+			// A typed reject of the client's fields reader fails the
+			// response as well, every command of it: matter.js's invoke
+			// throws from the response's decodeTlv, whatever the error's
+			// class, and maps none to a per-command status
+			// (packages/protocol/src/action/client/ClientInteraction.ts:578
+			// at b25ed960, no catch in #invokeSingle; #executeBatch rejects
+			// every pending command of the batch, :1005-1010; R2-C2-wire-0551,
+			// decision 531).
+			if inv.fieldsReject != nil {
+				return InvokeResponseEntry{}, fmt.Errorf("%w: command response %v: fields: %w",
+					ErrInvalidInvokeRequest, inv.Path, inv.fieldsReject)
 			}
 			ent.Path, ent.Response, ent.HasResponse = inv.Path, inv.Fields, inv.Fields != nil
 			ent.CommandRef, ent.HasCommandRef = inv.CommandRef, inv.HasCommandRef
