@@ -784,7 +784,19 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // it is refused with [ErrAddedElsewhere] (node.Aggregator.Remove it
 // first). A part already d's is left as it is. A callback on p's queue
 // must not move p: the move waits for p's queue to run what it holds.
+//
+// On a device a node holds, a part whose key — or a key of one of its
+// parts — another endpoint of that node serves is refused with the node's
+// node.ErrDuplicateKey, nothing moved: the node would assemble two Specs
+// under one key, and every later change of its set would fail until the
+// host removed one (decision 599, as an Add of the key is refused,
+// decision 580; review II, R4-err-4704). The check and the move are one
+// step against the node's set.
 func (d *Device) AddPart(p *Device) error { return d.addParts(p) }
+
+// errRebound is addParts' retry: the device was bound or unbound between
+// reading its node and the move.
+var errRebound = errors.New("device: rebound during AddPart")
 
 // addParts is [Device.AddPart] for several parts, all or none: every
 // refusal is checked for every part before any moves, under one hold of
@@ -806,13 +818,6 @@ func (d *Device) addParts(parts ...*Device) error {
 				ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
 		}
 	}
-	composeMu.Lock()
-	for _, p := range parts {
-		if err := d.moveRefusalLocked(p); err != nil {
-			composeMu.Unlock()
-			return err
-		}
-	}
 	type move struct {
 		tree  []*Device
 		bound bool
@@ -821,30 +826,79 @@ func (d *Device) addParts(parts ...*Device) error {
 		moves []move
 		h     deviceseam.Host
 	)
-	for _, p := range parts {
-		former := p.owner.Load()
-		if former == d {
+	for {
+		via := d.hostOf()
+		// section is the check and the move, one step under composeMu;
+		// on a bound device it runs inside the node's AdmitParts, which
+		// checks the keys against the node's set (check nil: unbound).
+		section := func(check func(endpoint.SourceKey) error) error {
+			composeMu.Lock()
+			defer composeMu.Unlock()
+			if d.hostOf() != via {
+				return errRebound
+			}
+			for _, p := range parts {
+				if err := d.moveRefusalLocked(p); err != nil {
+					return err
+				}
+			}
+			if check != nil {
+				for _, p := range parts {
+					// A part of d's already, or one this node holds,
+					// serves its keys as itself.
+					if p.owner.Load() == d || p.hostOf() == via {
+						continue
+					}
+					for _, x := range p.treeLocked() {
+						if x.opts.StableKey == nil {
+							continue
+						}
+						if err := check(x.opts.StableKey); err != nil {
+							return fmt.Errorf("%s: the part %s: %w", d.typ.Name, x.opts.StableKey, err)
+						}
+					}
+				}
+			}
+			moves, h = nil, nil
+			for _, p := range parts {
+				former := p.owner.Load()
+				if former == d {
+					continue
+				}
+				// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
+				if former != nil {
+					former.mu.Lock()
+					former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
+					former.mu.Unlock()
+				}
+				p.owner.Store(d)
+				d.mu.Lock()
+				d.parts = append(d.parts, p)
+				h = d.host
+				d.mu.Unlock()
+				tree := p.treeLocked()
+				bound := p.hostOf() != nil
+				for _, x := range tree {
+					x.setHost(h)
+				}
+				moves = append(moves, move{tree, bound})
+			}
+			return nil
+		}
+		var err error
+		if via == nil {
+			err = section(nil)
+		} else {
+			err = via.AdmitParts(section)
+		}
+		if errors.Is(err, errRebound) {
 			continue
 		}
-		// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
-		if former != nil {
-			former.mu.Lock()
-			former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
-			former.mu.Unlock()
+		if err != nil {
+			return err
 		}
-		p.owner.Store(d)
-		d.mu.Lock()
-		d.parts = append(d.parts, p)
-		h = d.host
-		d.mu.Unlock()
-		tree := p.treeLocked()
-		bound := p.hostOf() != nil
-		for _, x := range tree {
-			x.setHost(h)
-		}
-		moves = append(moves, move{tree, bound})
+		break
 	}
-	composeMu.Unlock()
 	for _, m := range moves {
 		if m.bound {
 			for _, x := range m.tree {

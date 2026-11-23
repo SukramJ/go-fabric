@@ -72,6 +72,10 @@ func (h *fakeHost) HostName(_ context.Context, _ endpoint.SourceKey, name string
 	h.mu.Unlock()
 }
 
+func (h *fakeHost) AdmitParts(move func(check func(key endpoint.SourceKey) error) error) error {
+	return move(func(endpoint.SourceKey) error { return nil })
+}
+
 // TestLifecycleThroughTheSeam: a device the node binds takes its clock,
 // answers its endpoint number, tells it reachability and names, binds its
 // parts, refuses a second node and lets go at detach.

@@ -20,7 +20,9 @@ import (
 // endpoint serving the key keeps it at its number, a replaced endpoint
 // stays served, and a later unrelated Add reassembles. Before, the batch
 // assembled two Specs under one key, and that assembly and every later
-// one failed until the device went (decision 580).
+// one failed until the device went (decision 580). The part comes through
+// a host Endpoint whose Spec is live: a device.Device's AddPart of such a
+// part is refused at its call since decision 599 (R4-err-4704).
 func TestBatchRefusesAPartAddedDuringFnThatAnotherEndpointServes(t *testing.T) {
 	t.Parallel()
 	const served = "other/light"
@@ -39,10 +41,11 @@ func TestBatchRefusesAPartAddedDuringFnThatAnotherEndpointServes(t *testing.T) {
 			partNum, _ := servedNumberOf(n, served)
 			freshNum, _ := servedNumberOf(n, "fresh")
 			old := n.Aggregator().Endpoints()
-			taken := bridgedWithParts(t, "fresh")
+			key := "fresh"
 			if !tc.replace {
-				taken = bridgedWithParts(t, "late")
+				key = "late"
 			}
+			taken := lateSpec(t, key, served)
 			err := n.Aggregator().Batch(ctx, func(b *node.Batch) error {
 				var err error
 				if tc.replace {
@@ -53,7 +56,8 @@ func TestBatchRefusesAPartAddedDuringFnThatAnotherEndpointServes(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return taken.AddPart(kitLight(t, served).Device)
+				taken.k.Store(0) // the part arrives
+				return nil
 			})
 			if !errors.Is(err, node.ErrDuplicateKey) {
 				t.Fatalf("batch: %v, want %v", err, node.ErrDuplicateKey)
@@ -93,7 +97,7 @@ func TestBatchRefusedReplaceIsPutBackWithoutACollision(t *testing.T) {
 	old := n.Aggregator().Endpoints()
 	freshNum, _ := servedNumberOf(n, "fresh")
 	partNum, _ := servedNumberOf(n, "fresh/light")
-	repl := bridgedWithParts(t, "fresh")
+	repl := lateSpec(t, "fresh", "other/light")
 	light := kitLight(t, "fresh/light")
 	err := n.Aggregator().Batch(ctx, func(b *node.Batch) error {
 		if err := b.Replace(endpoint.StringKey("fresh"), repl); err != nil {
@@ -102,7 +106,8 @@ func TestBatchRefusedReplaceIsPutBackWithoutACollision(t *testing.T) {
 		if err := b.Add(light); err != nil {
 			return err
 		}
-		return repl.AddPart(kitLight(t, "other/light").Device)
+		repl.k.Store(0) // the part arrives
+		return nil
 	})
 	if !errors.Is(err, node.ErrDuplicateKey) {
 		t.Fatalf("batch: %v, want %v", err, node.ErrDuplicateKey)
@@ -120,4 +125,14 @@ func TestBatchRefusedReplaceIsPutBackWithoutACollision(t *testing.T) {
 	if aerr := n.Aggregator().Add(ctx, kitLight(t, "after")); aerr != nil {
 		t.Errorf("unrelated Add after the batch: %v", aerr)
 	}
+}
+
+// lateSpec is a host Endpoint under key that serves no part until its k
+// is stored 0, and the part late from then on: a part added during a
+// batch's fn.
+func lateSpec(t *testing.T, key, late string) *specFlip {
+	t.Helper()
+	f := &specFlip{with: bridgedWithParts(t, key).Spec(), without: bridgedWithParts(t, key, late).Spec()}
+	f.k.Store(1 << 40)
+	return f
 }
