@@ -239,16 +239,21 @@ func (r *Registry) allocateIDLocked() string {
 	}
 }
 
-// nodeConfig is the template with the registry's fields.
-func (r *Registry) nodeConfig(id string) Config {
+// nodeConfig is the template with the registry's fields and hooks
+// (hooksFor): every node the registry builds carries them, a node that
+// failed to load as well (R3-fsm-3801), so a chain the host passes as
+// HooksFor sees its Deleted. The caller sets holder to the node it built.
+func (r *Registry) nodeConfig(id string) (Config, *nodeHolder) {
 	cfg := r.cfg.Node
 	cfg.ID, cfg.Store, cfg.Peer, cfg.Interaction = id, r.store, nil, nil
+	holder := &nodeHolder{}
+	cfg.Hooks = r.hooksFor(id, holder)
 	cfg.maxImageBytes = r.cfg.MaxImageBytesPerNode
 	cfg.AutoSubscribe, cfg.DefaultSubscription, cfg.NewlyCommissioned, cfg.NoInitialRead = false, nil, false, false
 	if cfg.Logger == nil {
 		cfg.Logger = r.log
 	}
-	return cfg
+	return cfg, holder
 }
 
 // restore builds a stored node, bound to its peer when its record has a
@@ -304,14 +309,15 @@ func storedPeerAddress(values map[uint32][]byte) *PeerAddress {
 // unavailable is the node of id that failed to load with cause: no image,
 // no peer, its store untouched until it is erased (Delete, Forget), its
 // Start and LoadError the cause, its PeerAddress stored, the address its
-// stored record names (nil for none).
+// stored record names (nil for none), its hooks the registry's.
 func (r *Registry) unavailable(id string, stored *PeerAddress, cause error) (*Node, error) {
-	cfg := r.nodeConfig(id)
+	cfg, holder := r.nodeConfig(id)
 	cfg.Store = unavailableStore{r.store}
 	n, err := newNode(cfg)
 	if err != nil {
 		return nil, err
 	}
+	holder.set(n)
 	n.loadErr = fmt.Errorf("%w: %q: %w", ErrLoadFailed, id, cause)
 	n.storedAddr = stored
 	return n, nil
@@ -332,9 +338,7 @@ func (unavailableStore) EraseEndpoint(string, uint16) error { return nil }
 // build creates a node of id, bound to p when it is not nil, its hooks
 // the registry's.
 func (r *Registry) build(id string, p *peer.Peer) (*Node, error) {
-	cfg := r.nodeConfig(id)
-	holder := &nodeHolder{}
-	cfg.Hooks = r.hooksFor(id, holder)
+	cfg, holder := r.nodeConfig(id)
 	n, err := newNode(cfg)
 	if err != nil {
 		return nil, err
