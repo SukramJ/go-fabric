@@ -34,8 +34,6 @@ const (
 )
 
 // Feature is a CommodityMetering FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // MeteredQuantityStruct is the MeteredQuantityStruct struct.
@@ -77,16 +75,12 @@ func (v MeteredQuantityStruct) Clone() MeteredQuantityStruct {
 }
 
 // MeteredQuantityStructDef describes MeteredQuantityStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MeteredQuantityStructDef = &spec.Struct{Name: "MeteredQuantityStruct", Fields: []spec.Field{
 	{ID: 0, Name: "TariffComponentIds", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128", Max: &spec.Bound{Int: 128}}},
 	{ID: 1, Name: "Quantity", Type: spec.Type{Name: "int64", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // TariffUnitEnum is the TariffUnitEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TariffUnitEnum uint8
 
 // TariffUnitEnum values.
@@ -96,8 +90,6 @@ const (
 )
 
 // TariffUnitEnumDef describes TariffUnitEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffUnitEnumDef = &spec.Enum{Name: "TariffUnitEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "KWh", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "KVAh", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

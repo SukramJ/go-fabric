@@ -29,13 +29,9 @@ const (
 )
 
 // Feature is a LaundryDryerControls FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // DrynessLevelEnum is the DrynessLevelEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DrynessLevelEnum uint8
 
 // DrynessLevelEnum values.
@@ -47,8 +43,6 @@ const (
 )
 
 // DrynessLevelEnumDef describes DrynessLevelEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DrynessLevelEnumDef = &spec.Enum{Name: "DrynessLevelEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Normal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

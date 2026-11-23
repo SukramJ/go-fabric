@@ -50,8 +50,6 @@ const (
 )
 
 // Feature is a BooleanStateConfiguration FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -64,8 +62,6 @@ const (
 )
 
 // AlarmModeBitmap is the AlarmModeBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AlarmModeBitmap uint8
 
 // AlarmModeBitmap bits; a member wider than one bit is its mask.
@@ -75,16 +71,12 @@ const (
 )
 
 // AlarmModeBitmapDef describes AlarmModeBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AlarmModeBitmapDef = &spec.Bitmap{Name: "AlarmModeBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Visual", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "VIS", Op: spec.ConfName, Name: "VIS"}},
 	{Name: "Audible", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "AUD", Op: spec.ConfName, Name: "AUD"}},
 }}
 
 // SensorFaultBitmap is the SensorFaultBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SensorFaultBitmap uint16
 
 // SensorFaultBitmap bits; a member wider than one bit is its mask.
@@ -93,8 +85,6 @@ const (
 )
 
 // SensorFaultBitmapDef describes SensorFaultBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SensorFaultBitmapDef = &spec.Bitmap{Name: "SensorFaultBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "GeneralFault", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}

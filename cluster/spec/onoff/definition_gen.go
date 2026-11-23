@@ -45,8 +45,6 @@ const (
 )
 
 // Feature is a OnOff FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -57,8 +55,6 @@ const (
 )
 
 // DelayedAllOffEffectVariantEnum is the DelayedAllOffEffectVariantEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DelayedAllOffEffectVariantEnum uint8
 
 // DelayedAllOffEffectVariantEnum values.
@@ -69,8 +65,6 @@ const (
 )
 
 // DelayedAllOffEffectVariantEnumDef describes DelayedAllOffEffectVariantEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DelayedAllOffEffectVariantEnumDef = &spec.Enum{Name: "DelayedAllOffEffectVariantEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "DelayedOffFastFade", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "NoFade", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -78,8 +72,6 @@ var DelayedAllOffEffectVariantEnumDef = &spec.Enum{Name: "DelayedAllOffEffectVar
 }}
 
 // DyingLightEffectVariantEnum is the DyingLightEffectVariantEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DyingLightEffectVariantEnum uint8
 
 // DyingLightEffectVariantEnum values.
@@ -88,15 +80,11 @@ const (
 )
 
 // DyingLightEffectVariantEnumDef describes DyingLightEffectVariantEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DyingLightEffectVariantEnumDef = &spec.Enum{Name: "DyingLightEffectVariantEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "DyingLightFadeOff", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // EffectIdentifierEnum is the EffectIdentifierEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EffectIdentifierEnum uint8
 
 // EffectIdentifierEnum values.
@@ -106,16 +94,12 @@ const (
 )
 
 // EffectIdentifierEnumDef describes EffectIdentifierEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EffectIdentifierEnumDef = &spec.Enum{Name: "EffectIdentifierEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "DelayedAllOff", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "DyingLight", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // OnOffControlBitmap is the OnOffControlBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OnOffControlBitmap uint8
 
 // OnOffControlBitmap bits; a member wider than one bit is its mask.
@@ -124,15 +108,11 @@ const (
 )
 
 // OnOffControlBitmapDef describes OnOffControlBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OnOffControlBitmapDef = &spec.Bitmap{Name: "OnOffControlBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "AcceptOnlyWhenOn", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // StartUpOnOffEnum is the StartUpOnOffEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StartUpOnOffEnum uint8
 
 // StartUpOnOffEnum values.
@@ -143,8 +123,6 @@ const (
 )
 
 // StartUpOnOffEnumDef describes StartUpOnOffEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StartUpOnOffEnumDef = &spec.Enum{Name: "StartUpOnOffEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Off", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "On", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

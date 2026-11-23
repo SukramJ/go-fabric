@@ -49,8 +49,6 @@ const (
 )
 
 // Feature is a IcdManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -62,8 +60,6 @@ const (
 )
 
 // ClientTypeEnum is the ClientTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ClientTypeEnum uint8
 
 // ClientTypeEnum values.
@@ -73,8 +69,6 @@ const (
 )
 
 // ClientTypeEnumDef describes ClientTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ClientTypeEnumDef = &spec.Enum{Name: "ClientTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Permanent", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Ephemeral", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -134,8 +128,6 @@ func (v MonitoringRegistrationStruct) Clone() MonitoringRegistrationStruct {
 }
 
 // MonitoringRegistrationStructDef describes MonitoringRegistrationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MonitoringRegistrationStructDef = &spec.Struct{Name: "MonitoringRegistrationStruct", Fields: []spec.Field{
 	{ID: 1, Name: "CheckInNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{NonVolatile: true}, FabricSensitive: true},
 	{ID: 2, Name: "MonitoredSubject", Type: spec.Type{Name: "subject-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{NonVolatile: true}, FabricSensitive: true},
@@ -145,8 +137,6 @@ var MonitoringRegistrationStructDef = &spec.Struct{Name: "MonitoringRegistration
 }}
 
 // OperatingModeEnum is the OperatingModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OperatingModeEnum uint8
 
 // OperatingModeEnum values.
@@ -156,16 +146,12 @@ const (
 )
 
 // OperatingModeEnumDef describes OperatingModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperatingModeEnumDef = &spec.Enum{Name: "OperatingModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Sit", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Lit", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // UserActiveModeTriggerBitmap is the UserActiveModeTriggerBitmap map32.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type UserActiveModeTriggerBitmap uint32
 
 // UserActiveModeTriggerBitmap bits; a member wider than one bit is its mask.
@@ -190,8 +176,6 @@ const (
 )
 
 // UserActiveModeTriggerBitmapDef describes UserActiveModeTriggerBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var UserActiveModeTriggerBitmapDef = &spec.Bitmap{Name: "UserActiveModeTriggerBitmap", Bits: 32, Members: []spec.BitmapMember{
 	{Name: "PowerCycle", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "SettingsMenu", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

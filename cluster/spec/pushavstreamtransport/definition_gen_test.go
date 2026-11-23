@@ -23,6 +23,21 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeaturePerZoneSensitivity, FeatureMetadata)
+	spectest.CheckEnum[CMAFInterfaceEnum](t, CMAFInterfaceEnumDef, CMAFInterfaceInterface1, CMAFInterfaceInterface2Dash, CMAFInterfaceInterface2Hls)
+	spectest.CheckEnum[ContainerFormatEnum](t, ContainerFormatEnumDef, ContainerFormatCmaf)
+	spectest.CheckEnum[IngestMethodsEnum](t, IngestMethodsEnumDef, IngestMethodsCmafIngest)
+	spectest.CheckEnum[StatusCodeEnum](t, StatusCodeEnumDef, StatusCodeInvalidTlsEndpoint, StatusCodeInvalidStream, StatusCodeInvalidUrl, StatusCodeInvalidZone, StatusCodeInvalidCombination, StatusCodeInvalidTriggerType, StatusCodeInvalidTransportStatus, StatusCodeInvalidOptions, StatusCodeInvalidStreamUsage, StatusCodeInvalidTime, StatusCodeInvalidPreRollLength, StatusCodeDuplicateStreamValues)
+	spectest.CheckEnum[TransportStatusEnum](t, TransportStatusEnumDef, TransportStatusActive, TransportStatusInactive)
+	spectest.CheckEnum[StreamUsageEnum](t, StreamUsageEnumDef, StreamUsageInternal, StreamUsageRecording, StreamUsageAnalysis, StreamUsageLiveView)
+	spectest.CheckEnum[TransportTriggerTypeEnum](t, TransportTriggerTypeEnumDef, TransportTriggerTypeCommand, TransportTriggerTypeMotion, TransportTriggerTypeContinuous)
+	spectest.CheckEnum[TriggerActivationReasonEnum](t, TriggerActivationReasonEnumDef, TriggerActivationReasonUserInitiated, TriggerActivationReasonAutomation, TriggerActivationReasonEmergency, TriggerActivationReasonDoorbellPressed)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

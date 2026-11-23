@@ -58,8 +58,6 @@ const (
 )
 
 // Feature is a GeneralDiagnostics FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -68,8 +66,6 @@ const (
 )
 
 // BootReasonEnum is the BootReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BootReasonEnum uint8
 
 // BootReasonEnum values.
@@ -84,8 +80,6 @@ const (
 )
 
 // BootReasonEnumDef describes BootReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BootReasonEnumDef = &spec.Enum{Name: "BootReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "PowerOnReboot", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -128,8 +122,6 @@ func (v *DeviceLoadStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DeviceLoadStructDef describes DeviceLoadStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DeviceLoadStructDef = &spec.Struct{Name: "DeviceLoadStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CurrentSubscriptions", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "CurrentSubscriptionsForFabric", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -139,8 +131,6 @@ var DeviceLoadStructDef = &spec.Struct{Name: "DeviceLoadStruct", Fields: []spec.
 }}
 
 // HardwareFaultEnum is the HardwareFaultEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type HardwareFaultEnum uint8
 
 // HardwareFaultEnum values.
@@ -159,8 +149,6 @@ const (
 )
 
 // HardwareFaultEnumDef describes HardwareFaultEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var HardwareFaultEnumDef = &spec.Enum{Name: "HardwareFaultEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Radio", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -176,8 +164,6 @@ var HardwareFaultEnumDef = &spec.Enum{Name: "HardwareFaultEnum", Bits: 8, Values
 }}
 
 // InterfaceTypeEnum is the InterfaceTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type InterfaceTypeEnum uint8
 
 // InterfaceTypeEnum values.
@@ -190,8 +176,6 @@ const (
 )
 
 // InterfaceTypeEnumDef describes InterfaceTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var InterfaceTypeEnumDef = &spec.Enum{Name: "InterfaceTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "WiFi", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -201,8 +185,6 @@ var InterfaceTypeEnumDef = &spec.Enum{Name: "InterfaceTypeEnum", Bits: 8, Values
 }}
 
 // NetworkFaultEnum is the NetworkFaultEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type NetworkFaultEnum uint8
 
 // NetworkFaultEnum values.
@@ -214,8 +196,6 @@ const (
 )
 
 // NetworkFaultEnumDef describes NetworkFaultEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NetworkFaultEnumDef = &spec.Enum{Name: "NetworkFaultEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "HardwareFailure", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -314,8 +294,6 @@ func (v NetworkInterface) Clone() NetworkInterface {
 }
 
 // NetworkInterfaceDef describes NetworkInterface.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NetworkInterfaceDef = &spec.Struct{Name: "NetworkInterface", Fields: []spec.Field{
 	{ID: 0, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
 	{ID: 1, Name: "IsOperational", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -328,8 +306,6 @@ var NetworkInterfaceDef = &spec.Struct{Name: "NetworkInterface", Fields: []spec.
 }}
 
 // RadioFaultEnum is the RadioFaultEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type RadioFaultEnum uint8
 
 // RadioFaultEnum values.
@@ -344,8 +320,6 @@ const (
 )
 
 // RadioFaultEnumDef describes RadioFaultEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RadioFaultEnumDef = &spec.Enum{Name: "RadioFaultEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "WiFiFault", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},

@@ -21,6 +21,18 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureExtension, FeatureManagedDevice, FeatureAuxiliary)
+	spectest.CheckEnum[AccessControlAuxiliaryTypeEnum](t, AccessControlAuxiliaryTypeEnumDef, AccessControlAuxiliaryTypeSystem, AccessControlAuxiliaryTypeGroupcast)
+	spectest.CheckEnum[AccessControlEntryAuthModeEnum](t, AccessControlEntryAuthModeEnumDef, AccessControlEntryAuthModePase, AccessControlEntryAuthModeCase, AccessControlEntryAuthModeGroup)
+	spectest.CheckEnum[AccessControlEntryPrivilegeEnum](t, AccessControlEntryPrivilegeEnumDef, AccessControlEntryPrivilegeView, AccessControlEntryPrivilegeProxyView, AccessControlEntryPrivilegeOperate, AccessControlEntryPrivilegeManage, AccessControlEntryPrivilegeAdminister)
+	spectest.CheckEnum[AccessRestrictionTypeEnum](t, AccessRestrictionTypeEnumDef, AccessRestrictionTypeAttributeAccessForbidden, AccessRestrictionTypeAttributeWriteForbidden, AccessRestrictionTypeCommandForbidden, AccessRestrictionTypeEventForbidden)
+	spectest.CheckEnum[ChangeTypeEnum](t, ChangeTypeEnumDef, ChangeTypeChanged, ChangeTypeAdded, ChangeTypeRemoved)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

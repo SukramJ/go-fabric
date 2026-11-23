@@ -23,6 +23,19 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeaturePositioning, FeatureMotionLatching, FeatureInstantaneous, FeatureSpeed, FeatureVentilation, FeaturePedestrian, FeatureCalibration, FeatureProtection, FeatureManuallyOperable)
+	spectest.CheckEnum[ClosureErrorEnum](t, ClosureErrorEnumDef, ClosureErrorPhysicallyBlocked, ClosureErrorBlockedBySensor, ClosureErrorTemperatureLimited, ClosureErrorMaintenanceRequired, ClosureErrorInternalInterference)
+	spectest.CheckEnum[CurrentPositionEnum](t, CurrentPositionEnumDef, CurrentPositionFullyClosed, CurrentPositionFullyOpened, CurrentPositionPartiallyOpened, CurrentPositionOpenedForPedestrian, CurrentPositionOpenedForVentilation, CurrentPositionOpenedAtSignature)
+	spectest.CheckBitmap[LatchControlModesBitmap](t, LatchControlModesBitmapDef, LatchControlModesRemoteLatching, LatchControlModesRemoteUnlatching)
+	spectest.CheckEnum[MainStateEnum](t, MainStateEnumDef, MainStateStopped, MainStateMoving, MainStateWaitingForMotion, MainStateError, MainStateCalibrating, MainStateProtected, MainStateDisengaged, MainStateSetupRequired)
+	spectest.CheckEnum[ThreeLevelAutoEnum](t, ThreeLevelAutoEnumDef, ThreeLevelAutoAuto, ThreeLevelAutoLow, ThreeLevelAutoMedium, ThreeLevelAutoHigh)
+	spectest.CheckEnum[TargetPositionEnum](t, TargetPositionEnumDef, TargetPositionMoveToFullyClosed, TargetPositionMoveToFullyOpen, TargetPositionMoveToPedestrianPosition, TargetPositionMoveToVentilationPosition, TargetPositionMoveToSignaturePosition)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

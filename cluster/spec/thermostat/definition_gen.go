@@ -115,8 +115,6 @@ const (
 )
 
 // Feature is a Thermostat FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -134,8 +132,6 @@ const (
 )
 
 // ACCapacityFormatEnum is the ACCapacityFormatEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ACCapacityFormatEnum uint8
 
 // ACCapacityFormatEnum values.
@@ -144,15 +140,11 @@ const (
 )
 
 // ACCapacityFormatEnumDef describes ACCapacityFormatEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ACCapacityFormatEnumDef = &spec.Enum{Name: "ACCapacityFormatEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "BtUh", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 }}
 
 // ACCompressorTypeEnum is the ACCompressorTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ACCompressorTypeEnum uint8
 
 // ACCompressorTypeEnum values.
@@ -164,8 +156,6 @@ const (
 )
 
 // ACCompressorTypeEnumDef describes ACCompressorTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ACCompressorTypeEnumDef = &spec.Enum{Name: "ACCompressorTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "T1", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -174,8 +164,6 @@ var ACCompressorTypeEnumDef = &spec.Enum{Name: "ACCompressorTypeEnum", Bits: 8, 
 }}
 
 // ACErrorCodeBitmap is the ACErrorCodeBitmap map32.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ACErrorCodeBitmap uint32
 
 // ACErrorCodeBitmap bits; a member wider than one bit is its mask.
@@ -188,8 +176,6 @@ const (
 )
 
 // ACErrorCodeBitmapDef describes ACErrorCodeBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ACErrorCodeBitmapDef = &spec.Bitmap{Name: "ACErrorCodeBitmap", Bits: 32, Members: []spec.BitmapMember{
 	{Name: "CompressorFail", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "RoomSensorFail", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -199,8 +185,6 @@ var ACErrorCodeBitmapDef = &spec.Bitmap{Name: "ACErrorCodeBitmap", Bits: 32, Mem
 }}
 
 // ACLouverPositionEnum is the ACLouverPositionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ACLouverPositionEnum uint8
 
 // ACLouverPositionEnum values.
@@ -213,8 +197,6 @@ const (
 )
 
 // ACLouverPositionEnumDef describes ACLouverPositionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ACLouverPositionEnumDef = &spec.Enum{Name: "ACLouverPositionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "Closed", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 2, Name: "Open", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -224,8 +206,6 @@ var ACLouverPositionEnumDef = &spec.Enum{Name: "ACLouverPositionEnum", Bits: 8, 
 }}
 
 // ACRefrigerantTypeEnum is the ACRefrigerantTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ACRefrigerantTypeEnum uint8
 
 // ACRefrigerantTypeEnum values.
@@ -237,8 +217,6 @@ const (
 )
 
 // ACRefrigerantTypeEnumDef describes ACRefrigerantTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ACRefrigerantTypeEnumDef = &spec.Enum{Name: "ACRefrigerantTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "R22", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -247,8 +225,6 @@ var ACRefrigerantTypeEnumDef = &spec.Enum{Name: "ACRefrigerantTypeEnum", Bits: 8
 }}
 
 // ACTypeEnum is the ACTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ACTypeEnum uint8
 
 // ACTypeEnum values.
@@ -261,8 +237,6 @@ const (
 )
 
 // ACTypeEnumDef describes ACTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ACTypeEnumDef = &spec.Enum{Name: "ACTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "CoolingFixed", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -272,8 +246,6 @@ var ACTypeEnumDef = &spec.Enum{Name: "ACTypeEnum", Bits: 8, Values: []spec.EnumV
 }}
 
 // ControlSequenceOfOperationEnum is the ControlSequenceOfOperationEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ControlSequenceOfOperationEnum uint8
 
 // ControlSequenceOfOperationEnum values.
@@ -287,8 +259,6 @@ const (
 )
 
 // ControlSequenceOfOperationEnumDef describes ControlSequenceOfOperationEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ControlSequenceOfOperationEnumDef = &spec.Enum{Name: "ControlSequenceOfOperationEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "CoolingOnly", Conformance: spec.Conformance{Text: "[COOL]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COOL"}}}},
 	{Value: 1, Name: "CoolingWithReheat", Conformance: spec.Conformance{Text: "[COOL]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COOL"}}}},
@@ -299,8 +269,6 @@ var ControlSequenceOfOperationEnumDef = &spec.Enum{Name: "ControlSequenceOfOpera
 }}
 
 // HVACSystemTypeBitmap is the HVACSystemTypeBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type HVACSystemTypeBitmap uint8
 
 // HVACSystemTypeBitmap bits; a member wider than one bit is its mask.
@@ -312,8 +280,6 @@ const (
 )
 
 // HVACSystemTypeBitmapDef describes HVACSystemTypeBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var HVACSystemTypeBitmapDef = &spec.Bitmap{Name: "HVACSystemTypeBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "CoolingStage", Bit: 0, Width: 2},
 	{Name: "HeatingStage", Bit: 2, Width: 2},
@@ -322,8 +288,6 @@ var HVACSystemTypeBitmapDef = &spec.Bitmap{Name: "HVACSystemTypeBitmap", Bits: 8
 }}
 
 // OccupancyBitmap is the OccupancyBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OccupancyBitmap uint8
 
 // OccupancyBitmap bits; a member wider than one bit is its mask.
@@ -332,15 +296,11 @@ const (
 )
 
 // OccupancyBitmapDef describes OccupancyBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OccupancyBitmapDef = &spec.Bitmap{Name: "OccupancyBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Occupied", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // PresetScenarioEnum is the PresetScenarioEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PresetScenarioEnum uint8
 
 // PresetScenarioEnum values.
@@ -355,8 +315,6 @@ const (
 )
 
 // PresetScenarioEnumDef describes PresetScenarioEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PresetScenarioEnumDef = &spec.Enum{Name: "PresetScenarioEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "Occupied", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 2, Name: "Unoccupied", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -439,8 +397,6 @@ func (v PresetStruct) Clone() PresetStruct {
 }
 
 // PresetStructDef describes PresetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PresetStructDef = &spec.Struct{Name: "PresetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PresetHandle", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
 	{ID: 1, Name: "PresetScenario", Type: spec.Type{Name: "PresetScenarioEnum", Kind: spec.KindEnum, Bits: 8, Enum: PresetScenarioEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -451,8 +407,6 @@ var PresetStructDef = &spec.Struct{Name: "PresetStruct", Fields: []spec.Field{
 }}
 
 // PresetTypeFeaturesBitmap is the PresetTypeFeaturesBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PresetTypeFeaturesBitmap uint16
 
 // PresetTypeFeaturesBitmap bits; a member wider than one bit is its mask.
@@ -462,8 +416,6 @@ const (
 )
 
 // PresetTypeFeaturesBitmapDef describes PresetTypeFeaturesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PresetTypeFeaturesBitmapDef = &spec.Bitmap{Name: "PresetTypeFeaturesBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "Automatic", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "SupportsNames", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -495,8 +447,6 @@ func (v *PresetTypeStruct) DecodeTLV(n spec.Node) error {
 }
 
 // PresetTypeStructDef describes PresetTypeStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PresetTypeStructDef = &spec.Struct{Name: "PresetTypeStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PresetScenario", Type: spec.Type{Name: "PresetScenarioEnum", Kind: spec.KindEnum, Bits: 8, Enum: PresetScenarioEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "NumberOfPresets", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Default: float64(0)},
@@ -504,8 +454,6 @@ var PresetTypeStructDef = &spec.Struct{Name: "PresetTypeStruct", Fields: []spec.
 }}
 
 // ProgrammingOperationModeBitmap is the ProgrammingOperationModeBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ProgrammingOperationModeBitmap uint8
 
 // ProgrammingOperationModeBitmap bits; a member wider than one bit is its mask.
@@ -516,8 +464,6 @@ const (
 )
 
 // ProgrammingOperationModeBitmapDef describes ProgrammingOperationModeBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ProgrammingOperationModeBitmapDef = &spec.Bitmap{Name: "ProgrammingOperationModeBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "ScheduleActive", Bit: 0, Width: 1},
 	{Name: "AutoRecovery", Bit: 1, Width: 1},
@@ -525,8 +471,6 @@ var ProgrammingOperationModeBitmapDef = &spec.Bitmap{Name: "ProgrammingOperation
 }}
 
 // RelayStateBitmap is the RelayStateBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type RelayStateBitmap uint16
 
 // RelayStateBitmap bits; a member wider than one bit is its mask.
@@ -541,8 +485,6 @@ const (
 )
 
 // RelayStateBitmapDef describes RelayStateBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RelayStateBitmapDef = &spec.Bitmap{Name: "RelayStateBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "Heat", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Cool", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -554,8 +496,6 @@ var RelayStateBitmapDef = &spec.Bitmap{Name: "RelayStateBitmap", Bits: 16, Membe
 }}
 
 // RemoteSensingBitmap is the RemoteSensingBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type RemoteSensingBitmap uint8
 
 // RemoteSensingBitmap bits; a member wider than one bit is its mask.
@@ -566,8 +506,6 @@ const (
 )
 
 // RemoteSensingBitmapDef describes RemoteSensingBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RemoteSensingBitmapDef = &spec.Bitmap{Name: "RemoteSensingBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "LocalTemperature", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "OutdoorTemperature", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "OutdoorTemperature", Op: spec.ConfName, Name: "OutdoorTemperature"}},
@@ -575,8 +513,6 @@ var RemoteSensingBitmapDef = &spec.Bitmap{Name: "RemoteSensingBitmap", Bits: 8, 
 }}
 
 // ScheduleDayOfWeekBitmap is the ScheduleDayOfWeekBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ScheduleDayOfWeekBitmap uint8
 
 // ScheduleDayOfWeekBitmap bits; a member wider than one bit is its mask.
@@ -592,8 +528,6 @@ const (
 )
 
 // ScheduleDayOfWeekBitmapDef describes ScheduleDayOfWeekBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ScheduleDayOfWeekBitmapDef = &spec.Bitmap{Name: "ScheduleDayOfWeekBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Sunday", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Monday", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -606,8 +540,6 @@ var ScheduleDayOfWeekBitmapDef = &spec.Bitmap{Name: "ScheduleDayOfWeekBitmap", B
 }}
 
 // ScheduleModeBitmap is the ScheduleModeBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ScheduleModeBitmap uint8
 
 // ScheduleModeBitmap bits; a member wider than one bit is its mask.
@@ -617,8 +549,6 @@ const (
 )
 
 // ScheduleModeBitmapDef describes ScheduleModeBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ScheduleModeBitmapDef = &spec.Bitmap{Name: "ScheduleModeBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "HeatSetpointPresent", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "CoolSetpointPresent", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -706,8 +636,6 @@ func (v ScheduleStruct) Clone() ScheduleStruct {
 }
 
 // ScheduleStructDef describes ScheduleStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ScheduleStructDef = &spec.Struct{Name: "ScheduleStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ScheduleHandle", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
 	{ID: 1, Name: "SystemMode", Type: spec.Type{Name: "SystemModeEnum", Kind: spec.KindEnum, Bits: 8, Enum: SystemModeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
@@ -718,8 +646,6 @@ var ScheduleStructDef = &spec.Struct{Name: "ScheduleStruct", Fields: []spec.Fiel
 }}
 
 // SystemModeEnum is the SystemModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SystemModeEnum uint8
 
 // SystemModeEnum values.
@@ -736,8 +662,6 @@ const (
 )
 
 // SystemModeEnumDef describes SystemModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SystemModeEnumDef = &spec.Enum{Name: "SystemModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Off", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "Auto", Conformance: spec.Conformance{Text: "AUTO", Op: spec.ConfName, Name: "AUTO"}},
@@ -828,8 +752,6 @@ func (v ScheduleTransitionStruct) Clone() ScheduleTransitionStruct {
 }
 
 // ScheduleTransitionStructDef describes ScheduleTransitionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ScheduleTransitionStructDef = &spec.Struct{Name: "ScheduleTransitionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "DayOfWeek", Type: spec.Type{Name: "ScheduleDayOfWeekBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: ScheduleDayOfWeekBitmapDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 1, Name: "TransitionTime", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 1439", Max: &spec.Bound{Int: 1439}}},
@@ -840,8 +762,6 @@ var ScheduleTransitionStructDef = &spec.Struct{Name: "ScheduleTransitionStruct",
 }}
 
 // ScheduleTypeFeaturesBitmap is the ScheduleTypeFeaturesBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ScheduleTypeFeaturesBitmap uint16
 
 // ScheduleTypeFeaturesBitmap bits; a member wider than one bit is its mask.
@@ -853,8 +773,6 @@ const (
 )
 
 // ScheduleTypeFeaturesBitmapDef describes ScheduleTypeFeaturesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ScheduleTypeFeaturesBitmapDef = &spec.Bitmap{Name: "ScheduleTypeFeaturesBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "SupportsPresets", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "[PRES].b+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "PRES"}}}}}},
 	{Name: "SupportsSetpoints", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "O.b+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
@@ -888,8 +806,6 @@ func (v *ScheduleTypeStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ScheduleTypeStructDef describes ScheduleTypeStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ScheduleTypeStructDef = &spec.Struct{Name: "ScheduleTypeStruct", Fields: []spec.Field{
 	{ID: 0, Name: "SystemMode", Type: spec.Type{Name: "SystemModeEnum", Kind: spec.KindEnum, Bits: 8, Enum: SystemModeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 1, Name: "NumberOfSchedules", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max numberOfSchedules", Max: &spec.Bound{Ref: "numberOfSchedules"}}, Default: float64(0)},
@@ -897,8 +813,6 @@ var ScheduleTypeStructDef = &spec.Struct{Name: "ScheduleTypeStruct", Fields: []s
 }}
 
 // SetpointChangeSourceEnum is the SetpointChangeSourceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SetpointChangeSourceEnum uint8
 
 // SetpointChangeSourceEnum values.
@@ -909,8 +823,6 @@ const (
 )
 
 // SetpointChangeSourceEnumDef describes SetpointChangeSourceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SetpointChangeSourceEnumDef = &spec.Enum{Name: "SetpointChangeSourceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Manual", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "Schedule", Conformance: spec.Conformance{Text: "[MSCH]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "MSCH"}}}},
@@ -918,8 +830,6 @@ var SetpointChangeSourceEnumDef = &spec.Enum{Name: "SetpointChangeSourceEnum", B
 }}
 
 // SetpointRaiseLowerModeEnum is the SetpointRaiseLowerModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SetpointRaiseLowerModeEnum uint8
 
 // SetpointRaiseLowerModeEnum values.
@@ -930,8 +840,6 @@ const (
 )
 
 // SetpointRaiseLowerModeEnumDef describes SetpointRaiseLowerModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SetpointRaiseLowerModeEnumDef = &spec.Enum{Name: "SetpointRaiseLowerModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Heat", Conformance: spec.Conformance{Text: "HEAT", Op: spec.ConfName, Name: "HEAT"}},
 	{Value: 1, Name: "Cool", Conformance: spec.Conformance{Text: "COOL", Op: spec.ConfName, Name: "COOL"}},
@@ -939,8 +847,6 @@ var SetpointRaiseLowerModeEnumDef = &spec.Enum{Name: "SetpointRaiseLowerModeEnum
 }}
 
 // StartOfWeekEnum is the StartOfWeekEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StartOfWeekEnum uint8
 
 // StartOfWeekEnum values.
@@ -955,8 +861,6 @@ const (
 )
 
 // StartOfWeekEnumDef describes StartOfWeekEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StartOfWeekEnumDef = &spec.Enum{Name: "StartOfWeekEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Sunday", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Monday", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -968,8 +872,6 @@ var StartOfWeekEnumDef = &spec.Enum{Name: "StartOfWeekEnum", Bits: 8, Values: []
 }}
 
 // TemperatureSetpointHoldEnum is the TemperatureSetpointHoldEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TemperatureSetpointHoldEnum uint8
 
 // TemperatureSetpointHoldEnum values.
@@ -979,16 +881,12 @@ const (
 )
 
 // TemperatureSetpointHoldEnumDef describes TemperatureSetpointHoldEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TemperatureSetpointHoldEnumDef = &spec.Enum{Name: "TemperatureSetpointHoldEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "SetpointHoldOff", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "SetpointHoldOn", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ThermostatRunningModeEnum is the ThermostatRunningModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ThermostatRunningModeEnum uint8
 
 // ThermostatRunningModeEnum values.
@@ -999,8 +897,6 @@ const (
 )
 
 // ThermostatRunningModeEnumDef describes ThermostatRunningModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThermostatRunningModeEnumDef = &spec.Enum{Name: "ThermostatRunningModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Off", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 3, Name: "Cool", Conformance: spec.Conformance{Text: "[COOL]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "COOL"}}}},
@@ -1008,8 +904,6 @@ var ThermostatRunningModeEnumDef = &spec.Enum{Name: "ThermostatRunningModeEnum",
 }}
 
 // ThermostatSuggestionNotFollowingReasonBitmap is the ThermostatSuggestionNotFollowingReasonBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ThermostatSuggestionNotFollowingReasonBitmap uint16
 
 // ThermostatSuggestionNotFollowingReasonBitmap bits; a member wider than one bit is its mask.
@@ -1025,8 +919,6 @@ const (
 )
 
 // ThermostatSuggestionNotFollowingReasonBitmapDef describes ThermostatSuggestionNotFollowingReasonBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThermostatSuggestionNotFollowingReasonBitmapDef = &spec.Bitmap{Name: "ThermostatSuggestionNotFollowingReasonBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "DemandResponseEvent", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "OngoingHold", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -1083,8 +975,6 @@ func (v ThermostatSuggestionStruct) Clone() ThermostatSuggestionStruct {
 }
 
 // ThermostatSuggestionStructDef describes ThermostatSuggestionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThermostatSuggestionStructDef = &spec.Struct{Name: "ThermostatSuggestionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "UniqueId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "PresetHandle", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
@@ -1118,8 +1008,6 @@ func (v *WeeklyScheduleTransitionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // WeeklyScheduleTransitionStructDef describes WeeklyScheduleTransitionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WeeklyScheduleTransitionStructDef = &spec.Struct{Name: "WeeklyScheduleTransitionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "TransitionTime", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 1439", Max: &spec.Bound{Int: 1439}}},
 	{ID: 1, Name: "HeatSetpoint", Type: spec.Type{Name: "temperature", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
@@ -1127,8 +1015,6 @@ var WeeklyScheduleTransitionStructDef = &spec.Struct{Name: "WeeklyScheduleTransi
 }}
 
 // Status is the status enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Status uint8
 
 // Status values.
@@ -1169,8 +1055,6 @@ const (
 )
 
 // StatusDef describes status.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusDef = &spec.Enum{Name: "status", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success"},
 	{Value: 1, Name: "Failure"},

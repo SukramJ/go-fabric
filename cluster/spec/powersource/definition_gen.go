@@ -71,8 +71,6 @@ const (
 )
 
 // Feature is a PowerSource FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -84,8 +82,6 @@ const (
 )
 
 // BatApprovedChemistryEnum is the BatApprovedChemistryEnum enum16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BatApprovedChemistryEnum uint16
 
 // BatApprovedChemistryEnum values.
@@ -126,8 +122,6 @@ const (
 )
 
 // BatApprovedChemistryEnumDef describes BatApprovedChemistryEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BatApprovedChemistryEnumDef = &spec.Enum{Name: "BatApprovedChemistryEnum", Bits: 16, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Alkaline", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -165,8 +159,6 @@ var BatApprovedChemistryEnumDef = &spec.Enum{Name: "BatApprovedChemistryEnum", B
 }}
 
 // BatChargeFaultEnum is the BatChargeFaultEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BatChargeFaultEnum uint8
 
 // BatChargeFaultEnum values.
@@ -185,8 +177,6 @@ const (
 )
 
 // BatChargeFaultEnumDef describes BatChargeFaultEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BatChargeFaultEnumDef = &spec.Enum{Name: "BatChargeFaultEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "AmbientTooHot", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -202,8 +192,6 @@ var BatChargeFaultEnumDef = &spec.Enum{Name: "BatChargeFaultEnum", Bits: 8, Valu
 }}
 
 // BatChargeLevelEnum is the BatChargeLevelEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BatChargeLevelEnum uint8
 
 // BatChargeLevelEnum values.
@@ -214,8 +202,6 @@ const (
 )
 
 // BatChargeLevelEnumDef describes BatChargeLevelEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BatChargeLevelEnumDef = &spec.Enum{Name: "BatChargeLevelEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ok", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Warning", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -223,8 +209,6 @@ var BatChargeLevelEnumDef = &spec.Enum{Name: "BatChargeLevelEnum", Bits: 8, Valu
 }}
 
 // BatChargeStateEnum is the BatChargeStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BatChargeStateEnum uint8
 
 // BatChargeStateEnum values.
@@ -236,8 +220,6 @@ const (
 )
 
 // BatChargeStateEnumDef describes BatChargeStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BatChargeStateEnumDef = &spec.Enum{Name: "BatChargeStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "IsCharging", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -246,8 +228,6 @@ var BatChargeStateEnumDef = &spec.Enum{Name: "BatChargeStateEnum", Bits: 8, Valu
 }}
 
 // BatCommonDesignationEnum is the BatCommonDesignationEnum enum16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BatCommonDesignationEnum uint16
 
 // BatCommonDesignationEnum values.
@@ -336,8 +316,6 @@ const (
 )
 
 // BatCommonDesignationEnumDef describes BatCommonDesignationEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BatCommonDesignationEnumDef = &spec.Enum{Name: "BatCommonDesignationEnum", Bits: 16, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Aaa", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -423,8 +401,6 @@ var BatCommonDesignationEnumDef = &spec.Enum{Name: "BatCommonDesignationEnum", B
 }}
 
 // BatFaultEnum is the BatFaultEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BatFaultEnum uint8
 
 // BatFaultEnum values.
@@ -435,8 +411,6 @@ const (
 )
 
 // BatFaultEnumDef describes BatFaultEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BatFaultEnumDef = &spec.Enum{Name: "BatFaultEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "OverTemp", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -444,8 +418,6 @@ var BatFaultEnumDef = &spec.Enum{Name: "BatFaultEnum", Bits: 8, Values: []spec.E
 }}
 
 // BatReplaceabilityEnum is the BatReplaceabilityEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BatReplaceabilityEnum uint8
 
 // BatReplaceabilityEnum values.
@@ -457,8 +429,6 @@ const (
 )
 
 // BatReplaceabilityEnumDef describes BatReplaceabilityEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BatReplaceabilityEnumDef = &spec.Enum{Name: "BatReplaceabilityEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "NotReplaceable", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -467,8 +437,6 @@ var BatReplaceabilityEnumDef = &spec.Enum{Name: "BatReplaceabilityEnum", Bits: 8
 }}
 
 // PowerSourceStatusEnum is the PowerSourceStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PowerSourceStatusEnum uint8
 
 // PowerSourceStatusEnum values.
@@ -480,8 +448,6 @@ const (
 )
 
 // PowerSourceStatusEnumDef describes PowerSourceStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PowerSourceStatusEnumDef = &spec.Enum{Name: "PowerSourceStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Active", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -490,8 +456,6 @@ var PowerSourceStatusEnumDef = &spec.Enum{Name: "PowerSourceStatusEnum", Bits: 8
 }}
 
 // WiredCurrentTypeEnum is the WiredCurrentTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type WiredCurrentTypeEnum uint8
 
 // WiredCurrentTypeEnum values.
@@ -501,16 +465,12 @@ const (
 )
 
 // WiredCurrentTypeEnumDef describes WiredCurrentTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WiredCurrentTypeEnumDef = &spec.Enum{Name: "WiredCurrentTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ac", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Dc", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // WiredFaultEnum is the WiredFaultEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type WiredFaultEnum uint8
 
 // WiredFaultEnum values.
@@ -521,8 +481,6 @@ const (
 )
 
 // WiredFaultEnumDef describes WiredFaultEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WiredFaultEnumDef = &spec.Enum{Name: "WiredFaultEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "OverVoltage", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

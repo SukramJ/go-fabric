@@ -47,8 +47,6 @@ const (
 )
 
 // Feature is a CommodityPrice FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -107,8 +105,6 @@ func (v CommodityPriceComponentStruct) Clone() CommodityPriceComponentStruct {
 }
 
 // CommodityPriceComponentStructDef describes CommodityPriceComponentStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CommodityPriceComponentStructDef = &spec.Struct{Name: "CommodityPriceComponentStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Price", Type: spec.Type{Name: "money", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Source", Type: spec.Type{Name: "TariffPriceTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: TariffPriceTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -117,8 +113,6 @@ var CommodityPriceComponentStructDef = &spec.Struct{Name: "CommodityPriceCompone
 }}
 
 // TariffPriceTypeEnum is the TariffPriceTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TariffPriceTypeEnum uint8
 
 // TariffPriceTypeEnum values.
@@ -131,8 +125,6 @@ const (
 )
 
 // TariffPriceTypeEnumDef describes TariffPriceTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffPriceTypeEnumDef = &spec.Enum{Name: "TariffPriceTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Standard", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Critical", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -142,8 +134,6 @@ var TariffPriceTypeEnumDef = &spec.Enum{Name: "TariffPriceTypeEnum", Bits: 8, Va
 }}
 
 // CommodityPriceDetailBitmap is the CommodityPriceDetailBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CommodityPriceDetailBitmap uint16
 
 // CommodityPriceDetailBitmap bits; a member wider than one bit is its mask.
@@ -153,8 +143,6 @@ const (
 )
 
 // CommodityPriceDetailBitmapDef describes CommodityPriceDetailBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CommodityPriceDetailBitmapDef = &spec.Bitmap{Name: "CommodityPriceDetailBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "Description", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Components", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -240,8 +228,6 @@ func (v CommodityPriceStruct) Clone() CommodityPriceStruct {
 }
 
 // CommodityPriceStructDef describes CommodityPriceStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CommodityPriceStructDef = &spec.Struct{Name: "CommodityPriceStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PeriodStart", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "PeriodEnd", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "min periodStart + 1", Min: &spec.Bound{Expr: "{\"type\":\"+\",\"lhs\":{\"type\":\"reference\",\"name\":\"periodStart\"},\"rhs\":1}"}}},
@@ -252,8 +238,6 @@ var CommodityPriceStructDef = &spec.Struct{Name: "CommodityPriceStruct", Fields:
 }}
 
 // TariffUnitEnum is the TariffUnitEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TariffUnitEnum uint8
 
 // TariffUnitEnum values.
@@ -263,8 +247,6 @@ const (
 )
 
 // TariffUnitEnumDef describes TariffUnitEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffUnitEnumDef = &spec.Enum{Name: "TariffUnitEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "KWh", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "KVAh", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -293,8 +275,6 @@ func (v *Currency) DecodeTLV(n spec.Node) error {
 }
 
 // CurrencyDef describes currency.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CurrencyDef = &spec.Struct{Name: "currency", Fields: []spec.Field{
 	{ID: 0, Name: "Currency", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 999", Max: &spec.Bound{Int: 999}}},
 	{ID: 1, Name: "DecimalPoints", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

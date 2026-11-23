@@ -41,13 +41,9 @@ const (
 )
 
 // Feature is a TlsClientManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // StatusCodeEnum is the StatusCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusCodeEnum uint8
 
 // StatusCodeEnum values.
@@ -60,8 +56,6 @@ const (
 )
 
 // StatusCodeEnumDef describes StatusCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusCodeEnumDef = &spec.Enum{Name: "StatusCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 2, Name: "EndpointAlreadyInstalled"},
 	{Value: 3, Name: "RootCertificateNotFound"},
@@ -124,8 +118,6 @@ func (v TLSEndpointStruct) Clone() TLSEndpointStruct {
 }
 
 // TLSEndpointStructDef describes TLSEndpointStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TLSEndpointStructDef = &spec.Struct{Name: "TLSEndpointStruct", Fields: []spec.Field{
 	{ID: 0, Name: "EndpointId", Type: spec.Type{Name: "TLSEndpointID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 65534", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 65534}}},
 	{ID: 1, Name: "Hostname", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "4 to 253", Min: &spec.Bound{Int: 4}, Max: &spec.Bound{Int: 253}}},

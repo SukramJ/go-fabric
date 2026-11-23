@@ -23,6 +23,16 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureConstantPressure, FeatureCompensatedPressure, FeatureConstantFlow, FeatureConstantSpeed, FeatureConstantTemperature, FeatureAutomatic, FeatureLocalOperation)
+	spectest.CheckEnum[ControlModeEnum](t, ControlModeEnumDef, ControlModeConstantSpeed, ControlModeConstantPressure, ControlModeProportionalPressure, ControlModeConstantFlow, ControlModeConstantTemperature, ControlModeAutomatic)
+	spectest.CheckEnum[OperationModeEnum](t, OperationModeEnumDef, OperationModeNormal, OperationModeMinimum, OperationModeMaximum, OperationModeLocal)
+	spectest.CheckBitmap[PumpStatusBitmap](t, PumpStatusBitmapDef, PumpStatusDeviceFault, PumpStatusSupplyFault, PumpStatusSpeedLow, PumpStatusSpeedHigh, PumpStatusLocalOverride, PumpStatusRunning, PumpStatusRemotePressure, PumpStatusRemoteFlow, PumpStatusRemoteTemperature)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

@@ -32,13 +32,9 @@ const (
 )
 
 // Feature is a DiagnosticLogs FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // IntentEnum is the IntentEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type IntentEnum uint8
 
 // IntentEnum values.
@@ -49,8 +45,6 @@ const (
 )
 
 // IntentEnumDef describes IntentEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var IntentEnumDef = &spec.Enum{Name: "IntentEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "EndUserSupport", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "NetworkDiag", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -58,8 +52,6 @@ var IntentEnumDef = &spec.Enum{Name: "IntentEnum", Bits: 8, Values: []spec.EnumV
 }}
 
 // StatusEnum is the StatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusEnum uint8
 
 // StatusEnum values.
@@ -72,8 +64,6 @@ const (
 )
 
 // StatusEnumDef describes StatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Exhausted", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -83,8 +73,6 @@ var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumV
 }}
 
 // TransferProtocolEnum is the TransferProtocolEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TransferProtocolEnum uint8
 
 // TransferProtocolEnum values.
@@ -94,8 +82,6 @@ const (
 )
 
 // TransferProtocolEnumDef describes TransferProtocolEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransferProtocolEnumDef = &spec.Enum{Name: "TransferProtocolEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "ResponsePayload", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Bdx", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

@@ -68,13 +68,9 @@ const (
 )
 
 // Feature is a JointFabricDatastore FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // DatastoreAccessControlEntryAuthModeEnum is the DatastoreAccessControlEntryAuthModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DatastoreAccessControlEntryAuthModeEnum uint8
 
 // DatastoreAccessControlEntryAuthModeEnum values.
@@ -85,8 +81,6 @@ const (
 )
 
 // DatastoreAccessControlEntryAuthModeEnumDef describes DatastoreAccessControlEntryAuthModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreAccessControlEntryAuthModeEnumDef = &spec.Enum{Name: "DatastoreAccessControlEntryAuthModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "Pase", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 2, Name: "Case", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -94,8 +88,6 @@ var DatastoreAccessControlEntryAuthModeEnumDef = &spec.Enum{Name: "DatastoreAcce
 }}
 
 // DatastoreAccessControlEntryPrivilegeEnum is the DatastoreAccessControlEntryPrivilegeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DatastoreAccessControlEntryPrivilegeEnum uint8
 
 // DatastoreAccessControlEntryPrivilegeEnum values.
@@ -107,8 +99,6 @@ const (
 )
 
 // DatastoreAccessControlEntryPrivilegeEnumDef describes DatastoreAccessControlEntryPrivilegeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreAccessControlEntryPrivilegeEnumDef = &spec.Enum{Name: "DatastoreAccessControlEntryPrivilegeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "View", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 3, Name: "Operate", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -169,8 +159,6 @@ func (v DatastoreAccessControlEntryStruct) Clone() DatastoreAccessControlEntrySt
 }
 
 // DatastoreAccessControlEntryStructDef describes DatastoreAccessControlEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreAccessControlEntryStructDef = &spec.Struct{Name: "DatastoreAccessControlEntryStruct", Fields: []spec.Field{
 	{ID: 1, Name: "Privilege", Type: spec.Type{Name: "DatastoreAccessControlEntryPrivilegeEnum", Kind: spec.KindEnum, Bits: 8, Enum: DatastoreAccessControlEntryPrivilegeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 2, Name: "AuthMode", Type: spec.Type{Name: "DatastoreAccessControlEntryAuthModeEnum", Kind: spec.KindEnum, Bits: 8, Enum: DatastoreAccessControlEntryAuthModeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -204,8 +192,6 @@ func (v *DatastoreAccessControlTargetStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DatastoreAccessControlTargetStructDef describes DatastoreAccessControlTargetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreAccessControlTargetStructDef = &spec.Struct{Name: "DatastoreAccessControlTargetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Cluster", Type: spec.Type{Name: "cluster-id", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 	{ID: 1, Name: "Endpoint", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
@@ -250,8 +236,6 @@ func (v DatastoreACLEntryStruct) Clone() DatastoreACLEntryStruct {
 }
 
 // DatastoreACLEntryStructDef describes DatastoreACLEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreACLEntryStructDef = &spec.Struct{Name: "DatastoreACLEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ListId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -285,8 +269,6 @@ func (v *DatastoreStatusEntryStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DatastoreStatusEntryStructDef describes DatastoreStatusEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreStatusEntryStructDef = &spec.Struct{Name: "DatastoreStatusEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "State", Type: spec.Type{Name: "DatastoreStateEnum", Kind: spec.KindEnum, Bits: 8, Enum: DatastoreStateEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "UpdateTimestamp", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -294,8 +276,6 @@ var DatastoreStatusEntryStructDef = &spec.Struct{Name: "DatastoreStatusEntryStru
 }}
 
 // DatastoreStateEnum is the DatastoreStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DatastoreStateEnum uint8
 
 // DatastoreStateEnum values.
@@ -307,8 +287,6 @@ const (
 )
 
 // DatastoreStateEnumDef describes DatastoreStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreStateEnumDef = &spec.Enum{Name: "DatastoreStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Pending", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Committed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -317,8 +295,6 @@ var DatastoreStateEnumDef = &spec.Enum{Name: "DatastoreStateEnum", Bits: 8, Valu
 }}
 
 // Status is the status enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Status uint8
 
 // Status values.
@@ -359,8 +335,6 @@ const (
 )
 
 // StatusDef describes status.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusDef = &spec.Enum{Name: "status", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success"},
 	{Value: 1, Name: "Failure"},
@@ -442,8 +416,6 @@ func (v DatastoreAdministratorInformationEntryStruct) Clone() DatastoreAdministr
 }
 
 // DatastoreAdministratorInformationEntryStructDef describes DatastoreAdministratorInformationEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreAdministratorInformationEntryStructDef = &spec.Struct{Name: "DatastoreAdministratorInformationEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "FriendlyName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
@@ -516,8 +488,6 @@ func (v DatastoreBindingTargetStruct) Clone() DatastoreBindingTargetStruct {
 }
 
 // DatastoreBindingTargetStructDef describes DatastoreBindingTargetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreBindingTargetStructDef = &spec.Struct{Name: "DatastoreBindingTargetStruct", Fields: []spec.Field{
 	{ID: 1, Name: "Node", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "Endpoint", Op: spec.ConfName, Name: "Endpoint"}},
 	{ID: 2, Name: "Group", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "!Endpoint", Op: spec.ConfNot, Args: []spec.Conformance{{Op: spec.ConfName, Name: "Endpoint"}}}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -566,8 +536,6 @@ func (v DatastoreEndpointBindingEntryStruct) Clone() DatastoreEndpointBindingEnt
 }
 
 // DatastoreEndpointBindingEntryStructDef describes DatastoreEndpointBindingEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreEndpointBindingEntryStructDef = &spec.Struct{Name: "DatastoreEndpointBindingEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "EndpointId", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -602,8 +570,6 @@ func (v *DatastoreEndpointEntryStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DatastoreEndpointEntryStructDef describes DatastoreEndpointEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreEndpointEntryStructDef = &spec.Struct{Name: "DatastoreEndpointEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "EndpointId", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -639,8 +605,6 @@ func (v *DatastoreEndpointGroupIDEntryStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DatastoreEndpointGroupIDEntryStructDef describes DatastoreEndpointGroupIDEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreEndpointGroupIDEntryStructDef = &spec.Struct{Name: "DatastoreEndpointGroupIDEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "EndpointId", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -683,8 +647,6 @@ func (v *DatastoreGroupInformationEntryStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DatastoreGroupInformationEntryStructDef describes DatastoreGroupInformationEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreGroupInformationEntryStructDef = &spec.Struct{Name: "DatastoreGroupInformationEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "GroupId", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "FriendlyName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
@@ -695,8 +657,6 @@ var DatastoreGroupInformationEntryStructDef = &spec.Struct{Name: "DatastoreGroup
 }}
 
 // DatastoreGroupKeyMulticastPolicyEnum is the DatastoreGroupKeyMulticastPolicyEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DatastoreGroupKeyMulticastPolicyEnum uint8
 
 // DatastoreGroupKeyMulticastPolicyEnum values.
@@ -706,16 +666,12 @@ const (
 )
 
 // DatastoreGroupKeyMulticastPolicyEnumDef describes DatastoreGroupKeyMulticastPolicyEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreGroupKeyMulticastPolicyEnumDef = &spec.Enum{Name: "DatastoreGroupKeyMulticastPolicyEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "PerGroupId", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "AllNodes", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // DatastoreGroupKeySecurityPolicyEnum is the DatastoreGroupKeySecurityPolicyEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DatastoreGroupKeySecurityPolicyEnum uint8
 
 // DatastoreGroupKeySecurityPolicyEnum values.
@@ -724,8 +680,6 @@ const (
 )
 
 // DatastoreGroupKeySecurityPolicyEnumDef describes DatastoreGroupKeySecurityPolicyEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreGroupKeySecurityPolicyEnumDef = &spec.Enum{Name: "DatastoreGroupKeySecurityPolicyEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "TrustFirst", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
@@ -813,8 +767,6 @@ func (v DatastoreGroupKeySetStruct) Clone() DatastoreGroupKeySetStruct {
 }
 
 // DatastoreGroupKeySetStructDef describes DatastoreGroupKeySetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreGroupKeySetStructDef = &spec.Struct{Name: "DatastoreGroupKeySetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "GroupKeySetId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "GroupKeySecurityPolicy", Type: spec.Type{Name: "DatastoreGroupKeySecurityPolicyEnum", Kind: spec.KindEnum, Bits: 8, Enum: DatastoreGroupKeySecurityPolicyEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -853,8 +805,6 @@ func (v *DatastoreNodeInformationEntryStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DatastoreNodeInformationEntryStructDef describes DatastoreNodeInformationEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreNodeInformationEntryStructDef = &spec.Struct{Name: "DatastoreNodeInformationEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "FriendlyName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
@@ -887,8 +837,6 @@ func (v *DatastoreNodeKeySetEntryStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DatastoreNodeKeySetEntryStructDef describes DatastoreNodeKeySetEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DatastoreNodeKeySetEntryStructDef = &spec.Struct{Name: "DatastoreNodeKeySetEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "GroupKeySetId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

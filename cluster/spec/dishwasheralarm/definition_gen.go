@@ -45,8 +45,6 @@ const (
 )
 
 // Feature is a DishwasherAlarm FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -55,8 +53,6 @@ const (
 )
 
 // AlarmBitmap is the AlarmBitmap map32.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AlarmBitmap uint32
 
 // AlarmBitmap bits; a member wider than one bit is its mask.
@@ -70,8 +66,6 @@ const (
 )
 
 // AlarmBitmapDef describes AlarmBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AlarmBitmapDef = &spec.Bitmap{Name: "AlarmBitmap", Bits: 32, Members: []spec.BitmapMember{
 	{Name: "InflowError", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "P, O.a+", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}}}},
 	{Name: "DrainError", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "P, O.a+", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}}}},

@@ -40,8 +40,6 @@ const (
 )
 
 // Feature is a MediaInput FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -78,8 +76,6 @@ func (v *InputInfoStruct) DecodeTLV(n spec.Node) error {
 }
 
 // InputInfoStructDef describes InputInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var InputInfoStructDef = &spec.Struct{Name: "InputInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Index", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "InputType", Type: spec.Type{Name: "InputTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: InputTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
@@ -88,8 +84,6 @@ var InputInfoStructDef = &spec.Struct{Name: "InputInfoStruct", Fields: []spec.Fi
 }}
 
 // InputTypeEnum is the InputTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type InputTypeEnum uint8
 
 // InputTypeEnum values.
@@ -109,8 +103,6 @@ const (
 )
 
 // InputTypeEnumDef describes InputTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var InputTypeEnumDef = &spec.Enum{Name: "InputTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Internal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Aux", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

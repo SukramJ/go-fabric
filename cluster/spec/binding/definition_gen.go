@@ -31,8 +31,6 @@ const (
 )
 
 // Feature is a Binding FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // TargetStruct is the TargetStruct struct.
@@ -103,8 +101,6 @@ func (v TargetStruct) Clone() TargetStruct {
 }
 
 // TargetStructDef describes TargetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TargetStructDef = &spec.Struct{Name: "TargetStruct", Fields: []spec.Field{
 	{ID: 1, Name: "Node", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "Endpoint", Op: spec.ConfName, Name: "Endpoint"}},
 	{ID: 2, Name: "Group", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "!Endpoint", Op: spec.ConfNot, Args: []spec.Conformance{{Op: spec.ConfName, Name: "Endpoint"}}}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},

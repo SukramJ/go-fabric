@@ -44,8 +44,6 @@ const (
 )
 
 // Feature is a EthernetNetworkDiagnostics FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -55,8 +53,6 @@ const (
 )
 
 // PHYRateEnum is the PHYRateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PHYRateEnum uint8
 
 // PHYRateEnum values.
@@ -74,8 +70,6 @@ const (
 )
 
 // PHYRateEnumDef describes PHYRateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PHYRateEnumDef = &spec.Enum{Name: "PHYRateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Rate10M", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Rate100M", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

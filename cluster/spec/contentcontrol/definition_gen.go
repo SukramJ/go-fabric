@@ -68,8 +68,6 @@ const (
 )
 
 // Feature is a ContentControl FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -107,8 +105,6 @@ func (v *AppInfoStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AppInfoStructDef describes AppInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AppInfoStructDef = &spec.Struct{Name: "AppInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CatalogVendorId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ApplicationId", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -158,8 +154,6 @@ func (v BlockChannelStruct) Clone() BlockChannelStruct {
 }
 
 // BlockChannelStructDef describes BlockChannelStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BlockChannelStructDef = &spec.Struct{Name: "BlockChannelStruct", Fields: []spec.Field{
 	{ID: 0, Name: "BlockChannelIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 	{ID: 1, Name: "MajorNumber", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -168,8 +162,6 @@ var BlockChannelStructDef = &spec.Struct{Name: "BlockChannelStruct", Fields: []s
 }}
 
 // DayOfWeekBitmap is the DayOfWeekBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DayOfWeekBitmap uint8
 
 // DayOfWeekBitmap bits; a member wider than one bit is its mask.
@@ -184,8 +176,6 @@ const (
 )
 
 // DayOfWeekBitmapDef describes DayOfWeekBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DayOfWeekBitmapDef = &spec.Bitmap{Name: "DayOfWeekBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Sunday", Bit: 0, Width: 1},
 	{Name: "Monday", Bit: 1, Width: 1},
@@ -234,16 +224,12 @@ func (v RatingNameStruct) Clone() RatingNameStruct {
 }
 
 // RatingNameStructDef describes RatingNameStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RatingNameStructDef = &spec.Struct{Name: "RatingNameStruct", Fields: []spec.Field{
 	{ID: 0, Name: "RatingName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}},
 	{ID: 1, Name: "RatingNameDesc", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
 }}
 
 // StatusCodeEnum is the StatusCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusCodeEnum uint8
 
 // StatusCodeEnum values.
@@ -261,8 +247,6 @@ const (
 )
 
 // StatusCodeEnumDef describes StatusCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusCodeEnumDef = &spec.Enum{Name: "StatusCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 2, Name: "InvalidPinCode"},
 	{Value: 3, Name: "InvalidRating"},
@@ -305,8 +289,6 @@ func (v *TimePeriodStruct) DecodeTLV(n spec.Node) error {
 }
 
 // TimePeriodStructDef describes TimePeriodStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TimePeriodStructDef = &spec.Struct{Name: "TimePeriodStruct", Fields: []spec.Field{
 	{ID: 0, Name: "StartHour", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 23", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 23}}},
 	{ID: 1, Name: "StartMinute", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 59", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 59}}},
@@ -356,8 +338,6 @@ func (v TimeWindowStruct) Clone() TimeWindowStruct {
 }
 
 // TimeWindowStructDef describes TimeWindowStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TimeWindowStructDef = &spec.Struct{Name: "TimeWindowStruct", Fields: []spec.Field{
 	{ID: 0, Name: "TimeWindowIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 	{ID: 1, Name: "DayOfWeek", Type: spec.Type{Name: "DayOfWeekBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: DayOfWeekBitmapDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},

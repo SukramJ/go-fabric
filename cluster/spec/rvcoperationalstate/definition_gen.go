@@ -54,13 +54,9 @@ const (
 )
 
 // Feature is a RvcOperationalState FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // ErrorStateEnum is the ErrorStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ErrorStateEnum uint8
 
 // ErrorStateEnum values.
@@ -87,8 +83,6 @@ const (
 )
 
 // ErrorStateEnumDef describes ErrorStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ErrorStateEnumDef = &spec.Enum{Name: "ErrorStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoError", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "UnableToStartOrResume", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -161,8 +155,6 @@ func (v ErrorStateStruct) Clone() ErrorStateStruct {
 }
 
 // ErrorStateStructDef describes ErrorStateStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ErrorStateStructDef = &spec.Struct{Name: "ErrorStateStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ErrorStateId", Type: spec.Type{Name: "ErrorStateEnum", Kind: spec.KindEnum, Bits: 8, Enum: ErrorStateEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Default: float64(0)},
 	{ID: 1, Name: "ErrorStateLabel", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "ErrorStateID >= 128 & ErrorStateID <= 191", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfGte, Args: []spec.Conformance{{Op: spec.ConfName, Name: "ErrorStateID"}, {Op: spec.ConfValue, Value: "128"}}}, {Op: spec.ConfLte, Args: []spec.Conformance{{Op: spec.ConfName, Name: "ErrorStateID"}, {Op: spec.ConfValue, Value: "191"}}}}}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
@@ -170,8 +162,6 @@ var ErrorStateStructDef = &spec.Struct{Name: "ErrorStateStruct", Fields: []spec.
 }}
 
 // OperationalStateEnum is the OperationalStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OperationalStateEnum uint8
 
 // OperationalStateEnum values.
@@ -190,8 +180,6 @@ const (
 )
 
 // OperationalStateEnumDef describes OperationalStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperationalStateEnumDef = &spec.Enum{Name: "OperationalStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Stopped", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Running", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -246,8 +234,6 @@ func (v OperationalStateStruct) Clone() OperationalStateStruct {
 }
 
 // OperationalStateStructDef describes OperationalStateStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperationalStateStructDef = &spec.Struct{Name: "OperationalStateStruct", Fields: []spec.Field{
 	{ID: 0, Name: "OperationalStateId", Type: spec.Type{Name: "OperationalStateEnum", Kind: spec.KindEnum, Bits: 8, Enum: OperationalStateEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Default: float64(0)},
 	{ID: 1, Name: "OperationalStateLabel", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "OperationalStateID >= 128 & OperationalStateID <= 191", Op: spec.ConfAnd, Args: []spec.Conformance{{Op: spec.ConfGte, Args: []spec.Conformance{{Op: spec.ConfName, Name: "OperationalStateID"}, {Op: spec.ConfValue, Value: "128"}}}, {Op: spec.ConfLte, Args: []spec.Conformance{{Op: spec.ConfName, Name: "OperationalStateID"}, {Op: spec.ConfValue, Value: "191"}}}}}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},

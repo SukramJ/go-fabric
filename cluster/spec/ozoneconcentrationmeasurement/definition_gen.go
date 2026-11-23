@@ -38,8 +38,6 @@ const (
 )
 
 // Feature is a OzoneConcentrationMeasurement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -53,8 +51,6 @@ const (
 )
 
 // LevelValueEnum is the LevelValueEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LevelValueEnum uint8
 
 // LevelValueEnum values.
@@ -67,8 +63,6 @@ const (
 )
 
 // LevelValueEnumDef describes LevelValueEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LevelValueEnumDef = &spec.Enum{Name: "LevelValueEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -78,8 +72,6 @@ var LevelValueEnumDef = &spec.Enum{Name: "LevelValueEnum", Bits: 8, Values: []sp
 }}
 
 // MeasurementMediumEnum is the MeasurementMediumEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MeasurementMediumEnum uint8
 
 // MeasurementMediumEnum values.
@@ -90,8 +82,6 @@ const (
 )
 
 // MeasurementMediumEnumDef describes MeasurementMediumEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MeasurementMediumEnumDef = &spec.Enum{Name: "MeasurementMediumEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Air", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Water", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -99,8 +89,6 @@ var MeasurementMediumEnumDef = &spec.Enum{Name: "MeasurementMediumEnum", Bits: 8
 }}
 
 // MeasurementUnitEnum is the MeasurementUnitEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MeasurementUnitEnum uint8
 
 // MeasurementUnitEnum values.
@@ -116,8 +104,6 @@ const (
 )
 
 // MeasurementUnitEnumDef describes MeasurementUnitEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MeasurementUnitEnumDef = &spec.Enum{Name: "MeasurementUnitEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ppm", Conformance: spec.Conformance{Text: "MEA", Op: spec.ConfName, Name: "MEA"}},
 	{Value: 1, Name: "Ppb", Conformance: spec.Conformance{Text: "MEA", Op: spec.ConfName, Name: "MEA"}},

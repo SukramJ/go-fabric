@@ -23,6 +23,15 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition)
+	spectest.CheckEnum[ColorEnum](t, ColorEnumDef, ColorBlack, ColorNavy, ColorGreen, ColorTeal, ColorMaroon, ColorPurple, ColorOlive, ColorGray, ColorBlue, ColorLime, ColorAqua, ColorRed, ColorFuchsia, ColorYellow, ColorWhite, ColorNickel, ColorChrome, ColorBrass, ColorCopper, ColorSilver, ColorGold)
+	spectest.CheckEnum[ProductFinishEnum](t, ProductFinishEnumDef, ProductFinishOther, ProductFinishMatte, ProductFinishSatin, ProductFinishPolished, ProductFinishRugged, ProductFinishFabric)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

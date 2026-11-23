@@ -28,8 +28,6 @@ const (
 )
 
 // Feature is a AirQuality FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -41,8 +39,6 @@ const (
 )
 
 // AirQualityEnum is the AirQualityEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AirQualityEnum uint8
 
 // AirQualityEnum values.
@@ -57,8 +53,6 @@ const (
 )
 
 // AirQualityEnumDef describes AirQualityEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AirQualityEnumDef = &spec.Enum{Name: "AirQualityEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Good", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

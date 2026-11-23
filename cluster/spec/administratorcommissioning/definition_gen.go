@@ -40,8 +40,6 @@ const (
 )
 
 // Feature is a AdministratorCommissioning FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -50,8 +48,6 @@ const (
 )
 
 // CommissioningWindowStatusEnum is the CommissioningWindowStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CommissioningWindowStatusEnum uint8
 
 // CommissioningWindowStatusEnum values.
@@ -62,8 +58,6 @@ const (
 )
 
 // CommissioningWindowStatusEnumDef describes CommissioningWindowStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CommissioningWindowStatusEnumDef = &spec.Enum{Name: "CommissioningWindowStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "WindowNotOpen", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "EnhancedWindowOpen", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -71,8 +65,6 @@ var CommissioningWindowStatusEnumDef = &spec.Enum{Name: "CommissioningWindowStat
 }}
 
 // StatusCodeEnum is the StatusCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusCodeEnum uint8
 
 // StatusCodeEnum values.
@@ -83,8 +75,6 @@ const (
 )
 
 // StatusCodeEnumDef describes StatusCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusCodeEnumDef = &spec.Enum{Name: "StatusCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 2, Name: "Busy", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 3, Name: "PakeParameterError", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

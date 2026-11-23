@@ -55,8 +55,6 @@ const (
 )
 
 // Feature is a ValveConfigurationAndControl FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -66,8 +64,6 @@ const (
 )
 
 // StatusCodeEnum is the StatusCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusCodeEnum uint8
 
 // StatusCodeEnum values.
@@ -76,15 +72,11 @@ const (
 )
 
 // StatusCodeEnumDef describes StatusCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusCodeEnumDef = &spec.Enum{Name: "StatusCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 2, Name: "FailureDueToFault", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ValveFaultBitmap is the ValveFaultBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ValveFaultBitmap uint16
 
 // ValveFaultBitmap bits; a member wider than one bit is its mask.
@@ -98,8 +90,6 @@ const (
 )
 
 // ValveFaultBitmapDef describes ValveFaultBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ValveFaultBitmapDef = &spec.Bitmap{Name: "ValveFaultBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "GeneralFault", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Blocked", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -110,8 +100,6 @@ var ValveFaultBitmapDef = &spec.Bitmap{Name: "ValveFaultBitmap", Bits: 16, Membe
 }}
 
 // ValveStateEnum is the ValveStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ValveStateEnum uint8
 
 // ValveStateEnum values.
@@ -122,8 +110,6 @@ const (
 )
 
 // ValveStateEnumDef describes ValveStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ValveStateEnumDef = &spec.Enum{Name: "ValveStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Closed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Open", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

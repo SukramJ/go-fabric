@@ -29,8 +29,6 @@ const (
 )
 
 // Feature is a UnitLocalization FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -39,8 +37,6 @@ const (
 )
 
 // TempUnitEnum is the TempUnitEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TempUnitEnum uint8
 
 // TempUnitEnum values.
@@ -51,8 +47,6 @@ const (
 )
 
 // TempUnitEnumDef describes TempUnitEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TempUnitEnumDef = &spec.Enum{Name: "TempUnitEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Fahrenheit", Conformance: spec.Conformance{Text: "O.a2+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 2, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
 	{Value: 1, Name: "Celsius", Conformance: spec.Conformance{Text: "O.a2+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 2, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},

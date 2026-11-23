@@ -31,8 +31,6 @@ const (
 )
 
 // Feature is a LowPower FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // SleepRequest is the Sleep command payload.

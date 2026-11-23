@@ -23,6 +23,18 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureDataModelTest)
+	spectest.CheckEnum[BootReasonEnum](t, BootReasonEnumDef, BootReasonUnspecified, BootReasonPowerOnReboot, BootReasonBrownOutReset, BootReasonSoftwareWatchdogReset, BootReasonHardwareWatchdogReset, BootReasonSoftwareUpdateCompleted, BootReasonSoftwareReset)
+	spectest.CheckEnum[HardwareFaultEnum](t, HardwareFaultEnumDef, HardwareFaultUnspecified, HardwareFaultRadio, HardwareFaultSensor, HardwareFaultResettableOverTemp, HardwareFaultNonResettableOverTemp, HardwareFaultPowerSource, HardwareFaultVisualDisplayFault, HardwareFaultAudioOutputFault, HardwareFaultUserInterfaceFault, HardwareFaultNonVolatileMemoryError, HardwareFaultTamperDetected)
+	spectest.CheckEnum[InterfaceTypeEnum](t, InterfaceTypeEnumDef, InterfaceTypeUnspecified, InterfaceTypeWiFi, InterfaceTypeEthernet, InterfaceTypeCellular, InterfaceTypeThread)
+	spectest.CheckEnum[NetworkFaultEnum](t, NetworkFaultEnumDef, NetworkFaultUnspecified, NetworkFaultHardwareFailure, NetworkFaultNetworkJammed, NetworkFaultConnectionFailed)
+	spectest.CheckEnum[RadioFaultEnum](t, RadioFaultEnumDef, RadioFaultUnspecified, RadioFaultWiFiFault, RadioFaultCellularFault, RadioFaultThreadFault, RadioFaultNfcFault, RadioFaultBleFault, RadioFaultEthernetFault)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

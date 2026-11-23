@@ -52,8 +52,6 @@ const (
 )
 
 // Feature is a AccessControl FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -64,8 +62,6 @@ const (
 )
 
 // AccessControlAuxiliaryTypeEnum is the AccessControlAuxiliaryTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AccessControlAuxiliaryTypeEnum uint8
 
 // AccessControlAuxiliaryTypeEnum values.
@@ -75,16 +71,12 @@ const (
 )
 
 // AccessControlAuxiliaryTypeEnumDef describes AccessControlAuxiliaryTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessControlAuxiliaryTypeEnumDef = &spec.Enum{Name: "AccessControlAuxiliaryTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "System", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Groupcast", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // AccessControlEntryAuthModeEnum is the AccessControlEntryAuthModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AccessControlEntryAuthModeEnum uint8
 
 // AccessControlEntryAuthModeEnum values.
@@ -95,8 +87,6 @@ const (
 )
 
 // AccessControlEntryAuthModeEnumDef describes AccessControlEntryAuthModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessControlEntryAuthModeEnumDef = &spec.Enum{Name: "AccessControlEntryAuthModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "Pase", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 2, Name: "Case", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -104,8 +94,6 @@ var AccessControlEntryAuthModeEnumDef = &spec.Enum{Name: "AccessControlEntryAuth
 }}
 
 // AccessControlEntryPrivilegeEnum is the AccessControlEntryPrivilegeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AccessControlEntryPrivilegeEnum uint8
 
 // AccessControlEntryPrivilegeEnum values.
@@ -118,8 +106,6 @@ const (
 )
 
 // AccessControlEntryPrivilegeEnumDef describes AccessControlEntryPrivilegeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessControlEntryPrivilegeEnumDef = &spec.Enum{Name: "AccessControlEntryPrivilegeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "View", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 2, Name: "ProxyView", Conformance: spec.Conformance{Text: "D", Op: spec.ConfDeprecated}},
@@ -194,8 +180,6 @@ func (v AccessControlEntryStruct) Clone() AccessControlEntryStruct {
 }
 
 // AccessControlEntryStructDef describes AccessControlEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessControlEntryStructDef = &spec.Struct{Name: "AccessControlEntryStruct", Fields: []spec.Field{
 	{ID: 1, Name: "Privilege", Type: spec.Type{Name: "AccessControlEntryPrivilegeEnum", Kind: spec.KindEnum, Bits: 8, Enum: AccessControlEntryPrivilegeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, FabricSensitive: true},
 	{ID: 2, Name: "AuthMode", Type: spec.Type{Name: "AccessControlEntryAuthModeEnum", Kind: spec.KindEnum, Bits: 8, Enum: AccessControlEntryAuthModeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, FabricSensitive: true},
@@ -231,8 +215,6 @@ func (v *AccessControlTargetStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AccessControlTargetStructDef describes AccessControlTargetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessControlTargetStructDef = &spec.Struct{Name: "AccessControlTargetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Cluster", Type: spec.Type{Name: "cluster-id", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 	{ID: 1, Name: "Endpoint", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
@@ -278,8 +260,6 @@ func (v AccessControlExtensionStruct) Clone() AccessControlExtensionStruct {
 }
 
 // AccessControlExtensionStructDef describes AccessControlExtensionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessControlExtensionStructDef = &spec.Struct{Name: "AccessControlExtensionStruct", Fields: []spec.Field{
 	{ID: 1, Name: "Data", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128", Max: &spec.Bound{Int: 128}}, FabricSensitive: true},
 	{ID: 254, Name: "FabricIndex", Type: spec.Type{Name: "FabricIndex", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 254", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 254}}},
@@ -330,8 +310,6 @@ func (v AccessRestrictionEntryStruct) Clone() AccessRestrictionEntryStruct {
 }
 
 // AccessRestrictionEntryStructDef describes AccessRestrictionEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessRestrictionEntryStructDef = &spec.Struct{Name: "AccessRestrictionEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Endpoint", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, FabricSensitive: true},
 	{ID: 1, Name: "Cluster", Type: spec.Type{Name: "cluster-id", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, FabricSensitive: true},
@@ -362,16 +340,12 @@ func (v *AccessRestrictionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AccessRestrictionStructDef describes AccessRestrictionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessRestrictionStructDef = &spec.Struct{Name: "AccessRestrictionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Type", Type: spec.Type{Name: "AccessRestrictionTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: AccessRestrictionTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Id", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 }}
 
 // AccessRestrictionTypeEnum is the AccessRestrictionTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AccessRestrictionTypeEnum uint8
 
 // AccessRestrictionTypeEnum values.
@@ -383,8 +357,6 @@ const (
 )
 
 // AccessRestrictionTypeEnumDef describes AccessRestrictionTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AccessRestrictionTypeEnumDef = &spec.Enum{Name: "AccessRestrictionTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "AttributeAccessForbidden", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "AttributeWriteForbidden", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -393,8 +365,6 @@ var AccessRestrictionTypeEnumDef = &spec.Enum{Name: "AccessRestrictionTypeEnum",
 }}
 
 // ChangeTypeEnum is the ChangeTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ChangeTypeEnum uint8
 
 // ChangeTypeEnum values.
@@ -405,8 +375,6 @@ const (
 )
 
 // ChangeTypeEnumDef describes ChangeTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ChangeTypeEnumDef = &spec.Enum{Name: "ChangeTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Changed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Added", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -455,8 +423,6 @@ func (v CommissioningAccessRestrictionEntryStruct) Clone() CommissioningAccessRe
 }
 
 // CommissioningAccessRestrictionEntryStructDef describes CommissioningAccessRestrictionEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CommissioningAccessRestrictionEntryStructDef = &spec.Struct{Name: "CommissioningAccessRestrictionEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Endpoint", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Cluster", Type: spec.Type{Name: "cluster-id", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

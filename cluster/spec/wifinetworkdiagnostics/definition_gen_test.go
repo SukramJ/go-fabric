@@ -23,6 +23,17 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeaturePacketCounts, FeatureErrorCounts)
+	spectest.CheckEnum[AssociationFailureCauseEnum](t, AssociationFailureCauseEnumDef, AssociationFailureCauseUnknown, AssociationFailureCauseAssociationFailed, AssociationFailureCauseAuthenticationFailed, AssociationFailureCauseSsidNotFound)
+	spectest.CheckEnum[ConnectionStatusEnum](t, ConnectionStatusEnumDef, ConnectionStatusConnected, ConnectionStatusNotConnected)
+	spectest.CheckEnum[SecurityTypeEnum](t, SecurityTypeEnumDef, SecurityTypeUnspecified, SecurityTypeNone, SecurityTypeWep, SecurityTypeWpa, SecurityTypeWpa2, SecurityTypeWpa3)
+	spectest.CheckEnum[WiFiVersionEnum](t, WiFiVersionEnumDef, WiFiVersionA, WiFiVersionB, WiFiVersionG, WiFiVersionN, WiFiVersionAc, WiFiVersionAx, WiFiVersionAh)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

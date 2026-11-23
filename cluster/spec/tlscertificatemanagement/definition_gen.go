@@ -53,8 +53,6 @@ const (
 )
 
 // Feature is a TlsCertificateManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // TLSCertStruct is the TLSCertStruct struct.
@@ -105,8 +103,6 @@ func (v TLSCertStruct) Clone() TLSCertStruct {
 }
 
 // TLSCertStructDef describes TLSCertStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TLSCertStructDef = &spec.Struct{Name: "TLSCertStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Caid", Type: spec.Type{Name: "TLSCAID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 65534", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 65534}}},
 	{ID: 1, Name: "Certificate", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 3000", Max: &spec.Bound{Int: 3000}}},
@@ -187,8 +183,6 @@ func (v TLSClientCertificateDetailStruct) Clone() TLSClientCertificateDetailStru
 }
 
 // TLSClientCertificateDetailStructDef describes TLSClientCertificateDetailStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TLSClientCertificateDetailStructDef = &spec.Struct{Name: "TLSClientCertificateDetailStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Ccdid", Type: spec.Type{Name: "TLSCCDID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 65534", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 65534}}},
 	{ID: 1, Name: "ClientCertificate", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 3000", Max: &spec.Bound{Int: 3000}}},

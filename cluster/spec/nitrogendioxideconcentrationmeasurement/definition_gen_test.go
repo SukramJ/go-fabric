@@ -23,6 +23,16 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureNumericMeasurement, FeatureLevelIndication, FeatureMediumLevel, FeatureCriticalLevel, FeaturePeakMeasurement, FeatureAverageMeasurement)
+	spectest.CheckEnum[LevelValueEnum](t, LevelValueEnumDef, LevelValueUnknown, LevelValueLow, LevelValueMedium, LevelValueHigh, LevelValueCritical)
+	spectest.CheckEnum[MeasurementMediumEnum](t, MeasurementMediumEnumDef, MeasurementMediumAir, MeasurementMediumWater, MeasurementMediumSoil)
+	spectest.CheckEnum[MeasurementUnitEnum](t, MeasurementUnitEnumDef, MeasurementUnitPpm, MeasurementUnitPpb, MeasurementUnitPpt, MeasurementUnitMgm3, MeasurementUnitUgm3, MeasurementUnitNgm3, MeasurementUnitPm3, MeasurementUnitBqm3)
+}
+
 // TestCloneIsDeep holds every generated Clone to a deep copy
 // (decision 142): spectest.CheckClone fills a value to every depth,
 // clones it and overwrites the clone through its lists and pointers.

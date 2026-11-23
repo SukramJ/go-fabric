@@ -50,8 +50,6 @@ const (
 )
 
 // Feature is a ClosureDimension FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -67,8 +65,6 @@ const (
 )
 
 // ClosureUnitEnum is the ClosureUnitEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ClosureUnitEnum uint8
 
 // ClosureUnitEnum values.
@@ -78,8 +74,6 @@ const (
 )
 
 // ClosureUnitEnumDef describes ClosureUnitEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ClosureUnitEnumDef = &spec.Enum{Name: "ClosureUnitEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Millimeter", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Degree", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -140,8 +134,6 @@ func (v DimensionStateStruct) Clone() DimensionStateStruct {
 }
 
 // DimensionStateStructDef describes DimensionStateStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DimensionStateStructDef = &spec.Struct{Name: "DimensionStateStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Position", Type: spec.Type{Name: "percent100ths", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "PS", Op: spec.ConfName, Name: "PS"}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "desc", Desc: true, Max: &spec.Bound{Int: 10000}}, Default: spec.NullDefault{}},
 	{ID: 1, Name: "Latch", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Default: spec.NullDefault{}},
@@ -149,8 +141,6 @@ var DimensionStateStructDef = &spec.Struct{Name: "DimensionStateStruct", Fields:
 }}
 
 // ThreeLevelAutoEnum is the ThreeLevelAutoEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ThreeLevelAutoEnum uint8
 
 // ThreeLevelAutoEnum values.
@@ -162,8 +152,6 @@ const (
 )
 
 // ThreeLevelAutoEnumDef describes ThreeLevelAutoEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThreeLevelAutoEnumDef = &spec.Enum{Name: "ThreeLevelAutoEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Auto", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -172,8 +160,6 @@ var ThreeLevelAutoEnumDef = &spec.Enum{Name: "ThreeLevelAutoEnum", Bits: 8, Valu
 }}
 
 // LatchControlModesBitmap is the LatchControlModesBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LatchControlModesBitmap uint8
 
 // LatchControlModesBitmap bits; a member wider than one bit is its mask.
@@ -183,16 +169,12 @@ const (
 )
 
 // LatchControlModesBitmapDef describes LatchControlModesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LatchControlModesBitmapDef = &spec.Bitmap{Name: "LatchControlModesBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "RemoteLatching", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"}},
 	{Name: "RemoteUnlatching", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"}},
 }}
 
 // ModulationTypeEnum is the ModulationTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ModulationTypeEnum uint8
 
 // ModulationTypeEnum values.
@@ -205,8 +187,6 @@ const (
 )
 
 // ModulationTypeEnumDef describes ModulationTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ModulationTypeEnumDef = &spec.Enum{Name: "ModulationTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "SlatsOrientation", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "SlatsOpenwork", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -216,8 +196,6 @@ var ModulationTypeEnumDef = &spec.Enum{Name: "ModulationTypeEnum", Bits: 8, Valu
 }}
 
 // OverflowEnum is the OverflowEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OverflowEnum uint8
 
 // OverflowEnum values.
@@ -236,8 +214,6 @@ const (
 )
 
 // OverflowEnumDef describes OverflowEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OverflowEnumDef = &spec.Enum{Name: "OverflowEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoOverflow", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Inside", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -275,16 +251,12 @@ func (v *RangePercent100thsStruct) DecodeTLV(n spec.Node) error {
 }
 
 // RangePercent100thsStructDef describes RangePercent100thsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RangePercent100thsStructDef = &spec.Struct{Name: "RangePercent100thsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Min", Type: spec.Type{Name: "percent100ths", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10000", Max: &spec.Bound{Int: 10000}}},
 	{ID: 1, Name: "Max", Type: spec.Type{Name: "percent100ths", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "Min to 100%", Min: &spec.Bound{Ref: "min"}, Max: &spec.Bound{Int: 10000}}},
 }}
 
 // RotationAxisEnum is the RotationAxisEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type RotationAxisEnum uint8
 
 // RotationAxisEnum values.
@@ -303,8 +275,6 @@ const (
 )
 
 // RotationAxisEnumDef describes RotationAxisEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RotationAxisEnumDef = &spec.Enum{Name: "RotationAxisEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Left", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "CenteredVertical", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -320,8 +290,6 @@ var RotationAxisEnumDef = &spec.Enum{Name: "RotationAxisEnum", Bits: 8, Values: 
 }}
 
 // StepDirectionEnum is the StepDirectionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StepDirectionEnum uint8
 
 // StepDirectionEnum values.
@@ -331,16 +299,12 @@ const (
 )
 
 // StepDirectionEnumDef describes StepDirectionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StepDirectionEnumDef = &spec.Enum{Name: "StepDirectionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Decrease", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Increase", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // TranslationDirectionEnum is the TranslationDirectionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TranslationDirectionEnum uint8
 
 // TranslationDirectionEnum values.
@@ -360,8 +324,6 @@ const (
 )
 
 // TranslationDirectionEnumDef describes TranslationDirectionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TranslationDirectionEnumDef = &spec.Enum{Name: "TranslationDirectionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Downward", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Upward", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -400,8 +362,6 @@ func (v *UnitRangeStruct) DecodeTLV(n spec.Node) error {
 }
 
 // UnitRangeStructDef describes UnitRangeStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var UnitRangeStructDef = &spec.Struct{Name: "UnitRangeStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Min", Type: spec.Type{Name: "int16", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Max", Type: spec.Type{Name: "int16", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "Min to 32767", Min: &spec.Bound{Ref: "min"}, Max: &spec.Bound{Int: 32767}}},

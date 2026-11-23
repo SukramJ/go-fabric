@@ -117,8 +117,6 @@ const (
 )
 
 // Feature is a DoorLock FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -139,8 +137,6 @@ const (
 )
 
 // AlarmCodeEnum is the AlarmCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AlarmCodeEnum uint8
 
 // AlarmCodeEnum values.
@@ -156,8 +152,6 @@ const (
 )
 
 // AlarmCodeEnumDef describes AlarmCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AlarmCodeEnumDef = &spec.Enum{Name: "AlarmCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "LockJammed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "LockFactoryReset", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -170,8 +164,6 @@ var AlarmCodeEnumDef = &spec.Enum{Name: "AlarmCodeEnum", Bits: 8, Values: []spec
 }}
 
 // AlarmMaskBitmap is the AlarmMaskBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AlarmMaskBitmap uint16
 
 // AlarmMaskBitmap bits; a member wider than one bit is its mask.
@@ -185,8 +177,6 @@ const (
 )
 
 // AlarmMaskBitmapDef describes AlarmMaskBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AlarmMaskBitmapDef = &spec.Bitmap{Name: "AlarmMaskBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "LockJammed", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "LockFactoryReset", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -197,8 +187,6 @@ var AlarmMaskBitmapDef = &spec.Bitmap{Name: "AlarmMaskBitmap", Bits: 16, Members
 }}
 
 // ConfigurationRegisterBitmap is the ConfigurationRegisterBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ConfigurationRegisterBitmap uint16
 
 // ConfigurationRegisterBitmap bits; a member wider than one bit is its mask.
@@ -212,8 +200,6 @@ const (
 )
 
 // ConfigurationRegisterBitmapDef describes ConfigurationRegisterBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ConfigurationRegisterBitmapDef = &spec.Bitmap{Name: "ConfigurationRegisterBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "LocalProgramming", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "KeypadInterface", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -224,8 +210,6 @@ var ConfigurationRegisterBitmapDef = &spec.Bitmap{Name: "ConfigurationRegisterBi
 }}
 
 // CredentialRuleEnum is the CredentialRuleEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CredentialRuleEnum uint8
 
 // CredentialRuleEnum values.
@@ -236,8 +220,6 @@ const (
 )
 
 // CredentialRuleEnumDef describes CredentialRuleEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CredentialRuleEnumDef = &spec.Enum{Name: "CredentialRuleEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Single", Conformance: spec.Conformance{Text: "USR", Op: spec.ConfName, Name: "USR"}},
 	{Value: 1, Name: "Dual", Conformance: spec.Conformance{Text: "[USR]", Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "USR"}}}},
@@ -245,8 +227,6 @@ var CredentialRuleEnumDef = &spec.Enum{Name: "CredentialRuleEnum", Bits: 8, Valu
 }}
 
 // CredentialRulesBitmap is the CredentialRulesBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CredentialRulesBitmap uint8
 
 // CredentialRulesBitmap bits; a member wider than one bit is its mask.
@@ -257,8 +237,6 @@ const (
 )
 
 // CredentialRulesBitmapDef describes CredentialRulesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CredentialRulesBitmapDef = &spec.Bitmap{Name: "CredentialRulesBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Single", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Dual", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -288,16 +266,12 @@ func (v *CredentialStruct) DecodeTLV(n spec.Node) error {
 }
 
 // CredentialStructDef describes CredentialStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CredentialStructDef = &spec.Struct{Name: "CredentialStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CredentialType", Type: spec.Type{Name: "CredentialTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: CredentialTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "CredentialIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // CredentialTypeEnum is the CredentialTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CredentialTypeEnum uint8
 
 // CredentialTypeEnum values.
@@ -314,8 +288,6 @@ const (
 )
 
 // CredentialTypeEnumDef describes CredentialTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CredentialTypeEnumDef = &spec.Enum{Name: "CredentialTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "ProgrammingPin", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "Pin", Conformance: spec.Conformance{Text: "PIN", Op: spec.ConfName, Name: "PIN"}},
@@ -329,8 +301,6 @@ var CredentialTypeEnumDef = &spec.Enum{Name: "CredentialTypeEnum", Bits: 8, Valu
 }}
 
 // DataOperationTypeEnum is the DataOperationTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DataOperationTypeEnum uint8
 
 // DataOperationTypeEnum values.
@@ -341,8 +311,6 @@ const (
 )
 
 // DataOperationTypeEnumDef describes DataOperationTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DataOperationTypeEnumDef = &spec.Enum{Name: "DataOperationTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Add", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Clear", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -350,8 +318,6 @@ var DataOperationTypeEnumDef = &spec.Enum{Name: "DataOperationTypeEnum", Bits: 8
 }}
 
 // DaysMaskBitmap is the DaysMaskBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DaysMaskBitmap uint8
 
 // DaysMaskBitmap bits; a member wider than one bit is its mask.
@@ -366,8 +332,6 @@ const (
 )
 
 // DaysMaskBitmapDef describes DaysMaskBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DaysMaskBitmapDef = &spec.Bitmap{Name: "DaysMaskBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Sunday", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Monday", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -379,8 +343,6 @@ var DaysMaskBitmapDef = &spec.Bitmap{Name: "DaysMaskBitmap", Bits: 8, Members: [
 }}
 
 // DoorStateEnum is the DoorStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DoorStateEnum uint8
 
 // DoorStateEnum values.
@@ -394,8 +356,6 @@ const (
 )
 
 // DoorStateEnumDef describes DoorStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DoorStateEnumDef = &spec.Enum{Name: "DoorStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "DoorOpen", Conformance: spec.Conformance{Text: "DPS", Op: spec.ConfName, Name: "DPS"}},
 	{Value: 1, Name: "DoorClosed", Conformance: spec.Conformance{Text: "DPS", Op: spec.ConfName, Name: "DPS"}},
@@ -406,8 +366,6 @@ var DoorStateEnumDef = &spec.Enum{Name: "DoorStateEnum", Bits: 8, Values: []spec
 }}
 
 // EventTypeEnum is the EventTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EventTypeEnum uint8
 
 // EventTypeEnum values.
@@ -418,8 +376,6 @@ const (
 )
 
 // EventTypeEnumDef describes EventTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EventTypeEnumDef = &spec.Enum{Name: "EventTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Operation", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Programming", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -427,8 +383,6 @@ var EventTypeEnumDef = &spec.Enum{Name: "EventTypeEnum", Bits: 8, Values: []spec
 }}
 
 // LEDSettingEnum is the LEDSettingEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LEDSettingEnum uint8
 
 // LEDSettingEnum values.
@@ -439,8 +393,6 @@ const (
 )
 
 // LEDSettingEnumDef describes LEDSettingEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LEDSettingEnumDef = &spec.Enum{Name: "LEDSettingEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoLedSignal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "NoLedSignalAccessAllowed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -448,8 +400,6 @@ var LEDSettingEnumDef = &spec.Enum{Name: "LEDSettingEnum", Bits: 8, Values: []sp
 }}
 
 // LocalProgrammingFeaturesBitmap is the LocalProgrammingFeaturesBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LocalProgrammingFeaturesBitmap uint8
 
 // LocalProgrammingFeaturesBitmap bits; a member wider than one bit is its mask.
@@ -461,8 +411,6 @@ const (
 )
 
 // LocalProgrammingFeaturesBitmapDef describes LocalProgrammingFeaturesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LocalProgrammingFeaturesBitmapDef = &spec.Bitmap{Name: "LocalProgrammingFeaturesBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "AddUsersCredentialsSchedules", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "ModifyUsersCredentialsSchedules", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -471,8 +419,6 @@ var LocalProgrammingFeaturesBitmapDef = &spec.Bitmap{Name: "LocalProgrammingFeat
 }}
 
 // LockDataTypeEnum is the LockDataTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LockDataTypeEnum uint8
 
 // LockDataTypeEnum values.
@@ -494,8 +440,6 @@ const (
 )
 
 // LockDataTypeEnumDef describes LockDataTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LockDataTypeEnumDef = &spec.Enum{Name: "LockDataTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "ProgrammingCode", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -514,8 +458,6 @@ var LockDataTypeEnumDef = &spec.Enum{Name: "LockDataTypeEnum", Bits: 8, Values: 
 }}
 
 // LockOperationTypeEnum is the LockOperationTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LockOperationTypeEnum uint8
 
 // LockOperationTypeEnum values.
@@ -528,8 +470,6 @@ const (
 )
 
 // LockOperationTypeEnumDef describes LockOperationTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LockOperationTypeEnumDef = &spec.Enum{Name: "LockOperationTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Lock", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Unlock", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -539,8 +479,6 @@ var LockOperationTypeEnumDef = &spec.Enum{Name: "LockOperationTypeEnum", Bits: 8
 }}
 
 // LockStateEnum is the LockStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LockStateEnum uint8
 
 // LockStateEnum values.
@@ -552,8 +490,6 @@ const (
 )
 
 // LockStateEnumDef describes LockStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LockStateEnumDef = &spec.Enum{Name: "LockStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NotFullyLocked", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Locked", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -562,8 +498,6 @@ var LockStateEnumDef = &spec.Enum{Name: "LockStateEnum", Bits: 8, Values: []spec
 }}
 
 // LockTypeEnum is the LockTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LockTypeEnum uint8
 
 // LockTypeEnum values.
@@ -583,8 +517,6 @@ const (
 )
 
 // LockTypeEnumDef describes LockTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LockTypeEnumDef = &spec.Enum{Name: "LockTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "DeadBolt", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Magnetic", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -601,8 +533,6 @@ var LockTypeEnumDef = &spec.Enum{Name: "LockTypeEnum", Bits: 8, Values: []spec.E
 }}
 
 // OperatingModeEnum is the OperatingModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OperatingModeEnum uint8
 
 // OperatingModeEnum values.
@@ -615,8 +545,6 @@ const (
 )
 
 // OperatingModeEnumDef describes OperatingModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperatingModeEnumDef = &spec.Enum{Name: "OperatingModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Normal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Vacation", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -626,8 +554,6 @@ var OperatingModeEnumDef = &spec.Enum{Name: "OperatingModeEnum", Bits: 8, Values
 }}
 
 // OperatingModesBitmap is the OperatingModesBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OperatingModesBitmap uint16
 
 // OperatingModesBitmap bits; a member wider than one bit is its mask.
@@ -641,8 +567,6 @@ const (
 )
 
 // OperatingModesBitmapDef describes OperatingModesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperatingModesBitmapDef = &spec.Bitmap{Name: "OperatingModesBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "Normal", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Vacation", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -653,8 +577,6 @@ var OperatingModesBitmapDef = &spec.Bitmap{Name: "OperatingModesBitmap", Bits: 1
 }}
 
 // OperationErrorEnum is the OperationErrorEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OperationErrorEnum uint8
 
 // OperationErrorEnum values.
@@ -667,8 +589,6 @@ const (
 )
 
 // OperationErrorEnumDef describes OperationErrorEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperationErrorEnumDef = &spec.Enum{Name: "OperationErrorEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "InvalidCredential", Conformance: spec.Conformance{Text: "USR", Op: spec.ConfName, Name: "USR"}},
@@ -678,8 +598,6 @@ var OperationErrorEnumDef = &spec.Enum{Name: "OperationErrorEnum", Bits: 8, Valu
 }}
 
 // OperationSourceEnum is the OperationSourceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OperationSourceEnum uint8
 
 // OperationSourceEnum values.
@@ -698,8 +616,6 @@ const (
 )
 
 // OperationSourceEnumDef describes OperationSourceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperationSourceEnumDef = &spec.Enum{Name: "OperationSourceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "Manual", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -715,8 +631,6 @@ var OperationSourceEnumDef = &spec.Enum{Name: "OperationSourceEnum", Bits: 8, Va
 }}
 
 // SoundVolumeEnum is the SoundVolumeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SoundVolumeEnum uint8
 
 // SoundVolumeEnum values.
@@ -728,8 +642,6 @@ const (
 )
 
 // SoundVolumeEnumDef describes SoundVolumeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SoundVolumeEnumDef = &spec.Enum{Name: "SoundVolumeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Silent", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -738,8 +650,6 @@ var SoundVolumeEnumDef = &spec.Enum{Name: "SoundVolumeEnum", Bits: 8, Values: []
 }}
 
 // StatusCodeEnum is the StatusCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusCodeEnum uint8
 
 // StatusCodeEnum values.
@@ -749,16 +659,12 @@ const (
 )
 
 // StatusCodeEnumDef describes StatusCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusCodeEnumDef = &spec.Enum{Name: "StatusCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 2, Name: "Duplicate", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 3, Name: "Occupied", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // UserStatusEnum is the UserStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type UserStatusEnum uint8
 
 // UserStatusEnum values.
@@ -769,8 +675,6 @@ const (
 )
 
 // UserStatusEnumDef describes UserStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var UserStatusEnumDef = &spec.Enum{Name: "UserStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Available", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "OccupiedEnabled", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -778,8 +682,6 @@ var UserStatusEnumDef = &spec.Enum{Name: "UserStatusEnum", Bits: 8, Values: []sp
 }}
 
 // UserTypeEnum is the UserTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type UserTypeEnum uint8
 
 // UserTypeEnum values.
@@ -797,8 +699,6 @@ const (
 )
 
 // UserTypeEnumDef describes UserTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var UserTypeEnumDef = &spec.Enum{Name: "UserTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "UnrestrictedUser", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "YearDayScheduleUser", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -813,8 +713,6 @@ var UserTypeEnumDef = &spec.Enum{Name: "UserTypeEnum", Bits: 8, Values: []spec.E
 }}
 
 // Status is the status enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Status uint8
 
 // Status values.
@@ -855,8 +753,6 @@ const (
 )
 
 // StatusDef describes status.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusDef = &spec.Enum{Name: "status", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success"},
 	{Value: 1, Name: "Failure"},

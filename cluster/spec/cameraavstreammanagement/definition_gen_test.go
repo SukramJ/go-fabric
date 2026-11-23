@@ -23,6 +23,20 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureAudio, FeatureVideo, FeatureSnapshot, FeaturePrivacy, FeatureSpeaker, FeatureImageControl, FeatureWatermark, FeatureOnScreenDisplay, FeatureLocalStorage, FeatureHighDynamicRange, FeatureNightVision)
+	spectest.CheckEnum[AudioCodecEnum](t, AudioCodecEnumDef, AudioCodecOpus, AudioCodecAacLc)
+	spectest.CheckEnum[StreamUsageEnum](t, StreamUsageEnumDef, StreamUsageInternal, StreamUsageRecording, StreamUsageAnalysis, StreamUsageLiveView)
+	spectest.CheckEnum[ImageCodecEnum](t, ImageCodecEnumDef, ImageCodecJpeg, ImageCodecHeic)
+	spectest.CheckEnum[VideoCodecEnum](t, VideoCodecEnumDef, VideoCodecH264, VideoCodecHevc, VideoCodecVvc, VideoCodecAv1)
+	spectest.CheckEnum[TriStateAutoEnum](t, TriStateAutoEnumDef, TriStateAutoOff, TriStateAutoOn, TriStateAutoAuto)
+	spectest.CheckEnum[TwoWayTalkSupportTypeEnum](t, TwoWayTalkSupportTypeEnumDef, TwoWayTalkSupportTypeNotSupported, TwoWayTalkSupportTypeHalfDuplex, TwoWayTalkSupportTypeFullDuplex)
+	spectest.CheckEnum[ThreeLevelAutoEnum](t, ThreeLevelAutoEnumDef, ThreeLevelAutoAuto, ThreeLevelAutoLow, ThreeLevelAutoMedium, ThreeLevelAutoHigh)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

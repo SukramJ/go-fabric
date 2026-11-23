@@ -44,8 +44,6 @@ const (
 )
 
 // Feature is a SoftwareDiagnostics FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -121,8 +119,6 @@ func (v ThreadMetricsStruct) Clone() ThreadMetricsStruct {
 }
 
 // ThreadMetricsStructDef describes ThreadMetricsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThreadMetricsStructDef = &spec.Struct{Name: "ThreadMetricsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Id", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}},

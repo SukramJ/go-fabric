@@ -31,8 +31,6 @@ const (
 )
 
 // Feature is a LaundryWasherControls FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -42,8 +40,6 @@ const (
 )
 
 // NumberOfRinsesEnum is the NumberOfRinsesEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type NumberOfRinsesEnum uint8
 
 // NumberOfRinsesEnum values.
@@ -55,8 +51,6 @@ const (
 )
 
 // NumberOfRinsesEnumDef describes NumberOfRinsesEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NumberOfRinsesEnumDef = &spec.Enum{Name: "NumberOfRinsesEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "None", Conformance: spec.Conformance{Text: "RINSE", Op: spec.ConfName, Name: "RINSE"}},
 	{Value: 1, Name: "Normal", Conformance: spec.Conformance{Text: "RINSE", Op: spec.ConfName, Name: "RINSE"}},

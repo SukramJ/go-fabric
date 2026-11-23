@@ -23,6 +23,15 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition)
+	spectest.CheckEnum[ErrorStateEnum](t, ErrorStateEnumDef, ErrorStateNoError, ErrorStateUnableToStartOrResume, ErrorStateUnableToCompleteOperation, ErrorStateCommandInvalidInState, ErrorStateFailedToFindChargingDock, ErrorStateStuck, ErrorStateDustBinMissing, ErrorStateDustBinFull, ErrorStateWaterTankEmpty, ErrorStateWaterTankMissing, ErrorStateWaterTankLidOpen, ErrorStateMopCleaningPadMissing, ErrorStateLowBattery, ErrorStateCannotReachTargetArea, ErrorStateDirtyWaterTankFull, ErrorStateDirtyWaterTankMissing, ErrorStateWheelsJammed, ErrorStateBrushJammed, ErrorStateNavigationSensorObscured)
+	spectest.CheckEnum[OperationalStateEnum](t, OperationalStateEnumDef, OperationalStateStopped, OperationalStateRunning, OperationalStatePaused, OperationalStateError, OperationalStateSeekingCharger, OperationalStateCharging, OperationalStateDocked, OperationalStateEmptyingDustBin, OperationalStateCleaningMop, OperationalStateFillingWaterTank, OperationalStateUpdatingMaps)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

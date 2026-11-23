@@ -59,8 +59,6 @@ const (
 )
 
 // Feature is a LevelControl FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -71,8 +69,6 @@ const (
 )
 
 // MoveModeEnum is the MoveModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MoveModeEnum uint8
 
 // MoveModeEnum values.
@@ -82,16 +78,12 @@ const (
 )
 
 // MoveModeEnumDef describes MoveModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MoveModeEnumDef = &spec.Enum{Name: "MoveModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Up", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Down", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // OptionsBitmap is the OptionsBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OptionsBitmap uint8
 
 // OptionsBitmap bits; a member wider than one bit is its mask.
@@ -101,16 +93,12 @@ const (
 )
 
 // OptionsBitmapDef describes OptionsBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OptionsBitmapDef = &spec.Bitmap{Name: "OptionsBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "ExecuteIfOff", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "LT | OO", Op: spec.ConfOr, Args: []spec.Conformance{{Op: spec.ConfName, Name: "LT"}, {Op: spec.ConfName, Name: "OO"}}}},
 	{Name: "CoupleColorTempToLevel", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"}},
 }}
 
 // StepModeEnum is the StepModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StepModeEnum uint8
 
 // StepModeEnum values.
@@ -120,8 +108,6 @@ const (
 )
 
 // StepModeEnumDef describes StepModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StepModeEnumDef = &spec.Enum{Name: "StepModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Up", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Down", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

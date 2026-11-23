@@ -52,8 +52,6 @@ const (
 )
 
 // Feature is a ScenesManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -169,8 +167,6 @@ func (v AttributeValuePairStruct) Clone() AttributeValuePairStruct {
 }
 
 // AttributeValuePairStructDef describes AttributeValuePairStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AttributeValuePairStructDef = &spec.Struct{Name: "AttributeValuePairStruct", Fields: []spec.Field{
 	{ID: 0, Name: "AttributeId", Type: spec.Type{Name: "attrib-id", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ValueUnsigned8", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "O.a", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: false, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
@@ -184,8 +180,6 @@ var AttributeValuePairStructDef = &spec.Struct{Name: "AttributeValuePairStruct",
 }}
 
 // CopyModeBitmap is the CopyModeBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CopyModeBitmap uint8
 
 // CopyModeBitmap bits; a member wider than one bit is its mask.
@@ -194,8 +188,6 @@ const (
 )
 
 // CopyModeBitmapDef describes CopyModeBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CopyModeBitmapDef = &spec.Bitmap{Name: "CopyModeBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "CopyAllScenes", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
@@ -241,8 +233,6 @@ func (v ExtensionFieldSetStruct) Clone() ExtensionFieldSetStruct {
 }
 
 // ExtensionFieldSetStructDef describes ExtensionFieldSetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ExtensionFieldSetStructDef = &spec.Struct{Name: "ExtensionFieldSetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ClusterId", Type: spec.Type{Name: "cluster-id", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "AttributeValueList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "AttributeValuePairStruct", Kind: spec.KindStruct, Struct: AttributeValuePairStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
@@ -305,8 +295,6 @@ func (v LogicalSceneTable) Clone() LogicalSceneTable {
 }
 
 // LogicalSceneTableDef describes LogicalSceneTable.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LogicalSceneTableDef = &spec.Struct{Name: "LogicalSceneTable", Fields: []spec.Field{
 	{ID: 0, Name: "SceneGroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "SceneId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 254", Max: &spec.Bound{Int: 254}}},
@@ -350,8 +338,6 @@ func (v *SceneInfoStruct) DecodeTLV(n spec.Node) error {
 }
 
 // SceneInfoStructDef describes SceneInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SceneInfoStructDef = &spec.Struct{Name: "SceneInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "SceneCount", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "CurrentScene", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}, FabricSensitive: true},
@@ -362,8 +348,6 @@ var SceneInfoStructDef = &spec.Struct{Name: "SceneInfoStruct", Fields: []spec.Fi
 }}
 
 // Status is the status enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Status uint8
 
 // Status values.
@@ -404,8 +388,6 @@ const (
 )
 
 // StatusDef describes status.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusDef = &spec.Enum{Name: "status", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success"},
 	{Value: 1, Name: "Failure"},

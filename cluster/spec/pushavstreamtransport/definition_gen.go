@@ -50,8 +50,6 @@ const (
 )
 
 // Feature is a PushAvStreamTransport FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -83,8 +81,6 @@ func (v *AudioStreamStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AudioStreamStructDef describes AudioStreamStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AudioStreamStructDef = &spec.Struct{Name: "AudioStreamStruct", Fields: []spec.Field{
 	{ID: 0, Name: "AudioStreamName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 16", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 16}}},
 	{ID: 1, Name: "AudioStreamId", Type: spec.Type{Name: "CameraAvStreamManagement.AudioStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -154,8 +150,6 @@ func (v CMAFContainerOptionsStruct) Clone() CMAFContainerOptionsStruct {
 }
 
 // CMAFContainerOptionsStructDef describes CMAFContainerOptionsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CMAFContainerOptionsStructDef = &spec.Struct{Name: "CMAFContainerOptionsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CmafInterface", Type: spec.Type{Name: "CMAFInterfaceEnum", Kind: spec.KindEnum, Bits: 8, Enum: CMAFInterfaceEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "SegmentDuration", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "500 to 65500", Min: &spec.Bound{Int: 500}, Max: &spec.Bound{Int: 65500}}},
@@ -166,8 +160,6 @@ var CMAFContainerOptionsStructDef = &spec.Struct{Name: "CMAFContainerOptionsStru
 }}
 
 // CMAFInterfaceEnum is the CMAFInterfaceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CMAFInterfaceEnum uint8
 
 // CMAFInterfaceEnum values.
@@ -178,8 +170,6 @@ const (
 )
 
 // CMAFInterfaceEnumDef describes CMAFInterfaceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CMAFInterfaceEnumDef = &spec.Enum{Name: "CMAFInterfaceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Interface1", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Interface2Dash", Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}},
@@ -187,8 +177,6 @@ var CMAFInterfaceEnumDef = &spec.Enum{Name: "CMAFInterfaceEnum", Bits: 8, Values
 }}
 
 // ContainerFormatEnum is the ContainerFormatEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ContainerFormatEnum uint8
 
 // ContainerFormatEnum values.
@@ -197,8 +185,6 @@ const (
 )
 
 // ContainerFormatEnumDef describes ContainerFormatEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ContainerFormatEnumDef = &spec.Enum{Name: "ContainerFormatEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Cmaf", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
@@ -241,16 +227,12 @@ func (v ContainerOptionsStruct) Clone() ContainerOptionsStruct {
 }
 
 // ContainerOptionsStructDef describes ContainerOptionsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ContainerOptionsStructDef = &spec.Struct{Name: "ContainerOptionsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ContainerType", Type: spec.Type{Name: "ContainerFormatEnum", Kind: spec.KindEnum, Bits: 8, Enum: ContainerFormatEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "CmafContainerOptions", Type: spec.Type{Name: "CMAFContainerOptionsStruct", Kind: spec.KindStruct, Struct: CMAFContainerOptionsStructDef}, Conformance: spec.Conformance{Text: "ContainerType == CMAF", Op: spec.ConfEq, Args: []spec.Conformance{{Op: spec.ConfName, Name: "ContainerType"}, {Op: spec.ConfName, Name: "CMAF"}}}},
 }}
 
 // IngestMethodsEnum is the IngestMethodsEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type IngestMethodsEnum uint8
 
 // IngestMethodsEnum values.
@@ -259,15 +241,11 @@ const (
 )
 
 // IngestMethodsEnumDef describes IngestMethodsEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var IngestMethodsEnumDef = &spec.Enum{Name: "IngestMethodsEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "CmafIngest", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // StatusCodeEnum is the StatusCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusCodeEnum uint8
 
 // StatusCodeEnum values.
@@ -287,8 +265,6 @@ const (
 )
 
 // StatusCodeEnumDef describes StatusCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusCodeEnumDef = &spec.Enum{Name: "StatusCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 2, Name: "InvalidTlsEndpoint", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 3, Name: "InvalidStream", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -327,8 +303,6 @@ func (v *SupportedFormatStruct) DecodeTLV(n spec.Node) error {
 }
 
 // SupportedFormatStructDef describes SupportedFormatStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SupportedFormatStructDef = &spec.Struct{Name: "SupportedFormatStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ContainerFormat", Type: spec.Type{Name: "ContainerFormatEnum", Kind: spec.KindEnum, Bits: 8, Enum: ContainerFormatEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "IngestMethod", Type: spec.Type{Name: "IngestMethodsEnum", Kind: spec.KindEnum, Bits: 8, Enum: IngestMethodsEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -378,8 +352,6 @@ func (v TransportConfigurationStruct) Clone() TransportConfigurationStruct {
 }
 
 // TransportConfigurationStructDef describes TransportConfigurationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransportConfigurationStructDef = &spec.Struct{Name: "TransportConfigurationStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ConnectionId", Type: spec.Type{Name: "PushTransportConnectionID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "0 to 65534", Min: &spec.Bound{Int: 0}, Max: &spec.Bound{Int: 65534}}},
 	{ID: 1, Name: "TransportStatus", Type: spec.Type{Name: "TransportStatusEnum", Kind: spec.KindEnum, Bits: 8, Enum: TransportStatusEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -388,8 +360,6 @@ var TransportConfigurationStructDef = &spec.Struct{Name: "TransportConfiguration
 }}
 
 // TransportStatusEnum is the TransportStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TransportStatusEnum uint8
 
 // TransportStatusEnum values.
@@ -399,8 +369,6 @@ const (
 )
 
 // TransportStatusEnumDef describes TransportStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransportStatusEnumDef = &spec.Enum{Name: "TransportStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Active", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Inactive", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -517,8 +485,6 @@ func (v TransportOptionsStruct) Clone() TransportOptionsStruct {
 }
 
 // TransportOptionsStructDef describes TransportOptionsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransportOptionsStructDef = &spec.Struct{Name: "TransportOptionsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "StreamUsage", Type: spec.Type{Name: "StreamUsageEnum", Kind: spec.KindEnum, Bits: 8, Enum: StreamUsageEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "VideoStreamId", Type: spec.Type{Name: "CameraAvStreamManagement.VideoStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "O, D", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfOptional}, {Op: spec.ConfDeprecated}}}, Quality: spec.Quality{Nullable: true}},
@@ -534,8 +500,6 @@ var TransportOptionsStructDef = &spec.Struct{Name: "TransportOptionsStruct", Fie
 }}
 
 // StreamUsageEnum is the StreamUsageEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StreamUsageEnum uint8
 
 // StreamUsageEnum values.
@@ -547,8 +511,6 @@ const (
 )
 
 // StreamUsageEnumDef describes StreamUsageEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StreamUsageEnumDef = &spec.Enum{Name: "StreamUsageEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Internal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Recording", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -634,8 +596,6 @@ func (v TransportTriggerOptionsStruct) Clone() TransportTriggerOptionsStruct {
 }
 
 // TransportTriggerOptionsStructDef describes TransportTriggerOptionsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransportTriggerOptionsStructDef = &spec.Struct{Name: "TransportTriggerOptionsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "TriggerType", Type: spec.Type{Name: "TransportTriggerTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: TransportTriggerTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "MotionZones", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "TransportZoneOptionsStruct", Kind: spec.KindStruct, Struct: TransportZoneOptionsStructDef}}}, Conformance: spec.Conformance{Text: "TriggerType == Motion", Op: spec.ConfEq, Args: []spec.Conformance{{Op: spec.ConfName, Name: "TriggerType"}, {Op: spec.ConfName, Name: "Motion"}}}, Quality: spec.Quality{Nullable: true}},
@@ -645,8 +605,6 @@ var TransportTriggerOptionsStructDef = &spec.Struct{Name: "TransportTriggerOptio
 }}
 
 // TransportTriggerTypeEnum is the TransportTriggerTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TransportTriggerTypeEnum uint8
 
 // TransportTriggerTypeEnum values.
@@ -657,8 +615,6 @@ const (
 )
 
 // TransportTriggerTypeEnumDef describes TransportTriggerTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransportTriggerTypeEnumDef = &spec.Enum{Name: "TransportTriggerTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Command", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Motion", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -703,8 +659,6 @@ func (v TransportZoneOptionsStruct) Clone() TransportZoneOptionsStruct {
 }
 
 // TransportZoneOptionsStructDef describes TransportZoneOptionsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransportZoneOptionsStructDef = &spec.Struct{Name: "TransportZoneOptionsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Zone", Type: spec.Type{Name: "ZoneManagement.ZoneID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 	{ID: 1, Name: "Sensitivity", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "PERZONESENS", Op: spec.ConfName, Name: "PERZONESENS"}, Constraint: spec.Constraint{Text: "1 to 10", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 10}}},
@@ -739,8 +693,6 @@ func (v *TransportMotionTriggerTimeControlStruct) DecodeTLV(n spec.Node) error {
 }
 
 // TransportMotionTriggerTimeControlStructDef describes TransportMotionTriggerTimeControlStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransportMotionTriggerTimeControlStructDef = &spec.Struct{Name: "TransportMotionTriggerTimeControlStruct", Fields: []spec.Field{
 	{ID: 0, Name: "InitialDuration", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 	{ID: 1, Name: "AugmentationDuration", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -771,16 +723,12 @@ func (v *VideoStreamStruct) DecodeTLV(n spec.Node) error {
 }
 
 // VideoStreamStructDef describes VideoStreamStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var VideoStreamStructDef = &spec.Struct{Name: "VideoStreamStruct", Fields: []spec.Field{
 	{ID: 0, Name: "VideoStreamName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 16", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 16}}},
 	{ID: 1, Name: "VideoStreamId", Type: spec.Type{Name: "CameraAvStreamManagement.VideoStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // TriggerActivationReasonEnum is the TriggerActivationReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TriggerActivationReasonEnum uint8
 
 // TriggerActivationReasonEnum values.
@@ -792,8 +740,6 @@ const (
 )
 
 // TriggerActivationReasonEnumDef describes TriggerActivationReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TriggerActivationReasonEnumDef = &spec.Enum{Name: "TriggerActivationReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "UserInitiated", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Automation", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

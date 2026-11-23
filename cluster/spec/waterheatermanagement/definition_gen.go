@@ -48,8 +48,6 @@ const (
 )
 
 // Feature is a WaterHeaterManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -59,8 +57,6 @@ const (
 )
 
 // BoostStateEnum is the BoostStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BoostStateEnum uint8
 
 // BoostStateEnum values.
@@ -70,8 +66,6 @@ const (
 )
 
 // BoostStateEnumDef describes BoostStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BoostStateEnumDef = &spec.Enum{Name: "BoostStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Inactive", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Active", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -155,8 +149,6 @@ func (v WaterHeaterBoostInfoStruct) Clone() WaterHeaterBoostInfoStruct {
 }
 
 // WaterHeaterBoostInfoStructDef describes WaterHeaterBoostInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WaterHeaterBoostInfoStructDef = &spec.Struct{Name: "WaterHeaterBoostInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Duration", Type: spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 	{ID: 1, Name: "OneShot", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "[!TP], [TP].a-", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfNot, Args: []spec.Conformance{{Op: spec.ConfName, Name: "TP"}}}}}, {Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: false, OrLess: true}, Args: []spec.Conformance{{Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "TP"}}}}}}}, Default: false},
@@ -167,8 +159,6 @@ var WaterHeaterBoostInfoStructDef = &spec.Struct{Name: "WaterHeaterBoostInfoStru
 }}
 
 // WaterHeaterHeatSourceBitmap is the WaterHeaterHeatSourceBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type WaterHeaterHeatSourceBitmap uint8
 
 // WaterHeaterHeatSourceBitmap bits; a member wider than one bit is its mask.
@@ -181,8 +171,6 @@ const (
 )
 
 // WaterHeaterHeatSourceBitmapDef describes WaterHeaterHeatSourceBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WaterHeaterHeatSourceBitmapDef = &spec.Bitmap{Name: "WaterHeaterHeatSourceBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "ImmersionElement1", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "ImmersionElement2", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

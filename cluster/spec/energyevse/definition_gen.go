@@ -77,8 +77,6 @@ const (
 )
 
 // Feature is a EnergyEvse FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -132,16 +130,12 @@ func (v ChargingTargetScheduleStruct) Clone() ChargingTargetScheduleStruct {
 }
 
 // ChargingTargetScheduleStructDef describes ChargingTargetScheduleStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ChargingTargetScheduleStructDef = &spec.Struct{Name: "ChargingTargetScheduleStruct", Fields: []spec.Field{
 	{ID: 0, Name: "DayOfWeekForSequence", Type: spec.Type{Name: "TargetDayOfWeekBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: TargetDayOfWeekBitmapDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ChargingTargets", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ChargingTargetStruct", Kind: spec.KindStruct, Struct: ChargingTargetStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10", Max: &spec.Bound{Int: 10}}, Relaxed: "connectedhomeip src/app/clusters/energy-evse-server/EnergyEvseCluster.cpp:564-565 at 6170af84 (owner decision 2026-11-03, BD-chip-EVSE-TargetsServerHeld)"},
 }}
 
 // TargetDayOfWeekBitmap is the TargetDayOfWeekBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TargetDayOfWeekBitmap uint8
 
 // TargetDayOfWeekBitmap bits; a member wider than one bit is its mask.
@@ -156,8 +150,6 @@ const (
 )
 
 // TargetDayOfWeekBitmapDef describes TargetDayOfWeekBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TargetDayOfWeekBitmapDef = &spec.Bitmap{Name: "TargetDayOfWeekBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Sunday", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Monday", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -216,8 +208,6 @@ func (v ChargingTargetStruct) Clone() ChargingTargetStruct {
 }
 
 // ChargingTargetStructDef describes ChargingTargetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ChargingTargetStructDef = &spec.Struct{Name: "ChargingTargetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "TargetTimeMinutesPastMidnight", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 1439", Max: &spec.Bound{Int: 1439}}},
 	{ID: 1, Name: "TargetSoC", Type: spec.Type{Name: "percent", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "SOC, O.a+", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfName, Name: "SOC"}, {Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}}}, Constraint: spec.Constraint{Text: "max 100", Max: &spec.Bound{Int: 100}}, Default: float64(0)},
@@ -225,8 +215,6 @@ var ChargingTargetStructDef = &spec.Struct{Name: "ChargingTargetStruct", Fields:
 }}
 
 // EnergyTransferStoppedReasonEnum is the EnergyTransferStoppedReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EnergyTransferStoppedReasonEnum uint8
 
 // EnergyTransferStoppedReasonEnum values.
@@ -237,8 +225,6 @@ const (
 )
 
 // EnergyTransferStoppedReasonEnumDef describes EnergyTransferStoppedReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EnergyTransferStoppedReasonEnumDef = &spec.Enum{Name: "EnergyTransferStoppedReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "EvStopped", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "EvseStopped", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -246,8 +232,6 @@ var EnergyTransferStoppedReasonEnumDef = &spec.Enum{Name: "EnergyTransferStopped
 }}
 
 // FaultStateEnum is the FaultStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type FaultStateEnum uint8
 
 // FaultStateEnum values.
@@ -272,8 +256,6 @@ const (
 )
 
 // FaultStateEnumDef describes FaultStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var FaultStateEnumDef = &spec.Enum{Name: "FaultStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoError", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "MeterFailure", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -295,8 +277,6 @@ var FaultStateEnumDef = &spec.Enum{Name: "FaultStateEnum", Bits: 8, Values: []sp
 }}
 
 // StateEnum is the StateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StateEnum uint8
 
 // StateEnum values.
@@ -311,8 +291,6 @@ const (
 )
 
 // StateEnumDef describes StateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StateEnumDef = &spec.Enum{Name: "StateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NotPluggedIn", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "PluggedInNoDemand", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -324,8 +302,6 @@ var StateEnumDef = &spec.Enum{Name: "StateEnum", Bits: 8, Values: []spec.EnumVal
 }}
 
 // SupplyStateEnum is the SupplyStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SupplyStateEnum uint8
 
 // SupplyStateEnum values.
@@ -339,8 +315,6 @@ const (
 )
 
 // SupplyStateEnumDef describes SupplyStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SupplyStateEnumDef = &spec.Enum{Name: "SupplyStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Disabled", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "ChargingEnabled", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

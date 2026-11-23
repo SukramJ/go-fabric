@@ -40,8 +40,6 @@ const (
 )
 
 // Feature is a ApplicationLauncher FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -87,8 +85,6 @@ func (v ApplicationEPStruct) Clone() ApplicationEPStruct {
 }
 
 // ApplicationEPStructDef describes ApplicationEPStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ApplicationEPStructDef = &spec.Struct{Name: "ApplicationEPStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Application", Type: spec.Type{Name: "ApplicationStruct", Kind: spec.KindStruct, Struct: ApplicationStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Endpoint", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -117,16 +113,12 @@ func (v *ApplicationStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ApplicationStructDef describes ApplicationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ApplicationStructDef = &spec.Struct{Name: "ApplicationStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CatalogVendorId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ApplicationId", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // StatusEnum is the StatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusEnum uint8
 
 // StatusEnum values.
@@ -140,8 +132,6 @@ const (
 )
 
 // StatusEnumDef describes StatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "AppNotAvailable", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

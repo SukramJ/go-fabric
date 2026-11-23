@@ -32,8 +32,6 @@ const (
 )
 
 // Feature is a KeypadInput FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -44,8 +42,6 @@ const (
 )
 
 // CecKeyCodeEnum is the CecKeyCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CecKeyCodeEnum uint8
 
 // CecKeyCodeEnum values.
@@ -138,8 +134,6 @@ const (
 )
 
 // CecKeyCodeEnumDef describes CecKeyCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CecKeyCodeEnumDef = &spec.Enum{Name: "CecKeyCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Select", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Up", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -229,8 +223,6 @@ var CecKeyCodeEnumDef = &spec.Enum{Name: "CecKeyCodeEnum", Bits: 8, Values: []sp
 }}
 
 // StatusEnum is the StatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusEnum uint8
 
 // StatusEnum values.
@@ -241,8 +233,6 @@ const (
 )
 
 // StatusEnumDef describes StatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "UnsupportedKey", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

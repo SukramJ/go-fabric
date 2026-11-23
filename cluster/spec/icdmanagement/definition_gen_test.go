@@ -23,6 +23,16 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureCheckInProtocolSupport, FeatureUserActiveModeTrigger, FeatureLongIdleTimeSupport, FeatureDynamicSitLitSupport)
+	spectest.CheckEnum[ClientTypeEnum](t, ClientTypeEnumDef, ClientTypePermanent, ClientTypeEphemeral)
+	spectest.CheckEnum[OperatingModeEnum](t, OperatingModeEnumDef, OperatingModeSit, OperatingModeLit)
+	spectest.CheckBitmap[UserActiveModeTriggerBitmap](t, UserActiveModeTriggerBitmapDef, UserActiveModeTriggerPowerCycle, UserActiveModeTriggerSettingsMenu, UserActiveModeTriggerCustomInstruction, UserActiveModeTriggerDeviceManual, UserActiveModeTriggerActuateSensor, UserActiveModeTriggerActuateSensorSeconds, UserActiveModeTriggerActuateSensorTimes, UserActiveModeTriggerActuateSensorLightsBlink, UserActiveModeTriggerResetButton, UserActiveModeTriggerResetButtonLightsBlink, UserActiveModeTriggerResetButtonSeconds, UserActiveModeTriggerResetButtonTimes, UserActiveModeTriggerSetupButton, UserActiveModeTriggerSetupButtonSeconds, UserActiveModeTriggerSetupButtonLightsBlink, UserActiveModeTriggerSetupButtonTimes, UserActiveModeTriggerAppDefinedButton)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

@@ -64,8 +64,6 @@ const (
 )
 
 // Feature is a SmokeCoAlarm FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -75,8 +73,6 @@ const (
 )
 
 // AlarmStateEnum is the AlarmStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AlarmStateEnum uint8
 
 // AlarmStateEnum values.
@@ -87,8 +83,6 @@ const (
 )
 
 // AlarmStateEnumDef describes AlarmStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AlarmStateEnumDef = &spec.Enum{Name: "AlarmStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Normal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Warning", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -96,8 +90,6 @@ var AlarmStateEnumDef = &spec.Enum{Name: "AlarmStateEnum", Bits: 8, Values: []sp
 }}
 
 // ContaminationStateEnum is the ContaminationStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ContaminationStateEnum uint8
 
 // ContaminationStateEnum values.
@@ -109,8 +101,6 @@ const (
 )
 
 // ContaminationStateEnumDef describes ContaminationStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ContaminationStateEnumDef = &spec.Enum{Name: "ContaminationStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Normal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Low", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -119,8 +109,6 @@ var ContaminationStateEnumDef = &spec.Enum{Name: "ContaminationStateEnum", Bits:
 }}
 
 // EndOfServiceEnum is the EndOfServiceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EndOfServiceEnum uint8
 
 // EndOfServiceEnum values.
@@ -130,16 +118,12 @@ const (
 )
 
 // EndOfServiceEnumDef describes EndOfServiceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EndOfServiceEnumDef = &spec.Enum{Name: "EndOfServiceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Normal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Expired", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ExpressedStateEnum is the ExpressedStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ExpressedStateEnum uint8
 
 // ExpressedStateEnum values.
@@ -157,8 +141,6 @@ const (
 )
 
 // ExpressedStateEnumDef describes ExpressedStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ExpressedStateEnumDef = &spec.Enum{Name: "ExpressedStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Normal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "SmokeAlarm", Conformance: spec.Conformance{Text: "SMOKE", Op: spec.ConfName, Name: "SMOKE"}},
@@ -173,8 +155,6 @@ var ExpressedStateEnumDef = &spec.Enum{Name: "ExpressedStateEnum", Bits: 8, Valu
 }}
 
 // MuteStateEnum is the MuteStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MuteStateEnum uint8
 
 // MuteStateEnum values.
@@ -184,16 +164,12 @@ const (
 )
 
 // MuteStateEnumDef describes MuteStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MuteStateEnumDef = &spec.Enum{Name: "MuteStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NotMuted", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Muted", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // SensitivityEnum is the SensitivityEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SensitivityEnum uint8
 
 // SensitivityEnum values.
@@ -204,8 +180,6 @@ const (
 )
 
 // SensitivityEnumDef describes SensitivityEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SensitivityEnumDef = &spec.Enum{Name: "SensitivityEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "High", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "Standard", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

@@ -45,8 +45,6 @@ const (
 )
 
 // Feature is a GroupKeyManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -78,8 +76,6 @@ func (v *GroupcastAdoptionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // GroupcastAdoptionStructDef describes GroupcastAdoptionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GroupcastAdoptionStructDef = &spec.Struct{Name: "GroupcastAdoptionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "GroupcastAdopted", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 254, Name: "FabricIndex", Type: spec.Type{Name: "FabricIndex", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 254", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 254}}},
@@ -137,8 +133,6 @@ func (v GroupInfoMapStruct) Clone() GroupInfoMapStruct {
 }
 
 // GroupInfoMapStructDef describes GroupInfoMapStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GroupInfoMapStructDef = &spec.Struct{Name: "GroupInfoMapStruct", Fields: []spec.Field{
 	{ID: 1, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 2, Name: "Endpoints", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -172,8 +166,6 @@ func (v *GroupKeyMapStruct) DecodeTLV(n spec.Node) error {
 }
 
 // GroupKeyMapStructDef describes GroupKeyMapStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GroupKeyMapStructDef = &spec.Struct{Name: "GroupKeyMapStruct", Fields: []spec.Field{
 	{ID: 1, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 2, Name: "GroupKeySetId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 65535", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 65535}}},
@@ -181,8 +173,6 @@ var GroupKeyMapStructDef = &spec.Struct{Name: "GroupKeyMapStruct", Fields: []spe
 }}
 
 // GroupKeyMulticastPolicyEnum is the GroupKeyMulticastPolicyEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type GroupKeyMulticastPolicyEnum uint8
 
 // GroupKeyMulticastPolicyEnum values.
@@ -192,16 +182,12 @@ const (
 )
 
 // GroupKeyMulticastPolicyEnumDef describes GroupKeyMulticastPolicyEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GroupKeyMulticastPolicyEnumDef = &spec.Enum{Name: "GroupKeyMulticastPolicyEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "PerGroupId", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "AllNodes", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // GroupKeySecurityPolicyEnum is the GroupKeySecurityPolicyEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type GroupKeySecurityPolicyEnum uint8
 
 // GroupKeySecurityPolicyEnum values.
@@ -211,8 +197,6 @@ const (
 )
 
 // GroupKeySecurityPolicyEnumDef describes GroupKeySecurityPolicyEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GroupKeySecurityPolicyEnumDef = &spec.Enum{Name: "GroupKeySecurityPolicyEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "TrustFirst", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "CacheAndSync", Conformance: spec.Conformance{Text: "P, CS", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfName, Name: "CS"}}}},
@@ -311,8 +295,6 @@ func (v GroupKeySetStruct) Clone() GroupKeySetStruct {
 }
 
 // GroupKeySetStructDef describes GroupKeySetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GroupKeySetStructDef = &spec.Struct{Name: "GroupKeySetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "GroupKeySetId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "GroupKeySecurityPolicy", Type: spec.Type{Name: "GroupKeySecurityPolicyEnum", Kind: spec.KindEnum, Bits: 8, Enum: GroupKeySecurityPolicyEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

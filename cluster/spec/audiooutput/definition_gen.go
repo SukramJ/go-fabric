@@ -38,8 +38,6 @@ const (
 )
 
 // Feature is a AudioOutput FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -73,8 +71,6 @@ func (v *OutputInfoStruct) DecodeTLV(n spec.Node) error {
 }
 
 // OutputInfoStructDef describes OutputInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OutputInfoStructDef = &spec.Struct{Name: "OutputInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Index", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "OutputType", Type: spec.Type{Name: "OutputTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: OutputTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
@@ -82,8 +78,6 @@ var OutputInfoStructDef = &spec.Struct{Name: "OutputInfoStruct", Fields: []spec.
 }}
 
 // OutputTypeEnum is the OutputTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OutputTypeEnum uint8
 
 // OutputTypeEnum values.
@@ -97,8 +91,6 @@ const (
 )
 
 // OutputTypeEnumDef describes OutputTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OutputTypeEnumDef = &spec.Enum{Name: "OutputTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Hdmi", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Bt", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

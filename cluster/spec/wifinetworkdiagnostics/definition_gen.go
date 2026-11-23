@@ -55,8 +55,6 @@ const (
 )
 
 // Feature is a WiFiNetworkDiagnostics FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -66,8 +64,6 @@ const (
 )
 
 // AssociationFailureCauseEnum is the AssociationFailureCauseEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AssociationFailureCauseEnum uint8
 
 // AssociationFailureCauseEnum values.
@@ -79,8 +75,6 @@ const (
 )
 
 // AssociationFailureCauseEnumDef describes AssociationFailureCauseEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AssociationFailureCauseEnumDef = &spec.Enum{Name: "AssociationFailureCauseEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "AssociationFailed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -89,8 +83,6 @@ var AssociationFailureCauseEnumDef = &spec.Enum{Name: "AssociationFailureCauseEn
 }}
 
 // ConnectionStatusEnum is the ConnectionStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ConnectionStatusEnum uint8
 
 // ConnectionStatusEnum values.
@@ -100,16 +92,12 @@ const (
 )
 
 // ConnectionStatusEnumDef describes ConnectionStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ConnectionStatusEnumDef = &spec.Enum{Name: "ConnectionStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Connected", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "NotConnected", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // SecurityTypeEnum is the SecurityTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SecurityTypeEnum uint8
 
 // SecurityTypeEnum values.
@@ -123,8 +111,6 @@ const (
 )
 
 // SecurityTypeEnumDef describes SecurityTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SecurityTypeEnumDef = &spec.Enum{Name: "SecurityTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "None", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -135,8 +121,6 @@ var SecurityTypeEnumDef = &spec.Enum{Name: "SecurityTypeEnum", Bits: 8, Values: 
 }}
 
 // WiFiVersionEnum is the WiFiVersionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type WiFiVersionEnum uint8
 
 // WiFiVersionEnum values.
@@ -151,8 +135,6 @@ const (
 )
 
 // WiFiVersionEnumDef describes WiFiVersionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WiFiVersionEnumDef = &spec.Enum{Name: "WiFiVersionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "A", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "B", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

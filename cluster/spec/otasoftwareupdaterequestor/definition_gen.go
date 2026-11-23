@@ -48,13 +48,9 @@ const (
 )
 
 // Feature is a OtaSoftwareUpdateRequestor FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // AnnouncementReasonEnum is the AnnouncementReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AnnouncementReasonEnum uint8
 
 // AnnouncementReasonEnum values.
@@ -65,8 +61,6 @@ const (
 )
 
 // AnnouncementReasonEnumDef describes AnnouncementReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AnnouncementReasonEnumDef = &spec.Enum{Name: "AnnouncementReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "SimpleAnnouncement", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "UpdateAvailable", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -74,8 +68,6 @@ var AnnouncementReasonEnumDef = &spec.Enum{Name: "AnnouncementReasonEnum", Bits:
 }}
 
 // ChangeReasonEnum is the ChangeReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ChangeReasonEnum uint8
 
 // ChangeReasonEnum values.
@@ -88,8 +80,6 @@ const (
 )
 
 // ChangeReasonEnumDef describes ChangeReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ChangeReasonEnumDef = &spec.Enum{Name: "ChangeReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -124,8 +114,6 @@ func (v *ProviderLocation) DecodeTLV(n spec.Node) error {
 }
 
 // ProviderLocationDef describes ProviderLocation.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ProviderLocationDef = &spec.Struct{Name: "ProviderLocation", Fields: []spec.Field{
 	{ID: 1, Name: "ProviderNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 2, Name: "Endpoint", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -133,8 +121,6 @@ var ProviderLocationDef = &spec.Struct{Name: "ProviderLocation", Fields: []spec.
 }}
 
 // UpdateStateEnum is the UpdateStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type UpdateStateEnum uint8
 
 // UpdateStateEnum values.
@@ -151,8 +137,6 @@ const (
 )
 
 // UpdateStateEnumDef describes UpdateStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var UpdateStateEnumDef = &spec.Enum{Name: "UpdateStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Idle", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

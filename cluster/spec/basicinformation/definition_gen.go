@@ -62,8 +62,6 @@ const (
 )
 
 // Feature is a BasicInformation FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // CapabilityMinimaStruct is the CapabilityMinimaStruct struct.
@@ -137,8 +135,6 @@ func (v CapabilityMinimaStruct) Clone() CapabilityMinimaStruct {
 }
 
 // CapabilityMinimaStructDef describes CapabilityMinimaStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CapabilityMinimaStructDef = &spec.Struct{Name: "CapabilityMinimaStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CaseSessionsPerFabric", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "3 to 10000", Min: &spec.Bound{Int: 3}, Max: &spec.Bound{Int: 10000}}, Default: float64(3)},
 	{ID: 1, Name: "SubscriptionsPerFabric", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "3 to 10000", Min: &spec.Bound{Int: 3}, Max: &spec.Bound{Int: 10000}}, Default: float64(3)},
@@ -149,8 +145,6 @@ var CapabilityMinimaStructDef = &spec.Struct{Name: "CapabilityMinimaStruct", Fie
 }}
 
 // ColorEnum is the ColorEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ColorEnum uint8
 
 // ColorEnum values.
@@ -179,8 +173,6 @@ const (
 )
 
 // ColorEnumDef describes ColorEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ColorEnumDef = &spec.Enum{Name: "ColorEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Black", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Navy", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -228,16 +220,12 @@ func (v *ProductAppearanceStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ProductAppearanceStructDef describes ProductAppearanceStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ProductAppearanceStructDef = &spec.Struct{Name: "ProductAppearanceStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Finish", Type: spec.Type{Name: "ProductFinishEnum", Kind: spec.KindEnum, Bits: 8, Enum: ProductFinishEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "PrimaryColor", Type: spec.Type{Name: "ColorEnum", Kind: spec.KindEnum, Bits: 8, Enum: ColorEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 }}
 
 // ProductFinishEnum is the ProductFinishEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ProductFinishEnum uint8
 
 // ProductFinishEnum values.
@@ -251,8 +239,6 @@ const (
 )
 
 // ProductFinishEnumDef describes ProductFinishEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ProductFinishEnumDef = &spec.Enum{Name: "ProductFinishEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Other", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Matte", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

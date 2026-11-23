@@ -23,6 +23,21 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeaturePositioning, FeatureMotionLatching, FeatureUnit, FeatureLimitation, FeatureSpeed, FeatureTranslation, FeatureRotation, FeatureModulation)
+	spectest.CheckEnum[ClosureUnitEnum](t, ClosureUnitEnumDef, ClosureUnitMillimeter, ClosureUnitDegree)
+	spectest.CheckEnum[ThreeLevelAutoEnum](t, ThreeLevelAutoEnumDef, ThreeLevelAutoAuto, ThreeLevelAutoLow, ThreeLevelAutoMedium, ThreeLevelAutoHigh)
+	spectest.CheckBitmap[LatchControlModesBitmap](t, LatchControlModesBitmapDef, LatchControlModesRemoteLatching, LatchControlModesRemoteUnlatching)
+	spectest.CheckEnum[ModulationTypeEnum](t, ModulationTypeEnumDef, ModulationTypeSlatsOrientation, ModulationTypeSlatsOpenwork, ModulationTypeStripesAlignment, ModulationTypeOpacity, ModulationTypeVentilation)
+	spectest.CheckEnum[OverflowEnum](t, OverflowEnumDef, OverflowNoOverflow, OverflowInside, OverflowOutside, OverflowTopInside, OverflowTopOutside, OverflowBottomInside, OverflowBottomOutside, OverflowLeftInside, OverflowLeftOutside, OverflowRightInside, OverflowRightOutside)
+	spectest.CheckEnum[RotationAxisEnum](t, RotationAxisEnumDef, RotationAxisLeft, RotationAxisCenteredVertical, RotationAxisLeftAndRight, RotationAxisRight, RotationAxisTop, RotationAxisCenteredHorizontal, RotationAxisTopAndBottom, RotationAxisBottom, RotationAxisLeftBarrier, RotationAxisLeftAndRightBarriers, RotationAxisRightBarrier)
+	spectest.CheckEnum[StepDirectionEnum](t, StepDirectionEnumDef, StepDirectionDecrease, StepDirectionIncrease)
+	spectest.CheckEnum[TranslationDirectionEnum](t, TranslationDirectionEnumDef, TranslationDirectionDownward, TranslationDirectionUpward, TranslationDirectionVerticalMask, TranslationDirectionVerticalSymmetry, TranslationDirectionLeftward, TranslationDirectionRightward, TranslationDirectionHorizontalMask, TranslationDirectionHorizontalSymmetry, TranslationDirectionForward, TranslationDirectionBackward, TranslationDirectionDepthMask, TranslationDirectionDepthSymmetry)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

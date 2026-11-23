@@ -17,6 +17,7 @@ pseudo-version of `main`.
 
 ### Added
 
+- `cluster/spec/spectest`: `CheckFeatures`, `CheckEnum` and `CheckBitmap` hold a cluster package's Feature constants against its definition's feature bits and an enum's or bitmap's constants against its descriptor; every generated cluster test calls them (`TestConstantsMatchTheDefinition`). The generated `cluster/spec` code no longer carries a `fabric:reachable` annotation (review II, R2-C2-test-2802, decision R3-3).
 - `cluster/core`: `ScenesConfig.ListFabrics`, the fabric list for FabricSceneInfo with an error result; a fabric-list error answers the FabricSceneInfo read FAILURE, as a scene table the store cannot load does. Set, it is used and `Fabrics` is not (review II, R2-C2-err-0455, decision 527).
 - `contract`, `endpoint`, `cluster/measurement`: `contract.StatefulServer`, beside `contract.ClusterServer` — a materialised cluster server that opts in with `MatterKeepInstance()` is kept by its endpoint across `ClusterServers` calls and reassemblies for as long as the endpoint and its source stay; `measurement.SoilMeasurementServer` opts in, so its last reading inside the limits survives a materialisation (review II, R2-C2-store-1453, decisions 526, 540).
 - `diagevent`: `diagevent.DetailPeer`, `diagevent.DetailSessionID` and `diagevent.DetailFabricIndex`, the detail keys of the session events in the diagnostic trace; `bridge` and `node` write them under these names (review II, R2-C2-sec-2451).

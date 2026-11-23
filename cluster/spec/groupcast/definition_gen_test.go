@@ -23,6 +23,16 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureListener, FeatureSender, FeaturePerGroup)
+	spectest.CheckEnum[GroupcastTestingEnum](t, GroupcastTestingEnumDef, GroupcastTestingDisableTesting, GroupcastTestingEnableListenerTesting, GroupcastTestingEnableSenderTesting)
+	spectest.CheckEnum[GroupcastTestResultEnum](t, GroupcastTestResultEnumDef, GroupcastTestResultSuccess, GroupcastTestResultGeneralError, GroupcastTestResultMessageReplay, GroupcastTestResultFailedAuth, GroupcastTestResultNoAvailableKey, GroupcastTestResultSendFailure)
+	spectest.CheckEnum[MulticastAddrPolicyEnum](t, MulticastAddrPolicyEnumDef, MulticastAddrPolicyIanaAddr, MulticastAddrPolicyPerGroup)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

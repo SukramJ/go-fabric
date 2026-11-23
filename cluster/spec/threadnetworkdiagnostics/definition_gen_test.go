@@ -23,6 +23,16 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeaturePacketCounts, FeatureErrorCounts, FeatureMleCounts, FeatureMacCounts)
+	spectest.CheckEnum[ConnectionStatusEnum](t, ConnectionStatusEnumDef, ConnectionStatusConnected, ConnectionStatusNotConnected)
+	spectest.CheckEnum[NetworkFaultEnum](t, NetworkFaultEnumDef, NetworkFaultUnspecified, NetworkFaultLinkDown, NetworkFaultHardwareFailure, NetworkFaultNetworkJammed)
+	spectest.CheckEnum[RoutingRoleEnum](t, RoutingRoleEnumDef, RoutingRoleUnspecified, RoutingRoleUnassigned, RoutingRoleSleepyEndDevice, RoutingRoleEndDevice, RoutingRoleReed, RoutingRoleRouter, RoutingRoleLeader)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

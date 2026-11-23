@@ -23,6 +23,16 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureTermsAndConditions, FeatureNetworkRecovery)
+	spectest.CheckEnum[CommissioningErrorEnum](t, CommissioningErrorEnumDef, CommissioningErrorOk, CommissioningErrorValueOutsideRange, CommissioningErrorInvalidAuthentication, CommissioningErrorNoFailSafe, CommissioningErrorBusyWithOtherAdmin, CommissioningErrorRequiredTcNotAccepted, CommissioningErrorTcAcknowledgementsNotReceived, CommissioningErrorTcMinVersionNotMet)
+	spectest.CheckEnum[NetworkRecoveryReasonEnum](t, NetworkRecoveryReasonEnumDef, NetworkRecoveryReasonUnspecified, NetworkRecoveryReasonAuth, NetworkRecoveryReasonVisibility)
+	spectest.CheckEnum[RegulatoryLocationTypeEnum](t, RegulatoryLocationTypeEnumDef, RegulatoryLocationTypeIndoor, RegulatoryLocationTypeOutdoor, RegulatoryLocationTypeIndoorOutdoor)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

@@ -35,8 +35,6 @@ const (
 )
 
 // Feature is a MeterIdentification FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -45,8 +43,6 @@ const (
 )
 
 // MeterTypeEnum is the MeterTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MeterTypeEnum uint8
 
 // MeterTypeEnum values.
@@ -57,8 +53,6 @@ const (
 )
 
 // MeterTypeEnumDef describes MeterTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MeterTypeEnumDef = &spec.Enum{Name: "MeterTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Utility", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Private", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -113,8 +107,6 @@ func (v PowerThresholdStruct) Clone() PowerThresholdStruct {
 }
 
 // PowerThresholdStructDef describes PowerThresholdStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PowerThresholdStructDef = &spec.Struct{Name: "PowerThresholdStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PowerThreshold", Type: spec.Type{Name: "power-mW", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "O.b", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: false, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
 	{ID: 1, Name: "ApparentPowerThreshold", Type: spec.Type{Name: "power-mVA", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "O.b", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: false, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
@@ -122,8 +114,6 @@ var PowerThresholdStructDef = &spec.Struct{Name: "PowerThresholdStruct", Fields:
 }}
 
 // PowerThresholdSourceEnum is the PowerThresholdSourceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PowerThresholdSourceEnum uint8
 
 // PowerThresholdSourceEnum values.
@@ -134,8 +124,6 @@ const (
 )
 
 // PowerThresholdSourceEnumDef describes PowerThresholdSourceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PowerThresholdSourceEnumDef = &spec.Enum{Name: "PowerThresholdSourceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Contract", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Regulator", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

@@ -41,8 +41,6 @@ const (
 )
 
 // Feature is a ModeSelect FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -92,8 +90,6 @@ func (v ModeOptionStruct) Clone() ModeOptionStruct {
 }
 
 // ModeOptionStructDef describes ModeOptionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ModeOptionStructDef = &spec.Struct{Name: "ModeOptionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Label", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Fixed: true}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
 	{ID: 1, Name: "Mode", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Fixed: true}},
@@ -123,16 +119,12 @@ func (v *SemanticTagStruct) DecodeTLV(n spec.Node) error {
 }
 
 // SemanticTagStructDef describes SemanticTagStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SemanticTagStructDef = &spec.Struct{Name: "SemanticTagStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MfgCode", Type: spec.Type{Name: "vendor-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Fixed: true}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 1, Name: "Value", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Fixed: true}},
 }}
 
 // Namespace is the namespace enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Namespace uint8
 
 // Namespace values.
@@ -168,8 +160,6 @@ const (
 )
 
 // NamespaceDef describes namespace.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NamespaceDef = &spec.Enum{Name: "namespace", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "CommonClosure"},
 	{Value: 2, Name: "CommonCompassDirection"},

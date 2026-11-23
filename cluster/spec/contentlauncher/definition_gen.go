@@ -39,8 +39,6 @@ const (
 )
 
 // Feature is a ContentLauncher FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -75,8 +73,6 @@ func (v *AdditionalInfoStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AdditionalInfoStructDef describes AdditionalInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AdditionalInfoStructDef = &spec.Struct{Name: "AdditionalInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 256", Max: &spec.Bound{Int: 256}}},
 	{ID: 1, Name: "Value", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8192", Max: &spec.Bound{Int: 8192}}},
@@ -160,8 +156,6 @@ func (v BrandingInformationStruct) Clone() BrandingInformationStruct {
 }
 
 // BrandingInformationStructDef describes BrandingInformationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BrandingInformationStructDef = &spec.Struct{Name: "BrandingInformationStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ProviderName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 256", Max: &spec.Bound{Int: 256}}},
 	{ID: 1, Name: "Background", Type: spec.Type{Name: "StyleInformationStruct", Kind: spec.KindStruct, Struct: StyleInformationStructDef}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -226,8 +220,6 @@ func (v StyleInformationStruct) Clone() StyleInformationStruct {
 }
 
 // StyleInformationStructDef describes StyleInformationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StyleInformationStructDef = &spec.Struct{Name: "StyleInformationStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ImageUrl", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8192", Max: &spec.Bound{Int: 8192}}},
 	{ID: 1, Name: "Color", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "7, 9", Parts: []spec.Constraint{{Text: "7", Value: &spec.Bound{Int: 7}}, {Text: "9", Value: &spec.Bound{Int: 9}}}}},
@@ -260,8 +252,6 @@ func (v *DimensionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DimensionStructDef describes DimensionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DimensionStructDef = &spec.Struct{Name: "DimensionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Width", Type: spec.Type{Name: "double", Kind: spec.KindFloat64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Height", Type: spec.Type{Name: "double", Kind: spec.KindFloat64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -269,8 +259,6 @@ var DimensionStructDef = &spec.Struct{Name: "DimensionStruct", Fields: []spec.Fi
 }}
 
 // MetricTypeEnum is the MetricTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MetricTypeEnum uint8
 
 // MetricTypeEnum values.
@@ -280,8 +268,6 @@ const (
 )
 
 // MetricTypeEnumDef describes MetricTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MetricTypeEnumDef = &spec.Enum{Name: "MetricTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Pixels", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Percentage", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -325,8 +311,6 @@ func (v ContentSearchStruct) Clone() ContentSearchStruct {
 }
 
 // ContentSearchStructDef describes ContentSearchStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ContentSearchStructDef = &spec.Struct{Name: "ContentSearchStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ParameterList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ParameterStruct", Kind: spec.KindStruct, Struct: ParameterStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
@@ -379,8 +363,6 @@ func (v ParameterStruct) Clone() ParameterStruct {
 }
 
 // ParameterStructDef describes ParameterStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ParameterStructDef = &spec.Struct{Name: "ParameterStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Type", Type: spec.Type{Name: "ParameterEnum", Kind: spec.KindEnum, Bits: 8, Enum: ParameterEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Value", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 1024", Max: &spec.Bound{Int: 1024}}},
@@ -388,8 +370,6 @@ var ParameterStructDef = &spec.Struct{Name: "ParameterStruct", Fields: []spec.Fi
 }}
 
 // ParameterEnum is the ParameterEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ParameterEnum uint8
 
 // ParameterEnum values.
@@ -414,8 +394,6 @@ const (
 )
 
 // ParameterEnumDef describes ParameterEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ParameterEnumDef = &spec.Enum{Name: "ParameterEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Actor", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Channel", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -500,8 +478,6 @@ func (v PlaybackPreferencesStruct) Clone() PlaybackPreferencesStruct {
 }
 
 // PlaybackPreferencesStructDef describes PlaybackPreferencesStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PlaybackPreferencesStructDef = &spec.Struct{Name: "PlaybackPreferencesStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PlaybackPosition", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "AS", Op: spec.ConfName, Name: "AS"}, Quality: spec.Quality{Nullable: true}},
 	{ID: 1, Name: "TextTrack", Type: spec.Type{Name: "TrackPreferenceStruct", Kind: spec.KindStruct, Struct: TrackPreferenceStructDef}, Conformance: spec.Conformance{Text: "TT", Op: spec.ConfName, Name: "TT"}, Quality: spec.Quality{Nullable: true}},
@@ -563,8 +539,6 @@ func (v TrackPreferenceStruct) Clone() TrackPreferenceStruct {
 }
 
 // TrackPreferenceStructDef describes TrackPreferenceStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TrackPreferenceStructDef = &spec.Struct{Name: "TrackPreferenceStruct", Fields: []spec.Field{
 	{ID: 0, Name: "LanguageCode", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
 	{ID: 1, Name: "Characteristics", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "MediaPlayback.CharacteristicEnum", Kind: spec.KindUint, Bits: 8}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
@@ -572,8 +546,6 @@ var TrackPreferenceStructDef = &spec.Struct{Name: "TrackPreferenceStruct", Field
 }}
 
 // StatusEnum is the StatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusEnum uint8
 
 // StatusEnum values.
@@ -586,8 +558,6 @@ const (
 )
 
 // StatusEnumDef describes StatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "UrlNotAvailable", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -597,8 +567,6 @@ var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumV
 }}
 
 // SupportedProtocolsBitmap is the SupportedProtocolsBitmap map32.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SupportedProtocolsBitmap uint32
 
 // SupportedProtocolsBitmap bits; a member wider than one bit is its mask.
@@ -608,8 +576,6 @@ const (
 )
 
 // SupportedProtocolsBitmapDef describes SupportedProtocolsBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SupportedProtocolsBitmapDef = &spec.Bitmap{Name: "SupportedProtocolsBitmap", Bits: 32, Members: []spec.BitmapMember{
 	{Name: "Dash", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Hls", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
