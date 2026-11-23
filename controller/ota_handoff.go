@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"thingfabric.dev/go-fabric/controller/softwareupdate"
 )
@@ -30,6 +31,34 @@ type otaHandoffs struct {
 	pending map[softwareupdate.Peer][]*otaHandoff // per peer, in hand-off order
 	open    int                                   // hand-offs not yet released
 	idle    chan struct{}                         // closed when open reaches 0 while Close waits
+
+	// lastPeers holds, per node id, the address that node's hooks hand
+	// NodeDeleted (ota.go otaHooks): set by every hook that saw the node
+	// with an address, and seeded by startOTA for the nodes the registry
+	// restored, so a node no hook saw is still forgotten (review II,
+	// R2-C2-fsm-2302).
+	lastPeers sync.Map // string → *atomic.Pointer[softwareupdate.Peer]
+}
+
+// track registers the address cell of node id's hooks.
+func (h *otaHandoffs) track(id string) *atomic.Pointer[softwareupdate.Peer] {
+	cell := &atomic.Pointer[softwareupdate.Peer]{}
+	h.lastPeers.Store(id, cell)
+	return cell
+}
+
+// untrack drops cell, node id's, once its Deleted ran.
+func (h *otaHandoffs) untrack(id string, cell *atomic.Pointer[softwareupdate.Peer]) {
+	h.lastPeers.CompareAndDelete(id, cell)
+}
+
+// seed gives node id's cell the address p unless a hook set one already.
+func (h *otaHandoffs) seed(id string, p softwareupdate.Peer) {
+	if v, ok := h.lastPeers.Load(id); ok {
+		if cell, ok := v.(*atomic.Pointer[softwareupdate.Peer]); ok {
+			cell.CompareAndSwap(nil, &p)
+		}
+	}
 }
 
 // otaHandoff is one NodeDeleted call; released once it returned or

@@ -6,7 +6,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"time"
 
 	"thingfabric.dev/go-fabric/bdx"
@@ -122,10 +121,19 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 	return nil
 }
 
-// startOTA retires a former own node and starts the manager.
+// startOTA retires a former own node, seeds the address NodeDeleted gets
+// for every node the registry holds (otaHandoffs.lastPeers) and starts the
+// manager.
 func (c *Controller) startOTA(ctx context.Context) error {
 	if err := c.retireOwnNode(ctx, c.st, c.log); err != nil {
 		return err
+	}
+	if r := c.registry.Load(); r != nil {
+		for _, n := range r.Nodes() {
+			if p, ok := n.PeerAddress(); ok {
+				c.otaHandoffs.seed(n.ID(), p)
+			}
+		}
 	}
 	c.ota.Load().Start()
 	return nil
@@ -288,8 +296,9 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 		}
 		// lastPeer is the node's address as the last hook saw it: Deleted
 		// runs once the registry no longer holds the node, so nodeOf is nil
-		// there.
-		var lastPeer atomic.Pointer[softwareupdate.Peer]
+		// there. A node no hook saw — restored and never started, or
+		// unavailable — has it from startOTA's seed (otaHandoffs.lastPeers).
+		lastPeer := c.otaHandoffs.track(id)
 		seen := func(n *client.Node) {
 			if p, ok := n.PeerAddress(); ok {
 				lastPeer.Store(&p)
@@ -314,6 +323,7 @@ func (c *Controller) otaHooks(user func(id string) client.Hooks) func(id string)
 		// not wait for the one running. Close waits for it within its ctx
 		// (otaHandoffs).
 		h.Deleted = func() {
+			c.otaHandoffs.untrack(id, lastPeer)
 			if p := lastPeer.Load(); p != nil {
 				c.otaNodeDeleted(*p)
 			}
