@@ -6,9 +6,10 @@ package node_test
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
-	"time"
 
 	"thingfabric.dev/go-fabric/cluster/spec/binding"
 	"thingfabric.dev/go-fabric/device"
@@ -25,6 +26,24 @@ func lightSwitch(t *testing.T, key string) *device.OnOffLightSwitch {
 		t.Fatal(err)
 	}
 	return sw
+}
+
+// goroutineWaitsIn reports whether a goroutine whose stack holds frame is
+// blocked — on a lock, a channel, a select — rather than running,
+// runnable or in a system call: read from the runtime's own stack dump.
+func goroutineWaitsIn(frame string) bool {
+	buf := make([]byte, 1<<20)
+	for _, g := range strings.Split(string(buf[:runtime.Stack(buf, true)]), "\n\n") {
+		header, _, _ := strings.Cut(g, "\n")
+		_, state, _ := strings.Cut(header, " [")
+		if !strings.Contains(g, frame) {
+			continue
+		}
+		if !strings.HasPrefix(state, "running") && !strings.HasPrefix(state, "runnable") && !strings.HasPrefix(state, "syscall") {
+			return true
+		}
+	}
+	return false
 }
 
 // TestBindingSyncFollowsTheNewestTopology (review II, R3-conc-3752): a
@@ -48,11 +67,19 @@ func TestBindingSyncFollowsTheNewestTopology(t *testing.T) {
 		once = true
 		go func() { added <- n.Aggregator().Add(ctx, lightSwitch(t, "second")) }()
 		// The Add's own sync runs now; a sync that waits for Start's lets
-		// the Add finish after it instead.
-		select {
-		case err := <-added:
-			added <- err
-		case <-time.After(300 * time.Millisecond):
+		// the Add finish after it instead: wait until the Add returned or
+		// waits on something — no wall-clock wait.
+		for {
+			select {
+			case err := <-added:
+				added <- err
+				return
+			default:
+			}
+			if goroutineWaitsIn("node.(*Aggregator).Add(") {
+				return
+			}
+			runtime.Gosched()
 		}
 	})
 	if err := n.Start(ctx); err != nil {

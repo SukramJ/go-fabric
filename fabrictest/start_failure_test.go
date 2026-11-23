@@ -219,12 +219,15 @@ func TestStartGivenUpLeavesTheBuildCountOnce(t *testing.T) {
 	if err := d.Start(short); err == nil {
 		t.Fatal("Start whose context ended after the build succeeded")
 	}
-	// The callback Site.Run gave up on may still run: watch the count
-	// for a while — it must not go below zero.
-	for deadline := time.Now().Add(500 * time.Millisecond); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
-		if got := group.Snapshot()[inflight.NodeBuild]; got != 0 {
-			t.Fatalf("node.build count %d after the failed Start, want 0", got)
-		}
+	// The callback Site.Run gave up on may still run: once the site is
+	// quiet it ran (its goroutine was started before Run gave up, and
+	// leaving the count is its first step), and the count must be zero,
+	// not below it.
+	if err := site.Settle(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := group.Snapshot()[inflight.NodeBuild]; got != 0 {
+		t.Fatalf("node.build count %d after the failed Start, want 0", got)
 	}
 	if err := d.Start(ctx); err != nil {
 		t.Fatalf("Start after the failed Start: %v", err)
