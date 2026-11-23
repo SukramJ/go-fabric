@@ -378,7 +378,8 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 // eraseDescendant). A key no partition holds and nothing is stored for is
 // no error; a key another partition holds is [ErrUnknownKey], and so is a
 // part key another endpoint, of any partition, serves: the part is that
-// endpoint's, and a Forget of it changes nothing (decision 567). A key
+// endpoint's, and a Forget of it changes nothing (decision 567; in a
+// [Batch] judged against the batch's end state, decision 585). A key
 // the specification level withheld loses its withheld record in
 // [Node.Surface].
 func (a *Aggregator) Forget(ctx context.Context, key device.SourceKey) error {
@@ -398,8 +399,14 @@ func (p *Partition) Forget(ctx context.Context, key device.SourceKey) error {
 // taken by a different device the batch adds, before or after the
 // Forget, and the erasure then spares that device's endpoint
 // ([Aggregator.servedInErasure]); the forgotten device added again starts
-// new with its parts.
+// new with its parts. A Forget of a key another endpoint serves is held
+// and judged once fn returned: refused with [ErrUnknownKey], from
+// [Partition.Batch], only if another endpoint still serves it ([Batch],
+// decision 585).
 func (b *Batch) Forget(key device.SourceKey) error {
+	if b.isDone() {
+		return ErrBatchDone
+	}
 	if key == nil {
 		return ErrNoStableKey
 	}
@@ -410,29 +417,69 @@ func (b *Batch) Forget(key device.SourceKey) error {
 		return err
 	}
 	a.mu.Lock()
+	defer a.mu.Unlock()
+	if b.done {
+		return ErrBatchDone
+	}
 	part, i := a.findLocked(k)
 	if part != nil && part.scope != b.scope {
-		a.mu.Unlock()
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
 	var removed Endpoint
 	if part != nil {
 		removed = part.eps[i]
 	}
-	// A part key another endpoint serves is that endpoint's: refused as
-	// a key another partition holds is, before anything changed (review
-	// II, R3-store-3702 edge, decision 567).
+	// A part key another endpoint serves is that endpoint's (review II,
+	// R3-store-3702 edge, decision 567) — judged against the batch's end
+	// state: held, and refused after fn only if another endpoint still
+	// serves it (decision 585), so a Remove or Forget of the owner before
+	// or after gives the same outcome.
 	if a.servesExceptLocked(k, removed) {
-		a.mu.Unlock()
-		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
+		b.pending = append(b.pending, pendingCall{kind: heldForget, key: k, reserved: reserved})
+		return nil
 	}
-	// A take of k the batch holds (decision 582) is dropped as an applied
-	// one would be.
-	b.dropPendingLocked(k)
+	b.forgetLocked(k, reserved, part, i)
+	return nil
+}
+
+// commitForgetLocked judges a Forget the batch held against the set fn
+// left: refused with [ErrUnknownKey] while another endpoint serves its
+// key, applied as at its call otherwise; a.mu is held.
+func (b *Batch) commitForgetLocked(t pendingCall) error {
+	a := b.a
+	part, i := a.findLocked(t.key)
+	if part != nil && part.scope != b.scope {
+		return fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
+	}
+	var removed Endpoint
 	if part != nil {
-		b.dropLocked(part, i, k)
+		removed = part.eps[i]
 	}
-	a.mu.Unlock()
+	if a.servesExceptLocked(t.key, removed) {
+		return fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
+	}
+	b.forgetLocked(t.key, t.reserved, part, i)
+	return nil
+}
+
+// forgetLocked forgets k: the endpoint at i of part (nil: the set holds
+// no k) is dropped, k's withheld record too, and its erasure is queued
+// with reserved, the tree the store reserved for k; a.mu is held.
+func (b *Batch) forgetLocked(k string, reserved []string, part *partition, i int) {
+	a := b.a
+	var removed Endpoint
+	if part != nil {
+		removed = part.eps[i]
+		// A held Replace of k goes with the endpoint; a held Add of k
+		// stays, judged after fn as if added after the Forget ([Batch],
+		// decision 585).
+		b.dropPendingLocked(k, heldReplace)
+		b.dropLocked(part, i, k)
+	} else {
+		// A held Add of k the set does not hold (decision 582) is
+		// dropped as an applied one would be.
+		b.dropPendingLocked(k, heldAdd)
+	}
 	// A device the level withheld has no endpoint and no number, only
 	// its record in the surface report; Forget drops that too.
 	a.n.dropWithheld(k)
@@ -450,7 +497,6 @@ func (b *Batch) Forget(key device.SourceKey) error {
 		op.tree = slices.Compact(slices.Sorted(slices.Values(tree)))
 	}
 	b.ops = append(b.ops, op)
-	return nil
 }
 
 // splitErasures splits a batch's reservation ops into the ones applied
