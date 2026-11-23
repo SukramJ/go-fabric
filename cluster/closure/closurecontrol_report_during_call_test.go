@@ -12,7 +12,7 @@ import (
 	"thingfabric.dev/go-fabric/cluster/wire"
 )
 
-// reportingMover reports through report while its MoveTo, Latch or
+// reportingMover reports through report while its MoveTo, Latch, Stop or
 // Calibrate runs: inline, as a fast or Instantaneous drive does before it
 // returns, or from another goroutine the call waits for, as a bridged
 // drive's event loop does while its RPC is in flight.
@@ -41,7 +41,10 @@ func (m *reportingMover) MoveTo(context.Context, closuredef.TargetPositionEnum) 
 	return nil
 }
 
-func (m *reportingMover) Stop(context.Context) error { return nil }
+func (m *reportingMover) Stop(context.Context) error {
+	m.during()
+	return nil
+}
 
 func (m *reportingMover) Calibrate(context.Context) error {
 	m.during()
@@ -58,13 +61,14 @@ func (m *reportingMover) Latch(context.Context, bool) error {
 }
 
 // TestClosureControlReportDuringTheCallIsKept: a report the drive makes
-// while MoveTo or Calibrate is with the mover — inline or from another
+// while MoveTo, Calibrate or Stop is with the mover — inline or from another
 // goroutine — is not overwritten by the command's outcome written after
 // the mover returned. A MainState the drive reported stays (Stopped after
 // a fast motion or calibration, Error); a target the drive reported
 // reaching is not outstanding. Without a report MainState becomes Moving
-// or Calibrating, as before. The command still answers SUCCESS (review
-// II, R2-P1-clu-01).
+// or Calibrating, as before; Stop keeps a report as they do
+// (R2-C2-fsm-1550). The command still answers SUCCESS (review II,
+// R2-P1-clu-01).
 func TestClosureControlReportDuringTheCallIsKept(t *testing.T) {
 	t.Parallel()
 	for _, async := range []bool{false, true} {
@@ -211,6 +215,28 @@ func TestClosureControlReportDuringTheCallIsKept(t *testing.T) {
 				// Not stuck in Calibrating: a MoveTo is accepted.
 				m.report = nil
 				invoke(t, srv, closuredef.CmdMoveTo, closuredef.MoveToRequest{Position: &fullyOpen})
+			})
+			// Stop keeps the report too (R2-C2-fsm-1550): a drive that
+			// reports Error while it handles the Stop reads Error, not
+			// Stopped.
+			t.Run("Stop: Error", func(t *testing.T) {
+				t.Parallel()
+				srv, m := newServer(t, 0)
+				srv.SetMainState(wire.ClosureMainStateMoving)
+				m.report = func() { srv.SetMainState(wire.ClosureMainStateError) }
+				invoke(t, srv, closuredef.CmdStop, nil)
+				if got := mainState(t, srv); got != wire.ClosureMainStateError {
+					t.Errorf("MainState %d, want Error (3) as the drive reported", got)
+				}
+			})
+			t.Run("Stop: no report", func(t *testing.T) {
+				t.Parallel()
+				srv, _ := newServer(t, 0)
+				srv.SetMainState(wire.ClosureMainStateMoving)
+				invoke(t, srv, closuredef.CmdStop, nil)
+				if got := mainState(t, srv); got != wire.ClosureMainStateStopped {
+					t.Errorf("MainState %d, want Stopped (0)", got)
+				}
 			})
 			t.Run("Calibrate: no report", func(t *testing.T) {
 				t.Parallel()
