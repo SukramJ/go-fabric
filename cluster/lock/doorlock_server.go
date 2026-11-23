@@ -607,8 +607,13 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 // credentialKey returns the node's credential key, generating and storing
 // it on first use; without an AuthStore it is a key of this server alone.
 // matter.js DoorLockServer.ts:153-155 generates 16 random bytes once.
+//
+// The read and the creation are one step per AuthStore (lockKeyCreation),
+// so servers that start together on one store end on one key
+// (R3-store-3254).
 func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
 	if s.auth != nil {
+		defer lockKeyCreation(s.auth)()
 		v, ok, err := s.auth.GetSetting(ctx, store.SettingDoorLockCredentialKey)
 		if err != nil {
 			return nil, fmt.Errorf("lock: read the credential key: %w", err)
