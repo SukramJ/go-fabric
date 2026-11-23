@@ -58,7 +58,12 @@ func TestResumeRecordOfTheWrongShapeIsAMiss(t *testing.T) {
 		s1, rid := sigma1ResumingWith(t, secret)
 		store := newStubStore()
 		store.records[string(rid)] = &ResumptionRecord{SharedSecret: secret, ResumptionID: recID(rid), FabricIndex: 1, PeerNodeID: 0xAAAA}
-		r := NewResponder(newTestIdentity(t, 0xBBBB, 1, fabricIPK()), testVerifier{}, 0x2001)
+		// The baseline carries the record's fabric index: a stamped record
+		// under an unstamped baseline is a miss of its own
+		// (R2-C2-sec-0101), which the control must not hit.
+		id := newTestIdentity(t, 0xBBBB, 1, fabricIPK())
+		id.FabricIndex = 1
+		r := NewResponder(id, testVerifier{}, 0x2001)
 		r.SetResumptionStore(store)
 		res, err := r.ProcessSigma1WithResume(s1)
 		if err != nil {

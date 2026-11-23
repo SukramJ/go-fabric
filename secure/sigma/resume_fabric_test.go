@@ -10,19 +10,26 @@ import "testing"
 // resolver, or one without [FabricIndexResolver] — a record whose
 // FabricIndex is set and differs from the baseline identity's is a miss
 // (Full Sigma): resuming it would report the baseline's fabric for the
-// other fabric's peer. R2-C2-sec-0101.
+// other fabric's peer. R2-C2-sec-0101. A stamped record under an
+// unstamped baseline (fabric index 0) is a miss too — the baseline's
+// caller would put the record's peer onto its default fabric with no proof
+// of fabric (decision 517); an unstamped record stays comparable with any
+// baseline.
 func TestSigma_Resume_RecordOfAnotherFabricWithoutFabricLookupIsAMiss(t *testing.T) {
-	const baseline uint8 = 1
 	for _, resolver := range []string{"none", "identity-only"} {
 		for _, tc := range []struct {
 			name       string
+			baseline   uint8
 			record     uint8
 			wantResume bool
 		}{
-			{"same fabric", baseline, true},
-			{"record without fabric index", 0, true},
-			{"another fabric", 2, false},
+			{"same fabric", 1, 1, true},
+			{"record without fabric index", 1, 0, true},
+			{"another fabric", 1, 2, false},
+			{"unstamped baseline, record without fabric index", 0, 0, true},
+			{"unstamped baseline, stamped record", 0, 1, false},
 		} {
+			baseline := tc.baseline
 			t.Run(resolver+"/"+tc.name, func(t *testing.T) {
 				sigma1Bytes, sharedSecret, rid := buildValidSigma1WithResume(t)
 				store := newStubStore()
