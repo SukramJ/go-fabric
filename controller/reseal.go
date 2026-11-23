@@ -27,7 +27,7 @@ import (
 // either the old state or the new.
 //
 // A wrong old key, a value that does not open under it and a secret in
-// clear (New under old seals it first) are store.ErrUnseal, and leave the
+// clear (New under old seals it first) are [ErrUnseal], and leave the
 // database as it was. Every error after the commit wraps
 // store.ErrScrubIncomplete: the values are sealed under next, the scrub
 // stays owed and the next New under next runs it again.

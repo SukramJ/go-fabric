@@ -211,7 +211,8 @@ func toRequiredNumber(value json.RawMessage, field string, r fieldRange) (int64,
 }
 
 // jsLength is a string's length as JavaScript counts it: UTF-16 code
-// units.
+// units. Only a bound of matterjs-server's own (client_session_key) counts
+// it; a Matter string field's bound counts bytes (toBoundedString).
 func jsLength(s string) int {
 	n := 0
 	for _, r := range s {
@@ -220,12 +221,17 @@ func jsLength(s string) int {
 	return n
 }
 
-// toBoundedString is a JSON string of 1 to maxLength characters. Mirrors
-// matterjs-server packages/ws-controller/src/camera/wireArgumentChecks.ts:38-43
-// at 0bd06f2.
+// toBoundedString is a JSON string of 1 to maxLength UTF-8 bytes
+// (spec.StringLength, owner decisions 294 and 554), the count the
+// generated decoder holds the request to afterwards, so a string over its
+// bound is refused here as an argument. The check and its refusal text
+// follow matterjs-server packages/ws-controller/src/camera/wireArgumentChecks.ts:38-43
+// at 0bd06f2; the count does not: matterjs-server at 0bd06f2 counts UTF-16
+// code units (value.length), matter.js counts bytes from e4326a175
+// (R3-err-3651).
 func toBoundedString(value json.RawMessage, field string, maxLength int) (string, error) {
 	var s string
-	if jsonKind(value) != '"' || json.Unmarshal(value, &s) != nil || s == "" || jsLength(s) > maxLength {
+	if jsonKind(value) != '"' || json.Unmarshal(value, &s) != nil || s == "" || spec.StringLength(s) > maxLength {
 		return "", invalidArguments("%s must be a string of 1 to %d characters", field, maxLength)
 	}
 	return s, nil
