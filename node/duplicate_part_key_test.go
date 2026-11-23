@@ -23,6 +23,11 @@ import (
 // device went (G5d probe). The served part stays at its number, and a
 // later, unrelated Add reassembles. A key no endpoint serves may still be
 // taken (decisions 575, 581): TestForgetLetsANewDeviceTakeAFormerKeyNoEndpointServes.
+// In a Batch the refusal is judged against the batch's end state and
+// arrives from Partition.Batch (decision 582): a Forget of a key nobody
+// holds leaves the owner serving, so the take is still refused; a Forget
+// of the owner in either order lets it through,
+// TestBatchIsJudgedAgainstItsEndState.
 func TestAddOrReplaceRefusesAKeyAnotherEndpointServes(t *testing.T) {
 	t.Parallel()
 	const partKey = "owner/light"
@@ -60,14 +65,14 @@ func TestAddOrReplaceRefusesAKeyAnotherEndpointServes(t *testing.T) {
 			},
 		},
 		{
-			name: "Batch.Add before a Forget of the owner", owner: node.Scope, scope: node.Scope, fresh: "fresh",
+			name: "Batch.Add before a Forget that leaves the owner", owner: node.Scope, scope: node.Scope, fresh: "fresh",
 			call: func(ctx context.Context, t *testing.T, p *node.Partition) error {
 				t.Helper()
 				return p.Batch(ctx, func(b *node.Batch) error {
 					if err := b.Add(bridgedWithParts(t, "fresh", partKey)); err != nil {
 						return err
 					}
-					return b.Forget(endpoint.StringKey("owner"))
+					return b.Forget(endpoint.StringKey("gone"))
 				})
 			},
 		},
@@ -88,7 +93,7 @@ func TestAddOrReplaceRefusesAKeyAnotherEndpointServes(t *testing.T) {
 			},
 		},
 		{
-			name: "Batch.Replace before a Forget of the owner", owner: node.Scope, scope: node.Scope, fresh: "fresh",
+			name: "Batch.Replace before a Forget that leaves the owner", owner: node.Scope, scope: node.Scope, fresh: "fresh",
 			existing: func(t *testing.T) node.Endpoint { t.Helper(); return bridgedWithParts(t, "fresh") },
 			call: func(ctx context.Context, t *testing.T, p *node.Partition) error {
 				t.Helper()
@@ -96,7 +101,7 @@ func TestAddOrReplaceRefusesAKeyAnotherEndpointServes(t *testing.T) {
 					if err := b.Replace(endpoint.StringKey("fresh"), bridgedWithParts(t, "fresh", partKey)); err != nil {
 						return err
 					}
-					return b.Forget(endpoint.StringKey("owner"))
+					return b.Forget(endpoint.StringKey("gone"))
 				})
 			},
 		},
