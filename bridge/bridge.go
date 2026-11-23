@@ -775,6 +775,11 @@ type Bridge struct {
 	// pairing timer.
 	paseInFlight      HandshakeKey
 	paseInFlightSince time.Time
+	// paseBusyRecorded is set once a PBKDFParamRequest refused for the
+	// current claim was recorded into the diagnostics ring
+	// ([Bridge.firstBusyOfClaim]); claimPase clears it when it hands the
+	// slot to a new claim. Guarded by b.mu. R3-bound-3451.
+	paseBusyRecorded bool
 
 	// paseClosing names the PASE sessions whose close the bridge has
 	// scheduled and not yet run ([Bridge.paseSessionsCloser]): they are

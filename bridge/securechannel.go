@@ -850,6 +850,13 @@ func (b *Bridge) dispatchPase(
 			b.logger.Info("matter.rx.sc.pase_busy",
 				slog.String("src", srcString(src)),
 				slog.Int("exchange_id", int(proto.ExchangeID)))
+			if !b.firstBusyOfClaim() {
+				// One ring event per claim: every unauthenticated
+				// datagram would otherwise push one older event out of
+				// the ring, the handshake, session and lockout history
+				// the host and RetrieveLogs read (R3-bound-3451).
+				return nil
+			}
 			b.diagRing().Record(diagevent.Event{
 				Kind:     diagevent.KindPairing,
 				Severity: diagevent.SeverityWarning,
@@ -1031,6 +1038,7 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 	expired := b.paseInFlight
 	b.paseInFlight = key
 	b.paseInFlightSince = now
+	b.paseBusyRecorded = false
 	b.mu.Unlock()
 	if held {
 		// The handshake that held the slot ran out and counts as a failed
@@ -1051,6 +1059,20 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 		b.recordFailedAttempt(attemptPASEPairing)
 	}
 	return paseClaimTaken
+}
+
+// firstBusyOfClaim reports whether a PBKDFParamRequest refused as
+// [paseClaimBusy] is the first of the current claim to reach the
+// diagnostics ring, and marks it so: the ring records one busy event per
+// claim, whatever the rate of the refused requests. R3-bound-3451.
+func (b *Bridge) firstBusyOfClaim() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.paseBusyRecorded {
+		return false
+	}
+	b.paseBusyRecorded = true
+	return true
 }
 
 // endRepeatedPairing ends the PASE pairing after a further
