@@ -203,9 +203,9 @@ func (c *Conn) markTraffic() {
 // carried a message of a secure session — one the host authenticated. The
 // listener measures a connection's place at the total bound
 // ([MaxInboundConnections]) by these notes — and, once one was made, by
-// every message sent on the connection ([Conn.Send]) — not by every
-// received frame: a
-// connection keeps its place while its sessions carried a message within
+// every message sent on the connection ([Conn.Send]) until
+// [Conn.NoteSessionsEnded] — not by every received frame: a connection
+// keeps its place while its sessions carried a message within
 // [idleGrace]; one never noted keeps it only for [sessionlessGrace] after
 // its accept (for [reclaimAgeFloor] when it carried nothing), whatever
 // frames it sends. A host that terminates sessions on the listener's
