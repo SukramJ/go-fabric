@@ -117,9 +117,9 @@ const CrossDeviceStagger = time.Second
 // handshakes of honest peers awaiting an acknowledgement at one moment:
 // the device side's unsecuredEntryLimit (bridge/outbound_reliable.go:301)
 // and the controller's inboundUnsecuredAckWaitLimit
-// (client/exchange/manager.go:958). matter.js starts every candidate's
+// (client/exchange/manager.go:1120). matter.js starts every candidate's
 // attempt after its stagger and bounds neither the attempts running nor
-// the stagger (ParallelPaseDiscovery.ts:102-103, :110-116 at db021da0;
+// the stagger (ParallelPaseDiscovery.ts:102-103, :110-116 at b25ed960;
 // review II, owner decision 55, R2-P3-ctl-lan-06, R2-P3-ble-01).
 const maxRaceAttempts = 16
 
