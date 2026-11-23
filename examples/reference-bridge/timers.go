@@ -15,7 +15,9 @@ import (
 // the state a newer arming set up — complete the new travel at once, end
 // the new boost, drop the new timer. Every arming and every stop advance
 // the generation under the device's lock; the callback receives its
-// arming's generation and, holding the same lock, asks takeLocked first.
+// arming's generation and, holding the same lock, asks takeLocked first —
+// and acts in that critical section: an act after releasing it undoes an
+// arming made in between (R2-C2-conc-2602).
 // fakeReadings' gen (fleet_energy_market.go) is the same pattern.
 //
 // The zero value is ready; after arms through time.AfterFunc when nil (a
