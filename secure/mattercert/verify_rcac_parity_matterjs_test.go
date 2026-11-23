@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"slices"
 	"testing"
 
 	"thingfabric.dev/go-fabric/clock"
@@ -249,6 +250,80 @@ func TestValidateRCACRefusesAKeyIdentifierOfAnotherLengthParityMatterJS(t *testi
 			}
 			if len(back.Extensions.SubjectKeyID) != tc.n {
 				t.Fatalf("DecodeDER kept a %d-byte subjectKeyIdentifier, want %d", len(back.Extensions.SubjectKeyID), tc.n)
+			}
+			err = mattercert.ValidateRCAC(back)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ValidateRCAC = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, mattercert.ErrInvalidRCAC) {
+				t.Fatalf("ValidateRCAC = %v, want ErrInvalidRCAC", err)
+			}
+		})
+	}
+}
+
+// A self-signed root that carries an extendedKeyUsage extension is
+// refused, as matter.js refuses it: packages/protocol/src/certificate/kinds/Rcac.ts:107-110
+// at b25ed960 ("The extended key usage extension SHALL NOT be present.",
+// `if (extensions.extendedKeyUsage !== undefined)` throws). connectedhomeip's
+// ValidateChipRCAC (src/credentials/CHIPCert.cpp:1116-1144 at 6170af84)
+// reads no extendedKeyUsage; matter.js decides (decision 539). The root
+// is re-signed over its rebuilt TBS, so that only the extendedKeyUsage
+// rule can refuse it.
+func TestValidateRCACRefusesAnExtendedKeyUsageParityMatterJS(t *testing.T) {
+	t.Parallel()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		eku  []uint8
+		ok   bool
+	}{
+		{"no extendedKeyUsage (control)", nil, true},
+		{"clientAuth", []uint8{2}, false},
+		{"serverAuth and clientAuth", []uint8{1, 2}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := mattercert.Decode(buildRCACTLV(t, priv, validRCACOpts(priv)))
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			if tc.eku != nil {
+				c.Extensions.HasExtendedKeyUsage, c.Extensions.ExtendedKeyUsage = true, tc.eku
+				// The encoding order: extendedKeyUsage (3) after keyUsage (2).
+				i := slices.Index(c.Extensions.Order, 2)
+				if i < 0 {
+					t.Fatalf("no keyUsage in the extension order %v", c.Extensions.Order)
+				}
+				c.Extensions.Order = slices.Insert(c.Extensions.Order, i+1, 3)
+			}
+			c.TBSDER = nil
+			tbs, err := mattercert.TBSToDER(c)
+			if err != nil {
+				t.Fatalf("TBSToDER: %v", err)
+			}
+			digest := sha256.Sum256(tbs)
+			r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Signature = append(r.FillBytes(make([]byte, 32)), s.FillBytes(make([]byte, 32))...)
+			der, err := mattercert.EncodeDER(c)
+			if err != nil {
+				t.Fatalf("EncodeDER: %v", err)
+			}
+			back, err := mattercert.DecodeDER(der)
+			if err != nil {
+				t.Fatalf("DecodeDER: %v", err)
+			}
+			if back.Extensions.HasExtendedKeyUsage != (tc.eku != nil) {
+				t.Fatalf("DecodeDER extendedKeyUsage present %v, want %v", back.Extensions.HasExtendedKeyUsage, tc.eku != nil)
 			}
 			err = mattercert.ValidateRCAC(back)
 			if tc.ok {

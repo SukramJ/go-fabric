@@ -95,6 +95,7 @@ const (
 //     each, and equal (self-signed key binding).
 //   - BasicConstraints present with is-ca set.
 //   - KeyUsage extension present with keyCertSign set (cRLSign is NOT required).
+//   - No extendedKeyUsage extension.
 //   - BasicConstraints PathLenConstraint, when PRESENT, must be ≤ 1 (Matter
 //     restricts depth to one ICAC). chip CHIPCert.cpp:1136-1139 wraps the
 //     bound in `if (mCertFlags.Has(kPathLenConstraintPresent))` — an RCAC
@@ -113,9 +114,9 @@ const (
 // with a firmware-signing-id is admitted, as matter.js admits it, where
 // chip's certificate-type test refuses it; and the key usage needs
 // keyCertSign only, as chip (:1141), where matter.js's Rcac.ts (:100-105)
-// refuses a key usage other than 0x0060 or 0x0061; and an extendedKeyUsage
-// extension is admitted, as chip (ValidateChipRCAC :1116-1144 reads none),
-// where matter.js's Rcac.ts (:107-110) refuses it. The previous
+// refuses a key usage other than 0x0060 or 0x0061. An extendedKeyUsage
+// extension is refused, as matter.js's Rcac.ts (:107-110) refuses it, where
+// chip's ValidateChipRCAC (:1116-1144) reads none (decision 539). The previous
 // "PathLen must be present AND > 0" guards were stricter than chip and rejected the chip-tool / openssl
 // commissioner default RCAC (Path­LenConstraint absent), breaking
 // commissioning at SendTrustedRootCert with `BasicConstraints
@@ -186,6 +187,14 @@ func ValidateRCAC(c *Certificate) error {
 	if c.Extensions.KeyUsage&KeyUsageKeyCertSign == 0 {
 		return fmt.Errorf("%w: KeyUsage=0x%04X missing keyCertSign (bit 5)",
 			ErrInvalidRCAC, c.Extensions.KeyUsage)
+	}
+	// No extendedKeyUsage on a root: matter.js
+	// packages/protocol/src/certificate/kinds/Rcac.ts:107-110 at b25ed960
+	// ("The extended key usage extension SHALL NOT be present.") refuses
+	// it; chip's ValidateChipRCAC (CHIPCert.cpp:1116-1144) reads none, and
+	// matter.js decides (decision 539).
+	if c.Extensions.HasExtendedKeyUsage {
+		return fmt.Errorf("%w: extendedKeyUsage present on a root", ErrInvalidRCAC)
 	}
 	// BasicConstraints PathLenConstraint, when present, must be ≤ 1
 	// (Matter restricts depth to at most one ICAC per §6.5.2.3).
