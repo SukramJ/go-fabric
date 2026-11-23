@@ -164,7 +164,22 @@ func (c *Conn) Send(msg []byte) error {
 		return fmt.Errorf("tcp: write %s: %w", c.remote, err)
 	}
 	c.markTraffic()
+	c.markSentSession()
 	return nil
+}
+
+// markSentSession counts a message sent on a connection already noted as
+// carrying a session ([Conn.NoteSessionTraffic]) as session traffic: what
+// the device sends there belongs to the sessions it carries (a
+// subscription's reports), and only an authenticated message can set the
+// note, so a party without a session cannot cause it. A received frame
+// does not count — the host notes the authenticated ones. A no-op on a
+// dialed connection and before the first note. R2-C2-bound-0201.
+func (c *Conn) markSentSession() {
+	if c.now == nil || !c.sessionNoted.Load() {
+		return
+	}
+	c.lastSession.Store(int64(c.now()))
 }
 
 // markTraffic records a message received or sent at the listener's
@@ -180,7 +195,9 @@ func (c *Conn) markTraffic() {
 // NoteSessionTraffic tells the accepting listener that the connection just
 // carried a message of a secure session — one the host authenticated. The
 // listener measures a connection's place at the total bound
-// ([MaxInboundConnections]) by these notes alone, not by every frame: a
+// ([MaxInboundConnections]) by these notes — and, once one was made, by
+// every message sent on the connection ([Conn.Send]) — not by every
+// received frame: a
 // connection keeps its place while its sessions carried a message within
 // [idleGrace]; one never noted keeps it only for [sessionlessGrace] after
 // its accept (for [reclaimAgeFloor] when it carried nothing), whatever

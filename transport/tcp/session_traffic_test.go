@@ -5,6 +5,7 @@ package tcp
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -125,5 +126,51 @@ func TestSessionlessConnectionsHoldNoPlaceByTheirFrames(t *testing.T) {
 	case <-sessionless[0].Closed():
 	default:
 		t.Fatal("the oldest sessionless connection kept its place by its frames")
+	}
+}
+
+// TestSentMessagesOfANotedConnectionKeepItsPlace: once the host noted
+// session traffic on a connection, a message the device sends on it counts
+// as session traffic too — a connection whose sessions only send (a
+// subscription's reports) keeps its place at the total bound, and the one
+// quiet for idleGrace is reclaimed. A connection never noted earns nothing
+// by sending. R2-C2-bound-0201.
+func TestSentMessagesOfANotedConnectionKeepItsPlace(t *testing.T) {
+	t.Parallel()
+	fake := clocktest.New(time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC))
+	l, err := Listen(Config{LocalAddr: "127.0.0.1:0", MaxPayloadSize: 64, Clock: fake})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	handler := func(_ *Conn, _ []byte, release func()) { release() }
+	var held []*Conn
+	for i := range MaxInboundConnections {
+		c, cli := acceptFrom(t, l, i, handler)
+		go func() { _, _ = io.Copy(io.Discard, cli) }()
+		c.received.Store(true)
+		c.NoteSessionTraffic()
+		held = append(held, c)
+	}
+	sender, quiet := held[0], held[MaxInboundConnections-1]
+	for range 6 {
+		fake.Advance(time.Minute)
+		if err := sender.Send([]byte{1, 2, 3}); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range held[1 : MaxInboundConnections-1] {
+			c.NoteSessionTraffic()
+		}
+	}
+	acceptFrom(t, l, 10, handler)
+	select {
+	case <-sender.Closed():
+		t.Fatal("the connection whose session sent every minute was reclaimed")
+	default:
+	}
+	select {
+	case <-quiet.Closed():
+	default:
+		t.Fatal("the connection quiet for idleGrace kept its place")
 	}
 }
