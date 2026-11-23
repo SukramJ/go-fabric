@@ -46,6 +46,15 @@ type Host interface {
 	// no-op before the endpoint is assembled, whose assembly reads the
 	// name from the device's Spec.
 	HostName(ctx context.Context, key endpoint.SourceKey, name string)
+	// AdmitParts runs move — device.Device.AddPart's structure change on
+	// a device bound to this node — while the node's set of endpoints
+	// changes nothing, and returns its error. check refuses a key an
+	// endpoint of the node serves, itself or as a part, with the node's
+	// error for it (node.ErrDuplicateKey), and is nil for any other key: a
+	// part under such a key would make the node assemble two Specs under
+	// one key (decision 599, review II R4-err-4704). move may not call the
+	// host or wait for a device's queue.
+	AdmitParts(move func(check func(key endpoint.SourceKey) error) error) error
 }
 
 // Attach binds ep — a device.Device, or a type that embeds one — to h:

@@ -110,8 +110,12 @@ type Node struct {
 	diagRing  *diagevent.Ring
 	// callbacks is the node's serial goroutine of the `…Async` callbacks
 	// it owns (OnDiagnosticEventAsync), running from Start to Stop.
-	callbacks  *serialqueue.Queue
-	advertiser mdns.Advertiser
+	callbacks *serialqueue.Queue
+	// queuedCalls counts the calls queued on callbacks (queued): an owed
+	// fabric event whose hooks queued one is acknowledged behind them
+	// (deliverOwedFabricEvents).
+	queuedCalls atomic.Uint64
+	advertiser  mdns.Advertiser
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
 	ownsAdvertiser bool
@@ -1151,6 +1155,7 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 	for i := range owed {
 		ev := &owed[i]
 		idx := ev.Fabric.FabricIndex
+		queued, dropped := n.queuedCalls.Load(), n.callbacks.Dropped()
 		switch ev.Kind {
 		case store.FabricPendingAdd:
 			removed[idx] = true
@@ -1174,9 +1179,28 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 		default:
 			n.logger.Warn("fabric.owed_event.unknown_kind", slog.Int("fabric_index", int(idx)), slog.String("kind", ev.Kind.String()))
 		}
-		if err := n.st.AckOwedFabricEvent(ctx, ev.ID); err != nil {
-			n.logger.Warn("fabric.owed_event.ack_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
+		ack := func(ctx context.Context) {
+			if err := n.st.AckOwedFabricEvent(ctx, ev.ID); err != nil {
+				n.logger.Warn("fabric.owed_event.ack_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
+			}
 		}
+		if n.queuedCalls.Load() == queued {
+			ack(ctx)
+			continue
+		}
+		// An ObserveAsync hook only queued its call: the event is
+		// acknowledged behind it on the same queue, once it ran (decision
+		// 600, review II R4-err-4751). A queue that dropped a call at its
+		// bound since may have dropped the hook's: the event stays owed,
+		// and the next start delivers it again.
+		ackCtx := context.WithoutCancel(ctx)
+		n.queued("owed_fabric_event_ack", func() {
+			if n.callbacks.Dropped() != dropped {
+				n.logger.Warn("fabric.owed_event.kept_after_drop", slog.Int("fabric_index", int(idx)))
+				return
+			}
+			ack(ackCtx)
+		})
 	}
 	recs := n.root.OperationalCredentials.RolledBackFabrics()
 	for i := range recs {

@@ -784,7 +784,19 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // it is refused with [ErrAddedElsewhere] (node.Aggregator.Remove it
 // first). A part already d's is left as it is. A callback on p's queue
 // must not move p: the move waits for p's queue to run what it holds.
+//
+// On a device a node holds, a part whose key — or a key of one of its
+// parts — another endpoint of that node serves is refused with the node's
+// node.ErrDuplicateKey, nothing moved: the node would assemble two Specs
+// under one key, and every later change of its set would fail until the
+// host removed one (decision 599, as an Add of the key is refused,
+// decision 580; review II, R4-err-4704). The check and the move are one
+// step against the node's set.
 func (d *Device) AddPart(p *Device) error { return d.addParts(p) }
+
+// errRebound is addParts' retry: the device was bound or unbound between
+// reading its node and the move.
+var errRebound = errors.New("device: rebound during AddPart")
 
 // addParts is [Device.AddPart] for several parts, all or none: every
 // refusal is checked for every part before any moves, under one hold of
@@ -793,6 +805,55 @@ func (d *Device) AddPart(p *Device) error { return d.addParts(p) }
 // (R2-C2-fsm-2506: one AddPart per component moved the earlier
 // components into a device the constructor then discarded).
 func (d *Device) addParts(parts ...*Device) error {
+	if err := d.partTypeRefusal(parts); err != nil {
+		return err
+	}
+	var (
+		moves []partMove
+		h     deviceseam.Host
+	)
+	for {
+		via := d.hostOf()
+		// The check and the move are one step under composeMu; on a bound
+		// device inside the node's AdmitParts, which checks the keys
+		// against the node's set (check nil: unbound).
+		section := func(check func(endpoint.SourceKey) error) error {
+			var err error
+			moves, h, err = d.composeLocked(parts, via, check)
+			return err
+		}
+		var err error
+		if via == nil {
+			err = section(nil)
+		} else {
+			err = via.AdmitParts(section)
+		}
+		if errors.Is(err, errRebound) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		break
+	}
+	for _, m := range moves {
+		if m.bound {
+			for _, x := range m.tree {
+				x.stop()
+			}
+		}
+		if h != nil {
+			for _, x := range m.tree {
+				x.start()
+			}
+		}
+	}
+	return nil
+}
+
+// partTypeRefusal is the refusal of parts that reads no device tree: a
+// nil part, a bridged power source, a device type d does not compose.
+func (d *Device) partTypeRefusal(parts []*Device) error {
 	for _, p := range parts {
 		if p == nil {
 			return fmt.Errorf("%w: %s: nil part", ErrComposition, d.typ.Name)
@@ -806,19 +867,39 @@ func (d *Device) addParts(parts ...*Device) error {
 				ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
 		}
 	}
+	return nil
+}
+
+// partMove is one part's tree moved into a device, and whether it was
+// bound to a node before.
+type partMove struct {
+	tree  []*Device
+	bound bool
+}
+
+// composeLocked takes composeMu and, when d is still bound to via, runs
+// every refusal of parts and then moves them into d; it returns the moves
+// and the node d is bound to. check (nil on an unbound d) is the node's
+// refusal of a key it serves already. errRebound: d's node changed since
+// via was read.
+func (d *Device) composeLocked(parts []*Device, via deviceseam.Host, check func(endpoint.SourceKey) error) ([]partMove, deviceseam.Host, error) {
 	composeMu.Lock()
+	defer composeMu.Unlock()
+	if d.hostOf() != via {
+		return nil, nil, errRebound
+	}
 	for _, p := range parts {
 		if err := d.moveRefusalLocked(p); err != nil {
-			composeMu.Unlock()
-			return err
+			return nil, nil, err
 		}
 	}
-	type move struct {
-		tree  []*Device
-		bound bool
+	if check != nil {
+		if err := d.keyRefusalLocked(parts, via, check); err != nil {
+			return nil, nil, err
+		}
 	}
 	var (
-		moves []move
+		moves []partMove
 		h     deviceseam.Host
 	)
 	for _, p := range parts {
@@ -842,18 +923,25 @@ func (d *Device) addParts(parts ...*Device) error {
 		for _, x := range tree {
 			x.setHost(h)
 		}
-		moves = append(moves, move{tree, bound})
+		moves = append(moves, partMove{tree, bound})
 	}
-	composeMu.Unlock()
-	for _, m := range moves {
-		if m.bound {
-			for _, x := range m.tree {
-				x.stop()
-			}
+	return moves, h, nil
+}
+
+// keyRefusalLocked is check's refusal of a key of a part's tree that
+// d's node, via, serves already (R4-err-4704); a part of d's already, or
+// one via holds, serves its keys as itself. composeMu is held.
+func (d *Device) keyRefusalLocked(parts []*Device, via deviceseam.Host, check func(endpoint.SourceKey) error) error {
+	for _, p := range parts {
+		if p.owner.Load() == d || p.hostOf() == via {
+			continue
 		}
-		if h != nil {
-			for _, x := range m.tree {
-				x.start()
+		for _, x := range p.treeLocked() {
+			if x.opts.StableKey == nil {
+				continue
+			}
+			if err := check(x.opts.StableKey); err != nil {
+				return fmt.Errorf("%s: the part %s: %w", d.typ.Name, x.opts.StableKey, err)
 			}
 		}
 	}
