@@ -946,29 +946,46 @@ func (w *WiFiNetworkCommissioning) driverSwitch(ctx context.Context, v bool) err
 // (src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp:205-213
 // at 6170af84; N4-d4wifi-1); matter.js has no server logic here
 // (NetworkCommissioningServer.ts:18 at b25ed960). The DataVersion advances
-// with the attribute; the rejoin of the committed network is not started,
+// with the attribute and the change is reported through OnAttributeChange,
+// so a persister stores it (R2-C2-store-1001); the rejoin of the committed network is not started,
 // the command's own join being the join. A driver that does not switch on
 // fails the command, as a write of true does (judgement: chip's driver
 // returns without an answer there, :212).
 func (w *WiFiNetworkCommissioning) enableForConnect(ctx context.Context) error {
+	changed, err := w.switchOnForConnect(ctx)
+	if changed {
+		// Reported, not only bumped, and outside switchMu (a listener may
+		// write the attribute): the switch-on is no controller's write, and
+		// OnAttributeChange is the route a persister stores such a change
+		// by — without it the earlier write's false is what a restart
+		// restores (R2-C2-store-1001).
+		w.changes.Notify(netcommAttrInterfaceEnabled)
+	}
+	return err
+}
+
+// switchOnForConnect is enableForConnect under switchMu; it answers
+// whether InterfaceEnabled moved.
+func (w *WiFiNetworkCommissioning) switchOnForConnect(ctx context.Context) (bool, error) {
 	w.switchMu.Lock()
 	defer w.switchMu.Unlock()
 	w.mu.Lock()
 	on := w.interfaceEnabled
 	w.mu.Unlock()
 	if on {
-		return nil
+		return false, nil
 	}
 	if err := w.driverSwitch(ctx, true); err != nil {
-		return err
+		return false, err
 	}
 	w.mu.Lock()
-	if !w.interfaceEnabled {
-		w.interfaceEnabled = true
-		w.dataVersion.Bump()
+	defer w.mu.Unlock()
+	if w.interfaceEnabled {
+		return false, nil
 	}
-	w.mu.Unlock()
-	return nil
+	w.interfaceEnabled = true
+	w.dataVersion.Bump()
+	return true, nil
 }
 
 // netcommStatusError is a command refused with an IM status.
