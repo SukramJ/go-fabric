@@ -73,6 +73,43 @@ func TestBasicWindowRefusedUnderTheInstallLock(t *testing.T) {
 	}
 }
 
+// TestBasicWindowRefusedAfterItsInstallKeepsTheAdministratorsAcceptor
+// (review II, R3-conc-3751): an administrator's basic window that opens
+// after a basic window installed its acceptor and before it recorded its
+// window refuses the basic window (ErrAdministratorWindowOpen), and the
+// refused window's restore leaves the administrator's window with the
+// configured PASE acceptor, not with none.
+func TestBasicWindowRefusedAfterItsInstallKeepsTheAdministratorsAcceptor(t *testing.T) {
+	t.Parallel()
+	n, _, _ := commissionedKeeperNode(t, mdns.NewNoop())
+	ctx := t.Context()
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		t.Fatal(err)
+	}
+	creds := WindowCredentials{Passcode: 34567890, Discriminator: 0x123, PBKDFIterations: 1000, Salt: salt}
+	var adminErr error
+	n.window.testAfterInstall = func() {
+		// OpenWindow runs the window's transition before it returns.
+		adminErr = n.br.CommissioningWindow().OpenWindow(ctx, wire.OpenWindowParams{CommissioningTimeoutSeconds: 180, IsBasicWindow: true})
+	}
+	if err := n.OpenBasicWindow(ctx, creds); !errors.Is(err, bridge.ErrAdministratorWindowOpen) {
+		t.Fatalf("OpenBasicWindow = %v (administrator OpenWindow: %v), want ErrAdministratorWindowOpen", err, adminErr)
+	}
+	if adminErr != nil {
+		t.Fatalf("administrator OpenWindow: %v", adminErr)
+	}
+	if w := n.br.CommissioningWindow(); !w.IsOpen() || w.IsOwnWindow() {
+		t.Fatal("the administrator's basic window is not open")
+	}
+	n.window.installMu.Lock()
+	acceptor, active, baseline := n.window.acceptor, n.window.active, n.window.baseline
+	n.window.installMu.Unlock()
+	if acceptor == nil || acceptor != baseline || active != nil {
+		t.Errorf("administrator's basic window: acceptor %p (configured %p), window provider %p; want the configured acceptor", acceptor, baseline, active)
+	}
+}
+
 // waitBlockedIn returns once a goroutine waits for a mutex inside fn,
 // read from the goroutines' stacks: no wall-clock wait.
 func waitBlockedIn(t *testing.T, fn string) {

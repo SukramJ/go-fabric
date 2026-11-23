@@ -56,9 +56,16 @@ type commissioningHost struct {
 	// deviceType is the record's device type when advert carries none
 	// ([ProductDescription].DeviceType zero).
 	deviceType *commissionableDeviceType
-	// installMu guards active and stopped.
+	// installMu guards active, stopped and acceptor.
 	installMu sync.Mutex
 	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
+	// acceptor is the provider attached to the bridge last ([setAcceptor]),
+	// nil for none.
+	acceptor *bridge.PerExchangePaseProvider
+	// testAfterInstall, a test seam, runs in openBasic between the
+	// install of its acceptor and the record of its window; nil outside
+	// tests.
+	testAfterInstall func()
 	// stopped: stop ran; no verifier is installed from then on, so no
 	// provider and no reaper outlive the node (review II, R2-P2-stop-02).
 	stopped bool
@@ -312,6 +319,9 @@ func (h *commissioningHost) openBasic(ctx context.Context, vc *spake2.VerifierCo
 	if err != nil {
 		return err
 	}
+	if h.testAfterInstall != nil {
+		h.testAfterInstall()
+	}
 	b := &basicWindow{discriminator: discriminator, restore: restore, opening: true}
 	h.basicMu.Lock()
 	prev := h.basic
@@ -479,6 +489,13 @@ func (h *commissioningHost) attachPase(p *bridge.PerExchangePaseProvider) {
 	if h.active != nil {
 		return
 	}
+	h.setAcceptor(p)
+}
+
+// setAcceptor attaches p as the bridge's PASE acceptor (nil: none);
+// installMu is held.
+func (h *commissioningHost) setAcceptor(p *bridge.PerExchangePaseProvider) {
+	h.acceptor = p
 	if p == nil {
 		h.br.AttachPaseHandlerProvider(nil)
 		return
@@ -556,21 +573,38 @@ func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, i
 		h.active.Stop()
 	}
 	h.active = provider
-	h.br.AttachPaseHandlerProvider(provider.Resolve)
+	h.setAcceptor(provider)
 	h.logger.Info("pase.window.verifier_installed", slog.Int("iterations", int(iterations)))
 
 	return func() {
 		h.installMu.Lock()
 		defer h.installMu.Unlock()
 		if h.active == provider {
-			// Back to no acceptor; the window's close hook attaches the
-			// configured one again if the node's own window is open.
+			// Back to the acceptor the window open now takes: the
+			// configured one for a window that carries no verifier of its
+			// own (the node's own, an administrator's basic window), none
+			// otherwise. The window's transition hook attaches the same,
+			// but it may have run while this provider was still active —
+			// an administrator's basic window opening between a basic
+			// window's install and its open, whose attachPase left the
+			// window without an acceptor (review II, R3-conc-3751).
 			h.active = nil
-			h.br.AttachPaseHandlerProvider(nil)
+			h.setAcceptor(h.idleAcceptor())
 		}
 		provider.Stop()
 		h.logger.Info("pase.window.verifier_restored")
 	}, nil
+}
+
+// idleAcceptor is the acceptor the window open now takes with no window
+// provider active: the configured one while a window without a supplied
+// verifier is open, nil otherwise.
+func (h *commissioningHost) idleAcceptor() *bridge.PerExchangePaseProvider {
+	w := h.br.CommissioningWindow()
+	if w == nil || !w.IsOpen() || w.HasSuppliedVerifier() {
+		return nil
+	}
+	return h.baseline
 }
 
 // stop ends a window provider still running at shutdown; no verifier is
