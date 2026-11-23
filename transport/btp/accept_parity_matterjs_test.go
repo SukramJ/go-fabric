@@ -35,7 +35,7 @@ type fakeGATT struct {
 	// failed to drop the link, and gone stays open.
 	disconnectErr error
 	gone          chan struct{}
-	goneOnce    sync.Once
+	goneOnce      sync.Once
 }
 
 func newFakeGATT() *fakeGATT { return &fakeGATT{gone: make(chan struct{})} }
