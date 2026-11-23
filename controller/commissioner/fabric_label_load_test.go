@@ -38,8 +38,9 @@ func storeWithLabel(t *testing.T, label string) (*ca.CA, *ca.MemoryStore) {
 // MaxLabelLength bytes — one v0.22.2 stored while SetLabel counted runes —
 // loads, cut to the bound between two characters with a warning, as
 // cluster/core BasicInformation.RestoreNodeLabel cuts a stored NodeLabel
-// (go-fabric #587, decision 557). The cut stays in memory until the next
-// save; NewFabric, CreateFabric and SetLabel keep refusing a longer label.
+// (go-fabric #587, decision 557), and the cut label is saved once at load
+// (R4-par-4403, decision 597); NewFabric, CreateFabric and SetLabel keep
+// refusing a longer label.
 func TestStoredFabricLabelOverTheBoundIsCutAtLoad(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ stored, want string }{
@@ -64,10 +65,10 @@ func TestStoredFabricLabelOverTheBoundIsCutAtLoad(t *testing.T) {
 		if got != tc.want || len(got) > MaxLabelLength || !utf8.ValidString(got) {
 			t.Errorf("stored label %q (%d bytes): served %q (%d bytes), want %q", tc.stored, len(tc.stored), got, len(got), tc.want)
 		}
-		// In memory only: the load writes nothing; the record keeps the
-		// stored label until the next save.
-		if rec, _, _ := st.LoadFabric(); rec.Label != tc.stored {
-			t.Errorf("stored label %q: the load rewrote the record's label to %q", tc.stored, rec.Label)
+		// Saved at load: the record holds the cut label, so the next start
+		// neither cuts nor warns again (R4-par-4403, decision 597).
+		if rec, _, _ := st.LoadFabric(); rec.Label != tc.want {
+			t.Errorf("stored label %q: the record holds %q after the load, want the cut %q saved", tc.stored, rec.Label, tc.want)
 		}
 		// SetLabel keeps refusing a label over the bound.
 		if err := f.SetLabel(strings.Repeat("x", 33)); !errors.Is(err, ErrLabel) {
@@ -85,7 +86,7 @@ func TestStoredFabricLabelOverTheBoundIsCutAtLoad(t *testing.T) {
 
 // TestStoredFabricLabelCutIsWarnedAndSavedWithTheRotation: the authority's
 // DefaultFabric warns through its logger when it cut a stored label, and
-// the NOC rotation — a save the package already does — persists the cut.
+// the record holds the cut after the load and the NOC rotation.
 func TestStoredFabricLabelCutIsWarnedAndSavedWithTheRotation(t *testing.T) {
 	t.Parallel()
 	stored := strings.Repeat("ü", 32)
