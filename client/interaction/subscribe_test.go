@@ -6,6 +6,7 @@ package interaction_test
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -264,6 +265,53 @@ func TestSubscriptionDisplacedByTheSameIDCloses(t *testing.T) {
 		}
 		if got := reg.GetPeer(first.Peer(), 5); got != second {
 			t.Fatalf("the registry holds %p under the id, want the second subscription %p", got, second)
+		}
+	})
+}
+
+// closeOnSubscribed is a slog handler that, at the record a subscription
+// logs once register returned, closes the peer's subscriptions — a Close
+// landing between the registration and Subscribe's return.
+type closeOnSubscribed struct {
+	reg  *interaction.Subscriptions
+	peer exchange.PeerAddress
+}
+
+func (h closeOnSubscribed) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h closeOnSubscribed) Handle(_ context.Context, r slog.Record) error {
+	if r.Message == "matter.controller.interaction.subscribed" {
+		h.reg.CloseForPeer(h.peer)
+	}
+	return nil
+}
+
+func (h closeOnSubscribed) WithAttrs([]slog.Attr) slog.Handler { return h }
+func (h closeOnSubscribed) WithGroup(string) slog.Handler      { return h }
+
+// TestSubscribeClosedBeforeReturnLeavesNothingActive: a plain
+// subscription closed after it was registered by (peer, id) and before
+// Subscribe returned is not left in the active set (review II,
+// R2-C2-conc-2101: the active set was joined in a second step, after the
+// Close had deleted the subscription).
+func TestSubscribeClosedBeforeReturnLeavesNothingActive(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		s := newScripted(t)
+		reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+		peer := exchange.PeerAddress{FabricIndex: 1, NodeID: 0x2222}
+		c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{
+			Subscriptions: reg, Logger: slog.New(closeOnSubscribed{reg: reg, peer: peer}),
+		})
+		sub := subscribed(t, s, c, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{onOff}}, 0x0202)
+		<-sub.Done()
+		if reg.GetPeer(peer, 0x0202) != nil {
+			t.Fatal("a closed subscription stays registered under (peer, id)")
+		}
+		for _, a := range reg.Active() {
+			if a == sub {
+				t.Fatal("a closed subscription stays in the active set")
+			}
 		}
 	})
 }

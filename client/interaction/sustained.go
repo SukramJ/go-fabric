@@ -681,7 +681,7 @@ func (c *Interaction) sustainAttempt(ctx context.Context, st *sustainedState, pe
 	if c.attemptHook != nil {
 		return c.attemptHook(ctx, *req, opts)
 	}
-	return c.subscribeOnce(ctx, peer, *req, floor, ceiling, opts)
+	return c.subscribeOnce(ctx, peer, *req, floor, ceiling, opts, c.subs.AddPeer)
 }
 
 // refreshed is the request its RefreshRequest hook rewrites, with the

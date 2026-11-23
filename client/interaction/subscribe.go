@@ -215,16 +215,18 @@ func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Sub
 	if req.Sustain {
 		return c.sustain(peer, req, floor, ceiling)
 	}
-	sub, err := c.subscribeOnce(ctx, peer, req, floor, ceiling, req.exchangeOptions())
-	if err != nil {
-		return nil, err
-	}
-	c.subs.addActive(sub)
-	return sub, nil
+	// The subscription joins the peer index and the active set in one
+	// registration, so no Close falls between the two and leaves a closed
+	// subscription in the active set (review II, R2-C2-conc-2101).
+	return c.subscribeOnce(ctx, peer, req, floor, ceiling, req.exchangeOptions(), func(s *Subscription) {
+		c.subs.AddPeer(s)
+		c.subs.addActive(s)
+	})
 }
 
-// subscribeOnce is the attempt of CI:1023-1078.
-func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddress, req SubscribeRequest, floor, ceiling time.Duration, opts ExchangeOptions) (*Subscription, error) {
+// subscribeOnce is the attempt of CI:1023-1078; add registers the
+// established subscription (see register).
+func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddress, req SubscribeRequest, floor, ceiling time.Duration, opts ExchangeOptions, add func(*Subscription)) (*Subscription, error) {
 	m, ctx, err := c.begin(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -297,7 +299,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 	sub.maxPeerResponseTime = c.provider.MaximumPeerResponseTime(SubscriptionProcessingTime, false)
 	// Mirrors matter.js ClientInteraction.ts:1086-1095, :1126 at b25ed960.
 	sub.compactPriming = primesCompactly(req, allFiltersSent)
-	if err := c.register(sub, c.subs.AddPeer); err != nil {
+	if err := c.register(sub, add); err != nil {
 		return nil, err
 	}
 	c.log.Info("matter.controller.interaction.subscribed",
