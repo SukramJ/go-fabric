@@ -21,12 +21,12 @@ type keyGatedStore struct {
 	release chan struct{}
 }
 
-func (g keyGatedStore) GetSetting(ctx context.Context, key string) (string, bool, error) {
-	v, ok, err := g.AuthStore.GetSetting(ctx, key)
+func (g keyGatedStore) GetSetting(ctx context.Context, key string) (value string, ok bool, err error) {
+	value, ok, err = g.AuthStore.GetSetting(ctx, key)
 	if key == store.SettingDoorLockCredentialKey {
 		<-g.release
 	}
-	return v, ok, err
+	return value, ok, err
 }
 
 // TestConcurrentLocksOnOneStoreShareOneCredentialKey (R3-store-3254): two

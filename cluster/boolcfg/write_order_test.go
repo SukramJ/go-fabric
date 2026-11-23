@@ -6,6 +6,7 @@ package boolcfg_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"thingfabric.dev/go-fabric/cluster/boolcfg"
@@ -49,7 +50,7 @@ func TestWrittenSensitivityFollowsTheServersState(t *testing.T) {
 			}
 			state := s.State().CurrentSensitivityLevel
 			served, _ := s.MatterRead(def.AttrCurrentSensitivityLevel)
-			if fmt.Sprintf("%d", served) != fmt.Sprintf("%d", state) {
+			if fmt.Sprintf("%d", served) != strconv.FormatUint(uint64(state), 10) {
 				t.Errorf("CurrentSensitivityLevel serves %v while the server's state is %d", served, state)
 			}
 		})

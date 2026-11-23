@@ -6,6 +6,7 @@ package thermo_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -67,7 +68,7 @@ func TestTemperatureControlCommandsStoreInTheOrderTheSetterHeard(t *testing.T) {
 		}
 		served, _ := srv.MatterRead(tc.AttrTemperatureSetpoint)
 		last := g.heard[len(g.heard)-1]
-		if fmt.Sprint(served) != fmt.Sprint(last) {
+		if fmt.Sprint(served) != strconv.Itoa(int(last)) {
 			t.Errorf("TemperatureSetpoint serves %v; the Setter heard %v last (order %v)", served, last, g.heard)
 		}
 	})
