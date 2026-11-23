@@ -268,7 +268,7 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 			return nil, errors.New("endpoint: snapshot Scope is required")
 		}
 		for i := range snap.Endpoints {
-			eps, err := a.buildEndpointTree(ctx, run, snap.Scope, &snap.Endpoints[i], 1, false)
+			eps, err := a.buildEndpointTree(ctx, run, snap.Scope, &snap.Endpoints[i], 1, false, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -337,14 +337,20 @@ const deviceTypeAggregator = 0x000E
 // (#currentPartsListNumbers: the IndexBehavior's partsByNumber, the
 // endpoint itself removed, for a full-family composer; endpoint.parts
 // otherwise; ascending either way).
-func (a *Assembler) buildEndpointTree(ctx context.Context, run *assemblyRun, scope string, spec *Spec, parent uint16, part bool) ([]*Endpoint, error) {
+//
+// instance is the parent's [Spec.Instance], which a part without one of
+// its own takes.
+func (a *Assembler) buildEndpointTree(ctx context.Context, run *assemblyRun, scope string, spec *Spec, parent uint16, part bool, instance any) ([]*Endpoint, error) {
 	if err := run.claimKey(spec.StableKey); err != nil {
 		return nil, err
 	}
 	if err := checkBridgedInfo(spec, part); err != nil {
 		return nil, err
 	}
-	ep, err := a.buildEndpoint(ctx, run, scope, spec)
+	if spec.Instance != nil {
+		instance = spec.Instance
+	}
+	ep, err := a.buildEndpoint(ctx, run, scope, spec, instance)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +369,7 @@ func (a *Assembler) buildEndpointTree(ctx context.Context, run *assemblyRun, sco
 	ep.Part = part
 	out := []*Endpoint{ep}
 	for i := range spec.Parts {
-		children, err := a.buildEndpointTree(ctx, run, scope, &spec.Parts[i], ep.ID, true)
+		children, err := a.buildEndpointTree(ctx, run, scope, &spec.Parts[i], ep.ID, true, instance)
 		if err != nil {
 			return nil, err
 		}
@@ -382,8 +388,9 @@ func (a *Assembler) buildEndpointTree(ctx context.Context, run *assemblyRun, sco
 
 // buildEndpoint turns one [Spec] into the assembled endpoint:
 // it resolves the persisted endpoint id for the spec's stable key and
-// binds the per-identity state that has to survive a reassembly.
-func (a *Assembler) buildEndpoint(ctx context.Context, run *assemblyRun, scope string, spec *Spec) (*Endpoint, error) {
+// binds the per-identity state that has to survive a reassembly — a new
+// one's trackers for a new instance ([Spec.Instance]).
+func (a *Assembler) buildEndpoint(ctx context.Context, run *assemblyRun, scope string, spec *Spec, instance any) (*Endpoint, error) {
 	id, err := a.assignOrReuseID(ctx, scope, spec.StableKey, spec.DeviceType)
 	if err != nil {
 		return nil, err
@@ -414,7 +421,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, run *assemblyRun, scope s
 		// Reuse the state bound to this stable source key so the
 		// endpoint's per-cluster version and Identify server survive
 		// reassembly.
-		state: a.restoredState(run, spec),
+		state: a.restoredState(run, spec, instance),
 		// Bridged endpoints are children of the Aggregator (EP 1).
 		// Mirrors chip examples/bridge-app/linux/main.cpp:261-276
 		// AddDeviceEndpoint(..., parentEndpointId=1) and matter.js
@@ -462,8 +469,11 @@ func (r *assemblyRun) claimKey(key SourceKey) error {
 // this process, and the ConfigurationVersion. The queue is applied once
 // the whole assembly succeeded (R2-C2-fsm-0451): the state is shared with
 // the live topology's endpoint of the same key.
-func (a *Assembler) restoredState(run *assemblyRun, spec *Spec) *endpointState {
-	st := a.states.stateFor(spec.StableKey)
+func (a *Assembler) restoredState(run *assemblyRun, spec *Spec, instance any) *endpointState {
+	st, install := a.states.stateFor(spec.StableKey, instance)
+	if install != nil {
+		run.restores = append(run.restores, install)
+	}
 	label, version := spec.NodeLabel, spec.ConfigurationVersion
 	run.restores = append(run.restores, func() {
 		// The host's name is the Spec's again: a name set live
