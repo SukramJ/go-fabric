@@ -638,6 +638,12 @@ type CaseAdapter struct {
 	// a Sigma1 that yields the same bytes is recognised as the
 	// responder's idempotent replay rather than a restart.
 	lastSigma2 []byte
+	// stepPeer is the initiator's SessionParameters as the Sigma1 that
+	// began the current handshake stated them (nil for none), set under mu
+	// in the same step that records the handshake, so a Sigma3 takes the
+	// ones of the handshake it completes ([CaseAdapter.processSigma3]) —
+	// never another Sigma1's that ran on the responder since (R4-sec-4401).
+	stepPeer *sessionparams.Parameters
 	// resumeInstalled is the session the last Sigma1 installed by
 	// resumption, until the router takes it for the Sigma2_Resume's
 	// retransmission entry ([CaseAdapter.takeResumeInstall]); zero for
@@ -939,6 +945,7 @@ func (a *CaseAdapter) SetResponder(r *sigma.Responder) {
 	a.established = false
 	a.establishedSessionID = 0
 	a.lastSigma2 = nil
+	a.stepPeer = nil
 	a.mu.Unlock()
 }
 
@@ -998,9 +1005,22 @@ func (a *CaseAdapter) SetOnSessionEstablished(cb CaseSessionEstablished) {
 //
 // Mirrors matter.js packages/protocol/src/session/case/CaseServer.ts::#handleSigma1.
 func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload []byte, err error) {
+	opcode, respPayload, _, err = a.processSigma1(payload)
+	return opcode, respPayload, err
+}
+
+// processSigma1 is [CaseAdapter.ProcessSigma1] with what this one call
+// took: the initiator's SessionParameters as this Sigma1 states them, and,
+// when it established a session by resumption, that session's id as this
+// call set it under a.mu. The bridge binds the resumed session's route and
+// paces the reply by them: read back from the adapter afterwards either
+// could belong to another Sigma1 or a Sigma3 that ran on the adapter since
+// (R4-sec-4401, the shape of R3-sec-3404).
+func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload []byte, taken caseStepTaken, err error) {
+	taken.peer = statedSigma1Params(payload)
 	r := a.snapshotResponder()
 	if r == nil {
-		return 0, nil, errors.New("bridge: CaseAdapter without responder")
+		return 0, nil, taken, errors.New("bridge: CaseAdapter without responder")
 	}
 	result, err := r.ProcessSigma1WithResume(payload)
 	if err != nil {
@@ -1031,7 +1051,7 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		if !begun {
 			a.handshakeFailed()
 		}
-		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma1 failure is converted to a StatusReport wire frame; the caller receives nil err by design
+		return mrp.SCOpcodeStatusReport, body, taken, nil //nolint:nilerr // Sigma1 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 
 	if result.IsResume() {
@@ -1056,13 +1076,17 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		// registered installs its keys: the first one on a fresh adapter,
 		// and any later one for which the responder took a fresh id (a
 		// resume on a finished handshake). A resume re-announcing the id
-		// already established is the MRP replay case and stays quiet.
-		sessionID := r.SessionID()
+		// already established is the MRP replay case and stays quiet. The
+		// id is the one this call's Sigma2_Resume announces — the responder
+		// set it in the step that built the reply — not read back from the
+		// responder, which another Sigma1 may have renewed since.
+		sessionID := result.Sigma2Resume.ResponderSessionID
 		a.mu.Lock()
 		install := !a.established || sessionID != a.establishedSessionID
-		prevEstablished, prevSessionID := a.established, a.establishedSessionID
+		prevEstablished, prevSessionID, prevPeer := a.established, a.establishedSessionID, a.stepPeer
 		a.established = true
 		a.establishedSessionID = sessionID
+		a.stepPeer = taken.peer
 		onEstablished := a.onEstablished
 		a.mu.Unlock()
 		if !install || onEstablished == nil {
@@ -1088,20 +1112,21 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 				// provider and returns its staked id — rather than wait
 				// for the reaper (review II, R2-P6-sec-0301).
 				a.mu.Lock()
-				a.established, a.establishedSessionID = prevEstablished, prevSessionID
+				a.established, a.establishedSessionID, a.stepPeer = prevEstablished, prevSessionID, prevPeer
 				begun := a.established || a.lastSigma2 != nil
 				a.mu.Unlock()
 				if !begun {
 					a.handshakeFailed()
 				}
-				return 0, nil, fmt.Errorf("bridge: CASE resume session pickup: %w", err)
+				return 0, nil, taken, fmt.Errorf("bridge: CASE resume session pickup: %w", err)
 			}
 			a.mu.Lock()
 			a.resumeInstalled = sessionID
 			a.mu.Unlock()
 		}
 		a.sigma1BeganHandshake()
-		return mrp.SCOpcodeSigma2Resume, out, nil
+		taken.sessionID, taken.named = sessionID, true
+		return mrp.SCOpcodeSigma2Resume, out, taken, nil
 	}
 
 	// Full Sigma path — reset established so the Sigma3 completion
@@ -1120,10 +1145,22 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	if !bytes.Equal(out, a.lastSigma2) {
 		a.established = false
 		a.lastSigma2 = out
+		a.stepPeer = taken.peer
 	}
 	a.mu.Unlock()
 	a.sigma1BeganHandshake()
-	return mrp.SCOpcodeSigma2, out, nil
+	return mrp.SCOpcodeSigma2, out, taken, nil
+}
+
+// statedSigma1Params returns the initiator's SessionParameters a Sigma1
+// states, nil when it states none or does not decode.
+func statedSigma1Params(payload []byte) *sessionparams.Parameters {
+	s1, err := sigma.UnmarshalSigma1(payload)
+	if err != nil || s1.InitiatorSessionParams == nil {
+		return nil
+	}
+	p := *s1.InitiatorSessionParams
+	return &p
 }
 
 // pendingOnFabric reports whether the adapter's handshake resolved
@@ -1201,20 +1238,23 @@ const (
 )
 
 // processSigma3 is [CaseAdapter.ProcessSigma3] with the outcome of this
-// one call and, when it established the session, the session's id as this
-// call set it under a.mu — the bridge binds the session's route and
-// records its establishment by them: read back from shared state either
-// could belong to another, concurrent Sigma3 or a resume that ran on the
-// adapter since (R3-sec-3404).
-func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload []byte, outcome sigma3Outcome, sessionID uint16, err error) {
+// one call, the initiator's SessionParameters of the handshake it ran in
+// and, when it established the session, the session's id as this call set
+// it under a.mu — the bridge binds the session's route, records and
+// completes its establishment and paces the reply by them: read back from
+// shared state either could belong to another, concurrent Sigma3 or a
+// Sigma1 that ran on the adapter since (R3-sec-3404, R4-sec-4401,
+// R4-sec-4402).
+func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload []byte, outcome sigma3Outcome, taken caseStepTaken, err error) {
 	// Held across the responder's step so the check of an established
 	// handshake and the establishment itself are one step for concurrent
 	// Sigma3 datagrams; released before the callbacks.
 	a.mu.Lock()
+	taken.peer = a.stepPeer
 	r := a.responder
 	if r == nil {
 		a.mu.Unlock()
-		return 0, nil, sigma3Failed, 0, errors.New("bridge: CaseAdapter without responder")
+		return 0, nil, sigma3Failed, taken, errors.New("bridge: CaseAdapter without responder")
 	}
 	if a.established {
 		// Every Sigma3 after establishment is acknowledged and not
@@ -1225,7 +1265,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		// db021da0), and a repeat on its exchange is a duplicate that does
 		// not reach it (packages/protocol/src/protocol/MessageExchange.ts:501-511).
 		a.mu.Unlock()
-		return 0, nil, sigma3OfCompleted, 0, nil
+		return 0, nil, sigma3OfCompleted, taken, nil
 	}
 	if err := r.ProcessSigma3(payload); err != nil {
 		a.mu.Unlock()
@@ -1233,7 +1273,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		// terminates the CASE exchange immediately instead of retransmitting
 		// Sigma3. Mirrors chip CASESession.cpp error-exit pattern.
 		a.handshakeFailed()
-		return mrp.SCOpcodeStatusReport, caseSigma3Refusal(), sigma3Failed, 0, nil //nolint:nilerr // Sigma3 failure is converted to a StatusReport wire frame; the caller receives nil err by design
+		return mrp.SCOpcodeStatusReport, caseSigma3Refusal(), sigma3Failed, taken, nil //nolint:nilerr // Sigma3 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 	// onEstablished must fire EXACTLY ONCE per CASE handshake. Apple's
 	// MRP-layer retransmits Sigma3 when our StatusReport ACK is
@@ -1242,7 +1282,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	// double-registers the same session-id in opMgr and confuses Apple's
 	// session table.
 	a.established = true
-	sessionID = r.SessionID()
+	sessionID := r.SessionID()
 	a.establishedSessionID = sessionID
 	onEstablished := a.onEstablished
 	a.mu.Unlock()
@@ -1255,14 +1295,15 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		keys, ok := r.SessionKeys()
 		if !ok {
 			a.sigma3PickupFailed()
-			return 0, nil, sigma3Failed, 0, errors.New("bridge: CASE keys missing after Sigma3 success")
+			return 0, nil, sigma3Failed, taken, errors.New("bridge: CASE keys missing after Sigma3 success")
 		}
 		if err := onEstablished(keys, r.PeerSessionID()); err != nil {
 			a.sigma3PickupFailed()
-			return 0, nil, sigma3Failed, 0, fmt.Errorf("bridge: CASE session pickup: %w", err)
+			return 0, nil, sigma3Failed, taken, fmt.Errorf("bridge: CASE session pickup: %w", err)
 		}
 	}
-	return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3Established, sessionID, nil
+	taken.sessionID, taken.named = sessionID, true
+	return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3Established, taken, nil
 }
 
 // sigma3PickupFailed ends a handshake whose Sigma3 the responder verified

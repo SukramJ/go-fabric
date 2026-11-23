@@ -13,10 +13,13 @@ package bridge
 import (
 	"errors"
 	"fmt"
+	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"thingfabric.dev/go-fabric/secure/sessionparams"
 	"thingfabric.dev/go-fabric/secure/sigma"
 	"thingfabric.dev/go-fabric/transport/message"
 	"thingfabric.dev/go-fabric/transport/mrp"
@@ -913,5 +916,156 @@ func TestCloseSessionNeedsGeneralSuccess(t *testing.T) {
 				t.Fatalf("closed %v, want closed=%v", reg.closedSessions(), c.closes)
 			}
 		})
+	}
+}
+
+// ─── R4-sec-4401 / R4-sec-4402: a CASE step is settled by what it took ───────
+
+// interleavedResumeAdapter is the singleton [CaseAdapter] of
+// [newResumeRig]'s shape — it resumes [buildResumeSigma1] into session
+// 0x2001 — whose established-callback lets another resume land on the
+// adapter between the resume's own step and its settlement: the adapter's
+// established session reads other from then on, as a concurrent resume of
+// another peer on the singleton handler leaves it.
+func interleavedResumeAdapter(t *testing.T, other uint16) (a *CaseAdapter, sigma1 []byte) {
+	t.Helper()
+	ipk := newCaseTestIPK(t)
+	id := newCaseTestIdentity(t, 0xBBBB, 1, ipk)
+	sigma1, secret, rid := buildResumeSigma1(t)
+	responder := sigma.NewResponder(id, caseTestVerifier{}, 0x2001)
+	responder.SetResumptionStore(&fakeResumptionStore{id: rid, secret: secret})
+	a = NewCaseAdapter(responder)
+	a.SetOnSessionEstablished(func(sigma.SessionKeys, uint16) error {
+		a.mu.Lock()
+		a.established, a.establishedSessionID = true, other
+		a.mu.Unlock()
+		return nil
+	})
+	return a, sigma1
+}
+
+// TestResumeBindsTheSessionItsSigma1Established (R4-sec-4401): the route
+// of a session a Sigma1 resumed is the resume's source, bound under the id
+// the resume's own step set — not under an id read back from the singleton
+// handler afterwards, which another peer's resume may have replaced. Over
+// UDP and over a TCP connection, where a wrong binding would outlive the
+// session's own later binds.
+func TestResumeBindsTheSessionItsSigma1Established(t *testing.T) {
+	t.Parallel()
+	const resumed, other = 0x2001, 0x2777
+	t.Run("udp", func(t *testing.T) {
+		t.Parallel()
+		r := newUnsecuredRig(t)
+		a, sigma1 := interleavedResumeAdapter(t, other)
+		r.b.AttachCaseHandler(a)
+		p := newPipelinePeer(t, r.b, 0xD00D)
+		if err := p.send(mrp.SCOpcodeSigma1, 0x0401, sigma1, nil); err != nil {
+			t.Fatal(err)
+		}
+		p.recv(mrp.SCOpcodeSigma2Resume, "Sigma2_Resume")
+		if raw, ok := r.b.sessionPeerAddrs.Load(uint16(other)); ok {
+			t.Fatalf("the resume's source %v is bound as the route of session %#x, which the resume did not establish", raw, other)
+		}
+		raw, ok := r.b.sessionPeerAddrs.Load(uint16(resumed))
+		if addr, _ := raw.(net.Addr); !ok || addr == nil || addr.String() != p.conn.LocalAddr().String() {
+			t.Fatalf("the resumed session %#x is bound to %v, want the resume's source %v", resumed, raw, p.conn.LocalAddr())
+		}
+	})
+	t.Run("tcp", func(t *testing.T) {
+		t.Parallel()
+		h := newTCPHarness(t)
+		a, sigma1 := interleavedResumeAdapter(t, other)
+		h.bridge.AttachCaseHandler(a)
+		conn, replies := h.dial()
+		hdr := message.Header{MessageCounter: 1, HasSourceNodeID: true, SourceNodeID: 0x5A5A}
+		proto := message.ProtocolHeader{Initiator: true, Opcode: mrp.SCOpcodeSigma1, ExchangeID: 0x0402, ProtocolID: mrp.SecureChannelProtocolID}
+		if err := conn.Send(append(append(hdr.Marshal(), proto.Marshal()...), sigma1...)); err != nil {
+			t.Fatal(err)
+		}
+		if got := scOpcodeOf(t, waitReply(t, replies)); got != mrp.SCOpcodeSigma2Resume {
+			t.Fatalf("Sigma1 answered with opcode %#x, want Sigma2_Resume", got)
+		}
+		if raw, ok := h.bridge.sessionPeerAddrs.Load(uint16(other)); ok {
+			t.Fatalf("the resume's connection %v is bound as the route of session %#x, which the resume did not establish", raw, other)
+		}
+		raw, ok := h.bridge.sessionPeerAddrs.Load(uint16(resumed))
+		if route, _ := raw.(*connRoute); !ok || route == nil {
+			t.Fatalf("the resumed session %#x is bound to %v, want the resume's connection", resumed, raw)
+		}
+	})
+}
+
+// paramsThenOtherHandler states first's SessionParameters until the test
+// changes them — another initiator's Sigma1 on the singleton handler.
+type paramsThenOtherHandler struct {
+	sigma2ThenSuccessHandler
+	mu     sync.Mutex
+	params *sessionparams.Parameters
+}
+
+func (h *paramsThenOtherHandler) PeerSessionParams() *sessionparams.Parameters {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.params
+}
+
+func (h *paramsThenOtherHandler) set(p *sessionparams.Parameters) {
+	h.mu.Lock()
+	h.params = p
+	h.mu.Unlock()
+}
+
+// TestSigma3StepKeepsTheParamsItTook (R4-sec-4401): the Sigma3 step's
+// SessionParameters — the pacing of its reply — are the ones taken at the
+// step, not read back from the handler when the reply goes out.
+func TestSigma3StepKeepsTheParamsItTook(t *testing.T) {
+	t.Parallel()
+	own := &sessionparams.Parameters{SessionIdleInterval: 300}
+	h := &paramsThenOtherHandler{params: own}
+	step := &sigma3Step{handler: h}
+	if _, _, err := processSigma3With(h, []byte{0x15, 0x18}, step); err != nil {
+		t.Fatal(err)
+	}
+	h.set(&sessionparams.Parameters{SessionIdleInterval: 5000})
+	if got := step.PeerSessionParams(); got != own {
+		t.Fatalf("the Sigma3 step paces its reply by %+v, want the %+v it took", got, own)
+	}
+}
+
+// TestSigma3EstablisherNamesTheStepsSession (R4-sec-4402): the session the
+// Success's send completes, or closes, is the one the Sigma3 step
+// established — not the adapter's established session read back, which a
+// resume of another peer on the singleton handler may have replaced.
+func TestSigma3EstablisherNamesTheStepsSession(t *testing.T) {
+	t.Parallel()
+	const sid, other = 0x4242, 0x5151
+	a := &CaseAdapter{}
+	a.established, a.establishedSessionID = true, other
+	step := &sigma3Step{handler: a}
+	step.outcome = sigma3Established
+	step.sessionID, step.named = sid, true
+	got, id := sigma3EstablisherOf(step)
+	if got != a || id != sid {
+		t.Fatalf("establisher %p names session %#x, want %p with the step's %#x", got, id, a, uint16(sid))
+	}
+}
+
+// TestSigma1StepKeepsWhatItTook (R4-sec-4401): a Sigma1 step of a handler
+// other than [CaseAdapter] takes the handler's SessionParameters once, at
+// its step, and names no session for a Sigma1 that established none.
+func TestSigma1StepKeepsWhatItTook(t *testing.T) {
+	t.Parallel()
+	own := &sessionparams.Parameters{SessionIdleInterval: 300}
+	h := &paramsThenOtherHandler{params: own}
+	step := &sigma1Step{handler: h}
+	if _, _, err := processSigma1With(h, []byte{0x15, 0x18}, step); err != nil {
+		t.Fatal(err)
+	}
+	h.set(&sessionparams.Parameters{SessionIdleInterval: 5000})
+	if got := step.PeerSessionParams(); got != own {
+		t.Fatalf("the Sigma1 step paces its reply by %+v, want the %+v it took", got, own)
+	}
+	if sid, ok := step.establishedSession(); ok {
+		t.Fatalf("a Sigma1 answered with Sigma2 names session %#x as established", sid)
 	}
 }

@@ -1651,7 +1651,7 @@ func (b *Bridge) handleCase(
 	// b25ed960).
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	var installed, tracked uint16
-	resumer, _ := handler.(*CaseAdapter)
+	resumer := caseAdapterOf(handler)
 	if resumer != nil && respOpcode == mrp.SCOpcodeSigma2Resume {
 		if installed, _ = resumer.takeResumeInstall(); installed != 0 {
 			if !resumer.completesEstablishment() {
@@ -1700,22 +1700,42 @@ func (b *Bridge) handleCase(
 }
 
 // sigma3EstablisherOf returns the adapter whose Sigma3 established a
-// session in this step and that session's id, read before the Success is
-// sent; nil when the step established nothing or its handler is not a
-// [CaseAdapter].
+// session in this step and that session's id as the step set it; nil when
+// the step established nothing or its handler is not a [CaseAdapter]. The
+// id is the step's, never read back from the adapter: another peer's resume
+// on a singleton handler may have replaced the adapter's established
+// session by then, and the Success's send would complete or close that one
+// (R4-sec-4402).
 func sigma3EstablisherOf(handler any) (a *CaseAdapter, sessionID uint16) {
 	step, ok := handler.(*sigma3Step)
-	if !ok || step.outcome != sigma3Established {
+	if !ok {
+		return nil, 0
+	}
+	sessionID, ok = step.establishedSession()
+	if !ok {
 		return nil, 0
 	}
 	a, ok = step.handler.(*CaseAdapter)
 	if !ok {
 		return nil, 0
 	}
-	if sessionID, ok = a.establishedSession(); !ok {
-		return nil, 0
-	}
 	return a, sessionID
+}
+
+// caseAdapterOf returns the [CaseAdapter] a CASE step ran on — the handler
+// itself or the handler of a [sigma1Step] / [sigma3Step] — or nil.
+func caseAdapterOf(handler any) *CaseAdapter {
+	switch h := handler.(type) {
+	case *CaseAdapter:
+		return h
+	case *sigma1Step:
+		a, _ := h.handler.(*CaseAdapter)
+		return a
+	case *sigma3Step:
+		a, _ := h.handler.(*CaseAdapter)
+		return a
+	}
+	return nil
 }
 
 // settleAwaitedResume ends the wait of a resumed session for the
@@ -2233,8 +2253,11 @@ func oldestSigma1Record(records map[HandshakeKey]sigma1Record, except HandshakeK
 func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte, key HandshakeKey, hash [32]byte, overRecord bool) error {
 	ch, provided, gen := b.resolveCaseHandlerGen(key)
 	begun, established := true, false
+	// A resumed session's route is bound, and the reply paced, by what
+	// this Sigma1's own step took ([sigma1Step]).
+	step := &sigma1Step{handler: ch}
 	processSigma1 := func(p []byte) (uint8, []byte, error) {
-		op, reply, err := ch.ProcessSigma1(p)
+		op, reply, err := processSigma1With(ch, p, step)
 		begun = sigma1Began(op, reply, err)
 		established = err == nil && establishedBy(op, reply)
 		if !begun && overRecord {
@@ -2242,7 +2265,7 @@ func (b *Bridge) handleSigma1(src net.Addr, requestHdr *message.Header, proto me
 		}
 		return op, reply, err
 	}
-	err := b.handleCase(src, requestHdr, proto, payload, "sigma1", processSigma1, ch)
+	err := b.handleCase(src, requestHdr, proto, payload, "sigma1", processSigma1, step)
 	switch {
 	case !begun && overRecord:
 		b.sigma1BeganNothingOverRecord(key, hash)
@@ -2565,36 +2588,88 @@ func (b *Bridge) handshakeCompleted(key HandshakeKey) bool {
 	return ok && rec.completed != nil
 }
 
+// caseStepTaken is what one CASE step took from its handler at the step
+// itself: the session it established (sessionID, when named) and the
+// initiator's SessionParameters the reply is paced by (peer, nil for
+// none). The bridge settles the step by these values, never by reading
+// the handler back afterwards: on a singleton handler another peer's
+// Sigma1 or Sigma3 may have run on it by then, and the route binding, the
+// diagnostics event, the establishment's completion and the reply's
+// timing would follow that handshake (R3-sec-3404, R4-sec-4401,
+// R4-sec-4402).
+type caseStepTaken struct {
+	sessionID uint16
+	named     bool
+	peer      *sessionparams.Parameters
+}
+
+// establishedSession implements [establishedSessionReporter].
+func (t *caseStepTaken) establishedSession() (uint16, bool) {
+	if !t.named {
+		return 0, false
+	}
+	return t.sessionID, true
+}
+
+// PeerSessionParams implements [peerSessionParamsSource].
+func (t *caseStepTaken) PeerSessionParams() *sessionparams.Parameters {
+	return t.peer
+}
+
+// takeFrom fills t from a handler that is not a [CaseAdapter], asked once,
+// at once after its step: the session it names when the step established
+// one, and its SessionParameters.
+func (t *caseStepTaken) takeFrom(h CaseHandler, established bool) {
+	if established {
+		if rep, ok := h.(establishedSessionReporter); ok {
+			t.sessionID, t.named = rep.establishedSession()
+		}
+	}
+	if p, ok := h.(peerSessionParamsSource); ok {
+		t.peer = p.PeerSessionParams()
+	}
+}
+
+// sigma1Step is the handler a Sigma1 is settled with
+// ([Bridge.settleHandshake], [Bridge.handleCase]): it names the session
+// this Sigma1 established by resumption and the SessionParameters it
+// stated, as the step took them ([processSigma1With]).
+type sigma1Step struct {
+	handler CaseHandler
+	caseStepTaken
+}
+
+// processSigma1With runs a Sigma1 through h and takes into step what it
+// established and stated: a [CaseAdapter] returns them from its own step;
+// any other handler is asked once, at once after its step (R4-sec-4401).
+func processSigma1With(h CaseHandler, payload []byte, step *sigma1Step) (opcode uint8, respPayload []byte, err error) {
+	if a, ok := h.(*CaseAdapter); ok {
+		opcode, respPayload, step.caseStepTaken, err = a.processSigma1(payload)
+		return opcode, respPayload, err
+	}
+	opcode, respPayload, err = h.ProcessSigma1(payload)
+	step.takeFrom(h, err == nil && establishedBy(opcode, respPayload))
+	return opcode, respPayload, err
+}
+
 // sigma3Step is the handler a Sigma3 is settled with
 // ([Bridge.settleHandshake]): it names the established session only when
 // this Sigma3 established it, so a Sigma3 of a handshake that had
 // completed already — the accepted one again included — binds no route.
-// The session is the one the step itself established (sessionID, named,
-// set by [processSigma3With]), never read back from the handler afterwards:
-// on a singleton handler another peer's resume may have replaced the
-// handler's established session by then, and the route binding and the
-// diagnostics event would name that one (R3-sec-3404).
+// The session and the SessionParameters are the ones the step itself took
+// ([caseStepTaken], set by [processSigma3With]).
 type sigma3Step struct {
-	handler   CaseHandler
-	outcome   sigma3Outcome
-	sessionID uint16
-	named     bool
+	handler CaseHandler
+	outcome sigma3Outcome
+	caseStepTaken
 }
 
 // establishedSession implements [establishedSessionReporter].
 func (s *sigma3Step) establishedSession() (uint16, bool) {
-	if s.outcome != sigma3Established || !s.named {
+	if s.outcome != sigma3Established {
 		return 0, false
 	}
-	return s.sessionID, true
-}
-
-// PeerSessionParams implements [peerSessionParamsSource].
-func (s *sigma3Step) PeerSessionParams() *sessionparams.Parameters {
-	if p, ok := s.handler.(peerSessionParamsSource); ok {
-		return p.PeerSessionParams()
-	}
-	return nil
+	return s.caseStepTaken.establishedSession()
 }
 
 // processSigma3With runs a Sigma3 through h and reports what it did to the
@@ -2602,22 +2677,20 @@ func (s *sigma3Step) PeerSessionParams() *sessionparams.Parameters {
 // success report is an establishment and everything else a failure — a
 // refusal comes back as a failure StatusReport reply, not as an error.
 // The outcome goes into step, and an establishment names its session there
-// as the step set it: a [CaseAdapter] returns the id it set under its
-// lock; another handler that reports its established session
-// ([establishedSessionReporter]) is asked once, at once after its step
-// (R3-sec-3404).
+// as the step set it, beside the SessionParameters the reply is paced by: a
+// [CaseAdapter] returns them from its own step; another handler
+// ([establishedSessionReporter], [peerSessionParamsSource]) is asked once,
+// at once after its step (R3-sec-3404, R4-sec-4401).
 func processSigma3With(h CaseHandler, payload []byte, step *sigma3Step) (opcode uint8, respPayload []byte, err error) {
 	if a, ok := h.(*CaseAdapter); ok {
-		op, reply, outcome, sid, err := a.processSigma3(payload)
-		step.outcome, step.sessionID, step.named = outcome, sid, outcome == sigma3Established
-		return op, reply, err
+		opcode, respPayload, step.outcome, step.caseStepTaken, err = a.processSigma3(payload)
+		return opcode, respPayload, err
 	}
 	op, reply, err := h.ProcessSigma3(payload)
-	if err == nil && establishedBy(op, reply) {
+	established := err == nil && establishedBy(op, reply)
+	step.takeFrom(h, established)
+	if established {
 		step.outcome = sigma3Established
-		if rep, ok := h.(establishedSessionReporter); ok {
-			step.sessionID, step.named = rep.establishedSession()
-		}
 		return op, reply, nil
 	}
 	step.outcome = sigma3Failed
