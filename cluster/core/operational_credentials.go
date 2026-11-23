@@ -2717,7 +2717,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// STORED root, so the chain must verify against it.
 	fab, err := o.store.GetFabric(ctx, idx)
 	if err != nil {
-		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+		return opcredsFabricReadFailure("UpdateNOC", idx, err, store.ErrFabricNotFound)
 	}
 	noc, rejected := validateUpdateNOCCert(fab, priv, req.NOCValue, req.ICACValue)
 	if rejected != nil {
@@ -2726,7 +2726,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// The fabric must hold an identity to update (its IPK stays: the
 	// store's UpdateFabricCredentials keeps it).
 	if _, err := o.store.GetIdentity(ctx, idx); err != nil {
-		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+		return opcredsFabricReadFailure("UpdateNOC", idx, err, store.ErrIdentityNotFound)
 	}
 	// One atomic write: the new NOC, ICAC, key and node id, and the row
 	// marked pending with the values it replaced, so nothing half-applied
@@ -2836,16 +2836,20 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	// (`fabrics.find(f => f.label === label && f.fabricIndex !==
 	// currentFabricIndex)`, no exception for ""); connectedhomeip 6170af84
 	// OperationalCredentialsCluster.cpp:719-725 compares the same way.
+	// A list the store cannot read is the command's FAILURE: the check is
+	// not skipped, so no conflicting label is written past it (review II,
+	// R2-C2-err-1003).
 	fabrics, err := o.store.ListFabrics(ctx)
-	if err == nil {
-		for i := range fabrics {
-			f := &fabrics[i]
-			if f.FabricIndex != idx && f.Label == req.Label {
-				return NOCResponse{
-					StatusCode: NOCStatusLabelConflict,
-					DebugText:  fmt.Sprintf("label %q already used by fabric %d", req.Label, f.FabricIndex),
-				}, nil
-			}
+	if err != nil {
+		return nil, spec.Errorf(im.StatusFailure, "core: UpdateFabricLabel: the fabric list: %v", err)
+	}
+	for i := range fabrics {
+		f := &fabrics[i]
+		if f.FabricIndex != idx && f.Label == req.Label {
+			return NOCResponse{
+				StatusCode: NOCStatusLabelConflict,
+				DebugText:  fmt.Sprintf("label %q already used by fabric %d", req.Label, f.FabricIndex),
+			}, nil
 		}
 	}
 	// matter.js Fabric.setLabel persists, and so reports, only a label
@@ -2853,7 +2857,7 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	prev, prevErr := o.store.GetFabric(ctx, idx)
 	relabelled := prevErr != nil || prev.Label != req.Label
 	if err := o.store.UpdateFabricLabel(ctx, idx, req.Label); err != nil {
-		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+		return opcredsFabricReadFailure("UpdateFabricLabel", idx, err, store.ErrFabricNotFound)
 	}
 	// Bump DataVersion after successful label update — fabric list changed.
 	o.dataVersion.Bump()
@@ -2864,6 +2868,18 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 		o.fabricChanged(ctx, idx)
 	}
 	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: idx}, nil
+}
+
+// opcredsFabricReadFailure answers a store error on the accessing fabric:
+// NOCResponse InvalidFabricIndex only when the store does not hold what
+// was asked for (notFound), any other error — the fabric exists, the
+// store failed — the command's FAILURE, as handleRemoveFabric answers it
+// (review II, R2-P6-err-1027, R2-C2-err-1003).
+func opcredsFabricReadFailure(cmd string, idx uint8, err, notFound error) (any, error) {
+	if !errors.Is(err, notFound) {
+		return nil, spec.Errorf(im.StatusFailure, "core: %s on fabric %d: %v", cmd, idx, err)
+	}
+	return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 }
 
 func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields any) (any, error) {
