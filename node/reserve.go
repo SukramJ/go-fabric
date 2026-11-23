@@ -149,16 +149,20 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp,
 // refused write or a crash left half done ([Aggregator.finishForgets]), so
 // a key's number never survives its values and reservation (review II,
 // R2-P6-store-2406). A store that refuses the record changes nothing.
+// The record carries the keys of keep among keys, so a forget a crash
+// left half done spares the held endpoint's record too and the endpoint
+// keeps its number across the restart (decision 568).
 func (a *Aggregator) erase(ctx context.Context, op reservationOp, keep []string) error {
 	reserved, err := a.n.persisted.reservedTree(ctx, op.key)
 	if err != nil {
 		return err
 	}
 	keys := slices.Compact(slices.Sorted(slices.Values(slices.Concat([]string{op.key}, op.tree, reserved))))
-	if err := a.markForget(ctx, keys, true); err != nil {
+	kept := slices.DeleteFunc(slices.Clone(keys), func(k string) bool { return !slices.Contains(keep, k) })
+	if err := a.markForget(ctx, pendingForget{Keys: keys, Keep: kept}, true); err != nil {
 		return err
 	}
-	return a.forgetKeys(ctx, keys, keep)
+	return a.forgetKeys(ctx, keys, kept)
 }
 
 // forgetKeys is erase's writes for keys, recorded as a forget in progress:
@@ -181,7 +185,7 @@ func (a *Aggregator) forgetKeys(ctx context.Context, keys, keep []string) error 
 	if err := errors.Join(errs...); err != nil {
 		return err
 	}
-	return a.markForget(ctx, keys, false)
+	return a.markForget(ctx, pendingForget{Keys: keys}, false)
 }
 
 // finishForgets runs again every forget a refused write or a crash left
@@ -192,8 +196,8 @@ func (a *Aggregator) finishForgets(ctx context.Context) error {
 		return err
 	}
 	var errs []error
-	for _, keys := range pending {
-		errs = append(errs, a.forgetKeys(ctx, keys, nil))
+	for _, f := range pending {
+		errs = append(errs, a.forgetKeys(ctx, f.Keys, f.Keep))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("node: finish a forget: %w", err)
@@ -202,11 +206,46 @@ func (a *Aggregator) finishForgets(ctx context.Context) error {
 }
 
 // forgetPendingKey is the setting the forgets in progress are recorded
-// under: a JSON list of their key sets.
+// under: a JSON list with one element per forget. An element is the
+// forget's key list, or — when the forget keeps the endpoint records of
+// some of them — an object {"keys": [...], "keep": [...]} (decision 568).
+// The bare list is the format before keep: a record written then reads
+// as before, and a forget that keeps nothing is still written in it.
 const forgetPendingKey = "aggregator.forget_pending"
 
-// pendingForgets returns the key sets of the forgets in progress.
-func (p persisted) pendingForgets(ctx context.Context) ([][]string, error) {
+// pendingForget is one forget in progress: the keys it erases and, of
+// them, the keys whose endpoint records it leaves ([Aggregator.erase]).
+type pendingForget struct {
+	Keys []string `json:"keys"`
+	Keep []string `json:"keep,omitempty"`
+}
+
+// MarshalJSON writes a forget that keeps nothing as the bare key list.
+func (f pendingForget) MarshalJSON() ([]byte, error) {
+	if len(f.Keep) == 0 {
+		return json.Marshal(f.Keys)
+	}
+	type object pendingForget
+	return json.Marshal(object(f))
+}
+
+// UnmarshalJSON reads both element forms of forgetPendingKey.
+func (f *pendingForget) UnmarshalJSON(b []byte) error {
+	if err := json.Unmarshal(b, &f.Keys); err == nil {
+		f.Keep = nil
+		return nil
+	}
+	type object pendingForget
+	var o object
+	if err := json.Unmarshal(b, &o); err != nil {
+		return err
+	}
+	*f = pendingForget(o)
+	return nil
+}
+
+// pendingForgets returns the forgets in progress.
+func (p persisted) pendingForgets(ctx context.Context) ([]pendingForget, error) {
 	v, ok, err := p.st.GetSetting(ctx, forgetPendingKey)
 	if err != nil {
 		return nil, fmt.Errorf("node: load %s: %w", forgetPendingKey, err)
@@ -214,7 +253,7 @@ func (p persisted) pendingForgets(ctx context.Context) ([][]string, error) {
 	if !ok || v == "" {
 		return nil, nil
 	}
-	var pending [][]string
+	var pending []pendingForget
 	if err := json.Unmarshal([]byte(v), &pending); err != nil {
 		return nil, fmt.Errorf("node: %s: %w", forgetPendingKey, err)
 	}
@@ -234,13 +273,14 @@ func (a *Aggregator) cancelForget(ctx context.Context, key string) error {
 	}
 	changed := false
 	kept := pending[:0]
-	for _, keys := range pending {
-		if i := slices.Index(keys, key); i >= 0 {
-			keys = slices.Delete(slices.Clone(keys), i, i+1)
+	for _, f := range pending {
+		if i := slices.Index(f.Keys, key); i >= 0 {
+			f.Keys = slices.Delete(slices.Clone(f.Keys), i, i+1)
+			f.Keep = slices.DeleteFunc(slices.Clone(f.Keep), func(k string) bool { return k == key })
 			changed = true
 		}
-		if len(keys) > 0 {
-			kept = append(kept, keys)
+		if len(f.Keys) > 0 {
+			kept = append(kept, f)
 		}
 	}
 	if !changed {
@@ -250,7 +290,7 @@ func (a *Aggregator) cancelForget(ctx context.Context, key string) error {
 }
 
 // storeForgets writes the forgets in progress; a.forgetMu is held.
-func (a *Aggregator) storeForgets(ctx context.Context, pending [][]string) error {
+func (a *Aggregator) storeForgets(ctx context.Context, pending []pendingForget) error {
 	v := ""
 	if len(pending) > 0 {
 		b, err := json.Marshal(pending)
@@ -262,9 +302,10 @@ func (a *Aggregator) storeForgets(ctx context.Context, pending [][]string) error
 	return a.n.persisted.st.SetSetting(ctx, forgetPendingKey, v)
 }
 
-// markForget records keys as a forget in progress (on) or done (off); the
-// record is read and written under a.forgetMu.
-func (a *Aggregator) markForget(ctx context.Context, keys []string, on bool) error {
+// markForget records f as a forget in progress (on) or done (off), a
+// forget known by its keys; the record is read and written under
+// a.forgetMu.
+func (a *Aggregator) markForget(ctx context.Context, f pendingForget, on bool) error {
 	a.forgetMu.Lock()
 	defer a.forgetMu.Unlock()
 	p := a.n.persisted
@@ -272,9 +313,9 @@ func (a *Aggregator) markForget(ctx context.Context, keys []string, on bool) err
 	if err != nil {
 		return err
 	}
-	pending = slices.DeleteFunc(pending, func(k []string) bool { return slices.Equal(k, keys) })
+	pending = slices.DeleteFunc(pending, func(p pendingForget) bool { return slices.Equal(p.Keys, f.Keys) })
 	if on {
-		pending = append(pending, keys)
+		pending = append(pending, f)
 	}
 	return a.storeForgets(ctx, pending)
 }
