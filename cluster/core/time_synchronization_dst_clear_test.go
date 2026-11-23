@@ -23,9 +23,9 @@ type refusingSettings struct {
 	vals map[string]string
 }
 
-func (s *refusingSettings) GetSetting(_ context.Context, k string) (string, bool, error) {
-	v, ok := s.vals[k]
-	return v, ok, nil
+func (s *refusingSettings) GetSetting(_ context.Context, k string) (value string, found bool, err error) {
+	value, found = s.vals[k]
+	return value, found, nil
 }
 
 func (s *refusingSettings) SetSetting(_ context.Context, k, v string) error {
