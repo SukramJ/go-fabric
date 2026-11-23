@@ -98,8 +98,9 @@ func fullQueueWithBlockedRepresent(t *testing.T) (*Messages, *flightPresenter, <
 
 func queuedIDs(m *Messages) [][]byte {
 	v, _ := m.MatterRead(messagesdef.AttrMessages)
-	var ids [][]byte
-	for _, msg := range v.(spec.List[messagesdef.MessageStruct]) {
+	list := v.(spec.List[messagesdef.MessageStruct])
+	ids := make([][]byte, 0, len(list))
+	for _, msg := range list {
 		ids = append(ids, msg.MessageId)
 	}
 	return ids
