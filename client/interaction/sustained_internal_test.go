@@ -173,10 +173,11 @@ func TestSustainedRetryAfterAnOutageIsNotCarriedOver(t *testing.T) {
 }
 
 // TestSustainRetriesMergeOverTheDefault: a request's Retries is merged
-// field by field over the default sustained schedule — a zero field takes
-// the default's field, as matter.js RetrySchedule.Configuration does — and
-// NoMaximumInterval / NoJitter say "none" where a zero field cannot
-// (review II, R3-api-3580, owner decision 566).
+// field by field over the default sustained schedule, as matter.js
+// RetrySchedule.Configuration merges a configuration over its defaults; a
+// zero field stands for matter.js's absent key and takes the default's
+// field, and NoMaximumInterval / NoJitter say "none" where a zero field
+// cannot (review II, R3-api-3580, owner decision 566).
 func TestSustainRetriesMergeOverTheDefault(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
