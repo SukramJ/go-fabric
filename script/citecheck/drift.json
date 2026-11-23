@@ -2519,7 +2519,7 @@
     "occurrences": 4
   },
   {
-    "file": "controller/dcl/ota_test.go",
+    "file": "dcl/ota_test.go",
     "line": 310,
     "citation": "DclOtaUpdateService.ts:811-816",
     "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
@@ -2546,7 +2546,7 @@
     "occurrences": 4
   },
   {
-    "file": "controller/dcl/types.go",
+    "file": "dcl/types.go",
     "line": 158,
     "citation": "DclOtaUpdateService.ts:811-816",
     "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
