@@ -92,7 +92,14 @@ type fabricGroups struct {
 	// destination identifier's keys (ipk.go).
 	ipk   *keySet
 	idMap map[uint16]uint16
-	table map[uint16]*TableEntry
+	// bySession indexes the epoch keys of the key sets idMap maps a
+	// group to by their group session id, each list ordered by key set
+	// id: the receive path's candidates ([Manager.candidates]). Built
+	// once by loadFabric from keySets and idMap, which nothing changes
+	// afterwards — a change installs a newly loaded fabricGroups (review
+	// II, R2-C2-bound-0301).
+	bySession map[uint16][]candidate
+	table     map[uint16]*TableEntry
 	// props is the Groupcast cluster's per-group state (matter.js
 	// GroupcastServer groupProperties): existence of a Groupcast
 	// membership beyond the group table, its multicast address policy and
@@ -347,7 +354,29 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 	for _, g := range props {
 		f.props[g.GroupID] = GroupProperties{McastAddrPolicy: g.McastAddrPolicy, HasAuxiliaryACL: g.HasAuxiliaryACL}
 	}
+	f.indexSessions()
 	return f, nil
+}
+
+// indexSessions builds f.bySession from f.keySets and f.idMap.
+func (f *fabricGroups) indexSessions() {
+	inMap := make(map[uint16]bool, len(f.idMap))
+	for _, ks := range f.idMap {
+		inMap[ks] = true
+	}
+	ids := make([]uint16, 0, len(f.keySets))
+	for id := range f.keySets {
+		if inMap[id] {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	f.bySession = make(map[uint16][]candidate)
+	for _, id := range ids {
+		for _, e := range f.keySets[id].epochs {
+			f.bySession[e.sessionID] = append(f.bySession[e.sessionID], candidate{fabric: f, keySetID: id, epoch: e})
+		}
+	}
 }
 
 // deriveKeySet computes the operational form of a stored key set.

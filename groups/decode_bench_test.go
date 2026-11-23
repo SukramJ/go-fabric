@@ -58,7 +58,7 @@ func benchEpochKey(fabric uint8, keySet uint16, epoch int, shared bool) []byte {
 // newBenchManager is a manager over fabrics fabrics with keySets key sets
 // each, every set holding three epoch keys and mapped to a group of its
 // own. It returns the manager and the group session id of the first key.
-func newBenchManager(b *testing.B, fabrics, keySets int, shared bool) (m *Manager, firstSessionID uint16) {
+func newBenchManager(b testing.TB, fabrics, keySets int, shared bool) (m *Manager, firstSessionID uint16) {
 	b.Helper()
 	st := newMemStore()
 	for f := 1; f <= fabrics; f++ {
@@ -99,7 +99,7 @@ func newBenchManager(b *testing.B, fabrics, keySets int, shared bool) (m *Manage
 }
 
 // unusedSessionID is a group session id no epoch key of m carries.
-func unusedSessionID(b *testing.B, m *Manager) uint16 {
+func unusedSessionID(b testing.TB, m *Manager) uint16 {
 	b.Helper()
 	for sid := range uint16(0xFFFF) {
 		if len(m.candidates(sid)) == 0 {
