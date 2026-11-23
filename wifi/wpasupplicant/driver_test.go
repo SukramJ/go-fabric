@@ -722,6 +722,30 @@ func TestErrName(t *testing.T) {
 	}
 }
 
+// TestRefused: only wpa_supplicant's own error reply means AddNetwork was
+// not carried out; the bus daemon's NoReply, a context error, a closed
+// connection and an unreadable answer leave it open (R4-err-4351).
+func TestRefused(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		err  error
+		want bool
+	}{
+		{dbus.Error{Name: "fi.w1.wpa_supplicant1.InvalidArgs"}, true},
+		{&dbus.Error{Name: "fi.w1.wpa_supplicant1.UnknownError"}, true},
+		{dbus.Error{Name: errNoReply}, false},
+		{&dbus.Error{Name: errNoReply}, false},
+		{context.DeadlineExceeded, false},
+		{context.Canceled, false},
+		{dbus.ErrClosed, false},
+		{errors.New("dbus.Store: type mismatch"), false},
+	} {
+		if got := refused(tc.err); got != tc.want {
+			t.Errorf("refused(%v) = %v, want %v", tc.err, got, tc.want)
+		}
+	}
+}
+
 // TestScanReadsAfterTheBound: the scan's bound covers the wait for
 // ScanDone, not the reads after it — a ScanDone close to the bound still
 // yields every BSS (run 43137917486: a scan while associated ended at
@@ -1388,6 +1412,196 @@ func TestNetworksLeftBehindAreRemoved(t *testing.T) {
 		}
 		if got := removes(b); !slices.Equal(got, []dbus.ObjectPath{first}) {
 			t.Fatalf("RemoveNetwork %v, want the first join's network", got)
+		}
+	})
+}
+
+// TestAnAddNetworkNobodyAnsweredIsRemoved: an AddNetwork that ends without
+// wpa_supplicant's answer — the join's context ended while the call was in
+// flight, or the bus daemon gave up (NoReply) — may have been carried out.
+// The network it added, with the credential, is removed before the join
+// returns, and one whose removal fails stays owed until Close; an answered
+// refusal added nothing, and a network another client added meanwhile is
+// left alone (review II, R4-err-4351).
+func TestAnAddNetworkNobodyAnsweredIsRemoved(t *testing.T) {
+	t.Parallel()
+	listed := func(b *fakeBus) []dbus.ObjectPath {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		l, _ := b.props["Networks"].Value().([]dbus.ObjectPath)
+		return slices.Clone(l)
+	}
+	owed := func(d *Driver) int {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		return len(d.owed)
+	}
+	// joinCancelledInAdd runs a join whose context ends while AddNetwork is
+	// in flight; that AddNetwork is carried out all the same.
+	joinCancelledInAdd := func(t *testing.T, b *fakeBus, d *Driver) {
+		t.Helper()
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		go func() {
+			<-b.addEntered
+			cancel()
+		}()
+		status, debug, _ := d.ConnectNetwork(ctx, []byte("lab"), []byte(testCredential))
+		if status != statusUnknown || !strings.Contains(debug, "add network") {
+			t.Fatalf("ConnectNetwork = %d %q, want UnknownError from AddNetwork", status, debug)
+		}
+	}
+	lateBus := func() *fakeBus {
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		b.addLate = true
+		b.addEntered = make(chan struct{})
+		return b
+	}
+
+	t.Run("the join's context ended", func(t *testing.T) {
+		t.Parallel()
+		b := lateBus()
+		d, _ := startDriver(t, b, Options{})
+		joinCancelledInAdd(t, b, d)
+		if n, _ := b.removed(); n != 1 {
+			t.Errorf("%d removals of the network the unanswered AddNetwork added, want 1", n)
+		}
+		if l := listed(b); len(l) != 0 {
+			t.Errorf("wpa_supplicant still lists %v after the join", l)
+		}
+		if n := owed(d); n != 0 {
+			t.Errorf("%d networks owed after the removal", n)
+		}
+	})
+
+	t.Run("the bus daemon gave up", func(t *testing.T) {
+		t.Parallel()
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		b.onAdd = func(b *fakeBus) { b.addLocked() }
+		b.fail[ifaceInterface+".AddNetwork"] = dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusUnknown {
+			t.Fatalf("ConnectNetwork = %d, want UnknownError", status)
+		}
+		if l := listed(b); len(l) != 0 {
+			t.Errorf("wpa_supplicant still lists %v after the join", l)
+		}
+	})
+
+	t.Run("a removal that fails is swept at Close", func(t *testing.T) {
+		t.Parallel()
+		b := lateBus()
+		b.fail[ifaceInterface+".RemoveNetwork"] = dbus.Error{Name: "fi.w1.wpa_supplicant1.UnknownError"}
+		d, _ := startDriver(t, b, Options{})
+		joinCancelledInAdd(t, b, d)
+		if n := owed(d); n != 1 {
+			t.Fatalf("%d networks owed, want the one the unanswered AddNetwork added", n)
+		}
+		b.mu.Lock()
+		delete(b.fail, ifaceInterface+".RemoveNetwork")
+		b.mu.Unlock()
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if l := listed(b); len(l) != 0 {
+			t.Errorf("wpa_supplicant still lists %v after Close", l)
+		}
+	})
+
+	// stalled is a wpa_supplicant that answers neither the AddNetwork nor
+	// the Networks read after it, and carries the AddNetwork out later
+	// (resume): the network appears with the path stale.
+	const stale = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/5")
+	stalled := func(t *testing.T) (*fakeBus, *Driver, func()) {
+		t.Helper()
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		b.onAdd = func(b *fakeBus) { b.failReads = 1 }
+		b.fail[ifaceInterface+".AddNetwork"] = dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusUnknown {
+			t.Fatalf("ConnectNetwork = %d, want UnknownError", status)
+		}
+		resume := func() {
+			b.mu.Lock()
+			defer b.mu.Unlock()
+			b.onAdd = nil
+			delete(b.fail, ifaceInterface+".AddNetwork")
+			b.nextNetworks = []dbus.ObjectPath{stale}
+			b.addLocked()
+		}
+		return b, d, resume
+	}
+
+	t.Run("the read after a stalled call failed: settled at Close", func(t *testing.T) {
+		t.Parallel()
+		b, d, resume := stalled(t)
+		resume()
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if l := listed(b); len(l) != 0 {
+			t.Errorf("wpa_supplicant still lists %v after Close", l)
+		}
+	})
+
+	t.Run("the read after a stalled call failed: settled before the next join", func(t *testing.T) {
+		t.Parallel()
+		b, d, resume := stalled(t)
+		resume()
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q, want Success", status, debug)
+		}
+		if l := listed(b); !slices.Equal(l, []dbus.ObjectPath{fakeNetwork}) {
+			t.Errorf("wpa_supplicant lists %v after the next join, want only its network %v", l, fakeNetwork)
+		}
+	})
+
+	t.Run("a join while the stalled call is unsettled keeps its network", func(t *testing.T) {
+		t.Parallel()
+		b, d, resume := stalled(t)
+		resume()
+		b.mu.Lock()
+		b.failReads = 1 // the sweep before the join cannot read Networks
+		b.mu.Unlock()
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q, want Success", status, debug)
+		}
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if l := listed(b); !slices.Equal(l, []dbus.ObjectPath{fakeNetwork}) {
+			t.Errorf("wpa_supplicant lists %v after Close, want only the joined network %v", l, fakeNetwork)
+		}
+	})
+
+	t.Run("an answered refusal owes nothing", func(t *testing.T) {
+		t.Parallel()
+		const other = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/9")
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		// Another client's network appears while the refused call runs.
+		b.onAdd = func(b *fakeBus) { b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{other}) }
+		b.fail[ifaceInterface+".AddNetwork"] = dbus.Error{Name: "fi.w1.wpa_supplicant1.InvalidArgs"}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusUnknown {
+			t.Fatalf("ConnectNetwork = %d, want UnknownError", status)
+		}
+		if n := owed(d); n != 0 {
+			t.Errorf("%d networks owed after an answered refusal", n)
+		}
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range b.callsCopy() {
+			if c.method == ifaceInterface+".RemoveNetwork" {
+				t.Errorf("RemoveNetwork %v after an answered refusal", c.args[0])
+			}
+		}
+		if l := listed(b); !slices.Equal(l, []dbus.ObjectPath{other}) {
+			t.Errorf("wpa_supplicant lists %v, want the other client's network kept", l)
 		}
 	})
 }
