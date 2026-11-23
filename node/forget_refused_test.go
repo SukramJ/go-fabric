@@ -80,21 +80,17 @@ func TestForgetRefusesAPartKeyAnotherEndpointServes(t *testing.T) {
 	}
 }
 
-// TestForgetRefusesAKeyANewDeviceTakesInTheBatch (review II, R3-store-3702
-// edge, decision 567): a key of a forgotten device — a part of its tree
-// or of its reservation — that a different device added in the same
-// batch takes, as its own key or a part key, refuses the batch as a key
-// another partition holds is: the call that would take it returns the
-// error that call returns for a key of another partition, an Add
-// [node.ErrDuplicateKey], a Forget [node.ErrUnknownKey]. The new device
-// is not served. The forgotten device added again in the batch is no
-// different device (TestForgetAndAddInOneBatchStartsNew). The first two
-// cases were TestForgetAndAddFormerPartKeyInOneBatch (R2-C2-store-2401),
-// which served the new device at the forgotten part's number. The last
-// two reach the key through a Replace of a device the batch added: the
-// Replace returns [node.ErrDuplicateKey], whichever of Add and Forget
-// came first, and the part is not served.
-func TestForgetRefusesAKeyANewDeviceTakesInTheBatch(t *testing.T) {
+// TestForgetLetsANewDeviceTakeAFormerKeyNoEndpointServes (review II,
+// R3-store-3702 edge, decision 575): a key of a forgotten device — a part
+// of its reservation, or of its tree once its Forget ran — that no
+// endpoint serves any more may be taken by a different device added in
+// the same batch, whichever of Add and Forget comes first and also
+// through a Replace of that device (Fable B1 of the G5c diff read, now
+// allowed). The new device is served after the erasure, the erasure
+// leaves the served key's endpoint record, and its number holds across a
+// later, unrelated reassembly, as TestForgetAndAddFormerPartKeyInOneBatch
+// (R2-C2-store-2401) asserts for the plain Forget-then-Add order.
+func TestForgetLetsANewDeviceTakeAFormerKeyNoEndpointServes(t *testing.T) {
 	t.Parallel()
 	const partKey = "owner/light"
 	forgetOwner := func(b *node.Batch) error { return b.Forget(endpoint.StringKey("owner")) }
@@ -103,38 +99,27 @@ func TestForgetRefusesAKeyANewDeviceTakesInTheBatch(t *testing.T) {
 		// removeFirst removes owner in a call before the batch, so its
 		// part key is in its reservation, not in the set.
 		removeFirst bool
-		newKey      string
 		build       func(t *testing.T) node.Endpoint
 		forgetFirst bool
-		// replaceWith, when set, is the Replace of newKey that follows
-		// the Forget and the Add in the batch; the Add then succeeds and
-		// the Replace is the call that takes the key.
+		// replaceWith, when set, is the Replace of fresh that follows the
+		// Forget and the Add in the batch.
 		replaceWith func(t *testing.T) node.Endpoint
-		want        error
 	}{
 		{
-			name: "part key of a new device", newKey: "fresh", forgetFirst: true, want: node.ErrDuplicateKey,
+			name: "part key of the reservation", removeFirst: true, forgetFirst: true,
 			build: func(t *testing.T) node.Endpoint { t.Helper(); return bridgedWithParts(t, "fresh", partKey) },
 		},
 		{
-			name: "own key of a new device", newKey: partKey, forgetFirst: true, want: node.ErrDuplicateKey,
-			build: func(t *testing.T) node.Endpoint { t.Helper(); return kitLight(t, partKey) },
-		},
-		{
-			name: "part key of the reservation", removeFirst: true, newKey: "fresh", forgetFirst: true, want: node.ErrDuplicateKey,
+			name: "new device added before the Forget", removeFirst: true, forgetFirst: false,
 			build: func(t *testing.T) node.Endpoint { t.Helper(); return bridgedWithParts(t, "fresh", partKey) },
 		},
 		{
-			name: "new device added before the Forget", removeFirst: true, newKey: "fresh", forgetFirst: false, want: node.ErrUnknownKey,
-			build: func(t *testing.T) node.Endpoint { t.Helper(); return bridgedWithParts(t, "fresh", partKey) },
-		},
-		{
-			name: "Replace of a new device added before the Forget", newKey: "fresh", forgetFirst: false, want: node.ErrDuplicateKey,
+			name: "Replace of a new device added before the Forget", forgetFirst: false,
 			build:       func(t *testing.T) node.Endpoint { t.Helper(); return bridgedWithParts(t, "fresh") },
 			replaceWith: func(t *testing.T) node.Endpoint { t.Helper(); return bridgedWithParts(t, "fresh", partKey) },
 		},
 		{
-			name: "Replace of a new device added after the Forget", newKey: "fresh", forgetFirst: true, want: node.ErrDuplicateKey,
+			name: "Replace of a new device added after the Forget", forgetFirst: true,
 			build:       func(t *testing.T) node.Endpoint { t.Helper(); return bridgedWithParts(t, "fresh") },
 			replaceWith: func(t *testing.T) node.Endpoint { t.Helper(); return bridgedWithParts(t, "fresh", partKey) },
 		},
@@ -142,8 +127,9 @@ func TestForgetRefusesAKeyANewDeviceTakesInTheBatch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := t.Context()
+			eps := epmem.New()
 			cfg := minimalConfig(nil)
-			cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+			cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: eps}
 			n := newNode(t, cfg)
 			if err := n.Aggregator().Add(ctx, bridgedWithParts(t, "owner", partKey)); err != nil {
 				t.Fatal(err)
@@ -156,8 +142,8 @@ func TestForgetRefusesAKeyANewDeviceTakesInTheBatch(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			var forgetErr, addErr, replaceErr error
 			err := n.Aggregator().Batch(ctx, func(b *node.Batch) error {
+				var forgetErr, addErr, replaceErr error
 				if tc.forgetFirst {
 					forgetErr = forgetOwner(b)
 					addErr = b.Add(tc.build(t))
@@ -166,33 +152,28 @@ func TestForgetRefusesAKeyANewDeviceTakesInTheBatch(t *testing.T) {
 					forgetErr = forgetOwner(b)
 				}
 				if tc.replaceWith != nil {
-					replaceErr = b.Replace(endpoint.StringKey(tc.newKey), tc.replaceWith(t))
+					replaceErr = b.Replace(endpoint.StringKey("fresh"), tc.replaceWith(t))
 				}
 				return errors.Join(forgetErr, addErr, replaceErr)
 			})
-			if !errors.Is(err, tc.want) {
-				t.Fatalf("batch: %v, want %v", err, tc.want)
+			if err != nil {
+				t.Fatalf("batch: %v, want nil", err)
 			}
-			refused := addErr
-			switch {
-			case tc.replaceWith != nil:
-				refused = replaceErr
-				if forgetErr != nil || addErr != nil {
-					t.Errorf("Forget %v, Add %v before the Replace, want nil", forgetErr, addErr)
-				}
-				if _, ok := servedNumberOf(n, partKey); ok {
-					t.Errorf("%s is served after the refused Replace", partKey)
-				}
-			case !tc.forgetFirst:
-				refused = forgetErr
+			first, ok := servedNumberOf(n, partKey)
+			if !ok {
+				t.Fatalf("%s is not served after the batch", partKey)
 			}
-			if !errors.Is(refused, tc.want) {
-				t.Errorf("the call that takes %s: %v, want %v (Forget %v, Add %v, Replace %v)", partKey, refused, tc.want, forgetErr, addErr, replaceErr)
+			if _, ok := servedNumberOf(n, "fresh"); !ok {
+				t.Error("the new device is not served after the batch")
 			}
-			if tc.forgetFirst && tc.replaceWith == nil {
-				if _, ok := servedNumberOf(n, tc.newKey); ok {
-					t.Errorf("the refused new device %s is served", tc.newKey)
-				}
+			if !hasEndpointRecord(t, eps, partKey) {
+				t.Errorf("the batch's Forget erased the endpoint record of the served key %s", partKey)
+			}
+			if err := n.Aggregator().Add(ctx, kitLight(t, "other")); err != nil {
+				t.Fatal(err)
+			}
+			if second, _ := servedNumberOf(n, partKey); second != first {
+				t.Errorf("served endpoint %s moved from %d to %d at an unrelated reassembly", partKey, first, second)
 			}
 		})
 	}

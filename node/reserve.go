@@ -392,12 +392,13 @@ func (p *Partition) Forget(ctx context.Context, key device.SourceKey) error {
 
 // Forget removes the endpoint with key from the batch's partition if it
 // holds it and frees the numbers stored for key once fn returned; see
-// [Aggregator.Forget]. In a batch, a key of the forgotten device — its
-// tree or its reservation's — is no different device's to take: a device
-// the batch added before that serves one refuses the Forget
-// ([ErrUnknownKey]), one it adds after refuses that Add
-// ([ErrDuplicateKey]), as a key another partition holds refuses each
-// (decision 567); the forgotten device added again takes its keys back.
+// [Aggregator.Forget]. Only a key another endpoint still serves is
+// refused (decision 575, narrowing 567): a key of the forgotten device —
+// its tree or its reservation's — that no endpoint serves any more may be
+// taken by a different device the batch adds, before or after the
+// Forget, and the erasure then spares that device's endpoint
+// ([Aggregator.servedInErasure]); the forgotten device added again starts
+// new with its parts.
 func (b *Batch) Forget(key device.SourceKey) error {
 	if key == nil {
 		return ErrNoStableKey
@@ -425,21 +426,9 @@ func (b *Batch) Forget(key device.SourceKey) error {
 		a.mu.Unlock()
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
-	erased := b.erasureSet(k, removed, reserved)
-	if a.takenByAddedLocked(b, erased, removed) {
-		a.mu.Unlock()
-		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
-	}
 	if part != nil {
 		b.dropLocked(part, i, k)
 	}
-	if b.erasing == nil {
-		b.erasing = map[string]string{}
-	}
-	for _, e := range erased {
-		b.erasing[e] = k
-	}
-	op := reservationOp{kind: opErase, key: k}
 	a.mu.Unlock()
 	// A device the level withheld has no endpoint and no number, only
 	// its record in the surface report; Forget drops that too.
@@ -453,54 +442,12 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	if removed != nil {
 		tree = append(tree, reservationTree(removed.Spec())...)
 	}
+	op := reservationOp{kind: opErase, key: k}
 	if len(tree) > 0 {
 		op.tree = slices.Compact(slices.Sorted(slices.Values(tree)))
 	}
 	b.ops = append(b.ops, op)
 	return nil
-}
-
-// erasureSet is what a Forget of k erases, as far as the batch knows it
-// now: k, the tree of removed (the endpoint the Forget drops, nil for
-// none), the tree reserved for k and the trees of this batch's Removes of
-// k, which reserve only after fn ([Aggregator.erase] reads the
-// reservation then).
-func (b *Batch) erasureSet(k string, removed Endpoint, reserved []string) []string {
-	set := slices.Concat([]string{k}, reserved)
-	if removed != nil {
-		set = append(set, reservationTree(removed.Spec())...)
-	}
-	for _, op := range b.ops {
-		if op.kind == opReserve && op.key == k {
-			set = append(set, op.tree...)
-		}
-	}
-	return slices.Compact(slices.Sorted(slices.Values(set)))
-}
-
-// takenByAddedLocked reports whether a device b added, other than except,
-// serves a key of keys; a.mu is held.
-func (a *Aggregator) takenByAddedLocked(b *Batch, keys []string, except Endpoint) bool {
-	if len(b.added) == 0 {
-		return false
-	}
-	for _, p := range a.parts {
-		for _, ep := range p.eps {
-			if ep == except {
-				continue
-			}
-			if k, err := keyOf(ep.Spec()); err != nil || !b.added[k] {
-				continue
-			}
-			entries := surfaceEntries(ep)
-			for i := range entries {
-				if slices.Contains(keys, entries[i].key) {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 // splitErasures splits a batch's reservation ops into the ones applied
@@ -544,8 +491,8 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp)
 	fresh := map[string]bool{}
 	var errs []error
 	for _, op := range erase {
-		// No endpoint serves a forgotten key once its Forget ran
-		// (decision 567): served again, it is a new device.
+		// No other endpoint serves a forgotten key when its Forget
+		// runs (decisions 567, 575): served again, it is a new device.
 		forgotten[op.key] = true
 		fresh[op.key] = true
 		for _, k := range op.tree {
