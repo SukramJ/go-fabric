@@ -210,7 +210,7 @@ func NewThermostatUserInterfaceConfiguration(cfg ThermostatUIConfig) (*Thermosta
 		initial[tsuic.AttrScheduleProgrammingVisibility] = *cfg.ScheduleProgrammingVisibility
 	}
 	var keypadSaver *keypadSaves
-	var sink spec.Sink = cfg.Sink
+	sink := cfg.Sink
 	if cfg.Settings != nil {
 		keypadSaver = &keypadSaves{settings: cfg.Settings, key: key}
 		sink = persistingSink{next: cfg.Sink, keypad: keypadSaver}
@@ -264,6 +264,10 @@ func (s *ThermostatUIServer) SetAttributes(values map[uint32]any) error {
 	return nil
 }
 
+// logger is the server's logger: the process default
+// (ThermostatUIConfig carries none).
+func (*ThermostatUIServer) logger() *slog.Logger { return slog.Default() }
+
 // MatterWrite is [spec.Server.MatterWrite] through
 // [ThermostatUIServer.MatterWriteCommit].
 func (s *ThermostatUIServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
@@ -295,7 +299,7 @@ func (s *ThermostatUIServer) MatterWriteCommit(ctx context.Context, attrID uint3
 		return changed, nil
 	}
 	if serr := s.keypad.save(ctx, cur); serr != nil {
-		slog.Default().Warn("matter.thermostat_ui.keypad_lockout_not_saved", slog.String("reason", serr.Error()))
+		s.logger().Warn("matter.thermostat_ui.keypad_lockout_not_saved", slog.String("reason", serr.Error()))
 	}
 	return changed, nil
 }

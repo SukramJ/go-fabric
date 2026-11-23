@@ -19,7 +19,7 @@ type blockingCommitPresetStore struct {
 	release chan struct{}
 }
 
-func (*blockingCommitPresetStore) LoadPresets(context.Context) ([]byte, []byte, bool, error) {
+func (*blockingCommitPresetStore) LoadPresets(context.Context) (presets, active []byte, ok bool, err error) {
 	return nil, nil, false, nil
 }
 

@@ -25,7 +25,7 @@ type orderingSelector struct {
 	release  chan struct{}
 }
 
-func (o *orderingSelector) SelectAreas(_ context.Context, areas []uint32) (servicearea.SelectAreasStatus, string, error) {
+func (o *orderingSelector) SelectAreas(_ context.Context, areas []uint32) (status servicearea.SelectAreasStatus, text string, err error) {
 	o.mu.Lock()
 	o.calls++
 	n := o.calls

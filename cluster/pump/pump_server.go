@@ -374,9 +374,9 @@ func NewServer(cfg Config) (*Server, error) {
 	s := &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg, inst: inst, admitted: map[uint32]*atomic.Uint32{}}
 	for id, def := range modeEnums {
 		s.admitted[id] = new(atomic.Uint32)
-		for _, ev := range def.Values {
-			if _, err := inst.CheckValue(id, ev.Value, nil); err == nil {
-				s.admitted[id].Store(uint32(ev.Value)) //nolint:gosec // an enum8 value
+		for i := range def.Values {
+			if _, err := inst.CheckValue(id, def.Values[i].Value, nil); err == nil {
+				s.admitted[id].Store(uint32(def.Values[i].Value)) //nolint:gosec // an enum8 value
 				break
 			}
 		}

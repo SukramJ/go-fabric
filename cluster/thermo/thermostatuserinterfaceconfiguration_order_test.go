@@ -25,11 +25,11 @@ type gatedSettings struct {
 	release chan struct{}
 }
 
-func (g *gatedSettings) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (g *gatedSettings) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	v, ok := g.values[key]
-	return v, ok, nil
+	value, ok = g.values[key]
+	return value, ok, nil
 }
 
 func (g *gatedSettings) SetSetting(_ context.Context, key, value string) error {
