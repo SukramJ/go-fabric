@@ -51,6 +51,43 @@ func newHookedBR(t *testing.T, opts otbrtest.Options, h *hookTransport) (*Border
 	return br, srv
 }
 
+func isPut(r *http.Request, path string) bool {
+	return r.Method == http.MethodPut && r.URL.Path == path
+}
+
+// An activation whose outcome is not known — the PUT failed in transport,
+// or the border router answered 5xx — may have written the dataset, so
+// the revert stays owed, as in chip, which saves the flag false before the
+// attach and leaves it on an error (GenericThreadBorderRouterDelegate.cpp
+// :131, :136-140 at 6170af84): only a 4xx proves nothing was written
+// (review II, R4-fsm-4302).
+func TestActivationOfUnknownOutcomeKeepsTheRevertOwed(t *testing.T) {
+	t.Parallel()
+	ds := fakeDataset(t)
+	ctx := context.Background()
+	for _, name := range []string{"transport", "503"} {
+		var refuse atomic.Bool
+		h := &hookTransport{refuse: func(r *http.Request) bool { return refuse.Load() && isPut(r, "/node/dataset/active") }}
+		br, srv := newHookedBR(t, otbrtest.Options{}, h)
+		if name == "transport" {
+			refuse.Store(true)
+		} else {
+			srv.Fail(http.MethodPut, "/node/dataset/active", http.StatusServiceUnavailable)
+		}
+		if err := br.SetActiveDataset(ctx, ds); err == nil {
+			t.Fatalf("%s: the activation succeeded", name)
+		}
+		refuse.Store(false)
+		srv.Fail(http.MethodPut, "/node/dataset/active", 0)
+		br.mu.Lock()
+		configured := br.configured
+		br.mu.Unlock()
+		if configured {
+			t.Errorf("%s: an activation of unknown outcome left the dataset configured, want the revert owed", name)
+		}
+	}
+}
+
 // A clear in flight does not drop an activation that started while it ran:
 // the activation's "not configured" survives the clear's end, and the next
 // revert clears the activation's dataset (review II, R4-fsm-4303).

@@ -75,7 +75,8 @@ type BorderRouter struct {
 	configured bool
 	// activations counts the activations that set configured false. A
 	// clear returns the flag to true only when no activation started
-	// while it ran (review II, R4-fsm-4303).
+	// while it ran, and a refused activation only when no later one
+	// started (review II, R4-fsm-4303).
 	activations uint64
 }
 
@@ -153,7 +154,11 @@ func (b *BorderRouter) Dataset(ctx context.Context, pending bool) ([]byte, error
 // then PUT /node/dataset/active, PUT /node/state "enable", and /node/state
 // is read every PollInterval until the role is attached — or ctx ends,
 // which the fail-safe's expiry does. The empty dataset clears the active
-// one, as chip attaches an empty dataset to clear it (:202-210).
+// one, as chip attaches an empty dataset to clear it (:202-210). A PUT
+// the border router refuses with a 4xx wrote nothing and leaves nothing
+// for a revert, ahead of chip (review II, R4-fsm-4302; decision 545); a
+// transport failure or a 5xx leaves the revert owed, as chip leaves the
+// flag on every error (:136-140).
 func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) error {
 	current, err := b.c.ActiveDataset(ctx)
 	if err != nil {
@@ -162,10 +167,12 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 	if len(dataset) == 0 {
 		return b.clear(ctx)
 	}
+	var activation uint64
 	if current == nil {
 		b.mu.Lock()
 		b.configured = false
 		b.activations++
+		activation = b.activations
 		b.mu.Unlock()
 	} else if bytes.Equal(current, dataset) {
 		if role, err := b.c.State(ctx); err == nil && role.Attached() {
@@ -178,6 +185,12 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 		}
 	}
 	if err := b.c.setDataset(ctx, false, dataset); err != nil {
+		if current == nil && refused(err) {
+			// The border router refused the PUT: nothing of this
+			// activation was written, so nothing is left for a revert
+			// (review II, R4-fsm-4302).
+			b.settle(activation)
+		}
 		return b.reenable(ctx, current != nil, err)
 	}
 	if err := b.c.setState(ctx, true); err != nil {
@@ -186,8 +199,17 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 	return b.awaitAttached(ctx)
 }
 
+// refused reports whether err is a 4xx answer of the border router: the
+// request was refused and nothing it carried was written. A transport
+// failure, a timeout or a 5xx (which something in front of the border
+// router may answer) does not prove that, and leaves the revert owed.
+func refused(err error) bool {
+	var oe *Error
+	return errors.As(err, &oe) && oe.HTTPStatus >= 400 && oe.HTTPStatus < 500
+}
+
 // settle returns the flag to configured unless an activation started
-// after the one counted as since: that activation's dataset is still
+// after the counter read since: that activation's dataset is still
 // uncommitted (review II, R4-fsm-4303).
 func (b *BorderRouter) settle(since uint64) {
 	b.mu.Lock()
