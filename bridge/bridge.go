@@ -271,7 +271,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"reflect"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -2797,7 +2796,10 @@ type reconciledServer struct {
 
 // reconciled lists the servers of topo that implement
 // [contract.ClusterQuiescer] or [contract.EventReceiver] and can be told
-// apart (a comparable dynamic type — every pointer server).
+// apart: a value that can be compared — every pointer server. It judges
+// the value, not its type: a server of a comparable type whose interface
+// field holds a slice panics as a map key (review II, R4-api-4753,
+// decision 618).
 func reconciled(topo *endpoint.Topology) []reconciledServer {
 	if topo == nil {
 		return nil
@@ -2810,7 +2812,7 @@ func reconciled(topo *endpoint.Topology) []reconciledServer {
 		for _, srv := range endpoint.ClusterServers(ep) {
 			_, quiesces := srv.(contract.ClusterQuiescer)
 			_, receives := srv.(contract.EventReceiver)
-			if (quiesces || receives) && srv != nil && reflect.TypeOf(srv).Comparable() {
+			if (quiesces || receives) && comparableValue(srv) {
 				out = append(out, reconciledServer{srv, ep.ID})
 			}
 		}
@@ -2819,8 +2821,7 @@ func reconciled(topo *endpoint.Topology) []reconciledServer {
 }
 
 // quiescers lists the servers of topo that implement
-// [contract.ClusterQuiescer] and can be told apart (a comparable dynamic
-// type — every pointer server).
+// [contract.ClusterQuiescer] and can be told apart ([reconciled]).
 func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
 	var out []contract.ClusterQuiescer
 	for _, r := range reconciled(topo) {
