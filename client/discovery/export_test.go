@@ -8,6 +8,7 @@ const (
 	RaceStaggerCeiling = raceStaggerCeiling
 	MaxRaceAttempts    = maxRaceAttempts
 	MaxRaceWaiting     = maxRaceWaiting
+	MaxRaceUnwinding   = maxRaceUnwinding
 )
 
 // RaceWaiting is how many candidates of the race s wait, found and not
