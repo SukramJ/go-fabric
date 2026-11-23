@@ -132,13 +132,16 @@ func (b *Bridge) SendUnsecured(addr *net.UDPAddr, opcode uint8, payload []byte) 
 
 // PeerSessionAddress returns the authenticated UDP address of the CASE
 // session of nodeID on fabricIndex the peer was active on last, nil when
-// the bridge holds none — the cached operational address matter.js's
-// Check-In sender prefers (IcdManagementServer.ts:361-364, the peer
-// descriptor's operationalAddress). The session is chosen as
-// [Bridge.livePeerLink] chooses one — the registry's activity order, or
-// its session list newest last — among those with a UDP address; a
-// registry without either is walked in no order (review II,
-// R2-C2-par-0353).
+// the bridge holds none. matter.js's Check-In sender prefers the peer
+// descriptor's cached operationalAddress (IcdManagementServer.ts:362-365
+// at b25ed960), which it sets when a session is added and when that
+// session's network address changes (packages/protocol/src/peer/Peer.ts:141-164,
+// PeerSet.ts:116-124, :317-318), not at each receive; this module takes
+// the session the peer sent on last, as [Bridge.livePeerLink] does — the
+// registry's activity order, or its session list newest last — among
+// those with a UDP address; a registry without either is walked in no
+// order (review II, R2-C2-par-0353; by_design
+// BD-Matter-ICD-CheckInAddressLastActive).
 func (b *Bridge) PeerSessionAddress(fabricIndex uint8, nodeID uint64) *net.UDPAddr {
 	b.mu.RLock()
 	reg := b.sessionRegistry
