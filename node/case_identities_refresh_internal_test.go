@@ -9,15 +9,29 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"log/slog"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"thingfabric.dev/go-fabric/groups"
 	"thingfabric.dev/go-fabric/secure/sigma"
 	"thingfabric.dev/go-fabric/store"
 )
+
+// refreshParkedOnLock reports whether a goroutine waits on a sync.Mutex
+// inside refreshIPK (its refreshMu), from the runtime's stack dump.
+func refreshParkedOnLock() bool {
+	buf := make([]byte, 1<<20)
+	for _, g := range strings.Split(string(buf[:runtime.Stack(buf, true)]), "\n\n") {
+		header, _, _ := strings.Cut(g, "\n")
+		if strings.Contains(header, "[sync.Mutex.Lock") && strings.Contains(g, "node.(*caseIdentities).refreshIPK(") {
+			return true
+		}
+	}
+	return false
+}
 
 // TestRefreshIPKOverlapInstallsTheNewerKeySet (review II, R3-conc-3750):
 // two refreshes of one fabric's key set 0 overlap — the first read the key
@@ -109,10 +123,18 @@ func TestRefreshIPKOverlapInstallsTheNewerKeySet(t *testing.T) {
 	}
 	wg.Go(func() { c.refreshIPK(ctx, idx) })
 	// Without serialisation the second refresh reaches its seam now; with
-	// it, it waits for the first. Either way the first installs next.
-	select {
-	case <-secondRead:
-	case <-time.After(200 * time.Millisecond):
+	// it, it waits for the first on refreshMu. Either way the first
+	// installs next. No wall-clock wait: the second is at its seam or
+	// parked on the lock, read from the runtime's stack dump.
+	for waiting := true; waiting; {
+		select {
+		case <-secondRead:
+			waiting = false
+		default:
+			if waiting = !refreshParkedOnLock(); waiting {
+				runtime.Gosched()
+			}
+		}
 	}
 	close(releaseFirst)
 	wg.Wait()
