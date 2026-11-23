@@ -63,14 +63,14 @@ var DefaultSustainRetries = RetrySchedule{
 	JitterFactor:    0.25,
 }
 
-// NoMaximumInterval, as the MaximumInterval of a [SubscribeRequest].Retries,
-// leaves the schedule without a maximum interval, where a zero field takes
-// the default schedule's hour. Any negative MaximumInterval means the same.
+// NoMaximumInterval is the MaximumInterval of a [SubscribeRequest].Retries
+// that leaves the schedule without a maximum interval, where a zero field
+// takes the default schedule's hour. Any negative MaximumInterval means the same.
 const NoMaximumInterval time.Duration = -1
 
-// NoJitter, as the JitterFactor of a [SubscribeRequest].Retries, leaves the
-// schedule without jitter, where a zero field takes the default schedule's
-// quarter. Any negative JitterFactor means the same.
+// NoJitter is the JitterFactor of a [SubscribeRequest].Retries that leaves
+// the schedule without jitter, where a zero field takes the default
+// schedule's quarter. Any negative JitterFactor means the same.
 const NoJitter float64 = -1
 
 // sustainRetries is the schedule req's sustained subscription retries on:
