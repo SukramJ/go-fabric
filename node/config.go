@@ -803,7 +803,7 @@ type Store struct {
 	// returns its error. A scrub that cannot finish (a full disk, a reader
 	// on the -wal) is no error: the node logs one warning and a later start
 	// scrubs (store.Store.ScrubOwed). The key must live outside the
-	// database (docs/security.md, "Sealing at rest"); store.Reseal moves the
+	// database (docs/security.md, "Sealing at rest"); [Reseal] moves the
 	// database to a new key while no node runs on it. Every later start
 	// needs the same sealer: under another key New fails with an error that
 	// wraps store.ErrUnseal (NewSealed opens the canary first); a store
