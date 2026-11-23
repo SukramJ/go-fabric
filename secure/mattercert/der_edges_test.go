@@ -666,6 +666,8 @@ func TestValidateRCACRefusals(t *testing.T) {
 	}{
 		{"not a root", func(c *Certificate) { *c = *noc }, "not a Root CA"},
 		{"issuer id differs", func(c *Certificate) { c.Issuer.MatterRCACID++ }, "root must be self-signed"},
+		{"not a CA", func(c *Certificate) { c.Extensions.BasicConstraintsIsCA = false }, "is not a CA"},
+		{"no basic constraints", func(c *Certificate) { c.Extensions.HasBasicConstraints = false }, "is not a CA"},
 		{"no key usage", func(c *Certificate) { c.Extensions.HasKeyUsage = false }, "KeyUsage extension absent"},
 		{"no keyCertSign", func(c *Certificate) { c.Extensions.KeyUsage = 0x0001 }, "missing keyCertSign"},
 		{"public key unreadable", func(c *Certificate) { c.PublicKey = []byte{1} }, "cannot decode RCAC public key"},

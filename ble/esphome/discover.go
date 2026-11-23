@@ -176,6 +176,10 @@ type candidate struct {
 	psk   string
 }
 
+// maxDiscoveredProxies bounds the discovered proxy set: what a browse
+// returns is a LAN party's to say. R2-C2-bound-2003.
+const maxDiscoveredProxies = 32
+
 // errNoAddress is an instance without a usable address. discovery.Names
 // returns none such (it returns resolved instances only); another Browser
 // may (R2-P6-err-2006).
@@ -247,8 +251,12 @@ func skip(log *slog.Logger, c candidate, reason error) {
 // DefaultBrowseTimeout; Rescan is unused); o.Clock paces the browse and
 // the connections, o.Dial opens them. Every device left out is logged on
 // o.Logger — slog.Default when nil, unlike a central's — as
-// ble.esphome.proxy_skipped with the reason. NewCentral with
-// Options.Discover runs the same discovery and keeps it current.
+// ble.esphome.proxy_skipped with the reason. A device is one proxy
+// however many instance names announce it — identified by the MAC its
+// DeviceInfoResponse states on the connection — and at most 32 are
+// dialled, the rest logged as ble.esphome.proxy_cap. NewCentral with
+// Options.Discover runs the same discovery and keeps it current, under
+// the same bound.
 func Discover(ctx context.Context, o Options) ([]Proxy, error) {
 	if o.Discover == nil {
 		return nil, ErrNoBrowser
@@ -273,7 +281,15 @@ func Discover(ctx context.Context, o Options) ([]Proxy, error) {
 		}
 		admitted = append(admitted, c)
 	}
+	if len(admitted) > maxDiscoveredProxies {
+		for _, c := range admitted[maxDiscoveredProxies:] {
+			o.Logger.Warn("ble.esphome.proxy_cap", slog.String("proxy", c.name), slog.Any("addresses", c.addrs),
+				slog.Int("max", maxDiscoveredProxies))
+		}
+		admitted = admitted[:maxDiscoveredProxies]
+	}
 	found := make([]*Proxy, len(admitted))
+	macs := make([]string, len(admitted))
 	eachBounded(admitted, func(i int, c candidate) {
 		var psk []byte
 		if c.psk != "" {
@@ -295,13 +311,24 @@ func Discover(ctx context.Context, o Options) ([]Proxy, error) {
 		if psk == nil {
 			warnPlaintext(o.Logger, c.name, c.addrs)
 		}
-		found[i] = &Proxy{Addr: addr, Key: c.psk, Name: c.name}
+		found[i], macs[i] = &Proxy{Addr: addr, Key: c.psk, Name: c.name}, a.mac
 	})
 	out := make([]Proxy, 0, len(found))
-	for _, p := range found {
-		if p != nil {
-			out = append(out, *p)
+	seen := map[string]bool{}
+	for i, p := range found {
+		if p == nil {
+			continue
 		}
+		// One proxy per device, by the MAC its connection stated
+		// (R2-C2-bound-2003).
+		if m := macs[i]; m != "" {
+			if seen[m] {
+				skip(o.Logger, admitted[i], errSameDevice)
+				continue
+			}
+			seen[m] = true
+		}
+		out = append(out, *p)
 	}
 	return out, ctx.Err()
 }
@@ -373,8 +400,48 @@ func (c *Central) rescan(ctx context.Context) {
 		}
 		fresh = append(fresh, cd)
 	}
+	if room := maxDiscoveredProxies - c.discoveredCount(); len(fresh) > room {
+		room = max(room, 0)
+		for _, cd := range fresh[room:] {
+			c.log.Warn("ble.esphome.proxy_cap", slog.String("proxy", cd.name), slog.Any("addresses", cd.addrs),
+				slog.Int("max", maxDiscoveredProxies))
+		}
+		fresh = fresh[:room]
+	}
 	c.join(ctx, fresh)
 	c.leave(advertised)
+}
+
+// discoveredCount is the number of discovered proxies in the set.
+func (c *Central) discoveredCount() int {
+	n := 0
+	for _, p := range c.proxyList() {
+		if !p.static {
+			n++
+		}
+	}
+	return n
+}
+
+// errSameDevice is a discovered candidate whose connection states the MAC
+// of a device the set already holds: another name for the same device.
+var errSameDevice = errors.New("esphome: the device is in the proxy set already (same MAC in its DeviceInfoResponse)")
+
+// holdsDeviceLocked reports whether a proxy of the set has stated mac on
+// its connection; c.setMu is held (before p.mu, the lock order).
+func (c *Central) holdsDeviceLocked(mac string) bool {
+	if mac == "" {
+		return false
+	}
+	for _, p := range c.proxies {
+		p.mu.Lock()
+		same := p.mac == mac
+		p.mu.Unlock()
+		if same {
+			return true
+		}
+	}
+	return false
 }
 
 // discoveredProxy is the discovered proxy of an instance name.
@@ -424,6 +491,17 @@ func (c *Central) join(ctx context.Context, cs []candidate) {
 			c.setMu.Unlock()
 			a.close(context.Canceled)
 			p.stop()
+			return
+		}
+		// A device is identified by what it states on the keyed
+		// connection, not by the name a browse returned: a second name
+		// for a device in the set is not a second proxy. Not refused for
+		// good — the name may be the device's new one once the old leaves.
+		if c.holdsDeviceLocked(a.mac) {
+			c.setMu.Unlock()
+			a.close(context.Canceled)
+			p.stop()
+			skip(c.log, cd, errSameDevice)
 			return
 		}
 		c.proxies = append(c.proxies, p)

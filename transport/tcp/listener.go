@@ -444,7 +444,8 @@ func (l *Listener) Close() error {
 }
 
 // idleLongestLocked is the open connection idle longest at now — its last
-// secure-session message ([Conn.NoteSessionTraffic]), or its accept when it
+// secure-session message ([Conn.NoteSessionTraffic], or a message sent
+// after the first note), or its accept when it
 // carried no session, earliest, the earlier accept first on a tie — among
 // those whose sessions carried no message within [idleGrace] and, when it
 // carried no session, were accepted at least [sessionlessGrace] ago (with

@@ -39,6 +39,15 @@ import (
 // calls (central_linux.go).
 const peripheralTimeout = 5 * time.Second
 
+// readvertiseFirst and readvertiseMax pace the registration of an
+// advertisement BlueZ released (Release): retried after a failure, the
+// pause doubling up to the maximum, until it holds or StopAdvertising or
+// Close ends it (R2-C2-fsm-2001).
+const (
+	readvertiseFirst = time.Second
+	readvertiseMax   = 30 * time.Second
+)
+
 // ErrServing is a [contract.GATTPeripheral.RegisterService] while the
 // Matter GATT service is registered — from its registration until its
 // [contract.GATTService.Serve] returned, or Close ended a registration that
@@ -95,8 +104,14 @@ type peripheral struct {
 	// adapter (chip: "/chipoble/<pid>", BluezEndpoint.cpp:526).
 	root dbus.ObjectPath
 	done chan struct{}
+	// quit ends the signal loop; Close closes it once a served service
+	// finished its teardown, which needs the loop's device signals.
+	quit chan struct{}
 	// dispatched is closed when the signal loop returned.
 	dispatched chan struct{}
+	// readvertising counts the goroutines that register a released
+	// advertisement again; Close waits for them before the bus goes.
+	readvertising sync.WaitGroup
 
 	// mu guards every field below.
 	mu sync.Mutex
@@ -110,6 +125,9 @@ type peripheral struct {
 	adv        map[string]dbus.Variant
 	registered bool
 	advOwed    bool
+	// advGen counts the registrations made: a Release names the one it
+	// ended by the generation it saw (release).
+	advGen uint64
 	// appOwed is an UnregisterApplication that failed at the end of a
 	// service's Serve: the application stays exported, and the next
 	// RegisterService retries the unregister before it registers
@@ -159,7 +177,7 @@ func newPeripheral(b bus, adapter dbus.ObjectPath) (*peripheral, error) {
 	name := string(adapter)[strings.LastIndex(string(adapter), "/")+1:]
 	p := &peripheral{
 		bus: b, adapter: adapter, root: dbus.ObjectPath("/gofabric/" + name),
-		done: make(chan struct{}), dispatched: make(chan struct{}),
+		done: make(chan struct{}), quit: make(chan struct{}), dispatched: make(chan struct{}),
 		conns: map[dbus.ObjectPath]*pconn{},
 	}
 	go p.dispatch()
@@ -172,11 +190,14 @@ func (p *peripheral) charPath(n int) dbus.ObjectPath {
 }
 func (p *peripheral) advPath() dbus.ObjectPath { return p.root + "/advertising" }
 
-// Close ends the service's Serve, unregisters a service that is
-// registered but not served (nothing else would: RegisterService's ctx
-// bounds the registration only), withdraws the advertisement and releases
-// the bus. A registration still in flight sees the close when BlueZ
-// answered it and unregisters itself (RegisterService).
+// Close ends the service's Serve and waits for its teardown — every
+// central disconnected, the application unregistered — for up to
+// 2×peripheralTimeout (one disconnect and the unregister), unregisters a
+// service that is registered but not served (nothing else would:
+// RegisterService's ctx bounds the registration only), withdraws the
+// advertisement and releases the bus. A registration still in flight sees
+// the close when BlueZ answered it and unregisters itself
+// (RegisterService).
 func (p *peripheral) Close() error {
 	p.mu.Lock()
 	if p.closed {
@@ -186,6 +207,10 @@ func (p *peripheral) Close() error {
 	}
 	p.closed = true
 	unserved := p.svc
+	var serving *gattService
+	if unserved != nil && unserved.serveCalled {
+		serving = unserved
+	}
 	if unserved != nil && unserved.state == svcRegistered {
 		unserved.state = svcEnded
 	} else {
@@ -201,6 +226,19 @@ func (p *peripheral) Close() error {
 		p.endRegistration(unserved)
 	}
 	close(p.done)
+	if serving != nil {
+		// Serve drops its centrals with Device1.Disconnect and unregisters
+		// the application on the bus (R2-C2-err-2002): the signal loop and
+		// the bus stay until it finished.
+		wait := time.NewTimer(2 * peripheralTimeout)
+		select {
+		case <-serving.finished:
+		case <-wait.C:
+		}
+		wait.Stop()
+	}
+	p.readvertising.Wait()
+	close(p.quit)
 	err := p.bus.Close()
 	<-p.dispatched
 	return err
@@ -213,7 +251,7 @@ func (p *peripheral) dispatch() {
 	defer close(p.dispatched)
 	for {
 		select {
-		case <-p.done:
+		case <-p.quit:
 			p.dropAll(false)
 			return
 		case sig, ok := <-p.bus.Signals():
@@ -350,6 +388,13 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 		}
 		return nil
 	}
+	return p.registerAdvertisement(ctx)
+}
+
+// registerAdvertisement exports the advertisement and registers it
+// (LEAdvertisingManager1.RegisterAdvertisement); the caller holds advMu.
+// A failed registration is undone and unexported.
+func (p *peripheral) registerAdvertisement(ctx context.Context) error {
 	//nolint:contextcheck // the exported handlers run on the bus's goroutines, outside the caller's context; fromBluez bounds its own call
 	if err := p.exportAdvertisement(); err != nil {
 		return err
@@ -361,6 +406,7 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 	}
 	p.mu.Lock()
 	p.registered = true
+	p.advGen++
 	p.mu.Unlock()
 	return nil
 }
@@ -442,16 +488,88 @@ func (p *peripheral) unexportAdvertisement() {
 }
 
 // release is LEAdvertisement1.Release: BlueZ dropped the advertisement
-// (chip BluezAdvertisement.cpp:92-101).
+// (chip BluezAdvertisement.cpp:92-101). The peripheral registers it again
+// with the properties of the last Advertise, retried until it holds or
+// StopAdvertising or Close ends it: the port has no way to tell the host,
+// which believes it advertises (R2-C2-fsm-2001). The work runs on its own
+// goroutine under advMu, so a Release that lands inside an Advertise is
+// handled after it, with its properties.
 func (p *peripheral) release(sender dbus.Sender) *dbus.Error {
 	if derr := p.fromBluez(sender); derr != nil {
 		return derr
 	}
 	p.mu.Lock()
-	p.registered, p.advOwed = false, false
+	gen, registered, closed := p.advGen, p.registered, p.closed
+	if registered && !closed {
+		p.readvertising.Add(1)
+	}
 	p.mu.Unlock()
-	p.unexportAdvertisement()
+	if registered && !closed {
+		go p.readvertise(gen)
+	}
 	return nil
+}
+
+// readvertise ends the registration of generation gen that BlueZ released
+// and registers the advertisement again, pausing readvertiseFirst and
+// doubling up to readvertiseMax after each failure. It stops when the
+// registration it saw was replaced meanwhile, when an Advertise registered
+// it, when StopAdvertising withdrew it (adv nil, or an unregister owed
+// when the release came: the advertisement is then forgotten), and when
+// the peripheral closes.
+func (p *peripheral) readvertise(gen uint64) {
+	defer p.readvertising.Done()
+	pause := readvertiseFirst
+	first := true
+	for {
+		p.advMu.Lock()
+		p.mu.Lock()
+		if first {
+			first = false
+			if p.advGen != gen || !p.registered {
+				p.mu.Unlock()
+				p.advMu.Unlock()
+				return
+			}
+			// An owed unregister means StopAdvertising withdrew this
+			// advertisement and only its UnregisterAdvertisement went
+			// unanswered: the Release settles it, and the radio stays
+			// silent as the host asked.
+			owed := p.advOwed
+			p.registered, p.advOwed = false, false
+			if owed {
+				p.adv = nil
+			}
+			p.mu.Unlock()
+			p.unexportAdvertisement()
+			if owed {
+				p.advMu.Unlock()
+				return
+			}
+			p.mu.Lock()
+		}
+		stop := p.closed || p.registered || p.advOwed || p.adv == nil
+		p.mu.Unlock()
+		if stop {
+			p.advMu.Unlock()
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+		err := p.registerAdvertisement(ctx)
+		cancel()
+		p.advMu.Unlock()
+		if err == nil {
+			return
+		}
+		wait := time.NewTimer(pause)
+		select {
+		case <-wait.C:
+		case <-p.done:
+			wait.Stop()
+			return
+		}
+		pause = min(2*pause, readvertiseMax)
+	}
 }
 
 // fromBluez admits a call on an exported method only from the owner of
@@ -529,7 +647,7 @@ func (p *peripheral) RegisterService(ctx context.Context, c3 []byte) (contract.G
 		p.mu.Unlock()
 		return nil, ErrServing
 	}
-	s := &gattService{p: p, state: svcRegistering, served: make(chan struct{}), ended: make(chan struct{})}
+	s := &gattService{p: p, state: svcRegistering, served: make(chan struct{}), ended: make(chan struct{}), finished: make(chan struct{})}
 	p.svc, p.c3 = s, bytes.Clone(c3)
 	owed := p.appOwed
 	p.mu.Unlock()
@@ -602,6 +720,9 @@ type gattService struct {
 	// service stopped accepting centrals (Serve's end, Close of an
 	// unserved registration, a failed registration).
 	served, ended chan struct{}
+	// finished is closed when the first Serve returned: its centrals
+	// dropped and the application unregistered (Close waits for it).
+	finished chan struct{}
 	// state, accept and serveCalled are guarded by p.mu.
 	state       serviceState
 	accept      func(contract.BLEConnection)
@@ -632,6 +753,7 @@ func (s *gattService) Serve(ctx context.Context, accept func(contract.BLEConnect
 		return ErrServing
 	}
 	s.serveCalled = true
+	defer close(s.finished)
 	if s.state != svcRegistered {
 		p.mu.Unlock()
 		return errPeripheralClosed

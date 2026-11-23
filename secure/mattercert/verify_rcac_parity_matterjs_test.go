@@ -102,3 +102,46 @@ func TestNewVerifierFromRCACRefusesANonRoot(t *testing.T) {
 		t.Fatal("NewVerifierFromRCAC accepted a truncated certificate")
 	}
 }
+
+// A self-signed root whose basic constraints say is-ca = false is refused,
+// with or without a path length. Both references refuse it: connectedhomeip
+// src/credentials/CHIPCert.cpp:1135 at 6170af84,
+// `VerifyOrReturnError(certData.mCertFlags.Has(CertFlags::kIsCA), CHIP_ERROR_CERT_USAGE_NOT_ALLOWED);`,
+// and matter.js packages/protocol/src/certificate/kinds/Rcac.ts:38-40 at
+// b25ed960 ("Root certificate must be a CA."). R2-C2-par-0150.
+func TestValidateRCACRefusesARootThatIsNotACAParityMatterJS(t *testing.T) {
+	t.Parallel()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(o *rcacBuildOpts)
+		ok   bool
+	}{
+		{"is-ca true (control)", func(*rcacBuildOpts) {}, true},
+		{"is-ca false, pathLen 1", func(o *rcacBuildOpts) { o.basicConstraintsIsCA = false }, false},
+		{"is-ca false, no pathLen", func(o *rcacBuildOpts) { o.basicConstraintsIsCA, o.basicConstraintsHasPathLen = false, false }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			o := validRCACOpts(priv)
+			tc.edit(&o)
+			c, err := mattercert.Decode(buildRCACTLV(t, priv, o))
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			err = mattercert.ValidateRCAC(c)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ValidateRCAC = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, mattercert.ErrInvalidRCAC) {
+				t.Fatalf("ValidateRCAC = %v, want ErrInvalidRCAC", err)
+			}
+		})
+	}
+}

@@ -58,6 +58,10 @@ type apiConn struct {
 	log   *slog.Logger
 	name  string
 	flags uint32
+	// mac is the device's MAC as its DeviceInfoResponse states it,
+	// normalised ([normalMAC]); "" when it states none. Discovery
+	// identifies a device by it (R2-C2-bound-2003).
+	mac string
 	// handle receives every message the connection does not answer
 	// itself; set before run.
 	handle func(typ uint16, payload []byte)
@@ -147,6 +151,7 @@ func (a *apiConn) open(psk []byte, clientInfo string) error {
 	if info.Name != "" {
 		a.name = info.Name
 	}
+	a.mac = normalMAC(info.MACAddress)
 	a.flags = info.BluetoothProxyFeatureFlags
 	// From API 1.15 the flags live in DeviceCapabilitiesResponse; the
 	// device still fills the DeviceInfoResponse field for older clients

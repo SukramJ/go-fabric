@@ -294,6 +294,9 @@ func (r *Responder) Publish(_ context.Context, svc Service) error {
 	case svc.hostNameDefaulted:
 		host = cmp.Or(r.hostPolicy().keptHostName(r.logger(), svc.HostName), svc.HostName)
 	}
+	if err := svc.validateNames(host); err != nil {
+		return err // the override or the OS host name must pack as well
+	}
 	defer r.follow()
 	r.mu.Lock()
 	defer r.mu.Unlock()
