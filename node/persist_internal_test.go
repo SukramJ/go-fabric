@@ -158,9 +158,43 @@ func TestRingLogs(t *testing.T) {
 	if b, _ := r.Logs(context.Background(), 0); !strings.Contains(string(b), "no diagnostic events") {
 		t.Errorf("empty ring %q", b)
 	}
-	ring.Record(diagevent.Event{Kind: "k", Message: "m", Detail: map[string]string{"b": "2", "a": "1"}})
-	if b, _ := r.Logs(context.Background(), 0); !strings.Contains(string(b), "k m a=1 b=2") {
+	ring.Record(diagevent.Event{Kind: "k", Message: "m", Detail: map[string]string{"max_errors": "2", "lockout_duration": "1"}})
+	if b, _ := r.Logs(context.Background(), 0); !strings.Contains(string(b), "k m lockout_duration=1 max_errors=2") {
 		t.Errorf("ring %q", b)
+	}
+}
+
+// TestRingLogsCarryNoPeerDetail (review II, R2-C2-sec-2451): the log a
+// controller retrieves with RetrieveLogsRequest — Operate on any fabric —
+// carries no peer address and no session id. The ring records every
+// fabric's and every PASE peer's sessions and pairing attempts and its
+// events name no fabric, so those details would show one fabric's
+// subject another fabric's controllers and commissioners on no fabric.
+// The event's time, kind and message stay, and so do the node-scoped
+// details (the PASE lockout's).
+func TestRingLogsCarryNoPeerDetail(t *testing.T) {
+	t.Parallel()
+	ring := diagevent.NewRing(8)
+	r := ringLogs{ring}
+	const addr = "[fd00::b]:5540"
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "A controller completed a secure-session handshake with the bridge.", Detail: map[string]string{"peer": addr}})
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "A controller closed its secure session with the bridge.", Detail: map[string]string{"peer": addr, "session_id": "4711"}})
+	ring.Record(diagevent.Event{Kind: diagevent.KindPairing, Message: "A commissioner tried to pair.", Detail: map[string]string{"peer": addr}})
+	ring.Record(diagevent.Event{Kind: diagevent.KindPairing, Message: "Pairing was locked.", Detail: map[string]string{"max_errors": "20", "lockout_duration": "1m0s"}})
+	b, err := r.Logs(context.Background(), mattercore.IntentEndUserSupport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(b)
+	for _, leak := range []string{addr, "peer=", "session_id=", "4711"} {
+		if strings.Contains(out, leak) {
+			t.Errorf("the retrieved log carries %q:\n%s", leak, out)
+		}
+	}
+	for _, kept := range []string{"closed its secure session", "lockout_duration=1m0s max_errors=20"} {
+		if !strings.Contains(out, kept) {
+			t.Errorf("the retrieved log lost %q:\n%s", kept, out)
+		}
 	}
 }
 

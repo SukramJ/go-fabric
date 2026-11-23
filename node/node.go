@@ -1848,7 +1848,25 @@ func (n *Node) wireEventsUTC() {
 // ringLogs serves DiagnosticLogs RetrieveLogsRequest from the diagnostic
 // event ring, one line per event (the daemon's ringLogs, wiring.go:
 // 1045-1074); CrashLogs answers NoLogs.
+//
+// The request is Operate on any fabric, and the ring is the node's: it
+// records every fabric's and every PASE peer's sessions and pairing
+// attempts, and its events name no fabric. A line therefore carries the
+// event's time, kind and message and only the details in
+// [ringLogsDetail], none of which names a peer; the peer address and the
+// session id stay in the host's trace ([Node.DiagnosticEvents]) and the
+// logs (review II, R2-C2-sec-2451).
 type ringLogs struct{ ring *diagevent.Ring }
+
+// ringLogsDetail is the event details a retrieved log carries: the
+// node-scoped ones. A detail key not listed here is left out, so a new
+// one recorded later reaches no controller until it is judged
+// node-scoped.
+var ringLogsDetail = map[string]bool{
+	// The PASE lockout (bridge/securechannel.go, pairing locked).
+	"max_errors":       true,
+	"lockout_duration": true,
+}
 
 // Logs implements [mattercore.LogProvider].
 func (r ringLogs) Logs(_ context.Context, intent uint8) ([]byte, error) {
@@ -1859,6 +1877,9 @@ func (r ringLogs) Logs(_ context.Context, intent uint8) ([]byte, error) {
 	for _, e := range r.ring.Snapshot() {
 		fmt.Fprintf(&b, "%s %s %s", e.At.UTC().Format(time.RFC3339), e.Kind, e.Message)
 		for _, k := range slices.Sorted(maps.Keys(e.Detail)) {
+			if !ringLogsDetail[k] {
+				continue
+			}
 			fmt.Fprintf(&b, " %s=%s", k, e.Detail[k])
 		}
 		b.WriteByte('\n')
