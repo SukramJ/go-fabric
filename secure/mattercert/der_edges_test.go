@@ -669,6 +669,19 @@ func TestValidateRCACRefusals(t *testing.T) {
 		{"icac-id in the subject", func(c *Certificate) { c.Subject.HasICACID = true }, "matter-icac-id"},
 		{"fabric id 0 in the subject", func(c *Certificate) { c.Subject.HasFabricID, c.Subject.MatterFabricID = true, 0 }, "fabric id of 0"},
 		{"CATs in the subject", func(c *Certificate) { c.Subject.CASEAuthTags = []uint32{0x0001_0001} }, "CASE Authenticated Tags"},
+		// SKID and AKID present and 20 bytes each: matter.js Rcac.ts:112-126
+		// and chip (CHIPCert.cpp:143-144, TLVReader.h:481, CHIPCert.h:50)
+		// share the refusal (R2-C2-par-0150, decision 523).
+		{"no subject key id", func(c *Certificate) { c.Extensions.HasSubjectKeyID, c.Extensions.SubjectKeyID = false, nil }, "subjectKeyIdentifier absent"},
+		{"no authority key id", func(c *Certificate) { c.Extensions.HasAuthorityKeyID, c.Extensions.AuthorityKeyID = false, nil }, "authorityKeyIdentifier absent"},
+		{"key ids of 19 bytes", func(c *Certificate) {
+			c.Extensions.SubjectKeyID, c.Extensions.AuthorityKeyID = c.Extensions.SubjectKeyID[:19], c.Extensions.AuthorityKeyID[:19]
+		}, "subjectKeyIdentifier of 19 bytes"},
+		{"key ids of 21 bytes", func(c *Certificate) {
+			id := append(append([]byte(nil), c.Extensions.SubjectKeyID...), 0)
+			c.Extensions.SubjectKeyID, c.Extensions.AuthorityKeyID = id, id
+		}, "subjectKeyIdentifier of 21 bytes"},
+		{"authority key id of 19 bytes", func(c *Certificate) { c.Extensions.AuthorityKeyID = c.Extensions.AuthorityKeyID[:19] }, "authorityKeyIdentifier of 19 bytes"},
 		{"not a CA", func(c *Certificate) { c.Extensions.BasicConstraintsIsCA = false }, "is not a CA"},
 		{"no basic constraints", func(c *Certificate) { c.Extensions.HasBasicConstraints = false }, "is not a CA"},
 		{"no key usage", func(c *Certificate) { c.Extensions.HasKeyUsage = false }, "KeyUsage extension absent"},

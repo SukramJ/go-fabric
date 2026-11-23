@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"testing"
 
@@ -181,6 +182,75 @@ func TestValidateRCACRefusesARootSubjectOfAnotherKindParityMatterJS(t *testing.T
 				t.Fatalf("Decode: %v", err)
 			}
 			err = mattercert.ValidateRCAC(c)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ValidateRCAC = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, mattercert.ErrInvalidRCAC) {
+				t.Fatalf("ValidateRCAC = %v, want ErrInvalidRCAC", err)
+			}
+		})
+	}
+}
+
+// A self-signed root whose subjectKeyIdentifier and authorityKeyIdentifier
+// are not 20 bytes each is refused. matter.js
+// packages/protocol/src/certificate/kinds/Rcac.ts:112-126 at b25ed960
+// requires both present and of byteLength 20; connectedhomeip refuses the
+// same at decode (src/credentials/CHIPCert.cpp:143-144,
+// src/lib/core/TLVReader.h:481, src/credentials/CHIPCert.h:50 at 6170af84).
+// The TLV decoder refuses another length already; the DER decoder does
+// not, so the root here comes through DecodeDER, signed over its rebuilt
+// TBS so that only the key-id rule can refuse it. R2-C2-par-0150,
+// decision 523.
+func TestValidateRCACRefusesAKeyIdentifierOfAnotherLengthParityMatterJS(t *testing.T) {
+	t.Parallel()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		n    int
+		ok   bool
+	}{
+		{"20 bytes (control)", 20, true},
+		{"19 bytes", 19, false},
+		{"21 bytes", 21, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := mattercert.Decode(buildRCACTLV(t, priv, validRCACOpts(priv)))
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			id := bytes.Repeat([]byte{0xA5}, tc.n)
+			c.Extensions.SubjectKeyID, c.Extensions.AuthorityKeyID = id, append([]byte(nil), id...)
+			c.TBSDER = nil
+			tbs, err := mattercert.TBSToDER(c)
+			if err != nil {
+				t.Fatalf("TBSToDER: %v", err)
+			}
+			digest := sha256.Sum256(tbs)
+			r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Signature = append(r.FillBytes(make([]byte, 32)), s.FillBytes(make([]byte, 32))...)
+			der, err := mattercert.EncodeDER(c)
+			if err != nil {
+				t.Fatalf("EncodeDER: %v", err)
+			}
+			back, err := mattercert.DecodeDER(der)
+			if err != nil {
+				t.Fatalf("DecodeDER: %v", err)
+			}
+			if len(back.Extensions.SubjectKeyID) != tc.n {
+				t.Fatalf("DecodeDER kept a %d-byte subjectKeyIdentifier, want %d", len(back.Extensions.SubjectKeyID), tc.n)
+			}
+			err = mattercert.ValidateRCAC(back)
 			if tc.ok {
 				if err != nil {
 					t.Fatalf("ValidateRCAC = %v, want nil", err)
