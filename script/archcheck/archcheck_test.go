@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -35,9 +36,29 @@ type exception struct {
 	Reason string `json:"reason"`
 }
 
+// forbidden is a rule the layer order cannot state: a package matching one
+// of From must not import a package matching one of To, whatever their
+// layers. A pattern is a layers.json pattern ("x" or "x/...").
+type forbidden struct {
+	From   []string `json:"from"`
+	To     []string `json:"to"`
+	Reason string   `json:"reason"`
+}
+
 type rules struct {
 	Layers     []layerDef  `json:"layers"`
 	Exceptions []exception `json:"exceptions"`
+	Forbidden  []forbidden `json:"forbidden"`
+}
+
+// matchesAny reports whether path matches one of patterns.
+func matchesAny(patterns []string, path string) bool {
+	for _, p := range patterns {
+		if specificity(p, path) >= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // matcher assigns a module-relative package path to a layer index.
@@ -119,6 +140,15 @@ func check(r rules, graph map[string][]string) []string {
 			out = append(out, fmt.Sprintf("%s -> %s (%s -> %s)", from, to, r.Layers[lf].Name, r.Layers[lt].Name))
 		}
 	}
+	for _, from := range pkgs {
+		for _, to := range graph[from] {
+			for _, f := range r.Forbidden {
+				if matchesAny(f.From, from) && matchesAny(f.To, to) {
+					out = append(out, fmt.Sprintf("forbidden import: %s -> %s (%s)", from, to, f.Reason))
+				}
+			}
+		}
+	}
 	for _, e := range r.Exceptions {
 		if !seenEx[[2]string{e.From, e.To}] {
 			out = append(out, fmt.Sprintf("stale exception: %s -> %s no longer occurs as an upward edge; remove it from layers.json", e.From, e.To))
@@ -147,6 +177,11 @@ func loadRules(t *testing.T) rules {
 	for _, e := range r.Exceptions {
 		if e.From == "" || e.To == "" || strings.TrimSpace(e.Reason) == "" {
 			t.Fatalf("layers.json: exception %+v needs from, to and a reason", e)
+		}
+	}
+	for _, f := range r.Forbidden {
+		if len(f.From) == 0 || len(f.To) == 0 || strings.TrimSpace(f.Reason) == "" {
+			t.Fatalf("layers.json: forbidden rule %+v needs from, to and a reason", f)
 		}
 	}
 	return r
@@ -234,7 +269,9 @@ func nestedModules(root string) ([]string, error) {
 }
 
 // TestLayering holds ADR 0026 principle 1: a package imports only its own
-// layer or a lower one, apart from the exceptions in layers.json.
+// layer or a lower one, apart from the exceptions in layers.json; and the
+// forbidden rules of layers.json, among them ADR 0020 decision 1's sibling
+// rule (review II, R3-api-3780, decision 556).
 func TestLayering(t *testing.T) {
 	r := loadRules(t)
 	if v := check(r, moduleGraph(t)); len(v) > 0 {
@@ -286,5 +323,57 @@ func TestCheckReportsUpwardStaleAndUnassigned(t *testing.T) {
 	r.Exceptions = nil
 	if got := strings.Join(check(r, map[string][]string{"a": {"b"}, "b": nil}), "\n"); got != "a -> b (low -> high)" {
 		t.Errorf("violation line = %q", got)
+	}
+}
+
+// TestCheckReportsForbiddenImports is the forbidden rule's fixture
+// (review II, R3-api-3780, decision 556): an edge the layer order allows is
+// still reported when a forbidden rule names both ends, whichever layer
+// either end is in; an edge from a package no from-pattern names is not.
+func TestCheckReportsForbiddenImports(t *testing.T) {
+	r := rules{
+		Layers: []layerDef{
+			{Name: "low", Packages: []string{"dcl"}},
+			{Name: "roles", Packages: []string{"bridge", "controller/..."}},
+			{Name: "facade", Packages: []string{"node"}},
+			{Name: "support", Packages: []string{"bridge/bridgetest"}},
+		},
+		Forbidden: []forbidden{{From: []string{"bridge", "node/..."}, To: []string{"controller/..."}, Reason: "siblings"}},
+	}
+	graph := map[string][]string{
+		"node":              {"controller/dcl", "dcl"},
+		"bridge":            {"controller"},
+		"bridge/bridgetest": {"controller/ca"},
+		"controller":        {"dcl"},
+		"controller/dcl":    {"dcl"},
+		"controller/ca":     nil,
+		"dcl":               nil,
+	}
+	got := check(r, graph)
+	want := []string{
+		"forbidden import: bridge -> controller (siblings)",
+		"forbidden import: node -> controller/dcl (siblings)",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("check = %q, want %q", got, want)
+	}
+}
+
+// TestADR0020SiblingRuleIsInTheRules holds the rule file to decision 556:
+// the forbidden rule that keeps bridge, node, device and endpoint off
+// controller/... is present, so deleting it from layers.json fails here
+// rather than silently disarming TestLayering.
+func TestADR0020SiblingRuleIsInTheRules(t *testing.T) {
+	r := loadRules(t)
+	for _, from := range []string{"bridge", "node", "node/metrics/prom", "device", "device/light", "endpoint", "endpoint/sqlitestore"} {
+		for _, to := range []string{"controller", "controller/dcl", "controller/attestation"} {
+			hit := false
+			for _, f := range r.Forbidden {
+				hit = hit || (matchesAny(f.From, from) && matchesAny(f.To, to))
+			}
+			if !hit {
+				t.Errorf("no forbidden rule in layers.json keeps %s off %s (ADR 0020 decision 1, decision 556)", from, to)
+			}
+		}
 	}
 }

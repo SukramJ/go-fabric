@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // TestImagesRequireTheLedgersChecksum: a ledger update — of the

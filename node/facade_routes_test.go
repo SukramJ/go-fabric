@@ -13,7 +13,7 @@ import (
 
 	"thingfabric.dev/go-fabric/bridge"
 	mattercore "thingfabric.dev/go-fabric/cluster/core"
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 	"thingfabric.dev/go-fabric/device"
 	"thingfabric.dev/go-fabric/diagevent"
 	"thingfabric.dev/go-fabric/endpoint"

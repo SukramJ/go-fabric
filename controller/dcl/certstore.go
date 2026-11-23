@@ -21,6 +21,7 @@ import (
 
 	"thingfabric.dev/go-fabric/client/exchange"
 	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // DefaultUpdateInterval is how often the trust store refreshes — matter.js
@@ -35,10 +36,10 @@ type CertificateOptions struct {
 	// Client asks the production ledger. nil is matter.js's offline
 	// (:2061-2070): no update, no CRL, no certificate fetched on demand —
 	// the store holds what Store and AddCertificate gave it.
-	Client *Client
+	Client *dcl.Client
 	// TestClient asks the test-net ledger when FetchTestCertificates is
-	// set; nil is Client's settings against [TestNetURL] (DclConfig.test).
-	TestClient *Client
+	// set; nil is Client's settings against [dcl.TestNetURL] (DclConfig.test).
+	TestClient *dcl.Client
 	// FetchTestCertificates also fetches the test-net ledger's roots
 	// (fetchTestCertificates, default false).
 	FetchTestCertificates bool
@@ -56,8 +57,8 @@ type CertificateOptions struct {
 	// UpdateInterval is the refresh period; 0 is [DefaultUpdateInterval],
 	// a negative one refreshes never (updateInterval null).
 	UpdateInterval time.Duration
-	// Store keeps the trust store between runs; nil is a [MemoryStore].
-	Store Store
+	// Store keeps the trust store between runs; nil is a [dcl.MemoryStore].
+	Store dcl.Store
 	// Clock times the refresh and stamps FetchedAt; nil is the system
 	// clock.
 	Clock exchange.Clock
@@ -120,7 +121,7 @@ type CertificateStore struct {
 	opts   CertificateOptions
 	clock  exchange.Clock
 	log    *slog.Logger
-	store  Store
+	store  dcl.Store
 	github *githubClient
 
 	// mu guards closed, githubRateLimited, index and timer.
@@ -183,7 +184,7 @@ func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*Certif
 		s.log = slog.New(slog.DiscardHandler)
 	}
 	if s.store == nil {
-		s.store = &MemoryStore{}
+		s.store = &dcl.MemoryStore{}
 	}
 	if opts.FetchTestCertificates && opts.FetchGitHubCertificates && opts.Client != nil {
 		s.github = newGitHubClient(opts.GitHub, opts.Client)
@@ -556,7 +557,7 @@ func (s *CertificateStore) fetchAndStoreRootCertificateBySkid(ctx context.Contex
 		return false, err
 	}
 	withColons := strings.ToUpper(strings.Join(hexPairs.FindAllString(id, -1), ":"))
-	i := slices.IndexFunc(refs, func(r SubjectReference) bool { return r.SubjectKeyID == withColons })
+	i := slices.IndexFunc(refs, func(r dcl.SubjectReference) bool { return r.SubjectKeyID == withColons })
 	if i < 0 {
 		return false, nil
 	}
@@ -566,7 +567,7 @@ func (s *CertificateStore) fetchAndStoreRootCertificateBySkid(ctx context.Contex
 }
 
 // clientFor is the ledger of a production or test certificate.
-func (s *CertificateStore) clientFor(isProduction bool) *Client {
+func (s *CertificateStore) clientFor(isProduction bool) *dcl.Client {
 	if isProduction || s.opts.TestClient != nil {
 		if isProduction {
 			return s.opts.Client
@@ -574,7 +575,7 @@ func (s *CertificateStore) clientFor(isProduction bool) *Client {
 		return s.opts.TestClient
 	}
 	c := *s.opts.Client
-	c.BaseURL = TestNetURL
+	c.BaseURL = dcl.TestNetURL
 	return &c
 }
 
@@ -922,7 +923,7 @@ func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProductio
 // DER parses as a PAA and carries the key identifier the ledger states —
 // at most maxCertificatesPerRootAnswer of them, ref's own first. It
 // reports whether the store holds a usable certificate for ref.
-func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client *Client, ref SubjectReference, isProduction, force bool) bool {
+func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client *dcl.Client, ref dcl.SubjectReference, isProduction, force bool) bool {
 	refID := normalizeKeyID(ref.SubjectKeyID)
 	if !force {
 		s.mu.Lock()
@@ -951,7 +952,7 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 	}
 	// The certificates of the root asked for first, so the bound below
 	// never drops them for others the answer carries.
-	slices.SortStableFunc(certs, func(a, b Certificate) int {
+	slices.SortStableFunc(certs, func(a, b dcl.Certificate) int {
 		aRef, bRef := normalizeKeyID(a.SubjectKeyID) == refID, normalizeKeyID(b.SubjectKeyID) == refID
 		switch {
 		case aRef && !bRef:

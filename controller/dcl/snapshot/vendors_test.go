@@ -9,8 +9,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"thingfabric.dev/go-fabric/controller/dcl"
 	"thingfabric.dev/go-fabric/controller/dcl/snapshot"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // TestVendors: the embedded snapshot names the ledger's vendors offline

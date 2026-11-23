@@ -14,8 +14,9 @@ import (
 
 // TestBackgroundContextsAreNamed (review II, R2-P6-conc-1906,
 // R2-P6-conc-1907) is the standing guard of the class "work a Close cannot
-// cancel": every context.Background() in controller/dcl and
-// controller/softwareupdate is listed here by file and function, with the
+// cancel": every context.Background() in controller/dcl,
+// controller/softwareupdate and dcl (where the ledger client moved, review
+// II, decision 553) is listed here by file and function, with the
 // reason it is not a caller's or the service's life. Periodic work runs
 // under the context its Close cancels; a new Background joins the list
 // with its reason or takes such a context.
@@ -27,21 +28,19 @@ func TestBackgroundContextsAreNamed(t *testing.T) {
 		"dcl/certstore.go attestationContext":               "attestation.PAAStore (PAA, CDSigner) takes no context; bounded by attestationLookupTimeout, the wait for a running update included",
 		"dcl/certstore.go CDSigner":                         "the store write of a fetched CD signer, bounded by the Store",
 		"dcl/revocation.go IsRevoked":                       "attestation.Revocations takes no context; bounded by revocationLookupTimeout",
-		"dcl/vendorinfo.go NewVendorInfoService":            "the root of the periodic context Close cancels",
+		"ledger/vendorinfo.go NewVendorInfoService":         "the root of the periodic context Close cancels",
 		"softwareupdate/manager.go New":                     "the root of the manager's life Close cancels",
 		"softwareupdate/announcements.go processQueueEntry": "an announcement, bounded by the node's own timeouts; announcements.close stops the queue",
 	}
 	seen := map[string]bool{}
 	fset := token.NewFileSet()
-	for _, dir := range []string{".", "../softwareupdate"} {
+	for _, dir := range []string{".", "../softwareupdate", "../../dcl"} {
 		files, err := filepath.Glob(filepath.Join(dir, "*.go"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		pkg := "dcl"
-		if dir != "." {
-			pkg = "softwareupdate"
-		}
+		// "ledger" is package dcl at the module root, "dcl" this one.
+		pkg := map[string]string{".": "dcl", "../softwareupdate": "softwareupdate", "../../dcl": "ledger"}[dir]
 		for _, name := range files {
 			if strings.HasSuffix(name, "_test.go") {
 				continue
