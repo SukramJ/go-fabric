@@ -66,12 +66,11 @@ func (p passcodeValue) Set(s string) error {
 	if err != nil {
 		return err
 	}
-	n, err := strconv.ParseUint(strings.TrimSpace(s), 10, 32)
-	if err != nil {
+	if n, perr := strconv.ParseUint(strings.TrimSpace(s), 10, 32); perr == nil {
+		*p.v, *p.err = uint(n), nil
+	} else {
 		*p.err = errPasscodeNotDecimal
-		return nil
 	}
-	*p.v, *p.err = uint(n), nil
 	return nil
 }
 

@@ -50,6 +50,20 @@ func parseCode(code string) (pairing, error) {
 	return pairing{code: code, what: what}, nil
 }
 
+// parsePasscode is --passcode's text as a number, 0 when it is empty. The
+// value is not echoed in the error: it is the passcode of the device being
+// paired, and the text reaches a log.
+func parsePasscode(arg string) (uint, error) {
+	if arg == "" {
+		return 0, nil
+	}
+	n, err := strconv.ParseUint(arg, 10, 32)
+	if err != nil {
+		return 0, errors.New("--passcode is not a decimal number")
+	}
+	return uint(n), nil
+}
+
 // codeOf is the QR code of a passcode and a long discriminator, the code
 // controller.Pair takes for --passcode and --discriminator: no vendor or
 // product (0 is unspecified), discovery on the IP network.
@@ -181,14 +195,8 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 	if err := wantArgs("pair", pos, 0, 0); err != nil {
 		return err
 	}
-	if passcodeArg != "" {
-		n, err := strconv.ParseUint(passcodeArg, 10, 32)
-		if err != nil {
-			// The value is not echoed: it is the passcode of the device
-			// being paired, and the text reaches a log.
-			return errors.New("--passcode is not a decimal number")
-		}
-		passcode = uint(n)
+	if passcode, err = parsePasscode(passcodeArg); err != nil {
+		return err
 	}
 	var pr pairing
 	switch {
