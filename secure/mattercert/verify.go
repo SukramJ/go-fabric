@@ -179,7 +179,7 @@ func ValidateRCAC(c *Certificate) error {
 	}
 	// KeyUsage must include keyCertSign. chip checks ONLY kKeyCertSign;
 	// cRLSign is NOT required by the Matter spec or chip.
-	// Mirrors chip CHIPCert.cpp:1141 kKeyUsage_KeyCertSign.
+	// Mirrors chip CHIPCert.cpp:1141 KeyUsageFlags::kKeyCertSign.
 	if !c.Extensions.HasKeyUsage {
 		return fmt.Errorf("%w: KeyUsage extension absent", ErrInvalidRCAC)
 	}
