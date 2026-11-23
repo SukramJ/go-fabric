@@ -126,12 +126,16 @@ type Messages struct {
 // messagesInFlight is one present or cancel at the presenter; removed
 // marks a present whose fabric was removed meanwhile, cancelled a present
 // whose id the same fabric cancelled meanwhile (R2-C2-conc-1201).
+// takingDown is set, and closed once the presenter's cancel returned,
+// while a present that queues nothing takes its message down
+// (R3-conc-3101, R3-conc-3102).
 type messagesInFlight struct {
-	id        []byte
-	fabric    uint8
-	present   bool
-	removed   bool
-	cancelled bool
+	id         []byte
+	fabric     uint8
+	present    bool
+	removed    bool
+	cancelled  bool
+	takingDown chan struct{}
 }
 
 // beginFlightLocked records an id at the presenter; endFlightLocked takes
@@ -310,9 +314,26 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	// under mu, the presenter called without it, the result applied under
 	// it again (ADR 0026 P6).
 	m.mu.Lock()
-	if m.heldByAnotherLocked(msg.MessageId, fabric) {
-		m.unlock()
-		return bindingStatusError{code: im.StatusAlreadyExists, msg: "core: Messages: another fabric's message holds the MessageID"}
+	for {
+		if m.heldByAnotherLocked(msg.MessageId, fabric) {
+			m.unlock()
+			return bindingStatusError{code: im.StatusAlreadyExists, msg: "core: Messages: another fabric's message holds the MessageID"}
+		}
+		// A take-down of the id under this fabric index runs at the
+		// presenter: this present waits for it, so the presenter sees the
+		// cancel before the present and never takes the new message down
+		// (R3-conc-3101, R3-conc-3102).
+		done := m.takeDownOfLocked(msg.MessageId, fabric)
+		if done == nil {
+			break
+		}
+		m.mu.Unlock()
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return messagesStatus(ctx.Err())
+		}
+		m.mu.Lock()
 	}
 	reserved := m.indexLocked(msg.MessageId) < 0
 	if reserved && len(m.messages)+m.presenting >= messagesMax {
@@ -374,17 +395,56 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 // takeDown answers a present whose message is not queued: the presenter
 // takes down what it showed, the flight ending only once that cancel
 // returned, and answer is the command's result unless the cancel failed.
-// Called with mu held; returns with it released.
+// When the id is queued again under the flight's fabric index, or another
+// present of it under that index runs that will queue it, the presenter's
+// display of the id is that newer present's, and the take-down skips the
+// cancel: the queue and the display stay one (R3-conc-3101, a cancelled
+// present; R3-conc-3102, a present of a removed fabric whose index a new
+// fabric holds). A present that begins while the cancel runs waits for it
+// (present). Called with mu held; returns with it released.
 func (m *Messages) takeDown(ctx context.Context, flight *messagesInFlight, answer error) error {
+	if m.supersededLocked(flight) {
+		m.endFlightLocked(flight)
+		m.unlock()
+		return answer
+	}
+	done := make(chan struct{})
+	flight.takingDown = done
 	m.unlock()
 	cancelErr := m.presenter.CancelMessage(ctx, slices.Clone(flight.id))
 	m.mu.Lock()
 	m.endFlightLocked(flight)
+	close(done)
 	m.unlock()
 	if cancelErr != nil {
 		return messagesStatus(cancelErr)
 	}
 	return answer
+}
+
+// supersededLocked reports whether a newer present owns the presenter's
+// display of flight's id: the id is queued under flight's fabric index, or
+// another present of it under that index runs that is neither cancelled
+// nor removed. Caller holds mu.
+func (m *Messages) supersededLocked(flight *messagesInFlight) bool {
+	if i := m.indexLocked(flight.id); i >= 0 && m.messages[i].FabricIndex == flight.fabric {
+		return true
+	}
+	return slices.ContainsFunc(m.inFlight, func(e *messagesInFlight) bool {
+		return e != flight && e.present && !e.cancelled && !e.removed && e.takingDown == nil &&
+			e.fabric == flight.fabric && bytes.Equal(e.id, flight.id)
+	})
+}
+
+// takeDownOfLocked is the done channel of a take-down of id under fabric
+// that runs at the presenter, nil when none does. Caller holds mu.
+func (m *Messages) takeDownOfLocked(id []byte, fabric uint8) chan struct{} {
+	for _, e := range m.inFlight {
+		if e.takingDown != nil && e.fabric == fabric && bytes.Equal(e.id, id) {
+			return e.takingDown
+		}
+	}
+	return nil
 }
 
 // cancelPresentsLocked marks the accessing fabric's presents of id at the
