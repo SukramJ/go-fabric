@@ -273,6 +273,10 @@ func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 	}
 	fabrics, err := n.st.ListFabrics(ctx)
 	if err != nil {
+		// No entry is written until the next Start or
+		// CommissioningComplete: a granted requestor refused meanwhile
+		// is refused for this (review II, R2-C2-err-2456).
+		n.logger.Warn("ota.provider.acl_list_failed", slog.Any("err", err))
 		return
 	}
 	for i := range fabrics {
