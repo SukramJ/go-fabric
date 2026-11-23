@@ -666,6 +666,9 @@ func TestValidateRCACRefusals(t *testing.T) {
 	}{
 		{"not a root", func(c *Certificate) { *c = *noc }, "not a Root CA"},
 		{"issuer id differs", func(c *Certificate) { c.Issuer.MatterRCACID++ }, "root must be self-signed"},
+		{"icac-id in the subject", func(c *Certificate) { c.Subject.HasICACID = true }, "matter-icac-id"},
+		{"fabric id 0 in the subject", func(c *Certificate) { c.Subject.HasFabricID, c.Subject.MatterFabricID = true, 0 }, "fabric id of 0"},
+		{"CATs in the subject", func(c *Certificate) { c.Subject.CASEAuthTags = []uint32{0x0001_0001} }, "CASE Authenticated Tags"},
 		{"not a CA", func(c *Certificate) { c.Extensions.BasicConstraintsIsCA = false }, "is not a CA"},
 		{"no basic constraints", func(c *Certificate) { c.Extensions.HasBasicConstraints = false }, "is not a CA"},
 		{"no key usage", func(c *Certificate) { c.Extensions.HasKeyUsage = false }, "KeyUsage extension absent"},

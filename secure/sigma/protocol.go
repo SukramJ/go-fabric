@@ -415,7 +415,11 @@ func (r *Responder) PeerCATs() []uint32 {
 // don't stamp it leave a zero (which is also the pre-resolver
 // fallback). Returns the operational FabricIndex (0 = unknown / not
 // set by daemon) and NodeID. Callers tolerant of fabric_index==0
-// fall back to their factory-time default fabric.
+// fall back to their factory-time default fabric. A resumption never
+// lands there with a stamped record: without a [FabricIndexResolver],
+// a record whose FabricIndex is set resumes only under a baseline
+// identity of the same FabricIndex — under an unstamped one (0) or none
+// (nil) it is a miss and the peer runs a full handshake (R2-C2-sec-0101).
 func (r *Responder) SessionIdentity() (fabricIndex uint8, nodeID uint64, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -706,10 +710,14 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	// Without the lookup by fabric index the baseline identity stands in
 	// only for a record of its own fabric: a record naming another fabric
 	// would resume that fabric's peer under the baseline's fabric
-	// (SessionIdentity) — fail closed, a miss (R2-C2-sec-0101). A zero
-	// on either side is "not stamped" (SessionIdentity's doc), the same
-	// unknown a full handshake reports, and is not compared.
-	if !byIndex && rec.FabricIndex != 0 && identity != nil && identity.FabricIndex != 0 && identity.FabricIndex != rec.FabricIndex {
+	// (SessionIdentity) — fail closed, a miss (R2-C2-sec-0101). An
+	// unstamped baseline (fabric index 0) proves no fabric either: its
+	// caller falls back to its default fabric, so a stamped record under
+	// it is a miss too and an unstamped host pays one Full Sigma
+	// (decision 517). A nil baseline (NewResponder(nil, …) with an
+	// identity-only resolver) proves none and is a miss for a stamped
+	// record as well. Only an unstamped record (0) is not compared.
+	if !byIndex && rec.FabricIndex != 0 && (identity == nil || identity.FabricIndex != rec.FabricIndex) {
 		return Sigma1ProcessResult{}, false, nil
 	}
 

@@ -42,6 +42,10 @@ type rcacBuildOpts struct {
 	// When foreignKey is set the cert is signed by a different key
 	// (simulates a self-signature failure).
 	foreignKey *ecdsa.PrivateKey
+
+	// subjectExtra, when set, appends further RDNs to the subject after
+	// its rcac-id; the self-signature covers them.
+	subjectExtra func(e *tlv.Encoder)
 }
 
 // buildRCACTLV returns a fully-signed RCAC TLV byte slice, timestamped
@@ -132,6 +136,9 @@ func buildRCACFull(t *testing.T, pubKey []byte, o rcacBuildOpts, sig []byte, now
 
 	e.StartList(tlv.ContextTag(6)) // Subject: RCAC-ID (same as Issuer → self-signed)
 	e.PutUint(tlv.ContextTag(20), o.rcacID)
+	if o.subjectExtra != nil {
+		o.subjectExtra(e)
+	}
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("subject end: %v", err)
 	}

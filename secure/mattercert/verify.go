@@ -88,6 +88,8 @@ const (
 // ValidateRCAC checks the structural invariants that chip enforces on Root
 // CA certificates beyond what the chain verifier already covers:
 //
+//   - The subject is a root's: an rcac-id, no node-id, no icac-id, no
+//     fabric id of 0, no CATs.
 //   - Subject == Issuer (self-signed: the RCAC-ID in both must match).
 //   - SubjectKeyIdentifier == AuthorityKeyIdentifier (self-signed key binding).
 //   - BasicConstraints present with is-ca set.
@@ -101,13 +103,17 @@ const (
 //   - ECDSA self-signature verification: the RCAC must be signed by its own key.
 //
 // Follows connectedhomeip/src/credentials/CHIPCert.cpp:1116-1144
-// ValidateChipRCAC, with these differences: the self-signed test compares
-// the subject's and issuer's RCAC-IDs, where chip compares the whole
-// subject and issuer DN (:1131); and the certificate-type test is IsRoot
-// (an rcac-id and no node-id), where chip's (:1129, ChipDN::GetCertType
-// :606-687) also refuses a root subject with an icac-id or a
-// firmware-signing-id, a fabric id of 0 or CATs. The previous "PathLen must be present AND > 0"
-// guards were stricter than chip and rejected the chip-tool / openssl
+// ValidateChipRCAC. The certificate-type test is IsRoot (an rcac-id and no
+// node-id) and refuses a root subject with an icac-id, a fabric id of 0 or
+// CATs — the refusals chip (:1129, ChipDN::GetCertType :606-687) and
+// matter.js (Rcac.ts:69-71, :74-76, :84-86) share. Differences: the
+// self-signed test compares the subject's and issuer's RCAC-IDs, where
+// chip compares the whole subject and issuer DN (:1131); a root subject
+// with a firmware-signing-id is admitted, as matter.js admits it, where
+// chip's certificate-type test refuses it; and the key usage needs
+// keyCertSign only, as chip (:1141), where matter.js's Rcac.ts (:100-105)
+// refuses a key usage other than 0x0060 or 0x0061. The previous
+// "PathLen must be present AND > 0" guards were stricter than chip and rejected the chip-tool / openssl
 // commissioner default RCAC (Path­LenConstraint absent), breaking
 // commissioning at SendTrustedRootCert with `BasicConstraints
 // PathLenConstraint absent on RCAC`.
@@ -118,6 +124,20 @@ func ValidateRCAC(c *Certificate) error {
 	}
 	if err := checkDNLimits(c, "RCAC"); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidRCAC, err)
+	}
+	// A root subject carries no icac-id, no fabric id of 0 and no CATs:
+	// the refusals chip's certificate-type test (CHIPCert.cpp:1129,
+	// ChipDN::GetCertType :606-687) and matter.js's Rcac.ts (:69-71,
+	// :74-76, :84-86) share (R2-C2-par-0150, decision 516). A
+	// firmware-signing-id stays admitted, as matter.js admits it.
+	if c.Subject.HasICACID {
+		return fmt.Errorf("%w: root subject carries a matter-icac-id", ErrInvalidRCAC)
+	}
+	if c.Subject.HasFabricID && c.Subject.MatterFabricID == 0 {
+		return fmt.Errorf("%w: root subject carries a fabric id of 0", ErrInvalidRCAC)
+	}
+	if len(c.Subject.CASEAuthTags) > 0 {
+		return fmt.Errorf("%w: root subject carries CASE Authenticated Tags", ErrInvalidRCAC)
 	}
 	// Self-signed: Subject RCAC-ID must equal Issuer RCAC-ID. chip
 	// CHIPCert.cpp:1131 compares the whole DN, mSubjectDN.IsEqual(mIssuerDN);
