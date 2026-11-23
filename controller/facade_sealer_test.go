@@ -15,8 +15,8 @@ import (
 	"thingfabric.dev/go-fabric/store"
 )
 
-// The controller facade's sealing errors are the store's values (decision
-// 551, #584), for errors.Is.
+// The controller facade's sealing and scrub errors are the store's values
+// (decisions 551, 571, #584), for errors.Is.
 func TestFacadeSealErrorsAreTheStores(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -25,6 +25,7 @@ func TestFacadeSealErrorsAreTheStores(t *testing.T) {
 	}{
 		{"Unseal", controller.ErrUnseal, store.ErrUnseal},
 		{"NoSealer", controller.ErrNoSealer, store.ErrNoSealer},
+		{"ScrubIncomplete", controller.ErrScrubIncomplete, store.ErrScrubIncomplete},
 	} {
 		if c.facade == nil || !errors.Is(c.facade, c.base) || !errors.Is(c.base, c.facade) {
 			t.Errorf("%s: controller's %v is not the store's %v", c.name, c.facade, c.base)

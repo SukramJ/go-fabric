@@ -5,8 +5,8 @@ package controller
 
 import "thingfabric.dev/go-fabric/store"
 
-// The store errors of a sealed controller database, for errors.Is. They
-// are the store's values, not copies.
+// The store errors of a sealed controller database and of its scrub, for
+// errors.Is. They are the store's values, not copies.
 var (
 	// ErrUnseal is wrapped by [New] when [Config].Sealer does not open the
 	// sealed database — another key than the one that sealed it, or a
@@ -17,6 +17,13 @@ var (
 	// a sealer (store.ErrNoSealer): the database was sealed, and
 	// [Config].Sealer must be set.
 	ErrNoSealer = store.ErrNoSealer
+	// ErrScrubIncomplete is wrapped by every error [Reseal] returns after
+	// its commit — the values are sealed under the new sealer, but the
+	// scrub of the file did not finish or its mark could not be dropped,
+	// and the next [New] under the new sealer scrubs again — and by a
+	// [Controller.Erase] whose reset completed but whose scrub did not
+	// (store.ErrScrubIncomplete).
+	ErrScrubIncomplete = store.ErrScrubIncomplete
 )
 
 // NewAESGCMSealer returns the module's stdlib sealer for [Config].Sealer
