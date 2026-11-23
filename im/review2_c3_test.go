@@ -38,8 +38,8 @@ func invokeResponseWithFields(t *testing.T, put func(enc *tlv.Encoder)) []byte {
 // TestInvokeResponseFieldsThatDoNotDecodeFailTheResponse (R2-C2-wire-0551):
 // a command response whose CommandFields is not a structure does not
 // decode; the response is an error, never an entry that reads as a Success
-// without fields. A typed reject of the client's own fields reader is
-// left as it was (the row's second half, put to the coordinator).
+// without fields. A typed reject of the client's own fields reader fails it
+// too: TestInvokeResponseFieldsATypedReaderRejectFailTheResponse.
 func TestInvokeResponseFieldsThatDoNotDecodeFailTheResponse(t *testing.T) {
 	t.Parallel()
 	accept := func(ConcreteCommandPath, *tlv.Decoder, tlv.Element) (any, error) { return "fields", nil }
@@ -90,6 +90,72 @@ func TestInvokeResponseFieldsThatDoNotDecodeFailTheResponse(t *testing.T) {
 	scalar := invokeResponseWithFields(t, func(enc *tlv.Encoder) { enc.PutUint(tlv.ContextTag(1), 7) })
 	if _, err := UnmarshalInvokeResponseTLV(tlv.NewDecoder(scalar), nil); err != nil {
 		t.Fatalf("no reader: %v", err)
+	}
+}
+
+// TestInvokeResponseFieldsATypedReaderRejectFailTheResponse
+// (R2-C2-wire-0551, decision 531): a typed reject (a [StatusCodeError]) of
+// the client's fields reader for a structure CommandFields fails the
+// decode with the reader's error, as matter.js's invoke throws from the
+// response's decodeTlv (packages/protocol/src/action/client/
+// ClientInteraction.ts:578 at b25ed960, no catch in #invokeSingle) — never
+// an entry that reads as a Success without fields, never a per-command
+// status. It fails every command of the response, the ones that decoded
+// included (#executeBatch rejects them all, :1005-1010).
+func TestInvokeResponseFieldsATypedReaderRejectFailTheResponse(t *testing.T) {
+	t.Parallel()
+	reject := func(_ ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
+		return nil, constraintFieldsError{}
+	}
+	structure := func(enc *tlv.Encoder) {
+		enc.StartStruct(tlv.ContextTag(1))
+		enc.PutUint(tlv.ContextTag(0), 7)
+		_ = enc.EndContainer()
+	}
+	resp, err := UnmarshalInvokeResponseTLV(tlv.NewDecoder(invokeResponseWithFields(t, structure)), reject)
+	if err == nil {
+		t.Fatalf("decoded without an error: %+v", resp.Responses)
+	}
+	if !errors.Is(err, ErrInvalidInvokeRequest) {
+		t.Errorf("err = %v, want it to wrap ErrInvalidInvokeRequest", err)
+	}
+	var sce StatusCodeError
+	if !errors.As(err, &sce) || sce.MatterStatusCode() != StatusConstraintError {
+		t.Errorf("err = %v, want it to carry the reader's ConstraintError", err)
+	}
+
+	// Two responses, the first decodes: the reject of the second still
+	// fails the whole response.
+	calls := 0
+	second := func(_ ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
+		calls++
+		if calls == 2 {
+			return nil, constraintFieldsError{}
+		}
+		return "fields", skipContainer(dec)
+	}
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutBool(tlv.ContextTag(0), false)
+	enc.StartArray(tlv.ContextTag(1))
+	for ref := uint64(1); ref <= 2; ref++ {
+		enc.StartStruct(tlv.AnonymousTag())
+		enc.StartStruct(tlv.ContextTag(0)) // CommandDataIB
+		ConcreteCommandPath{Endpoint: 1, Cluster: 6, Command: 0, HasEndpoint: true, HasCluster: true, HasCommand: true}.MarshalTLV(enc, tlv.ContextTag(0))
+		structure(enc)
+		enc.PutUint(tlv.ContextTag(2), ref)
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+	}
+	_ = enc.EndContainer()
+	enc.PutUint(tlv.ContextTag(0xFF), 12)
+	_ = enc.EndContainer()
+	b, err := enc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp, err := UnmarshalInvokeResponseTLV(tlv.NewDecoder(b), second); err == nil {
+		t.Fatalf("two responses, the second rejected: decoded without an error: %+v", resp.Responses)
 	}
 }
 

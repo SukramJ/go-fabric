@@ -157,9 +157,16 @@ func decodeReport(t *testing.T, b []byte) im.ReportData {
 	return rd
 }
 
+// decodeInvokeResponse decodes an InvokeResponse as a client does: the
+// response's fields as a node tree. wire.CommandFieldsReader is the
+// server's request reader; it refuses a response command's fields
+// (AddGroupResponse) with INVALID_COMMAND, which fails the response
+// (R2-C2-wire-0551, decision 531).
 func decodeInvokeResponse(t *testing.T, b []byte) im.InvokeResponse {
 	t.Helper()
-	resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(b), wire.CommandFieldsReader)
+	resp, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(b), func(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
+		return spec.ReadContainer(dec, el)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
