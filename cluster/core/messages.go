@@ -30,7 +30,9 @@ type MessagePresenter interface {
 	// becomes of the message with [Messages.Presented] and
 	// [Messages.Complete].
 	PresentMessage(ctx context.Context, msg messagesdef.MessageStruct) error
-	// CancelMessage takes a queued or presented message down.
+	// CancelMessage takes a queued or presented message down: at a
+	// CancelMessagesRequest, and for every queued message of a fabric
+	// when the fabric is removed ([Messages.RemoveFabric]).
 	CancelMessage(ctx context.Context, messageID []byte) error
 }
 
@@ -493,13 +495,20 @@ func (m *Messages) cancel(ctx context.Context, fabric uint8, ids [][]byte) error
 		i := m.indexLocked(id)
 		visible := i >= 0 && m.messages[i].FabricIndex == fabric
 		var flight *messagesInFlight
+		var done chan struct{}
 		if visible {
 			// The id stays the accessing fabric's while the presenter
 			// cancels it: another fabric's present of it is refused even
 			// if the host completes the message meanwhile, so the cancel
 			// never takes that fabric's display down (review II,
-			// R2-P6-sec-1201 round 2).
+			// R2-P6-sec-1201 round 2). The flight is a take-down: the
+			// same fabric's present of the id waits for it (present), so
+			// the presenter shows that present after the cancel, and the
+			// cancel's removal from the queue never undoes it (review II,
+			// R4-conc-4101).
 			flight = m.beginFlightLocked(id, fabric)
+			done = make(chan struct{})
+			flight.takingDown = done
 		}
 		if !visible {
 			// Not queued: a present of it at the presenter is the one
@@ -511,23 +520,26 @@ func (m *Messages) cancel(ctx context.Context, fabric uint8, ids [][]byte) error
 			continue
 		}
 		err := m.presenter.CancelMessage(ctx, slices.Clone(id))
+		// The flight ends, the cancel applies and the waiting presents are
+		// released in one critical section (R4-conc-4101).
 		m.mu.Lock()
 		m.endFlightLocked(flight)
-		m.mu.Unlock()
+		if err == nil {
+			// A re-present of the id that runs now must not queue it
+			// again once it returns (R2-C2-conc-1201); marked only after
+			// the presenter's cancel succeeded, so a refused cancel leaves
+			// both as they were.
+			m.cancelPresentsLocked(id, fabric)
+			if i := m.indexLocked(id); i >= 0 && m.messages[i].FabricIndex == fabric {
+				m.removeLocked(i)
+				changed = true
+			}
+		}
+		close(done)
+		m.mu.Unlock() // the events queued go out with the attributes, below
 		if err != nil {
 			return messagesStatus(err)
 		}
-		m.mu.Lock()
-		// A re-present of the id that runs now must not queue it again
-		// once it returns (R2-C2-conc-1201); marked only after the
-		// presenter's cancel succeeded, so a refused cancel leaves both as
-		// they were.
-		m.cancelPresentsLocked(id, fabric)
-		if i := m.indexLocked(id); i >= 0 && m.messages[i].FabricIndex == fabric {
-			m.removeLocked(i)
-			changed = true
-		}
-		m.mu.Unlock() // the events queued go out with the attributes, below
 	}
 	return nil
 }
@@ -692,9 +704,22 @@ func (m *Messages) Complete(id []byte, outcome MessageOutcome) bool {
 // the filter at :62-68, and :114-123;
 // [Binding.RemoveFabric]). No event is emitted: the fabric that would
 // read it is gone.
+//
+// The presenter takes each dropped message down ([MessagePresenter]
+// CancelMessage, once per message, after the lock is released), so the
+// display and the queue agree as they do for a removed fabric's present
+// still at the presenter. Until a cancel returned its id stays held:
+// another fabric's present of it is refused meanwhile, so the cancel never
+// takes that fabric's display down (review II, R4-fsm-4103, decision 598).
 func (m *Messages) RemoveFabric(fabricIndex uint8) {
+	_ = m.removeFabric(context.Background(), fabricIndex)
+}
+
+// removeFabric is RemoveFabric with ctx for the presenter; it answers the
+// presenter's refusals of the cancels, joined. The queue's drop stands
+// either way.
+func (m *Messages) removeFabric(ctx context.Context, fabricIndex uint8) error {
 	m.mu.Lock()
-	defer m.unlock()
 	for _, f := range m.inFlight {
 		if f.fabric == fabricIndex {
 			f.removed = true
@@ -710,19 +735,41 @@ func (m *Messages) RemoveFabric(fabricIndex uint8) {
 		return false
 	})
 	if len(m.messages) == before {
-		return
+		m.unlock()
+		return nil
 	}
 	m.active = slices.DeleteFunc(m.active, func(id []byte) bool {
 		return slices.ContainsFunc(gone, func(g []byte) bool { return bytes.Equal(g, id) })
 	})
 	m.changedLocked(messagesdef.AttrMessages, messagesdef.AttrActiveMessageIds)
+	flights := make([]*messagesInFlight, len(gone))
+	done := make(chan struct{})
+	for i, id := range gone {
+		flights[i] = m.beginFlightLocked(id, fabricIndex)
+		flights[i].takingDown = done
+	}
+	m.unlock()
+	var errs []error
+	for _, id := range gone {
+		if err := m.presenter.CancelMessage(ctx, slices.Clone(id)); err != nil {
+			errs = append(errs, fmt.Errorf("core: Messages: take down message %x of removed fabric %d: %w", id, fabricIndex, err))
+		}
+	}
+	m.mu.Lock()
+	for _, f := range flights {
+		m.endFlightLocked(f)
+	}
+	close(done)
+	m.mu.Unlock()
+	return errors.Join(errs...)
 }
 
 // MatterDropFabric implements [contract.FabricScopedState]
-// ([Messages.RemoveFabric]): the queue is memory only.
-func (m *Messages) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
-	m.RemoveFabric(fabricIndex)
-	return nil
+// ([Messages.RemoveFabric]): the queue is memory only. An error is the
+// presenter's refusal to take a dropped message down; the queue's drop
+// stands, and nothing is held for a later drop to retry.
+func (m *Messages) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	return m.removeFabric(ctx, fabricIndex)
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
