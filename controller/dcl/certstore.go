@@ -148,6 +148,11 @@ type CertificateStore struct {
 	// matter.js's DclCertificateServiceTest.ts:1758-1777 at b25ed960 stands
 	// in the crypto.
 	verifyCDSigner func(der, skid []byte) (*ecdsa.PublicKey, error)
+
+	// lookupTimeout bounds PAA's and CDSigner's lookups, which
+	// attestation.PAAStore gives no context: attestationLookupTimeout, a
+	// test sets it shorter.
+	lookupTimeout time.Duration
 }
 
 var (
@@ -168,6 +173,7 @@ func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*Certif
 	s := &CertificateStore{
 		opts: opts, clock: opts.Clock, log: opts.Logger, store: opts.Store, index: map[string]storedCertificate{},
 		verifyCDSigner: attestation.VerifyCDSignerCertificate, fetching: make(chan struct{}, 1),
+		lookupTimeout: attestationLookupTimeout,
 	}
 	s.periodic, s.cancelPeriodic = context.WithCancel(context.Background())
 	if s.clock == nil {
@@ -326,12 +332,32 @@ func (s *CertificateStore) lookup(skid string) (storedCertificate, bool) {
 // [CertificateStore.CertificateDER] included.
 func (s *CertificateStore) PAA(skid []byte) (attestation.PAA, bool) {
 	id := hexUpper(skid)
-	der, err := s.CertificateDER(context.Background(), id, GetCertificateOptions{ConsiderTestCertificates: &considerAll})
+	ctx, cancel := s.attestationContext()
+	defer cancel()
+	der, err := s.CertificateDER(ctx, id, GetCertificateOptions{ConsiderTestCertificates: &considerAll})
 	if err != nil {
 		return attestation.PAA{}, false
 	}
 	e, _ := s.lookup(id)
 	return attestation.PAA{DER: der, Production: e.IsProduction, FetchedAt: e.FetchedAt}, true
+}
+
+// attestationLookupTimeout bounds PAA's and CDSigner's lookups, which
+// attestation.PAAStore gives no context: the ledger request, and the wait
+// for a running update in front of PAA's self-heal — an update holds the
+// slot for up to maxRootsPerUpdate requests. Past it PAA answers with the
+// stored bytes, as when the re-fetch fails (review II, R2-C2-conc-1904).
+// The value is revocationLookupTimeout's, this module's judgement.
+const attestationLookupTimeout = 10 * time.Second
+
+// attestationContext is the context of one PAA or CDSigner lookup,
+// bounded by lookupTimeout (attestationLookupTimeout when unset).
+func (s *CertificateStore) attestationContext() (context.Context, context.CancelFunc) {
+	d := s.lookupTimeout
+	if d <= 0 {
+		d = attestationLookupTimeout
+	}
+	return context.WithTimeout(context.Background(), d)
 }
 
 // considerAll is the validator's considerTestCertificates: true.
@@ -585,7 +611,9 @@ func (s *CertificateStore) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 	if s.offline() {
 		return nil, false
 	}
-	certs, err := s.opts.Client.CertificatesBySubjectKeyID(context.Background(), id)
+	ctx, cancel := s.attestationContext()
+	certs, err := s.opts.Client.CertificatesBySubjectKeyID(ctx, id)
+	cancel()
 	if err != nil {
 		s.log.Info("dcl.certificates.cd_signer_fetch_failed", slog.String("skid", id), slog.Any("err", err),
 			slog.String("message", "Failed to fetch CD signer "+id+" from DCL"))
