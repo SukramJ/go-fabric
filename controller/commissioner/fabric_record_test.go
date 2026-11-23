@@ -86,9 +86,10 @@ func mustNOC(t *testing.T, c *ca.CA, pub []byte, fabricID, nodeID uint64) []byte
 }
 
 // TestFabricLabelIsBoundInBytes: the controller's fabric label is at most
-// 32 bytes of UTF-8 — the bound a device enforces — at creation, at load
-// and in SetLabel (review II, R2-P6-par-1854, decision 155). Before, only
-// SetLabel checked it, in code points.
+// 32 bytes of UTF-8 — the bound a device enforces — at creation and in
+// SetLabel, and a stored one is cut to it at load (review II,
+// R2-P6-par-1854, decision 155; go-fabric #587, decision 557). Before,
+// only SetLabel checked it, in code points.
 func TestFabricLabelIsBoundInBytes(t *testing.T) {
 	t.Parallel()
 	tooLong := []string{strings.Repeat("x", 33), strings.Repeat("ä", 17), strings.Repeat("😀", 9)}
@@ -119,8 +120,10 @@ func TestFabricLabelIsBoundInBytes(t *testing.T) {
 		rec, _, _ := st.LoadFabric()
 		rec.Label = l
 		_ = st.SaveFabric(rec)
-		if _, err := NewFabric(c, cfg); !errors.Is(err, ErrLabel) {
-			t.Errorf("a stored label of %d bytes: %v, want ErrLabel", len(l), err)
+		// A stored label is cut at load, not refused (go-fabric #587,
+		// decision 557; TestStoredFabricLabelOverTheBoundIsCutAtLoad).
+		if f, err := NewFabric(c, cfg); err != nil || len(f.CurrentLabel()) > MaxLabelLength {
+			t.Errorf("a stored label of %d bytes: %v, want it loaded and cut to %d bytes", len(l), err, MaxLabelLength)
 		}
 	}
 	for _, l := range fits {
