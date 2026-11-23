@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/binary"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -21,7 +22,9 @@ func heapInUse() uint64 {
 	return ms.HeapAlloc
 }
 
-// waitFor polls cond for up to five seconds.
+// waitFor yields until cond holds, for up to five seconds. It waits for a
+// state, never for a stretch of time: every condition below is one the
+// connection reaches by itself and then keeps.
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -29,8 +32,46 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 		if time.Now().After(deadline) {
 			t.Fatalf("timed out waiting for %s", what)
 		}
-		time.Sleep(5 * time.Millisecond)
+		runtime.Gosched()
 	}
+}
+
+// goroutineStacks is every goroutine's stack, one block per goroutine.
+func goroutineStacks() []string {
+	buf := make([]byte, 1<<20)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			return strings.Split(string(buf[:n]), "\n\n")
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+}
+
+// inFlight counts the goroutines a connection's reader started for its
+// messages and that have not ended: the messages it holds in flight.
+func inFlight() int {
+	n := 0
+	for _, g := range goroutineStacks() {
+		if strings.Contains(g, "created by thingfabric.dev/go-fabric/transport/tcp.(*Conn).serve ") {
+			n++
+		}
+	}
+	return n
+}
+
+// readerWaitsForASlot reports whether a connection's reader is parked in
+// its select for a free in-flight slot — the one select in serve — with a
+// complete message it has not handed on. From there it starts no goroutine
+// and reads nothing until a slot frees.
+func readerWaitsForASlot() bool {
+	for _, g := range goroutineStacks() {
+		if strings.HasPrefix(g[strings.Index(g, "[")+1:], "select") &&
+			strings.Contains(g, "transport/tcp.(*Conn).serve(") {
+			return true
+		}
+	}
+	return false
 }
 
 // TestConnectionAtItsInFlightBound drives one connection with messages of
@@ -42,7 +83,8 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 // goroutines and the live heap the connection holds at the bound and
 // beyond it.
 //
-// Not parallel: it counts the process's goroutines.
+// Not parallel: it reads every goroutine's stack, and another test's
+// connection would count as this one's.
 func TestConnectionAtItsInFlightBound(t *testing.T) {
 	const beyond = 16
 	payload := DefaultMaxPayloadSize
@@ -110,9 +152,9 @@ func TestConnectionAtItsInFlightBound(t *testing.T) {
 	// Warm-up: the connection is accepted and served, its one message
 	// handled and its goroutine gone.
 	frames <- frame(0)
-	waitFor(t, "the warm-up message", func() bool { return delivered.Load() == 1 })
-	time.Sleep(50 * time.Millisecond)
-	baseGoroutines := runtime.NumGoroutine()
+	waitFor(t, "the warm-up message and its goroutine's end", func() bool {
+		return delivered.Load() == 1 && inFlight() == 0
+	})
 	baseHeap := heapInUse()
 
 	// Exactly the bound.
@@ -120,13 +162,12 @@ func TestConnectionAtItsInFlightBound(t *testing.T) {
 		frames <- frame(uint32(1 + i)) //nolint:gosec // G115: i < 64
 	}
 	waitFor(t, "a goroutine per message in flight", func() bool {
-		return runtime.NumGoroutine()-baseGoroutines >= maxInFlightPerConn
+		return inFlight() >= maxInFlightPerConn
 	})
-	time.Sleep(100 * time.Millisecond)
-	atBound := runtime.NumGoroutine() - baseGoroutines
+	atBound := inFlight()
 	heapAtBound := int64(heapInUse()) - int64(baseHeap) //nolint:gosec // G115: heap sizes fit int64
 	if atBound != maxInFlightPerConn || delivered.Load() != 2 {
-		t.Fatalf("at the bound: %d goroutines above the baseline, %d messages delivered; want %d and 2 (the warm-up and the held one)",
+		t.Fatalf("at the bound: %d messages in flight, %d messages delivered; want %d and 2 (the warm-up and the held one)",
 			atBound, delivered.Load(), maxInFlightPerConn)
 	}
 	t.Logf("at the bound (%d messages of %d bytes in flight): +%d goroutines, live heap +%d bytes, %d bytes written by the peer",
@@ -136,11 +177,11 @@ func TestConnectionAtItsInFlightBound(t *testing.T) {
 	for i := range beyond {
 		frames <- frame(uint32(1 + maxInFlightPerConn + i)) //nolint:gosec // G115: small
 	}
-	time.Sleep(300 * time.Millisecond)
-	pastBound := runtime.NumGoroutine() - baseGoroutines
+	waitFor(t, "the reader waiting for a free slot", readerWaitsForASlot)
+	pastBound := inFlight()
 	heapPastBound := int64(heapInUse()) - int64(baseHeap) //nolint:gosec // G115: heap sizes fit int64
 	if pastBound != maxInFlightPerConn || delivered.Load() != 2 {
-		t.Fatalf("past the bound: %d goroutines above the baseline, %d messages delivered; want %d and 2",
+		t.Fatalf("past the bound: %d messages in flight, %d messages delivered; want %d and 2",
 			pastBound, delivered.Load(), maxInFlightPerConn)
 	}
 	t.Logf("%d messages past the bound: +%d goroutines, live heap +%d bytes, %d of %d bytes written by the peer",
@@ -160,6 +201,6 @@ func TestConnectionAtItsInFlightBound(t *testing.T) {
 	}
 	orderMu.Unlock()
 	waitFor(t, "the goroutines of the delivered messages to end", func() bool {
-		return runtime.NumGoroutine() <= baseGoroutines
+		return inFlight() == 0
 	})
 }
