@@ -135,3 +135,29 @@ func TestUpdateNOCStoreFailureIsFailure(t *testing.T) {
 		})
 	}
 }
+
+// TestSignVIDVerificationRequestStoreFailureIsFailure (R3-err-3053): a
+// GetFabric I/O failure is the command's FAILURE, not ConstraintError
+// "fabric does not exist"; an unknown fabric index stays ConstraintError.
+func TestSignVIDVerificationRequestStoreFailureIsFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := &ioFailStore{fakeStore: newFakeStore()}
+	oc, err := core.NewOperationalCredentials(st, core.OpcredsConfig{FailSafe: armedFailSafe(0), SupportedFabrics: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, fabricIndex := commissionTestFabric(ctx, t, oc)
+	sctx := core.WithInvokeAttestationChallenge(im.WithFabricFilter(ctx, true, fabricIndex), make([]byte, 16))
+	challenge := make([]byte, 32)
+	st.failGetFabric.Store(true)
+	resp, err := oc.MatterInvoke(sctx, 0x0D, core.SignVidVerificationRequest{FabricIndex: fabricIndex, ClientChallenge: challenge})
+	st.failGetFabric.Store(false)
+	if got := spec.StatusOf(err); got != im.StatusFailure {
+		t.Errorf("SignVIDVerificationRequest with GetFabric failing = %#v, %v (status %v), want FAILURE", resp, err, got)
+	}
+	resp, err = oc.MatterInvoke(sctx, 0x0D, core.SignVidVerificationRequest{FabricIndex: fabricIndex + 1, ClientChallenge: challenge})
+	if got := spec.StatusOf(err); got != im.StatusConstraintError {
+		t.Errorf("SignVIDVerificationRequest of an unknown fabric = %#v, %v (status %v), want CONSTRAINT_ERROR", resp, err, got)
+	}
+}

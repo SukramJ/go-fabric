@@ -5,6 +5,7 @@ package discovery
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -290,7 +291,7 @@ type cachedDevice struct {
 
 type waiter struct {
 	identifier Identifier
-	seen       map[string]bool
+	seen       *instanceSet
 	push       func(Device)
 	cancel     func()
 }
@@ -298,11 +299,47 @@ type waiter struct {
 // notify delivers a device the waiter has not seen and selects. Mirrors
 // matter.js 0ceb202d CommissionableMdnsScanner.ts:188-194.
 func (w *waiter) notify(d *Device) {
-	if w.identifier.matches(d) && !w.seen[d.InstanceID] {
-		w.seen[d.InstanceID] = true
+	if w.identifier.matches(d) && w.seen.add(d.InstanceID) {
 		w.push(d.clone())
 	}
 }
+
+// maxSeenInstances is how many instance ids a search keeps to deliver
+// each device once. Past it the id seen longest ago is forgotten, so a
+// search a sender feeds ever-new matching instances does not grow for its
+// length; a forgotten device announced again is delivered again. The
+// cache holds no more records than this (maxCachedRecords), and a device
+// takes several, so every device the cache can hold at one time stays
+// remembered. This module's own bound (review II, R3-bound-3552).
+const maxSeenInstances = maxCachedRecords
+
+// instanceSet is the instance ids a search has delivered, at most
+// maxSeenInstances, the oldest forgotten first. Loop-only.
+type instanceSet struct {
+	ids   map[string]struct{}
+	order []string // a ring of the ids in the order added once full
+	next  int      // the ring's oldest entry once full
+}
+
+func newInstanceSet() *instanceSet { return &instanceSet{ids: map[string]struct{}{}} }
+
+// add records id and reports whether it was not recorded yet.
+func (s *instanceSet) add(id string) bool {
+	if _, ok := s.ids[id]; ok {
+		return false
+	}
+	if len(s.order) < maxSeenInstances {
+		s.order = append(s.order, id)
+	} else {
+		delete(s.ids, s.order[s.next])
+		s.order[s.next] = id
+		s.next = (s.next + 1) % maxSeenInstances
+	}
+	s.ids[id] = struct{}{}
+	return true
+}
+
+func (s *instanceSet) len() int { return len(s.ids) }
 
 type speculativeTarget struct {
 	cancel    func()
@@ -383,16 +420,36 @@ func (s *Scanner) armCleanup() {
 	})
 }
 
+// maxQueuedDeliveries is how many devices a search's delivery queue holds
+// while its found has not taken them — found may wait, for a Prepare slot
+// of a discovery session, while the loop keeps delivering. Past it the
+// oldest queued device is dropped and the drop logged. It equals
+// maxSeenInstances: a device is queued as the waiter records its instance,
+// so a full queue holds the last maxSeenInstances instances recorded, the
+// device an overflow drops is the one the waiter forgets at the same push,
+// and its next announcement is delivered again. This module's own bound (review II, R3-bound-3552,
+// owner decision 573).
+const maxQueuedDeliveries = maxSeenInstances
+
 // deliveryQueue hands devices from the loop to a search's goroutine.
 type deliveryQueue struct {
-	// mu guards items.
-	mu     sync.Mutex
-	items  []Device
-	signal chan struct{}
+	// mu guards items and dropped.
+	mu    sync.Mutex
+	items []Device
+	// dropped counts the devices the bound dropped since the last drain.
+	dropped int
+	signal  chan struct{}
+	// logger receives the drops; nil logs nothing.
+	logger *slog.Logger
 }
 
 func (q *deliveryQueue) push(d Device) {
 	q.mu.Lock()
+	if len(q.items) >= maxQueuedDeliveries {
+		q.items[0] = Device{}
+		q.items = q.items[1:]
+		q.dropped++
+	}
 	q.items = append(q.items, d)
 	q.mu.Unlock()
 	select {
@@ -403,9 +460,13 @@ func (q *deliveryQueue) push(d Device) {
 
 func (q *deliveryQueue) drain() []Device {
 	q.mu.Lock()
-	defer q.mu.Unlock()
-	out := q.items
-	q.items = nil
+	out, dropped := q.items, q.dropped
+	q.items, q.dropped = nil, 0
+	q.mu.Unlock()
+	if dropped > 0 && q.logger != nil {
+		q.logger.Warn("matter.discovery.deliveries_dropped", slog.Int("dropped", dropped),
+			slog.String("reason", "a search queues at most "+strconv.Itoa(maxQueuedDeliveries)+" devices its callback has not taken; the oldest were dropped"))
+	}
 	return out
 }
 
@@ -420,15 +481,25 @@ func (q *deliveryQueue) drain() []Device {
 // matter.js 0ceb202d CommissionableMdnsScanner.ts:165-256
 // (findCommissionableDevicesContinuously).
 func (s *Scanner) FindCommissionable(ctx context.Context, id Identifier, found func(Device)) ([]Device, error) {
-	q := &deliveryQueue{signal: make(chan struct{}, 1)}
+	return s.find(ctx, id, found, true)
+}
+
+// find is [Scanner.FindCommissionable]; with keep false it returns no
+// device, keeping none of those it delivers to found — the search of
+// [IPTransport], which runs until it is stopped and needs only found
+// (review II, R3-bound-3552).
+func (s *Scanner) find(ctx context.Context, id Identifier, found func(Device), keep bool) ([]Device, error) {
+	q := &deliveryQueue{signal: make(chan struct{}, 1), logger: s.names.logger}
 	cancelled := make(chan struct{})
 	var once sync.Once
-	w := &waiter{identifier: id, seen: make(map[string]bool), push: q.push, cancel: func() { once.Do(func() { close(cancelled) }) }}
+	w := &waiter{identifier: id, seen: newInstanceSet(), push: q.push, cancel: func() { once.Do(func() { close(cancelled) }) }}
 	result := []Device{}
 	deliver := func() {
 		items := q.drain()
 		for i := range items {
-			result = append(result, items[i])
+			if keep {
+				result = append(result, items[i])
+			}
 			if found != nil {
 				found(items[i])
 			}
@@ -534,7 +605,7 @@ func (s *Scanner) register(w *waiter) bool {
 			continue
 		}
 		if len(d.Addresses) > 0 {
-			w.seen[d.InstanceID] = true
+			w.seen.add(d.InstanceID)
 			w.push(d.clone())
 			invoked = true
 		} else {

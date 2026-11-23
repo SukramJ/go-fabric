@@ -717,8 +717,8 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// for the one Sigma3 that established it ([sigma3Step]).
 	step := &sigma3Step{handler: ch}
 	processSigma3 := func(p []byte) (uint8, []byte, error) {
-		op, reply, outcome, err := processSigma3With(ch, p)
-		step.outcome = outcome
+		op, reply, err := processSigma3With(ch, p, step)
+		outcome := step.outcome
 		// A Sigma3 that fails drops nothing: an unacknowledged Sigma2
 		// goes on being retransmitted (owner decision 173).
 		if outcome == sigma3Established {
@@ -850,6 +850,13 @@ func (b *Bridge) dispatchPase(
 			b.logger.Info("matter.rx.sc.pase_busy",
 				slog.String("src", srcString(src)),
 				slog.Int("exchange_id", int(proto.ExchangeID)))
+			if !b.firstBusyOfClaim() {
+				// One ring event per claim: every unauthenticated
+				// datagram would otherwise push one older event out of
+				// the ring, the handshake, session and lockout history
+				// the host and RetrieveLogs read (R3-bound-3451).
+				return nil
+			}
 			b.diagRing().Record(diagevent.Event{
 				Kind:     diagevent.KindPairing,
 				Severity: diagevent.SeverityWarning,
@@ -1031,6 +1038,7 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 	expired := b.paseInFlight
 	b.paseInFlight = key
 	b.paseInFlightSince = now
+	b.paseBusyRecorded = false
 	b.mu.Unlock()
 	if held {
 		// The handshake that held the slot ran out and counts as a failed
@@ -1051,6 +1059,20 @@ func (b *Bridge) claimPase(key HandshakeKey) paseClaim {
 		b.recordFailedAttempt(attemptPASEPairing)
 	}
 	return paseClaimTaken
+}
+
+// firstBusyOfClaim reports whether a PBKDFParamRequest refused as
+// [paseClaimBusy] is the first of the current claim to reach the
+// diagnostics ring, and marks it so: the ring records one busy event per
+// claim, whatever the rate of the refused requests. R3-bound-3451.
+func (b *Bridge) firstBusyOfClaim() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.paseBusyRecorded {
+		return false
+	}
+	b.paseBusyRecorded = true
+	return true
 }
 
 // endRepeatedPairing ends the PASE pairing after a further
@@ -2547,18 +2569,24 @@ func (b *Bridge) handshakeCompleted(key HandshakeKey) bool {
 // ([Bridge.settleHandshake]): it names the established session only when
 // this Sigma3 established it, so a Sigma3 of a handshake that had
 // completed already — the accepted one again included — binds no route.
+// The session is the one the step itself established (sessionID, named,
+// set by [processSigma3With]), never read back from the handler afterwards:
+// on a singleton handler another peer's resume may have replaced the
+// handler's established session by then, and the route binding and the
+// diagnostics event would name that one (R3-sec-3404).
 type sigma3Step struct {
-	handler CaseHandler
-	outcome sigma3Outcome
+	handler   CaseHandler
+	outcome   sigma3Outcome
+	sessionID uint16
+	named     bool
 }
 
 // establishedSession implements [establishedSessionReporter].
 func (s *sigma3Step) establishedSession() (uint16, bool) {
-	rep, ok := s.handler.(establishedSessionReporter)
-	if s.outcome != sigma3Established || !ok {
+	if s.outcome != sigma3Established || !s.named {
 		return 0, false
 	}
-	return rep.establishedSession()
+	return s.sessionID, true
 }
 
 // PeerSessionParams implements [peerSessionParamsSource].
@@ -2573,15 +2601,27 @@ func (s *sigma3Step) PeerSessionParams() *sessionparams.Parameters {
 // handshake: a [CaseAdapter] says so itself; for any other handler a
 // success report is an establishment and everything else a failure — a
 // refusal comes back as a failure StatusReport reply, not as an error.
-func processSigma3With(h CaseHandler, payload []byte) (opcode uint8, respPayload []byte, outcome sigma3Outcome, err error) {
+// The outcome goes into step, and an establishment names its session there
+// as the step set it: a [CaseAdapter] returns the id it set under its
+// lock; another handler that reports its established session
+// ([establishedSessionReporter]) is asked once, at once after its step
+// (R3-sec-3404).
+func processSigma3With(h CaseHandler, payload []byte, step *sigma3Step) (opcode uint8, respPayload []byte, err error) {
 	if a, ok := h.(*CaseAdapter); ok {
-		return a.processSigma3(payload)
+		op, reply, outcome, sid, err := a.processSigma3(payload)
+		step.outcome, step.sessionID, step.named = outcome, sid, outcome == sigma3Established
+		return op, reply, err
 	}
 	op, reply, err := h.ProcessSigma3(payload)
 	if err == nil && establishedBy(op, reply) {
-		return op, reply, sigma3Established, nil
+		step.outcome = sigma3Established
+		if rep, ok := h.(establishedSessionReporter); ok {
+			step.sessionID, step.named = rep.establishedSession()
+		}
+		return op, reply, nil
 	}
-	return op, reply, sigma3Failed, err
+	step.outcome = sigma3Failed
+	return op, reply, err
 }
 
 // forgetSigma1Replied removes the dedupe entry for a handshake. Called

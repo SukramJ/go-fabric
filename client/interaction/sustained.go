@@ -21,7 +21,18 @@ import (
 // matter.js RetrySchedule.Configuration
 // (packages/general/src/net/RetrySchedule.ts:67-109). A zero field takes
 // the schedule's default (an initial interval of 1 s, a backoff of 2); a
-// zero MaximumInterval and JitterFactor mean none.
+// zero MaximumInterval and JitterFactor mean none. A field out of range is
+// taken as the nearest value that keeps the base interval from shrinking
+// below the initial one: an initial interval below 0 as 1 s, a backoff
+// below 1 (or NaN) as 1, a maximum interval below 0 as none and a jitter
+// factor outside [0, 1] (or NaN) as the bound it passed (0 for NaN) — this
+// module's hardening (review II, R3-api-3580).
+//
+// As a [SubscribeRequest].Retries it is merged field by field over the
+// default sustained schedule ([DefaultSustainRetries]): a zero field takes
+// the default's field. "None" therefore has its own values there:
+// [NoMaximumInterval] and [NoJitter] (review II, R3-api-3580, owner
+// decision 566).
 type RetrySchedule struct {
 	InitialInterval time.Duration
 	BackoffFactor   float64
@@ -29,8 +40,19 @@ type RetrySchedule struct {
 	JitterFactor    float64
 }
 
-// DefaultSustainRetries is the schedule a sustained subscription retries
-// on: 15 s, doubling, at most an hour, a quarter of jitter, no timeout.
+// DefaultSustainRetries is the schedule a sustained subscription whose
+// [SubscribeRequest].Retries is the zero value retries on, and the one a
+// set Retries is merged over field by field: 15 s, doubling,
+// at most an hour, a quarter of jitter, no timeout. Such a subscription
+// reads it unsynchronised when it starts a schedule: a host that changes
+// it does so before its first subscription. Its fields are taken as
+// [RetrySchedule] says, an initial interval of 0 as 1 s.
+//
+// Deprecated: set [SubscribeRequest].Retries, a schedule of the
+// subscription's own; while this variable is kept, the field's zero
+// fields read it. Removable in v0.28.0 (review II, R3-api-3580, owner
+// decision 562).
+//
 // Mirrors matter.js
 // packages/protocol/src/action/client/subscription/SustainedSubscription.ts:614-630
 // (SustainedSubscription.DefaultRetrySchedule) at b25ed960.
@@ -39,6 +61,42 @@ var DefaultSustainRetries = RetrySchedule{
 	BackoffFactor:   2,
 	MaximumInterval: time.Hour,
 	JitterFactor:    0.25,
+}
+
+// NoMaximumInterval is the MaximumInterval of a [SubscribeRequest].Retries
+// that leaves the schedule without a maximum interval, where a zero field
+// takes the default schedule's hour. Any negative MaximumInterval means the same.
+const NoMaximumInterval time.Duration = -1
+
+// NoJitter is the JitterFactor of a [SubscribeRequest].Retries that leaves
+// the schedule without jitter, where a zero field takes the default
+// schedule's quarter. Any negative JitterFactor means the same.
+const NoJitter float64 = -1
+
+// sustainRetries is the schedule req's sustained subscription retries on:
+// its Retries merged field by field over DefaultSustainRetries, a zero
+// field taking the default's — matter.js
+// "RetrySchedule.Configuration(SustainedSubscription.DefaultRetrySchedule,
+// sustainRetries)" (packages/protocol/src/action/client/ClientInteraction.ts:266-269),
+// "{ ...defaults, ...config }" (packages/general/src/net/RetrySchedule.ts:114-119)
+// at b25ed960. matter.js sets that configuration per ClientInteraction
+// (ClientInteraction.ts:178, :1175), this module per request (review II,
+// R3-api-3580, owner decision 566).
+func sustainRetries(req SubscribeRequest) RetrySchedule {
+	cfg, o := DefaultSustainRetries, req.Retries
+	if o.InitialInterval != 0 {
+		cfg.InitialInterval = o.InitialInterval
+	}
+	if o.BackoffFactor != 0 {
+		cfg.BackoffFactor = o.BackoffFactor
+	}
+	if o.MaximumInterval != 0 {
+		cfg.MaximumInterval = o.MaximumInterval
+	}
+	if o.JitterFactor != 0 {
+		cfg.JitterFactor = o.JitterFactor
+	}
+	return cfg
 }
 
 // retries yields the intervals of a schedule without timeout or count
@@ -59,11 +117,23 @@ type retries struct {
 func (r *retries) reset() { r.base = r.cfg.InitialInterval }
 
 func newRetries(cfg RetrySchedule, rand func() float64) *retries {
-	if cfg.InitialInterval == 0 {
+	if cfg.InitialInterval <= 0 {
 		cfg.InitialInterval = time.Second
 	}
-	if cfg.BackoffFactor == 0 {
+	switch {
+	case cfg.BackoffFactor == 0:
 		cfg.BackoffFactor = 2
+	case !(cfg.BackoffFactor >= 1):
+		cfg.BackoffFactor = 1
+	}
+	if cfg.MaximumInterval < 0 {
+		cfg.MaximumInterval = 0
+	}
+	switch {
+	case !(cfg.JitterFactor >= 0):
+		cfg.JitterFactor = 0
+	case cfg.JitterFactor > 1:
+		cfg.JitterFactor = 1
 	}
 	return &retries{cfg: cfg, rand: rand, base: cfg.InitialInterval}
 }
@@ -207,12 +277,19 @@ func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report)
 // the request's filters kept until then. Mirrors matter.js
 // SustainedSubscription.#requestNewEvents
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:379-384)
-// at b25ed960.
+// at b25ed960. After an event numbered 2^64-1 the bound is held at
+// 2^64-1 rather than wrapping to 0, which would ask the peer for every
+// event it still holds again: this module's own choice, as the
+// controller's nextEventMin (review II, R2-C2-wire-2351).
 func (st *sustainedState) requestNewEvents(req SubscribeRequest) SubscribeRequest {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if st.hasEvent {
-		req.EventFilters = []im.EventMinimumNumber{{EventMin: st.maxEvent + 1}}
+		next := st.maxEvent
+		if next != math.MaxUint64 {
+			next++
+		}
+		req.EventFilters = []im.EventMinimumNumber{{EventMin: next}}
 	}
 	return req
 }
@@ -343,7 +420,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	// failed attempts of an outage do not count against the subscription
 	// that ends it. Ahead of matter.js; the rule is this module's (review
 	// II, R2-P6-fsm-2110).
-	losses := newRetries(DefaultSustainRetries, c.rand)
+	losses := newRetries(sustainRetries(outer.request), c.rand)
 	for {
 		req, closed, deliberate := innerRequest(outer, updated)
 		// The attempt's network: a mode-flip recreate's goes out on the
@@ -360,7 +437,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 			return
 		}
 
-		schedule := newRetries(DefaultSustainRetries, c.rand)
+		schedule := newRetries(sustainRetries(outer.request), c.rand)
 		var held *icd.PeerWakefulness
 		for {
 			inner, err := c.sustainAttempt(ctx, st, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)

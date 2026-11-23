@@ -68,7 +68,8 @@ client/exchange          unsecured and secure sessions, exchanges, MRP (initiato
 client/handshake         PASE and CASE as initiator, CASE responder for reconnects
 controller/ca            the fabric's root CA, NOC issuance
 controller/attestation   DAC → PAI → PAA, Certification Declaration, revocation hook
-controller/dcl           CSA Distributed Compliance Ledger client (opt-in)
+dcl                      CSA Distributed Compliance Ledger client, OTA versions, vendor info (opt-in, role-neutral)
+controller/dcl           the PAA and CD-signer trust store, CRL revocation, the snapshot (opt-in)
 controller/commissioner  the commissioning flow (ControllerCommissioningFlow), incl. the Wi-Fi / Thread network steps
 client/interaction       Read, Write, Invoke, Subscribe as a client
 client/peer              peer sets, address monitoring, session resumption

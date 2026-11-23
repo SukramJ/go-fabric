@@ -24,9 +24,10 @@ import (
 	"thingfabric.dev/go-fabric/controller/client"
 	"thingfabric.dev/go-fabric/controller/client/sqlstore"
 	"thingfabric.dev/go-fabric/controller/commissioner"
-	"thingfabric.dev/go-fabric/controller/dcl"
+	ctldcl "thingfabric.dev/go-fabric/controller/dcl"
 	"thingfabric.dev/go-fabric/controller/dcl/snapshot"
 	"thingfabric.dev/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/dcl"
 	"thingfabric.dev/go-fabric/store"
 	"thingfabric.dev/go-fabric/transport/udp"
 )
@@ -67,7 +68,7 @@ type stack struct {
 	set      *peer.Set
 	com      *commissioner.Commissioner
 	reg      *client.Registry
-	certs    *dcl.CertificateStore
+	certs    *ctldcl.CertificateStore
 	policy   attestation.Policy
 
 	// images is the OTA push's image store; onStatus the serving
@@ -245,7 +246,7 @@ func openSnapshot(e *env) (*snapshot.Snapshot, error) {
 
 // openTrust is the online DCL trust store --dcl names, nil for off (the
 // snapshot and, with --trust development, the test PAAs are used then). What it asks the ledger is in README.md.
-func openTrust(e *env, settings *store.Store) (*dcl.CertificateStore, error) {
+func openTrust(e *env, settings *store.Store) (*ctldcl.CertificateStore, error) {
 	var c *dcl.Client
 	testnet := false
 	switch e.opts.dcl {
@@ -264,7 +265,7 @@ func openTrust(e *env, settings *store.Store) (*dcl.CertificateStore, error) {
 	default:
 		return nil, fmt.Errorf("--dcl %q, want prod, testnet or off", e.opts.dcl)
 	}
-	return dcl.OpenCertificateStore(e.ctx, dcl.CertificateOptions{
+	return ctldcl.OpenCertificateStore(e.ctx, ctldcl.CertificateOptions{
 		Client: c, FetchTestCertificates: testnet,
 		Store: dcl.SettingStore{Settings: settings, Key: dclTrustKey}, Logger: e.log,
 	})

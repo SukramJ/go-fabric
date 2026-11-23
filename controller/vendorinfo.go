@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"thingfabric.dev/go-fabric/controller/dcl"
 	"thingfabric.dev/go-fabric/controller/dcl/snapshot"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // DCLConfig configures the controller's ledger services — matter.js

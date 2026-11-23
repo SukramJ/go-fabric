@@ -123,6 +123,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/controller/client/sqlstore", min: 89},
 	{pkg: "thingfabric.dev/go-fabric/controller/commissioner", min: 88},
 	{pkg: "thingfabric.dev/go-fabric/controller/dcl", min: 92},
+	{pkg: "thingfabric.dev/go-fabric/dcl", min: 90}, // review II run 3 (R3-api-3780): 90.8 when the ledger client moved here from controller/dcl
 	{
 		pkg: "thingfabric.dev/go-fabric/controller/softwareupdate",
 		min: 78,
@@ -244,6 +245,7 @@ var floors = []packageFloor{
 		unmeasurable: true,
 		why:          "declaration-only seam (M9 module wave): a function variable cluster/core installs from its init, so the package holds no statement a test could execute",
 	},
+	{pkg: "thingfabric.dev/go-fabric/internal/dclseam", min: 0, unmeasurable: true, why: "function variables and a config type only: dcl installs them from its init, controller/dcl calls them (review II, R3-api-3780, decision 577)"},
 	{
 		pkg:          "thingfabric.dev/go-fabric/internal/exchangeseam",
 		min:          0,

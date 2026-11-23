@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // TestImagesHonourTheLedgersMaxImageSize (review II, R2-P0-bound-C01): both

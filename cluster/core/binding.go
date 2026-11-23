@@ -41,6 +41,12 @@ type Binding struct {
 	mu       sync.RWMutex
 	bindings []TargetStruct
 	save     func([]TargetStruct) error
+	// saveOwed marks a list in memory the store does not hold: a removed
+	// fabric's drop whose save failed. The next drop (of any index, also
+	// one that finds nothing) and the next write store the list, so a
+	// restart does not restore the removed fabric's entries (R3-store-3052).
+	// Guarded by writeMu.
+	saveOwed bool
 	// fabrics is BindingConfig.Fabrics or SetFabricSource's source, set
 	// without writeMu (fabricSourceBox).
 	fabrics atomic.Pointer[fabricSourceBox]
@@ -212,6 +218,7 @@ func (b *Binding) Persist(cfg BindingConfig) error {
 	before := b.bindings
 	if stored != nil {
 		b.bindings = append([]TargetStruct{}, stored...)
+		b.saveOwed = false // memory is the store's list again
 	}
 	after := b.bindings
 	b.mu.Unlock()
@@ -515,6 +522,10 @@ func (b *Binding) replace(origin contract.Origin, build func(before []TargetStru
 		after = []TargetStruct{}
 	}
 	if slices.Equal(before, after) {
+		// Nothing to commit; a save a drop owes is made now. Its failure
+		// keeps it owed and is not this write's: the write changed
+		// nothing (R3-store-3052).
+		_ = b.settleOwedLocked(before)
 		b.writeMu.Unlock()
 		return false, nil
 	}
@@ -526,6 +537,7 @@ func (b *Binding) replace(origin contract.Origin, build func(before []TargetStru
 			b.writeMu.Unlock()
 			return false, fmt.Errorf("core: Binding persist: %w", err)
 		}
+		b.saveOwed = false
 	}
 	b.mu.Lock()
 	b.bindings = after
@@ -596,11 +608,13 @@ func (b *Binding) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, val
 // [Binding.OnChange] observers — matter.js limitNodeDataToAllowedFabrics
 // strips a departed fabric's fabric-scoped attribute entries from every
 // endpoint (packages/node/src/behavior/cluster/FabricScopedDataHandler.ts:
-// 109-122).
+// 41-73, the filter at :62-68, and :114-123).
 //
 // A persisted list ([Binding.Persist]) is saved; the fabric is gone
 // whether or not the save succeeds, so a failed save still drops the
-// entries here (the Save function reports its own failure).
+// entries here (the Save function reports its own failure) and the save
+// stays owed: the next drop of any index, or the next write, stores the
+// list (R3-store-3052).
 func (b *Binding) RemoveFabric(fabricIndex uint8) {
 	_ = b.MatterDropFabric(context.Background(), fabricIndex)
 }
@@ -614,7 +628,14 @@ func (b *Binding) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
 	after := slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabricIndex })
 	if len(after) == len(before) {
 		b.mu.Unlock()
+		// Nothing of the index in memory; a save an earlier drop owes is
+		// made now — the node drops an index again when a fabric is
+		// installed at it (R3-store-3052).
+		err := b.settleOwedLocked(before)
 		b.writeMu.Unlock()
+		if err != nil {
+			return fmt.Errorf("core: Binding: owed save at dropping fabric %d: %w", fabricIndex, err)
+		}
 		return nil
 	}
 	b.bindings = after
@@ -623,11 +644,27 @@ func (b *Binding) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
 	if b.save != nil {
 		if serr := b.save(slices.Clone(after)); serr != nil {
 			err = fmt.Errorf("core: Binding: save after dropping fabric %d: %w", fabricIndex, serr)
+			b.saveOwed = true
+		} else {
+			b.saveOwed = false
 		}
 	}
 	b.writeMu.Unlock()
 	b.notify(contract.OriginUnknown, before, after)
 	return err
+}
+
+// settleOwedLocked stores list, the list in memory, when a drop owes its
+// save, and clears the mark when the store took it. Caller holds writeMu.
+func (b *Binding) settleOwedLocked(list []TargetStruct) error {
+	if !b.saveOwed || b.save == nil {
+		return nil
+	}
+	if err := b.save(slices.Clone(list)); err != nil {
+		return err
+	}
+	b.saveOwed = false
+	return nil
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics

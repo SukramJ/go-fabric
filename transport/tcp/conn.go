@@ -91,6 +91,10 @@ type Conn struct {
 	// listener measures the connection's idleness by lastSession alone.
 	sessionNoted atomic.Bool
 	lastSession  atomic.Int64
+	// sendRenews is set by [Conn.NoteSessionTraffic] and cleared by
+	// [Conn.NoteSessionsEnded]: while it is set, a message sent renews
+	// lastSession (markSentSession). R3-bound-3402.
+	sendRenews atomic.Bool
 
 	recoveredPanics *panicCounter
 }
@@ -168,15 +172,18 @@ func (c *Conn) Send(msg []byte) error {
 	return nil
 }
 
-// markSentSession counts a message sent on a connection already noted as
-// carrying a session ([Conn.NoteSessionTraffic]) as session traffic: what
-// the device sends there belongs to the sessions it carries (a
-// subscription's reports), and only an authenticated message can set the
-// note, so a party without a session cannot cause it. A received frame
-// does not count — the host notes the authenticated ones. A no-op on a
-// dialed connection and before the first note. R2-C2-bound-0201.
+// markSentSession counts a message sent on a connection noted as carrying
+// a session ([Conn.NoteSessionTraffic]) as session traffic: what the device
+// sends there belongs to the sessions it carries (a subscription's
+// reports), and only an authenticated message can set the note, so a party
+// without a session cannot cause it. Once the host noted that the
+// connection's last session ended ([Conn.NoteSessionsEnded]), a send — a
+// reply to a handshake's unsecured frame — counts no more until the next
+// note (R3-bound-3402). A received frame does not count — the host notes
+// the authenticated ones. A no-op on a dialed connection and before the
+// first note. R2-C2-bound-0201.
 func (c *Conn) markSentSession() {
-	if c.now == nil || !c.sessionNoted.Load() {
+	if c.now == nil || !c.sendRenews.Load() {
 		return
 	}
 	c.lastSession.Store(int64(c.now()))
@@ -196,9 +203,9 @@ func (c *Conn) markTraffic() {
 // carried a message of a secure session — one the host authenticated. The
 // listener measures a connection's place at the total bound
 // ([MaxInboundConnections]) by these notes — and, once one was made, by
-// every message sent on the connection ([Conn.Send]) — not by every
-// received frame: a
-// connection keeps its place while its sessions carried a message within
+// every message sent on the connection ([Conn.Send]) until
+// [Conn.NoteSessionsEnded] — not by every received frame: a connection
+// keeps its place while its sessions carried a message within
 // [idleGrace]; one never noted keeps it only for [sessionlessGrace] after
 // its accept (for [reclaimAgeFloor] when it carried nothing), whatever
 // frames it sends. A host that terminates sessions on the listener's
@@ -211,6 +218,22 @@ func (c *Conn) NoteSessionTraffic() {
 	}
 	c.lastSession.Store(int64(c.now()))
 	c.sessionNoted.Store(true)
+	c.sendRenews.Store(true)
+}
+
+// NoteSessionsEnded tells the accepting listener that the last secure
+// session the connection carried has ended while the connection stays open
+// (a handshake in flight on it). The connection keeps the measure of its
+// last [Conn.NoteSessionTraffic]; what the device sends on it no longer
+// renews that measure until the host notes session traffic again, so a
+// peer without a session cannot keep the connection's place at
+// [MaxInboundConnections] by frames that draw a reply. A no-op on a dialed
+// connection. Review II, R3-bound-3402.
+func (c *Conn) NoteSessionsEnded() {
+	if c.now == nil {
+		return
+	}
+	c.sendRenews.Store(false)
 }
 
 // sessionSince is the reading of the connection's last session message

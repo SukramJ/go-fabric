@@ -18,6 +18,7 @@ import (
 
 	"thingfabric.dev/go-fabric/cluster/alarm"
 	"thingfabric.dev/go-fabric/cluster/appliance"
+	"thingfabric.dev/go-fabric/cluster/boolcfg"
 	mattercore "thingfabric.dev/go-fabric/cluster/core"
 	"thingfabric.dev/go-fabric/cluster/cover"
 	"thingfabric.dev/go-fabric/cluster/fan"
@@ -31,6 +32,7 @@ import (
 	acldef "thingfabric.dev/go-fabric/cluster/spec/accesscontrol"
 	basicdef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
 	bindingdef "thingfabric.dev/go-fabric/cluster/spec/binding"
+	boolcfgdef "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
 	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	ccdef "thingfabric.dev/go-fabric/cluster/spec/colorcontrol"
 	fandef "thingfabric.dev/go-fabric/cluster/spec/fancontrol"
@@ -137,6 +139,13 @@ func verdictCases() []verdictCase {
 			bindingdef.AttrBinding,
 			spec.List[bindingdef.TargetStruct]{{Node: ptr(uint64(0x1234)), Endpoint: ptr(uint16(1)), Cluster: ptr(uint32(6))}},
 		},
+		// boolcfg.Server re-publishes the field after an accepted
+		// CurrentSensitivityLevel write (R3-conc-3203): its own verdict.
+		{"boolcfg.Server", false, func(t *testing.T) contract.ClusterServer {
+			t.Helper()
+			s, err := boolcfg.New(boolcfg.Config{Features: boolcfg.FeatureSensitivityLevel, SupportedSensitivityLevels: 3})
+			return must(t, s, err)
+		}, boolcfgdef.AttrCurrentSensitivityLevel, uint8(2)},
 		{"cover.WindowCoveringServer", false, func(*testing.T) contract.ClusterServer {
 			return cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0b101})
 		}, wcdef.AttrMode, uint8(1)},
@@ -294,7 +303,6 @@ const (
 var verdictExempt = map[string]string{
 	"alarmbase.Server":                    exemptDelegates,
 	"appliance.MicrowaveServer":           exemptDelegates,
-	"boolcfg.Server":                      exemptDelegates,
 	"camera.AvSettings":                   exemptDelegates,
 	"camera.AvStream":                     exemptDelegates,
 	"camera.Chime":                        exemptDelegates,

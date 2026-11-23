@@ -207,7 +207,7 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 		return true
 	}
 	current := addressOf(s.Addr()).AddrPort()
-	discovered := p.service.Addresses()
+	discovered := unicastDestinations(p.service.Addresses())
 	log := p.log.With(slog.String("reason", reason.String()), slog.String("address", current.String()))
 	if p.icdAwaited() {
 		adoptICDAddress(p, s, current, discovered, log)
@@ -356,6 +356,23 @@ func (m *monitor) resetBackoff() {
 	defer m.mu.Unlock()
 	m.fibPrev, m.fibCurr = 0, 0
 	m.lastProbeAt = time.Time{}
+}
+
+// unicastDestinations is discovered without the addresses that cannot be
+// the destination of a datagram to one host (unicastDestination): the
+// filter the connection applies to a discovered address
+// (addAddressLocked), since any host on the link can send the record that
+// names one. The monitor neither adopts nor probes such an address, and a
+// set of only such addresses is one that names none (review II,
+// R3-bound-3551, R2-P3-ctl-lan-09).
+func unicastDestinations(discovered []discovery.Address) []discovery.Address {
+	out := discovered[:0:0]
+	for _, a := range discovered {
+		if unicastDestination(a.IP) {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 // adoptICDAddress is the monitor's ICD branch. A sleeping LIT ICD does not

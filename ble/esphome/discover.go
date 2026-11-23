@@ -253,7 +253,8 @@ func skip(log *slog.Logger, c candidate, reason error) {
 // o.Logger — slog.Default when nil, unlike a central's — as
 // ble.esphome.proxy_skipped with the reason. A device is one proxy
 // however many instance names announce it — identified by the MAC its
-// DeviceInfoResponse states on the connection — and at most 32 are
+// DeviceInfoResponse states on the connection, a keyed connection's taking
+// precedence over a plaintext one's — and at most 32 are
 // dialled, the rest logged as ble.esphome.proxy_cap. NewCentral with
 // Options.Discover runs the same discovery and keeps it current, under
 // the same bound.
@@ -313,22 +314,33 @@ func Discover(ctx context.Context, o Options) ([]Proxy, error) {
 		}
 		found[i], macs[i] = &Proxy{Addr: addr, Key: c.psk, Name: c.name}, a.mac
 	})
-	out := make([]Proxy, 0, len(found))
+	// One proxy per device, by the MAC its connection stated
+	// (R2-C2-bound-2003). The keyed connections are taken first: a MAC
+	// stated over the plaintext API identifies nothing, so a plaintext
+	// device that states a keyed device's MAC is the one left out, never
+	// the keyed one (R3-sec-3303).
+	keep := make([]bool, len(found))
 	seen := map[string]bool{}
-	for i, p := range found {
-		if p == nil {
-			continue
-		}
-		// One proxy per device, by the MAC its connection stated
-		// (R2-C2-bound-2003).
-		if m := macs[i]; m != "" {
-			if seen[m] {
-				skip(o.Logger, admitted[i], errSameDevice)
+	for _, keyed := range []bool{true, false} {
+		for i, p := range found {
+			if p == nil || (p.Key != "") != keyed {
 				continue
 			}
-			seen[m] = true
+			if m := macs[i]; m != "" {
+				if seen[m] {
+					skip(o.Logger, admitted[i], errSameDevice)
+					continue
+				}
+				seen[m] = true
+			}
+			keep[i] = true
 		}
-		out = append(out, *p)
+	}
+	out := make([]Proxy, 0, len(found))
+	for i, p := range found {
+		if keep[i] {
+			out = append(out, *p)
+		}
 	}
 	return out, ctx.Err()
 }
@@ -388,8 +400,10 @@ func (c *Central) rescan(ctx context.Context) {
 		}
 		c.setMu.Lock()
 		hash, refused := c.skipped[cd.key]
+		al, aliased := c.aliases[cd.key]
+		aliased = aliased && al.hash == cd.hash && c.holdsDeviceLocked(al.mac, al.keyed)
 		c.setMu.Unlock()
-		if refused && hash == cd.hash {
+		if refused && hash == cd.hash || aliased {
 			continue
 		}
 		if err := admit(cd, c.disc.AllowPlaintext); err != nil {
@@ -402,12 +416,26 @@ func (c *Central) rescan(ctx context.Context) {
 	}
 	if room := maxDiscoveredProxies - c.discoveredCount(); len(fresh) > room {
 		room = max(room, 0)
+		c.setMu.Lock()
+		var logCap []candidate
 		for _, cd := range fresh[room:] {
+			if !c.capped[cd.key] {
+				c.capped[cd.key] = true
+				logCap = append(logCap, cd)
+			}
+		}
+		c.setMu.Unlock()
+		for _, cd := range logCap {
 			c.log.Warn("ble.esphome.proxy_cap", slog.String("proxy", cd.name), slog.Any("addresses", cd.addrs),
 				slog.Int("max", maxDiscoveredProxies))
 		}
 		fresh = fresh[:room]
 	}
+	c.setMu.Lock()
+	for _, cd := range fresh {
+		delete(c.capped, cd.key)
+	}
+	c.setMu.Unlock()
 	c.join(ctx, fresh)
 	c.leave(advertised)
 }
@@ -427,15 +455,27 @@ func (c *Central) discoveredCount() int {
 // of a device the set already holds: another name for the same device.
 var errSameDevice = errors.New("esphome: the device is in the proxy set already (same MAC in its DeviceInfoResponse)")
 
-// holdsDeviceLocked reports whether a proxy of the set has stated mac on
-// its connection; c.setMu is held (before p.mu, the lock order).
-func (c *Central) holdsDeviceLocked(mac string) bool {
+// alias is a discovered name found to be a device of the set: the
+// config_hash it was found at, the MAC its connection stated, and whether
+// that connection was keyed.
+type alias struct {
+	hash, mac string
+	keyed     bool
+}
+
+// holdsDeviceLocked reports whether a proxy of the set has stated mac on a
+// connection that identifies it to a newcomer: a MAC stated over the
+// plaintext API identifies nothing to a keyed newcomer, so a keyed
+// connection is the same device only as a keyed proxy of the set, a
+// plaintext one as any (review II, R3-sec-3303). c.setMu is held (before
+// p.mu, the lock order).
+func (c *Central) holdsDeviceLocked(mac string, keyed bool) bool {
 	if mac == "" {
 		return false
 	}
 	for _, p := range c.proxies {
 		p.mu.Lock()
-		same := p.mac == mac
+		same := p.mac == mac && (p.psk != nil || !keyed)
 		p.mu.Unlock()
 		if same {
 			return true
@@ -496,8 +536,12 @@ func (c *Central) join(ctx context.Context, cs []candidate) {
 		// A device is identified by what it states on the keyed
 		// connection, not by the name a browse returned: a second name
 		// for a device in the set is not a second proxy. Not refused for
-		// good — the name may be the device's new one once the old leaves.
-		if c.holdsDeviceLocked(a.mac) {
+		// good — the name may be the device's new one once the old leaves —
+		// but remembered, so it is not dialled again while the device
+		// stays (R3-bound-3302).
+		keyed := p.psk != nil
+		if c.holdsDeviceLocked(a.mac, keyed) {
+			c.aliases[cd.key] = alias{hash: cd.hash, mac: a.mac, keyed: keyed}
 			c.setMu.Unlock()
 			a.close(context.Canceled)
 			p.stop()
@@ -506,6 +550,7 @@ func (c *Central) join(ctx context.Context, cs []candidate) {
 		}
 		c.proxies = append(c.proxies, p)
 		delete(c.skipped, cd.key)
+		delete(c.aliases, cd.key)
 		c.setMu.Unlock()
 		c.log.Info("ble.esphome.proxy_discovered", slog.String("proxy", p.name), slog.Any("addresses", cd.addrs), slog.Bool("encrypted", p.psk != nil))
 		if p.psk == nil {
@@ -527,12 +572,18 @@ func (c *Central) refuse(cd candidate, err error) {
 // connection; one still connected stays until a browse misses it while
 // it is down. A refused name no longer advertised is forgotten
 // (R2-P6-bound-2009): it is refused again, at its config_hash, should it
-// come back.
+// come back. An alias is forgotten when its name is no longer advertised
+// or the device it named left the set (R3-bound-3302).
 func (c *Central) leave(advertised map[string]bool) {
 	c.setMu.Lock()
 	for name := range c.skipped {
 		if !advertised[name] {
 			delete(c.skipped, name)
+		}
+	}
+	for name := range c.capped {
+		if !advertised[name] {
+			delete(c.capped, name)
 		}
 	}
 	var gone []*proxy
@@ -545,6 +596,11 @@ func (c *Central) leave(advertised map[string]bool) {
 		keep = append(keep, p)
 	}
 	c.proxies = keep
+	for name, al := range c.aliases {
+		if !advertised[name] || !c.holdsDeviceLocked(al.mac, al.keyed) {
+			delete(c.aliases, name)
+		}
+	}
 	c.setMu.Unlock()
 	for _, p := range gone {
 		p.stop()

@@ -174,3 +174,54 @@ func TestSentMessagesOfANotedConnectionKeepItsPlace(t *testing.T) {
 		t.Fatal("the connection quiet for idleGrace kept its place")
 	}
 }
+
+// TestSentMessagesAfterTheLastSessionEndedEarnNoPlace: once the host noted
+// that a connection's last session ended (a handshake still in flight on
+// it), what the device sends there — replies to a peer's unsecured
+// handshake frames — no longer renews the connection's place; it is
+// reclaimed at the bound idleGrace after its last session traffic. A new
+// note of session traffic restores the renewal. R3-bound-3402.
+func TestSentMessagesAfterTheLastSessionEndedEarnNoPlace(t *testing.T) {
+	t.Parallel()
+	fake := clocktest.New(time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC))
+	l, err := Listen(Config{LocalAddr: "127.0.0.1:0", MaxPayloadSize: 64, Clock: fake})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	handler := func(_ *Conn, _ []byte, release func()) { release() }
+	held := make([]*Conn, 0, MaxInboundConnections)
+	for i := range MaxInboundConnections {
+		c, cli := acceptFrom(t, l, i, handler)
+		go func() { _, _ = io.Copy(io.Discard, cli) }()
+		c.received.Store(true)
+		c.NoteSessionTraffic()
+		held = append(held, c)
+	}
+	ended, renewed := held[0], held[1]
+	ended.NoteSessionsEnded()
+	renewed.NoteSessionsEnded()
+	renewed.NoteSessionTraffic() // a new session on it
+	for range 6 {
+		fake.Advance(time.Minute)
+		for _, c := range []*Conn{ended, renewed} {
+			if err := c.Send([]byte{1, 2, 3}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, c := range held[2:] {
+			c.NoteSessionTraffic()
+		}
+	}
+	acceptFrom(t, l, 10, handler)
+	select {
+	case <-ended.Closed():
+	default:
+		t.Fatal("the connection whose last session ended kept its place by the replies it sent")
+	}
+	select {
+	case <-renewed.Closed():
+		t.Fatal("the connection noted again after its sessions ended lost its place although it sent every minute")
+	default:
+	}
+}

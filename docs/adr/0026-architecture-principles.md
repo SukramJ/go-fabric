@@ -133,7 +133,7 @@ hold gets the guard (principle 11).
    one path a host configures (named at gate 1, 2026-10-20): the OTA
    download and applied-image directories (`node/ota.go`,
    `cluster/core/ota_requestor_query.go`), the DCL file store
-   (`controller/dcl/store.go`), the controller's CA key file
+   (`dcl/store.go`), the controller's CA key file
    (`controller/ca/keyfile`) and the attestation chain files
    (`secure/attestation/files.go`). No package opens a file or keeps
    state across a restart by any other path — two residues named at

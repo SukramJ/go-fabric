@@ -97,50 +97,114 @@ func TestForgetErasesAfterTheEndpointLeftTheWire(t *testing.T) {
 // TestForgetAndAddInOneBatchStartsNew (review II, R2-P6-conc-2405): a key
 // forgotten and added again in one batch is served after the erasure —
 // a fresh endpoint number and none of the forgotten device's stored
-// state — as a Forget and a later Add are.
+// state — as a Forget and a later Add are. A part of the device added
+// again starts new with it: its number is fresh too, so nothing naming
+// the forgotten part's endpoint reaches the new device (R3-store-3702
+// repair, decision 560). That holds for a device removed before the
+// batch too, whose parts are then in its reservation, not in the set
+// (Fable N2 of the G5c diff read, decision 576).
 func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
-	const key = "switch:1"
-	st := memstore.New()
-	cfg := minimalConfig(nil)
-	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
-	n := newNode(t, cfg)
-	build := func() node.Endpoint {
-		sw, err := device.NewOnOffLightSwitch(device.Options{StableKey: endpoint.StringKey(key), Name: key})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return sw
-	}
-	if err := n.Aggregator().Add(ctx, build()); err != nil {
-		t.Fatal(err)
-	}
-	if err := n.Start(ctx); err != nil {
-		t.Fatal(err)
-	}
-	before, _ := endpointOf(t, n, key)
-	if got := dispatchWrite(t, n, attrPath(before, bdbidef.ClusterID, bdbidef.AttrNodeLabel), "old"); got != im.StatusSuccess {
-		t.Fatalf("NodeLabel write: %v", got)
-	}
-	err := n.Aggregator().Partition(node.Scope).Batch(ctx, func(b *node.Batch) error {
-		if err := b.Forget(endpoint.StringKey(key)); err != nil {
-			return err
-		}
-		return b.Add(build())
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	after, ok := endpointOf(t, n, key)
-	if !ok {
-		t.Fatal("the key added again in the batch is not served")
-	}
-	if after == before {
-		t.Errorf("endpoint %d after Forget and Add in one batch, want a fresh number", after)
-	}
-	if got := dispatchRead(t, n, attrPath(after, bdbidef.ClusterID, bdbidef.AttrNodeLabel)); got == "old" {
-		t.Errorf("NodeLabel %q after Forget and Add in one batch, want the declaration's", got)
+	const partKey = "switch:1/light"
+	for _, tc := range []struct {
+		name  string
+		key   string
+		parts []string
+		build func(t *testing.T) node.Endpoint
+		// removeFirst removes the device in a call before the batch.
+		removeFirst bool
+	}{
+		{"device", "switch:1", nil, func(t *testing.T) node.Endpoint {
+			t.Helper()
+			sw, err := device.NewOnOffLightSwitch(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return sw
+		}, false},
+		{"device with part", "switch:1", []string{partKey}, func(t *testing.T) node.Endpoint {
+			t.Helper()
+			nd, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := nd.AddPart(kitLight(t, partKey).Device); err != nil {
+				t.Fatal(err)
+			}
+			return nd
+		}, false},
+		{"device with part removed before the batch", "switch:1", []string{partKey}, func(t *testing.T) node.Endpoint {
+			t.Helper()
+			nd, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := nd.AddPart(kitLight(t, partKey).Device); err != nil {
+				t.Fatal(err)
+			}
+			return nd
+		}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			key := tc.key
+			st := memstore.New()
+			cfg := minimalConfig(nil)
+			cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+			n := newNode(t, cfg)
+			if err := n.Aggregator().Add(ctx, tc.build(t)); err != nil {
+				t.Fatal(err)
+			}
+			if err := n.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			before, _ := endpointOf(t, n, key)
+			partsBefore := map[string]uint16{}
+			for _, pk := range tc.parts {
+				num, ok := servedNumberOf(n, pk)
+				if !ok {
+					t.Fatalf("%s is not served before the batch", pk)
+				}
+				partsBefore[pk] = num
+			}
+			if got := dispatchWrite(t, n, attrPath(before, bdbidef.ClusterID, bdbidef.AttrNodeLabel), "old"); got != im.StatusSuccess {
+				t.Fatalf("NodeLabel write: %v", got)
+			}
+			if tc.removeFirst {
+				if err := n.Aggregator().Remove(ctx, endpoint.StringKey(key)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := n.Aggregator().Partition(node.Scope).Batch(ctx, func(b *node.Batch) error {
+				if err := b.Forget(endpoint.StringKey(key)); err != nil {
+					return err
+				}
+				return b.Add(tc.build(t))
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			after, ok := endpointOf(t, n, key)
+			if !ok {
+				t.Fatal("the key added again in the batch is not served")
+			}
+			if after == before {
+				t.Errorf("endpoint %d after Forget and Add in one batch, want a fresh number", after)
+			}
+			for _, pk := range tc.parts {
+				num, ok := servedNumberOf(n, pk)
+				if !ok {
+					t.Fatalf("%s is not served after the batch", pk)
+				}
+				if num == partsBefore[pk] {
+					t.Errorf("part %s at endpoint %d after Forget and Add in one batch, want a fresh number", pk, num)
+				}
+			}
+			if got := dispatchRead(t, n, attrPath(after, bdbidef.ClusterID, bdbidef.AttrNodeLabel)); got == "old" {
+				t.Errorf("NodeLabel %q after Forget and Add in one batch, want the declaration's", got)
+			}
+		})
 	}
 }
 
@@ -150,7 +214,9 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 // erasure, as it serves a forgotten key added again: the erasure of the
 // forgotten tree does not take the served endpoint's record, so its
 // number holds across a later, unrelated reassembly and a controller's
-// write to it is stored.
+// write to it is stored. No endpoint serves the forgotten part's key once
+// the Forget ran, so a different new device may take it (decision 575,
+// which narrows 567's refusal to a key another endpoint still serves).
 func TestForgetAndAddFormerPartKeyInOneBatch(t *testing.T) {
 	t.Parallel()
 	const partKey = "owner/light"

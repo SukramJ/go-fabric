@@ -37,6 +37,25 @@
 // directories and held to the same layers: they are released on their own,
 // and the root's ./... does not reach them.
 //
+// # Forbidden imports
+//
+// The layer order cannot state that two packages of the same layer, or a
+// higher layer and a lower one, must not meet. The "forbidden" list of
+// layers.json can: each rule names from-patterns, to-patterns and a reason,
+// and TestLayering fails on every non-test import from a package a
+// from-pattern matches to one a to-pattern matches, whatever their layers —
+// "forbidden import: from -> to (reason)". A rule's "except" list names the
+// packages a from-pattern matches that it still does not hold, each exact and
+// with its own reason; an exception whose package no longer makes the import
+// is reported as "stale forbidden exception". The first rule holds ADR 0020
+// decision 1: bridge, node, device and endpoint and every package below them
+// do not import controller/... (review II, R3-api-3780, decisions 556, 583),
+// with one exception, the test support bridge/bridgetest;
+// TestADR0020SiblingRuleIsInTheRules fails when the rule is taken out of the
+// file, narrowed, or given another exception. A forbidden import is fixed
+// by moving the code both sides need to a role-neutral package, as the
+// ledger client moved from controller/dcl to dcl.
+//
 // # Changing the rules
 //
 // An exception needs a reason and is added only in the commit that explains

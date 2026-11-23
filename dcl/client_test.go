@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"slices"
@@ -35,9 +36,8 @@ func TestClientRoots(t *testing.T) {
 	if err != nil || len(certs) != 1 || !certs[0].IsRoot || certs[0].SerialNumber != pki.paa.cert.SerialNumber.String() {
 		t.Fatalf("RootCertificateBySubject %+v (%v)", certs, err)
 	}
-	der, err := pemToDER(certs[0].PEMCert)
-	if err != nil || !bytes.Equal(der, pki.paa.der) {
-		t.Fatalf("PEM %v", err)
+	if blk, _ := pem.Decode([]byte(certs[0].PEMCert)); blk == nil || !bytes.Equal(blk.Bytes, pki.paa.der) {
+		t.Fatalf("PEM %q", certs[0].PEMCert)
 	}
 	// Another subject's answer is not the root asked for (:157-167).
 	if _, err := c.RootCertificateBySubject(ctx, SubjectReference{Subject: refs[0].Subject, SubjectKeyID: "00:11"}); err == nil {
@@ -197,7 +197,7 @@ func TestClientFailures(t *testing.T) {
 	ctx := context.Background()
 	f.json("/dcl/pki/root-certificates", 200, map[string]any{"approvedRootCertificates": map[string]any{"certs": []any{}, "schemaVersion": 0}})
 	f.mu.Lock()
-	f.delay = 300 * time.Millisecond
+	f.stall = true
 	f.mu.Unlock()
 	c := f.client()
 	c.Timeout = 50 * time.Millisecond
@@ -207,7 +207,7 @@ func TestClientFailures(t *testing.T) {
 		t.Fatalf("timeout: %v", err)
 	}
 	f.mu.Lock()
-	f.delay = 0
+	f.stall = false
 	f.mu.Unlock()
 	if (&Client{}).timeout() != DefaultTimeout || (&Client{}).baseURL() != ProductionURL || NewClient(TestNetURL).baseURL() != TestNetURL {
 		t.Fatal("defaults")

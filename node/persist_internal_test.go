@@ -227,7 +227,7 @@ func TestRingLogsServeTheAccessingFabricsOwnSessions(t *testing.T) {
 			t.Errorf("fabric 1's log lost its own %q:\n%s", kept, out)
 		}
 	}
-	for _, leak := range []string{other, "22", pase} {
+	for _, leak := range []string{other, "session_id=22", pase} {
 		if strings.Contains(out, leak) {
 			t.Errorf("fabric 1's log carries %q:\n%s", leak, out)
 		}

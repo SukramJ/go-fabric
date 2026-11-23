@@ -100,7 +100,7 @@ Code, Docs, ADRs oder Issues geht, ist Englisch.
   Fensters `:106-110`; am Pin gelesen). Die Roadmap-Formulierung „after
   §5.5“ meint den Spec-Abschnitt der PASE-Flows; das Item ist erledigt
   und wird nur dokumentiert. Fuzz: 24 Ziele in 10 Paketen; keines in
-  `client/interaction`, `client/discovery`, `controller/dcl`.
+  `client/interaction`, `client/discovery`, `dcl`.
 
 ### A.2 Der Persistenz-Port (Roadmap 21: „Store seam proved by a second implementation“)
 
@@ -171,7 +171,7 @@ fährt dieselbe Tabelle gegen SQLite und `memstore` (das Muster von
   hält, bekommt `node.Config.Limits{…}` ihn, sonst bleibt er Konstante).
 - PASE-Limit: nichts zu tun außer der Tabelle (siehe A.1).
 - Fuzz: Ziele für `client/interaction` (Report-/Subscribe-Decoder),
-  `client/discovery` (TXT/DNS-SD-Parsing), `controller/dcl` (die
+  `client/discovery` (TXT/DNS-SD-Parsing), `dcl` (die
   DCL-Antworten), `bdx/otaimage` (Header) — der Controller liest fremde
   Bytes; `make fuzz` bleibt der Guard. `client/handshake` (Sigma) ist
   Owner-Pfad: ein Fuzz-Ziel dort schreibt der Owner.

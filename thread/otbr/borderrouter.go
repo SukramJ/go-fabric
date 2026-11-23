@@ -61,9 +61,17 @@ type BorderRouter struct {
 
 	// mu guards configured.
 	mu sync.Mutex
-	// configured is chip's ActiveDatasetConfigured: true until an
-	// activation onto a border router without an active dataset begins,
-	// what CommitActiveDataset finds after (:186-189).
+	// configured is chip's ActiveDatasetConfigured, narrowed to this
+	// delegate's own activations (review II, R3-fsm-3350; decision 545):
+	// false only while an activation onto a border router without an
+	// active dataset is uncommitted. A CommissioningComplete sets it true
+	// when the border router is attached and otherwise leaves it as it
+	// is; a clear returns it to true. chip saves IsThreadAttached() at
+	// every CommissioningComplete (:186-189;
+	// ThreadBorderRouterManagementCluster.cpp:319-322); over REST the border router
+	// has other writers, so a commit while it is not attached must not arm
+	// the fail-safe's revert against a dataset no activation of this node
+	// set.
 	configured bool
 }
 
@@ -135,7 +143,7 @@ func (b *BorderRouter) Dataset(ctx context.Context, pending bool) ([]byte, error
 // SetActiveDataset (:127-143) attaches the border router to the dataset
 // and completes on kConnectivity_Established (:145-157). Over REST: an
 // activation onto a border router without an active dataset marks the
-// dataset not configured (SaveActiveDatasetConfigured(false), :130); the
+// dataset not configured (SaveActiveDatasetConfigured(false), :131); the
 // Thread interface is disabled first when a dataset is active, since the
 // OTBR refuses to replace it in place (409, OtbrRestClient.ts:421-422);
 // then PUT /node/dataset/active, PUT /node/state "enable", and /node/state
@@ -208,7 +216,8 @@ func (b *BorderRouter) awaitAttached(ctx context.Context) error {
 	}
 }
 
-// clear disables the Thread interface and deletes the active dataset.
+// clear disables the Thread interface and deletes the active dataset; on
+// success nothing of this delegate's is left for a revert.
 func (b *BorderRouter) clear(ctx context.Context) error {
 	if err := b.c.setState(ctx, false); err != nil {
 		return err
@@ -227,30 +236,37 @@ func (b *BorderRouter) clear(ctx context.Context) error {
 			return err
 		}
 	}
+	// Nothing of this delegate's is left to revert.
 	b.mu.Lock()
-	b.configured = false
+	b.configured = true
 	b.mu.Unlock()
 	return nil
 }
 
-// CommitActiveDataset implements [threadbr.BorderRouter]: the dataset is
-// configured when the border router is attached (CommitActiveDataset,
-// :186-189).
+// CommitActiveDataset implements [threadbr.BorderRouter]: an uncommitted
+// activation is committed when the border router is attached
+// (CommitActiveDataset, :186-189). A border router found not attached
+// leaves the flag as it is: only an activation of this delegate leaves
+// the dataset to the fail-safe's revert (review II, R3-fsm-3350).
 func (b *BorderRouter) CommitActiveDataset(ctx context.Context) error {
 	role, err := b.c.State(ctx)
 	if err != nil {
 		return err
 	}
+	if !role.Attached() {
+		return nil
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.configured = role.Attached()
+	b.configured = true
 	return nil
 }
 
 // RevertActiveDataset implements [threadbr.BorderRouter]: a dataset an
-// activation set onto a border router that had none, and that no
-// CommissioningComplete committed, is cleared (RevertActiveDataset,
-// :191-212); otherwise nothing changes.
+// activation of this delegate set onto a border router that had none, and
+// that no CommissioningComplete committed, is cleared (RevertActiveDataset,
+// :191-212); otherwise nothing changes. A clear that succeeded leaves
+// nothing armed.
 func (b *BorderRouter) RevertActiveDataset(ctx context.Context) error {
 	b.mu.Lock()
 	configured := b.configured

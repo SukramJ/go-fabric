@@ -19,7 +19,7 @@ import (
 
 	mattercore "thingfabric.dev/go-fabric/cluster/core"
 	provdef "thingfabric.dev/go-fabric/cluster/spec/otasoftwareupdateprovider"
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // TestDCLFlag: --dcl off (the default) builds no client — nothing reaches

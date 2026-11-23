@@ -1,7 +1,7 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10580,
-  "initializers": 370,
+  "entry_points": 10669,
+  "initializers": 372,
   "entry_packages": [
     ".",
     "bdx",
@@ -206,6 +206,7 @@
     "controller/dcl/snapshot",
     "controller/softwareupdate",
     "controller/topology",
+    "dcl",
     "device",
     "diag",
     "diagevent",
@@ -295,9 +296,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28380,
-    "reachable": 22240,
-    "whitelisted": 6118,
+    "total_exported": 28486,
+    "reachable": 22276,
+    "whitelisted": 6188,
     "unreachable": 22
   },
   "by_package": [
@@ -387,7 +388,7 @@
       "package": "bridge",
       "identifier": "Bridge.ControllerRTT",
       "file": "bridge/bridge.go",
-      "line": 3324,
+      "line": 3347,
       "kind": "method"
     },
     {
@@ -1609,6 +1610,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
       "line": 55
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBusyPaseRequestsRecordOneRingEventPerClaim",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/review2_r3_test.go",
+      "line": 57
     },
     {
       "package": "bridge",
@@ -4258,6 +4266,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFabricEventsRecordedBeforeTheDeferredCloseLeaveTheRing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/review2_r3_test.go",
+      "line": 205
+    },
+    {
+      "package": "bridge",
       "identifier": "TestFabricLeavingFlushesTheInvokingSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_leaving_flush_test.go",
@@ -5144,6 +5159,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/keyset_write_null_start_test.go",
       "line": 19
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestLastSessionEndTellsTheConnection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/review2_r3_test.go",
+      "line": 34
     },
     {
       "package": "bridge",
@@ -6771,6 +6793,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRemovedFabricsEventsAreNotServedToItsIndexsNextHolder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/review2_r3_test.go",
+      "line": 163
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRemovedServerEmitsIntoNoEventLog",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/withdrawn_emitter_test.go",
@@ -7692,6 +7721,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_after_completion_test.go",
       "line": 420
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSigma3EventNamesTheSessionItsStepEstablished",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/review2_r3_test.go",
+      "line": 128
     },
     {
       "package": "bridge",
@@ -8941,10 +8977,24 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "MaxConcurrentPreparations",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/export_test.go",
+      "line": 12
+    },
+    {
+      "package": "client/discovery",
       "identifier": "MaxRaceAttempts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/export_test.go",
       "line": 9
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "MaxRaceUnwinding",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/export_test.go",
+      "line": 11
     },
     {
       "package": "client/discovery",
@@ -8965,7 +9015,7 @@
       "identifier": "RaceWaiting",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/export_test.go",
-      "line": 15
+      "line": 17
     },
     {
       "package": "client/discovery",
@@ -9015,6 +9065,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/window_change_parity_matterjs_test.go",
       "line": 199
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestDeliveryQueue_BoundDropsTheOldest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_delivery_bound_test.go",
+      "line": 16
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestDeliveryQueue_DropIsLogged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_delivery_bound_test.go",
+      "line": 37
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestDeliveryQueue_DroppedDeviceIsDeliveredAgain",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_delivery_bound_test.go",
+      "line": 57
     },
     {
       "package": "client/discovery",
@@ -9389,6 +9460,13 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "TestRetrySchedule_NeverShrinksBelowItsFirstInterval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/retries_bound_test.go",
+      "line": 18
+    },
+    {
+      "package": "client/discovery",
       "identifier": "TestScannerPTRTargetsPastTheBoundAreNotCached",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/scanner_ptr_bound_test.go",
@@ -9424,10 +9502,24 @@
     },
     {
       "package": "client/discovery",
+      "identifier": "TestScanner_ContinuousSearchRetainsBoundedState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_bound_test.go",
+      "line": 18
+    },
+    {
+      "package": "client/discovery",
       "identifier": "TestScanner_FindByLongDiscriminator",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/scanner_test.go",
       "line": 66
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestScanner_FindWithoutKeepReturnsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/scanner_bound_test.go",
+      "line": 57
     },
     {
       "package": "client/discovery",
@@ -10684,6 +10776,27 @@
     },
     {
       "package": "client/interaction",
+      "identifier": "TestSustainRetriesMergeOverTheDefault",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/sustained_internal_test.go",
+      "line": 181
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestSustainRetries_NeverShrinkBelowTheFirstInterval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/retries_bound_internal_test.go",
+      "line": 16
+    },
+    {
+      "package": "client/interaction",
+      "identifier": "TestSustainedEventMinAtTheTopOfTheRange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/interaction/sustained_eventmin_internal_test.go",
+      "line": 16
+    },
+    {
+      "package": "client/interaction",
       "identifier": "TestSustainedHoldsWakefulnessFedAfterEstablishment",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/interaction/sustained_internal_test.go",
@@ -11192,6 +11305,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/peer/suspect_walk_test.go",
       "line": 17
+    },
+    {
+      "package": "client/peer",
+      "identifier": "TestMonitorTakesOnlyUnicastDestinations",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/peer/monitor_unicast_test.go",
+      "line": 19
     },
     {
       "package": "client/peer",
@@ -11916,6 +12036,13 @@
     },
     {
       "package": "cluster/boolcfg",
+      "identifier": "HoldAfterSensitivitySink",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/boolcfg/export_test.go",
+      "line": 37
+    },
+    {
+      "package": "cluster/boolcfg",
       "identifier": "HoldNextPublish",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/boolcfg/export_test.go",
@@ -12588,6 +12715,20 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestBindingDropOwesAFailedSave",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/binding_owed_save_test.go",
+      "line": 49
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestBindingWriteSettlesAnOwedSave",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/binding_owed_save_test.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestBridgedDeviceBasicInformationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
@@ -12756,6 +12897,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestFailSafeParticipantsReportTheirChanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_thread_changes_test.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestFailedRejoinAtStartIsRetriedWithABackoff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_wifi_rejoin_test.go",
@@ -12896,6 +13044,34 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestMessagesCancelledPresentLeavesALaterPresent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/messages_takedown_test.go",
+      "line": 92
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestMessagesPresentWaitsForATakeDown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/messages_takedown_test.go",
+      "line": 156
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestMessagesRefusedPresentInheritsTheTakeDown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/messages_inherit_test.go",
+      "line": 73
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestMessagesRemovedPresentLeavesAReusedIndexPresent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/messages_takedown_test.go",
+      "line": 124
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestMessagesRepresentRechecksTheBound",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/messages_flight_test.go",
@@ -12935,6 +13111,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_provider_fabric_state_test.go",
       "line": 46
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProviderDropWithdrawsTheScopeOfAnEndedAttempt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_scope_withdraw_test.go",
+      "line": 20
     },
     {
       "package": "cluster/core",
@@ -13365,6 +13548,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestOTARequestor_StartAfterLoadFailureRetries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_start_retry_test.go",
+      "line": 33
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestOTARequestor_UpdateProgress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
@@ -13691,6 +13881,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/network_commissioning_thread_test.go",
       "line": 343
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestThreadNetworkCommissioningReportsChangesOutsideACommand",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_thread_changes_test.go",
+      "line": 66
     },
     {
       "package": "cluster/core",
@@ -15280,6 +15477,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/lock/doorlock_server.go",
       "line": 129
+    },
+    {
+      "package": "cluster/lock",
+      "identifier": "TestKeyCreationSlotsAreReleased",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/lock/keylock_test.go",
+      "line": 19
     },
     {
       "package": "cluster/measurement",
@@ -21124,7 +21328,7 @@
       "identifier": "KeypadLockout",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 53
+      "line": 54
     },
     {
       "package": "cluster/thermo",
@@ -21173,7 +21377,7 @@
       "identifier": "ScheduleProgrammingVisibility",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 56
+      "line": 57
     },
     {
       "package": "cluster/thermo",
@@ -21201,7 +21405,7 @@
       "identifier": "SettingStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 106
+      "line": 107
     },
     {
       "package": "cluster/thermo",
@@ -21222,7 +21426,7 @@
       "identifier": "TemperatureDisplayMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 51
+      "line": 52
     },
     {
       "package": "cluster/thermo",
@@ -21286,6 +21490,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/thermo/atomic_commit_parity_matterjs_test.go",
       "line": 153
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestRevertedPresetsReachTheStoreAfterAFailedRestore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/atomic_revert_resave_internal_test.go",
+      "line": 56
     },
     {
       "package": "cluster/thermo",
@@ -21600,14 +21811,14 @@
       "identifier": "PairingPhase",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1168
+      "line": 1169
     },
     {
       "package": "controller",
       "identifier": "PairingStep",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/controller.go",
-      "line": 1164
+      "line": 1165
     },
     {
       "package": "controller",
@@ -23309,6 +23520,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/camera/start_after_stop_internal_test.go",
       "line": 16
+    },
+    {
+      "package": "controller/camera",
+      "identifier": "TestStringBoundsCountBytes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/camera/string_bytes_internal_test.go",
+      "line": 26
     },
     {
       "package": "controller/camera",
@@ -25142,7 +25360,7 @@
       "identifier": "TestCreateFabricNeverReplacesAStoredFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 185
+      "line": 188
     },
     {
       "package": "controller/commissioner",
@@ -25240,7 +25458,7 @@
       "identifier": "TestFabricLabelIsBoundInBytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 92
+      "line": 93
     },
     {
       "package": "controller/commissioner",
@@ -25667,7 +25885,7 @@
       "identifier": "TestRotationDoesNotHoldTheObserverLock",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 210
+      "line": 213
     },
     {
       "package": "controller/commissioner",
@@ -25706,10 +25924,38 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestStoredFabricLabelCutIsWarnedAndSavedWithTheRotation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_label_load_test.go",
+      "line": 89
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestStoredFabricLabelCutIsWarnedThroughFabricConfigLogger",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_label_load_test.go",
+      "line": 120
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestStoredFabricLabelCutWithoutLoggerIsDiscarded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_label_load_test.go",
+      "line": 167
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestStoredFabricLabelOverTheBoundIsCutAtLoad",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_label_load_test.go",
+      "line": 43
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestStoredOperationalKeyIsNeverDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 254
+      "line": 257
     },
     {
       "package": "controller/commissioner",
@@ -25779,7 +26025,7 @@
       "identifier": "TestZeroFabricLabelIsSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_record_test.go",
-      "line": 141
+      "line": 144
     },
     {
       "package": "controller/commissioner",
@@ -25787,6 +26033,55 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/commissioner/jcm.go",
       "line": 37
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "Certificate",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 76
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "Client",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 27
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "ComplianceHistoryItem",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 111
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "ComplianceInfo",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 104
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "DeviceModel",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 83
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "Error",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 34
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "FileStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 139
     },
     {
       "package": "controller/dcl",
@@ -25804,6 +26099,55 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "MemoryStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 132
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "OTAError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 48
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "OTAUpdate",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 55
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "OTAVersions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 62
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "ProductInfo",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 167
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "ResponseError",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 41
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "RevocationPoint",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 118
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "SetHarnessNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/export_harness_test.go",
@@ -25811,24 +26155,59 @@
     },
     {
       "package": "controller/dcl",
+      "identifier": "SettingStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 153
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "Settings",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 146
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "SoftwareVersion",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 90
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "Store",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 125
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "SubjectReference",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 69
+    },
+    {
+      "package": "controller/dcl",
       "identifier": "TestBackgroundContextsAreNamed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/background_guard_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "controller/dcl",
       "identifier": "TestCRLDownloadConnectsToPublicDestinationsOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 517
+      "line": 279
     },
     {
       "package": "controller/dcl",
       "identifier": "TestCRLDownloadRefusesARedirectFromHTTPSToHTTP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 179
+      "line": 136
     },
     {
       "package": "controller/dcl",
@@ -25923,41 +26302,6 @@
     },
     {
       "package": "controller/dcl",
-      "identifier": "TestClientFailures",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_test.go",
-      "line": 194
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestClientModels",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_test.go",
-      "line": 92
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestClientRevocationPointsPaginated",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_test.go",
-      "line": 155
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestClientRoots",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_test.go",
-      "line": 21
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestClientSchemaVersions",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_test.go",
-      "line": 63
-    },
-    {
-      "package": "controller/dcl",
       "identifier": "TestCommissionRevokedDAC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/commission_test.go",
@@ -25969,13 +26313,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/commission_test.go",
       "line": 130
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestConnectTargetRefusesAnUnmappedHost",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/connect_target_ascii_test.go",
-      "line": 15
     },
     {
       "package": "controller/dcl",
@@ -26147,87 +26484,10 @@
     },
     {
       "package": "controller/dcl",
-      "identifier": "TestDclClientConstructor",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_parity_matterjs_test.go",
-      "line": 117
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientFetchAllVendors",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_parity_matterjs_test.go",
-      "line": 491
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientFetchComplianceInfo",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_parity_matterjs_test.go",
-      "line": 295
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientFetchModelByVidPid",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_parity_matterjs_test.go",
-      "line": 199
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientFetchModelVersionByVidPidSoftwareVersion",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_parity_matterjs_test.go",
-      "line": 239
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientFetchRootCertificateBySubject",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_parity_matterjs_test.go",
-      "line": 163
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientFetchRootCertificateList",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_parity_matterjs_test.go",
-      "line": 147
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientRecordsWithUnsetOptionalFields",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_parity_matterjs_test.go",
-      "line": 351
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientRevocationFetchRevocationDistributionPoints",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_revocation_parity_matterjs_test.go",
-      "line": 123
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclClientRevocationFetchRevocationDistributionPointsByIssuer",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_revocation_parity_matterjs_test.go",
-      "line": 213
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclConfig",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/config_parity_matterjs_test.go",
-      "line": 17
-    },
-    {
-      "package": "controller/dcl",
       "identifier": "TestDclConfigDclGithubConfig",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/config_parity_matterjs_test.go",
-      "line": 44
+      "line": 12
     },
     {
       "package": "controller/dcl",
@@ -26287,55 +26547,6 @@
     },
     {
       "package": "controller/dcl",
-      "identifier": "TestDclOtaUpdateServiceCheckForUpdate",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_parity_matterjs_test.go",
-      "line": 177
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclOtaUpdateServiceCustomDclConfig",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_parity_matterjs_test.go",
-      "line": 536
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclOtaUpdateServiceDownloadUpdate",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_parity_matterjs_test.go",
-      "line": 386
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclOtaUpdateServiceIntegration",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_parity_matterjs_test.go",
-      "line": 479
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclVendorInfoServiceParity",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/vendorinfo_parity_matterjs_test.go",
-      "line": 84
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclVendorInfoServiceProductInfoParity",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/vendorinfo_parity_matterjs_test.go",
-      "line": 333
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestDclVendorInfoServiceSeedParity",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/vendorinfo_parity_matterjs_test.go",
-      "line": 405
-    },
-    {
-      "package": "controller/dcl",
       "identifier": "TestDownloadCRLBounded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/revocation_test.go",
@@ -26343,52 +26554,31 @@
     },
     {
       "package": "controller/dcl",
-      "identifier": "TestEncodeURIComponent",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/client_test.go",
-      "line": 236
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestFileStoreRoundTrip",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/store_damaged_test.go",
-      "line": 58
-    },
-    {
-      "package": "controller/dcl",
       "identifier": "TestGitHubNamedURLsConnectToPublicDestinationsOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 605
+      "line": 367
     },
     {
       "package": "controller/dcl",
       "identifier": "TestGitHubRequestsCarryADeadline",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 228
+      "line": 185
     },
     {
       "package": "controller/dcl",
       "identifier": "TestGuardBehindAProxy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 546
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestGuardDropsTheHostsDots",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/guard_proxy_dial_test.go",
-      "line": 56
+      "line": 308
     },
     {
       "package": "controller/dcl",
       "identifier": "TestGuardJudgesTheHostAsSent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 670
+      "line": 432
     },
     {
       "package": "controller/dcl",
@@ -26399,122 +26589,17 @@
     },
     {
       "package": "controller/dcl",
-      "identifier": "TestHeld5bDclF6Retry",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/guard_proxy_dial_test.go",
-      "line": 106
-    },
-    {
-      "package": "controller/dcl",
       "identifier": "TestHeld5bDclR8",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/guard_proxy_dial_test.go",
-      "line": 72
+      "line": 54
     },
     {
       "package": "controller/dcl",
-      "identifier": "TestIPv4Legacy",
+      "identifier": "TestMovedForwardersDelegate",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/bounds_net_test.go",
-      "line": 752
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestListingBound",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/bounds_test.go",
-      "line": 49
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestListingItemBound",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/bounds_test.go",
-      "line": 72
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTADownload",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 201
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTADownloadBoundAtMaxInt64",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 337
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTADownloadBoundedByMaxImageSize",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 251
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTADownloadBoundedByTheAnnouncedSize",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 227
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTADownloadByURLSchemesAndDestinations",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/bounds_net_test.go",
-      "line": 489
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTADownloadConnectsToPublicDestinationsOnly",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/bounds_net_test.go",
-      "line": 396
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTADownloadLongerThanAnnounced",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 356
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTADownloadRefusesARedirectFromHTTPSToHTTP",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/bounds_net_test.go",
-      "line": 140
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTATestNet",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 115
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTAVersionWithoutMaximum",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 312
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTAVersions",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 44
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestOTAVersionsExaminedPerCheckAreBounded",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_cap_test.go",
-      "line": 19
+      "file": "controller/dcl/moved_test.go",
+      "line": 20
     },
     {
       "package": "controller/dcl",
@@ -26529,20 +26614,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/revocation_test.go",
       "line": 392
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestPublicDestination",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/bounds_net_test.go",
-      "line": 255
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "TestResponseBounds",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/bounds_test.go",
-      "line": 21
     },
     {
       "package": "controller/dcl",
@@ -26563,7 +26634,7 @@
       "identifier": "TestRevocationLookupBoundsItsConcurrentDownloads",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/bounds_net_test.go",
-      "line": 49
+      "line": 47
     },
     {
       "package": "controller/dcl",
@@ -26637,17 +26708,45 @@
     },
     {
       "package": "controller/dcl",
-      "identifier": "TestVendorInfoCloseCancelsThePeriodicRefresh",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/vendorinfo_close_test.go",
-      "line": 19
+      "identifier": "Vendor",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 97
     },
     {
       "package": "controller/dcl",
-      "identifier": "TestVerifyImage",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/dcl/ota_test.go",
-      "line": 151
+      "identifier": "VendorInfo",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 160
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "VendorInfoOptions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 181
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "VendorInfoService",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 195
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "VendorSeed",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 174
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "VendorUpdate",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/dcl/moved.go",
+      "line": 188
     },
     {
       "package": "controller/dcl/snapshot",
@@ -27544,6 +27643,335 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/topology/build_internal_test.go",
       "line": 445
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestClientFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_test.go",
+      "line": 194
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestClientModels",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_test.go",
+      "line": 92
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestClientRevocationPointsPaginated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_test.go",
+      "line": 155
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestClientRoots",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_test.go",
+      "line": 22
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestClientSchemaVersions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_test.go",
+      "line": 63
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestConnectTargetRefusesAnUnmappedHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/connect_target_ascii_test.go",
+      "line": 15
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientConstructor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_parity_matterjs_test.go",
+      "line": 117
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientFetchAllVendors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_parity_matterjs_test.go",
+      "line": 491
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientFetchComplianceInfo",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_parity_matterjs_test.go",
+      "line": 295
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientFetchModelByVidPid",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_parity_matterjs_test.go",
+      "line": 199
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientFetchModelVersionByVidPidSoftwareVersion",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_parity_matterjs_test.go",
+      "line": 239
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientFetchRootCertificateBySubject",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_parity_matterjs_test.go",
+      "line": 163
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientFetchRootCertificateList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_parity_matterjs_test.go",
+      "line": 147
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientRecordsWithUnsetOptionalFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_parity_matterjs_test.go",
+      "line": 351
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientRevocationFetchRevocationDistributionPoints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_revocation_parity_matterjs_test.go",
+      "line": 123
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclClientRevocationFetchRevocationDistributionPointsByIssuer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_revocation_parity_matterjs_test.go",
+      "line": 213
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclConfig",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/config_parity_matterjs_test.go",
+      "line": 17
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclOtaUpdateServiceCheckForUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_parity_matterjs_test.go",
+      "line": 177
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclOtaUpdateServiceCustomDclConfig",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_parity_matterjs_test.go",
+      "line": 536
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclOtaUpdateServiceDownloadUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_parity_matterjs_test.go",
+      "line": 386
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclOtaUpdateServiceIntegration",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_parity_matterjs_test.go",
+      "line": 479
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclVendorInfoServiceParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/vendorinfo_parity_matterjs_test.go",
+      "line": 84
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclVendorInfoServiceProductInfoParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/vendorinfo_parity_matterjs_test.go",
+      "line": 333
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestDclVendorInfoServiceSeedParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/vendorinfo_parity_matterjs_test.go",
+      "line": 405
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestEncodeURIComponent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/client_test.go",
+      "line": 236
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestFileStoreRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/store_test.go",
+      "line": 16
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestGuardDropsTheHostsDots",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/guard_proxy_dial_test.go",
+      "line": 17
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestHeld5bDclF6Retry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/guard_proxy_dial_test.go",
+      "line": 33
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestIPv4Legacy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/bounds_net_test.go",
+      "line": 239
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestListingBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/bounds_test.go",
+      "line": 49
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestListingItemBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/bounds_test.go",
+      "line": 72
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTADownload",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 201
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTADownloadBoundAtMaxInt64",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 337
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTADownloadBoundedByMaxImageSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 251
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTADownloadBoundedByTheAnnouncedSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 227
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTADownloadByURLSchemesAndDestinations",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/bounds_net_test.go",
+      "line": 210
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTADownloadConnectsToPublicDestinationsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/bounds_net_test.go",
+      "line": 117
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTADownloadLongerThanAnnounced",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 356
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTADownloadRefusesARedirectFromHTTPSToHTTP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/bounds_net_test.go",
+      "line": 28
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTATestNet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 115
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTAVersionWithoutMaximum",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 312
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTAVersions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 44
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestOTAVersionsExaminedPerCheckAreBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_cap_test.go",
+      "line": 19
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestPublicDestination",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/bounds_net_test.go",
+      "line": 68
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestResponseBounds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/bounds_test.go",
+      "line": 21
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestVendorInfoCloseCancelsThePeriodicRefresh",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/vendorinfo_close_test.go",
+      "line": 19
+    },
+    {
+      "package": "dcl",
+      "identifier": "TestVerifyImage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "dcl/ota_test.go",
+      "line": 151
     },
     {
       "package": "device",
@@ -28621,70 +29049,84 @@
       "identifier": "TestACapacityBelowOneStillProducesAUsableRing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 91
+      "line": 92
     },
     {
       "package": "diagevent",
       "identifier": "TestAnUnwiredRingIsSilentRatherThanFatal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 51
+      "line": 52
     },
     {
       "package": "diagevent",
       "identifier": "TestDetailKeysAreTheirNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 240
+      "line": 241
+    },
+    {
+      "package": "diagevent",
+      "identifier": "TestForgetFabricRemovesOnlyThatIndex",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "diagevent/ring_test.go",
+      "line": 259
+    },
+    {
+      "package": "diagevent",
+      "identifier": "TestForgetFabricUnderConcurrentRecording",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "diagevent/ring_test.go",
+      "line": 301
     },
     {
       "package": "diagevent",
       "identifier": "TestObserve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 146
+      "line": 147
     },
     {
       "package": "diagevent",
       "identifier": "TestRecordKeepsItsOwnDetail",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 192
+      "line": 193
     },
     {
       "package": "diagevent",
       "identifier": "TestRecordingIsSafeUnderConcurrentWireTraffic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 68
+      "line": 69
     },
     {
       "package": "diagevent",
       "identifier": "TestSetClockStampsUnstampedEvents",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 123
+      "line": 124
     },
     {
       "package": "diagevent",
       "identifier": "TestSnapshotDetailIsACopy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 215
+      "line": 216
     },
     {
       "package": "diagevent",
       "identifier": "TestSnapshotIsACopy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 107
+      "line": 108
     },
     {
       "package": "diagevent",
       "identifier": "TestTheRingKeepsTheNewestAndDropsTheOldest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
-      "line": 24
+      "line": 25
     },
     {
       "package": "eligibility",
@@ -28996,6 +29438,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestClusterServersLeavesTheSourceSliceAlone",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/review2_r3_test.go",
+      "line": 27
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestClusterServersMomentarySwitch",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/materialize_test.go",
@@ -29279,7 +29728,7 @@
       "identifier": "TestEveryWriteVerdictIsInTheTable",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_verdict_table_test.go",
-      "line": 363
+      "line": 371
     },
     {
       "package": "endpoint",
@@ -29461,7 +29910,7 @@
       "identifier": "TestKitWriteVerdictParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_verdict_table_test.go",
-      "line": 237
+      "line": 246
     },
     {
       "package": "endpoint",
@@ -35996,10 +36445,17 @@
     },
     {
       "package": "node",
+      "identifier": "AttachedBindings",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 101
+    },
+    {
+      "package": "node",
       "identifier": "AttestationChain",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 233
+      "line": 275
     },
     {
       "package": "node",
@@ -36013,7 +36469,7 @@
       "identifier": "BDXResponder",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 249
+      "line": 291
     },
     {
       "package": "node",
@@ -36021,6 +36477,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
       "line": 143
+    },
+    {
+      "package": "node",
+      "identifier": "BeforeStartBindingSync",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 97
     },
     {
       "package": "node",
@@ -36034,14 +36497,14 @@
       "identifier": "CapabilityMinimaStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 221
+      "line": 263
     },
     {
       "package": "node",
       "identifier": "CommissionerControlServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 252
+      "line": 294
     },
     {
       "package": "node",
@@ -36062,7 +36525,7 @@
       "identifier": "CommissioningApprover",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 215
+      "line": 257
     },
     {
       "package": "node",
@@ -36090,14 +36553,14 @@
       "identifier": "DeviceTypeValidationMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 227
+      "line": 269
     },
     {
       "package": "node",
       "identifier": "DiagnosticEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 65
+      "line": 67
     },
     {
       "package": "node",
@@ -36111,7 +36574,7 @@
       "identifier": "DiscoveryNames",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 255
+      "line": 297
     },
     {
       "package": "node",
@@ -36167,7 +36630,7 @@
       "identifier": "GeneralDiagnosticsFeatures",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 224
+      "line": 266
     },
     {
       "package": "node",
@@ -36216,21 +36679,21 @@
       "identifier": "NTPClient",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 164
+      "line": 206
     },
     {
       "package": "node",
       "identifier": "OTAApplier",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 196
+      "line": 238
     },
     {
       "package": "node",
       "identifier": "OTAApplyPolicy",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 181
+      "line": 223
     },
     {
       "package": "node",
@@ -36244,21 +36707,21 @@
       "identifier": "OTAConsent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 173
+      "line": 215
     },
     {
       "package": "node",
       "identifier": "OTAConsentState",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 176
+      "line": 218
     },
     {
       "package": "node",
       "identifier": "OTADownloadProtocol",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 199
+      "line": 241
     },
     {
       "package": "node",
@@ -36272,7 +36735,7 @@
       "identifier": "OTAHTTPClient",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 202
+      "line": 244
     },
     {
       "package": "node",
@@ -36300,21 +36763,21 @@
       "identifier": "OTAImageSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 170
+      "line": 212
     },
     {
       "package": "node",
       "identifier": "OTAPeer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 190
+      "line": 232
     },
     {
       "package": "node",
       "identifier": "OTAProviderServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 246
+      "line": 288
     },
     {
       "package": "node",
@@ -36328,21 +36791,21 @@
       "identifier": "OTAUpdateAttempt",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 187
+      "line": 229
     },
     {
       "package": "node",
       "identifier": "OTAUpdateManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 184
+      "line": 226
     },
     {
       "package": "node",
       "identifier": "OTAUpdateStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 193
+      "line": 235
     },
     {
       "package": "node",
@@ -36412,14 +36875,14 @@
       "identifier": "ReverseCommissioner",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 218
+      "line": 260
     },
     {
       "package": "node",
       "identifier": "SemanticTag",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 57
+      "line": 59
     },
     {
       "package": "node",
@@ -36440,42 +36903,42 @@
       "identifier": "SessionManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 48
+      "line": 50
     },
     {
       "package": "node",
       "identifier": "SessionParameters",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 243
+      "line": 285
     },
     {
       "package": "node",
       "identifier": "Snapshotter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 35
+      "line": 37
     },
     {
       "package": "node",
       "identifier": "SubscriptionInfo",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 61
+      "line": 63
     },
     {
       "package": "node",
       "identifier": "SubscriptionManager",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 53
+      "line": 55
     },
     {
       "package": "node",
       "identifier": "TCPConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 43
+      "line": 45
     },
     {
       "package": "node",
@@ -36553,6 +37016,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/attestation_product_internal_test.go",
       "line": 53
+    },
+    {
+      "package": "node",
+      "identifier": "TestBasicWindowRefusedAfterItsInstallKeepsTheAdministratorsAcceptor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/basic_window_race_internal_test.go",
+      "line": 82
     },
     {
       "package": "node",
@@ -36927,6 +37397,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestRefreshIPKOverlapInstallsTheNewerKeySet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_identities_refresh_internal_test.go",
+      "line": 40
+    },
+    {
+      "package": "node",
       "identifier": "TestRemovalReachesTheServedTopologyAfterARefusedSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/fabric_state_reconcile_internal_test.go",
@@ -37119,21 +37596,21 @@
       "identifier": "TimePeerReader",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 167
+      "line": 209
     },
     {
       "package": "node",
       "identifier": "TimeSynchronizationConfig",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 161
+      "line": 203
     },
     {
       "package": "node",
       "identifier": "Topology",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 39
+      "line": 41
     },
     {
       "package": "node",
@@ -37147,14 +37624,14 @@
       "identifier": "WiFiReporter",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 212
+      "line": 254
     },
     {
       "package": "node",
       "identifier": "WindowStatus",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/facade.go",
-      "line": 230
+      "line": 272
     },
     {
       "package": "node",
@@ -40742,6 +41219,13 @@
     },
     {
       "package": "thread/otbr",
+      "identifier": "TestRevertTouchesOnlyAnUncommittedActivation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_test.go",
+      "line": 434
+    },
+    {
+      "package": "thread/otbr",
       "identifier": "TestTranslateAllFixtureEntries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/translate_parity_matterjs_test.go",
@@ -43049,6 +43533,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/send_timeout_test.go",
       "line": 20
+    },
+    {
+      "package": "transport/tcp",
+      "identifier": "TestSentMessagesAfterTheLastSessionEndedEarnNoPlace",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/tcp/session_traffic_test.go",
+      "line": 184
     },
     {
       "package": "transport/tcp",

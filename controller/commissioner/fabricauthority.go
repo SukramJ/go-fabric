@@ -139,6 +139,9 @@ func (a *FabricAuthority) DefaultFabric(cfg FabricConfig, rotateNOC bool) (*Fabr
 		return a.CreateFabric(cfg)
 	}
 	label := cfg.Label
+	if cfg.Logger == nil {
+		cfg.Logger = a.log // the load's warnings go through the authority's logger
+	}
 	f, err := NewFabric(a.ca, cfg)
 	if err != nil {
 		return nil, err

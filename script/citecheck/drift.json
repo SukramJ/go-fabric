@@ -157,7 +157,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1929,
+    "line": 1934,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -167,7 +167,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1936,
+    "line": 1941,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -176,7 +176,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1968,
+    "line": 1980,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -186,7 +186,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2866,
+    "line": 2889,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
@@ -215,7 +215,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 727,
+    "line": 742,
     "citation": "NodeSession.ts:319-328",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -987,7 +987,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 337,
+    "line": 347,
     "citation": "InteractionMessenger.ts:1129",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ackWaitAbort",
@@ -996,7 +996,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 374,
+    "line": 384,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
@@ -1177,7 +1177,7 @@
   },
   {
     "file": "cluster/core/binding.go",
-    "line": 110,
+    "line": 116,
     "citation": "packages/node/src/behaviors/binding/BindingManager.ts:714-718",
     "resolved": "packages/node/src/behaviors/binding/BindingManager.ts",
     "identifier": "entryKey",
@@ -1307,7 +1307,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 69,
+    "line": 76,
     "citation": "SoftwareUpdateManager.ts:95-102",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "OtaUpdateAvailableDetails",
@@ -1322,6 +1322,16 @@
     "identifier": "OnOff",
     "nearest": 558,
     "occurrences": 2
+  },
+  {
+    "file": "cluster/core/vid_verification.go",
+    "line": 137,
+    "citation": "OperationalCredentialsServer.ts:485-488",
+    "resolved": "packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts",
+    "at": "b25ed960",
+    "identifier": "ConstraintError",
+    "nearest": 453,
+    "occurrences": 11
   },
   {
     "file": "cluster/cover/windowcovering_parity_matterjs_test.go",
@@ -1648,7 +1658,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 385,
+    "line": 388,
     "citation": "ThermostatServer.ts:1508-1510",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "#handlePersistedPresetsChanged",
@@ -1657,7 +1667,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 392,
+    "line": 395,
     "citation": "ThermostatServer.ts:1289-1291",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "AtomicChanging",
@@ -1666,7 +1676,7 @@
   },
   {
     "file": "cluster/thermo/presets.go",
-    "line": 403,
+    "line": 406,
     "citation": "ThermostatServer.ts:1687-1690",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "identifier": "hasLocalActor",
@@ -1784,7 +1794,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1259,
+    "line": 1266,
     "citation": "ThermostatServer.ts:1104",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "b25ed960",
@@ -1794,7 +1804,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1543,
+    "line": 1550,
     "citation": "thermostat-cluster.element.ts:510-514",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLowerModeEnum",
@@ -1803,7 +1813,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1685,
+    "line": 1692,
     "citation": "ThermostatServer.ts:219-220",
     "resolved": "packages/node/src/behaviors/thermostat/ThermostatServer.ts",
     "at": "db021da0",
@@ -1813,7 +1823,7 @@
   },
   {
     "file": "cluster/thermo/thermostat_server.go",
-    "line": 1866,
+    "line": 1873,
     "citation": "thermostat-cluster.element.ts:322-323",
     "resolved": "packages/model/src/standard/elements/thermostat-cluster.element.ts",
     "identifier": "SetpointRaiseLower",
@@ -2310,7 +2320,7 @@
   },
   {
     "file": "controller/client/registry.go",
-    "line": 433,
+    "line": 437,
     "citation": "CommissioningClient.ts:685-714",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#bindPeer",
@@ -2456,7 +2466,7 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 331,
+    "line": 332,
     "citation": "DeviceAttestationValidator.ts:235",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "considerTestCertificates",
@@ -2465,7 +2475,7 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 879,
+    "line": 880,
     "citation": "DclCertificateService.ts:1144-1147",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "at": "db021da0",
@@ -2511,7 +2521,7 @@
   },
   {
     "file": "controller/dcl/github.go",
-    "line": 36,
+    "line": 38,
     "citation": "packages/general/src/util/Github.ts:131-133",
     "resolved": "packages/general/src/util/Github.ts",
     "identifier": "GitHub",
@@ -2519,17 +2529,8 @@
     "occurrences": 4
   },
   {
-    "file": "controller/dcl/ota_test.go",
-    "line": 310,
-    "citation": "DclOtaUpdateService.ts:811-816",
-    "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
-    "identifier": "maxApplicableSoftwareVersion",
-    "nearest": 833,
-    "occurrences": 15
-  },
-  {
     "file": "controller/dcl/revocation.go",
-    "line": 712,
+    "line": 713,
     "citation": "DclCertificateService.ts:2092-2104",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "identifier": "RevocationSetEntry",
@@ -2544,15 +2545,6 @@
     "identifier": "nextUpdate",
     "nearest": 1941,
     "occurrences": 4
-  },
-  {
-    "file": "controller/dcl/types.go",
-    "line": 158,
-    "citation": "DclOtaUpdateService.ts:811-816",
-    "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
-    "identifier": "maxApplicableSoftwareVersion",
-    "nearest": 833,
-    "occurrences": 15
   },
   {
     "file": "controller/ota_observe_test.go",
@@ -2643,6 +2635,24 @@
     "identifier": "#cleanupObsoleteUpdates",
     "nearest": 3230,
     "occurrences": 1
+  },
+  {
+    "file": "dcl/ota_test.go",
+    "line": 310,
+    "citation": "DclOtaUpdateService.ts:811-816",
+    "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
+    "identifier": "maxApplicableSoftwareVersion",
+    "nearest": 833,
+    "occurrences": 15
+  },
+  {
+    "file": "dcl/types.go",
+    "line": 158,
+    "citation": "DclOtaUpdateService.ts:811-816",
+    "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
+    "identifier": "maxApplicableSoftwareVersion",
+    "nearest": 833,
+    "occurrences": 15
   },
   {
     "file": "device/device.go",
@@ -3085,7 +3095,7 @@
   },
   {
     "file": "node/commissioning.go",
-    "line": 662,
+    "line": 696,
     "citation": "packages/protocol/src/protocol/DeviceCommissioner.ts:236-256",
     "resolved": "packages/protocol/src/protocol/DeviceCommissioner.ts",
     "identifier": "commissioningConfig",
@@ -3209,7 +3219,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 135,
+    "line": 142,
     "citation": "FabricManager.ts:325-331",
     "resolved": "packages/protocol/src/fabric/FabricManager.ts",
     "identifier": "findFabricFromDestinationId",
@@ -3218,7 +3228,7 @@
   },
   {
     "file": "node/security.go",
-    "line": 1197,
+    "line": 1213,
     "citation": "packages/protocol/src/session/case/CaseServer.ts:204-217",
     "resolved": "packages/protocol/src/session/case/CaseServer.ts",
     "at": "b25ed960",

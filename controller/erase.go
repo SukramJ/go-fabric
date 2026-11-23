@@ -27,7 +27,7 @@ import (
 // the database untouched; an Erase called again once the hook returned
 // completes the reset. Concurrent Erase calls run one after the other.
 //
-// An error that wraps [store.ErrScrubIncomplete] is a completed reset whose
+// An error that wraps [ErrScrubIncomplete] is a completed reset whose
 // scrub of the file did not finish (another connection's reader holds its
 // -wal, a full disk fails the VACUUM): every row is gone, and the erased
 // bytes may remain in the file until a later [store.Scrub] of [Config].DB

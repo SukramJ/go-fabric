@@ -56,11 +56,11 @@ type ipTransport struct{ s *Scanner }
 func (ipTransport) Kind() TransportKind { return TransportIP }
 
 func (t ipTransport) FindContinuously(ctx context.Context, id Identifier, found func(Device)) error {
-	_, err := t.s.FindCommissionable(ctx, id, func(d Device) {
+	_, err := t.s.find(ctx, id, func(d Device) {
 		if len(d.Addresses) > 0 {
 			found(d)
 		}
-	})
+	}, false)
 	return err
 }
 
@@ -119,7 +119,12 @@ type SessionOptions struct {
 	// host's (a registry node, say). Its error loses this device only: it
 	// is logged once per device and, as the first such error, replaces a
 	// "not discovered" outcome (:404-430). The discovery ends only after
-	// every preparation finished (:303-331).
+	// every preparation finished (:303-331). At most 16 devices are
+	// prepared at once; while 16 are, the transport that found the next
+	// one waits until a preparation has finished. No device is dropped
+	// while the search runs; one still waiting when the search stops is
+	// not prepared, so the discovery ends at most one Prepare time after
+	// its search.
 	Prepare func(ctx context.Context, c Candidate) error
 	// Clock times Timeout and the race's stagger; nil is the system clock.
 	Clock fabricclock.Clock
@@ -198,6 +203,7 @@ type Session[T any] struct {
 	scannerCount   int
 	scannerErrors  []error
 	preparing      sync.WaitGroup
+	prepareSlots   chan struct{} // one per running preparation, at most maxConcurrentPreparations
 	done           chan struct{}
 	result         T
 	err            error
@@ -208,7 +214,10 @@ type Session[T any] struct {
 }
 
 func start[T any](ctx context.Context, k kind[T], transports []Transport, opts SessionOptions, name string) *Session[T] {
-	s := &Session[T]{kind: k, opts: opts, log: opts.Logger, clock: opts.Clock, done: make(chan struct{}), unusable: map[string]bool{}, description: name}
+	s := &Session[T]{
+		kind: k, opts: opts, log: opts.Logger, clock: opts.Clock, done: make(chan struct{}), unusable: map[string]bool{}, description: name,
+		prepareSlots: make(chan struct{}, maxConcurrentPreparations),
+	}
 	if s.log == nil {
 		s.log = slog.New(slog.DiscardHandler)
 	}
@@ -352,10 +361,37 @@ func (s *Session[T]) run(transports []Transport) {
 	close(s.done)
 }
 
+// maxConcurrentPreparations is how many found devices a discovery
+// prepares and hands to its kind at once. A sender announcing ever-new
+// matching devices would otherwise start a goroutine and a Prepare call
+// for each; past the bound the transport's found callback waits, so the
+// backlog stays with the transport. This module's own bound (review II,
+// R3-bound-3552, owner decision 563), at the race's number of places.
+const maxConcurrentPreparations = 16
+
 // prepare readies a found device, then hands it to the kind (#prepare,
-// #tryFound, #found, :303-357).
+// #tryFound, #found, :303-357). It waits for one of the
+// maxConcurrentPreparations slots first, on the transport's goroutine. No
+// device is dropped while the search runs; one still waiting when the
+// search stops is not prepared — a transport may hand over a batch after
+// the search ended (Scanner.find's deliver), and a backlog held to the
+// slots would otherwise outlast Timeout, Stop and Cancel by its length
+// times the Prepare time (review II, R3-bound-3552, Fable diff read). A
+// device handed over after the stop while a slot is free is still
+// prepared, as the ported DiscoveryCancelTest case "does not start an
+// attempt for a device that is handed over after the cancel" expects.
 func (s *Session[T]) prepare(c Candidate) {
+	select {
+	case s.prepareSlots <- struct{}{}:
+	default:
+		select {
+		case s.prepareSlots <- struct{}{}:
+		case <-s.scan.Done():
+			return
+		}
+	}
 	s.preparing.Go(func() {
+		defer func() { <-s.prepareSlots }()
 		if s.opts.Prepare != nil {
 			if err := s.opts.Prepare(s.ctx, c); err != nil {
 				s.localFailure(c, err)

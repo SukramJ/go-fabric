@@ -86,6 +86,11 @@ type ThreadNetworkCommissioning struct {
 	lastStatus     *uint8
 	lastNetworkID  []byte
 	lastConnectErr *int32
+
+	// changes reports what moves outside the cluster's own commands — the
+	// fail-safe's expiry, the re-attach after it, Refresh
+	// ([ThreadNetworkCommissioning.OnAttributeChange]; R3-par-3051).
+	changes cluster.AttributeChanges
 }
 
 // ThreadNetworkCommissioningConfig drives [NewThreadNetworkCommissioning].
@@ -167,7 +172,25 @@ var (
 	_ contract.ClusterAttributeWritePrivilege = (*ThreadNetworkCommissioning)(nil)
 	_ contract.ClusterCommandLister           = (*ThreadNetworkCommissioning)(nil)
 	_ contract.ClusterCommandInvokePrivilege  = (*ThreadNetworkCommissioning)(nil)
+	_ contract.AttributeChangeNotifier        = (*ThreadNetworkCommissioning)(nil)
 )
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: the
+// fail-safe's expiry ([ThreadNetworkCommissioning.OnFailSafeExpired]), the
+// re-attach of the reverted network after an abandoned ConnectNetwork and
+// [ThreadNetworkCommissioning.Refresh] change Networks, InterfaceEnabled
+// and — when the reverted backup was empty — LastNetworkingStatus,
+// LastNetworkID and LastConnectErrorValue outside a command of this
+// cluster (the bridge reports a command's effect on the cluster it
+// invoked), so each tells the listeners once the lock is released, as the
+// Wi-Fi server does ([WiFiNetworkCommissioning.OnAttributeChange];
+// R3-par-3051). connectedhomeip reports at the same point:
+// ReportNetworksListChanged() after the revert and the three setters, each
+// NotifyAttributeChanged (NetworkCommissioningCluster.cpp:250-281,
+// :992-1014 at 6170af84).
+func (n *ThreadNetworkCommissioning) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return n.changes.OnAttributeChange(cb)
+}
 
 // AttachFailSafe wires the node's fail-safe after construction, as
 // [ThreadNetworkCommissioningConfig.FailSafe] does.
@@ -178,18 +201,36 @@ func (n *ThreadNetworkCommissioning) AttachFailSafe(failSafe func() (fabricIndex
 }
 
 // Refresh reads the border router's attachment and interface again
-// (Networks' Connected, InterfaceEnabled) and reports a change.
+// (Networks' Connected, InterfaceEnabled) and reports a change
+// ([ThreadNetworkCommissioning.OnAttributeChange]).
 func (n *ThreadNetworkCommissioning) Refresh(ctx context.Context) {
 	n.mu.Lock()
 	staging := slices.Clone(n.staging)
 	n.mu.Unlock()
 	enabled, connected := n.probe(ctx, staging)
 	n.mu.Lock()
-	defer n.mu.Unlock()
-	if connected != n.connected || enabled != n.enabled {
-		n.enabled, n.connected = enabled, connected
+	moved := n.setLinkLocked(enabled, connected)
+	n.mu.Unlock()
+	n.changes.Notify(moved...)
+}
+
+// setLinkLocked takes what a read of the border router found and answers
+// the attributes it moved: Networks when Connected changed,
+// InterfaceEnabled when the interface did; the DataVersion advances when
+// either did. Caller holds mu.
+func (n *ThreadNetworkCommissioning) setLinkLocked(enabled, connected bool) []uint32 {
+	var moved []uint32
+	if connected != n.connected {
+		moved = append(moved, netcommAttrNetworks)
+	}
+	if enabled != n.enabled {
+		moved = append(moved, netcommAttrInterfaceEnabled)
+	}
+	n.enabled, n.connected = enabled, connected
+	if len(moved) > 0 {
 		n.dataVersion.Bump()
 	}
+	return moved
 }
 
 // probe reads the border router's interface and, as
@@ -690,11 +731,12 @@ func (n *ThreadNetworkCommissioning) reattachReverted(ctx context.Context, windo
 	_ = n.br.SetActiveDataset(ctx, staging) // as the expiry's own revert: attempted once
 	enabled, connected := n.probe(ctx, staging)
 	n.mu.Lock()
-	defer n.mu.Unlock()
+	var moved []uint32
 	if n.backup == nil && n.expiries == window+1 {
-		n.enabled, n.connected = enabled, connected
-		n.dataVersion.Bump()
+		moved = n.setLinkLocked(enabled, connected)
 	}
+	n.mu.Unlock()
+	n.changes.Notify(moved...)
 }
 
 // OnCommissioningComplete drops the fail-safe's backup
@@ -748,10 +790,15 @@ func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	}
 	backup := n.backup
 	n.backup = nil
+	// Networks is reported after every revert, as the staged network may
+	// have moved; the three Last… attributes when an empty backup cleared
+	// them (OnAttributeChange).
+	moved := []uint32{netcommAttrNetworks}
 	if backup != nil {
 		n.staging = backup
 		if len(backup) == 0 {
 			n.lastNetworkID, n.lastConnectErr, n.lastStatus = nil, nil, nil
+			moved = append(moved, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
 		}
 	}
 	staging := slices.Clone(n.staging)
@@ -761,7 +808,11 @@ func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	}
 	enabled, connected := n.probe(ctx, staging)
 	n.mu.Lock()
-	defer n.mu.Unlock()
+	if enabled != n.enabled {
+		moved = append(moved, netcommAttrInterfaceEnabled)
+	}
 	n.enabled, n.connected = enabled, connected
 	n.dataVersion.Bump()
+	n.mu.Unlock()
+	n.changes.Notify(moved...)
 }

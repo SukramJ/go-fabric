@@ -34,6 +34,8 @@ import (
 
 	"thingfabric.dev/go-fabric/clock/clocktest"
 	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/dcl"
+	"thingfabric.dev/go-fabric/internal/dclseam"
 )
 
 var (
@@ -207,11 +209,12 @@ type fakeDCL struct {
 	t   *testing.T
 	srv *httptest.Server
 
-	mu       sync.Mutex
-	hits     map[string]int
-	routes   map[string]func(w http.ResponseWriter, r *http.Request)
-	roots    []fakeRoot
-	delay    time.Duration
+	mu     sync.Mutex
+	hits   map[string]int
+	routes map[string]func(w http.ResponseWriter, r *http.Request)
+	roots  []fakeRoot
+	// stall holds every answer until the request's context ends.
+	stall    bool
 	failPath map[string]int
 }
 
@@ -265,15 +268,12 @@ func (f *fakeDCL) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.hits[r.URL.RequestURI()]++
 	fn := f.routes[r.URL.RequestURI()]
-	delay := f.delay
+	stall := f.stall
 	status := f.failPath[r.URL.RequestURI()]
 	f.mu.Unlock()
-	if delay > 0 {
-		select {
-		case <-time.After(delay):
-		case <-r.Context().Done():
-			return
-		}
+	if stall {
+		<-r.Context().Done()
+		return
 	}
 	if status != 0 {
 		w.WriteHeader(status)
@@ -489,4 +489,32 @@ func standInCSA(s *CertificateStore, signer testCert) {
 		}
 		return attestation.VerifyCDSignerCertificate(der, skid)
 	}
+}
+
+// guardedClient is a ledger client whose ledger-named downloads go through
+// a destination guard built from cfg (dclseam.SetTestGuard): the guard is
+// dcl's, reached through the seam (review II, decision 577).
+func guardedClient(t *testing.T, cfg dclseam.GuardConfig) *dcl.Client {
+	t.Helper()
+	c := &dcl.Client{}
+	if !dclseam.SetTestGuard(c, cfg) {
+		t.Fatal("dclseam.SetTestGuard refused a *dcl.Client")
+	}
+	return c
+}
+
+// encodeURIComponent is JavaScript's, as the fake ledger's paths are
+// spelled: every byte but A-Z a-z 0-9 and - _ . ! ~ * ' ( )
+// percent-encoded.
+func encodeURIComponent(s string) string {
+	var b strings.Builder
+	for i := range len(s) {
+		ch := s[i]
+		if ch >= 'A' && ch <= 'Z' || ch >= 'a' && ch <= 'z' || ch >= '0' && ch <= '9' || strings.IndexByte("-_.!~*'()", ch) >= 0 {
+			b.WriteByte(ch)
+			continue
+		}
+		fmt.Fprintf(&b, "%%%02X", ch)
+	}
+	return b.String()
 }

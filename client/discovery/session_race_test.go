@@ -156,8 +156,10 @@ func TestCommissioningRace_RunningAttemptsKeepTheStagger(t *testing.T) {
 // TestCommissioningRace_DeviceAfterUnansweredCandidatesIsAttempted: a
 // device found after any number of candidates whose attempts never get an
 // answer is attempted within RaceStaggerCeiling of being found and wins
-// the race, and no more than MaxRaceAttempts attempts run at once (review
-// II, R2-P3-ctl-lan-06, R2-P3-ble-01).
+// the race; every place is filled, and beside the MaxRaceAttempts places at
+// most MaxRaceUnwinding attempts ended for later candidates still run
+// (review II, R2-P3-ctl-lan-06, R2-P3-ble-01, R3-bound-3501, owner
+// decision 559).
 func TestCommissioningRace_DeviceAfterUnansweredCandidatesIsAttempted(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
@@ -202,8 +204,9 @@ func TestCommissioningRace_DeviceAfterUnansweredCandidatesIsAttempted(t *testing
 			t.Fatalf("the device, found %v into the race, was attempted %v after it was found, want at most %v",
 				discovery.CrossDeviceStagger, waited, discovery.RaceStaggerCeiling)
 		}
-		if most != discovery.MaxRaceAttempts {
-			t.Fatalf("at most %d attempts ran at once, want %d: every place filled, none more", most, discovery.MaxRaceAttempts)
+		if most < discovery.MaxRaceAttempts || most > discovery.MaxRaceAttempts+discovery.MaxRaceUnwinding {
+			t.Fatalf("at most %d attempts ran at once, want every place filled (%d) and at most %d beside them still returning",
+				most, discovery.MaxRaceAttempts, discovery.MaxRaceUnwinding)
 		}
 	})
 }
@@ -376,5 +379,198 @@ func TestRace_WaitingCandidatesAreBounded(t *testing.T) {
 				t.Fatalf("late-%03d started while every place was held", i)
 			}
 		}
+	})
+}
+
+// TestRace_DeviceFoundBehindAStreamOfCandidatesStartsWithinItsCeiling:
+// a device found while every place holds an attempt without an answer
+// starts within RaceStaggerCeiling of being found while further
+// candidates arrive after it — the overflow of the waiting candidates
+// makes the one found longest ago take a place at once, and does not drop
+// it while a place holds an unanswered attempt; a burst faster than the
+// ended attempts return is TestRace_DeviceInABurstStartsWithinItsCeiling's
+// (review II, R3-bound-3501, owner decisions 55, 552 and 559).
+func TestRace_DeviceFoundBehindAStreamOfCandidatesStartsWithinItsCeiling(t *testing.T) {
+	t.Parallel()
+	for _, every := range []time.Duration{100 * time.Millisecond, 500 * time.Millisecond, 900 * time.Millisecond} {
+		t.Run(every.String(), func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				ids := placeIDs()
+				r := newPlacesRace(t, func(string) bool { return false })
+				r.find(ids...)
+				r.advance(time.Duration(discovery.MaxRaceAttempts) * discovery.CrossDeviceStagger)
+				r.find("device")
+				var waited time.Duration
+				for waited <= 2*discovery.RaceStaggerCeiling {
+					if started, _ := r.state("device"); started {
+						break
+					}
+					r.advance(every)
+					waited += every
+					r.find(fmt.Sprintf("stream-%04d", int(waited/every)))
+					if got := discovery.RaceWaiting(r.s); got > discovery.MaxRaceWaiting {
+						t.Fatalf("%d candidates wait, want at most %d", got, discovery.MaxRaceWaiting)
+					}
+				}
+				if started, _ := r.state("device"); !started || waited > discovery.RaceStaggerCeiling {
+					t.Fatalf("one candidate every %v after the device: the device started %v (after %v), want within %v of being found",
+						every, started, waited, discovery.RaceStaggerCeiling)
+				}
+				r.s.Cancel(nil)
+				_, _ = settledOutcome(t, r.s, r.clk, time.Second, time.Minute)
+			})
+		})
+	}
+}
+
+// TestRace_DeviceInABurstStartsWithinItsCeiling: every place holds an
+// attempt without an answer, then a burst arrives faster than the ended
+// attempts return — MaxRaceWaiting candidates, the device, MaxRaceWaiting
+// more. An ended attempt gives its place up when it is cancelled, not when
+// it returns, so the device starts within RaceStaggerCeiling of being
+// found however long the ended attempts take to unwind; the attempts
+// running stay within MaxRaceAttempts + MaxRaceUnwinding (review II,
+// R3-bound-3501, owner decision 559; the burst is the Fable diff read's
+// probe, fable-diff-g3.md).
+func TestRace_DeviceInABurstStartsWithinItsCeiling(t *testing.T) {
+	t.Parallel()
+	for _, unwind := range []time.Duration{0, 5 * time.Millisecond, 50 * time.Millisecond} {
+		t.Run(unwind.String(), func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				clk := newClock()
+				f := make(feed)
+				var mu sync.Mutex
+				started := map[string]bool{}
+				running, most := 0, 0
+				s := discovery.Race(t.Context(), []discovery.Transport{f},
+					discovery.SessionOptions{Clock: clk, Timeout: 10 * time.Minute},
+					func(ctx context.Context, c discovery.Candidate, _ func() bool) (string, error) {
+						mu.Lock()
+						started[c.Device.InstanceID] = true
+						running++
+						most = max(most, running)
+						mu.Unlock()
+						defer func() {
+							mu.Lock()
+							running--
+							mu.Unlock()
+						}()
+						<-ctx.Done()
+						time.Sleep(unwind) // the attempt's unwind after its cancel
+						return "", ctx.Err()
+					})
+				find := func(id string) {
+					f <- discovery.Device{InstanceID: id}
+					synctest.Wait()
+				}
+				for _, id := range placeIDs() {
+					find(id)
+				}
+				clk.Advance(time.Duration(discovery.MaxRaceAttempts) * discovery.CrossDeviceStagger)
+				synctest.Wait()
+				for i := range discovery.MaxRaceWaiting {
+					find(fmt.Sprintf("before-%02d", i))
+				}
+				find("device")
+				for i := range discovery.MaxRaceWaiting {
+					find(fmt.Sprintf("after-%02d", i))
+				}
+				isStarted := func() bool {
+					mu.Lock()
+					defer mu.Unlock()
+					return started["device"]
+				}
+				const step = 100 * time.Millisecond
+				var waited time.Duration
+				for !isStarted() && waited <= 2*discovery.RaceStaggerCeiling {
+					time.Sleep(step) // the unwinds run in the bubble's time
+					synctest.Wait()
+					clk.Advance(step)
+					synctest.Wait()
+					waited += step
+				}
+				if !isStarted() || waited > discovery.RaceStaggerCeiling {
+					t.Errorf("attempts unwinding %v after their cancel: the device started %v (after %v), want within %v of being found",
+						unwind, isStarted(), waited, discovery.RaceStaggerCeiling)
+				}
+				mu.Lock()
+				if most > discovery.MaxRaceAttempts+discovery.MaxRaceUnwinding {
+					t.Errorf("%d attempts ran at once, want at most %d", most, discovery.MaxRaceAttempts+discovery.MaxRaceUnwinding)
+				}
+				mu.Unlock()
+				if got := discovery.RaceWaiting(s); got > discovery.MaxRaceWaiting {
+					t.Errorf("%d candidates wait once the unwinds are over, want at most %d", got, discovery.MaxRaceWaiting)
+				}
+				s.Cancel(nil)
+				time.Sleep(time.Second)
+				_, _ = settledOutcome(t, s, clk, time.Second, time.Minute)
+			})
+		})
+	}
+}
+
+// TestRace_OverflowWhileReplacedAttemptsHaveNotReturnedIsBounded: the
+// attempts ignore their cancel and never return. An ended attempt gives
+// its place up at its cancel while fewer than MaxRaceUnwinding ended ones
+// have not returned, so exactly that many late candidates start; past
+// them an ended attempt keeps its place until it returns and covers one
+// waiting candidate, and past those and MaxRaceWaiting more the one found
+// longest ago is dropped. The attempts running stay within
+// MaxRaceAttempts + MaxRaceUnwinding and the queue within MaxRaceWaiting +
+// MaxRaceAttempts even when no attempt returns (review II, R3-bound-3501,
+// R2-C2-bound-2153, owner decision 559).
+func TestRace_OverflowWhileReplacedAttemptsHaveNotReturnedIsBounded(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		clk := newClock()
+		f := make(feed)
+		stuck := make(chan struct{})
+		var mu sync.Mutex
+		started := map[string]bool{}
+		s := discovery.Race(t.Context(), []discovery.Transport{f},
+			discovery.SessionOptions{Clock: clk, Timeout: 10 * time.Minute},
+			func(ctx context.Context, c discovery.Candidate, _ func() bool) (string, error) {
+				mu.Lock()
+				started[c.Device.InstanceID] = true
+				mu.Unlock()
+				<-ctx.Done()
+				<-stuck
+				return "", ctx.Err()
+			})
+		ids := placeIDs()
+		for _, id := range ids {
+			f <- discovery.Device{InstanceID: id}
+			synctest.Wait()
+		}
+		clk.Advance(time.Duration(discovery.MaxRaceAttempts) * discovery.CrossDeviceStagger)
+		synctest.Wait()
+		const late = 200
+		for i := range late {
+			f <- discovery.Device{InstanceID: fmt.Sprintf("late-%03d", i)}
+			synctest.Wait()
+			if got := discovery.RaceWaiting(s); got > discovery.MaxRaceWaiting+discovery.MaxRaceAttempts {
+				t.Fatalf("%d candidates wait with no attempt returning, want at most %d", got, discovery.MaxRaceWaiting+discovery.MaxRaceAttempts)
+			}
+		}
+		mu.Lock()
+		if len(started) > discovery.MaxRaceAttempts+discovery.MaxRaceUnwinding {
+			t.Errorf("%d attempts run with none returning, want at most %d", len(started), discovery.MaxRaceAttempts+discovery.MaxRaceUnwinding)
+		}
+		lateStarted := 0
+		for i := range late {
+			if started[fmt.Sprintf("late-%03d", i)] {
+				lateStarted++
+			}
+		}
+		if lateStarted != discovery.MaxRaceUnwinding {
+			t.Errorf("%d late candidates started with no attempt returning, want %d: an ended attempt gives its place up at its cancel while fewer than that are unwinding",
+				lateStarted, discovery.MaxRaceUnwinding)
+		}
+		mu.Unlock()
+		close(stuck)
+		s.Cancel(nil)
+		_, _ = settledOutcome(t, s, clk, time.Second, time.Minute)
 	})
 }

@@ -1860,7 +1860,9 @@ func (n *Node) wireEventsUTC() {
 // event with no fabric (a PASE commissioner's) and a request with no
 // accessing fabric or fabric 0 get neither; they stay in the host's trace
 // ([Node.DiagnosticEvents]) and the logs (review II, R2-C2-sec-2451,
-// owner decision 524).
+// owner decision 524). An event of a removed fabric carries no
+// "fabric_index" ([diagevent.Ring.ForgetFabric]), so it is no fabric's
+// own — not the next holder's of the index either.
 type ringLogs struct{ ring *diagevent.Ring }
 
 // ringLogsDetail is the event details a retrieved log carries: the

@@ -57,8 +57,8 @@ import (
 	"thingfabric.dev/go-fabric/controller/client"
 	"thingfabric.dev/go-fabric/controller/client/sqlstore"
 	"thingfabric.dev/go-fabric/controller/commissioner"
-	"thingfabric.dev/go-fabric/controller/dcl"
 	"thingfabric.dev/go-fabric/controller/softwareupdate"
+	"thingfabric.dev/go-fabric/dcl"
 	"thingfabric.dev/go-fabric/diag"
 	"thingfabric.dev/go-fabric/diagevent"
 	"thingfabric.dev/go-fabric/groups"
@@ -157,7 +157,8 @@ type Config struct {
 	// device — and the database then holds one per node.
 	KeepOnboardingCodes bool
 	// Sealer seals the secrets of the controller's database at rest
-	// (opt-in, off by default), the same sealer node.Store.Sealer takes.
+	// (opt-in, off by default), the same sealer node.Store.Sealer takes;
+	// [NewAESGCMSealer] builds the module's own.
 	// New opens the store with store.NewSealed and the node registry with
 	// sqlstore.NewSealed: what is sealed is the CA (controller.ca, with
 	// its root and ICAC key), the controller's fabric (controller.ca.fabric,
@@ -175,9 +176,9 @@ type Config struct {
 	// while no controller is open on the database. The key must live
 	// outside the database (docs/security.md, "Sealing at rest"). Every
 	// later New needs the same sealer: under another key New fails with an
-	// error that wraps store.ErrUnseal (the stores open one sealed value
+	// error that wraps [ErrUnseal] (the stores open one sealed value
 	// first); without one, New fails reading the sealed CA with
-	// store.ErrNoSealer. The node registry carries its own seal canary
+	// [ErrNoSealer]. The node registry carries its own seal canary
 	// (sqlstore.NewSealed).
 	Sealer store.Sealer
 	// Names opens the DNS-SD browser; nil is discovery.Open. A test

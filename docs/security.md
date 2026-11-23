@@ -150,19 +150,23 @@ that holds a sealed row.
 
 Wiring: set `node.Store.Sealer` beside `Path` or `DB` — the node applies
 the schema, opens its credential store with `store.NewSealed` and `New`
-returns its error. A host that builds the store itself applies the schema
+returns its error. A host that imports the facade only fills it with
+`node.NewAESGCMSealer(key)` (AES-256-GCM, the store's sealer) and tells a
+wrong key from a missing sealer with `errors.Is(err, node.ErrUnseal)` and
+`node.ErrNoSealer`, the store's errors. A host that builds the store itself applies the schema
 (`store.Apply`), calls `store.NewSealed` and hands the store over as
 `node.Store{DB: db, Credentials: sealed}` (then without `Sealer`). A wrong
 key fails `store.NewSealed`, and with it `New`, with `store.ErrUnseal`
 before anything is written: `NewSealed` opens the canary first — on a
 database the first `NewSealed` has not marked yet, one sealed value the
 database already holds. Provisioning the key is the host's; to rotate it,
-the host calls `store.Reseal(ctx, db, old, new)` while no store is open on
-the file: one transaction opens every sealed value and the canary under
+the host calls `node.Reseal(ctx, db, old, new)` for a node store (it is
+`store.Reseal`; a controller uses `controller.Reseal`, below) while no store
+is open on the file: one transaction opens every sealed value and the canary under
 the old sealer and seals them under the new one, the canary last, then the
 file is scrubbed of the values under the old key (a scrub that does not
-finish is `store.ErrScrubIncomplete` after the commit and is owed to the
-next `NewSealed`). The transaction is atomic only with a journal:
+finish is `store.ErrScrubIncomplete` — `node.ErrScrubIncomplete` through
+the facade — after the commit and is owed to the next `NewSealed`). The transaction is atomic only with a journal:
 `journal_mode=OFF` is not supported, as a Reseal that fails part-way
 under it can leave the file half-moved. There is no unseal: the way back to a clear database is
 a factory reset, which drops the canary with every other row, or a restore.
@@ -180,7 +184,13 @@ transaction and scrubs once, and a registry kept alone with
 `sqlstore.Reseal`.
 
 The controller takes the same sealer as `controller.Config.Sealer` (opt-in,
-off by default): `New` opens its store with `store.NewSealed` and its node
+off by default), and its facade carries its own route:
+`controller.NewAESGCMSealer(key)` builds the store's sealer,
+`controller.ErrUnseal`, `controller.ErrNoSealer` and
+`controller.ErrScrubIncomplete` are the store's errors for `errors.Is` (the
+last wraps every error `controller.Reseal` returns after its commit, and a
+`Controller.Erase` whose scrub did not finish), and `controller.Reseal`
+rotates the key: `New` opens its store with `store.NewSealed` and its node
 registry with `sqlstore.NewSealed`, under the same rules — a database
 written without a sealer is sealed on the way in and its file scrubbed
 (each store records the scrub it owes with its sealing; a scrub that did

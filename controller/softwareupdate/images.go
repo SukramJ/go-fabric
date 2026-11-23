@@ -22,7 +22,7 @@ import (
 
 	"thingfabric.dev/go-fabric/bdx"
 	"thingfabric.dev/go-fabric/bdx/otaimage"
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // The image store: the storage half of matter.js's DclOtaUpdateService

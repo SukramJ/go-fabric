@@ -238,7 +238,7 @@ var variableKeySites = map[string][]string{
 	// SettingStore.Key, DefaultSettingKey when empty, and FabricKey
 	"controller/ca/persist.go:SettingStore.save": {"controller.ca", "controller.ca.fabric"},
 	// SettingStore.Key: the host's
-	"controller/dcl/store.go:SettingStore.Save": nil,
+	"dcl/store.go:SettingStore.Save": nil,
 	// nonVolatileKey: nonVolatileKeyRoot + key or "@" + the endpoint
 	// number, the cluster and the attribute; or bridgedUserLabelKeyRoot + key
 	"node/nonvolatile.go:nonVolatile.PersistWrite": {

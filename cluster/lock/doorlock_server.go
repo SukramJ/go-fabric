@@ -428,7 +428,10 @@ func NewDoorLockServer(cfg DoorLockConfig) *DoorLockServer {
 // attribute to its model, SupportedOperatingModes to matter.js's rules.
 // The records come from the AuthStore when it saved some for AuthKey,
 // from Initial otherwise; an ExpiringUser's pending deadline is armed
-// again. Mirrors matter.js DoorLockServer.ts:114-180 (initialize).
+// again. A saved credential that does not decrypt under the loaded
+// credential key refuses the start with ErrConfig. Mirrors matter.js
+// DoorLockServer.ts:114-180 (initialize), but for that refusal, which is
+// this module's (by_design.md).
 func New(cfg DoorLockConfig) (*DoorLockServer, error) {
 	features := cfg.Features
 	if features&^servedFeatures != 0 {
@@ -588,6 +591,15 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 			return fmt.Errorf("lock: load records: %w", err)
 		}
 		if ok {
+			// The key and the records live in two areas of the store that
+			// can drift apart; a record the loaded key does not open would
+			// refuse its PIN on every use, so the start is refused instead
+			// (R3-store-3254, decision 569; a hardening, see by_design.md).
+			for _, c := range saved.Credentials {
+				if _, err := s.cipher.Decrypt(c.Data); err != nil {
+					return fmt.Errorf("%w: stored credential %d (type %d) does not decrypt under the loaded credential key: %w", ErrConfig, c.Index, c.Type, err)
+				}
+			}
 			s.data = saved
 			return nil
 		}
@@ -607,8 +619,13 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 // credentialKey returns the node's credential key, generating and storing
 // it on first use; without an AuthStore it is a key of this server alone.
 // matter.js DoorLockServer.ts:153-155 generates 16 random bytes once.
+//
+// The read and the creation are one step per AuthStore (lockKeyCreation),
+// so servers that start together on one store end on one key
+// (R3-store-3254).
 func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
 	if s.auth != nil {
+		defer lockKeyCreation(s.auth)()
 		v, ok, err := s.auth.GetSetting(ctx, store.SettingDoorLockCredentialKey)
 		if err != nil {
 			return nil, fmt.Errorf("lock: read the credential key: %w", err)

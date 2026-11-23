@@ -491,14 +491,6 @@ func (c *Client) timeout() time.Duration {
 	return DefaultTimeout
 }
 
-// withTimeout is the client with another request timeout — the per-call
-// DclClient.Options of matter.js (DclClient.ts:424-428).
-func (c *Client) withTimeout(d time.Duration) *Client {
-	cc := *c
-	cc.Timeout = d
-	return &cc
-}
-
 // baseURL is the ledger URL the client asks.
 func (c *Client) baseURL() string {
 	if c.BaseURL == "" {

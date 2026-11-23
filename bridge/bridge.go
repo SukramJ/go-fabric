@@ -775,6 +775,11 @@ type Bridge struct {
 	// pairing timer.
 	paseInFlight      HandshakeKey
 	paseInFlightSince time.Time
+	// paseBusyRecorded is set once a PBKDFParamRequest refused for the
+	// current claim was recorded into the diagnostics ring
+	// ([Bridge.firstBusyOfClaim]); claimPase clears it when it hands the
+	// slot to a new claim. Guarded by b.mu. R3-bound-3451.
+	paseBusyRecorded bool
 
 	// paseClosing names the PASE sessions whose close the bridge has
 	// scheduled and not yet run ([Bridge.paseSessionsCloser]): they are
@@ -1947,7 +1952,14 @@ func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8
 	}
 	invoking := mattercore.InvokeSessionIDFromContext(ctx)
 	b.closeFabricSessionsGracefully(reg, fabricIndex, invoking)
-	closeNow := func() { closer.CloseFabric(fabricIndex) }
+	closeNow := func() {
+		closer.CloseFabric(fabricIndex)
+		// An event of a session that closed itself while the response
+		// was out (the peer's CloseSession, a TCP drop) was recorded
+		// with the removed index after emitFabricRemoved forgot it
+		// (review II, R3-sec-3403, decision 578).
+		b.diagRing().ForgetFabric(fabricIndex)
+	}
 	if !im.DeferAfterResponse(ctx, closeNow) {
 		closeNow()
 	}
@@ -2074,7 +2086,13 @@ func (b *Bridge) notifyFabricSessionsClosing(fabricIndex uint8, exceptSessionID 
 // EmitFabricRemoved is the bridge-side dispatch helper the daemon
 // invokes inside the [core.OperationalCredentials.SetOnFabricRemoved]
 // closure. Forwards to whatever closure the daemon wired via
-// [SetOnFabricRemoved]; nil-safe.
+// [SetOnFabricRemoved]; nil-safe. It drops the removed fabric's index from
+// the diagnostics ring once, at the call, and closes none of the fabric's
+// sessions: an event a session of the fabric records afterwards carries the
+// index again. A host that ends those sessions itself calls
+// [Bridge.EmitFabricRemovedContext] instead, which forgets the index again
+// after it closed them through a [SessionRegistry] that can close by fabric
+// (review II, R3-sec-3403, decision 584).
 func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
 	b.emitFabricRemoved(context.Background(), fabricIndex)
 }
@@ -2092,6 +2110,11 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	// Its groups go with it: keys, group table, reception state and the
 	// multicast memberships only it used.
 	b.groupMessagingPort().ForgetFabric(fabricIndex)
+	// Its index leaves the diagnostics ring's events: the index is
+	// allocated again, and its next holder must not read the removed
+	// fabric's sessions as its own (review II, R3-sec-3403, decision
+	// 578).
+	b.diagRing().ForgetFabric(fabricIndex)
 	// And its scenes (fabric-scoped scene table entries).
 	if topo := b.Topology(); topo != nil {
 		for _, ep := range topo.Endpoints {
