@@ -30,3 +30,17 @@ func HoldNextPublish(s *Server, attrID uint32, entered chan<- struct{}, release 
 		<-release
 	}
 }
+
+// HoldAfterSensitivitySink makes the next controller write of
+// CurrentSensitivityLevel signal entered once its Sink set the field, and
+// wait there until release closes, before the generated server stores it.
+func HoldAfterSensitivitySink(s *Server, entered chan<- struct{}, release <-chan struct{}) {
+	var held atomic.Bool
+	s.sinkSet = func() {
+		if !held.CompareAndSwap(false, true) {
+			return
+		}
+		close(entered)
+		<-release
+	}
+}
