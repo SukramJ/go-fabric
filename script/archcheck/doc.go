@@ -42,19 +42,22 @@
 // The layer order cannot state that two packages of the same layer, or a
 // higher layer and a lower one, must not meet. The "forbidden" list of
 // layers.json can: each rule names from-patterns, to-patterns and a reason,
-// and TestLayering fails on every non-test import from a package a
-// from-pattern matches to one a to-pattern matches, whatever their layers —
-// "forbidden import: from -> to (reason)". A rule's "except" list names the
-// packages a from-pattern matches that it still does not hold, each exact and
-// with its own reason; an exception whose package no longer makes the import
-// is reported as "stale forbidden exception". The first rule holds ADR 0020
-// decision 1: bridge, node, device and endpoint and every package below them
-// do not import controller/... (review II, R3-api-3780, decisions 556, 583),
-// with one exception, the test support bridge/bridgetest;
+// and TestLayering fails on every package a to-pattern matches that a package
+// a from-pattern matches depends on through non-test imports, whatever their
+// layers — directly, "forbidden import: from -> to (reason)", or through a
+// chain of other packages, "forbidden import: from -> to via a -> b (reason)"
+// with the shortest chain (review II, R4-test-4801, decision 601: a seam
+// between the two does not hide the dependency). A rule's "except" list names
+// the packages a from-pattern matches that it still does not hold, each exact
+// and with its own reason; an exception whose package no longer depends on
+// what the rule forbids is reported as "stale forbidden exception". The first
+// rule holds ADR 0020 decision 1: bridge, node, device and endpoint and every
+// package below them do not depend on controller/... (review II, R3-api-3780,
+// decisions 556, 583), with one exception, the test support bridge/bridgetest;
 // TestADR0020SiblingRuleIsInTheRules fails when the rule is taken out of the
-// file, narrowed, or given another exception. A forbidden import is fixed
-// by moving the code both sides need to a role-neutral package, as the
-// ledger client moved from controller/dcl to dcl.
+// file, narrowed, or given another exception. A forbidden import is fixed by
+// moving the code both sides need to a role-neutral package, as the ledger
+// client moved from controller/dcl to dcl.
 //
 // # Changing the rules
 //

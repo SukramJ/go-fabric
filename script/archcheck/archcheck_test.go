@@ -157,23 +157,28 @@ func check(r rules, graph map[string][]string) []string {
 	}
 	usedExcept := map[[2]string]bool{} // {rule reason, package}
 	for _, from := range pkgs {
-		for _, to := range graph[from] {
-			for _, f := range r.Forbidden {
-				if !matchesAny(f.From, from) || !matchesAny(f.To, to) {
-					continue
-				}
+		for _, f := range r.Forbidden {
+			if !matchesAny(f.From, from) {
+				continue
+			}
+			for _, reach := range forbiddenReach(graph, from, f.To) {
 				if excepted(f, from) {
 					usedExcept[[2]string{f.Reason, from}] = true
 					continue
 				}
-				out = append(out, fmt.Sprintf("forbidden import: %s -> %s (%s)", from, to, f.Reason))
+				to := reach[len(reach)-1]
+				if len(reach) == 1 {
+					out = append(out, fmt.Sprintf("forbidden import: %s -> %s (%s)", from, to, f.Reason))
+					continue
+				}
+				out = append(out, fmt.Sprintf("forbidden import: %s -> %s via %s (%s)", from, to, strings.Join(reach[:len(reach)-1], " -> "), f.Reason))
 			}
 		}
 	}
 	for _, f := range r.Forbidden {
 		for _, e := range f.Except {
 			if !usedExcept[[2]string{f.Reason, e.Package}] {
-				out = append(out, fmt.Sprintf("stale forbidden exception: %s no longer imports what the rule forbids (%s); remove it from layers.json", e.Package, f.Reason))
+				out = append(out, fmt.Sprintf("stale forbidden exception: %s no longer depends on what the rule forbids (%s); remove it from layers.json", e.Package, f.Reason))
 			}
 		}
 	}
@@ -183,6 +188,46 @@ func check(r rules, graph map[string][]string) []string {
 		}
 	}
 	sort.Strings(out)
+	return out
+}
+
+// forbiddenReach returns, for every package matching one of to that from
+// depends on — directly or through any chain of non-test imports in graph
+// (R4-test-4801, decision 601: the ADR 0020 rule judges the transitive
+// dependencies, so a seam between from and controller/ does not hide the
+// edge) — the shortest import chain to it, from's own import first and the
+// forbidden package last. The walk does not continue past a forbidden
+// package: what it imports in turn is its own dependency, reached only
+// through it.
+func forbiddenReach(graph map[string][]string, from string, to []string) [][]string {
+	prev := map[string]string{from: ""}
+	queue := []string{from}
+	var hits []string
+	for len(queue) > 0 {
+		p := queue[0]
+		queue = queue[1:]
+		for _, next := range graph[p] {
+			if _, seen := prev[next]; seen {
+				continue
+			}
+			prev[next] = p
+			if matchesAny(to, next) {
+				hits = append(hits, next)
+				continue
+			}
+			queue = append(queue, next)
+		}
+	}
+	sort.Strings(hits)
+	out := make([][]string, 0, len(hits))
+	for _, h := range hits {
+		var chain []string
+		for p := h; p != from; p = prev[p] {
+			chain = append(chain, p)
+		}
+		slices.Reverse(chain)
+		out = append(out, chain)
+	}
 	return out
 }
 
@@ -366,7 +411,7 @@ func TestCheckReportsUpwardStaleAndUnassigned(t *testing.T) {
 // (review II, R3-api-3780): a from-pattern bridge/... holds every non-test
 // sub-package of bridge, so bridge/x importing controller/... is reported,
 // while bridge/bridgetest, the rule's one reasoned exception, is not; and an
-// exception whose package no longer imports what the rule forbids is reported
+// exception whose package no longer depends on what the rule forbids is reported
 // as stale.
 func TestCheckReportsForbiddenSubPackages(t *testing.T) {
 	r := rules{
@@ -397,7 +442,7 @@ func TestCheckReportsForbiddenSubPackages(t *testing.T) {
 	got := check(r, graph)
 	want := []string{
 		"forbidden import: bridge/x -> controller/ca (siblings)",
-		"stale forbidden exception: node/nodetest no longer imports what the rule forbids (siblings); remove it from layers.json",
+		"stale forbidden exception: node/nodetest no longer depends on what the rule forbids (siblings); remove it from layers.json",
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("check = %q, want %q", got, want)
@@ -468,5 +513,48 @@ func TestADR0020SiblingRuleIsInTheRules(t *testing.T) {
 	}
 	if !slices.Equal(exc, []string{"bridge/bridgetest"}) {
 		t.Errorf("ADR 0020 rule exceptions = %q, want only bridge/bridgetest (decision 583)", exc)
+	}
+}
+
+// TestCheckReportsTransitiveForbidden is R4-test-4801's fixture (decision
+// 601): the forbidden rule judges what a package depends on, not only what
+// it imports. node reaching controller/dcl through an internal seam is
+// reported with the chain, once per forbidden package and by its shortest
+// chain; a package the walk reaches only through a forbidden one is not
+// reported again; an excepted package's own reach stays allowed, while a
+// package that reaches controller/ through the excepted one is reported.
+func TestCheckReportsTransitiveForbidden(t *testing.T) {
+	r := rules{
+		Layers: []layerDef{
+			{Name: "roles", Packages: []string{"controller/...", "internal/nodeseam", "internal/other"}},
+			{Name: "facade", Packages: []string{"node", "node/y"}},
+			{Name: "support", Packages: []string{"bridge/bridgetest"}},
+		},
+		// node/y -> bridge/bridgetest is an upward edge; the exception
+		// keeps this fixture about the forbidden rule.
+		Exceptions: []exception{{From: "node/y", To: "bridge/bridgetest", Reason: "fixture"}},
+		Forbidden: []forbidden{{
+			From:   []string{"bridge/...", "node/..."},
+			To:     []string{"controller/..."},
+			Except: []forbiddenExcept{{Package: "bridge/bridgetest", Reason: "test support"}},
+			Reason: "siblings",
+		}},
+	}
+	graph := map[string][]string{
+		"node":              {"internal/nodeseam", "internal/other"},
+		"internal/nodeseam": {"controller/dcl", "internal/other"},
+		"internal/other":    {"internal/nodeseam"},
+		"controller/dcl":    {"controller/inner"},
+		"controller/inner":  nil,
+		"node/y":            {"bridge/bridgetest"},
+		"bridge/bridgetest": {"internal/other"},
+	}
+	got := check(r, graph)
+	want := []string{
+		"forbidden import: node -> controller/dcl via internal/nodeseam (siblings)",
+		"forbidden import: node/y -> controller/dcl via bridge/bridgetest -> internal/other -> internal/nodeseam (siblings)",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("check =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
