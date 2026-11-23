@@ -1016,9 +1016,10 @@ func (b *Batch) addedLocked(key string, ep Endpoint) (int, bool) {
 // [ErrDuplicateKey] and undone: an Add leaves the set and keeps the key's
 // reservation, a Replace puts the endpoint it replaced back (decision 585:
 // no path wedges; fable-diff-g5g N1). The takes are judged from the last
-// to the first, so of two that collide the later one goes. A take the
-// batch removed or replaced again is not the set's and not judged. a.mu
-// is held.
+// to the first, so of two that collide the later one goes; after a
+// Replace is undone, all are judged again against the endpoint put back.
+// A take the batch removed or replaced again is not the set's and not
+// judged. a.mu is held.
 func (b *Batch) refuseLateCollisionsLocked() []error {
 	a := b.a
 	var errs []error
@@ -1054,6 +1055,12 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 			// The replaced device stays bound: it is served again.
 			b.detach[t.oldAt] = func() {}
 		}
+		// The endpoint put back serves its keys again: the takes judged
+		// while it was out are judged once more against it
+		// (fable-read-close B1). Each restart removes a take, so the loop
+		// ends.
+		b.taken = slices.Delete(b.taken, j, j+1)
+		j = len(b.taken)
 	}
 	return errs
 }

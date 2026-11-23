@@ -78,3 +78,46 @@ func TestBatchRefusesAPartAddedDuringFnThatAnotherEndpointServes(t *testing.T) {
 		})
 	}
 }
+
+// TestBatchRefusedReplaceIsPutBackWithoutACollision (decision 585;
+// fable-read-close B1): the endpoint a refused Replace puts back serves
+// its parts again, so a take the batch applied while it was out — here
+// an Add of its former part key — is judged against it once more and
+// refused too. Before, the take was judged only while the replaced
+// endpoint was out, and the endpoint put back made the reassembly, and
+// every later one, assemble two Specs under one key.
+func TestBatchRefusedReplaceIsPutBackWithoutACollision(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	n := batchNode(t, bridgedWithParts(t, "other", "other/light"), bridgedWithParts(t, "fresh", "fresh/light"))
+	old := n.Aggregator().Endpoints()
+	freshNum, _ := servedNumberOf(n, "fresh")
+	partNum, _ := servedNumberOf(n, "fresh/light")
+	repl := bridgedWithParts(t, "fresh")
+	light := kitLight(t, "fresh/light")
+	err := n.Aggregator().Batch(ctx, func(b *node.Batch) error {
+		if err := b.Replace(endpoint.StringKey("fresh"), repl); err != nil {
+			return err
+		}
+		if err := b.Add(light); err != nil {
+			return err
+		}
+		return repl.AddPart(kitLight(t, "other/light").Device)
+	})
+	if !errors.Is(err, node.ErrDuplicateKey) {
+		t.Fatalf("batch: %v, want %v", err, node.ErrDuplicateKey)
+	}
+	eps := n.Aggregator().Endpoints()
+	if len(eps) != 2 || !slices.Contains(eps, old[1]) || slices.Contains(eps, node.Endpoint(light)) || slices.Contains(eps, node.Endpoint(repl)) {
+		t.Errorf("set after the batch: %d endpoints (replaced kept %v, light %v, repl %v), want the two from before",
+			len(eps), slices.Contains(eps, old[1]), slices.Contains(eps, node.Endpoint(light)), slices.Contains(eps, node.Endpoint(repl)))
+	}
+	for key, want := range map[string]uint16{"fresh": freshNum, "fresh/light": partNum} {
+		if got, ok := servedNumberOf(n, key); !ok || got != want {
+			t.Errorf("%s served at %d (%v), want %d", key, got, ok, want)
+		}
+	}
+	if aerr := n.Aggregator().Add(ctx, kitLight(t, "after")); aerr != nil {
+		t.Errorf("unrelated Add after the batch: %v", aerr)
+	}
+}
