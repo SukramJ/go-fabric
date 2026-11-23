@@ -5,6 +5,7 @@ package boolcfg
 
 import (
 	"context"
+	"sync/atomic"
 
 	def "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
 )
@@ -15,4 +16,17 @@ import (
 // no sequential write produces.
 func WriteSensitivityThroughSink(ctx context.Context, s *Server, level uint8) error {
 	return sensitivitySink{s}.MatterWriteAttribute(ctx, def.AttrCurrentSensitivityLevel, level)
+}
+
+// HoldNextPublish makes the first publish of s that names attrID signal
+// entered and wait until release closes.
+func HoldNextPublish(s *Server, attrID uint32, entered chan<- struct{}, release <-chan struct{}) {
+	var held atomic.Bool
+	s.publishing = func(values map[uint32]any) {
+		if _, ok := values[attrID]; !ok || !held.CompareAndSwap(false, true) {
+			return
+		}
+		close(entered)
+		<-release
+	}
 }

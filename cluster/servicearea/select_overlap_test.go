@@ -46,25 +46,45 @@ func TestSelectAreasDoesNotStoreAnAreaRemovedMeanwhile(t *testing.T) {
 }
 
 // TestProgressIsCopiedDeep (decision 142): a Progress list handed in or
-// read out shares no field with the one the server holds.
+// read out shares no field with the one the server holds — through every
+// host path that takes one: SetProgress and SetAttributes (R2-C2-api-1552).
 func TestProgressIsCopiedDeep(t *testing.T) {
 	t.Parallel()
-	srv := newServer(t, vacuum(&device{}))
-	in := []servicearea.Progress{{AreaId: 7, Status: servicearea.StatusPending, TotalOperationalTime: &spec.Nullable[uint32]{Value: 10}}}
-	if err := srv.SetProgress(in); err != nil {
-		t.Fatal(err)
-	}
-	in[0].TotalOperationalTime.Value = 99
-	read := func() uint32 {
-		v, _ := srv.MatterRead(sa.AttrProgress)
-		return v.(spec.List[servicearea.Progress])[0].TotalOperationalTime.Value
-	}
-	if got := read(); got != 10 {
-		t.Errorf("Progress follows the caller's list after SetProgress: %d", got)
-	}
-	v, _ := srv.MatterRead(sa.AttrProgress)
-	v.(spec.List[servicearea.Progress])[0].TotalOperationalTime.Value = 77
-	if got := read(); got != 10 {
-		t.Errorf("Progress follows a list a read returned: %d", got)
+	for _, tc := range []struct {
+		name string
+		set  func(*servicearea.Server, []servicearea.Progress) error
+	}{
+		{"SetProgress", func(srv *servicearea.Server, p []servicearea.Progress) error { return srv.SetProgress(p) }},
+		{"SetAttributes", func(srv *servicearea.Server, p []servicearea.Progress) error {
+			return srv.SetAttributes(map[uint32]any{sa.AttrProgress: p})
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := newServer(t, vacuum(&device{}))
+			in := []servicearea.Progress{{
+				AreaId: 7, Status: servicearea.StatusPending,
+				TotalOperationalTime: &spec.Nullable[uint32]{Value: 10},
+				EstimatedTime:        &spec.Nullable[uint32]{Value: 10},
+			}}
+			if err := tc.set(srv, in); err != nil {
+				t.Fatal(err)
+			}
+			in[0].TotalOperationalTime.Value = 99
+			in[0].EstimatedTime.Value = 99
+			read := func() (uint32, uint32) {
+				v, _ := srv.MatterRead(sa.AttrProgress)
+				p := v.(spec.List[servicearea.Progress])[0]
+				return p.TotalOperationalTime.Value, p.EstimatedTime.Value
+			}
+			if total, est := read(); total != 10 || est != 10 {
+				t.Errorf("Progress follows the caller's list after %s: %d, %d", tc.name, total, est)
+			}
+			v, _ := srv.MatterRead(sa.AttrProgress)
+			v.(spec.List[servicearea.Progress])[0].TotalOperationalTime.Value = 77
+			if total, _ := read(); total != 10 {
+				t.Errorf("Progress follows a list a read returned: %d", total)
+			}
+		})
 	}
 }

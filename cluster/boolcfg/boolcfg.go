@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"sync"
 
 	"thingfabric.dev/go-fabric/cluster"
@@ -149,6 +150,10 @@ type Server struct {
 	supported uint8 // SupportedSensitivityLevels after the clamp
 	alarmsSup AlarmMode
 
+	// publishing, when set, runs as a publish of values begins: a test
+	// seam that holds one publish while another path stores and publishes.
+	publishing func(values map[uint32]any)
+
 	// mu guards active, current, enabled, endpoint, fault and suppressed.
 	mu         sync.Mutex
 	endpoint   uint16
@@ -256,8 +261,52 @@ func (s *Server) served(values map[uint32]any) map[uint32]any {
 // publish stores the served attributes among values; the generated server
 // reports the ones that changed. Every value is one the model admits, so
 // it cannot fail.
+//
+// The state is kept twice — in the fields under s.mu, which the commands
+// judge, and in the generated store, which reads and reports serve — and
+// two paths may publish in the other order than they stored. So publish
+// stores the fields' values as they are now, not the ones its caller
+// stored, and stores again while they move under it: the last publish
+// leaves the store at the fields (R2-C2-conc-1551). A value of values
+// that is not one of the fields is stored as given.
 func (s *Server) publish(origin contract.Origin, values map[uint32]any) {
-	_ = s.srv.SetAttributesFrom(origin, s.served(values))
+	if s.publishing != nil {
+		s.publishing(values)
+	}
+	for {
+		s.mu.Lock()
+		now := s.fieldsLocked(values)
+		s.mu.Unlock()
+		_ = s.srv.SetAttributesFrom(origin, s.served(now))
+		s.mu.Lock()
+		again := s.fieldsLocked(values)
+		s.mu.Unlock()
+		if maps.Equal(now, again) {
+			return
+		}
+	}
+}
+
+// fieldsLocked is values with every attribute the server keeps in a field
+// replaced by the field's value; the caller holds s.mu.
+func (s *Server) fieldsLocked(values map[uint32]any) map[uint32]any {
+	out := make(map[uint32]any, len(values))
+	for id, v := range values {
+		switch id {
+		case def.AttrCurrentSensitivityLevel:
+			v = s.current
+		case def.AttrAlarmsEnabled:
+			v = s.enabled
+		case def.AttrAlarmsActive:
+			v = s.active
+		case def.AttrAlarmsSuppressed:
+			v = s.suppressed
+		case def.AttrSensorFault:
+			v = s.fault
+		}
+		out[id] = v
+	}
+	return out
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].

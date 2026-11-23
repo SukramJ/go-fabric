@@ -213,8 +213,8 @@ type ControlServer struct {
 	currentSpeed, targetSpeed *closuredef.ThreeLevelAutoEnum
 
 	// stateReports and currentReports count the drive's reports —
-	// SetMainState and the OverallCurrentState setters. MoveTo and
-	// Calibrate compare them across the mover call: a report made while
+	// SetMainState and the OverallCurrentState setters. MoveTo, Calibrate
+	// and Stop compare them across the mover call: a report made while
 	// the mover had the command, from inside it or from another goroutine,
 	// is newer than the outcome the command writes after it returned, and
 	// is kept (review II, R2-P1-clu-01).
@@ -686,8 +686,9 @@ func copyOf[T any](p *T) *T {
 }
 
 // invokeStop halts motion (cluster§5.4.8.1): only a closure that is
-// Moving, WaitingForMotion or Calibrating stops and becomes Stopped; in
-// any other state the command changes nothing. SUCCESS either way. A
+// Moving, WaitingForMotion or Calibrating stops and becomes Stopped —
+// unless the drive reported a MainState while the mover had the Stop,
+// which stays; in any other state the command changes nothing. SUCCESS either way. A
 // mover that is also a [closuredef.StopObserver] hears of the ignored
 // Stop (StopIgnored), and its error answers FAILURE; the state stays as
 // it is. matter.js has no Stop logic to mirror here: a case-insensitive
@@ -695,7 +696,7 @@ func copyOf[T any](p *T) *T {
 // ClosureControlServer.ts at the pin (862ad75f) finds nothing.
 func (s *ControlServer) invokeStop(ctx context.Context) error {
 	s.mu.RLock()
-	state := s.mainState
+	state, stateReports := s.mainState, s.stateReports
 	s.mu.RUnlock()
 	switch state {
 	case wire.ClosureMainStateMoving, wire.ClosureMainStateWaitingForMotion, wire.ClosureMainStateCalibrating:
@@ -716,10 +717,18 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 	s.mu.Lock()
 	// MainState only: OverallTargetState keeps the target, as
 	// connectedhomeip's HandleStop touches MainState alone
-	// (ClosureControlCluster.cpp:531-551 at 6170af84; W3-club1-05).
-	s.mainState = wire.ClosureMainStateStopped
+	// (ClosureControlCluster.cpp:531-551 at 6170af84; W3-club1-05). A
+	// MainState the drive reported while the mover had the Stop (Error,
+	// Disengaged) is newer and stays, as for MoveTo and Calibrate
+	// (stateReports; R2-C2-fsm-1550).
+	written := s.stateReports == stateReports
+	if written {
+		s.mainState = wire.ClosureMainStateStopped
+	}
 	s.mu.Unlock()
-	s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState)
+	if written {
+		s.NotifyFrom(contract.OriginCommand, wire.ClosureControlAttrMainState)
+	}
 	return nil
 }
 
