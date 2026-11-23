@@ -38,7 +38,8 @@
 // 8. The camera quirks matterjs-server works around are named constants in
 // types.go.
 //
-// Over the policies runs the [Service], one per controller:
+// Over the policies runs the [Service], one per controller ([New] refuses
+// a second while the first is not closed, [ErrServiceInUse]):
 //
 //   - the manager (manager*.go): the per-endpoint lock, the stream leases
 //     and their grace window, the allocation ladders for video, audio and

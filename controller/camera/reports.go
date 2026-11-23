@@ -86,6 +86,16 @@ func (r *Reports) claim() bool {
 	return true
 }
 
+// unclaim gives back a claim no Service attached to — New's, when it
+// refuses after the claim.
+func (r *Reports) unclaim() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.svc == nil {
+		r.held = false
+	}
+}
+
 // attach hangs s on the reports and learns the operational node id of
 // every node the registry holds, so a node decommissioned before its next
 // report is still named.
