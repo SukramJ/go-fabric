@@ -354,7 +354,7 @@ func (t *TimeSynchronization) updateDSTOffsetStateLocked(ctx context.Context, p 
 	}
 	if !cur.ValidUntil.Null && cur.ValidUntil.Value <= now {
 		if active+1 >= len(dst) {
-			t.clearDSTOffsetLocked(ctx, p)
+			_ = t.clearDSTOffsetLocked(ctx, p) // logged; a state read has no caller to answer
 			return timeStateInvalid
 		}
 		previous := cur.Offset
@@ -375,15 +375,18 @@ func (t *TimeSynchronization) updateDSTOffsetStateLocked(ctx context.Context, p 
 }
 
 // clearDSTOffsetLocked is chip's ClearDSTOffset (:824-830): the list
-// emptied and stored, and DSTTableEmpty.
-func (t *TimeSynchronization) clearDSTOffsetLocked(ctx context.Context, p *pending) {
+// emptied and stored, and DSTTableEmpty. A refused store leaves the list
+// empty in memory, reports nothing and answers the store's error, which
+// SetDSTOffset([]) returns (R3-store-3151) and the other callers only log.
+func (t *TimeSynchronization) clearDSTOffsetLocked(ctx context.Context, p *pending) error {
 	t.state.dstOffset = nil
 	if err := t.save(ctx, timeSyncKeyDSTOffset, []timesyncdef.DSTOffsetStruct{}); err != nil {
 		t.logger().Warn("matter.timesync.store_failed", slog.String("what", "DSTOffset"), slog.String("reason", err.Error()))
-		return
+		return err
 	}
 	p.changed(timesyncdef.AttrDstOffset)
 	p.event(func() { t.emit(timesyncdef.EventDstTableEmpty, timesyncdef.DstTableEmptyEvent{}) })
+	return nil
 }
 
 // timeZoneStatusEvent is EmitTimeZoneStatusEvent (:124-141): the active
@@ -672,7 +675,7 @@ func (t *TimeSynchronization) handleSetTimeZone(ctx context.Context, fields any)
 	}
 	if resp.DstOffsetRequired {
 		state := t.updateDSTOffsetStateLocked(ctx, &p)
-		t.clearDSTOffsetLocked(ctx, &p)
+		_ = t.clearDSTOffsetLocked(ctx, &p) // logged; SetTimeZone does not answer it
 		if state == timeStateActive || state == timeStateChanged {
 			t.dstStatusEvent(&p, false)
 		}
@@ -709,8 +712,12 @@ func (t *TimeSynchronization) setDSTOffsetLocked(ctx context.Context, list []tim
 		return errTimeSyncTooMany
 	}
 	if len(list) == 0 {
-		t.clearDSTOffsetLocked(ctx, p)
-		return nil
+		// A refused store is the command's error, mapped as the non-empty
+		// branch's: chip's SetDSTOffset returns it for an empty list and
+		// HandleSetDSTOffset answers CONSTRAINT_ERROR
+		// (TimeSynchronizationCluster.cpp:761-764, :1224-1235 at 6170af84;
+		// R3-store-3151).
+		return t.clearDSTOffsetLocked(ctx, p)
 	}
 	if err := validDSTOffsets(list); err != nil {
 		return err
