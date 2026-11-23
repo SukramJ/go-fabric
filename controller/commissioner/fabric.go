@@ -64,8 +64,9 @@ type FabricConfig struct {
 	// (Fabric.ts:50-76 keeps #keyPair).
 	OperationalSigner crypto.Signer
 	// Logger receives the fabric's load warnings — a stored label cut to
-	// [MaxLabelLength] bytes; nil is slog.Default. In
-	// [FabricAuthority.DefaultFabric] nil is the authority's logger.
+	// [MaxLabelLength] bytes; nil discards them, as [Config.Logger] and
+	// [NewFabricAuthority]. In [FabricAuthority.DefaultFabric] nil is the
+	// authority's logger.
 	Logger *slog.Logger
 }
 
@@ -138,8 +139,8 @@ func validLabel(label string) error {
 // storedLabel is a stored fabric label held to [MaxLabelLength] bytes: a
 // longer one — stored by v0.22.x, whose SetLabel bounded the label in
 // runes — is cut to the longest prefix of at most MaxLabelLength bytes
-// that ends between two characters, with a warning through log (nil is
-// slog.Default), as
+// that ends between two characters, with a warning through log (nil
+// discards it), as
 // cluster/core BasicInformation.RestoreNodeLabel cuts a stored NodeLabel
 // (cluster/core/basic_information.go:969, shortenStored :990, the cut
 // truncateUTF8 in cluster/core/utf8.go). The cut stays in memory; the
@@ -154,7 +155,7 @@ func storedLabel(label string, log *slog.Logger) string {
 		cut--
 	}
 	if log == nil {
-		log = slog.Default()
+		log = slog.New(slog.DiscardHandler)
 	}
 	log.Warn("matter.controller.fabric.stored_label_shortened",
 		slog.Int("max_bytes", MaxLabelLength), slog.String("stored", label), slog.String("label", label[:cut]))
@@ -211,7 +212,7 @@ func (f *Fabric) SetLabel(label string) error {
 //
 // A stored label longer than [MaxLabelLength] bytes is not refused: the
 // load cuts it to the bound between two characters and warns through
-// cfg.Logger (nil is slog.Default); the cut is stored with the record's
+// cfg.Logger (nil discards the warning); the cut is stored with the record's
 // next save. cfg.Label itself is still [ErrLabel] when longer.
 func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 	f, err := newFabric(c, cfg)
