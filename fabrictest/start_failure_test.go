@@ -149,3 +149,36 @@ func TestFailedStopIsFinishedByTheNext(t *testing.T) {
 		t.Fatalf("Start after the failed and the finished Stop: %v", err)
 	}
 }
+
+// TestFailedFactoryResetIsFinishedByTheNext (review II, decision 532, the
+// class of R2-C2-test-2502): a FactoryReset of a running device that
+// fails — here its context ended before it began — leaves the device
+// running, so the next FactoryReset finishes the reset and brings the
+// device back, and a Stop after it stops the node.
+func TestFailedFactoryResetIsFinishedByTheNext(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	d := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{newPlug(t)}})
+	ended, cancelEnded := context.WithCancel(context.Background())
+	cancelEnded()
+	if err := d.FactoryReset(ended); err == nil {
+		t.Fatal("FactoryReset with an ended context succeeded")
+	}
+	if !d.Running() {
+		t.Error("the device reads stopped after a FactoryReset that failed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := d.FactoryReset(ctx); err != nil {
+		t.Fatalf("FactoryReset after the failed FactoryReset: %v", err)
+	}
+	if !d.Running() {
+		t.Error("the device reads stopped after the FactoryReset of a running device")
+	}
+	if err := d.Stop(ctx); err != nil {
+		t.Fatalf("Stop after the finished FactoryReset: %v", err)
+	}
+	if d.Running() {
+		t.Error("the device reads running after its Stop")
+	}
+}
