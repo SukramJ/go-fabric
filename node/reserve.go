@@ -426,6 +426,9 @@ func (b *Batch) Forget(key device.SourceKey) error {
 		a.mu.Unlock()
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
+	// A take of k the batch holds (decision 582) is dropped as an applied
+	// one would be.
+	b.dropPendingLocked(k)
 	if part != nil {
 		b.dropLocked(part, i, k)
 	}
