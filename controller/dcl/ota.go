@@ -134,9 +134,19 @@ func (o *OTAVersions) CheckForUpdate(ctx context.Context, vid, pid uint16, curre
 	return found[0], true
 }
 
+// maxOTAVersionsPerCheck bounds the software versions one check looks up
+// of those a ledger lists above the current one. A ledger's answer admits
+// about 2·10⁶ versions within its body bound, and each costs one sequential
+// version lookup (and a compliance lookup when applicable) while the
+// update checks of every other product wait; past this number only the
+// highest are looked up and the cut is logged (review II,
+// R2-C2-bound-1902). The value 64 is this module's judgement, not a
+// measured figure, the same as maxCRLPointsPerIssuer's.
+const maxOTAVersionsPerCheck = 64
+
 // queryDCLForUpdate is #queryDclForUpdate (:182-281): the targeted version
-// alone, or every listed version above current, highest first, until one
-// is applicable.
+// alone, or the listed versions above current, highest first, until one
+// is applicable — at most maxOTAVersionsPerCheck of them.
 func (o *OTAVersions) queryDCLForUpdate(ctx context.Context, c *Client, source string, vid, pid uint16, current uint32, target *uint32) (SoftwareVersion, bool) {
 	attrs := []any{slog.String("source", source), slog.Int("vendor_id", int(vid)), slog.Int("product_id", int(pid)), slog.Uint64("current", uint64(current))}
 	if target != nil {
@@ -160,6 +170,11 @@ func (o *OTAVersions) queryDCLForUpdate(ctx context.Context, c *Client, source s
 	}
 	slices.Sort(newer)
 	slices.Reverse(newer)
+	if len(newer) > maxOTAVersionsPerCheck {
+		o.log().Warn("dcl.ota.too_many_versions", append(attrs, slog.Int("count", len(newer)), slog.Int("max", maxOTAVersionsPerCheck),
+			slog.String("message", fmt.Sprintf("DCL lists %d versions above %d for VID: %d, PID: %d; the highest %d are checked", len(newer), current, vid, pid, maxOTAVersionsPerCheck)))...)
+		newer = newer[:maxOTAVersionsPerCheck]
+	}
 	for _, version := range newer {
 		v, ok, err := o.CheckVersion(ctx, c, vid, pid, version, current)
 		if err != nil {
