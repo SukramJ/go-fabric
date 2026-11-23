@@ -406,7 +406,7 @@ func TestCertificateStoreCloseCancelsPeriodicUpdate(t *testing.T) {
 	s := openStore(t, CertificateOptions{Client: f.client(), Clock: clock})
 	before := f.hit("/dcl/pki/root-certificates")
 	f.mu.Lock()
-	f.delay = time.Hour
+	f.stall = true
 	f.mu.Unlock()
 	go clock.advance(DefaultUpdateInterval)
 	deadline := time.Now().Add(10 * time.Second)

@@ -36,7 +36,7 @@ import (
 // commit, so the count only falls.
 const (
 	sleepRatchet = 58
-	afterRatchet = 125
+	afterRatchet = 124
 )
 
 // nestedRatchets holds, per nested module (a directory under the root

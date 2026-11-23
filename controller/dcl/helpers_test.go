@@ -209,11 +209,12 @@ type fakeDCL struct {
 	t   *testing.T
 	srv *httptest.Server
 
-	mu       sync.Mutex
-	hits     map[string]int
-	routes   map[string]func(w http.ResponseWriter, r *http.Request)
-	roots    []fakeRoot
-	delay    time.Duration
+	mu     sync.Mutex
+	hits   map[string]int
+	routes map[string]func(w http.ResponseWriter, r *http.Request)
+	roots  []fakeRoot
+	// stall holds every answer until the request's context ends.
+	stall    bool
 	failPath map[string]int
 }
 
@@ -267,15 +268,12 @@ func (f *fakeDCL) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.hits[r.URL.RequestURI()]++
 	fn := f.routes[r.URL.RequestURI()]
-	delay := f.delay
+	stall := f.stall
 	status := f.failPath[r.URL.RequestURI()]
 	f.mu.Unlock()
-	if delay > 0 {
-		select {
-		case <-time.After(delay):
-		case <-r.Context().Done():
-			return
-		}
+	if stall {
+		<-r.Context().Done()
+		return
 	}
 	if status != 0 {
 		w.WriteHeader(status)
