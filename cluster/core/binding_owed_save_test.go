@@ -7,6 +7,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 )
 
 // owedBindingStore is a stored Binding list whose next save fails on
@@ -96,5 +99,114 @@ func TestBindingWriteSettlesAnOwedSave(t *testing.T) {
 	}
 	if held := persistedBinding(t, s).MatterHeldFabrics(); len(held) != 1 || held[0] != 1 {
 		t.Errorf("after a restart the server holds fabrics %v, want [1]", held)
+	}
+}
+
+// owedFabrics is a fabric source holding the listed indices.
+type owedFabrics []uint8
+
+func (p owedFabrics) ListFabrics(context.Context) ([]store.FabricRecord, error) {
+	out := make([]store.FabricRecord, len(p))
+	for i, f := range p {
+		out[i].FabricIndex = f
+	}
+	return out, nil
+}
+
+// TestBindingUnchangedWritesSettleAnOwedSave (R4-store-4001) holds every
+// write route to the promise of the saveOwed field: a write that changes
+// nothing still stores the list when a drop's save is owed. A local
+// MatterWriteChanged and a controller's request write compare the held
+// entries before replace and returned there without the settle.
+func TestBindingUnchangedWritesSettleAnOwedSave(t *testing.T) {
+	t.Parallel()
+	kept := TargetStruct{Node: 0x55, Endpoint: 1, FabricIndex: 1}
+	routes := map[string]func(ctx context.Context, b *Binding) error{
+		"SetAttributes": func(_ context.Context, b *Binding) error {
+			return b.SetAttributes(map[uint32]any{bindingAttrBinding: []TargetStruct{kept}})
+		},
+		"local MatterWriteChanged": func(ctx context.Context, b *Binding) error {
+			_, err := b.MatterWriteChanged(ctx, bindingAttrBinding, []TargetStruct{kept})
+			return err
+		},
+		"request write of the remaining fabric": func(ctx context.Context, b *Binding) error {
+			_, err := b.MatterWriteChanged(im.WithFabricFilter(ctx, true, 1), bindingAttrBinding, []TargetStruct{kept})
+			return err
+		},
+	}
+	for name, write := range routes {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			s := &owedBindingStore{}
+			cfg := s.config()
+			cfg.Fabrics = owedFabrics{1}
+			b := NewBinding()
+			if err := b.Persist(cfg); err != nil {
+				t.Fatal(err)
+			}
+			if err := b.SetAttributes(map[uint32]any{bindingAttrBinding: []TargetStruct{kept, {Node: 0x1234, Endpoint: 1, FabricIndex: 3}}}); err != nil {
+				t.Fatal(err)
+			}
+			s.failNext = true
+			if err := b.MatterDropFabric(ctx, 3); err == nil {
+				t.Fatal("the drop whose save failed answered nil")
+			}
+			if err := write(ctx, b); err != nil {
+				t.Fatal(err)
+			}
+			if held := persistedBinding(t, s).MatterHeldFabrics(); len(held) != 1 || held[0] != 1 {
+				t.Errorf("after a restart the server holds fabrics %v, want [1]", held)
+			}
+			// Paid: the same write again saves nothing.
+			before := s.saves
+			if err := write(ctx, b); err != nil {
+				t.Fatal(err)
+			}
+			if s.saves != before {
+				t.Errorf("an unchanged write with nothing owed saved %d times", s.saves-before)
+			}
+		})
+	}
+}
+
+// TestBindingIndexReuseAfterTwoFailedDrops (R4-store-4001): the removal's
+// drop and the install's drop at the reused index both fail to save; the
+// new fabric's write of the empty list it holds stores the list, so a
+// restart does not give it the removed fabric's entry.
+func TestBindingIndexReuseAfterTwoFailedDrops(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := &owedBindingStore{}
+	fail := 0
+	cfg := s.config()
+	inner := cfg.Save
+	cfg.Save = func(l []TargetStruct) error {
+		if fail > 0 {
+			fail--
+			return errors.New("store down")
+		}
+		return inner(l)
+	}
+	cfg.Fabrics = owedFabrics{3}
+	b := NewBinding()
+	if err := b.Persist(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.SetAttributes(map[uint32]any{bindingAttrBinding: []TargetStruct{{Node: 0x1234, Endpoint: 1, FabricIndex: 3}}}); err != nil {
+		t.Fatal(err)
+	}
+	fail = 2
+	if err := b.MatterDropFabric(ctx, 3); err == nil {
+		t.Fatal("the removal's drop answered nil")
+	}
+	if err := b.MatterDropFabric(ctx, 3); err == nil {
+		t.Fatal("the install's drop answered nil")
+	}
+	if _, err := b.MatterWriteChanged(im.WithFabricFilter(ctx, true, 3), bindingAttrBinding, []TargetStruct{}); err != nil {
+		t.Fatal(err)
+	}
+	if held := persistedBinding(t, s).MatterHeldFabrics(); len(held) != 0 {
+		t.Errorf("after a restart the server holds fabrics %v, want none", held)
 	}
 }
