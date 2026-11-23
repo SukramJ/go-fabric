@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10299,
+  "entry_points": 10312,
   "initializers": 369,
   "entry_packages": [
     ".",
@@ -295,9 +295,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28033,
+    "total_exported": 28039,
     "reachable": 20960,
-    "whitelisted": 7051,
+    "whitelisted": 7057,
     "unreachable": 22
   },
   "by_package": [
@@ -33497,6 +33497,20 @@
     },
     {
       "package": "controller/softwareupdate",
+      "identifier": "TestImagesDownloadVolumeAboveTheBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_download_volume_test.go",
+      "line": 194
+    },
+    {
+      "package": "controller/softwareupdate",
+      "identifier": "TestImagesDownloadVolumeRefusedByItsChecks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/softwareupdate/images_download_volume_test.go",
+      "line": 261
+    },
+    {
+      "package": "controller/softwareupdate",
       "identifier": "TestImagesHonourTheLedgersMaxImageSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/softwareupdate/images_bound_test.go",
@@ -38474,6 +38488,13 @@
     },
     {
       "package": "groups",
+      "identifier": "BenchmarkDecodeUnopenedDatagram",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/decode_bench_test.go",
+      "line": 113
+    },
+    {
+      "package": "groups",
       "identifier": "FuzzDecode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/fuzz_decode_test.go",
@@ -42527,6 +42548,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestTruncatedQueryBesideAFullTable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/truncated_full_table_test.go",
+      "line": 45
+    },
+    {
+      "package": "mdns",
       "identifier": "TestTruncatedQueryBounds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/truncated_bound_test.go",
@@ -42601,6 +42629,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "node/routes.go",
       "line": 143
+    },
+    {
+      "package": "node",
+      "identifier": "BenchmarkCaseResolveSigma1Destination",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/case_destination_bench_internal_test.go",
+      "line": 45
     },
     {
       "package": "node",
@@ -49412,6 +49447,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/tcp/owner_test.go",
       "line": 21
+    },
+    {
+      "package": "transport/tcp",
+      "identifier": "TestConnectionAtItsInFlightBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/tcp/inflight_bound_test.go",
+      "line": 88
     },
     {
       "package": "transport/tcp",
