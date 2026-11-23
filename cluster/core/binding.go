@@ -416,10 +416,11 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: the
 // write of [Binding.MatterWrite], unchanged when the written entries are
 // the ones the accessing fabric holds, in their order (the whole list for
-// a local writer) — then nothing is saved, stored or told, as matter.js
+// a local writer) — then nothing is committed or told, as matter.js
 // commits and stores nothing for an equal value
 // (packages/node/src/behavior/state/managed/Datasource.ts:1446-1457,
-// :1479 at db021da0).
+// :1479 at db021da0); only a save a fabric's drop still owes is made
+// (R4-store-4001).
 func (b *Binding) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
 	if attrID != bindingAttrBinding {
 		_, err := bindingInst.ValidateWrite(attrID, value, nil)

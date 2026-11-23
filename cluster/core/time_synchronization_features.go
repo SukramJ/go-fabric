@@ -132,11 +132,16 @@ const (
 // timeSyncState is the features' state; mu of [TimeSynchronization]
 // guards it.
 type timeSyncState struct {
-	trusted    *timesyncdef.TrustedTimeSourceStruct
-	defaultNTP *string
-	timeZone   []timesyncdef.TimeZoneStruct
-	dstOffset  []timesyncdef.DSTOffsetStruct
-	ntpServer  bool
+	trusted *timesyncdef.TrustedTimeSourceStruct
+	// storedTrusted is the fabric of the trusted time source the store
+	// holds, as last loaded or stored; 0 for none. It differs from
+	// trusted's after a refused store, and a removed fabric's index here
+	// is a clear owed to the store (review II, R4-store-4151).
+	storedTrusted uint8
+	defaultNTP    *string
+	timeZone      []timesyncdef.TimeZoneStruct
+	dstOffset     []timesyncdef.DSTOffsetStruct
+	ntpServer     bool
 }
 
 // NewTimeSynchronizationWith returns the server with cfg's features, its
@@ -156,9 +161,12 @@ func NewTimeSynchronizationWith(cfg TimeSynchronizationConfig) (*TimeSynchroniza
 	t.state.ntpServer = cfg.NTPServerAvailable
 	t.state.timeZone = defaultTimeZone()
 	ctx := context.Background()
-	var tts timesyncdef.TrustedTimeSourceStruct
-	if ok := t.load(ctx, timeSyncKeyTrustedTimeSource, &tts); ok {
-		t.state.trusted = &tts
+	// A cleared source is stored as JSON null, which decodes to no
+	// source, not to a zero one.
+	var tts *timesyncdef.TrustedTimeSourceStruct
+	if ok := t.load(ctx, timeSyncKeyTrustedTimeSource, &tts); ok && tts != nil {
+		t.state.trusted = tts
+		t.state.storedTrusted = tts.FabricIndex
 	}
 	var ntp string
 	if ok := t.load(ctx, timeSyncKeyDefaultNTP, &ntp); ok {
@@ -484,11 +492,20 @@ func (t *TimeSynchronization) readFeatureLocked(attrID uint32) (any, bool) {
 }
 
 // setTrustedTimeSource is chip's SetTrustedTimeSource (:571-593): the
-// source stored (null clears it) and reported.
+// source set in memory, then stored (null clears it). The change is
+// reported only once the store took it: a refused store leaves the new
+// source served and unreported (review II, R4-store-4152, decision 603).
 func (t *TimeSynchronization) setTrustedTimeSourceLocked(ctx context.Context, tts *timesyncdef.TrustedTimeSourceStruct, p *pending) error {
 	t.state.trusted = tts
+	if err := t.save(ctx, timeSyncKeyTrustedTimeSource, tts); err != nil {
+		return err
+	}
+	t.state.storedTrusted = 0
+	if tts != nil {
+		t.state.storedTrusted = tts.FabricIndex
+	}
 	p.changed(timesyncdef.AttrTrustedTimeSource)
-	return t.save(ctx, timeSyncKeyTrustedTimeSource, tts)
+	return nil
 }
 
 // handleSetTrustedTimeSource is chip's HandleSetTrustedTimeSource
@@ -521,43 +538,71 @@ func (t *TimeSynchronization) handleSetTrustedTimeSource(ctx context.Context, fi
 // FabricRemoved is chip's OnFabricRemoved (:1020-1028): a trusted time
 // source of the removed fabric is cleared, with MissingTrustedTimeSource.
 func (t *TimeSynchronization) FabricRemoved(ctx context.Context, fabricIndex uint8) {
-	if !t.has(timesyncdef.FeatureTimeSyncClient) {
-		return
+	_ = t.fabricRemoved(ctx, fabricIndex)
+}
+
+// fabricRemoved is FabricRemoved, answering a refused store. A source of
+// the removed fabric that the store still holds — its clear, or a later
+// source's store, was refused — is stored over again with what memory
+// serves, so the reconcile's next drop retries it (review II,
+// R4-store-4151).
+func (t *TimeSynchronization) fabricRemoved(ctx context.Context, fabricIndex uint8) error {
+	if !t.has(timesyncdef.FeatureTimeSyncClient) || fabricIndex == 0 {
+		return nil
 	}
 	var p pending
 	t.mu.Lock()
-	if t.state.trusted == nil || t.state.trusted.FabricIndex != fabricIndex {
+	served := t.state.trusted != nil && t.state.trusted.FabricIndex == fabricIndex
+	if !served && t.state.storedTrusted != fabricIndex {
 		t.mu.Unlock()
-		return
+		return nil
 	}
-	if err := t.setTrustedTimeSourceLocked(ctx, nil, &p); err != nil {
+	if !served {
+		err := t.setTrustedTimeSourceLocked(ctx, t.state.trusted, &p)
+		t.mu.Unlock()
+		t.flush(contract.OriginHostSet, &p)
+		if err != nil {
+			return fmt.Errorf("core: TimeSynchronization: store the TrustedTimeSource without fabric %d: %w", fabricIndex, err)
+		}
+		return nil
+	}
+	err := t.setTrustedTimeSourceLocked(ctx, nil, &p)
+	if err != nil {
 		t.logger().Warn("matter.timesync.store_failed", slog.String("what", "TrustedTimeSource"), slog.String("reason", err.Error()))
+		err = fmt.Errorf("core: TimeSynchronization: store the TrustedTimeSource without fabric %d: %w", fabricIndex, err)
 	}
 	t.mu.Unlock()
 	p.event(func() { t.emit(timesyncdef.EventMissingTrustedTimeSource, timesyncdef.MissingTrustedTimeSourceEvent{}) })
 	t.flush(contract.OriginHostSet, &p)
 	t.requestTime() // SetTrustedTimeSource, :584-587
+	return err
 }
 
 // MatterDropFabric implements [contract.FabricScopedState]:
-// [TimeSynchronization.FabricRemoved].
+// [TimeSynchronization.FabricRemoved]. A drop whose store the store
+// refuses answers that error, and the fabric stays listed as held until a
+// store of the source lands (review II, R4-store-4151).
 func (t *TimeSynchronization) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
-	t.FabricRemoved(ctx, fabricIndex)
-	return nil
+	return t.fabricRemoved(ctx, fabricIndex)
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the fabric
-// of the trusted time source, which only the TimeSyncClient feature keeps.
+// of the trusted time source, which only the TimeSyncClient feature keeps,
+// in memory and in the store (they differ after a refused store).
 func (t *TimeSynchronization) MatterHeldFabrics() []uint8 {
 	if !t.has(timesyncdef.FeatureTimeSyncClient) {
 		return nil
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.state.trusted == nil {
-		return nil
+	var out []uint8
+	if t.state.trusted != nil {
+		out = append(out, t.state.trusted.FabricIndex)
 	}
-	return []uint8{t.state.trusted.FabricIndex}
+	if f := t.state.storedTrusted; f != 0 && !slices.Contains(out, f) {
+		out = append(out, f)
+	}
+	return out
 }
 
 // errTooMany is chip's CHIP_ERROR_BUFFER_TOO_SMALL from a setter, which

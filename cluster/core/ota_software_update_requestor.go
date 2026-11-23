@@ -97,6 +97,12 @@ type OTASoftwareUpdateRequestor struct {
 	// Persisted state beside the attributes (:1354, :1362).
 	active     []activeProvider
 	inProgress *updateInProgress
+	// dropOwed names each fabric whose drop removed active providers from
+	// memory while the store refused the state without them: the store
+	// may still hold them. It is listed as held, and the next save that
+	// lands — the reconcile's drop, any other persist — settles it
+	// (review II, R4-store-4102).
+	dropOwed map[uint8]bool
 
 	// Internal state (:1397-1429).
 	timer           *queryTimer
@@ -898,11 +904,12 @@ func (r *OTASoftwareUpdateRequestor) markActiveOtaProviderNoUpdate(ctx context.C
 // at b25ed960). An update in progress keeps its provider location: the
 // apply it names is already under way.
 func (r *OTASoftwareUpdateRequestor) FabricRemoved(fabricIndex uint8) {
-	r.fabricRemoved(context.Background(), fabricIndex)
+	_ = r.fabricRemoved(context.Background(), fabricIndex)
 }
 
-// fabricRemoved is FabricRemoved with ctx for the store.
-func (r *OTASoftwareUpdateRequestor) fabricRemoved(ctx context.Context, fabricIndex uint8) {
+// fabricRemoved is FabricRemoved with ctx for the store; the error is a
+// refused save of the state without the fabric, which stays owed.
+func (r *OTASoftwareUpdateRequestor) fabricRemoved(ctx context.Context, fabricIndex uint8) error {
 	r.mu.Lock()
 	kept := r.defaults[:0:0]
 	for _, d := range r.defaults {
@@ -919,30 +926,45 @@ func (r *OTASoftwareUpdateRequestor) fabricRemoved(ctx context.Context, fabricIn
 		r.selected = nil
 	}
 	r.announcedDuringQuery = slices.DeleteFunc(r.announcedDuringQuery, func(a otaAnnouncement) bool { return a.fabric == fabricIndex })
+	owed := r.dropOwed[fabricIndex]
 	r.mu.Unlock()
 	if changed {
 		r.changed(otadef.AttrDefaultOtaProviders)
 	}
-	if activeChanged {
-		r.persist(ctx)
+	if !activeChanged && !owed {
+		return nil
 	}
+	// A refused save keeps the drop owed: the fabric stays listed as held,
+	// so the node's reconcile drops it again and this save is retried
+	// (review II, R4-store-4102).
+	if err := r.persistOwing(ctx, fabricIndex, true); err != nil {
+		return fmt.Errorf("core: OTA requestor: store the state without fabric %d: %w", fabricIndex, err)
+	}
+	return nil
 }
 
 // MatterDropFabric implements [contract.FabricScopedState]:
-// [OTASoftwareUpdateRequestor.FabricRemoved].
+// [OTASoftwareUpdateRequestor.FabricRemoved]. A drop whose save of the
+// state without the fabric's active providers the store refuses answers
+// that error and stays owed: [OTASoftwareUpdateRequestor.MatterHeldFabrics]
+// lists the fabric until a save lands, and the next drop of it saves
+// again even though memory no longer changes (review II, R4-store-4102).
 func (r *OTASoftwareUpdateRequestor) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
-	r.fabricRemoved(ctx, fabricIndex)
-	return nil
+	return r.fabricRemoved(ctx, fabricIndex)
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
 // of the DefaultOTAProviders entries and of the active providers (review
-// II, R2-P6-store-1204).
+// II, R2-P6-store-1204), and every fabric whose drop is owed to the store
+// (R4-store-4102).
 func (r *OTASoftwareUpdateRequestor) MatterHeldFabrics() []uint8 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := fabricsOf(r.defaults, func(d otadef.ProviderLocation) uint8 { return d.FabricIndex })
 	out = append(out, fabricsOf(r.active, func(a activeProvider) uint8 { return a.Location.FabricIndex })...)
+	for f := range r.dropOwed {
+		out = append(out, f)
+	}
 	slices.Sort(out)
 	return slices.Compact(out)
 }
@@ -1194,8 +1216,17 @@ func (r *OTASoftwareUpdateRequestor) load(ctx context.Context) error {
 // in the order of their snapshots, so an older one held up in the store
 // never lands after a newer one (review II, R2-C2-store-1203).
 func (r *OTASoftwareUpdateRequestor) persist(ctx context.Context) {
+	_ = r.persistOwing(ctx, 0, false)
+}
+
+// persistOwing is persist, returning the store's answer. A save that
+// lands stores memory, which holds no dropped fabric's active provider, so
+// it settles every owed drop; a refused one marks dropped as owed when
+// drop is set (dropOwed). Both under persistSem, so a save that landed
+// before the refused one never clears the mark it sets.
+func (r *OTASoftwareUpdateRequestor) persistOwing(ctx context.Context, dropped uint8, drop bool) error {
 	if r.cfg.Store == nil {
-		return
+		return nil
 	}
 	r.persistSem <- struct{}{}
 	defer func() { <-r.persistSem }()
@@ -1217,9 +1248,21 @@ func (r *OTASoftwareUpdateRequestor) persist(ctx context.Context) {
 	if err == nil {
 		err = r.cfg.Store.SaveOTARequestorState(context.WithoutCancel(ctx), b)
 	}
+	r.mu.Lock()
+	switch {
+	case err == nil:
+		r.dropOwed = nil
+	case drop:
+		if r.dropOwed == nil {
+			r.dropOwed = map[uint8]bool{}
+		}
+		r.dropOwed[dropped] = true
+	}
+	r.mu.Unlock()
 	if err != nil {
 		r.logger.Warn("matter.ota.persist_state", slog.Any("err", err))
 	}
+	return err
 }
 
 // DecodeDefaultOTAProvidersWrite decodes a written DefaultOTAProviders
