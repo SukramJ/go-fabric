@@ -263,6 +263,10 @@ type providerSessions struct {
 	// and Close's end of the untracked entries sees every one added
 	// before (review II, R2-P6-conc-2201).
 	closed bool
+
+	// dropping, nil outside tests, runs in reconcileUntracked between the
+	// decision to drop an entry and the drop (R2-C2-conc-2202).
+	dropping func(k providerKey)
 }
 
 // close refuses every session answered from now on; it returns once no
@@ -800,11 +804,34 @@ func (p *providerSessions) reconcileUntracked(t target, present map[uint16]bool,
 		if present[s.Id] || !listed {
 			continue
 		}
-		p.log.Info("camera.session.dropped_by_report", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Int("webrtc_session_id", int(s.Id)))
-		// A session the registry took the id for since is its own
-		// (ownedByOther); a raw entry has no owner.
-		p.removeTrackedOf(t, s.Id, nil)
+		if p.dropping != nil {
+			p.dropping(k)
+		}
+		if p.dropListed(t, s.Id) {
+			p.log.Info("camera.session.dropped_by_report", slog.Uint64("node_id", t.nodeID), slog.Int("endpoint", int(t.endpointID)), slog.Int("webrtc_session_id", int(s.Id)))
+		}
 	}
+}
+
+// dropListed drops a listed raw entry a report no longer lists, deciding
+// under recordMu: a session answered under the id since the mark was read
+// recorded itself under recordMu and started unlisted (learn), so it is
+// not dropped for the older session's absence (review II,
+// R2-C2-conc-2202). A session the registry took the id for since is its
+// own (ownedByOther); a raw entry has no owner. It reports whether the
+// entry was dropped.
+func (p *providerSessions) dropListed(t target, id uint16) bool {
+	k := p.key(t, id)
+	p.recordMu.Lock()
+	defer p.recordMu.Unlock()
+	p.mu.Lock()
+	listed := p.listed[k]
+	p.mu.Unlock()
+	if !listed || p.ownedByOther(k, nil) {
+		return false
+	}
+	p.removeTracked(t, id)
+	return true
 }
 
 // sendEndSession ends a session with UserHangup through the provider
