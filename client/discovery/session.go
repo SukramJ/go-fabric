@@ -376,17 +376,19 @@ const maxConcurrentPreparations = 16
 // search stops is not prepared — a transport may hand over a batch after
 // the search ended (Scanner.find's deliver), and a backlog held to the
 // slots would otherwise outlast Timeout, Stop and Cancel by its length
-// times the Prepare time (review II, R3-bound-3552, Fable diff read).
+// times the Prepare time (review II, R3-bound-3552, Fable diff read). A
+// device handed over after the stop while a slot is free is still
+// prepared, as the ported DiscoveryCancelTest case "does not start an
+// attempt for a device that is handed over after the cancel" expects.
 func (s *Session[T]) prepare(c Candidate) {
 	select {
-	case <-s.scan.Done():
-		return
-	default:
-	}
-	select {
 	case s.prepareSlots <- struct{}{}:
-	case <-s.scan.Done():
-		return
+	default:
+		select {
+		case s.prepareSlots <- struct{}{}:
+		case <-s.scan.Done():
+			return
+		}
 	}
 	s.preparing.Go(func() {
 		defer func() { <-s.prepareSlots }()

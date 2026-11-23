@@ -94,8 +94,8 @@ type backlog []discovery.Device
 func (backlog) Kind() discovery.TransportKind { return discovery.TransportIP }
 
 func (b backlog) FindContinuously(ctx context.Context, _ discovery.Identifier, found func(discovery.Device)) error {
-	for _, d := range b {
-		found(d)
+	for i := range b {
+		found(b[i])
 	}
 	<-ctx.Done()
 	return nil
