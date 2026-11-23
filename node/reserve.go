@@ -389,18 +389,22 @@ func splitErasures(ops []reservationOp) (pre, erase []reservationOp) {
 	return pre, erase
 }
 
-// readdedInErasure finds the endpoints a batch added (its opRelease keys,
-// still in scope's partition) that an erasure of the same batch would
-// reach: one whose own key or a part key lies in a forgotten key's
-// erasure set (the key, its tree in the set, its reservation's tree —
-// what [Aggregator.erase] erases). held is their keys, for
-// [Aggregator.holdBack]; cancel is the stable keys they serve inside an
-// erasure set, for [Aggregator.cancelForget]. A device keyed as a part of
-// the forgotten device is served after the erasure, as a forgotten key
-// added again is, so the erasure never takes what an endpoint already
-// serves (review II, R2-C2-store-2401). Run after the batch's pre ops:
-// a re-added key's release has then dropped the reservation it shared.
-func (a *Aggregator) readdedInErasure(ctx context.Context, scope string, ops, erase []reservationOp) (held, cancel []string, err error) {
+// servedInErasure finds every endpoint the set serves, in any partition,
+// that an erasure of the batch would reach: one whose own key or a part
+// key lies in a forgotten key's erasure set (the key, its tree in the set,
+// its reservation's tree — what [Aggregator.erase] erases). It does not
+// matter how the endpoint came to serve the key — an Add or a Replace of
+// this batch, an Add of an earlier call, another partition's endpoint:
+// each is held out of the reassembly before the erasure and served again
+// after it, as a forgotten key added again is, so the erasure never takes
+// what an endpoint serves (review II, R2-C2-store-2401, R3-store-3702).
+// held is their partitions and keys, for [Aggregator.holdBack]; cancel is
+// the stable keys they serve inside an erasure set, for
+// [Aggregator.cancelForget]. It only reads the partition list: a
+// partition retired meanwhile stays retired (R3-store-3701). Run after the
+// batch's pre ops: a re-added key's release has then dropped the
+// reservation it shared.
+func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp) (held []heldKey, cancel []string, err error) {
 	if len(erase) == 0 {
 		return nil, nil, nil
 	}
@@ -418,66 +422,70 @@ func (a *Aggregator) readdedInErasure(ctx context.Context, scope string, ops, er
 		}
 	}
 	a.mu.Lock()
-	part := a.partLocked(scope)
-	for _, op := range ops {
-		if op.kind != opRelease || slices.Contains(held, op.key) {
-			continue
-		}
-		i := slices.IndexFunc(part.eps, func(ep Endpoint) bool {
-			ek, err := keyOf(ep.Spec())
-			return err == nil && ek == op.key
-		})
-		if i < 0 {
-			continue
-		}
-		hit := false
-		for _, k := range reservationTree(part.eps[i].Spec()) {
-			if forgotten[k] {
-				hit = true
-				if !slices.Contains(cancel, k) {
-					cancel = append(cancel, k)
+	for _, part := range a.parts {
+		for _, ep := range part.eps {
+			spec := ep.Spec()
+			key, err := keyOf(spec)
+			if err != nil {
+				continue
+			}
+			hit := false
+			for _, k := range reservationTree(spec) {
+				if forgotten[k] {
+					hit = true
+					if !slices.Contains(cancel, k) {
+						cancel = append(cancel, k)
+					}
 				}
 			}
-		}
-		if hit {
-			held = append(held, op.key)
+			if hit {
+				held = append(held, heldKey{scope: part.scope, key: key})
+			}
 		}
 	}
 	a.mu.Unlock()
 	return held, cancel, errors.Join(errs...)
 }
 
+// heldKey names an endpoint to hold back: its partition and its key.
+type heldKey struct{ scope, key string }
+
 // heldEndpoint is an endpoint [Aggregator.holdBack] took out of its
 // partition: where it was and its device's detach.
 type heldEndpoint struct {
+	scope  string
 	key    string
 	at     int
 	ep     Endpoint
 	detach func()
 }
 
-// holdBack takes the endpoints with keys out of scope's partition until
+// holdBack takes the endpoints keys names out of their partitions until
 // the returned restore puts them back where they were; restore reports
 // whether it put any back. A key another goroutine added meanwhile keeps
-// that endpoint, and the held one is unbound; on a stopped node nothing is
-// put back (its Stop unbound every device it held, the held ones among
-// them). nil restore for no key held.
-func (a *Aggregator) holdBack(scope string, keys []string) (restore func() bool) {
+// that endpoint, and the held one is unbound; so is one whose partition
+// was retired meanwhile — the retirement is not undone (R3-store-3701) —
+// and on a stopped node nothing is put back (its Stop unbound every
+// device it held, the held ones among them). nil restore for no key held.
+func (a *Aggregator) holdBack(keys []heldKey) (restore func() bool) {
 	if len(keys) == 0 {
 		return nil
 	}
 	a.mu.Lock()
-	part := a.partLocked(scope)
 	var held []heldEndpoint
-	for _, k := range keys {
+	for _, hk := range keys {
+		part := a.findPartLocked(hk.scope)
+		if part == nil {
+			continue
+		}
 		i := slices.IndexFunc(part.eps, func(ep Endpoint) bool {
 			ek, err := keyOf(ep.Spec())
-			return err == nil && ek == k
+			return err == nil && ek == hk.key
 		})
 		if i < 0 {
 			continue
 		}
-		held = append(held, heldEndpoint{key: k, at: i, ep: part.eps[i], detach: a.detach[k]})
+		held = append(held, heldEndpoint{scope: hk.scope, key: hk.key, at: i, ep: part.eps[i], detach: a.detach[hk.key]})
 		part.eps = slices.Delete(part.eps, i, i+1)
 	}
 	a.mu.Unlock()
@@ -488,14 +496,17 @@ func (a *Aggregator) holdBack(scope string, keys []string) (restore func() bool)
 		var unbind []func()
 		put := false
 		a.mu.Lock()
-		part := a.partLocked(scope)
 		for j := len(held) - 1; j >= 0; j-- {
 			h := held[j]
 			if a.closed {
 				continue
 			}
-			if p, _ := a.findLocked(h.key); p != nil {
+			part := a.findPartLocked(h.scope)
+			if p, _ := a.findLocked(h.key); p != nil || part == nil {
 				unbind = append(unbind, h.detach)
+				if p == nil && a.detach[h.key] != nil {
+					a.detachSetLocked(h.key, nil)
+				}
 				continue
 			}
 			part.eps = slices.Insert(part.eps, min(h.at, len(part.eps)), h.ep)

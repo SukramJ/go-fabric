@@ -14,6 +14,7 @@ import (
 	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/fabrictest"
+	"thingfabric.dev/go-fabric/internal/inflight"
 	"thingfabric.dev/go-fabric/node"
 	"thingfabric.dev/go-fabric/store"
 )
@@ -177,5 +178,55 @@ func TestFailedFactoryResetIsFinishedByTheNext(t *testing.T) {
 	}
 	if d.Running() {
 		t.Error("the device reads running after its Stop")
+	}
+}
+
+// TestStartGivenUpLeavesTheBuildCountOnce (review II, R3-test-3802): a
+// Start whose context ends after the node was built, so Site.Run gives up
+// on the node's start before its callback ran, leaves the node.build count
+// once — by the failed Start or by the callback, never by both — and the
+// count is back at zero, not below it, once the callback ran.
+func TestStartGivenUpLeavesTheBuildCountOnce(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	var clk clock.Clock
+	var cancelStart atomic.Pointer[context.CancelFunc]
+	d := site.AddDevice(fabrictest.Topology{
+		Bridged: []node.Endpoint{newPlug(t)},
+		Configure: func(cfg *node.Config) {
+			if clk == nil {
+				clk = cfg.Clock
+			}
+		},
+		Prepare: func(*node.Node) {
+			if c := cancelStart.Swap(nil); c != nil {
+				(*c)()
+			}
+		},
+	})
+	group := inflight.Of(clk)
+	if group == nil {
+		t.Fatal("the device's clock carries no inflight group")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := d.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	short, cancelShort := context.WithCancel(ctx)
+	defer cancelShort()
+	cancelStart.Store(&cancelShort)
+	if err := d.Start(short); err == nil {
+		t.Fatal("Start whose context ended after the build succeeded")
+	}
+	// The callback Site.Run gave up on may still run: watch the count
+	// for a while — it must not go below zero.
+	for deadline := time.Now().Add(500 * time.Millisecond); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		if got := group.Snapshot()[inflight.NodeBuild]; got != 0 {
+			t.Fatalf("node.build count %d after the failed Start, want 0", got)
+		}
+	}
+	if err := d.Start(ctx); err != nil {
+		t.Fatalf("Start after the failed Start: %v", err)
 	}
 }

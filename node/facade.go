@@ -103,7 +103,24 @@ var (
 	// ErrFabricNotFound is [Node.RemoveFabric]'s answer for an index no
 	// fabric holds (store.ErrFabricNotFound).
 	ErrFabricNotFound = store.ErrFabricNotFound
+	// ErrUnseal is wrapped by [New] when [Store].Sealer does not open the
+	// sealed database — another key than the one that sealed it, or a
+	// tampered value (store.ErrUnseal).
+	ErrUnseal = store.ErrUnseal
+	// ErrNoSealer is wrapped by a read or write of a sealed secret on a
+	// store opened without a sealer (store.ErrNoSealer): the database was
+	// sealed, and [Store].Sealer must be set.
+	ErrNoSealer = store.ErrNoSealer
 )
+
+// NewAESGCMSealer returns the module's stdlib sealer for [Store].Sealer —
+// AES-256-GCM under key, which must be 32 bytes. It is
+// store.NewAESGCMSealer, for a host that imports the facade only
+// (decision 551). The key is the host's: generated once (crypto/rand) and
+// kept outside the database (docs/security.md, "Sealing at rest").
+func NewAESGCMSealer(key []byte) (*store.AESGCMSealer, error) {
+	return store.NewAESGCMSealer(key)
+}
 
 // The commissioning bounds [Config.Validate] and [Node.OpenBasicWindow]
 // check, for a host that validates its own configuration before [New].

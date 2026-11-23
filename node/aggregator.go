@@ -189,6 +189,18 @@ func (a *Aggregator) partLocked(scope string) *partition {
 	return p
 }
 
+// findPartLocked returns the partition of scope, nil for none; unlike
+// partLocked it creates nothing and takes no scope off the retired list.
+// a.mu is held.
+func (a *Aggregator) findPartLocked(scope string) *partition {
+	for _, p := range a.parts {
+		if p.scope == scope {
+			return p
+		}
+	}
+	return nil
+}
+
 // findLocked returns the partition and index of the endpoint with key, in
 // any partition; nil, -1 for none. a.mu is held.
 func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
@@ -264,6 +276,13 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // (endpoint/Endpoint.ts:1024-1032, ServerEndpointInitializer.ts:67-69,
 // where `delete()` would erase it, endpoint/Endpoint.ts:987-992) and the new endpoint
 // with the same id is assigned it (ServerEndpointInitializer.ts:34-42).
+// A replacement that fails validation ([ErrKeyMismatch],
+// [ErrPolicyMismatch], …) changes nothing. A replacement the
+// specification level withholds (ep's report lists withheld elements)
+// takes the endpoint off the wire as [Aggregator.Remove] does — the key
+// keeps its endpoint number, and its parts theirs — records ep as
+// withheld in [Node.Surface], and returns the *surface.WithheldError; an
+// Add of a declaration the level serves gets the number back.
 // It acts on the default partition.
 func (a *Aggregator) Replace(ctx context.Context, key device.SourceKey, ep Endpoint) error {
 	return a.Partition(Scope).Replace(ctx, key, ep)
@@ -391,20 +410,20 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	// R2-P6-conc-2405, N-finp-3). A key forgotten and added again in the
 	// batch is held out of the first reassembly and served by a second
 	// one, after the erasure, so it starts as a new device would — and so
-	// is a device the batch added whose own key or a part key the erasure
-	// reaches, a part of the forgotten device among them (review II,
-	// R2-C2-store-2401).
+	// is every served endpoint, of any partition, whose own key or a part
+	// key the erasure reaches, however it came to serve it (review II,
+	// R2-C2-store-2401, R3-store-3702).
 	pre, erase := splitErasures(b.ops)
 	resErr := p.a.applyReservations(ctx, pre)
-	readded, cancel, findErr := p.a.readdedInErasure(ctx, b.scope, b.ops, erase)
+	served, cancel, findErr := p.a.servedInErasure(ctx, erase)
 	resErr = errors.Join(resErr, findErr)
 	p.a.mu.Lock()
 	started := p.a.started
 	p.a.mu.Unlock()
 	var err error
 	var restore func() bool
-	if b.changed && started {
-		restore = p.a.holdBack(b.scope, readded)
+	if (b.changed || len(served) > 0) && started {
+		restore = p.a.holdBack(served)
 		err = p.a.reassemble(ctx)
 	}
 	// Unbound after the reassembly: no controller reaches them any more.
@@ -501,6 +520,9 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	if part.eps[i] == ep {
 		return nil
 	}
+	if withheld := withheldKeys(entries); len(withheld) > 0 {
+		return b.replaceWithheldLocked(part, i, newKey, entries, withheld)
+	}
 	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
 		return err
 	}
@@ -516,6 +538,38 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	}
 	b.changed = true
 	return nil
+}
+
+// replaceWithheldLocked is Replace by a declaration the specification
+// level withholds (decision 550, #585): the served endpoint at i is
+// dropped as [Batch.Remove] drops it — its number and its parts' kept for
+// the key's return — and the declaration recorded as withheld for
+// [Node.Surface], in one step. A withheld key another endpoint serves
+// refuses the call and changes nothing (review II, R2-P6-store-2414).
+// It returns the *surface.WithheldError; a.mu is held.
+func (b *Batch) replaceWithheldLocked(part *partition, i int, key string, entries []surfaceEntry, withheld []string) error {
+	a := b.a
+	old := part.eps[i]
+	servedElsewhere := func(k string) bool { return a.servesExceptLocked(k, old) }
+	if slices.ContainsFunc(withheld, servedElsewhere) {
+		return a.n.recordWithheld(b.ctx, entries, a.servesLocked)
+	}
+	err := a.n.recordWithheld(b.ctx, entries, servedElsewhere)
+	b.dropLocked(part, i, key)
+	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key, tree: reservationTree(old.Spec())})
+	return err
+}
+
+// withheldKeys is the keys of the entries the specification level
+// withheld.
+func withheldKeys(entries []surfaceEntry) []string {
+	var out []string
+	for i := range entries {
+		if r := entries[i].reporter; r != nil && len(r.Surface().Withheld) > 0 {
+			out = append(out, entries[i].key)
+		}
+	}
+	return out
 }
 
 // Remove drops the endpoint with key from the batch's partition; see
@@ -562,6 +616,25 @@ func (b *Batch) dropLocked(part *partition, i int, key string) {
 func (a *Aggregator) servesLocked(key string) bool {
 	for _, p := range a.parts {
 		for _, ep := range p.eps {
+			entries := surfaceEntries(ep)
+			for i := range entries {
+				if entries[i].key == key {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// servesExceptLocked is servesLocked with the endpoint except (and its
+// parts) left out; a.mu is held.
+func (a *Aggregator) servesExceptLocked(key string, except Endpoint) bool {
+	for _, p := range a.parts {
+		for _, ep := range p.eps {
+			if ep == except {
+				continue
+			}
 			entries := surfaceEntries(ep)
 			for i := range entries {
 				if entries[i].key == key {

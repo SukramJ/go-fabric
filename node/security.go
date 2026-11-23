@@ -105,7 +105,14 @@ type caseIdentities struct {
 	// establishment bookkeeping as the adapter is built, so a test can
 	// report the handshake's completion the bridge would report.
 	testEstablishment func(*caseEstablishment)
+	// testAfterCandidates, a test seam, runs in refreshIPK between its
+	// read of the key set and its install.
+	testAfterCandidates func()
 
+	// refreshMu serialises refreshIPK's read of a key set and its
+	// install, so of two overlapping refreshes the later read installs
+	// last (review II, R3-conc-3750).
+	refreshMu sync.Mutex
 	// mu guards byIdx and latest.
 	mu     sync.RWMutex
 	byIdx  map[uint8]*caseFabric
@@ -205,7 +212,13 @@ func (c *caseIdentities) ipkCandidates(ctx context.Context, fabricIndex uint8, a
 // or KeySetRemove reloaded the fabric's group state (the group manager's
 // OnGroupcastChanged): the identity a later Sigma1 resolves to keys on the
 // rotated set. A responder in flight keeps the identity it resolved.
+// Refreshes run one at a time: the group manager calls its observers
+// outside its locks, so two KeySetWrites on two sessions can refresh at
+// once, and the one that read the older set must not install over — or
+// in place of — the newer one.
 func (c *caseIdentities) refreshIPK(ctx context.Context, fabricIndex uint8) {
+	c.refreshMu.Lock()
+	defer c.refreshMu.Unlock()
 	c.mu.RLock()
 	f, ok := c.byIdx[fabricIndex]
 	c.mu.RUnlock()
@@ -213,6 +226,9 @@ func (c *caseIdentities) refreshIPK(ctx context.Context, fabricIndex uint8) {
 		return
 	}
 	current, ipks := c.ipkCandidates(ctx, fabricIndex, f.addNOCIPK)
+	if c.testAfterCandidates != nil {
+		c.testAfterCandidates()
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.byIdx[fabricIndex] != f {
