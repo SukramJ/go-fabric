@@ -162,7 +162,9 @@ type Solicitation struct {
 	RecordTypes []mdns.DNSType
 	// AssociatedNames, when set, returns further names whose records go
 	// into the query as known answers. It is read when the query is built,
-	// so it may change between retries.
+	// so it may change between retries. It runs on the cache's goroutine
+	// and must not call back into the cache — a [Name]'s methods included
+	// — whose methods wait for that goroutine (review II, R3-api-3553).
 	AssociatedNames func() []*Name
 }
 

@@ -28,7 +28,9 @@
 // notification, deletion of an unused name) runs on the loop right after
 // the operation that caused it, and work it defers to a macrotask (query
 // coalescing, service-change coalescing) runs after that. User callbacks
-// never run on the loop.
+// never run on the loop, with two exceptions that say so: [Names.Watch]'s
+// fn and a [Solicitation]'s AssociatedNames. Neither may call back into
+// the cache, whose methods wait for the loop.
 //
 // The package imports mdns, clock and the standard library only; it does not
 // import bridge/, node/, device/ or endpoint/ (ADR 0020).
