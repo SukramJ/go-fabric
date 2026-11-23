@@ -82,6 +82,9 @@ type fakeBus struct {
 	addEntered chan struct{}
 	// onAdd runs on AddNetwork under mu, before a fail answers it.
 	onAdd func(b *fakeBus)
+	// failReads is the number of the next Gets that fail with the bus
+	// daemon's NoReply — a wpa_supplicant that does not answer in time.
+	failReads int
 }
 
 // Watch implements bus: the subscription is recorded, with the calls.
@@ -195,6 +198,10 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	}
 	if method == ifaceInterface+".AddNetwork" && b.onAdd != nil {
 		b.onAdd(b)
+	}
+	if method == methodGet && b.failReads > 0 {
+		b.failReads--
+		return nil, dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"}
 	}
 	if err := b.fail[method]; err != nil {
 		return nil, err

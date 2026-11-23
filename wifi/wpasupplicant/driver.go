@@ -142,6 +142,12 @@ type Driver struct {
 	// fails (review II, R2-P6-store-2021).
 	owed   map[dbus.ObjectPath]struct{}
 	joined dbus.ObjectPath
+	// unsettled (mu), when not nil, is the Networks listed before an
+	// AddNetwork that ended without wpa_supplicant's answer and whose
+	// settling read failed (review II, R4-err-4351): sweep diffs Networks
+	// against it before the next join and at Close; a path AddNetwork
+	// hands the driver meanwhile is added to it.
+	unsettled []dbus.ObjectPath
 
 	closed    chan struct{}
 	closeOnce sync.Once
@@ -674,17 +680,17 @@ func (d *Driver) owe(network dbus.ObjectPath) {
 
 // sweep removes the networks owed (a RemoveNetwork that failed) that
 // wpa_supplicant still lists in the interface's Networks; one it no longer
-// lists is forgotten, one whose removal fails again stays owed. It runs
-// before a join and at Close, on a context of its own bounded by
-// removeTimeout; a failed read of Networks leaves everything owed.
+// lists is forgotten, one whose removal fails again stays owed. An
+// unsettled AddNetwork is settled first: every path listed now and not in
+// unsettled is owed. It runs before a join and at Close, on a context of
+// its own bounded by removeTimeout; a failed read of Networks leaves
+// everything owed and unsettled.
 func (d *Driver) sweep(ctx context.Context) {
 	d.mu.Lock()
-	owed := make([]dbus.ObjectPath, 0, len(d.owed))
-	for n := range d.owed {
-		owed = append(owed, n)
-	}
+	unsettled := d.unsettled
+	pending := len(d.owed)
 	d.mu.Unlock()
-	if len(owed) == 0 {
+	if unsettled == nil && pending == 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
@@ -695,6 +701,23 @@ func (d *Driver) sweep(ctx context.Context) {
 		return
 	}
 	listed, _ := v.Value().([]dbus.ObjectPath)
+	if unsettled != nil {
+		d.mu.Lock()
+		for _, n := range listed {
+			if !slices.Contains(d.unsettled, n) {
+				d.log.Info("wpasupplicant: an unanswered AddNetwork added a network", slog.String("path", string(n)))
+				d.owed[n] = struct{}{}
+			}
+		}
+		d.unsettled = nil
+		d.mu.Unlock()
+	}
+	d.mu.Lock()
+	owed := make([]dbus.ObjectPath, 0, len(d.owed))
+	for n := range d.owed {
+		owed = append(owed, n)
+	}
+	d.mu.Unlock()
 	for _, n := range owed {
 		if slices.Contains(listed, n) {
 			if _, err := d.bus.Call(ctx, d.iface, ifaceInterface+".RemoveNetwork", n); err != nil {
@@ -853,6 +876,9 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 	// carried out, and the path numbered anew (review II, R2-P6-store-2021).
 	d.mu.Lock()
 	delete(d.owed, network)
+	if d.unsettled != nil {
+		d.unsettled = append(d.unsettled, network)
+	}
 	d.mu.Unlock()
 	d.log.Info("wpasupplicant: added network", ssidAttr, slog.String("path", string(network)))
 	return network, prev, ""
@@ -874,8 +900,8 @@ func refused(err error) bool {
 	return false
 }
 
-// errNoReply is the bus daemon's error when the service did not answer in
-// time: the request was delivered and may still be carried out.
+// errNoReply is the bus daemon's error for a call the service never
+// answered: the request may still be carried out.
 const errNoReply = "org.freedesktop.DBus.Error.NoReply"
 
 // settleUnanswered handles an AddNetwork that ended without
@@ -886,8 +912,11 @@ const errNoReply = "org.freedesktop.DBus.Error.NoReply"
 // (and, while its removal fails, before the next join and at Close), so
 // the credential stays in the node's store only. The read runs on a
 // context of its own bounded by removeTimeout, as the join's may have
-// ended; with no before (its read failed) or a failed read nothing can be
-// told apart and nothing is owed, which is logged.
+// ended. When it fails (wpa_supplicant stalled), before is kept as
+// unsettled and sweep diffs against it before the next join and at Close
+// — an earlier unsettled list is kept, being the older. With no before
+// (its read failed) nothing can be told apart and nothing is owed, which
+// is logged.
 func (d *Driver) settleUnanswered(ctx context.Context, before []dbus.ObjectPath) {
 	if before == nil {
 		d.log.Warn("wpasupplicant: cannot tell whether the unanswered network was added", slog.String("reason", "the networks before the call are unknown"))
@@ -897,7 +926,12 @@ func (d *Driver) settleUnanswered(ctx context.Context, before []dbus.ObjectPath)
 	defer cancel()
 	v, err := d.property(rctx, "Networks")
 	if err != nil {
-		d.log.Warn("wpasupplicant: cannot tell whether the unanswered network was added", slog.String("reason", errName(err)))
+		d.log.Warn("wpasupplicant: cannot tell yet whether the unanswered network was added; settled before the next join or at Close", slog.String("reason", errName(err)))
+		d.mu.Lock()
+		if d.unsettled == nil {
+			d.unsettled = before
+		}
+		d.mu.Unlock()
 		return
 	}
 	listed, _ := v.Value().([]dbus.ObjectPath)

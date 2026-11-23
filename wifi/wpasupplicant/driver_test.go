@@ -1510,6 +1510,73 @@ func TestAnAddNetworkNobodyAnsweredIsRemoved(t *testing.T) {
 		}
 	})
 
+	// stalled is a wpa_supplicant that answers neither the AddNetwork nor
+	// the Networks read after it, and carries the AddNetwork out later
+	// (resume): the network appears with the path stale.
+	const stale = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/5")
+	stalled := func(t *testing.T) (*fakeBus, *Driver, func()) {
+		t.Helper()
+		b := newFakeBus()
+		b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+		b.onAdd = func(b *fakeBus) { b.failReads = 1 }
+		b.fail[ifaceInterface+".AddNetwork"] = dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusUnknown {
+			t.Fatalf("ConnectNetwork = %d, want UnknownError", status)
+		}
+		resume := func() {
+			b.mu.Lock()
+			defer b.mu.Unlock()
+			b.onAdd = nil
+			delete(b.fail, ifaceInterface+".AddNetwork")
+			b.nextNetworks = []dbus.ObjectPath{stale}
+			b.addLocked()
+		}
+		return b, d, resume
+	}
+
+	t.Run("the read after a stalled call failed: settled at Close", func(t *testing.T) {
+		t.Parallel()
+		b, d, resume := stalled(t)
+		resume()
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if l := listed(b); len(l) != 0 {
+			t.Errorf("wpa_supplicant still lists %v after Close", l)
+		}
+	})
+
+	t.Run("the read after a stalled call failed: settled before the next join", func(t *testing.T) {
+		t.Parallel()
+		b, d, resume := stalled(t)
+		resume()
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q, want Success", status, debug)
+		}
+		if l := listed(b); !slices.Equal(l, []dbus.ObjectPath{fakeNetwork}) {
+			t.Errorf("wpa_supplicant lists %v after the next join, want only its network %v", l, fakeNetwork)
+		}
+	})
+
+	t.Run("a join while the stalled call is unsettled keeps its network", func(t *testing.T) {
+		t.Parallel()
+		b, d, resume := stalled(t)
+		resume()
+		b.mu.Lock()
+		b.failReads = 1 // the sweep before the join cannot read Networks
+		b.mu.Unlock()
+		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
+			t.Fatalf("ConnectNetwork = %d %q, want Success", status, debug)
+		}
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if l := listed(b); !slices.Equal(l, []dbus.ObjectPath{fakeNetwork}) {
+			t.Errorf("wpa_supplicant lists %v after Close, want only the joined network %v", l, fakeNetwork)
+		}
+	})
+
 	t.Run("an answered refusal owes nothing", func(t *testing.T) {
 		t.Parallel()
 		const other = dbus.ObjectPath("/fi/w1/wpa_supplicant1/Interfaces/0/Networks/9")

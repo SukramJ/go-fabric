@@ -26,7 +26,8 @@
 // wpa_supplicant's answer (the join's bound or context ended in the call,
 // or the bus daemon gave up) may still have been carried out: the network
 // that appeared in the interface's Networks meanwhile is removed the same
-// way.
+// way — at once when wpa_supplicant answers the read that follows the
+// call, else before the next join or at Close.
 //
 // What it does not do, on purpose: it saves nothing into wpa_supplicant's
 // configuration (the node's store holds the committed network and the
