@@ -160,7 +160,12 @@ import (
 // re-read at b25ed960 leave two rows (measured by make cite-report).
 // 415 after P5-A: controller/softwareupdate's cites re-pointed at b25ed960.
 // 412 after P5-S: client/interaction/interaction.go's #network, #interactions and ClosedError cites re-read at b25ed960.
-const citecheckDriftRatchet = 412
+// 413 after R3-err-3053: cluster/core/vid_verification.go's cite of
+// OperationalCredentialsServer.ts:485-488 at b25ed960, confirmed by
+// fable-diff-g1 (statement 2), is drift only because its sentence names
+// ConstraintError and the collector finds that name nearest at :453
+// (measured by make cite-report).
+const citecheckDriftRatchet = 413
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -224,7 +229,9 @@ const citecheckDriftRatchet = 412
 // Wave P5-A2 moved checkForUpdate onto the pin's findApplicable selection and its cite to b25ed960 (2674).
 // Wave P6-B relabelled im/subscription/manager.go's flush cites at b25ed960 (2668).
 // Wave P6-C relabelled bridge cites at b25ed960 (2658).
-const citecheckOffPinRatchet = 2658
+// Review II run-3 fix close: node's Add/Replace/Forget Endpoint.ts cites
+// re-pinned at b25ed960 per fable-diff-g5c/g5d/g5e (2655).
+const citecheckOffPinRatchet = 2655
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
