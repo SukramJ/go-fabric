@@ -100,7 +100,9 @@ func TestForgetErasesAfterTheEndpointLeftTheWire(t *testing.T) {
 // state — as a Forget and a later Add are. A part of the device added
 // again starts new with it: its number is fresh too, so nothing naming
 // the forgotten part's endpoint reaches the new device (R3-store-3702
-// repair, decision 560).
+// repair, decision 560). That holds for a device removed before the
+// batch too, whose parts are then in its reservation, not in the set
+// (Fable N2 of the G5c diff read, decision 576).
 func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 	t.Parallel()
 	const partKey = "switch:1/light"
@@ -109,6 +111,8 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 		key   string
 		parts []string
 		build func(t *testing.T) node.Endpoint
+		// removeFirst removes the device in a call before the batch.
+		removeFirst bool
 	}{
 		{"device", "switch:1", nil, func(t *testing.T) node.Endpoint {
 			t.Helper()
@@ -117,7 +121,7 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 				t.Fatal(err)
 			}
 			return sw
-		}},
+		}, false},
 		{"device with part", "switch:1", []string{partKey}, func(t *testing.T) node.Endpoint {
 			t.Helper()
 			nd, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"})
@@ -128,7 +132,18 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 				t.Fatal(err)
 			}
 			return nd
-		}},
+		}, false},
+		{"device with part removed before the batch", "switch:1", []string{partKey}, func(t *testing.T) node.Endpoint {
+			t.Helper()
+			nd, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := nd.AddPart(kitLight(t, partKey).Device); err != nil {
+				t.Fatal(err)
+			}
+			return nd
+		}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -155,6 +170,11 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 			}
 			if got := dispatchWrite(t, n, attrPath(before, bdbidef.ClusterID, bdbidef.AttrNodeLabel), "old"); got != im.StatusSuccess {
 				t.Fatalf("NodeLabel write: %v", got)
+			}
+			if tc.removeFirst {
+				if err := n.Aggregator().Remove(ctx, endpoint.StringKey(key)); err != nil {
+					t.Fatal(err)
+				}
 			}
 			err := n.Aggregator().Partition(node.Scope).Batch(ctx, func(b *node.Batch) error {
 				if err := b.Forget(endpoint.StringKey(key)); err != nil {
@@ -183,6 +203,95 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 			}
 			if got := dispatchRead(t, n, attrPath(after, bdbidef.ClusterID, bdbidef.AttrNodeLabel)); got == "old" {
 				t.Errorf("NodeLabel %q after Forget and Add in one batch, want the declaration's", got)
+			}
+		})
+	}
+}
+
+// TestForgetAndAddFormerPartKeyInOneBatch (review II, R2-C2-store-2401): a
+// batch that forgets a device and adds one whose own key or part key was
+// a part of the forgotten device serves the added device after the
+// erasure, as it serves a forgotten key added again: the erasure of the
+// forgotten tree does not take the served endpoint's record, so its
+// number holds across a later, unrelated reassembly and a controller's
+// write to it is stored. No endpoint serves the forgotten part's key once
+// the Forget ran, so a different new device may take it (decision 575,
+// which narrows 567's refusal to a key another endpoint still serves).
+func TestForgetAndAddFormerPartKeyInOneBatch(t *testing.T) {
+	t.Parallel()
+	const partKey = "owner/light"
+	for _, tc := range []struct {
+		name  string
+		build func(t *testing.T) node.Endpoint
+	}{
+		{"own key", func(t *testing.T) node.Endpoint {
+			t.Helper()
+			return kitLight(t, partKey)
+		}},
+		{"part key", func(t *testing.T) node.Endpoint {
+			t.Helper()
+			nd, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("fresh"), Name: "fresh"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := nd.AddPart(kitLight(t, partKey).Device); err != nil {
+				t.Fatal(err)
+			}
+			return nd
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			st := memstore.New()
+			eps := epmem.New()
+			cfg := minimalConfig(nil)
+			cfg.Store = node.Store{Credentials: st, Endpoints: eps}
+			n := newNode(t, cfg)
+			owner, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("owner"), Name: "owner"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := owner.AddPart(kitLight(t, partKey).Device); err != nil {
+				t.Fatal(err)
+			}
+			if err := n.Aggregator().Add(ctx, owner); err != nil {
+				t.Fatal(err)
+			}
+			if err := n.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			err = n.Aggregator().Partition(node.Scope).Batch(ctx, func(b *node.Batch) error {
+				if err := b.Forget(endpoint.StringKey("owner")); err != nil {
+					return err
+				}
+				return b.Add(tc.build(t))
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			first, ok := servedNumberOf(n, partKey)
+			if !ok {
+				t.Fatalf("%s is not served after the batch", partKey)
+			}
+			recs, err := eps.ListEndpoints(ctx, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, r := range recs {
+				if r.Key != nil && r.Key.String() == partKey {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("the batch's Forget erased the endpoint record of the served key %s", partKey)
+			}
+			if err := n.Aggregator().Add(ctx, kitLight(t, "other")); err != nil {
+				t.Fatal(err)
+			}
+			if second, _ := servedNumberOf(n, partKey); second != first {
+				t.Errorf("served endpoint %s moved from %d to %d at an unrelated reassembly", partKey, first, second)
 			}
 		})
 	}

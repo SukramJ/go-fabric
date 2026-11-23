@@ -94,8 +94,7 @@ func hasEndpointRecord(t *testing.T, eps *epmem.Store, key string) bool {
 // way the endpoint came to serve a key of the forgotten tree — a
 // Batch.Replace in the same batch, an Add of an earlier call or an
 // endpoint of another partition. (A part key forgotten by name while an
-// endpoint serves it, and a key a different device added in the same
-// batch takes, are refused instead: decision 567,
+// endpoint serves it is refused instead: decisions 567 and 575,
 // forget_refused_test.go.) The served
 // endpoint is held out of the reassembly before the erasure and served
 // again after it at the number it had before the Forget (an installed
