@@ -24,8 +24,8 @@ func TestBackgroundContextsAreNamed(t *testing.T) {
 	allowed := map[string]string{
 		"dcl/certstore.go OpenCertificateStore":             "the root of the periodic context Close cancels",
 		"dcl/certstore.go Close":                            "Close waits for an update in flight after it cancelled the periodic one",
-		"dcl/certstore.go PAA":                              "attestation.PAAStore takes no context; the lookup is bounded by the client's timeout",
-		"dcl/certstore.go CDSigner":                         "attestation.PAAStore takes no context; the lookup is bounded by the client's timeout",
+		"dcl/certstore.go attestationContext":               "attestation.PAAStore (PAA, CDSigner) takes no context; bounded by attestationLookupTimeout, the wait for a running update included",
+		"dcl/certstore.go CDSigner":                         "the store write of a fetched CD signer, bounded by the Store",
 		"dcl/revocation.go IsRevoked":                       "attestation.Revocations takes no context; bounded by revocationLookupTimeout",
 		"dcl/vendorinfo.go NewVendorInfoService":            "the root of the periodic context Close cancels",
 		"softwareupdate/manager.go New":                     "the root of the manager's life Close cancels",

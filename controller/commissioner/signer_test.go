@@ -133,3 +133,59 @@ func TestCommissionWithOperationalSigner(t *testing.T) {
 		t.Fatal("CASE did not sign through the operational signer")
 	}
 }
+
+// TestSignerFabricStoredNOCIsChecked holds R2-C2-store-1801: with an
+// OperationalSigner the stored NOC is held to the record as on the key
+// path — it verifies under the CA, names the record's node and fabric —
+// not only compared with the signer's key. Each damage is refused with
+// ErrFabricMismatch and ca.ErrConfig, the record left as it is.
+func TestSignerFabricStoredNOCIsChecked(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name   string
+		damage func(t *testing.T, c *ca.CA, own []byte, r *ca.FabricRecord)
+	}{
+		{"a NOC for another node", func(t *testing.T, c *ca.CA, own []byte, r *ca.FabricRecord) {
+			t.Helper()
+			r.NOC = mustNOC(t, c, own, r.FabricID, 0x77)
+		}},
+		{"a NOC for another fabric", func(t *testing.T, c *ca.CA, own []byte, r *ca.FabricRecord) {
+			t.Helper()
+			r.NOC = mustNOC(t, c, own, 0x99, r.RootNodeID)
+		}},
+		{"a NOC of another CA, the record's root key cleared", func(t *testing.T, _ *ca.CA, own []byte, r *ca.FabricRecord) {
+			t.Helper()
+			other, err := ca.New(ca.Config{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.NOC, r.RootPublicKey = mustNOC(t, other, own, r.FabricID, r.RootNodeID), nil
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			st := &ca.MemoryStore{}
+			authority, err := ca.New(ca.Config{Store: st})
+			if err != nil {
+				t.Fatal(err)
+			}
+			s := newOpSigner(t)
+			cfg := FabricConfig{FabricID: testFabricID, RootNodeID: controllerNodeID, Store: st, OperationalSigner: s}
+			if _, err := NewFabric(authority, cfg); err != nil {
+				t.Fatal(err)
+			}
+			rec, _, _ := st.LoadFabric()
+			own, _ := s.key.PublicKey.Bytes()
+			c.damage(t, authority, own, &rec)
+			if err := st.SaveFabric(rec); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := NewFabric(authority, cfg); !errors.Is(err, ErrFabricMismatch) || !errors.Is(err, ca.ErrConfig) {
+				t.Fatalf("NewFabric = %v, want ErrFabricMismatch and ca.ErrConfig", err)
+			}
+			if after, _, _ := st.LoadFabric(); !bytes.Equal(after.NOC, rec.NOC) {
+				t.Fatal("the refused record was replaced")
+			}
+		})
+	}
+}

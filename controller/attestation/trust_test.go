@@ -5,6 +5,7 @@ package attestation_test
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"thingfabric.dev/go-fabric/controller/attestation"
@@ -76,4 +77,55 @@ func TestTrustModes(t *testing.T) {
 	if attestation.TrustMode(9).String() == "" {
 		t.Fatal("no name for an unknown mode")
 	}
+}
+
+// errRevoker is a Revocations layer whose lookup fails.
+type errRevoker struct{ attestation.StaticStore }
+
+func (*errRevoker) IsRevoked(_, _ []byte, _ string) (bool, error) {
+	return false, errLookup
+}
+
+var errLookup = errors.New("lookup failed")
+
+// TestLayeredRevocationAsksEveryLayer holds R2-C2-sec-1802: a Layered asks
+// every layer that is Revocations — a nested Layered without a revoker,
+// a snapshot that is itself Layered, a second revoker behind a first that
+// says "not revoked" — and a failed lookup in any layer is the answer.
+func TestLayeredRevocationAsksEveryLayer(t *testing.T) {
+	snap := &attestation.StaticStore{}
+	cases := []struct {
+		name  string
+		store func(online *onlineStore) attestation.PAAStore
+	}{
+		{"flat", func(o *onlineStore) attestation.PAAStore { return attestation.Layered{snap, o} }},
+		{"nested", func(o *onlineStore) attestation.PAAStore {
+			return attestation.Layered{attestation.Layered{snap}, o}
+		}},
+		{"layered snapshot via Trust", func(o *onlineStore) attestation.PAAStore {
+			return attestation.Trust(attestation.Production, attestation.Layered{snap}, o)
+		}},
+		{"second revoker", func(o *onlineStore) attestation.PAAStore {
+			return attestation.Layered{&onlineStore{}, o}
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			online := &onlineStore{revoked: true}
+			r, ok := c.store(online).(attestation.Revocations)
+			if !ok {
+				t.Fatal("store is not Revocations")
+			}
+			revoked, err := r.IsRevoked([]byte{7}, []byte{1}, "DN")
+			if err != nil || !revoked || len(online.asked) != 1 {
+				t.Fatalf("IsRevoked = %v, %v (online asked %d), want true, nil (asked 1)", revoked, err, len(online.asked))
+			}
+		})
+	}
+	t.Run("error in a later layer", func(t *testing.T) {
+		l := attestation.Layered{&onlineStore{}, &errRevoker{}}
+		if revoked, err := l.IsRevoked([]byte{7}, []byte{1}, "DN"); !errors.Is(err, errLookup) {
+			t.Fatalf("IsRevoked = %v, %v, want errLookup", revoked, err)
+		}
+	})
 }

@@ -351,8 +351,10 @@ func checkStoredNOC(c *ca.CA, rec ca.FabricRecord, key *ecdsa.PublicKey) error {
 }
 
 // loadSignerFabric is loadFabric with an operational signer: the stored
-// NOC is kept when it is for the signer's key, and a stored NOC for
-// another key — or one that does not decode — is refused with
+// NOC is kept when it is for the signer's key and passes checkStoredNOC
+// (verifies under the CA, names the record's node and fabric), and a
+// stored NOC for another key — or one that does not decode or does not
+// pass that check — is refused with
 // ca.ErrConfig, the record left as it is (decision 191, Fable read F3):
 // the signer is held to the stored certificate as the CA holds its
 // signers (ca.Config.RootSigner). A record without a NOC gets one minted
@@ -372,6 +374,13 @@ func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric,
 		}
 		if !bytes.Equal(noc.PublicKey, pub) {
 			return nil, fmt.Errorf("%w: %w: the operational signer's key is not the stored NOC's", ErrFabricMismatch, ca.ErrConfig)
+		}
+		// The key path's rule holds the signer path too (R2-C2-store-1801):
+		// the NOC verifies under the CA and names the record's node and
+		// fabric, or the record is refused and left as it is.
+		signerKey, _ := cfg.OperationalSigner.Public().(*ecdsa.PublicKey) // P-256 ECDSA: ca.P256PublicKey above
+		if err := checkStoredNOC(c, rec, signerKey); err != nil {
+			return nil, fmt.Errorf("%w: %w", ca.ErrConfig, err)
 		}
 		keep = true
 	}

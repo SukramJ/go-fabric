@@ -5,6 +5,7 @@ package dcl
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -139,4 +140,47 @@ func TestCertificateWaitersHonourTheirContext(t *testing.T) {
 			t.Error("an update that never ran reported success")
 		}
 	})
+}
+
+// TestCertificatesPerRootAnswerBounded holds R2-C2-bound-1903: of one
+// root's answer that carries more certificates than
+// maxCertificatesPerRootAnswer, an update stores the bound's number — the
+// root the answer was asked for among them — and logs the cut.
+func TestCertificatesPerRootAnswerBounded(t *testing.T) {
+	t.Parallel()
+	f := newFakeDCL(t)
+	root := mint(t, certSpec{cn: "Root", vid: u16(0xFFF1), ca: true, noAKID: true}, nil)
+	subject := base64.StdEncoding.EncodeToString(root.cert.RawSubject)
+	certs := make([]any, 0, 1+maxCertificatesPerRootAnswer+4)
+	certs = append(certs, certRecord(root, subject, true))
+	minted := make([]testCert, 0, 1+maxCertificatesPerRootAnswer+4)
+	minted = append(minted, root)
+	for i := range maxCertificatesPerRootAnswer + 4 {
+		c := mint(t, certSpec{cn: fmt.Sprintf("Extra %d", i), vid: u16(0xFFF1), ca: true, noAKID: true}, nil)
+		minted = append(minted, c)
+		certs = append(certs, certRecord(c, subject, true))
+	}
+	f.json("/dcl/pki/root-certificates", 200, map[string]any{"approvedRootCertificates": map[string]any{
+		"certs": []any{map[string]any{"subject": subject, "subjectKeyId": colonHex(root.skid())}}, "schemaVersion": 0,
+	}})
+	f.json("/dcl/pki/certificates/"+encodeURIComponent(subject)+"/"+encodeURIComponent(colonHex(root.skid())), 200, map[string]any{
+		"approvedCertificates": map[string]any{"subject": subject, "subjectKeyId": colonHex(root.skid()), "schemaVersion": 0, "certs": certs},
+	})
+	log := &logRecorder{}
+	s := openStore(t, CertificateOptions{Client: f.client(), Clock: newManualClock(), Logger: slog.New(log)})
+	stored := 0
+	for _, c := range minted {
+		if _, ok := s.lookup(c.skidHex()); ok {
+			stored++
+		}
+	}
+	if stored != maxCertificatesPerRootAnswer {
+		t.Fatalf("%d certificates stored, want %d", stored, maxCertificatesPerRootAnswer)
+	}
+	if _, ok := s.lookup(root.skidHex()); !ok {
+		t.Fatal("the root the answer was asked for is not stored")
+	}
+	if !log.hasMessage("dcl.certificates.too_many_in_answer") {
+		t.Fatal("the cut is not logged")
+	}
 }

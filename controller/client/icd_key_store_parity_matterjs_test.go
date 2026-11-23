@@ -5,8 +5,10 @@ package client_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -68,5 +70,35 @@ func TestIcdClientKeyStoreParity(t *testing.T) {
 	}
 	if !bytes.Equal(p.deviceKey(t), storedKey) {
 		t.Fatal("the device took the key the store refused")
+	}
+}
+
+// TestIcdClientRegisterFailsWhenTheStoreRefuses holds R2-C2-store-2350:
+// Register returns the store's error when the commit that stores the new
+// registration fails, the registration staying committed in memory. As
+// matter.js: #commitIfOwned runs write() and transaction.commit() in a
+// try, on failure follows the committed registration again and rethrows,
+// and register awaits it (IcdClient.ts:356-372, :576-591 at b25ed960).
+// The memory state staying after a phase-two failure is shown for the
+// offered key (IcdClientTest.ts:806-824 at b25ed960); register goes
+// through the same #commitIfOwned.
+func TestIcdClientRegisterFailsWhenTheStoreRefuses(t *testing.T) {
+	t.Parallel()
+	st := &failingICDStore{}
+	p := newICDPair(t, icdPairOptions{controller: fabrictest.ControllerOptions{
+		Registry: func(c *client.RegistryConfig) {
+			if c.Store != client.Store(st) {
+				st.Store = c.Store
+				c.Store = st
+			}
+		},
+	}})
+	st.fail.Store(true)
+	err := p.do(t, func(ctx context.Context) error { return p.icd().Register(ctx, uncovered) })
+	if err == nil || !strings.Contains(err.Error(), "storage refused") {
+		t.Fatalf("Register = %v, want the store's error", err)
+	}
+	if _, ok := p.icd().Registration(); !ok {
+		t.Fatal("the registration left memory; matter.js keeps the committed state")
 	}
 }

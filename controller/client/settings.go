@@ -5,6 +5,7 @@ package client
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"time"
 
@@ -255,4 +256,16 @@ func (o *SubscribeOptions) clone() *SubscribeOptions {
 		c.MaxIntervalCeiling = &v
 	}
 	return &c
+}
+
+// nextEventMin is the EventMin the default subscription and its bootstrap
+// read ask from: the event cursor + 1, saturated at the top of the range —
+// a cursor a node raised to 2^64-1 would wrap to 0 and ask for every
+// retained event again (review II, R2-C2-wire-2351). Every site that
+// builds the default event filter takes it here.
+func (s *settings) nextEventMin() uint64 {
+	if s.maxEventNumber == math.MaxUint64 {
+		return math.MaxUint64
+	}
+	return s.maxEventNumber + 1
 }
