@@ -434,40 +434,79 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	// state: held, and refused after fn only if another endpoint still
 	// serves it (decision 585), so a Remove or Forget of the owner before
 	// or after gives the same outcome.
-	if a.servesExceptLocked(k, removed) {
-		b.pending = append(b.pending, pendingCall{kind: heldForget, key: k, reserved: reserved})
+	if b.servesOtherLocked(k, removed) {
+		b.pending = append(b.pending, pendingCall{kind: heldForget, seq: b.nextSeq(), key: k, reserved: reserved})
 		return nil
 	}
-	b.forgetLocked(k, reserved, part, i)
+	b.forgetLocked(b.nextSeq(), k, reserved, part, i)
 	return nil
 }
 
-// commitForgetLocked judges a Forget the batch held against the set fn
-// left: refused with [ErrUnknownKey] while another endpoint serves its
-// key, applied as at its call otherwise; a.mu is held.
-func (b *Batch) commitForgetLocked(t pendingCall) error {
+// commitForgetLocked judges a Forget the batch held against the set as
+// it is: blocked ([ErrUnknownKey], blocked set) while another endpoint
+// serves its key, refused for good when another partition holds it,
+// applied as at its call otherwise; a.mu is held.
+func (b *Batch) commitForgetLocked(t pendingCall) (err error, blocked bool) {
 	a := b.a
 	part, i := a.findLocked(t.key)
 	if part != nil && part.scope != b.scope {
-		return fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
+		return fmt.Errorf("%w: %s", ErrUnknownKey, t.key), false
 	}
 	var removed Endpoint
 	if part != nil {
 		removed = part.eps[i]
 	}
-	if a.servesExceptLocked(t.key, removed) {
-		return fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
+	if b.servesOtherLocked(t.key, removed) {
+		return fmt.Errorf("%w: %s", ErrUnknownKey, t.key), true
 	}
-	b.forgetLocked(t.key, t.reserved, part, i)
-	return nil
+	b.forgetLocked(t.seq, t.key, t.reserved, part, i)
+	return nil, false
 }
 
-// forgetLocked forgets k: the endpoint at i of part (nil: the set holds
-// no k) is dropped, k's withheld record too, and its erasure is queued
-// with reserved, the tree the store reserved for k; a.mu is held.
-func (b *Batch) forgetLocked(k string, reserved []string, part *partition, i int) {
+// servesOtherLocked reports whether an endpoint of the set other than
+// removed, and other than a device the batch's own Add put in the set,
+// serves key, itself or as a part: a Forget of key is that endpoint's
+// refusal (decision 567). A device the batch added keeps the key and
+// starts new with it, as it would after a Forget before its Add
+// (decision 582, fable-diff-g5g N2). a.mu is held.
+func (b *Batch) servesOtherLocked(key string, removed Endpoint) bool {
+	for _, p := range b.a.parts {
+		for _, ep := range p.eps {
+			if removed != nil && sameEndpoint(ep, removed) {
+				continue
+			}
+			if k, err := keyOf(ep.Spec()); err == nil {
+				if _, added := b.addedLocked(k, ep); added {
+					continue
+				}
+			}
+			entries := surfaceEntries(ep)
+			for i := range entries {
+				if entries[i].key == key {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// forgetLocked forgets k, a Forget made as the call numbered seq: the
+// endpoint at i of part (nil: the set holds no k) is dropped, k's
+// withheld record too, and its erasure is queued with reserved, the tree
+// the store reserved for k; a.mu is held.
+func (b *Batch) forgetLocked(seq int, k string, reserved []string, part *partition, i int) {
 	a := b.a
 	var removed Endpoint
+	if part != nil {
+		if at, ok := b.addedLocked(k, part.eps[i]); ok && at > seq {
+			// A held Forget judged after fn reaches a device the batch
+			// added after it: the Forget came first, so the device stays
+			// and starts new, as it would had the Forget applied at its
+			// call (fable-diff-g5g N2).
+			part = nil
+		}
+	}
 	if part != nil {
 		removed = part.eps[i]
 		// A held Replace of k goes with the endpoint; a held Add of k
@@ -476,9 +515,9 @@ func (b *Batch) forgetLocked(k string, reserved []string, part *partition, i int
 		b.dropPendingLocked(k, heldReplace)
 		b.dropLocked(part, i, k)
 	} else {
-		// A held Add of k the set does not hold (decision 582) is
-		// dropped as an applied one would be.
-		b.dropPendingLocked(k, heldAdd)
+		// A held Add of k the set does not hold, made before the Forget
+		// (decision 582), is dropped as an applied one would be.
+		b.dropPendingBeforeLocked(k, heldAdd, seq)
 	}
 	// A device the level withheld has no endpoint and no number, only
 	// its record in the surface report; Forget drops that too.

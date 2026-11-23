@@ -387,8 +387,9 @@ func (p *Partition) Endpoints() []Endpoint {
 // A batch is judged against its end state (decisions 582, 585): a call
 // that collides with a key another endpoint serves is not refused at the
 // call. It returns nil, and the change is held until fn returned; then
-// the held calls are judged, in call order, against the set fn left. The
-// calls held are:
+// the held calls are judged against the set fn left, one at a time: the
+// first that applies — a Forget before a take — until none applies, and
+// what still collides then is refused. The calls held are:
 //
 //   - an Add of a key the set holds, or an Add or a Replace whose device —
 //     its own key or a part key — another endpoint serves: applied if no
@@ -405,15 +406,18 @@ func (p *Partition) Endpoints() []Endpoint {
 // leaves the set, a Replace puts the replaced endpoint back — so the
 // batch never assembles two Specs under one key (decision 585). Every
 // error of a held call arrives in the result of [Partition.Batch]: those
-// refusals, and what the applied call itself returns ([ErrReservedKey], [ErrPolicyMismatch], a
-// *surface.WithheldError, a device's attach error). So a batch that takes
-// a key — or forgets a part key — and removes or forgets the endpoint
-// serving it gives the same outcome in either call order. A held change
-// takes part in the batch's reassembly like any other. A later Replace,
-// Remove or Forget of a key the set holds acts on the set's endpoint, and
-// a held Add of that key stays held; of a key the set does not hold, it
-// acts on the held Add: a Replace replaces it, a Remove or Forget drops
-// it.
+// refusals, and what the applied call itself returns ([ErrReservedKey],
+// [ErrPolicyMismatch], a *surface.WithheldError, a device's attach
+// error). So a batch that takes a key — or forgets a part key — and
+// removes or forgets the endpoint serving it gives the same outcome in
+// either call order. A Forget of a key that a device the batch added
+// serves as a part is not refused for it: the device keeps the key and
+// starts new with it, before or after the Forget (fable-diff-g5g N2). A
+// held change takes part in the batch's reassembly like any other. A
+// later Replace, Remove or Forget of a key the set holds acts on the
+// set's endpoint, and a held Add of that key stays held; of a key the set
+// does not hold, it acts on the held Add: a Replace replaces it, a Remove
+// or Forget drops it.
 //
 // A Batch is valid only during fn: a call after fn returned is refused
 // with [ErrBatchDone] and changes nothing.
@@ -439,6 +443,10 @@ type Batch struct {
 	// as a part added to the device during fn may collide (decision 585,
 	// fable-diff-g5g N1).
 	taken []takenCall
+	// seq numbers the batch's Add, Replace and Forget calls in call
+	// order, so a call judged after fn still knows which calls came
+	// before it.
+	seq int
 	// done is set once fn returned: every later call is [ErrBatchDone].
 	// a.mu guards it.
 	done bool
@@ -461,6 +469,7 @@ const (
 // the store reserved for the key at the call.
 type pendingCall struct {
 	kind     pendingKind
+	seq      int
 	key      string
 	ep       Endpoint
 	entries  []surfaceEntry
@@ -472,6 +481,7 @@ type pendingCall struct {
 // that endpoint's detach and oldAt its index in the batch's detach list
 // (-1: none).
 type takenCall struct {
+	seq       int
 	key       string
 	ep        Endpoint
 	old       Endpoint
@@ -603,15 +613,16 @@ func (b *Batch) Add(ep Endpoint) error {
 	// endpoint serves: a Remove or Forget of it in the batch, before or
 	// after, lets the device in (decision 585).
 	if p, _ := a.findLocked(key); p != nil || b.collidesLocked(entries, nil) {
-		b.pending = append(b.pending, pendingCall{kind: heldAdd, key: key, ep: ep, entries: entries})
+		b.pending = append(b.pending, pendingCall{kind: heldAdd, seq: b.nextSeq(), key: key, ep: ep, entries: entries})
 		return nil
 	}
-	return b.addLocked(key, ep, entries)
+	return b.addLocked(b.nextSeq(), key, ep, entries)
 }
 
 // addLocked puts ep under key into the batch's partition: entries are
 // its surface, checked; a.mu is held.
-func (b *Batch) addLocked(key string, ep Endpoint, entries []surfaceEntry) error {
+// seq is the Add's place in call order.
+func (b *Batch) addLocked(seq int, key string, ep Endpoint, entries []surfaceEntry) error {
 	a := b.a
 	// Withheld only once the set takes the key, and never for a key it
 	// serves (review II, R2-P6-store-2414).
@@ -629,7 +640,7 @@ func (b *Batch) addLocked(key string, ep Endpoint, entries []surfaceEntry) error
 	// A returning key takes its reserved number back; the reservation is
 	// done with.
 	b.ops = append(b.ops, reservationOp{kind: opRelease, key: key})
-	b.taken = append(b.taken, takenCall{key: key, ep: ep, oldAt: -1})
+	b.taken = append(b.taken, takenCall{seq: seq, key: key, ep: ep, oldAt: -1})
 	return nil
 }
 
@@ -689,15 +700,16 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 		return nil
 	}
 	if b.collidesLocked(entries, part.eps[i]) {
-		b.pending = append(b.pending, pendingCall{kind: heldReplace, key: newKey, ep: ep, entries: entries})
+		b.pending = append(b.pending, pendingCall{kind: heldReplace, seq: b.nextSeq(), key: newKey, ep: ep, entries: entries})
 		return nil
 	}
-	return b.replaceLocked(part, i, newKey, ep, entries)
+	return b.replaceLocked(b.nextSeq(), part, i, newKey, ep, entries)
 }
 
 // replaceLocked puts ep in the place of the endpoint at i of part, under
 // key: entries are its surface, checked; a.mu is held.
-func (b *Batch) replaceLocked(part *partition, i int, newKey string, ep Endpoint, entries []surfaceEntry) error {
+// seq is the Replace's place in call order.
+func (b *Batch) replaceLocked(seq int, part *partition, i int, newKey string, ep Endpoint, entries []surfaceEntry) error {
 	a := b.a
 	if len(withheldKeys(entries)) > 0 {
 		return b.replaceWithheldLocked(part, i, newKey, entries)
@@ -710,7 +722,7 @@ func (b *Batch) replaceLocked(part *partition, i int, newKey string, ep Endpoint
 	if err != nil {
 		return err
 	}
-	t := takenCall{key: newKey, ep: ep, old: part.eps[i], oldDetach: old, oldAt: -1}
+	t := takenCall{seq: seq, key: newKey, ep: ep, old: part.eps[i], oldDetach: old, oldAt: -1}
 	part.eps[i] = ep
 	a.detachSetLocked(newKey, detach)
 	if old != nil {
@@ -822,12 +834,26 @@ func (b *Batch) pendingIndex(key string, kind pendingKind) int {
 // dropPendingLocked drops the batch's held call of kind on key, if any,
 // and reports whether there was one; a.mu is held.
 func (b *Batch) dropPendingLocked(key string, kind pendingKind) bool {
-	j := b.pendingIndex(key, kind)
+	return b.dropPendingBeforeLocked(key, kind, -1)
+}
+
+// dropPendingBeforeLocked is dropPendingLocked for a held call made
+// before the call numbered seq only (seq < 0: any); a.mu is held.
+func (b *Batch) dropPendingBeforeLocked(key string, kind pendingKind, seq int) bool {
+	j := slices.IndexFunc(b.pending, func(t pendingCall) bool {
+		return t.key == key && t.kind == kind && (seq < 0 || t.seq < seq)
+	})
 	if j < 0 {
 		return false
 	}
 	b.pending = slices.Delete(b.pending, j, j+1)
 	return true
+}
+
+// nextSeq numbers the next call; a.mu is held.
+func (b *Batch) nextSeq() int {
+	b.seq++
+	return b.seq
 }
 
 // isDone reports whether fn returned ([ErrBatchDone]).
@@ -861,8 +887,9 @@ func (b *Batch) collidesLocked(entries []surfaceEntry, except Endpoint) bool {
 }
 
 // commitPending ends the batch's calls ([ErrBatchDone] from here on) and
-// judges the calls the batch held against the set fn left, in call order
-// (decisions 582, 585). A held Add or Replace is judged by its device as
+// judges the calls the batch held against the set fn left, one at a
+// time, the first that applies and a Forget before a take, until none
+// applies (decisions 582, 585). A held Add or Replace is judged by its device as
 // it is now — its surface computed and checked again, so a part added
 // during fn counts (fable-diff-g5f N1): applied as at its call when none
 // of its keys is the set's or another endpoint's, refused with
@@ -870,57 +897,109 @@ func (b *Batch) collidesLocked(entries []surfaceEntry, except Endpoint) bool {
 // it would assemble two Specs under one key, decision 580). A held
 // Replace whose key the partition no longer holds is [ErrUnknownKey]. A
 // held Forget is applied when no other endpoint serves its key any more,
-// refused with [ErrUnknownKey] otherwise (decision 567).
+// refused with [ErrUnknownKey] otherwise (decision 567); applied, it acts
+// as at its call — on a device the batch added before it, never on one
+// added after it.
 func (b *Batch) commitPending() error {
 	a := b.a
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	b.done = true
-	pending := b.pending
-	b.pending = nil
 	var errs []error
-	for _, t := range pending {
-		switch t.kind {
-		case heldForget:
-			errs = append(errs, b.commitForgetLocked(t))
-		case heldAdd:
-			entries, err := b.recheckLocked(t.ep)
-			if err != nil {
+	// One call at a time, the first that applies now — the Forgets
+	// before the takes — until none applies: so a Forget and an Add of
+	// one key end the same in either call order (decision 582,
+	// fable-diff-g5g N2), and a call that collides now may apply once a
+	// later one moved its collision away. The held calls stay in
+	// b.pending while they are judged, so an applied Forget drops a held
+	// Add of its key made before it, as at its call. What still collides
+	// when none applies is refused.
+	for {
+		applied := false
+		for _, forgets := range []bool{true, false} {
+			for j := 0; j < len(b.pending) && !applied; j++ {
+				t := b.pending[j]
+				if (t.kind == heldForget) != forgets {
+					continue
+				}
+				b.pending = slices.Delete(b.pending, j, j+1)
+				err, blocked := b.judgeLocked(t)
+				if blocked {
+					b.pending = slices.Insert(b.pending, j, t)
+					continue
+				}
 				errs = append(errs, err)
-				continue
+				applied = true
 			}
-			if p, _ := a.findLocked(t.key); p != nil {
-				errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, t.key))
-				continue
+			if applied {
+				break
 			}
-			if k, ok := a.servedOfLocked(entries, nil); ok {
-				errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, k))
-				continue
-			}
-			errs = append(errs, b.addLocked(t.key, t.ep, entries))
-		case heldReplace:
-			part, i := a.findLocked(t.key)
-			if part == nil || part.scope != b.scope {
-				errs = append(errs, fmt.Errorf("%w: %s", ErrUnknownKey, t.key))
-				continue
-			}
-			if part.eps[i] == t.ep {
-				continue
-			}
-			entries, err := b.recheckLocked(t.ep)
-			if err != nil {
-				errs = append(errs, err)
-				continue
-			}
-			if k, ok := a.servedOfLocked(entries, part.eps[i]); ok {
-				errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, k))
-				continue
-			}
-			errs = append(errs, b.replaceLocked(part, i, t.key, t.ep, entries))
+		}
+		if !applied {
+			break
 		}
 	}
+	for _, t := range b.pending {
+		err, _ := b.judgeLocked(t)
+		errs = append(errs, err)
+	}
+	b.pending = nil
 	errs = append(errs, b.refuseLateCollisionsLocked()...)
 	return errors.Join(errs...)
+}
+
+// judgeLocked judges the held call t against the set as it is: applied
+// (its error, nil or what the applied call returns), refused for good
+// (the error), or blocked — another endpoint serves one of its keys
+// now, the refusal it would get returned with blocked set, nothing
+// changed; a.mu is held.
+func (b *Batch) judgeLocked(t pendingCall) (err error, blocked bool) {
+	a := b.a
+	switch t.kind {
+	case heldForget:
+		return b.commitForgetLocked(t)
+	case heldAdd:
+		entries, err := b.recheckLocked(t.ep)
+		if err != nil {
+			return err, false
+		}
+		if p, _ := a.findLocked(t.key); p != nil {
+			return fmt.Errorf("%w: %s", ErrDuplicateKey, t.key), true
+		}
+		if k, ok := a.servedOfLocked(entries, nil); ok {
+			return fmt.Errorf("%w: %s", ErrDuplicateKey, k), true
+		}
+		return b.addLocked(t.seq, t.key, t.ep, entries), false
+	case heldReplace:
+		part, i := a.findLocked(t.key)
+		if part == nil || part.scope != b.scope {
+			return fmt.Errorf("%w: %s", ErrUnknownKey, t.key), false
+		}
+		if part.eps[i] == t.ep {
+			return nil, false
+		}
+		entries, err := b.recheckLocked(t.ep)
+		if err != nil {
+			return err, false
+		}
+		if k, ok := a.servedOfLocked(entries, part.eps[i]); ok {
+			return fmt.Errorf("%w: %s", ErrDuplicateKey, k), true
+		}
+		return b.replaceLocked(t.seq, part, i, t.key, t.ep, entries), false
+	}
+	return nil, false
+}
+
+// addedLocked reports whether ep, the set's endpoint under key, is one
+// the batch's Add put there, and that Add's place in call order; a.mu is
+// held.
+func (b *Batch) addedLocked(key string, ep Endpoint) (int, bool) {
+	for _, t := range b.taken {
+		if t.key == key && t.old == nil && sameEndpoint(t.ep, ep) {
+			return t.seq, true
+		}
+	}
+	return 0, false
 }
 
 // refuseLateCollisionsLocked judges every Add and Replace the batch
