@@ -25,7 +25,7 @@ import (
 func bareCentral(t *testing.T, o Options) *Central {
 	t.Helper()
 	o.normalize()
-	c := &Central{opts: o, log: o.Logger, clk: o.Clock, sightings: map[uint64]map[*proxy]sighting{}, skipped: map[string]string{}}
+	c := &Central{opts: o, log: o.Logger, clk: o.Clock, sightings: map[uint64]map[*proxy]sighting{}, skipped: map[string]string{}, aliases: map[string]alias{}, capped: map[string]bool{}}
 	c.ctx, c.cancel = context.WithCancel(t.Context())
 	t.Cleanup(c.cancel)
 	if o.Discover != nil {

@@ -43,7 +43,8 @@ func TestSameDeviceAliasesAreDialledOnce(t *testing.T) {
 	x := fake(t, esphometest.Options{Name: "x", MAC: "AABBCCDDEE31", Key: testKey})
 	y := fake(t, esphometest.Options{Name: "y", MAC: "AABBCCDDEE32", Key: testKey})
 	xa, ya := netip.MustParseAddrPort(x.Addr()), netip.MustParseAddrPort(y.Addr())
-	b := listBrowser{instanceAt("x-proxy", "aabbccddee31", xa)}
+	b := make(listBrowser, 0, aliases+2)
+	b = append(b, instanceAt("x-proxy", "aabbccddee31", xa))
 	for i := range aliases {
 		b = append(b, instanceAt(fmt.Sprintf("x-alias-%03d", i), "aabbccddee31", xa))
 	}
