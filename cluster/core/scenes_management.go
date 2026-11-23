@@ -475,6 +475,18 @@ func (st *ScenesState) activate(fabric uint8, groupID uint16, sceneID uint8) {
 	st.monitor = fabric
 }
 
+// activateIfHeld activates the scene a recall applied, looked up again: a
+// recall applies the values without mu, and a RemoveScene, RemoveAllScenes
+// or fabric removal that landed meanwhile already invalidated the scene,
+// which is not made current and valid again for a scene the table no
+// longer holds (review II, R2-C2-conc-1205). Caller holds mu.
+func (st *ScenesState) activateIfHeld(fabric uint8, groupID uint16, sceneID uint8) {
+	if st.indexOf(fabric, groupID, sceneID) == -1 {
+		return
+	}
+	st.activate(fabric, groupID, sceneID)
+}
+
 // RemoveScenesForGroup drops a fabric's scenes of one group — matter.js
 // removeScenesForGroupOnFabric, called by Groups.RemoveGroup — and
 // invalidates the current scene if it was one of them.
@@ -708,7 +720,7 @@ func (s *ScenesManagement) RecallGlobalScene(ctx context.Context, fabricIndex ui
 	st.mu.Unlock()
 	s.applyValues(ctx, e.Values, e.TransitionTime)
 	st.mu.Lock()
-	st.activate(fabricIndex, scenesUndefinedGroup, scenesGlobalSceneID)
+	st.activateIfHeld(fabricIndex, scenesUndefinedGroup, scenesGlobalSceneID)
 	st.mu.Unlock()
 }
 
@@ -1209,7 +1221,7 @@ func (s *ScenesManagement) recallScene(ctx context.Context, fabric uint8, req Re
 	}
 	s.applyValues(ctx, e.Values, tt)
 	st.mu.Lock()
-	st.activate(fabric, req.GroupID, req.SceneID)
+	st.activateIfHeld(fabric, req.GroupID, req.SceneID)
 	st.mu.Unlock()
 	return nil
 }
