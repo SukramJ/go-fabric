@@ -75,3 +75,32 @@ func TestPushTransportRemountAfterTheDeadlineExpiresAtOnce(t *testing.T) {
 		t.Fatalf("after the remount: deallocated %v, connections %d", m.deallocated, len(p.Connections()))
 	}
 }
+
+// TestPushAllocateAfterQuiesceArmsNoTimer (R2-P6-conc-1606 follow-on): an
+// allocation in flight across MatterQuiesce — here one that commits after
+// it — keeps its expiry deadline but arms no timer; SetEndpoint arms it
+// for the time left. Before, commitAllocation armed the expiry on the
+// quiesced server.
+func TestPushAllocateAfterQuiesceArmsNoTimer(t *testing.T) {
+	t.Parallel()
+	clk := clocktest.New(time.Unix(1_000_000, 0))
+	p, m := newPush(t, func(c *camera.PushTransportConfig) { c.Clock = clk })
+	p.MatterQuiesce()
+	o := motionOptions()
+	expiry := uint32(30)
+	o.ExpiryTime = &expiry
+	allocatePush(t, p, o)
+	if n := clk.Pending(); n != 0 {
+		t.Fatalf("%d timers armed on the quiesced server", n)
+	}
+	clk.Advance(10 * time.Second)
+	p.SetEndpoint(1)
+	clk.Advance(19 * time.Second)
+	if len(m.deallocated) != 0 {
+		t.Fatal("expired before the time left")
+	}
+	clk.Advance(time.Second)
+	if len(m.deallocated) != 1 || len(p.Connections()) != 0 {
+		t.Fatalf("after the remount: deallocated %v, connections %d", m.deallocated, len(p.Connections()))
+	}
+}

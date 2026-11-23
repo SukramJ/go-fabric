@@ -250,6 +250,10 @@ type DeviceEnergyManagementServer struct {
 	// quiescedTimers are the timers MatterQuiesce stopped, which the
 	// SetEndpoint of a reassembly arms again for the time left.
 	quiescedPowerAdjust, quiescedPause bool
+	// quiesced is set by MatterQuiesce and cleared by SetEndpoint; a timer
+	// a command arms meanwhile keeps its deadline but is not armed
+	// (R2-P6-conc-1606 follow-on).
+	quiesced bool
 	// cause is the contract.Origin of the changes a command makes
 	// (OriginCommand), zero outside one: the device's own changes, the
 	// timers' expiries included, are the host's.
@@ -674,6 +678,10 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 // powerAdjustUntil; the caller holds mu.
 func (s *DeviceEnergyManagementServer) armPowerAdjustLocked(d time.Duration) {
 	s.powerAdjustUntil = s.clock.Now().Add(d)
+	if s.quiesced { // SetEndpoint arms it for the time left
+		s.quiescedPowerAdjust = true
+		return
+	}
 	s.rearmPowerAdjustLocked(d)
 }
 
@@ -687,6 +695,10 @@ func (s *DeviceEnergyManagementServer) rearmPowerAdjustLocked(d time.Duration) {
 // holds mu.
 func (s *DeviceEnergyManagementServer) armPauseLocked(d time.Duration) {
 	s.pauseUntil = s.clock.Now().Add(d)
+	if s.quiesced { // SetEndpoint arms it for the time left
+		s.quiescedPause = true
+		return
+	}
 	s.rearmPauseLocked(d)
 }
 
@@ -1159,6 +1171,7 @@ func (s *DeviceEnergyManagementServer) SetEndpoint(endpoint uint16) {
 	s.srv.SetEndpoint(endpoint) // the store emits on it (EmitEvent, the typed Record<Event>)
 	s.mu.Lock()
 	s.endpoint = endpoint
+	s.quiesced = false
 	now := s.clock.Now()
 	if s.quiescedPowerAdjust {
 		s.quiescedPowerAdjust = false
@@ -1222,6 +1235,7 @@ func (s *DeviceEnergyManagementServer) OnAttributeReport(cb func(change contract
 // the timers (review II, R2-P6-conc-1605).
 func (s *DeviceEnergyManagementServer) MatterQuiesce() {
 	s.mu.Lock()
+	s.quiesced = true
 	if s.powerAdjustTimer != nil {
 		s.quiescedPowerAdjust = true
 	}
