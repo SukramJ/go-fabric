@@ -159,6 +159,93 @@ func TestInvokeResponseFieldsATypedReaderRejectFailTheResponse(t *testing.T) {
 	}
 }
 
+// missingFieldReject is a reader's INVALID_COMMAND for a missing
+// mandatory field, returned after it read the container's end.
+type missingFieldReject struct{}
+
+func (missingFieldReject) Error() string                 { return "missing mandatory field" }
+func (missingFieldReject) MatterStatusCode() StatusCode  { return StatusInvalidCommand }
+func (missingFieldReject) FieldsContainerConsumed() bool { return true }
+
+// TestInvokeResponseWithoutMandatedFieldsIsDiscarded (decision 535): a
+// command response whose CommandDataIB carries no CommandFields while the
+// client's fields reader refuses {} — a response command with a mandatory
+// field — is discarded, not read as a Success without fields: matter.js
+// logs "Discarding invoke response without mandated payload" and skips the
+// entry when commandFields is undefined and the response schema is not
+// TlvVoid (packages/protocol/src/action/client/ClientInteraction.ts:571-576
+// at b25ed960); the command then has no response, which the client reports
+// as NoCommandResponse (:636-664). The other entries stand; a reader that
+// takes {} keeps the entry, as before.
+func TestInvokeResponseWithoutMandatedFieldsIsDiscarded(t *testing.T) {
+	t.Parallel()
+	// mandatory refuses an empty structure (a missing mandatory field) and
+	// takes one that carries field 0.
+	mandatory := func(_ ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
+		n := 0
+		for {
+			e, err := dec.Next()
+			if err != nil {
+				return nil, err
+			}
+			if e.IsEndContainer {
+				break
+			}
+			n++
+		}
+		if n == 0 {
+			return nil, missingFieldReject{}
+		}
+		return "fields", nil
+	}
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutBool(tlv.ContextTag(0), false)
+	enc.StartArray(tlv.ContextTag(1))
+	for ref := uint64(1); ref <= 2; ref++ {
+		enc.StartStruct(tlv.AnonymousTag())
+		enc.StartStruct(tlv.ContextTag(0)) // CommandDataIB
+		ConcreteCommandPath{Endpoint: 1, Cluster: 6, Command: 0, HasEndpoint: true, HasCluster: true, HasCommand: true}.MarshalTLV(enc, tlv.ContextTag(0))
+		if ref == 1 {
+			enc.StartStruct(tlv.ContextTag(1))
+			enc.PutUint(tlv.ContextTag(0), 7)
+			_ = enc.EndContainer()
+		}
+		enc.PutUint(tlv.ContextTag(2), ref)
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+	}
+	_ = enc.EndContainer()
+	enc.PutUint(tlv.ContextTag(0xFF), 12)
+	_ = enc.EndContainer()
+	b, err := enc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := UnmarshalInvokeResponseTLV(tlv.NewDecoder(b), mandatory)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Responses) != 1 || resp.Responses[0].CommandRef != 1 || !resp.Responses[0].HasResponse {
+		t.Fatalf("responses %+v, want only CommandRef 1 with its fields: the one without its mandated fields is discarded", resp.Responses)
+	}
+
+	// One response without fields, the reader refusing {}: no entry.
+	absent := invokeResponseWithFields(t, func(*tlv.Encoder) {})
+	resp, err = UnmarshalInvokeResponseTLV(tlv.NewDecoder(absent), mandatory)
+	if err != nil || len(resp.Responses) != 0 {
+		t.Fatalf("absent fields, reader refusing {}: err=%v responses=%+v, want no entry", err, resp.Responses)
+	}
+	// The control: a reader that takes {} keeps the entry, without fields.
+	empty := func(_ ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) {
+		return nil, skipContainer(dec)
+	}
+	resp, err = UnmarshalInvokeResponseTLV(tlv.NewDecoder(absent), empty)
+	if err != nil || len(resp.Responses) != 1 || resp.Responses[0].HasResponse {
+		t.Fatalf("absent fields, reader taking {}: err=%v responses=%+v, want one entry without fields", err, resp.Responses)
+	}
+}
+
 // TestConcreteEventPathWithSentinelValuesSelectsNoOtherEvent
 // (R2-C2-wire-0553): a concrete EventPathIB that names endpoint 0xFFFF,
 // cluster 0xFFFFFFFF or event 0xFFFFFFFF names those ids, not "any": it
