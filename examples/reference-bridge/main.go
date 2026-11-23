@@ -99,8 +99,6 @@ type flags struct {
 	wifiSimSSIDs                                   string
 	otbr, sealKey                                  string
 	passcode, discriminator, customFlow            uint
-	// passcodeErr is a --passcode that did not parse (passcodeValue).
-	passcodeErr error
 	iterations                                     int
 	advertise, osHostName, otaHarness, wifi        bool
 	wifiSim                                        bool
@@ -115,6 +113,8 @@ type flags struct {
 	extensions                                     string
 	specLevel                                      string
 	profiles                                       string
+	// passcodeErr is a --passcode that did not parse (passcodeValue).
+	passcodeErr error
 }
 
 func parseFlags() flags {
