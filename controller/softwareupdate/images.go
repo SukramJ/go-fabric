@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -1114,6 +1115,7 @@ func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool
 		return name, nil
 	}
 	var buf bytes.Buffer
+	i.sizeDownloadBuffer(&buf, *info.ledger)
 	if err := i.fetch(ctx, info, &buf); err != nil {
 		return "", fmt.Errorf("%w: %w", ErrOTA, err)
 	}
@@ -1129,6 +1131,25 @@ func (i *Images) downloadUpdate(ctx context.Context, info UpdateInfo, force bool
 		return "", err
 	}
 	return name, nil
+}
+
+// sizeDownloadBuffer grows buf, before a download without a
+// [BlobStreamer], to the size the ledger record announces — within the
+// download's bound (dcl.OTAVersions.MaxImageSize, else
+// dcl.DefaultMaxImageSize), past which the download is refused before its
+// request anyway — plus the read-ahead bytes.Buffer.ReadFrom asks for, so
+// the image arrives in one allocation instead of a regrowing buffer
+// (review II, R2-P7-C1-01 (a)). A record without a size leaves buf as it
+// is.
+func (i *Images) sizeDownloadBuffer(buf *bytes.Buffer, v dcl.SoftwareVersion) {
+	bound := int64(dcl.DefaultMaxImageSize)
+	if i.ledger != nil && i.ledger.MaxImageSize > 0 {
+		bound = i.ledger.MaxImageSize
+	}
+	if v.OTAFileSize == 0 || v.OTAFileSize > uint64(bound) || v.OTAFileSize > uint64(math.MaxInt-bytes.MinRead) { //nolint:gosec // bound is positive
+		return
+	}
+	buf.Grow(int(v.OTAFileSize) + bytes.MinRead) //nolint:gosec // at most math.MaxInt-bytes.MinRead, checked above
 }
 
 // downloadInto is DownloadUpdate's download through a [BlobStreamer]

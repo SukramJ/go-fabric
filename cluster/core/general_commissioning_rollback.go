@@ -93,15 +93,25 @@ func (g *GeneralCommissioning) trackRollbackLocked(hook expiryHook, windowFabric
 // arm from sessFabric's session that the rollback removed, or whose row it
 // could not roll back and left pending (review II, R2-P2-rr-dev-01), is
 // errGencommArmFabricUnsettled. Nothing runs when the fail-safe is armed or no
-// hook is wired. Caller holds g.mu; it is held again on return, and
+// hook is wired; a closed server, before the hook or after it, is
+// errGencommClosed. Caller holds g.mu; it is held again on return, and
 // released in between.
 func (g *GeneralCommissioning) startFailSafeLocked(ctx context.Context, sessFabric uint8, forSession bool) error {
+	// The arm's closed check ran before the settle released the lock, and
+	// the hook releases it again: Close may have run in either gap, and
+	// from Close on no arm is taken (R2-C2-conc-1002).
+	if g.closed {
+		return errGencommClosed
+	}
 	hook := g.onFailSafeStarting
 	if hook == nil || g.failSafeArmed {
 		return nil
 	}
 	removals := g.rollbackFabricRemovals[sessFabric]
 	g.runFailSafeStartingLocked(ctx, hook)
+	if g.closed {
+		return errGencommClosed
+	}
 	if forSession && sessFabric != 0 && g.rollbackFabricRemovals[sessFabric] != removals {
 		return errGencommArmFabricUnsettled
 	}
@@ -223,6 +233,9 @@ func (g *GeneralCommissioning) settleArmLocked(ctx context.Context, sessFabric u
 	settled, err := g.settleExpiryLocked(ctx)
 	if err != nil {
 		return err
+	}
+	if g.closed { // closed while the settle released the lock (R2-C2-conc-1002)
+		return errGencommClosed
 	}
 	switch {
 	case named:

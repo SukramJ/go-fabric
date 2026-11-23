@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/cluster/core"
 	"thingfabric.dev/go-fabric/contract"
 	endpointpkg "thingfabric.dev/go-fabric/endpoint"
@@ -583,7 +584,13 @@ func (b *Bridge) writeContinues(key mrp.ExchangeKey) bool {
 		return false
 	}
 	w, isTx := v.(*writeTx)
-	return isTx && b.clk().Now().Sub(time.Unix(0, w.lastChunk.Load())) <= writeTxTTL
+	return isTx && w.idle(clock.MonotonicOf(b.clk())) <= writeTxTTL
+}
+
+// chunkWriteTransaction is [exchangeRouting.writeTransaction] at the
+// bridge clock's monotonic reading.
+func (b *Bridge) chunkWriteTransaction(key mrp.ExchangeKey, more bool) *im.WriteTransaction {
+	return b.routing.writeTransaction(key, more, clock.MonotonicOf(b.clk()))
 }
 
 // applyWrite runs a WriteRequest that passed the interaction's checks —
@@ -627,7 +634,7 @@ func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *messa
 	// A chunk that would open one chunked write more than the session may
 	// have is answered Busy before anything is held or written
 	// ([maxChunkedWritesPerSession]).
-	tx := b.routing.writeTransaction(txKey, req.MoreChunkedMessages, b.clk().Now())
+	tx := b.chunkWriteTransaction(txKey, req.MoreChunkedMessages)
 	if tx == nil {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_open", im.StatusBusy)
 	}
@@ -938,7 +945,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 // the disposal of `_held`). A transaction no longer in the table is a
 // fresh one, whose release is a no-op.
 func (b *Bridge) endWriteInteraction(key mrp.ExchangeKey) {
-	b.routing.writeTransaction(key, false, b.clk().Now()).Release()
+	b.chunkWriteTransaction(key, false).Release()
 }
 
 // dispatchTimedRequest handles a decoded TimedRequest.
@@ -980,7 +987,7 @@ func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, 
 	// controller whose follow-up Write / Invoke never arrives leaves an
 	// entry nothing consumes, so the table would otherwise grow for the
 	// daemon's whole uptime. Amortised — see [timedSweepInterval].
-	b.routing.maybeSweepExpiredTimedDeadlines(now)
+	b.routing.maybeSweepExpiredTimedDeadlines(now, clock.MonotonicOf(b.clk()))
 	body, err := EncodeStatusResponse(im.StatusResponse{Status: im.StatusSuccess})
 	if err != nil {
 		debugReplyError(b.logger, "encode_status", src, err)

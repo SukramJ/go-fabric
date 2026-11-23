@@ -8,11 +8,14 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
+	"slices"
 	"testing"
 
 	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // A verifier built from the root certificate checks the authorityKeyIdentifier
@@ -100,5 +103,238 @@ func TestNewVerifierFromRCACRefusesANonRoot(t *testing.T) {
 	}
 	if _, err := mattercert.NewVerifierFromRCAC([]byte{0x15}, nil); err == nil {
 		t.Fatal("NewVerifierFromRCAC accepted a truncated certificate")
+	}
+}
+
+// A self-signed root whose basic constraints say is-ca = false is refused,
+// with or without a path length. Both references refuse it: connectedhomeip
+// src/credentials/CHIPCert.cpp:1135 at 6170af84,
+// `VerifyOrReturnError(certData.mCertFlags.Has(CertFlags::kIsCA), CHIP_ERROR_CERT_USAGE_NOT_ALLOWED);`,
+// and matter.js packages/protocol/src/certificate/kinds/Rcac.ts:38-40 at
+// b25ed960 ("Root certificate must be a CA."). R2-C2-par-0150.
+func TestValidateRCACRefusesARootThatIsNotACAParityMatterJS(t *testing.T) {
+	t.Parallel()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(o *rcacBuildOpts)
+		ok   bool
+	}{
+		{"is-ca true (control)", func(*rcacBuildOpts) {}, true},
+		{"is-ca false, pathLen 1", func(o *rcacBuildOpts) { o.basicConstraintsIsCA = false }, false},
+		{"is-ca false, no pathLen", func(o *rcacBuildOpts) { o.basicConstraintsIsCA, o.basicConstraintsHasPathLen = false, false }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			o := validRCACOpts(priv)
+			tc.edit(&o)
+			c, err := mattercert.Decode(buildRCACTLV(t, priv, o))
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			err = mattercert.ValidateRCAC(c)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ValidateRCAC = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, mattercert.ErrInvalidRCAC) {
+				t.Fatalf("ValidateRCAC = %v, want ErrInvalidRCAC", err)
+			}
+		})
+	}
+}
+
+// A self-signed root whose subject carries an icac-id, a fabric id of 0
+// or CATs is refused: both references refuse them (connectedhomeip
+// src/credentials/CHIPCert.cpp:1129, ChipDN::GetCertType :606-687 at
+// 6170af84; matter.js packages/protocol/src/certificate/kinds/Rcac.ts:69-71,
+// :74-76, :84-86 at b25ed960). A firmware-signing-id stays admitted, as
+// matter.js admits it, and so does a fabric id other than 0.
+// R2-C2-par-0150, decision 516.
+func TestValidateRCACRefusesARootSubjectOfAnotherKindParityMatterJS(t *testing.T) {
+	t.Parallel()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		extra func(e *tlv.Encoder)
+		ok    bool
+	}{
+		{"plain root (control)", nil, true},
+		{"fabric id 1", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(21), 1) }, true},
+		{"firmware-signing-id", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(18), 7) }, true},
+		{"icac-id", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(19), 2) }, false},
+		{"fabric id 0", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(21), 0) }, false},
+		{"one CAT", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(22), 0x0001_0001) }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			o := validRCACOpts(priv)
+			o.subjectExtra = tc.extra
+			c, err := mattercert.Decode(buildRCACTLV(t, priv, o))
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			err = mattercert.ValidateRCAC(c)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ValidateRCAC = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, mattercert.ErrInvalidRCAC) {
+				t.Fatalf("ValidateRCAC = %v, want ErrInvalidRCAC", err)
+			}
+		})
+	}
+}
+
+// A self-signed root whose subjectKeyIdentifier and authorityKeyIdentifier
+// are not 20 bytes each is refused. matter.js
+// packages/protocol/src/certificate/kinds/Rcac.ts:112-126 at b25ed960
+// requires both present and of byteLength 20; connectedhomeip refuses the
+// same at decode (src/credentials/CHIPCert.cpp:143-144,
+// src/lib/core/TLVReader.h:481, src/credentials/CHIPCert.h:50 at 6170af84).
+// The TLV decoder refuses another length already; the DER decoder does
+// not, so the root here comes through DecodeDER, signed over its rebuilt
+// TBS so that only the key-id rule can refuse it. R2-C2-par-0150,
+// decision 523.
+func TestValidateRCACRefusesAKeyIdentifierOfAnotherLengthParityMatterJS(t *testing.T) {
+	t.Parallel()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		n    int
+		ok   bool
+	}{
+		{"20 bytes (control)", 20, true},
+		{"19 bytes", 19, false},
+		{"21 bytes", 21, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := mattercert.Decode(buildRCACTLV(t, priv, validRCACOpts(priv)))
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			id := bytes.Repeat([]byte{0xA5}, tc.n)
+			c.Extensions.SubjectKeyID, c.Extensions.AuthorityKeyID = id, append([]byte(nil), id...)
+			c.TBSDER = nil
+			tbs, err := mattercert.TBSToDER(c)
+			if err != nil {
+				t.Fatalf("TBSToDER: %v", err)
+			}
+			digest := sha256.Sum256(tbs)
+			r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Signature = append(r.FillBytes(make([]byte, 32)), s.FillBytes(make([]byte, 32))...)
+			der, err := mattercert.EncodeDER(c)
+			if err != nil {
+				t.Fatalf("EncodeDER: %v", err)
+			}
+			back, err := mattercert.DecodeDER(der)
+			if err != nil {
+				t.Fatalf("DecodeDER: %v", err)
+			}
+			if len(back.Extensions.SubjectKeyID) != tc.n {
+				t.Fatalf("DecodeDER kept a %d-byte subjectKeyIdentifier, want %d", len(back.Extensions.SubjectKeyID), tc.n)
+			}
+			err = mattercert.ValidateRCAC(back)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ValidateRCAC = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, mattercert.ErrInvalidRCAC) {
+				t.Fatalf("ValidateRCAC = %v, want ErrInvalidRCAC", err)
+			}
+		})
+	}
+}
+
+// A self-signed root that carries an extendedKeyUsage extension is
+// refused, as matter.js refuses it: packages/protocol/src/certificate/kinds/Rcac.ts:107-110
+// at b25ed960 ("The extended key usage extension SHALL NOT be present.",
+// `if (extensions.extendedKeyUsage !== undefined)` throws). connectedhomeip's
+// ValidateChipRCAC (src/credentials/CHIPCert.cpp:1116-1144 at 6170af84)
+// reads no extendedKeyUsage; matter.js decides (decision 539). The root
+// is re-signed over its rebuilt TBS, so that only the extendedKeyUsage
+// rule can refuse it.
+func TestValidateRCACRefusesAnExtendedKeyUsageParityMatterJS(t *testing.T) {
+	t.Parallel()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		eku  []uint8
+		ok   bool
+	}{
+		{"no extendedKeyUsage (control)", nil, true},
+		{"clientAuth", []uint8{2}, false},
+		{"serverAuth and clientAuth", []uint8{1, 2}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, err := mattercert.Decode(buildRCACTLV(t, priv, validRCACOpts(priv)))
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			if tc.eku != nil {
+				c.Extensions.HasExtendedKeyUsage, c.Extensions.ExtendedKeyUsage = true, tc.eku
+				// The encoding order: extendedKeyUsage (3) after keyUsage (2).
+				i := slices.Index(c.Extensions.Order, 2)
+				if i < 0 {
+					t.Fatalf("no keyUsage in the extension order %v", c.Extensions.Order)
+				}
+				c.Extensions.Order = slices.Insert(c.Extensions.Order, i+1, 3)
+			}
+			c.TBSDER = nil
+			tbs, err := mattercert.TBSToDER(c)
+			if err != nil {
+				t.Fatalf("TBSToDER: %v", err)
+			}
+			digest := sha256.Sum256(tbs)
+			r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.Signature = append(r.FillBytes(make([]byte, 32)), s.FillBytes(make([]byte, 32))...)
+			der, err := mattercert.EncodeDER(c)
+			if err != nil {
+				t.Fatalf("EncodeDER: %v", err)
+			}
+			back, err := mattercert.DecodeDER(der)
+			if err != nil {
+				t.Fatalf("DecodeDER: %v", err)
+			}
+			if back.Extensions.HasExtendedKeyUsage != (tc.eku != nil) {
+				t.Fatalf("DecodeDER extendedKeyUsage present %v, want %v", back.Extensions.HasExtendedKeyUsage, tc.eku != nil)
+			}
+			err = mattercert.ValidateRCAC(back)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ValidateRCAC = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, mattercert.ErrInvalidRCAC) {
+				t.Fatalf("ValidateRCAC = %v, want ErrInvalidRCAC", err)
+			}
+		})
 	}
 }

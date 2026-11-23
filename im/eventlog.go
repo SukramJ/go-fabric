@@ -483,6 +483,11 @@ func (l *EventLog) SetCeilingPersistence(persist func(ceiling uint64) error, epo
 //   - cluster  == 0xFFFFFFFF → match any cluster
 //   - eventID  == 0xFFFFFFFF → match any event
 //
+// The sentinels cannot name a concrete endpoint 0xFFFF or a concrete
+// cluster or event 0xFFFFFFFF; an EventPathIB, whose wildcards are its
+// absent fields, is answered by [BuildEventReports], which takes them
+// from the path's Has* flags (R2-C2-wire-0553).
+//
 // Results are returned in ascending Number order. Callers typically
 // pass minNumber=0 to retrieve all buffered events.
 func (l *EventLog) Query(endpoint uint16, cluster, eventID uint32, minNumber uint64) []EventRecord {
@@ -494,6 +499,28 @@ func (l *EventLog) Query(endpoint uint16, cluster, eventID uint32, minNumber uin
 	var out []EventRecord
 	for _, rec := range l.occurrences {
 		if matchRecord(rec, endpoint, cluster, eventID, minNumber) {
+			out = append(out, rec)
+		}
+	}
+	return out
+}
+
+// queryPath returns the buffered events path selects with Number >=
+// minNumber, in ascending Number order: [EventLog.Query] with the path's
+// wildcards taken from its Has* flags, so a concrete id equal to one of
+// Query's sentinels selects that id alone.
+func (l *EventLog) queryPath(path ConcreteEventPath, minNumber uint64) []EventRecord {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	var out []EventRecord
+	for _, rec := range l.occurrences {
+		if rec.Number < minNumber {
+			continue
+		}
+		if path.Matches(ConcreteEventPath{
+			Endpoint: rec.Endpoint, Cluster: rec.Cluster, Event: rec.EventID,
+			HasEndpoint: true, HasCluster: true, HasEvent: true,
+		}) {
 			out = append(out, rec)
 		}
 	}

@@ -56,8 +56,17 @@ type SoilMoistureSource interface {
 //     with CONSTRAINT_ERROR and the attribute keeps its previous value
 //     (SetSoilMoistureMeasuredValue :58-71). The reading here is pulled
 //     from the source on every read, so a refused reading is never
-//     stored: the read answers the last reading that was inside the
-//     limits, or null when there was none.
+//     stored: the read answers the last reading inside the limits that
+//     this server instance saw, or null when it saw none.
+//
+// The last reading lives in the server instance. The materialiser builds
+// a new instance on every call; the server opts into the endpoint's kept
+// servers ([SoilMeasurementServer.MatterKeepInstance], the
+// contract.StatefulServer interface), so a materialised endpoint hands out
+// the same instance for as long as the endpoint and its source stay, and a
+// reading outside the limits reads the previous one there too
+// (R2-C2-store-1453, decision 526). A host that constructs the server
+// itself keeps it the same way by holding on to it.
 //
 // Model unit: percent. The reading is rounded to the attribute's whole
 // percent (type "percent", uint8).
@@ -87,6 +96,11 @@ var (
 func NewSoilMeasurementServer(src SoilMoistureSource) *SoilMeasurementServer {
 	return &SoilMeasurementServer{src: src, limits: src.MatterSoilMoistureLimits()}
 }
+
+// MatterKeepInstance marks the server as one the endpoint keeps across
+// materialisations (contract.StatefulServer): its last reading inside the
+// limits is state of its own (R2-C2-store-1453).
+func (*SoilMeasurementServer) MatterKeepInstance() {}
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *SoilMeasurementServer) MatterDataVersion() uint32 { return s.Current() }

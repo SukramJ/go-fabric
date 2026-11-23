@@ -255,7 +255,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/internal/forward", min: 100},
 	{pkg: "thingfabric.dev/go-fabric/internal/inflight", min: 100},
 	{pkg: "thingfabric.dev/go-fabric/internal/netwatch", min: 92},
-	{pkg: "thingfabric.dev/go-fabric/internal/reportchunk", min: 84},
+	{pkg: "thingfabric.dev/go-fabric/internal/reportchunk", min: 87, why: "review II C3: measured 87.4 with the R2-C2 chunking fixes tested"},
 	{pkg: "thingfabric.dev/go-fabric/internal/serialqueue", min: 97},
 	{
 		pkg:          "thingfabric.dev/go-fabric/internal/deviceseam",
@@ -303,7 +303,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/schema", min: 100},
 	{pkg: "thingfabric.dev/go-fabric/script/aheadcheck", min: 93, why: "the parser, the check and run against a fixture git repository built in the test; main (flags, the exit) is exercised by make ahead-check"},
 	{pkg: "thingfabric.dev/go-fabric/script/archcheck", min: 0, unmeasurable: true, why: "doc and test only, no statements to cover"},
-	{pkg: "thingfabric.dev/go-fabric/script/apidiff", min: 48, why: "review II 6b wave 3: measured 45.8 with the base, heading and nested-module checks tested; the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check; org move step 4 (v0.25.0): 48.7 with the module-move split and modulePath tested"},
+	{pkg: "thingfabric.dev/go-fabric/script/apidiff", min: 51, why: "review II C3: 51.8 with the method-break announcement forms tested (R2-C2-sup-2801); review II 6b wave 3: measured 45.8 with the base, heading and nested-module checks tested; the report parsing and the CHANGELOG match are tested; run, which drives the version control and the apidiff tool, is exercised by make apidiff-check; org move step 4 (v0.25.0): 48.7 with the module-move split and modulePath tested"},
 	// BX4's forward generator; main() only writes the files its test compares.
 	{
 		pkg: "thingfabric.dev/go-fabric/script/citecheck",
@@ -340,8 +340,8 @@ var floors = []packageFloor{
 	},
 	{
 		pkg: "thingfabric.dev/go-fabric/script/reachability",
-		min: 70,
-		why: "review II 6b wave 3: measured 70.4 — the analyzer's tests now run the analysis (initializers seeded, methods in the population, R2-P6-test-2804..2807), no longer only the committed inventory",
+		min: 74,
+		why: "review II C3: 74.5 with the redundant-annotation and package-name checks unskipped; 6b wave 3: measured 70.4 — the analyzer's tests now run the analysis (initializers seeded, methods in the population, R2-P6-test-2804..2807), no longer only the committed inventory",
 	},
 	{pkg: "thingfabric.dev/go-fabric/secure", min: 0, unmeasurable: true, why: "package doc only, no statements to cover"},
 	{pkg: "thingfabric.dev/go-fabric/secure/aesccm", min: 96},

@@ -22,23 +22,23 @@ func TestWriteTransactionSpansTheChunksOfOneWrite(t *testing.T) {
 	a := mrp.ExchangeKey{SessionID: 1, ExchangeID: 7}
 	b := mrp.ExchangeKey{SessionID: 1, ExchangeID: 8}
 
-	first := r.writeTransaction(a, true, now)
-	if r.writeTransaction(a, true, now) != first {
+	first := r.writeTransaction(a, true, monoOf(now))
+	if r.writeTransaction(a, true, monoOf(now)) != first {
 		t.Fatal("a second chunk got a different transaction")
 	}
-	if r.writeTransaction(b, true, now) == first {
+	if r.writeTransaction(b, true, monoOf(now)) == first {
 		t.Fatal("another exchange shares the transaction")
 	}
-	if r.writeTransaction(a, false, now) != first {
+	if r.writeTransaction(a, false, monoOf(now)) != first {
 		t.Fatal("the final chunk got a different transaction")
 	}
 	if _, ok := r.writeTxs.Load(a); ok {
 		t.Fatal("the final chunk left the transaction in the table")
 	}
-	if r.writeTransaction(a, false, now) == first {
+	if r.writeTransaction(a, false, monoOf(now)) == first {
 		t.Fatal("a new single-message write reused a finished transaction")
 	}
-	r.writeTransaction(mrp.ExchangeKey{SessionID: 2, ExchangeID: 1}, true, now.Add(2*writeTxTTL))
+	r.writeTransaction(mrp.ExchangeKey{SessionID: 2, ExchangeID: 1}, true, monoOf(now.Add(2*writeTxTTL)))
 	if _, ok := r.writeTxs.Load(b); ok {
 		t.Fatal("an abandoned chunked write was not pruned")
 	}
@@ -53,12 +53,12 @@ func TestWriteTransactionTTLIsIdleTime(t *testing.T) {
 	now := time.Unix(1000, 0)
 	a := mrp.ExchangeKey{SessionID: 1, ExchangeID: 7}
 	sweep := mrp.ExchangeKey{SessionID: 2, ExchangeID: 1}
-	first := r.writeTransaction(a, true, now)
+	first := r.writeTransaction(a, true, monoOf(now))
 	step := writeTxTTL * 3 / 4
 	for i := 1; i <= 3; i++ { // 2.25 TTLs in all, each gap within one
 		at := now.Add(time.Duration(i) * step)
-		r.writeTransaction(sweep, true, at)
-		if got := r.writeTransaction(a, true, at); got != first {
+		r.writeTransaction(sweep, true, monoOf(at))
+		if got := r.writeTransaction(a, true, monoOf(at)); got != first {
 			t.Fatalf("chunk %d after %v got a fresh transaction", i+1, time.Duration(i)*step)
 		}
 	}
@@ -72,14 +72,14 @@ func TestChunkedWriteCapIsPerSession(t *testing.T) {
 	var r exchangeRouting
 	now := time.Unix(1000, 0)
 	for i := range uint16(maxChunkedWritesPerSession) {
-		if r.writeTransaction(mrp.ExchangeKey{SessionID: 1, ExchangeID: 10 + i}, true, now) == nil {
+		if r.writeTransaction(mrp.ExchangeKey{SessionID: 1, ExchangeID: 10 + i}, true, monoOf(now)) == nil {
 			t.Fatalf("chunked write %d of session 1 refused", i)
 		}
 	}
-	if r.writeTransaction(mrp.ExchangeKey{SessionID: 1, ExchangeID: 99}, true, now) != nil {
+	if r.writeTransaction(mrp.ExchangeKey{SessionID: 1, ExchangeID: 99}, true, monoOf(now)) != nil {
 		t.Fatal("session 1 opened one more than its bound")
 	}
-	if r.writeTransaction(mrp.ExchangeKey{SessionID: 2, ExchangeID: 10}, true, now) == nil {
+	if r.writeTransaction(mrp.ExchangeKey{SessionID: 2, ExchangeID: 10}, true, monoOf(now)) == nil {
 		t.Fatal("session 2's first chunked write refused while session 1 is at its bound")
 	}
 }
@@ -95,7 +95,7 @@ func TestSessionCloseEndsOnlyItsChunkedWrites(t *testing.T) {
 	b := []mrp.ExchangeKey{{SessionID: 2, ExchangeID: 10}, {SessionID: 2, ExchangeID: 11}}
 	held := map[mrp.ExchangeKey]*im.WriteTransaction{}
 	for _, k := range append(append([]mrp.ExchangeKey(nil), a...), b...) {
-		tx := r.writeTransaction(k, true, now)
+		tx := r.writeTransaction(k, true, monoOf(now))
 		if tx == nil {
 			t.Fatalf("%+v refused", k)
 		}
@@ -108,7 +108,7 @@ func TestSessionCloseEndsOnlyItsChunkedWrites(t *testing.T) {
 		}
 	}
 	for _, k := range b {
-		if r.writeTransaction(k, true, now) != held[k] {
+		if r.writeTransaction(k, true, monoOf(now)) != held[k] {
 			t.Errorf("%+v lost its transaction to another session's close", k)
 		}
 	}
@@ -123,12 +123,12 @@ func TestWriteTransactionKeptAtExactlyItsTTL(t *testing.T) {
 	now := time.Unix(1000, 0)
 	a := mrp.ExchangeKey{SessionID: 1, ExchangeID: 7}
 	sweep := mrp.ExchangeKey{SessionID: 2, ExchangeID: 1}
-	r.writeTransaction(a, true, now)
-	r.writeTransaction(sweep, true, now.Add(writeTxTTL))
+	r.writeTransaction(a, true, monoOf(now))
+	r.writeTransaction(sweep, true, monoOf(now.Add(writeTxTTL)))
 	if _, ok := r.writeTxs.Load(a); !ok {
 		t.Fatal("a chunked write idle for exactly writeTxTTL was pruned")
 	}
-	r.writeTransaction(sweep, true, now.Add(writeTxTTL+time.Nanosecond))
+	r.writeTransaction(sweep, true, monoOf(now.Add(writeTxTTL+time.Nanosecond)))
 	if _, ok := r.writeTxs.Load(a); ok {
 		t.Fatal("a chunked write idle past writeTxTTL was kept")
 	}

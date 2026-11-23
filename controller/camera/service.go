@@ -39,7 +39,43 @@ var (
 	// errors.Is, as it did before this sentinel existed (review II,
 	// R2-P6-api-2208, decision 248).
 	ErrReportsInUse = errors.New("camera: Config.Reports is held by a camera Service that is not closed")
+	// ErrServiceInUse: a Service over the same controller is not closed.
+	// One Service runs per controller: the requestor's table and the
+	// camera signals are the controller's, and a Service's Close and its
+	// reconciliation act on every requestor session of the fabric that
+	// its own registry does not name — a second Service's among them.
+	// The refusal also matches [ErrInvalidArgument] with errors.Is
+	// (review II, R2-C2-api-2201).
+	ErrServiceInUse = errors.New("camera: a camera Service over this controller is not closed")
 )
+
+// services is the Service each controller runs, from New's claim to the
+// end of its Close's teardown (finishClose).
+var services = struct {
+	mu sync.Mutex
+	of map[*controller.Controller]*Service
+}{of: map[*controller.Controller]*Service{}}
+
+// claimController records s as ctrl's Service, false when another holds
+// it.
+func claimController(ctrl *controller.Controller, s *Service) bool {
+	services.mu.Lock()
+	defer services.mu.Unlock()
+	if _, held := services.of[ctrl]; held {
+		return false
+	}
+	services.of[ctrl] = s
+	return true
+}
+
+// releaseController lets go of ctrl's claim when s holds it.
+func releaseController(ctrl *controller.Controller, s *Service) {
+	services.mu.Lock()
+	defer services.mu.Unlock()
+	if services.of[ctrl] == s {
+		delete(services.of, ctrl)
+	}
+}
 
 // Signal is one command a camera invoked on the controller's requestor:
 // its Offer, Answer, ICECandidates or End, or the requestor's refusal of
@@ -181,10 +217,14 @@ type Service struct {
 // (ctrl.CameraRequestor) and its signals (ctrl.OnCameraSignal). It
 // refuses a controller without a requestor ([ErrNoRequestor]), without
 // outgoing TCP ([ErrTCPRequired]), a Config whose Reports were not
-// installed ([ErrReportsNotInstalled]) and one whose Reports a Service
+// installed ([ErrReportsNotInstalled]), one whose Reports a Service
 // that is not closed holds ([ErrReportsInUse], which also matches
 // [ErrInvalidArgument]): the first would stop getting its reports (review
-// II, R2-P6-api-2208).
+// II, R2-P6-api-2208), and a controller a Service that is not closed runs
+// over ([ErrServiceInUse], which also matches [ErrInvalidArgument]): the
+// second's Close would end the first's sessions (review II,
+// R2-C2-api-2201). A Service's claim on its controller ends when its
+// Close has finished the teardown.
 func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service, error) {
 	switch {
 	case ctrl.CameraRequestor() == nil:
@@ -194,7 +234,7 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 	case cfg.Reports == nil || !cfg.Reports.installed():
 		return nil, ErrReportsNotInstalled
 	case !cfg.Reports.claim():
-		return nil, &argumentError{msg: "Config.Reports is held by a camera Service that is not closed; close that Service first, or give this one its own Reports", also: ErrReportsInUse}
+		return nil, &argumentError{msg: "Config.Reports is held by a camera Service that is not closed; close that Service first", also: ErrReportsInUse}
 	}
 	log := cfg.Logger
 	if log == nil {
@@ -202,6 +242,11 @@ func New(ctx context.Context, ctrl *controller.Controller, cfg Config) (*Service
 	}
 	life, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	s := &Service{ctrl: ctrl, cfg: cfg, log: log, life: life, cancel: cancel, sessions: map[sessionKey]*Session{}, lastSeen: map[watchKey][]sessionPeer{}}
+	if !claimController(ctrl, s) {
+		cancel()
+		cfg.Reports.unclaim()
+		return nil, &argumentError{msg: "a camera Service over this controller is not closed; one Service runs per controller, close that Service first", also: ErrServiceInUse}
+	}
 	s.io = &clientIO{ctrl: ctrl, svc: s, syncTime: cfg.SyncTime, clk: ctrl.Clock(), log: log}
 	s.m = newManager(s.io, ctrl.Clock(), log)
 	s.image = s.io
@@ -322,6 +367,7 @@ func (s *Service) finishClose() {
 	for _, sess := range open {
 		sess.box.close()
 	}
+	releaseController(s.ctrl, s)
 }
 
 // enter counts a raw provider command in with ending, false once Close

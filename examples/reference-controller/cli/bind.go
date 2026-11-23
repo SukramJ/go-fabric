@@ -70,11 +70,9 @@ func appendToList(ctx context.Context, n *client.Node, path im.ConcreteAttribute
 	if err != nil {
 		return err
 	}
-	list := spec.Node{El: tlv.Element{Tag: tlv.AnonymousTag(), Type: tlv.TypeArray, IsContainer: true}}
-	if v, ok := rep.Value(path.Endpoint, path.Cluster, path.Attribute); ok && v.El.IsContainer {
-		list.Children = append(list.Children, v.Children...)
-	} else if len(rep.Statuses) > 0 {
-		return fmt.Errorf("read: %s", rep.Statuses[0].Status)
+	list, err := readList(rep, path)
+	if err != nil {
+		return err
 	}
 	if present != nil {
 		for _, c := range list.Children {
@@ -90,6 +88,28 @@ func appendToList(ctx context.Context, n *client.Node, path im.ConcreteAttribute
 		return err
 	}
 	return st.Err()
+}
+
+// readList is the list a read of path reported, as a new array to extend.
+// A read without the list — a status in its place, or neither a value nor
+// a status (an empty report, an entry the assembler dropped as malformed),
+// or a value that is not a list — is an error: appendToList must not take
+// it for an empty list and write its one entry as the whole list, which
+// for the ACL replaces this fabric's every entry (R2-C2-err-2652).
+func readList(rep *interaction.Report, path im.ConcreteAttributePath) (spec.Node, error) {
+	v, ok := rep.Value(path.Endpoint, path.Cluster, path.Attribute)
+	switch {
+	case ok && v.El.IsContainer:
+	case len(rep.Statuses) > 0:
+		return spec.Node{}, fmt.Errorf("read: %s", rep.Statuses[0].Status)
+	case ok:
+		return spec.Node{}, fmt.Errorf("read %v: the value is not a list", path)
+	default:
+		return spec.Node{}, fmt.Errorf("read %v: the report carries no value for it", path)
+	}
+	list := spec.Node{El: tlv.Element{Tag: tlv.AnonymousTag(), Type: tlv.TypeArray, IsContainer: true}}
+	list.Children = append(list.Children, v.Children...)
+	return list, nil
 }
 
 // cmdBind writes a Binding entry on the source node's endpoint and what

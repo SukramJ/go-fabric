@@ -1,15 +1,15 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)
-Entry points: 10312 across 290 test packages, and 369 package initializers.
+Entry points: 10442 across 290 test packages, and 370 package initializers.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 28039 |
-| Reached by a test | 20960 |
-| Whitelisted | 7057 |
+| Total exported | 28242 |
+| Reached by a test | 21079 |
+| Whitelisted | 7141 |
 | **Unreached** | **22** |
 
 ## Top-20 packages by unreached exported identifiers
@@ -32,17 +32,17 @@ Entry points: 10312 across 290 test packages, and 369 package initializers.
 
 | Package | Identifier | File | Line |
 |---|---|---|---|
-| bdx | ServerSession.InitType | bdx/responder.go | 568 |
-| bdx | ServerSession.Scope | bdx/responder.go | 562 |
-| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3305 |
+| bdx | ServerSession.InitType | bdx/responder.go | 571 |
+| bdx | ServerSession.Scope | bdx/responder.go | 565 |
+| bridge | Bridge.ControllerRTT | bridge/bridge.go | 3324 |
 | bridge | Bridge.SubscriptionFlushReporter | bridge/subscribe.go | 407 |
 | client/exchange | Manager.LocalFixedMrpBackoff | client/exchange/manager.go | 254 |
 | cluster/core | OperationalCredentials.RolledBackUpdates | cluster/core/operational_credentials.go | 736 |
-| cluster/core | ScenesState.ForgetFabric | cluster/core/scenes_management.go | 540 |
-| cluster/jointfabric | Datastore.ForceAddNodeKeySetEntry | cluster/jointfabric/datastore_ops.go | 1014 |
-| cluster/jointfabric | Datastore.FriendlyName | cluster/jointfabric/datastore.go | 674 |
-| cluster/jointfabric | Datastore.SetAnchorVendorID | cluster/jointfabric/datastore.go | 775 |
-| cluster/jointfabric | Datastore.Status | cluster/jointfabric/datastore.go | 681 |
+| cluster/core | ScenesState.ForgetFabric | cluster/core/scenes_management.go | 552 |
+| cluster/jointfabric | Datastore.ForceAddNodeKeySetEntry | cluster/jointfabric/datastore_ops.go | 1041 |
+| cluster/jointfabric | Datastore.FriendlyName | cluster/jointfabric/datastore.go | 680 |
+| cluster/jointfabric | Datastore.SetAnchorVendorID | cluster/jointfabric/datastore.go | 781 |
+| cluster/jointfabric | Datastore.Status | cluster/jointfabric/datastore.go | 687 |
 | cluster/measurement | HeldBooleanState.Set | cluster/measurement/booleanstate_held.go | 68 |
 | controller/client | ICDClient.OnAvailableChanged | controller/client/icd.go | 405 |
 | controller/client | ICDClient.OnRegistered | controller/client/icd.go | 391 |

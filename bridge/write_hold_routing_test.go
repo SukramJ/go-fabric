@@ -47,14 +47,14 @@ func TestWriteTransactionsShareHolds(t *testing.T) {
 	now := time.Now()
 	holder := mrp.ExchangeKey{SessionID: 1, ExchangeID: 10}
 	other := mrp.ExchangeKey{SessionID: 2, ExchangeID: 10}
-	if s := write(r.writeTransaction(holder, true, now), true); s != im.StatusSuccess {
+	if s := write(r.writeTransaction(holder, true, monoOf(now)), true); s != im.StatusSuccess {
 		t.Fatalf("first chunk %v", s)
 	}
-	if s := write(r.writeTransaction(other, false, now), false); s != im.StatusBusy {
+	if s := write(r.writeTransaction(other, false, monoOf(now)), false); s != im.StatusBusy {
 		t.Fatalf("competing write %v, want BUSY", s)
 	}
 	later := now.Add(writeTxTTL + time.Second)
-	if s := write(r.writeTransaction(other, false, later), false); s != im.StatusSuccess {
+	if s := write(r.writeTransaction(other, false, monoOf(later)), false); s != im.StatusSuccess {
 		t.Fatalf("write after the abandoned chunked write expired %v, want SUCCESS", s)
 	}
 }
@@ -77,12 +77,12 @@ func TestEndWriteChunkKeepsAnOpenWritesHolds(t *testing.T) {
 	}
 	now := time.Now()
 	holder := mrp.ExchangeKey{SessionID: 1, ExchangeID: 10}
-	tx := r.writeTransaction(holder, true, now)
+	tx := r.writeTransaction(holder, true, monoOf(now))
 	if s := write(tx, true); s != im.StatusSuccess {
 		t.Fatalf("first chunk %v", s)
 	}
 	r.endWriteChunk(holder, tx, true)
-	if s := write(r.writeTransaction(mrp.ExchangeKey{SessionID: 2, ExchangeID: 10}, false, now), false); s != im.StatusBusy {
+	if s := write(r.writeTransaction(mrp.ExchangeKey{SessionID: 2, ExchangeID: 10}, false, monoOf(now)), false); s != im.StatusBusy {
 		t.Fatalf("a competing write after the open write's chunk ended: %v, want BUSY", s)
 	}
 }

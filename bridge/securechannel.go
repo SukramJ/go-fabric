@@ -566,7 +566,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 			// refusal has to live on the receive path — and has to expire,
 			// or the refusal itself becomes the denial of service
 			// (BD-Matter-PASE-TimedLockout).
-			b.logger.Warn("matter.rx.sc.pase_locked_out",
+			b.warnPerDatagram(context.Background(), "matter.rx.sc.pase_locked_out",
 				slog.String("src", srcString(src)),
 				slog.Int("opcode", int(proto.Opcode)),
 				slog.String("hint", "too many failed pairing attempts; PASE re-enables after the lockout period, or immediately when a new pairing window is opened"))
@@ -757,7 +757,7 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 		Kind:     diagevent.KindSession,
 		Severity: diagevent.SeverityInfo,
 		Message:  "A controller completed a secure-session handshake with the bridge.",
-		Detail:   map[string]string{"peer": srcString(src)},
+		Detail:   b.establishedEventDetail(step, map[string]string{diagevent.DetailPeer: srcString(src)}),
 	})
 	return nil
 }
@@ -855,7 +855,7 @@ func (b *Bridge) dispatchPase(
 				Severity: diagevent.SeverityWarning,
 				Message: "A commissioner tried to pair while another pairing was already " +
 					"in progress; its attempt was dropped and it will retry.",
-				Detail: map[string]string{"peer": srcString(src)},
+				Detail: map[string]string{diagevent.DetailPeer: srcString(src)},
 			})
 			return nil
 		}
@@ -2813,6 +2813,11 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 			slog.Int("session_id", int(requestHdr.SessionID)))
 		return nil
 	}
+	// The fabric is read before the close takes the session away.
+	detail := b.sessionEventDetail(requestHdr.SessionID, map[string]string{
+		diagevent.DetailPeer:      srcString(src),
+		diagevent.DetailSessionID: strconv.Itoa(int(requestHdr.SessionID)),
+	})
 	if err := reg.Close(requestHdr.SessionID); err != nil {
 		// Already gone — racing a local reap / fabric teardown.
 		b.logger.Debug("matter.rx.sc.close_session.miss",
@@ -2827,10 +2832,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 		Kind:     diagevent.KindSession,
 		Severity: diagevent.SeverityInfo,
 		Message:  "A controller closed its secure session with the bridge.",
-		Detail: map[string]string{
-			"peer":       srcString(src),
-			"session_id": strconv.Itoa(int(requestHdr.SessionID)),
-		},
+		Detail:   detail,
 	})
 	return nil
 }

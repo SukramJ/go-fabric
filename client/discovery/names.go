@@ -56,6 +56,17 @@ const (
 	// peer's attempts. This module's own bound (owner decision 45; review
 	// II, R2-P6-bound-2101), at the staging's number.
 	maxCachedAddressesPerHost = maxStagedAddressesPerHost
+	// maxServiceTargets is how many SRV targets one Service tracks; past
+	// it the target discovered or refreshed longest ago goes, as a host's
+	// cached addresses drop their oldest. Each target's addresses join
+	// the service's, and each becomes a peer's connection target, so a
+	// sender that answers an instance with many SRV targets would
+	// otherwise set the number of a peer's attempts. This module's own
+	// bound (owner decision 45; review II, R2-C2-bound-2152): twice the
+	// host discoveries one resolution runs at once (maxHostDiscoveries),
+	// so targets beyond those still wait their turn; a service holds at
+	// most maxServiceTargets × maxCachedAddressesPerHost addresses.
+	maxServiceTargets = 2 * maxHostDiscoveries
 )
 
 // Bounds on what unauthenticated senders on the link make the cache hold

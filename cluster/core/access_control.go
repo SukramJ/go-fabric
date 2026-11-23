@@ -72,6 +72,13 @@ type AccessControl struct {
 	// not be read (loadExtension); that fabric's Extension write reads it
 	// again and is refused while it still fails.
 	extLoadErr map[uint8]error
+	// extOwedClear names each fabric whose Extension memory dropped but
+	// whose stored setting a failed clear left behind (MatterDropFabric):
+	// the clear is retried by the fabric's next drop, a new fabric's
+	// default admin entry at the index and that fabric's Extension write,
+	// so a fabric on the reused index does not load it as its own at the
+	// next start (review II, R2-C2-store-1004).
+	extOwedClear map[uint8]bool
 
 	// Event surface — wired by the bridge during topology assembly via
 	// [SetMatterEventEmitter] + [SetEndpoint] so [MatterWrite] can fire
@@ -517,25 +524,61 @@ func (a *AccessControl) MatterDropFabric(ctx context.Context, fabricIndex uint8)
 	loadErr := a.extLoadErr[fabricIndex]
 	unread := loadErr != nil
 	delete(a.extLoadErr, fabricIndex)
+	owed := a.extOwedClear[fabricIndex]
 	a.mu.Unlock()
-	if !had && !unread {
+	if !had && !unread && !owed {
 		return nil
 	}
 	if had {
 		a.dataVersion.Bump()
 	}
 	if err := a.persistExtension(ctx, fabricIndex, nil); err != nil {
+		a.mu.Lock()
 		if unread {
 			// The setting is still stored and still unread: keep the
 			// record, so a later drop clears it again.
-			a.mu.Lock()
 			if _, ok := a.extLoadErr[fabricIndex]; !ok {
 				a.extLoadErr[fabricIndex] = loadErr
 			}
-			a.mu.Unlock()
+		} else {
+			// Memory no longer names the fabric, the setting still does:
+			// the clear is owed (R2-C2-store-1004).
+			a.oweClearLocked(fabricIndex)
 		}
+		a.mu.Unlock()
 		return fmt.Errorf("core: AccessControl: clear the Extension of fabric %d: %w", fabricIndex, err)
 	}
+	a.mu.Lock()
+	delete(a.extOwedClear, fabricIndex)
+	a.mu.Unlock()
+	return nil
+}
+
+// oweClearLocked records that fabric's stored Extension is owed a clear.
+// Caller holds mu.
+func (a *AccessControl) oweClearLocked(fabric uint8) {
+	if a.extOwedClear == nil {
+		a.extOwedClear = make(map[uint8]bool)
+	}
+	a.extOwedClear[fabric] = true
+}
+
+// settleOwedClear retries the owed clear of fabric's stored Extension, if
+// one is owed (R2-C2-store-1004); the error is the clear's. Caller holds
+// writeMu.
+func (a *AccessControl) settleOwedClear(ctx context.Context, fabric uint8) error {
+	a.mu.RLock()
+	owed := a.extOwedClear[fabric]
+	a.mu.RUnlock()
+	if !owed {
+		return nil
+	}
+	if err := a.persistExtension(ctx, fabric, nil); err != nil {
+		return fmt.Errorf("core: AccessControl: the owed clear of fabric %d's Extension: %w", fabric, err)
+	}
+	a.mu.Lock()
+	delete(a.extOwedClear, fabric)
+	a.mu.Unlock()
 	return nil
 }
 
@@ -1128,6 +1171,13 @@ func (a *AccessControl) MatterWriteChanged(ctx context.Context, attrID uint32, v
 				return false, spec.Errorf(im.StatusFailure, "core: AccessControl.Extension write: the stored Extension of fabric %d could not be read: %v", fabric, loadErr)
 			}
 		}
+		// A removed fabric's setting still stored at this index is cleared
+		// before the write compares with memory: an equal (empty) write
+		// stores nothing, and would leave it to the next start (review II,
+		// R2-C2-store-1004).
+		if err := a.settleOwedClear(ctx, fabric); err != nil {
+			return false, storeFailureErr{err: fmt.Errorf("core: AccessControl.Extension write: %w", err)}
+		}
 		a.mu.RLock()
 		oldExtensions := a.extensions[fabric]
 		a.mu.RUnlock()
@@ -1393,7 +1443,19 @@ func aclAdminFromContext(ctx context.Context) (adminNode *uint64, adminPasscodeI
 // always runs over PASE) is emitted. Mirrors matter.js
 // AccessControlServer.ts, which emits the event itself for the entry it
 // adds on fabric creation. TC-ACL-2.5/2.6/2.9 read it back.
+//
+// A clear of the index's stored Extension that a removed fabric's drop
+// owes is retried first: the new fabric must not load it as its own at
+// the next start (review II, R2-C2-store-1004). A clear that fails again
+// stays owed and is logged.
 func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
+	a.writeMu.Lock()
+	err := a.settleOwedClear(context.Background(), entry.FabricIndex)
+	a.writeMu.Unlock()
+	if err != nil {
+		a.logger().Warn("matter.access_control.extension_owed_clear_failed",
+			slog.Int("fabric_index", int(entry.FabricIndex)), slog.Any("err", err))
+	}
 	a.dataVersion.Bump()
 	a.mu.RLock()
 	emitter := a.emitter

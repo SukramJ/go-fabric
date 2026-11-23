@@ -163,6 +163,20 @@ type CommandInvocation struct {
 	// CommandInvokeResponse.ts:484-487 at db021da0, the failure the
 	// command's status :509-546).
 	DecodeStatus StatusCode
+	// fieldsNotStructure records that CommandFields was no structure —
+	// DecodeStatus is INVALID_COMMAND then, the reader not called: a
+	// client decoding a response refuses it ([readInvokeResponseIB]).
+	fieldsNotStructure bool
+	// fieldsReject is the reader's typed reject of CommandFields the
+	// CommandDataIB carries (DecodeStatus is its status): a client decoding
+	// a response refuses it ([readInvokeResponseIB]). Nil for absent
+	// CommandFields read as {}.
+	fieldsReject error
+	// absentFieldsRejected records that the CommandDataIB carried no
+	// CommandFields and the reader refused them read as {} (DecodeStatus
+	// is its status): a client decoding a response discards the entry
+	// ([readInvokeResponseIB], decision 535).
+	absentFieldsRejected bool
 }
 
 // CommandFieldsReader extracts the cluster-native fields struct from
@@ -336,6 +350,12 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 				if err := readAbsentFields(fieldsReader, &inv); err != nil {
 					return CommandInvocation{}, err
 				}
+				// Absent fields are not a payload that failed to decode
+				// (R2-C2-wire-0551 is about the latter); the reject stays
+				// the DecodeStatus a server answers with, and a client
+				// discards the response (decision 535).
+				inv.absentFieldsRejected = inv.fieldsReject != nil
+				inv.fieldsReject = nil
 			}
 			return inv, nil
 		}
@@ -404,7 +424,7 @@ func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFie
 		if err != nil {
 			return err
 		}
-		inv.Fields, inv.DecodeStatus = nil, StatusInvalidCommand
+		inv.Fields, inv.DecodeStatus, inv.fieldsNotStructure = nil, StatusInvalidCommand, true
 		return nil
 	}
 	f, err := fieldsReader(inv.Path, dec, el)
@@ -424,6 +444,7 @@ func readCommandFields(dec *tlv.Decoder, el tlv.Element, fieldsReader CommandFie
 		}
 		inv.Fields = nil
 		inv.DecodeStatus = sce.MatterStatusCode()
+		inv.fieldsReject = err
 		return nil
 	}
 	inv.Fields = f

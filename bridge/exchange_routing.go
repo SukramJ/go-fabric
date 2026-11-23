@@ -105,11 +105,13 @@ type exchangeRouting struct {
 	// map[timedKey]time.Time
 	timedDeadlines sync.Map
 
-	// lastTimedSweep is the wall-clock nanosecond stamp of the last
-	// expiry sweep over timedDeadlines, so the sweep amortises to at
-	// most one full Range per [timedSweepInterval] no matter how many
-	// TimedRequests or pump ticks arrive in between. Zero means "never
-	// swept", which lets the first caller sweep immediately.
+	// lastTimedSweep is the monotonic reading ([clock.MonotonicOf]), in
+	// nanoseconds, of the last expiry sweep over timedDeadlines, so the
+	// sweep amortises to at most one full Range per [timedSweepInterval]
+	// no matter how many TimedRequests or pump ticks arrive in between,
+	// and a wall-clock step neither postpones nor hastens it (review II,
+	// R2-C2-fsm-0350). Zero means "never swept", which lets the first
+	// caller sweep immediately.
 	lastTimedSweep atomic.Int64
 
 	// subTargets maps an active subscription ID to the routing
@@ -180,15 +182,16 @@ func (r *exchangeRouting) hasTimedDeadlines() bool {
 
 // maybeSweepExpiredTimedDeadlines runs the expiry sweep at most once
 // per [timedSweepInterval] and reports how many entries it reclaimed.
-// Callers pass the time they already hold, so the sweep costs a single
-// atomic load on the common path.
-func (r *exchangeRouting) maybeSweepExpiredTimedDeadlines(now time.Time) int {
+// Callers pass the time they already hold and the clock's monotonic
+// reading at, which the interval is measured on, so the sweep costs a
+// single atomic load on the common path.
+func (r *exchangeRouting) maybeSweepExpiredTimedDeadlines(now time.Time, at time.Duration) int {
 	last := r.lastTimedSweep.Load()
-	nowNanos := now.UnixNano()
-	if nowNanos-last < int64(timedSweepInterval) {
+	stamp := max(int64(at), 1) // zero is "never swept"
+	if last != 0 && stamp-last < int64(timedSweepInterval) {
 		return 0
 	}
-	if !r.lastTimedSweep.CompareAndSwap(last, nowNanos) {
+	if !r.lastTimedSweep.CompareAndSwap(last, stamp) {
 		// A concurrent caller claimed this sweep slot; one Range is
 		// enough.
 		return 0
@@ -278,9 +281,18 @@ const maxChunkedWritesPerSession = 4
 
 type writeTx struct {
 	tx *im.WriteTransaction
-	// lastChunk is when the interaction's last chunk arrived, Unix
-	// nanoseconds; the sweep of another exchange reads it concurrently.
+	// lastChunk is when the interaction's last chunk arrived, the clock's
+	// monotonic reading ([clock.MonotonicOf]) in nanoseconds, so a
+	// wall-clock step between two chunks neither ends the write nor keeps
+	// an abandoned one (review II, R2-C2-fsm-0350); the sweep of another
+	// exchange reads it concurrently.
 	lastChunk atomic.Int64
+}
+
+// idle is how long before the monotonic reading at the interaction's last
+// chunk arrived.
+func (w *writeTx) idle(at time.Duration) time.Duration {
+	return at - time.Duration(w.lastChunk.Load())
 }
 
 // writeTransaction returns the write transaction of the exchange key
@@ -288,10 +300,11 @@ type writeTx struct {
 // or a fresh one. more is the chunk's MoreChunkedMessages; the final
 // chunk (more=false) takes the transaction out of the table. Nil when the
 // chunk would open a chunked write and key's session already has
-// [maxChunkedWritesPerSession] open.
-func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now time.Time) *im.WriteTransaction {
+// [maxChunkedWritesPerSession] open. at is the clock's monotonic reading
+// ([clock.MonotonicOf]).
+func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, at time.Duration) *im.WriteTransaction {
 	r.writeTxs.Range(func(k, v any) bool {
-		if w, ok := v.(*writeTx); ok && now.Sub(time.Unix(0, w.lastChunk.Load())) > writeTxTTL {
+		if w, ok := v.(*writeTx); ok && w.idle(at) > writeTxTTL {
 			r.writeTxs.Delete(k)
 			w.tx.Release()
 		}
@@ -307,7 +320,7 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 	}
 	if v, ok := r.writeTxs.Load(key); ok {
 		if w, isTx := v.(*writeTx); isTx {
-			w.lastChunk.Store(now.UnixNano())
+			w.lastChunk.Store(int64(at))
 			return w.tx
 		}
 	}
@@ -319,10 +332,10 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 		return nil
 	}
 	fresh := &writeTx{tx: im.NewWriteTransaction(&r.writeHolds)}
-	fresh.lastChunk.Store(now.UnixNano())
+	fresh.lastChunk.Store(int64(at))
 	v, _ := r.writeTxs.LoadOrStore(key, fresh)
 	if w, isTx := v.(*writeTx); isTx {
-		w.lastChunk.Store(now.UnixNano())
+		w.lastChunk.Store(int64(at))
 		return w.tx
 	}
 	return im.NewWriteTransaction(&r.writeHolds)

@@ -216,11 +216,15 @@ type IdentityResolver interface {
 // used on the Sigma2_Resume path. A resuming Sigma1 carries no
 // DestinationID worth trusting for identity selection — the fabric is
 // authoritative from the stored [ResumptionRecord] instead (matter.js
-// CaseServer.ts:151 destructures `fabric` from the record). Resolvers
+// CaseServer.ts:155 destructures `fabric` from the record). Resolvers
 // that manage multiple fabric identities should implement this so the
-// resumed session is registered under the record's fabric; a resolver
-// that only implements [IdentityResolver] keeps the responder's
-// baseline identity (single-fabric / test path). Returning
+// resumed session is registered under the record's fabric; without it
+// (no resolver, or one that only implements [IdentityResolver]) the
+// responder resumes under its baseline identity only a record of the
+// baseline's own fabric — a record whose FabricIndex is set resumes only
+// under a baseline whose [Identity.FabricIndex] is the same — an
+// unstamped baseline (0) included; only an unstamped record (0) is not
+// compared — and otherwise falls through to Full Sigma. Returning
 // (_, _, false) means the record's fabric no longer has an installed
 // identity — the responder then falls through to Full Sigma.
 type FabricIndexResolver interface {

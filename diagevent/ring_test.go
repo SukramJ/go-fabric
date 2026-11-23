@@ -233,3 +233,19 @@ func TestSnapshotDetailIsACopy(t *testing.T) {
 		t.Fatalf("an event recorded without Detail has %v", second[0].Detail)
 	}
 }
+
+// TestDetailKeysAreTheirNames pins the session-event detail keys: a host
+// reading the ring matches them as text, so a renamed constant is a
+// break, not a refactor.
+func TestDetailKeysAreTheirNames(t *testing.T) {
+	t.Parallel()
+	for got, want := range map[string]string{
+		DetailPeer:        "peer",
+		DetailSessionID:   "session_id",
+		DetailFabricIndex: "fabric_index",
+	} {
+		if got != want {
+			t.Errorf("detail key %q, want %q", got, want)
+		}
+	}
+}

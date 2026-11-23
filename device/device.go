@@ -784,63 +784,98 @@ func (d *Device) MatterClusterServers() []contract.ClusterServer { return d.Serv
 // it is refused with [ErrAddedElsewhere] (node.Aggregator.Remove it
 // first). A part already d's is left as it is. A callback on p's queue
 // must not move p: the move waits for p's queue to run what it holds.
-func (d *Device) AddPart(p *Device) error {
-	if p == nil {
-		return fmt.Errorf("%w: %s: nil part", ErrComposition, d.typ.Name)
-	}
-	if p.bridgedPowerSource {
-		return fmt.Errorf("%w: %s: the part %s declares PowerSource, which BridgedNode allows on a bridged device under BridgedPowerSourceInfo; a part is no bridged node",
-			ErrComposition, d.typ.Name, p.typ.Name)
-	}
-	if !composes(d.typ, p.typ) {
-		return fmt.Errorf("%w: %s (%s) states no component device type %s; its parts must be device types its requirements name",
-			ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
+func (d *Device) AddPart(p *Device) error { return d.addParts(p) }
+
+// addParts is [Device.AddPart] for several parts, all or none: every
+// refusal is checked for every part before any moves, under one hold of
+// composeMu, so a refused call leaves each part with its former owner. A
+// generated composite constructor adds its components with it
+// (R2-C2-fsm-2506: one AddPart per component moved the earlier
+// components into a device the constructor then discarded).
+func (d *Device) addParts(parts ...*Device) error {
+	for _, p := range parts {
+		if p == nil {
+			return fmt.Errorf("%w: %s: nil part", ErrComposition, d.typ.Name)
+		}
+		if p.bridgedPowerSource {
+			return fmt.Errorf("%w: %s: the part %s declares PowerSource, which BridgedNode allows on a bridged device under BridgedPowerSourceInfo; a part is no bridged node",
+				ErrComposition, d.typ.Name, p.typ.Name)
+		}
+		if !composes(d.typ, p.typ) {
+			return fmt.Errorf("%w: %s (%s) states no component device type %s; its parts must be device types its requirements name",
+				ErrComposition, d.typ.Name, d.typ.Classification, p.typ.Name)
+		}
 	}
 	composeMu.Lock()
+	for _, p := range parts {
+		if err := d.moveRefusalLocked(p); err != nil {
+			composeMu.Unlock()
+			return err
+		}
+	}
+	type move struct {
+		tree  []*Device
+		bound bool
+	}
+	var (
+		moves []move
+		h     deviceseam.Host
+	)
+	for _, p := range parts {
+		former := p.owner.Load()
+		if former == d {
+			continue
+		}
+		// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
+		if former != nil {
+			former.mu.Lock()
+			former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
+			former.mu.Unlock()
+		}
+		p.owner.Store(d)
+		d.mu.Lock()
+		d.parts = append(d.parts, p)
+		h = d.host
+		d.mu.Unlock()
+		tree := p.treeLocked()
+		bound := p.hostOf() != nil
+		for _, x := range tree {
+			x.setHost(h)
+		}
+		moves = append(moves, move{tree, bound})
+	}
+	composeMu.Unlock()
+	for _, m := range moves {
+		if m.bound {
+			for _, x := range m.tree {
+				x.stop()
+			}
+		}
+		if h != nil {
+			for _, x := range m.tree {
+				x.start()
+			}
+		}
+	}
+	return nil
+}
+
+// moveRefusalLocked is the refusal of moving p into d that reads the
+// device trees, nil when p may move (or is d's already); composeMu held.
+func (d *Device) moveRefusalLocked(p *Device) error {
 	if p == d || p.contains(d) {
-		composeMu.Unlock()
 		return fmt.Errorf("%w: %s: a part may not contain its owner", ErrComposition, d.typ.Name)
 	}
 	former := p.owner.Load()
 	if former == d {
-		composeMu.Unlock()
 		return nil
 	}
 	if former == nil && p.hostOf() != nil {
-		composeMu.Unlock()
 		return fmt.Errorf("%w: %s is a bridged device of a node; remove it from the Aggregator before it becomes a part", ErrAddedElsewhere, p.opts.StableKey)
 	}
 	if h := p.hostOf(); h != nil && h.Running() {
-		composeMu.Unlock()
 		return fmt.Errorf("%w: %s is a part on a running node and does not move; move it before the node starts, or remove its owner first",
 			ErrComposition, p.opts.StableKey)
-	}
-	// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
-	if former != nil {
-		former.mu.Lock()
-		former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
-		former.mu.Unlock()
-	}
-	p.owner.Store(d)
-	d.mu.Lock()
-	d.parts = append(d.parts, p)
-	h := d.host
-	d.mu.Unlock()
-	tree := p.treeLocked()
-	bound := p.hostOf() != nil
-	for _, x := range tree {
-		x.setHost(h)
-	}
-	composeMu.Unlock()
-	if bound {
-		for _, x := range tree {
-			x.stop()
-		}
-	}
-	if h != nil {
-		for _, x := range tree {
-			x.start()
-		}
 	}
 	return nil
 }

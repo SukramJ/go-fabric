@@ -15,7 +15,6 @@ import (
 	"log/slog"
 	"math"
 	"slices"
-	"sync"
 	"time"
 
 	"thingfabric.dev/go-fabric/clock"
@@ -142,7 +141,7 @@ type demoCamera struct {
 	camera *device.Camera
 	chime  *device.Chime
 
-	mu sync.Mutex
+	mu deviceMutex
 	// st keeps the state (attach).
 	st settings
 	// restored is the state read from st, applied by devices.
@@ -1046,32 +1045,38 @@ func (c *demoCamera) afterFunc(d time.Duration, f func()) func() bool {
 
 // endTriggered is a triggered recording's timer: it ends the recording of
 // transport t armed as gen, and nothing when t was deallocated or a newer
-// begin re-armed it since.
+// begin re-armed it since. It ends it in the critical section that took
+// gen: a begin that re-arms after the take is not ended with it
+// (R2-C2-conc-2602).
 func (c *demoCamera) endTriggered(id uint16, t *camTransport, gen uint64) {
 	c.mu.Lock()
-	current := c.transports[id] == t && t.stop.takeLocked(gen)
-	c.mu.Unlock()
-	if current {
-		c.endTransport(id)
+	defer c.mu.Unlock()
+	if c.transports[id] == t && t.stop.takeLocked(gen) {
+		c.endTransportLocked(id)
 	}
 }
 
 // endTransport ends a transport's recording: PushTransportEnd.
 func (c *demoCamera) endTransport(id uint16) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.endTransportLocked(id)
+}
+
+// endTransportLocked is endTransport; the caller holds c.mu.
+func (c *demoCamera) endTransportLocked(id uint16) {
 	t, ok := c.transports[id]
 	if !ok || !t.streaming {
-		c.mu.Unlock()
 		return
 	}
 	t.streaming = false
 	t.stop.stopLocked()
+	// Posted under c.mu: the queue keeps the transitions' order.
 	c.pushEvents.post(func() {
 		if err := c.pushTransport().TransportStopped(id); err != nil {
 			c.logger.Info("camerasim.pushend", slog.Uint64("connection", uint64(id)), slog.Any("err", err))
 		}
 	})
-	c.mu.Unlock()
 }
 
 // pushTransport is the camera's push transport server's host side.

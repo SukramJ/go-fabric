@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1848,17 +1849,54 @@ func (n *Node) wireEventsUTC() {
 // ringLogs serves DiagnosticLogs RetrieveLogsRequest from the diagnostic
 // event ring, one line per event (the daemon's ringLogs, wiring.go:
 // 1045-1074); CrashLogs answers NoLogs.
+//
+// The request is Operate on any fabric, and the ring is the node's: it
+// records every fabric's and every PASE peer's sessions and pairing
+// attempts. A line therefore carries the event's time, kind and message
+// and the details in [ringLogsDetail], none of which names a peer; the
+// peer address and the session id ([ringLogsOwnDetail]) only on a session
+// event the bridge attributed to the accessing fabric (its detail
+// "fabric_index", bridge sessionEventDetail). Another fabric's event, an
+// event with no fabric (a PASE commissioner's) and a request with no
+// accessing fabric or fabric 0 get neither; they stay in the host's trace
+// ([Node.DiagnosticEvents]) and the logs (review II, R2-C2-sec-2451,
+// owner decision 524).
 type ringLogs struct{ ring *diagevent.Ring }
 
+// ringLogsDetail is the event details a retrieved log carries: the
+// node-scoped ones. A detail key not listed here is left out, so a new
+// one recorded later reaches no controller until it is judged
+// node-scoped.
+var ringLogsDetail = map[string]bool{
+	// The PASE lockout (bridge/securechannel.go, pairing locked).
+	"max_errors":       true,
+	"lockout_duration": true,
+}
+
+// ringLogsOwnDetail is the event details a retrieved log carries only
+// for an event of the accessing fabric's own session.
+var ringLogsOwnDetail = map[string]bool{
+	diagevent.DetailPeer:      true,
+	diagevent.DetailSessionID: true,
+}
+
 // Logs implements [mattercore.LogProvider].
-func (r ringLogs) Logs(_ context.Context, intent uint8) ([]byte, error) {
+func (r ringLogs) Logs(ctx context.Context, intent uint8) ([]byte, error) {
 	if intent == mattercore.IntentCrashLogs {
 		return nil, nil
+	}
+	accessing := ""
+	if idx, _, ok := contract.AccessingFabric(ctx); ok && idx != 0 {
+		accessing = strconv.Itoa(int(idx))
 	}
 	var b strings.Builder
 	for _, e := range r.ring.Snapshot() {
 		fmt.Fprintf(&b, "%s %s %s", e.At.UTC().Format(time.RFC3339), e.Kind, e.Message)
+		own := accessing != "" && e.Detail[diagevent.DetailFabricIndex] == accessing
 		for _, k := range slices.Sorted(maps.Keys(e.Detail)) {
+			if !ringLogsDetail[k] && (!own || !ringLogsOwnDetail[k]) {
+				continue
+			}
 			fmt.Fprintf(&b, " %s=%s", k, e.Detail[k])
 		}
 		b.WriteByte('\n')

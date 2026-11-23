@@ -75,7 +75,9 @@ type stack struct {
 	images   *softwareupdate.Images
 	statusMu sync.Mutex
 	onStatus func(p softwareupdate.Peer, st softwareupdate.Status, v uint32)
-	// restore undoes what a command changed on a node for its run.
+	// restore undoes what a command changed on a node for its run; close
+	// runs it, so every return of the command — an error after the
+	// change included — undoes it (R2-C2-err-2651).
 	restore []func()
 }
 
@@ -195,10 +197,15 @@ func openStack(e *env) (_ *stack, err error) {
 	return s, nil
 }
 
-// close tears the stack down: the controller (with the tree it serves),
+// close tears the stack down: the command's node changes undone
+// (restore), the controller (with the tree it serves),
 // the trust store, the database.
 func (s *stack) close() {
 	ctx := context.Background()
+	for _, f := range s.restore {
+		f()
+	}
+	s.restore = nil
 	if s.ctl != nil {
 		_ = s.ctl.Close(ctx)
 	}

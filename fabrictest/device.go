@@ -237,7 +237,19 @@ func (d *Device) startLocked(ctx context.Context) error {
 		if started {
 			return
 		}
-		_ = n.Stop(context.WithoutCancel(ctx))
+		// Under the site's pacing and bounded, as Stop and the site's
+		// closer stop a node: a Start Site.Run gave up on may still be in
+		// flight, and the node's Stop waits for it and runs the started
+		// node's timers on the site's clock — unpaced and unbounded it
+		// would never return (review II, R2-C2-test-2501). The node.build
+		// count ends first, or it would hold the clock without a budget.
+		if building {
+			building = false
+			d.group.Leave(inflight.NodeBuild)
+		}
+		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
+		defer cancel()
+		d.site.logTeardown(fmt.Sprintf("device %d: stop after a failed start", d.index), d.site.Run(stopCtx, n.Stop))
 		if operational != nil {
 			_ = operational.Close()
 		}
@@ -426,6 +438,20 @@ func (d *Device) Stop(ctx context.Context) error {
 	if !running {
 		return nil
 	}
+	if err := d.stopNode(ctx, n); err != nil {
+		// The node is not stopped (node.Stop: the next Stop finishes the
+		// work): the device stays running, so the next Stop and the
+		// site's closer still reach it (review II, R2-C2-test-2502).
+		d.mu.Lock()
+		d.running = true
+		d.mu.Unlock()
+		return err
+	}
+	return nil
+}
+
+// stopNode is Stop's work on n; d.actMu is held.
+func (d *Device) stopNode(ctx context.Context, n *node.Node) error {
 	if err := d.site.Run(ctx, n.Stop); err != nil { // the stop's own timers on the site's clock, as Start
 		return err
 	}
@@ -445,7 +471,9 @@ func (d *Device) Stop(ctx context.Context) error {
 // erased store and the same address — matter.js ServerNode.erase, which
 // comes back online when the node was (ServerNode.ts:159-200). A Stop
 // called meanwhile waits for it and takes the device offline after it. A
-// device that is stopped has its store erased and stays stopped.
+// device that is stopped has its store erased and stays stopped. A reset
+// of a running device that fails leaves the device running: the next
+// FactoryReset finishes the reset and brings it back.
 func (d *Device) FactoryReset(ctx context.Context) error {
 	d.actMu.Lock()
 	defer d.actMu.Unlock()
@@ -460,6 +488,14 @@ func (d *Device) FactoryReset(ctx context.Context) error {
 		return n.FactoryReset(ctx)
 	}
 	if err := d.site.Run(ctx, n.FactoryReset); err != nil {
+		// The reset did not finish (node.FactoryReset: a later
+		// FactoryReset finishes it): the device stays running, so the
+		// next FactoryReset brings it back and the next Stop and the
+		// site's closer still reach it (review II, decision 532, the
+		// class of R2-C2-test-2502).
+		d.mu.Lock()
+		d.running = true
+		d.mu.Unlock()
 		return err
 	}
 	if err := d.site.drain(ctx, d.group); err != nil {
@@ -507,6 +543,25 @@ func (d *Device) AwaitCASESession(ctx context.Context, fabricIndex uint8, peerNo
 			return fabric == fabricIndex && peer == peerNodeID
 		})
 	})
+}
+
+// fabricIndexOf returns the index of the device's fabric with
+// compressedFabricID on which it is node nodeID; false when it holds none.
+func (d *Device) fabricIndexOf(ctx context.Context, compressedFabricID [8]byte, nodeID uint64) (uint8, bool) {
+	n := d.Node()
+	if n == nil {
+		return 0, false
+	}
+	fabrics, err := n.FabricInfos(ctx)
+	if err != nil {
+		return 0, false
+	}
+	for _, f := range fabrics {
+		if f.CompressedFabricID == compressedFabricID && f.NodeID == nodeID {
+			return f.FabricIndex, true
+		}
+	}
+	return 0, false
 }
 
 // listsCASESession reports whether the device's node lists an

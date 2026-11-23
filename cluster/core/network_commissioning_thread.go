@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 
@@ -48,6 +49,11 @@ type ThreadNetworkCommissioning struct {
 	br            tbrmdef.BorderRouter
 	failSafe      func() (fabricIndex uint8, armed bool)
 	failSafeArmed func() bool
+	// blindWarned logs, once, that only the deprecated fabric-blind port
+	// answers the gate (armedFor); logger is where, nil slog.Default()
+	// (no config field: the warning is the only thing it logs).
+	blindWarned   sync.Once
+	logger        *slog.Logger
 	setBreadcrumb func(uint64)
 	scanMax       uint8
 	connectMax    uint8
@@ -90,13 +96,21 @@ type ThreadNetworkCommissioningConfig struct {
 	// ([GeneralCommissioning.FailSafeFabric]); the network commands need
 	// the window of their accessing fabric (EnsureFailsafeIsArmed over
 	// IsFailSafeArmed(GetAccessingFabricIndex()),
-	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609 at
+	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609, :644 at
 	// 6170af84; by_design BD-chip-FailSafeOfTheAccessingFabric). Nil reads
 	// as disarmed until [ThreadNetworkCommissioning.AttachFailSafe] wires
 	// it, unless IsFailSafeArmed is set.
 	FailSafe func() (fabricIndex uint8, armed bool)
 	// IsFailSafeArmed is the fabric-blind port (armed for any fabric);
-	// consulted only while FailSafe is nil.
+	// consulted only while FailSafe is nil. While it alone answers,
+	// AddOrUpdateThreadNetwork, RemoveNetwork and ConnectNetwork pass in
+	// any fabric's fail-safe window, and the server logs that once
+	// (netcomm.failsafe_blind_port).
+	//
+	// Deprecated: wire FailSafe, or [ThreadNetworkCommissioning.AttachFailSafe],
+	// the fabric-aware port ([GeneralCommissioning.FailSafeFabric]),
+	// instead; this field keeps its behaviour until it goes and is
+	// removable in v0.28.0 (review II, R2-C2-sec-1006).
 	IsFailSafeArmed func() bool
 	// SetBreadcrumb writes GeneralCommissioning's Breadcrumb
 	// (UpdateBreadcrumb, :589-593); nil writes none.
@@ -395,19 +409,26 @@ func (n *ThreadNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 
 // armedFor is connectedhomeip's EnsureFailsafeIsArmed(failSafeContext,
 // handler.GetAccessingFabricIndex()) (NetworkCommissioningCluster.cpp:155-172,
-// :380, :568, :609 at 6170af84): the window must be armed, and armed for
-// the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
+// :380, :568, :609, :644 at 6170af84): the window must be armed, and armed
+// for the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
 // ([ThreadNetworkCommissioningConfig.IsFailSafeArmed]) answers for any
-// fabric, as before.
+// fabric, as before, and is logged once (R2-C2-sec-1006).
 func (n *ThreadNetworkCommissioning) armedFor(ctx context.Context) bool {
 	n.mu.Lock()
-	failSafe, armed := n.failSafe, n.failSafeArmed
+	failSafe, armed, logger := n.failSafe, n.failSafeArmed, n.logger
 	n.mu.Unlock()
 	if failSafe != nil {
 		_, accessing := im.FabricFilterFromContext(ctx)
 		return FailSafeArmedFor(failSafe, accessing)
 	}
-	return armed != nil && armed()
+	if armed == nil {
+		return false
+	}
+	if logger == nil {
+		logger = slog.Default()
+	}
+	n.blindWarned.Do(func() { warnBlindFailSafePort(logger, "thread") })
+	return armed()
 }
 
 // releaseBusy ends the command's claim gen.

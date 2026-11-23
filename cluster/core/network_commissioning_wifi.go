@@ -67,6 +67,9 @@ type WiFiNetworkCommissioning struct {
 	loadErr error
 	logger  *slog.Logger
 	clk     clock.Clock
+	// blindWarned logs, once, that only the deprecated fabric-blind port
+	// answers the gate (armedFor).
+	blindWarned sync.Once
 
 	interfaceEnabled bool
 	// networks is the staged list, committed the list a CommissioningComplete
@@ -135,12 +138,20 @@ type WiFiNetworkCommissioningConfig struct {
 	// ([GeneralCommissioning.FailSafeFabric]); the network commands need
 	// the window of their accessing fabric (EnsureFailsafeIsArmed over
 	// IsFailSafeArmed(GetAccessingFabricIndex()),
-	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609 at
+	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609, :644 at
 	// 6170af84; by_design BD-chip-FailSafeOfTheAccessingFabric).
 	FailSafe func() (fabricIndex uint8, armed bool)
 	// IsFailSafeArmed is the fabric-blind port (armed for any fabric,
 	// GeneralCommissioning.FailSafeArmed); consulted only while FailSafe
-	// is nil. Both nil reads as disarmed.
+	// is nil. Both nil reads as disarmed. While it alone answers,
+	// AddOrUpdateWiFiNetwork, RemoveNetwork and ConnectNetwork pass in any
+	// fabric's fail-safe window, and the server logs that once
+	// (netcomm.failsafe_blind_port).
+	//
+	// Deprecated: wire FailSafe, the fabric-aware port
+	// ([GeneralCommissioning.FailSafeFabric]), instead; this field keeps
+	// its behaviour until it goes and is removable in v0.28.0
+	// (review II, R2-C2-sec-1006).
 	IsFailSafeArmed func() bool
 	// SetBreadcrumb writes GeneralCommissioning's Breadcrumb
 	// (UpdateBreadcrumb, :589-593); nil writes none.
@@ -946,29 +957,46 @@ func (w *WiFiNetworkCommissioning) driverSwitch(ctx context.Context, v bool) err
 // (src/platform/OpenThread/GenericNetworkCommissioningThreadDriver.cpp:205-213
 // at 6170af84; N4-d4wifi-1); matter.js has no server logic here
 // (NetworkCommissioningServer.ts:18 at b25ed960). The DataVersion advances
-// with the attribute; the rejoin of the committed network is not started,
+// with the attribute and the change is reported through OnAttributeChange,
+// so a persister stores it (R2-C2-store-1001); the rejoin of the committed network is not started,
 // the command's own join being the join. A driver that does not switch on
 // fails the command, as a write of true does (judgement: chip's driver
 // returns without an answer there, :212).
 func (w *WiFiNetworkCommissioning) enableForConnect(ctx context.Context) error {
+	changed, err := w.switchOnForConnect(ctx)
+	if changed {
+		// Reported, not only bumped, and outside switchMu (a listener may
+		// write the attribute): the switch-on is no controller's write, and
+		// OnAttributeChange is the route a persister stores such a change
+		// by — without it the earlier write's false is what a restart
+		// restores (R2-C2-store-1001).
+		w.changes.Notify(netcommAttrInterfaceEnabled)
+	}
+	return err
+}
+
+// switchOnForConnect is enableForConnect under switchMu; it answers
+// whether InterfaceEnabled moved.
+func (w *WiFiNetworkCommissioning) switchOnForConnect(ctx context.Context) (bool, error) {
 	w.switchMu.Lock()
 	defer w.switchMu.Unlock()
 	w.mu.Lock()
 	on := w.interfaceEnabled
 	w.mu.Unlock()
 	if on {
-		return nil
+		return false, nil
 	}
 	if err := w.driverSwitch(ctx, true); err != nil {
-		return err
+		return false, err
 	}
 	w.mu.Lock()
-	if !w.interfaceEnabled {
-		w.interfaceEnabled = true
-		w.dataVersion.Bump()
+	defer w.mu.Unlock()
+	if w.interfaceEnabled {
+		return false, nil
 	}
-	w.mu.Unlock()
-	return nil
+	w.interfaceEnabled = true
+	w.dataVersion.Bump()
+	return true, nil
 }
 
 // netcommStatusError is a command refused with an IM status.
@@ -1211,16 +1239,31 @@ func validCredentials(c []byte) bool {
 
 // armedFor is connectedhomeip's EnsureFailsafeIsArmed(failSafeContext,
 // handler.GetAccessingFabricIndex()) (NetworkCommissioningCluster.cpp:155-172,
-// :380, :568, :609 at 6170af84): the window must be armed, and armed for
-// the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
+// :380, :568, :609, :644 at 6170af84): the window must be armed, and armed
+// for the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
 // ([WiFiNetworkCommissioningConfig.IsFailSafeArmed]) answers for any
-// fabric, as before.
+// fabric, as before, and is logged once (R2-C2-sec-1006).
 func (w *WiFiNetworkCommissioning) armedFor(ctx context.Context) bool {
 	if w.failSafe != nil {
 		_, accessing := im.FabricFilterFromContext(ctx)
 		return FailSafeArmedFor(w.failSafe, accessing)
 	}
-	return w.failSafeArmed != nil && w.failSafeArmed()
+	if w.failSafeArmed == nil {
+		return false
+	}
+	w.blindWarned.Do(func() { warnBlindFailSafePort(w.log(), "wifi") })
+	return w.failSafeArmed()
+}
+
+// warnBlindFailSafePort logs that a NetworkCommissioning server gates its
+// network commands on the deprecated fabric-blind fail-safe port alone
+// (R2-C2-sec-1006, decision 515).
+func warnBlindFailSafePort(l *slog.Logger, server string) {
+	l.Warn("netcomm.failsafe_blind_port",
+		slog.String("kind", server),
+		slog.String("detail", "only the deprecated fabric-blind IsFailSafeArmed port is wired: "+
+			"the network commands pass in any fabric's fail-safe window; wire FailSafe "+
+			"(GeneralCommissioning.FailSafeFabric)"))
 }
 
 // addOrUpdate is HandleAddOrUpdateWiFiNetwork (:373-451) over the Linux

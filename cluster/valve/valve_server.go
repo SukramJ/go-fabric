@@ -32,6 +32,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -237,6 +238,11 @@ type Server struct {
 	// epoch-us; nil is null.
 	mu        sync.Mutex
 	autoClose *uint64
+
+	// lastCurrentState and lastTargetState hold the last defined
+	// ValveStateEnum value the host reported, plus one (zero: none yet),
+	// served in place of an undefined one (R2-C2-wire-1553).
+	lastCurrentState, lastTargetState atomic.Uint32
 }
 
 // Compile-time assertions.
@@ -343,7 +349,9 @@ func (s *Server) MatterRead(attrID uint32) (value any, ok bool) {
 	case valvedef.AttrTargetLevel:
 		return nullablePercent(s.level.TargetLevel())
 	case valvedef.AttrDefaultOpenLevel:
-		return s.defaults.DefaultOpenLevel(), true
+		// "1 to 100": a host value outside it reads the nearer bound
+		// (R2-C2-wire-1553).
+		return min(max(s.defaults.DefaultOpenLevel(), 1), maxPercent), true
 	case valvedef.AttrLevelStep:
 		return s.levelStep, true
 	}
@@ -371,12 +379,17 @@ func (s *Server) readAutoClose() (any, bool) {
 	return *at, true
 }
 
-// nullablePercent mirrors [nullableSeconds] for the level attributes.
+// maxPercent is the level attributes' upper bound ("max 100").
+const maxPercent = 100
+
+// nullablePercent mirrors [nullableSeconds] for the level attributes,
+// held to their "max 100": a host level above it reads 100
+// (R2-C2-wire-1553).
 func nullablePercent(percent uint8, known bool) (any, bool) {
 	if !known {
 		return nil, true
 	}
-	return percent, true
+	return min(percent, maxPercent), true
 }
 
 // readFromSource projects one host-reported value onto the wire types
@@ -392,9 +405,11 @@ func (s *Server) readFromSource(attrID uint32) (any, bool) {
 	case AttrRemainingDuration:
 		return nullableSeconds(s.src.RemainingDuration())
 	case AttrCurrentState:
-		return nullableState(s.src.CurrentState())
+		state, known := s.src.CurrentState()
+		return s.admitState(attrID, &s.lastCurrentState, state, known)
 	case AttrTargetState:
-		return nullableState(s.src.TargetState())
+		state, known := s.src.TargetState()
+		return s.admitState(attrID, &s.lastTargetState, state, known)
 	default:
 		return nil, false
 	}
@@ -409,12 +424,29 @@ func nullableSeconds(seconds uint32, known bool) (any, bool) {
 	return seconds, true
 }
 
-// nullableState mirrors [nullableSeconds] for the two enum attributes.
-func nullableState(state State, known bool) (any, bool) {
+// logger is the server's logger: the process default (Config carries
+// none).
+func (*Server) logger() *slog.Logger { return slog.Default() }
+
+// admitState is [nullableSeconds] for the two enum attributes, held to
+// ValveStateEnum: an undefined host value is logged and the last defined
+// one served instead, null before any (R2-C2-wire-1553). last holds that
+// value plus one.
+func (s *Server) admitState(attrID uint32, last *atomic.Uint32, state State, known bool) (any, bool) {
 	if !known {
 		return nil, true
 	}
-	return uint8(state), true
+	if _, err := s.inst.CheckValue(attrID, uint64(state), nil); err == nil {
+		last.Store(uint32(state) + 1)
+		return uint8(state), true
+	}
+	prev := last.Load()
+	s.logger().Warn("matter.valve.inbound_value_not_admitted",
+		slog.Int("attribute", int(attrID)), slog.Int("value", int(state)), slog.Int("served", int(prev)-1))
+	if prev == 0 {
+		return nil, true
+	}
+	return uint8(prev - 1), true //nolint:gosec // a stored ValveStateEnum value
 }
 
 // MatterWrite applies the writable attributes: DefaultOpenDuration and,

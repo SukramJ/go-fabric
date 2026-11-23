@@ -57,6 +57,14 @@ func MarshalInvokeRequestTLV(enc *tlv.Encoder, req InvokeRequest, fieldsWriter C
 
 // UnmarshalInvokeResponseTLV decodes an InvokeResponseMessage, each
 // command response's fields through fieldsReader (nil skips them).
+// CommandFields that is no structure, and any error of fieldsReader — a
+// typed [StatusCodeError] reject included — fails the whole response with
+// an error wrapping [ErrInvalidInvokeRequest] and the reader's error; it is
+// never an entry without fields nor a per-command status. A command
+// response that carries no CommandFields while fieldsReader refuses {}
+// with a typed reject is discarded: Responses holds no entry for it, as
+// matter.js discards an invoke response without its mandated payload
+// (decision 535).
 func UnmarshalInvokeResponseTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (InvokeResponse, error) {
 	open, err := dec.Next()
 	if err != nil {
@@ -122,11 +130,13 @@ func readInvokeResponseIBs(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 		if taggedArrayElement(ib) || !ib.IsContainer || ib.Type != tlv.TypeStructure {
 			return nil, fmt.Errorf("%w: InvokeResponseIB not struct", ErrInvalidInvokeRequest)
 		}
-		ent, err := readInvokeResponseIB(dec, fieldsReader)
+		ent, keep, err := readInvokeResponseIB(dec, fieldsReader)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, ent)
+		if keep {
+			out = append(out, ent)
+		}
 	}
 }
 
@@ -136,24 +146,36 @@ func readInvokeResponseIBs(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 // Exactly one of the two is present, as in every InvokeResponseIB
 // matter.js decodes (TlvInvokeResponseData.ts); a block with neither or
 // both is refused, not read as a success (review II, R2-P1-req2-09).
-func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (InvokeResponseEntry, error) {
-	var ent InvokeResponseEntry
+//
+// keep is false for a command response that carries no CommandFields
+// while fieldsReader refuses them read as {} — a response command with a
+// mandatory field: the entry is discarded, as matter.js discards an invoke
+// response without its mandated payload when commandFields is undefined
+// and the response schema is not TlvVoid
+// (packages/protocol/src/action/client/ClientInteraction.ts:571-576 at
+// b25ed960); the command then has no response, which the client reports
+// as NoCommandResponse (:636-664; decision 535).
+func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (ent InvokeResponseEntry, keep bool, err error) {
 	members := 0
+	discard := false
 	for {
 		el, err := dec.Next()
 		if err != nil {
-			return InvokeResponseEntry{}, err
+			return InvokeResponseEntry{}, false, err
 		}
 		if el.IsEndContainer {
 			if members != 1 {
-				return InvokeResponseEntry{}, fmt.Errorf("%w: InvokeResponseIB carries %d of CommandDataIB and CommandStatusIB, want one", ErrInvalidInvokeRequest, members)
+				return InvokeResponseEntry{}, false, fmt.Errorf("%w: InvokeResponseIB carries %d of CommandDataIB and CommandStatusIB, want one", ErrInvalidInvokeRequest, members)
 			}
-			return ent, nil
+			if discard {
+				return InvokeResponseEntry{}, false, nil
+			}
+			return ent, true, nil
 		}
 		if el.Tag.Kind != tlv.TagKindContext || !el.IsContainer {
 			if el.IsContainer {
 				if err := skipContainer(dec); err != nil {
-					return InvokeResponseEntry{}, err
+					return InvokeResponseEntry{}, false, err
 				}
 			}
 			continue
@@ -162,20 +184,41 @@ func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (I
 		case tagInvokeRespCommandData:
 			inv, err := readCommandInvocation(dec, fieldsReader)
 			if err != nil {
-				return InvokeResponseEntry{}, err
+				return InvokeResponseEntry{}, false, err
 			}
+			// The server's per-command outcome is no client's: a command
+			// response whose CommandFields is no structure does not decode —
+			// the response is an error, never a Success without fields
+			// (R2-C2-wire-0551).
+			if inv.fieldsNotStructure {
+				return InvokeResponseEntry{}, false, fmt.Errorf("%w: command response %v: CommandFields is not a structure",
+					ErrInvalidInvokeRequest, inv.Path)
+			}
+			// A typed reject of the client's fields reader fails the
+			// response as well, every command of it: matter.js's invoke
+			// throws from the response's decodeTlv, whatever the error's
+			// class, and maps none to a per-command status
+			// (packages/protocol/src/action/client/ClientInteraction.ts:578
+			// at b25ed960, no catch in #invokeSingle; #executeBatch rejects
+			// every pending command of the batch, :1005-1010; R2-C2-wire-0551,
+			// decision 531).
+			if inv.fieldsReject != nil {
+				return InvokeResponseEntry{}, false, fmt.Errorf("%w: command response %v: fields: %w",
+					ErrInvalidInvokeRequest, inv.Path, inv.fieldsReject)
+			}
+			discard = inv.absentFieldsRejected
 			ent.Path, ent.Response, ent.HasResponse = inv.Path, inv.Fields, inv.Fields != nil
 			ent.CommandRef, ent.HasCommandRef = inv.CommandRef, inv.HasCommandRef
 			members++
 		case tagInvokeRespCommandStatus:
 			if err := readCommandStatusIB(dec, &ent); err != nil {
-				return InvokeResponseEntry{}, err
+				return InvokeResponseEntry{}, false, err
 			}
 			ent.IsStatus = true
 			members++
 		default:
 			if err := skipContainer(dec); err != nil {
-				return InvokeResponseEntry{}, err
+				return InvokeResponseEntry{}, false, err
 			}
 		}
 	}

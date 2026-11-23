@@ -37,7 +37,7 @@
   },
   {
     "file": "bdx/responder.go",
-    "line": 427,
+    "line": 430,
     "citation": "BdxProtocol.ts:159-164",
     "resolved": "packages/protocol/src/bdx/BdxProtocol.ts",
     "identifier": "onNewExchange",
@@ -157,7 +157,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1918,
+    "line": 1929,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -167,7 +167,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1925,
+    "line": 1936,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -176,7 +176,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1957,
+    "line": 1968,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -186,7 +186,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2847,
+    "line": 2866,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
@@ -215,7 +215,7 @@
   },
   {
     "file": "bridge/conn.go",
-    "line": 722,
+    "line": 727,
     "citation": "NodeSession.ts:319-328",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "handlePeerClose",
@@ -234,7 +234,7 @@
   },
   {
     "file": "bridge/exchange_routing.go",
-    "line": 369,
+    "line": 382,
     "citation": "InteractionServer.ts:460-469",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "at": "db021da0",
@@ -301,7 +301,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 645,
+    "line": 652,
     "citation": "InteractionMessenger.ts:431-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -311,7 +311,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 727,
+    "line": 734,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "at": "db021da0",
@@ -768,7 +768,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 434,
+    "line": 446,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -977,7 +977,7 @@
   },
   {
     "file": "client/interaction/server_test.go",
-    "line": 414,
+    "line": 421,
     "citation": "InteractionMessenger.ts:458-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -987,7 +987,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 335,
+    "line": 337,
     "citation": "InteractionMessenger.ts:1129",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "ackWaitAbort",
@@ -996,7 +996,7 @@
   },
   {
     "file": "client/interaction/subscribe.go",
-    "line": 372,
+    "line": 374,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
@@ -1005,7 +1005,7 @@
   },
   {
     "file": "client/interaction/subscribe_test.go",
-    "line": 66,
+    "line": 67,
     "citation": "InteractionMessenger.ts:938-972",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "SubscribeResponse",
@@ -1159,7 +1159,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 237,
+    "line": 244,
     "citation": "packages/model/src/standard/elements/access-control.element.ts:35-39",
     "resolved": "packages/model/src/standard/elements/access-control.element.ts",
     "identifier": "ChangeTypeEnum",
@@ -1307,7 +1307,7 @@
   },
   {
     "file": "cluster/core/ota_provider.go",
-    "line": 60,
+    "line": 69,
     "citation": "SoftwareUpdateManager.ts:95-102",
     "resolved": "packages/node/src/behavior/system/software-update/SoftwareUpdateManager.ts",
     "identifier": "OtaUpdateAvailableDetails",
@@ -1316,7 +1316,7 @@
   },
   {
     "file": "cluster/core/scenes_management.go",
-    "line": 628,
+    "line": 653,
     "citation": "ScenesManagementServer.ts:77-80",
     "resolved": "packages/node/src/behaviors/scenes-management/ScenesManagementServer.ts",
     "identifier": "OnOff",
@@ -1528,7 +1528,7 @@
   },
   {
     "file": "cluster/measurement/measurement.go",
-    "line": 1914,
+    "line": 1913,
     "citation": "packages/model/src/standard/elements/power-source-cluster.element.ts:135",
     "resolved": "packages/model/src/standard/elements/power-source-cluster.element.ts",
     "at": "db021da0",
@@ -2183,7 +2183,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 85,
+    "line": 88,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -2192,7 +2192,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 102,
+    "line": 105,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -2201,7 +2201,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 446,
+    "line": 449,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -2456,7 +2456,7 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 325,
+    "line": 331,
     "citation": "DeviceAttestationValidator.ts:235",
     "resolved": "packages/protocol/src/certificate/DeviceAttestationValidator.ts",
     "identifier": "considerTestCertificates",
@@ -2465,7 +2465,7 @@
   },
   {
     "file": "controller/dcl/certstore.go",
-    "line": 851,
+    "line": 879,
     "citation": "DclCertificateService.ts:1144-1147",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "at": "db021da0",
@@ -2502,7 +2502,7 @@
   },
   {
     "file": "controller/dcl/crl.go",
-    "line": 63,
+    "line": 71,
     "citation": "DclCertificateService.ts:235-241",
     "resolved": "packages/protocol/src/dcl/DclCertificateService.ts",
     "identifier": "parseCrl",
@@ -2830,7 +2830,7 @@
   },
   {
     "file": "groups/sender.go",
-    "line": 236,
+    "line": 258,
     "citation": "GroupSession.ts:104-105",
     "resolved": "packages/protocol/src/session/GroupSession.ts",
     "identifier": "addSession",
@@ -2839,7 +2839,7 @@
   },
   {
     "file": "groups/sender.go",
-    "line": 252,
+    "line": 274,
     "citation": "packages/protocol/src/protocol/ExchangeManager.ts:729-743",
     "resolved": "packages/protocol/src/protocol/ExchangeManager.ts",
     "identifier": "ExchangeCounter",
@@ -2848,7 +2848,7 @@
   },
   {
     "file": "groups/sender.go",
-    "line": 279,
+    "line": 301,
     "citation": "GroupSession.ts:173-179",
     "resolved": "packages/protocol/src/session/GroupSession.ts",
     "identifier": "usePrivacy",
@@ -3076,7 +3076,7 @@
   },
   {
     "file": "mdns/service.go",
-    "line": 497,
+    "line": 539,
     "citation": "NodeSession.ts:153",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "idleInterval",
@@ -3143,7 +3143,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1782,
+    "line": 1783,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
@@ -3320,7 +3320,7 @@
   },
   {
     "file": "secure/mattercert/validate_rcac_test.go",
-    "line": 112,
+    "line": 116,
     "citation": "Certificate.ts:101",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "signEcdsa",
@@ -3329,7 +3329,7 @@
   },
   {
     "file": "secure/mattercert/validate_rcac_test.go",
-    "line": 427,
+    "line": 434,
     "citation": "Certificate.ts:101",
     "resolved": "packages/protocol/src/certificate/kinds/Certificate.ts",
     "identifier": "signEcdsa",
@@ -3338,7 +3338,7 @@
   },
   {
     "file": "secure/mattercert/verify.go",
-    "line": 522,
+    "line": 582,
     "citation": "OperationalBase.ts:92-97",
     "resolved": "packages/protocol/src/certificate/kinds/OperationalBase.ts",
     "at": "b25ed960",
@@ -3645,7 +3645,7 @@
   },
   {
     "file": "secure/sigma/sigma.go",
-    "line": 249,
+    "line": 253,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",

@@ -139,7 +139,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	}
 	hdr, hdrLen, err := message.UnmarshalHeader(buf)
 	if err != nil {
-		b.logger.Warn("matter.rx.header",
+		b.warnPerDatagram(ctx, "matter.rx.header",
 			slog.String("src", srcString(src)),
 			slog.Int("bytes", len(buf)),
 			slog.Any("err", err))
@@ -191,7 +191,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 
 	proto, _, err := message.UnmarshalProtocolHeader(plain)
 	if err != nil {
-		b.logger.Warn("matter.rx.protocol_header",
+		b.warnPerDatagram(ctx, "matter.rx.protocol_header",
 			slog.String("src", srcString(src)),
 			slog.Any("err", err))
 		return err

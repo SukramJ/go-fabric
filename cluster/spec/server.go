@@ -182,7 +182,12 @@ type Server struct {
 	mu          sync.Mutex
 	beforeWrite func(ctx context.Context, attrID uint32, value any) error
 	values      map[uint32]any
-	handlers    map[uint32]CommandHandler
+	// gen counts the stores that changed values; a check against the
+	// state takes it first and stores only while it has not moved
+	// ([Server.storeWith]), so a value is judged against the state it
+	// enters (review II, R2-C2-conc-1302).
+	gen      uint64
+	handlers map[uint32]CommandHandler
 	// own are the handlers construction was given ([ServerConfig.Handlers]),
 	// which [Server.Handle] with a nil handler restores.
 	own map[uint32]CommandHandler
@@ -216,6 +221,9 @@ type Server struct {
 	// package's tests stop a Set between its store and its notification
 	// and a write between leaving its window and advancing the version.
 	storedForTests, leftForTests func()
+	// judgedForTests, nil in production, runs in a Set between judging
+	// its values and storing them.
+	judgedForTests func()
 }
 
 // Compile-time assertions.
@@ -493,17 +501,11 @@ func (s *Server) MatterWriteCommit(ctx context.Context, attrID uint32, value any
 // commit of the window this write entered, nil for a write that joined an
 // open one.
 func (s *Server) writeIn(ctx context.Context, attrID uint32, value any, own *writeCommit) (changed []uint32, wrote bool, err error) {
-	v, err := s.ValidateWrite(attrID, value, s.peers)
+	at := s.stateGen()
+	v, err := s.judgeWrite(attrID, value)
 	if err != nil {
 		return nil, false, err
 	}
-	// A struct's fields are held to their conformance as well (matter.js
-	// validates the written state,
-	// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467).
-	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
-		return nil, false, err
-	}
-	v = stored(s.def.Attribute(attrID).Type, v)
 	// The author's rule judges every write, the held value included:
 	// matter.js runs a property's schema validator on the assigned value
 	// with no comparison to the previous one (StructManager.ts:273 assign,
@@ -535,24 +537,62 @@ func (s *Server) writeIn(ctx context.Context, attrID uint32, value any, own *wri
 	// veto and the Sink changed, and its notification joins theirs, told
 	// once the window is released. A joined write's store adds to the
 	// open commit instead ([Server.storeWith]).
+	//
+	// The write was judged before the veto and the Sink ran; a change a
+	// Set stored meanwhile — theirs or another goroutine's — makes it be
+	// judged again against the state it is stored into, and a sibling
+	// that moved can refuse it then (review II, R2-C2-conc-1302).
 	if own == nil {
 		// A joined write's store: while the commit it joined is open,
 		// its notification joins that commit's ([Server.storeWith]).
-		all, notify := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, nil)
-		if notify != nil {
-			notify()
+		for {
+			all, notify, stale := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, nil, &at)
+			if !stale {
+				if notify != nil {
+					notify()
+				}
+				return all, true, nil
+			}
+			at = s.stateGen()
+			if _, err := s.judgeWrite(attrID, value); err != nil {
+				return nil, false, err
+			}
 		}
-		return all, true, nil
 	}
-	s.mu.Lock()
-	s.commit = nil
-	earlier := own.changed
-	s.mu.Unlock()
-	all, notify := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, earlier)
-	if notify != nil {
-		own.notifies = append(own.notifies, notify)
+	for {
+		s.mu.Lock()
+		s.commit = nil
+		earlier := own.changed
+		s.mu.Unlock()
+		all, notify, stale := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, earlier, &at)
+		if !stale {
+			if notify != nil {
+				own.notifies = append(own.notifies, notify)
+			}
+			return all, true, nil
+		}
+		at = s.stateGen()
+		if _, err := s.judgeWrite(attrID, value); err != nil {
+			return nil, false, err
+		}
 	}
-	return all, true, nil
+}
+
+// judgeWrite holds a controller's write of attrID to the definition
+// against the state as it reads now: [Instance.ValidateWrite] and the
+// conformance of a struct's fields; v is the value in its stored form.
+func (s *Server) judgeWrite(attrID uint32, value any) (any, error) {
+	v, err := s.ValidateWrite(attrID, value, s.peers)
+	if err != nil {
+		return nil, err
+	}
+	// A struct's fields are held to their conformance as well (matter.js
+	// validates the written state,
+	// packages/node/src/behavior/state/validation/ValueValidator.ts:392-467).
+	if err := s.CheckConformance(attrID, value, s.peers); err != nil {
+		return nil, err
+	}
+	return stored(s.def.Attribute(attrID).Type, v), nil
 }
 
 // runWriteHooks runs the host's veto and the Sink of a controller's write
@@ -573,7 +613,7 @@ func (s *Server) runWriteHooks(ctx context.Context, attrID uint32, v any) error 
 }
 
 // holds reports whether the server holds v for attrID: its stored value
-// is v (the comparison [Server.store] makes) and, when a Source answers
+// is v (the comparison [Server.storeWith] makes) and, when a Source answers
 // the attribute, the Source's answer is v too.
 func (s *Server) holds(attrID uint32, v any) bool {
 	s.mu.Lock()
@@ -620,6 +660,14 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 // range set in one call is therefore accepted, and an incoherent one
 // refused, whatever the order of the ids — as [NewServer] judges its
 // initial values (review II, R2-P6-fsm-1303).
+//
+// The state judged is the one the patch is stored into: when another Set
+// or a controller write stored a change after the patch was judged, the
+// patch is judged again against the new state before it is stored, so two
+// concurrent changes end as one of them made after the other would — a
+// sibling stored meanwhile can refuse the patch (review II,
+// R2-C2-conc-1302). A sibling the [Source] answers is read as the Source
+// answers it; a change of it is the host's and not tracked here.
 func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any) error {
 	checked := make(map[uint32]any, len(values))
 	for _, id := range slices.Sorted(maps.Keys(values)) {
@@ -637,13 +685,27 @@ func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any
 		}
 		return s.peers(attrID)
 	}
-	for _, id := range slices.Sorted(maps.Keys(checked)) {
-		if err := s.checkInState(id, checked[id], pending); err != nil {
-			return err
+	for {
+		at := s.stateGen()
+		for _, id := range slices.Sorted(maps.Keys(checked)) {
+			if err := s.checkInState(id, checked[id], pending); err != nil {
+				return err
+			}
+		}
+		if s.judgedForTests != nil {
+			s.judgedForTests()
+		}
+		if s.storeAt(origin, checked, at) {
+			return nil
 		}
 	}
-	s.store(origin, checked)
-	return nil
+}
+
+// stateGen is the count of stores that changed values ([Server.gen]).
+func (s *Server) stateGen() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.gen
 }
 
 // check holds a device-side value to the served attribute's type and to
@@ -754,18 +816,28 @@ func defaultOf(t Type, d any) (any, bool) {
 	return nil, false
 }
 
-// store keeps values and reports the ones that changed, from origin; it
-// returns the ids of those that changed, sorted, empty when none did
-// ([Server.storeWith] without an earlier list).
-func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
-	all, notify := s.storeWith(origin, values, nil)
+// storeAt keeps values a Set judged against the state of generation at
+// and reports the ones that changed, from origin ([Server.storeWith]
+// without an earlier list); false, with nothing stored, when a change was
+// stored since.
+func (s *Server) storeAt(origin contract.Origin, values map[uint32]any, at uint64) bool {
+	_, notify, stale := s.storeWith(origin, values, nil, &at)
+	if stale {
+		return false
+	}
+	s.told(notify)
+	return true
+}
+
+// told runs a Set's test hook between its store and its notification,
+// then the notification.
+func (s *Server) told(notify func()) {
 	if s.storedForTests != nil {
 		s.storedForTests()
 	}
 	if notify != nil {
 		notify()
 	}
-	return all
 }
 
 // storeWith is store for a commit whose list already holds earlier, the
@@ -788,7 +860,12 @@ func (s *Server) store(origin contract.Origin, values map[uint32]any) []uint32 {
 // window, after the version advanced. Decided later, a commit that closed
 // between the store and the notification would let a notification out
 // before the advance the commit makes for this change.
-func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlier []uint32) (all []uint32, notify func()) {
+//
+// With at, values were judged against the state of that generation
+// ([Server.gen]): when a change was stored since, nothing is stored and
+// stale is true, and the caller judges them again (review II,
+// R2-C2-conc-1302). nil stores unconditionally.
+func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlier []uint32, at *uint64) (all []uint32, notify func(), stale bool) {
 	type quietChange struct {
 		qa              *quietAttr
 		wasNull, isNull bool
@@ -798,6 +875,10 @@ func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlie
 		quiets         = map[uint32]quietChange{}
 	)
 	s.mu.Lock()
+	if at != nil && *at != s.gen {
+		s.mu.Unlock()
+		return nil, nil, true
+	}
 	for id, v := range values {
 		old, ok := s.values[id]
 		if ok && reflect.DeepEqual(old, v) {
@@ -818,6 +899,7 @@ func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlie
 	slices.Sort(changed)
 	slices.Sort(plain)
 	if len(changed) > 0 {
+		s.gen++
 		notify = func() {
 			if len(plain) == len(changed) {
 				s.AttributeChanges.NotifyFrom(origin, changed...)
@@ -850,7 +932,7 @@ func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlie
 	if len(all) > 0 && open == nil {
 		s.tracker().Bump()
 	}
-	return all, notify
+	return all, notify, false
 }
 
 // Handle implements [CommandRegistrar]: fn handles the request command

@@ -151,6 +151,14 @@ func (h *levelRecorder) requirements(msg string, level slog.Level, ep int64) []s
 // logged at debug, each a root-asserted violation the verdict holds, and
 // none of them as a warning — matter.js DeviceTypeConformanceService.ts:
 // 433-442 at 862ad75f.
+// lightSource is an OnOffLight source serving no cluster of its own: the
+// assembler refuses a Spec with no Source, Measurement or PowerSource
+// (R2-C2-err-0453, decision 528).
+type lightSource struct{}
+
+func (lightSource) MatterDeviceType() uint16                       { return 0x0100 }
+func (lightSource) MatterClusterServers() []contract.ClusterServer { return nil }
+
 func TestDeviceTypeValidationLogsRootAssertedAtDebug(t *testing.T) {
 	t.Parallel()
 	asm, err := endpoint.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
@@ -159,7 +167,7 @@ func TestDeviceTypeValidationLogsRootAssertedAtDebug(t *testing.T) {
 	}
 	snap := func(ctx context.Context) (*endpoint.Topology, error) {
 		return asm.Assemble(ctx, []endpoint.Snapshot{{Scope: "s", Endpoints: []endpoint.Spec{{
-			StableKey: endpoint.StringKey("light"), DeviceType: 0x0100, FriendlyName: "Light",
+			StableKey: endpoint.StringKey("light"), DeviceType: 0x0100, FriendlyName: "Light", Source: lightSource{},
 		}}}})
 	}
 	rec := &levelRecorder{}

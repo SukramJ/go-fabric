@@ -378,6 +378,9 @@ func (s Service) Validate() error {
 	if s.HostName == "" {
 		return fmt.Errorf("%w: hostname is empty", ErrInvalidService)
 	}
+	if err := s.validateNames(s.HostName); err != nil {
+		return err
+	}
 	for i, txt := range s.TXT {
 		if txt.Key == "" {
 			return fmt.Errorf("%w: TXT[%d] key is empty", ErrInvalidService, i)
@@ -387,6 +390,45 @@ func (s Service) Validate() error {
 		}
 	}
 	return nil
+}
+
+// validateNames checks that every name the record set of s carries with
+// host as the SRV target — the instance, the service type, each subtype
+// and the host — can go on the wire: every label 1..63 octets and every
+// name at most 255 octets in wire form (RFC 1035 §2.3.4). A name that
+// fails would make every message carrying it fail to pack, so the service
+// would be listed as published while nothing is announced or answered.
+func (s Service) validateNames(host string) error {
+	n := namesOf(s, host)
+	check := func(what, name string) error {
+		labels := strings.Split(strings.TrimSuffix(name, "."), ".")
+		wire := 1 // the root label
+		for _, l := range labels {
+			if l == "" {
+				return fmt.Errorf("%w: %s %q has an empty label", ErrInvalidService, what, name)
+			}
+			if len(l) > 63 {
+				return fmt.Errorf("%w: %s label length=%d (max 63)", ErrInvalidService, what, len(l))
+			}
+			wire += 1 + len(l)
+		}
+		if wire > 255 {
+			return fmt.Errorf("%w: %s length=%d (max 255)", ErrInvalidService, what, wire)
+		}
+		return nil
+	}
+	if err := check("host name", n.host); err != nil {
+		return err
+	}
+	if err := check("service instance name", n.instance); err != nil {
+		return err
+	}
+	for _, sub := range n.subtypes {
+		if err := check("subtype name", sub); err != nil {
+			return err
+		}
+	}
+	return check("enumeration name", n.enumeration)
 }
 
 // MarshalTXT returns the TXT records as `key=value` strings sorted by

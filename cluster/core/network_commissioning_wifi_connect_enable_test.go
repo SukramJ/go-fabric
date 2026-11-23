@@ -7,11 +7,13 @@ import (
 	"bytes"
 	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
 	"thingfabric.dev/go-fabric/clock/clocktest"
 	netcommdef "thingfabric.dev/go-fabric/cluster/spec/networkcommissioning"
+	"thingfabric.dev/go-fabric/contract"
 )
 
 // TestWiFiConnectNetworkSwitchesADisabledInterfaceOn (N4-d4wifi-1): a
@@ -90,5 +92,64 @@ func TestWiFiConnectNetworkSwitchesADisabledInterfaceOn(t *testing.T) {
 	d.mu.Unlock()
 	if n != 1 {
 		t.Errorf("%d joins, want still the first one", n)
+	}
+}
+
+// TestWiFiConnectNetworkReportsTheSwitchOn (R2-C2-store-1001): the
+// switch-on of a disabled interface by ConnectNetwork is reported through
+// OnAttributeChange naming InterfaceEnabled — the route a persister stores
+// a change by that is not a controller's write — so the stored false of
+// the earlier write does not outlive it across a restart.
+func TestWiFiConnectNetworkReportsTheSwitchOn(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	d := &switchDriver{simDriver: &simDriver{}}
+	w, err := NewWiFiNetworkCommissioning(WiFiNetworkCommissioningConfig{
+		Driver: d, IsFailSafeArmed: func() bool { return true }, SetBreadcrumb: func(uint64) {},
+		Clock: clocktest.New(time.Unix(0, 0)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var reported [][]uint32
+	w.OnAttributeChange(func(c contract.Change) {
+		mu.Lock()
+		reported = append(reported, slices.Clone(c.Attributes))
+		mu.Unlock()
+	})
+	snapshot := func() [][]uint32 {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(reported)
+	}
+	namesEnabled := func(changes [][]uint32) bool {
+		for _, attrs := range changes {
+			if slices.Contains(attrs, netcommAttrInterfaceEnabled) {
+				return true
+			}
+		}
+		return false
+	}
+	connect := func() {
+		t.Helper()
+		if _, err := w.MatterInvoke(ctx, netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: []byte("lab")}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.MatterWrite(ctx, netcommAttrInterfaceEnabled, false); err != nil {
+		t.Fatal(err)
+	}
+	n := len(snapshot())
+	connect()
+	if after := snapshot()[n:]; !namesEnabled(after) {
+		t.Errorf("changes after the write %v: none names InterfaceEnabled", after)
+	}
+
+	// An interface already on: no change is reported for it.
+	n = len(snapshot())
+	connect()
+	if after := snapshot()[n:]; namesEnabled(after) {
+		t.Errorf("a ConnectNetwork on an enabled interface reported InterfaceEnabled: %v", after)
 	}
 }

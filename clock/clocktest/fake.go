@@ -279,8 +279,21 @@ func (f *Fake) advanceToLocked(target time.Time) {
 		} else {
 			f.disarmLocked(e)
 		}
-		fn, ch := e.fn, e.ch
+		fn := e.fn
+		if fn == nil {
+			// The send stays under f.mu: a Stop or Reset after it drains
+			// the value, one before it disarmed the entry first — so no
+			// value lands after either returned (clock.Timer's contract).
+			// It never blocks: a non-blocking send on a 1-buffered channel.
+			select {
+			case e.ch <- at:
+			default:
+			}
+		}
 		f.mu.Unlock()
+		if testHookFired != nil {
+			testHookFired()
+		}
 
 		if fn != nil {
 			done := make(chan struct{})
@@ -289,14 +302,15 @@ func (f *Fake) advanceToLocked(target time.Time) {
 				fn()
 			}()
 			<-done
-			continue
-		}
-		select {
-		case ch <- at:
-		default:
 		}
 	}
 }
+
+// testHookFired, when set by a test, runs after a due entry fired (taken
+// off, its channel value sent) and f.mu was released, before an AfterFunc
+// callback runs: the window a Stop or Reset from another goroutine can
+// fall into.
+var testHookFired func()
 
 // Yield lets the goroutines the fired callbacks and ticks started run
 // before the test continues — MockTime's yield. It is a scheduler hint

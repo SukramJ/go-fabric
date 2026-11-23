@@ -262,21 +262,27 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		VendorName: a.cfg.VendorName,
 	}
 
-	seen := make(map[SourceKey]struct{})
+	run := &assemblyRun{seen: make(map[SourceKey]struct{})}
 	for _, snap := range snapshots {
 		if snap.Scope == "" {
 			return nil, errors.New("endpoint: snapshot Scope is required")
 		}
 		for i := range snap.Endpoints {
-			eps, err := a.buildEndpointTree(ctx, snap.Scope, &snap.Endpoints[i], 1, false)
+			eps, err := a.buildEndpointTree(ctx, run, snap.Scope, &snap.Endpoints[i], 1, false)
 			if err != nil {
 				return nil, err
 			}
-			for _, ep := range eps {
-				seen[ep.SourceKey] = struct{}{}
-			}
 			topology.Endpoints = append(topology.Endpoints, eps...)
 		}
+	}
+	seen := run.seen
+
+	// The state of an endpoint is shared with the live topology's endpoint
+	// of the same key, so what a spec restores into it is written only now
+	// that the whole assembly succeeded: a failed Assemble leaves the
+	// topology that keeps serving untouched (R2-C2-fsm-0451).
+	for _, restore := range run.restores {
+		restore()
 	}
 
 	// Release the state of sources that vanished / were de-exposed this
@@ -331,19 +337,33 @@ const deviceTypeAggregator = 0x000E
 // (#currentPartsListNumbers: the IndexBehavior's partsByNumber, the
 // endpoint itself removed, for a full-family composer; endpoint.parts
 // otherwise; ascending either way).
-func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *Spec, parent uint16, part bool) ([]*Endpoint, error) {
+func (a *Assembler) buildEndpointTree(ctx context.Context, run *assemblyRun, scope string, spec *Spec, parent uint16, part bool) ([]*Endpoint, error) {
+	if err := run.claimKey(spec.StableKey); err != nil {
+		return nil, err
+	}
 	if err := checkBridgedInfo(spec, part); err != nil {
 		return nil, err
 	}
-	ep, err := a.buildEndpoint(ctx, scope, spec)
+	ep, err := a.buildEndpoint(ctx, run, scope, spec)
 	if err != nil {
 		return nil, err
+	}
+	// An endpoint with no source serves only what its measurement and its
+	// battery materialise. A spec with none of the three, or a Measurement
+	// or PowerSource that materialises nothing — a host defect, such as an
+	// unregistered measurement class — would leave an endpoint of the
+	// topology, listed in its parent's PartsList, that serves no cluster,
+	// not even a Descriptor (R2-C2-err-0453, decision 528); refused here,
+	// naming the key. A part is held to the same rule: it serves nothing
+	// either ([ClusterServers]).
+	if ep.Source == nil && len(ep.measuredServers()) == 0 {
+		return nil, fmt.Errorf("endpoint: %s: no Source, and no Measurement or PowerSource that materialises a cluster: the endpoint would serve nothing", spec.StableKey)
 	}
 	ep.ParentEndpointID = parent
 	ep.Part = part
 	out := []*Endpoint{ep}
 	for i := range spec.Parts {
-		children, err := a.buildEndpointTree(ctx, scope, &spec.Parts[i], ep.ID, true)
+		children, err := a.buildEndpointTree(ctx, run, scope, &spec.Parts[i], ep.ID, true)
 		if err != nil {
 			return nil, err
 		}
@@ -363,7 +383,7 @@ func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *S
 // buildEndpoint turns one [Spec] into the assembled endpoint:
 // it resolves the persisted endpoint id for the spec's stable key and
 // binds the per-identity state that has to survive a reassembly.
-func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec) (*Endpoint, error) {
+func (a *Assembler) buildEndpoint(ctx context.Context, run *assemblyRun, scope string, spec *Spec) (*Endpoint, error) {
 	id, err := a.assignOrReuseID(ctx, scope, spec.StableKey, spec.DeviceType)
 	if err != nil {
 		return nil, err
@@ -394,7 +414,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		// Reuse the state bound to this stable source key so the
 		// endpoint's per-cluster version and Identify server survive
 		// reassembly.
-		state: a.restoredState(spec),
+		state: a.restoredState(run, spec),
 		// Bridged endpoints are children of the Aggregator (EP 1).
 		// Mirrors chip examples/bridge-app/linux/main.cpp:261-276
 		// AddDeviceEndpoint(..., parentEndpointId=1) and matter.js
@@ -412,19 +432,49 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 	}, nil
 }
 
-// restoredState returns the state bound to spec's key, with the label the
-// host restored for it (Spec.NodeLabel) installed unless a controller has
-// written one during this process.
-func (a *Assembler) restoredState(spec *Spec) *endpointState {
-	st := a.states.stateFor(spec.StableKey)
-	// The host's name is the Spec's again: a name set live
-	// (Endpoint.SetHostName) is what the Spec carries by now, and a stale
-	// one must not outlive the device that set it.
-	st.clearHostName()
-	if spec.NodeLabel != "" {
-		st.restoreLabel(truncateLabel(spec.NodeLabel))
+// assemblyRun is what one [Assembler.Assemble] collects while it builds:
+// the keys its specs claimed, and the restores of the per-key state that
+// wait for the assembly to succeed.
+type assemblyRun struct {
+	seen     map[SourceKey]struct{}
+	restores []func()
+}
+
+// claimKey holds the contract of [Spec.StableKey] — every spec of the
+// assembly has a key, and no two share one, across every scope and part
+// (R2-C2-err-0452). A nil key, or one whose rendering is empty, cannot
+// keep its endpoint number or a UniqueID of its own; a shared key would
+// give two endpoints one endpoint id and one state.
+func (r *assemblyRun) claimKey(key SourceKey) error {
+	if key == nil || renderSourceKey(key) == "" {
+		return errors.New("endpoint: a Spec without a StableKey (nil, or rendering empty)")
 	}
-	st.restoreConfigurationVersion(spec.ConfigurationVersion)
+	if _, dup := r.seen[key]; dup {
+		return fmt.Errorf("endpoint: %s: two Specs share this StableKey", key)
+	}
+	r.seen[key] = struct{}{}
+	return nil
+}
+
+// restoredState returns the state bound to spec's key and queues, on run,
+// what the spec restores into it: the label the host restored for it
+// (Spec.NodeLabel), installed unless a controller has written one during
+// this process, and the ConfigurationVersion. The queue is applied once
+// the whole assembly succeeded (R2-C2-fsm-0451): the state is shared with
+// the live topology's endpoint of the same key.
+func (a *Assembler) restoredState(run *assemblyRun, spec *Spec) *endpointState {
+	st := a.states.stateFor(spec.StableKey)
+	label, version := spec.NodeLabel, spec.ConfigurationVersion
+	run.restores = append(run.restores, func() {
+		// The host's name is the Spec's again: a name set live
+		// (Endpoint.SetHostName) is what the Spec carries by now, and a
+		// stale one must not outlive the device that set it.
+		st.clearHostName()
+		if label != "" {
+			st.restoreLabel(truncateLabel(label))
+		}
+		st.restoreConfigurationVersion(version)
+	})
 	return st
 }
 

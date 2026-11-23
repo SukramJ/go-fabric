@@ -404,6 +404,13 @@ func (d *Datastore) updateGroupLocked(req UpdateGroupRequest, p *[]pushFn) error
 	if reservedCAT(g.GroupCat) { // :1418-1423
 		return constraintError("group %d: the administrator and anchor CATs are reserved", req.GroupId)
 	}
+	keySetChanged := !req.GroupKeySetId.Null && (g.GroupKeySetId.Null || g.GroupKeySetId.Value != req.GroupKeySetId.Value)
+	if keySetChanged {
+		// Before anything changes: the tables keep what an error leaves.
+		if err := d.nodeKeySetRoomLocked(req.GroupId, req.GroupKeySetId.Value); err != nil {
+			return err
+		}
+	}
 	d.markLocked(dsdef.AttrGroupList)
 	if !req.FriendlyName.Null && g.FriendlyName != req.FriendlyName.Value { // :1426-1471
 		for i := range d.t.EndpointGroupIDs {
@@ -417,7 +424,7 @@ func (d *Datastore) updateGroupLocked(req UpdateGroupRequest, p *[]pushFn) error
 		}
 		g.FriendlyName = req.FriendlyName.Value
 	}
-	if !req.GroupKeySetId.Null && (g.GroupKeySetId.Null || g.GroupKeySetId.Value != req.GroupKeySetId.Value) { // :1473-1487
+	if keySetChanged { // :1473-1487
 		if err := d.addNodeKeySetEntryLocked(req.GroupId, req.GroupKeySetId.Value, p); err != nil {
 			return err
 		}
@@ -547,6 +554,10 @@ func (d *Datastore) addGroupIDToEndpointLocked(nodeID uint64, endpointID, groupI
 	}
 	if len(d.t.EndpointGroupIDs) >= MaxGroups { // :1684
 		return ErrNoMemory
+	}
+	if g := d.t.Groups[gi]; !g.GroupKeySetId.Null && len(d.t.NodeKeySets) >= maxNodeKeySets &&
+		!slices.ContainsFunc(d.t.NodeKeySets, sameNodeKeySet(nodeID, g.GroupKeySetId.Value)) {
+		return fmt.Errorf("%w: NodeKeySetList is full", ErrNoMemory)
 	}
 	d.t.EndpointGroupIDs = append(d.t.EndpointGroupIDs, entry)
 	d.markLocked(dsdef.AttrEndpointGroupIdList)
@@ -956,6 +967,22 @@ func (d *Datastore) groupMembersLocked(groupID uint16) []uint64 {
 	}
 	slices.Sort(nodes)
 	return nodes
+}
+
+// nodeKeySetRoomLocked reports ErrNoMemory when giving each member of the
+// group without one a key set entry of ks would take NodeKeySetList past
+// maxNodeKeySets (R2-C2-bound-1101).
+func (d *Datastore) nodeKeySetRoomLocked(groupID, ks uint16) error {
+	n := len(d.t.NodeKeySets)
+	for _, nodeID := range d.groupMembersLocked(groupID) {
+		if !slices.ContainsFunc(d.t.NodeKeySets, sameNodeKeySet(nodeID, ks)) {
+			n++
+		}
+	}
+	if n > maxNodeKeySets {
+		return fmt.Errorf("%w: NodeKeySetList would hold %d entries", ErrNoMemory, n)
+	}
+	return nil
 }
 
 // addNodeKeySetEntryLocked gives each member of the group without one a

@@ -680,3 +680,40 @@ func TestNonVolatileWriteOfTheHeldValueStoresNothing(t *testing.T) {
 		t.Errorf("stored %q (found %v, %v); want %d's TLV", v, ok, err, held+100)
 	}
 }
+
+// TestNonVolatileWriteOfTheHeldValueStoresAnOwedKey (review II,
+// R2-C2-store-2402): the held-value skip of a controller's write does not
+// apply to an owed key — a change the store refused under a key it never
+// held. A write of the value the server holds then stores it, so the
+// restart serves the change and not the declaration.
+func TestNonVolatileWriteOfTheHeldValueStoresAnOwedKey(t *testing.T) {
+	t.Parallel()
+	st := &refusingKeys{Port: memstore.New(), keys: []string{"nonvolatile."}}
+	cfg := minimalConfig(nil)
+	cfg.Store = node.Store{Credentials: st, Endpoints: epmem.New()}
+	n, ep := nvRun(t, cfg, nvHeat)
+	path := attrPath(ep, thermostatdef.ClusterID, thermostatdef.AttrOccupiedHeatingSetpoint)
+	const key = "nonvolatile.thermo.0201.0012"
+	st.refuse.Store(true)
+	nvRaise(t, n, ep)
+	st.refuse.Store(false)
+	if _, ok, err := st.GetSetting(t.Context(), key); err != nil || ok {
+		t.Fatalf("the refused change is stored (found %v, %v); the case needs it owed", ok, err)
+	}
+	held, err := strconv.ParseInt(dispatchRead(t, n, path), 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := dispatchWrite(t, n, path, held); s != im.StatusSuccess {
+		t.Fatalf("write of the held %d: %v", held, s)
+	}
+	if v, ok, err := st.GetSetting(t.Context(), key); err != nil || !ok || v != nvStoredTLV(t, held) {
+		t.Errorf("stored %q (found %v, %v) after the write of the held %d, want its TLV", v, ok, err, held)
+	}
+	if err := n.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if v, ok, err := st.GetSetting(t.Context(), key); err != nil || !ok || v != nvStoredTLV(t, held) {
+		t.Errorf("stored %q (found %v, %v) after the stop, want %d's TLV", v, ok, err, held)
+	}
+}

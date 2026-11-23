@@ -377,25 +377,74 @@ func (b *Batch) Forget(key device.SourceKey) error {
 
 // splitErasures splits a batch's reservation ops into the ones applied
 // before its reassembly and the erasures of forgotten keys applied after
-// it ([Partition.Batch]); readded are the forgotten keys an Add of the
-// same batch brought back (an opRelease after the opErase).
-func splitErasures(ops []reservationOp) (pre, erase []reservationOp, readded []string) {
-	forgotten := map[string]bool{}
+// it ([Partition.Batch]).
+func splitErasures(ops []reservationOp) (pre, erase []reservationOp) {
 	for _, op := range ops {
-		switch op.kind {
-		case opErase:
+		if op.kind == opErase {
 			erase = append(erase, op)
-			forgotten[op.key] = true
-		case opRelease:
-			if forgotten[op.key] && !slices.Contains(readded, op.key) {
-				readded = append(readded, op.key)
-			}
-			pre = append(pre, op)
-		default:
-			pre = append(pre, op)
+			continue
+		}
+		pre = append(pre, op)
+	}
+	return pre, erase
+}
+
+// readdedInErasure finds the endpoints a batch added (its opRelease keys,
+// still in scope's partition) that an erasure of the same batch would
+// reach: one whose own key or a part key lies in a forgotten key's
+// erasure set (the key, its tree in the set, its reservation's tree —
+// what [Aggregator.erase] erases). held is their keys, for
+// [Aggregator.holdBack]; cancel is the stable keys they serve inside an
+// erasure set, for [Aggregator.cancelForget]. A device keyed as a part of
+// the forgotten device is served after the erasure, as a forgotten key
+// added again is, so the erasure never takes what an endpoint already
+// serves (review II, R2-C2-store-2401). Run after the batch's pre ops:
+// a re-added key's release has then dropped the reservation it shared.
+func (a *Aggregator) readdedInErasure(ctx context.Context, scope string, ops, erase []reservationOp) (held, cancel []string, err error) {
+	if len(erase) == 0 {
+		return nil, nil, nil
+	}
+	forgotten := map[string]bool{}
+	var errs []error
+	for _, op := range erase {
+		forgotten[op.key] = true
+		for _, k := range op.tree {
+			forgotten[k] = true
+		}
+		reserved, err := a.n.persisted.reservedTree(ctx, op.key)
+		errs = append(errs, err)
+		for _, k := range reserved {
+			forgotten[k] = true
 		}
 	}
-	return pre, erase, readded
+	a.mu.Lock()
+	part := a.partLocked(scope)
+	for _, op := range ops {
+		if op.kind != opRelease || slices.Contains(held, op.key) {
+			continue
+		}
+		i := slices.IndexFunc(part.eps, func(ep Endpoint) bool {
+			ek, err := keyOf(ep.Spec())
+			return err == nil && ek == op.key
+		})
+		if i < 0 {
+			continue
+		}
+		hit := false
+		for _, k := range reservationTree(part.eps[i].Spec()) {
+			if forgotten[k] {
+				hit = true
+				if !slices.Contains(cancel, k) {
+					cancel = append(cancel, k)
+				}
+			}
+		}
+		if hit {
+			held = append(held, op.key)
+		}
+	}
+	a.mu.Unlock()
+	return held, cancel, errors.Join(errs...)
 }
 
 // heldEndpoint is an endpoint [Aggregator.holdBack] took out of its

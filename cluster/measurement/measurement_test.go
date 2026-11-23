@@ -2419,17 +2419,21 @@ func TestMomentarySwitchFeaturesFollowTheSource(t *testing.T) {
 	}
 }
 
-// TestWhToMilliWattHoursSaturatesAtTheBound holds R2-P6-wire-1417: 2^63
-// mWh is beyond int64, and float64(math.MaxInt64) is 2^63 itself, so the
-// bound saturates it rather than converting it (implementation-defined:
-// MinInt64 on amd64).
+// TestWhToMilliWattHoursSaturatesAtTheBound holds R2-P6-wire-1417 and
+// R2-C2-wire-1454: the Energy field's constraint is "0 to 2^62" mWh, so a
+// negative reading (a meter reset, a host's signed counter) serves 0 and
+// one above 2^62 serves 2^62; 2^63 is beyond int64 and saturates rather
+// than converting (implementation-defined: MinInt64 on amd64).
 func TestWhToMilliWattHoursSaturatesAtTheBound(t *testing.T) {
 	for _, tc := range []struct {
 		wh   float64
 		want int64
 	}{
-		{math.Exp2(63) / 1000, math.MaxInt64},
-		{-math.Exp2(63) / 1000, math.MinInt64},
+		{math.Exp2(63) / 1000, 1 << 62},
+		{-math.Exp2(63) / 1000, 0},
+		{math.Exp2(62)/1000 + 1, 1 << 62},
+		{-1, 0},
+		{0, 0},
 		{1.5, 1500},
 	} {
 		if got := measurement.WhToMilliWattHours(tc.wh); got != tc.want {

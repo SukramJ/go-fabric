@@ -148,6 +148,11 @@ type CertificateStore struct {
 	// matter.js's DclCertificateServiceTest.ts:1758-1777 at b25ed960 stands
 	// in the crypto.
 	verifyCDSigner func(der, skid []byte) (*ecdsa.PublicKey, error)
+
+	// lookupTimeout bounds PAA's and CDSigner's lookups, which
+	// attestation.PAAStore gives no context: attestationLookupTimeout, a
+	// test sets it shorter.
+	lookupTimeout time.Duration
 }
 
 var (
@@ -168,6 +173,7 @@ func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*Certif
 	s := &CertificateStore{
 		opts: opts, clock: opts.Clock, log: opts.Logger, store: opts.Store, index: map[string]storedCertificate{},
 		verifyCDSigner: attestation.VerifyCDSignerCertificate, fetching: make(chan struct{}, 1),
+		lookupTimeout: attestationLookupTimeout,
 	}
 	s.periodic, s.cancelPeriodic = context.WithCancel(context.Background())
 	if s.clock == nil {
@@ -326,12 +332,32 @@ func (s *CertificateStore) lookup(skid string) (storedCertificate, bool) {
 // [CertificateStore.CertificateDER] included.
 func (s *CertificateStore) PAA(skid []byte) (attestation.PAA, bool) {
 	id := hexUpper(skid)
-	der, err := s.CertificateDER(context.Background(), id, GetCertificateOptions{ConsiderTestCertificates: &considerAll})
+	ctx, cancel := s.attestationContext()
+	defer cancel()
+	der, err := s.CertificateDER(ctx, id, GetCertificateOptions{ConsiderTestCertificates: &considerAll})
 	if err != nil {
 		return attestation.PAA{}, false
 	}
 	e, _ := s.lookup(id)
 	return attestation.PAA{DER: der, Production: e.IsProduction, FetchedAt: e.FetchedAt}, true
+}
+
+// attestationLookupTimeout bounds PAA's and CDSigner's lookups, which
+// attestation.PAAStore gives no context: the ledger request, and the wait
+// for a running update in front of PAA's self-heal — an update holds the
+// slot for up to maxRootsPerUpdate requests. Past it PAA answers with the
+// stored bytes, as when the re-fetch fails (review II, R2-C2-conc-1904).
+// The value is revocationLookupTimeout's, this module's judgement.
+const attestationLookupTimeout = 10 * time.Second
+
+// attestationContext is the context of one PAA or CDSigner lookup,
+// bounded by lookupTimeout (attestationLookupTimeout when unset).
+func (s *CertificateStore) attestationContext() (context.Context, context.CancelFunc) {
+	d := s.lookupTimeout
+	if d <= 0 {
+		d = attestationLookupTimeout
+	}
+	return context.WithTimeout(context.Background(), d)
 }
 
 // considerAll is the validator's considerTestCertificates: true.
@@ -585,7 +611,9 @@ func (s *CertificateStore) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 	if s.offline() {
 		return nil, false
 	}
-	certs, err := s.opts.Client.CertificatesBySubjectKeyID(context.Background(), id)
+	ctx, cancel := s.attestationContext()
+	certs, err := s.opts.Client.CertificatesBySubjectKeyID(ctx, id)
+	cancel()
 	if err != nil {
 		s.log.Info("dcl.certificates.cd_signer_fetch_failed", slog.String("skid", id), slog.Any("err", err),
 			slog.String("message", "Failed to fetch CD signer "+id+" from DCL"))
@@ -857,7 +885,17 @@ const (
 	maxGitHubFilesPerUpdate = 1024
 )
 
-// fetchDclCertificates is #fetchDclCertificates (:1026-1043).
+// maxCertificatesPerRootAnswer bounds the certificates one root's answer
+// (the approved certificates of one subject and key identifier) adds to
+// the store: an answer is a handful, and the index and the blob saveIndex
+// writes at every update otherwise grow with whatever the ledger sends —
+// about 2·10⁴ certificates per answer within its body bound, per root.
+// Past the bound the rest is not stored, logged once per answer (review II,
+// R2-C2-bound-1903). The value 16 is this module's judgement, not a
+// measured figure.
+const maxCertificatesPerRootAnswer = 16
+
+// fetchDclCertificates is #fetchDclCertificates (:1136-1153 at b25ed960).
 func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProduction, force bool) error {
 	client := s.clientFor(isProduction)
 	refs, err := client.RootCertificates(ctx)
@@ -879,10 +917,11 @@ func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProductio
 	return nil
 }
 
-// fetchAndStoreCertificate is #fetchAndStoreCertificate (:1061-1148): one
+// fetchAndStoreCertificate is #fetchAndStoreCertificate (:1171-1258 at b25ed960): one
 // root's certificates, each stored under its own key identifier once its
-// DER parses as a PAA and carries the key identifier the ledger states.
-// It reports whether the store holds a usable certificate for ref.
+// DER parses as a PAA and carries the key identifier the ledger states —
+// at most maxCertificatesPerRootAnswer of them, ref's own first. It
+// reports whether the store holds a usable certificate for ref.
 func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client *Client, ref SubjectReference, isProduction, force bool) bool {
 	refID := normalizeKeyID(ref.SubjectKeyID)
 	if !force {
@@ -910,9 +949,26 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		s.log.Info("dcl.certificates.fetch_failed", slog.String("subject", ref.Subject), slog.String("skid", ref.SubjectKeyID), slog.Any("err", err))
 		return false
 	}
-	stored := false
+	// The certificates of the root asked for first, so the bound below
+	// never drops them for others the answer carries.
+	slices.SortStableFunc(certs, func(a, b Certificate) int {
+		aRef, bRef := normalizeKeyID(a.SubjectKeyID) == refID, normalizeKeyID(b.SubjectKeyID) == refID
+		switch {
+		case aRef && !bRef:
+			return -1
+		case bRef && !aRef:
+			return 1
+		}
+		return 0
+	})
+	stored, taken := false, 0
 	for i := range certs {
 		cert := &certs[i]
+		if taken == maxCertificatesPerRootAnswer {
+			s.log.Warn("dcl.certificates.too_many_in_answer", slog.String("subject", ref.Subject), slog.String("skid", ref.SubjectKeyID),
+				slog.Int("count", len(certs)), slog.Int("max", maxCertificatesPerRootAnswer))
+			break
+		}
 		if cert.SubjectKeyID == "" {
 			s.log.Warn("dcl.certificates.missing_skid", slog.String("subject", cert.Subject))
 			continue
@@ -931,6 +987,7 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 			Subject: cert.Subject, SubjectAsText: cert.SubjectAsText, SubjectKeyID: id, SerialNumber: cert.SerialNumber,
 			VID: cert.VID, IsRoot: cert.IsRoot, IsProduction: isProduction, Kind: KindPAA,
 		}, isProduction)
+		taken++
 		stored = stored || id == refID
 	}
 	return stored

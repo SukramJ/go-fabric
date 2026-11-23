@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"slices"
 	"strconv"
 
 	"thingfabric.dev/go-fabric/cluster"
@@ -111,17 +113,39 @@ const DefaultKeypadLockoutSetting = "thermostat_user_interface_configuration.key
 // the generated default server with matter.js's initial values.
 type ThermostatUIServer struct {
 	*spec.Server
+	keypad *keypadSaves
+}
+
+// keypadSaves serialises the saves of KeypadLockout: the host's save and
+// store in [ThermostatUIServer.SetAttributes], a controller's save in
+// persistingSink, and the check after a controller's store
+// ([ThermostatUIServer.MatterWriteCommit]). saved is the value last
+// written to the Settings, "" before the first. mu is a one-slot
+// channel, so that a waiter is durably blocked for a testing/synctest
+// bubble.
+type keypadSaves struct {
+	mu       chan struct{}
+	saved    string
 	settings SettingStore
 	key      string
+}
+
+// save writes v to the Settings; the caller holds k.mu.
+func (k *keypadSaves) save(ctx context.Context, v any) error {
+	text := fmt.Sprintf("%d", v)
+	if err := k.settings.SetSetting(ctx, k.key, text); err != nil {
+		return err
+	}
+	k.saved = text
+	return nil
 }
 
 // persistingSink saves a controller's KeypadLockout write before the
 // server stores it, after the host's Sink consented; a failed save
 // refuses the write, as a failed commit refuses it in matter.js.
 type persistingSink struct {
-	next     spec.Sink
-	settings SettingStore
-	key      string
+	next   spec.Sink
+	keypad *keypadSaves
 }
 
 func (p persistingSink) MatterWriteAttribute(ctx context.Context, attrID uint32, value any) error {
@@ -130,10 +154,12 @@ func (p persistingSink) MatterWriteAttribute(ctx context.Context, attrID uint32,
 			return err
 		}
 	}
-	if attrID != tsuic.AttrKeypadLockout || p.settings == nil {
+	if attrID != tsuic.AttrKeypadLockout || p.keypad == nil {
 		return nil
 	}
-	if err := p.settings.SetSetting(ctx, p.key, fmt.Sprintf("%d", value)); err != nil {
+	p.keypad.mu <- struct{}{}
+	defer func() { <-p.keypad.mu }()
+	if err := p.keypad.save(ctx, value); err != nil {
 		return spec.Errorf(im.StatusFailure, "thermostatuserinterfaceconfiguration: save KeypadLockout: %v", err)
 	}
 	return nil
@@ -184,9 +210,11 @@ func NewThermostatUserInterfaceConfiguration(cfg ThermostatUIConfig) (*Thermosta
 		opts.Attributes = []uint32{tsuic.AttrScheduleProgrammingVisibility}
 		initial[tsuic.AttrScheduleProgrammingVisibility] = *cfg.ScheduleProgrammingVisibility
 	}
-	var sink spec.Sink = persistingSink{next: cfg.Sink, settings: cfg.Settings, key: key}
-	if cfg.Settings == nil {
-		sink = cfg.Sink
+	var keypadSaver *keypadSaves
+	sink := cfg.Sink
+	if cfg.Settings != nil {
+		keypadSaver = &keypadSaves{mu: make(chan struct{}, 1), settings: cfg.Settings, key: key}
+		sink = persistingSink{next: cfg.Sink, keypad: keypadSaver}
 	}
 	srv, err := spec.NewServer(tsuic.Definition, opts, spec.ServerConfig{
 		DataVersion: cfg.DataVersion, //nolint:staticcheck // the deprecated tracker is passed on for its window (decision 165)
@@ -196,7 +224,7 @@ func NewThermostatUserInterfaceConfiguration(cfg ThermostatUIConfig) (*Thermosta
 	if err != nil {
 		return nil, fmt.Errorf("thermostatuserinterfaceconfiguration: %w", err)
 	}
-	return &ThermostatUIServer{Server: srv, settings: cfg.Settings, key: key}, nil
+	return &ThermostatUIServer{Server: srv, keypad: keypadSaver}, nil
 }
 
 // Set records a change the device made to attrID, as [spec.Server.Set]
@@ -209,26 +237,70 @@ func (s *ThermostatUIServer) Set(attrID uint32, value any) error {
 // is saved to the Settings first, as a controller's write is
 // (persistingSink): a failed save refuses the call and nothing is stored
 // (R2-P6-store-1563). When the store then refuses another value of the
-// call, the saved KeypadLockout is put back.
+// call, the saved KeypadLockout is put back. The save and the store are
+// one step against a controller's write of KeypadLockout, so the
+// Settings and the served value do not part (R2-C2-store-1555).
 func (s *ThermostatUIServer) SetAttributes(values map[uint32]any) error {
 	given, ok := values[tsuic.AttrKeypadLockout]
-	if !ok || s.settings == nil {
+	if !ok || s.keypad == nil {
 		return s.Server.SetAttributes(values)
 	}
 	v, err := s.CheckSet(tsuic.AttrKeypadLockout, given, s.MatterRead)
 	if err != nil {
 		return fmt.Errorf("thermostatuserinterfaceconfiguration: %w", err)
 	}
+	s.keypad.mu <- struct{}{}
+	defer func() { <-s.keypad.mu }()
 	old, _ := s.Value(tsuic.AttrKeypadLockout)
 	ctx := context.Background()
-	if err := s.settings.SetSetting(ctx, s.key, fmt.Sprintf("%d", v)); err != nil {
+	if err := s.keypad.save(ctx, v); err != nil {
 		return fmt.Errorf("thermostatuserinterfaceconfiguration: save KeypadLockout: %w", err)
 	}
 	if err := s.Server.SetAttributes(values); err != nil {
-		if rerr := s.settings.SetSetting(ctx, s.key, fmt.Sprintf("%d", old)); rerr != nil {
+		if rerr := s.keypad.save(ctx, old); rerr != nil {
 			return errors.Join(err, fmt.Errorf("thermostatuserinterfaceconfiguration: restore KeypadLockout: %w", rerr))
 		}
 		return err
 	}
 	return nil
+}
+
+// logger is the server's logger: the process default
+// (ThermostatUIConfig carries none).
+func (*ThermostatUIServer) logger() *slog.Logger { return slog.Default() }
+
+// MatterWrite is [spec.Server.MatterWrite] through
+// [ThermostatUIServer.MatterWriteCommit].
+func (s *ThermostatUIServer) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	_, err := s.MatterWriteCommit(ctx, attrID, value)
+	return err
+}
+
+// MatterWriteChanged is [spec.Server.MatterWriteChanged] through
+// [ThermostatUIServer.MatterWriteCommit].
+func (s *ThermostatUIServer) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
+	changed, err := s.MatterWriteCommit(ctx, attrID, value)
+	return len(changed) > 0, err
+}
+
+// MatterWriteCommit is [spec.Server.MatterWriteCommit]; after a write
+// changed KeypadLockout, the Settings are brought to
+// the served value when a host's Set saved and stored between the
+// write's save and its store (R2-C2-store-1555). A failed save there is
+// logged; the next save of the setting corrects it.
+func (s *ThermostatUIServer) MatterWriteCommit(ctx context.Context, attrID uint32, value any) ([]uint32, error) {
+	changed, err := s.Server.MatterWriteCommit(ctx, attrID, value)
+	if err != nil || s.keypad == nil || !slices.Contains(changed, tsuic.AttrKeypadLockout) {
+		return changed, err
+	}
+	s.keypad.mu <- struct{}{}
+	defer func() { <-s.keypad.mu }()
+	cur, _ := s.Value(tsuic.AttrKeypadLockout)
+	if fmt.Sprintf("%d", cur) == s.keypad.saved {
+		return changed, nil
+	}
+	if serr := s.keypad.save(ctx, cur); serr != nil {
+		s.logger().Warn("matter.thermostat_ui.keypad_lockout_not_saved", slog.String("reason", serr.Error()))
+	}
+	return changed, nil
 }

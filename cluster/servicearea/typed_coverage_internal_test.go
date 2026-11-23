@@ -22,7 +22,7 @@ func definitionWith(tb testing.TB, edit func(attrs []spec.Attribute)) *Server {
 	def := *sa.Definition
 	def.Attributes = append([]spec.Attribute(nil), sa.Definition.Attributes...)
 	edit(def.Attributes)
-	s := &Server{}
+	s := &Server{op: make(chan struct{}, 1)}
 	srv, err := newHeld(&def, spec.Options{}, s.MatterRead, s.invoke)
 	if err != nil {
 		tb.Fatal(err)

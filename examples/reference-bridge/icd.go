@@ -78,13 +78,22 @@ func icdConfig(idleSeconds, activeMillis uint) *node.ICDConfig {
 type demoICD struct {
 	log *slog.Logger
 
-	mu         sync.Mutex
-	icd        *node.ICD
+	mu  sync.Mutex
+	icd *node.ICD
+	// modes is the mode machine the windows drive: the node's ICD, a
+	// fake in a test.
+	modes      icdModes
 	counter    func(by int64) error
 	active     time.Duration
 	idle       time.Duration
 	keepActive bool
-	timer      *time.Timer
+	window     latestTimer
+}
+
+// icdModes is what the cadence asks of the node's ICD.
+type icdModes interface {
+	EnterIdleMode()
+	RequestActiveMode()
 }
 
 // newDemoICD is the cadence of the configured timings.
@@ -101,6 +110,7 @@ func attachICD(d *demoICD, n *node.Node) {
 	}
 	d.mu.Lock()
 	d.icd = n.ICD()
+	d.modes = d.icd
 	if srv := n.Root().ICDManagement; srv != nil {
 		d.counter = func(by int64) error { _, err := srv.Counter().Advance(by); return err }
 	}
@@ -117,35 +127,49 @@ func attachICD(d *demoICD, n *node.Node) {
 }
 
 // arm replaces the running window's timer (IcdTestEventServer.ts:89-98,
-// :109-118, #armActiveWindow, #onIdleEntered).
-func (d *demoICD) arm(after time.Duration, fn func()) {
+// :109-118, #armActiveWindow, #onIdleEntered). A window's end acts only
+// while its arming is the latest (latestTimer, R2-C2-conc-2603): an end
+// that fired before a newer window or stop replaced it does nothing.
+func (d *demoICD) arm(after time.Duration, fn func(gen uint64)) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.timer != nil {
-		d.timer.Stop()
-	}
-	d.timer = time.AfterFunc(after, fn)
+	d.window.armLocked(after, fn)
 }
 
 // activeWindowDone is #onActiveWindowDone (:100-107): AddActiveMode holds
 // the device active, otherwise it goes idle.
-func (d *demoICD) activeWindowDone() {
+//
+// The mode request runs after d.mu is released: the node's ICD calls the
+// mode-change hook inline, and the hook arms the next window under d.mu.
+// A window armed between the take and the request — the node entering
+// active mode on its own in that instant — is not covered.
+func (d *demoICD) activeWindowDone(gen uint64) {
 	d.mu.Lock()
-	keep, icd := d.keepActive, d.icd
-	d.mu.Unlock()
-	if keep {
-		d.arm(d.active, d.activeWindowDone)
+	if !d.window.takeLocked(gen) {
+		d.mu.Unlock()
 		return
 	}
-	icd.EnterIdleMode()
+	if d.keepActive {
+		d.window.armLocked(d.active, d.activeWindowDone)
+		d.mu.Unlock()
+		return
+	}
+	modes := d.modes
+	d.mu.Unlock()
+	modes.EnterIdleMode()
 }
 
-// idleWindowDone is #onIdleWindowDone (:120-122): the device wakes.
-func (d *demoICD) idleWindowDone() {
+// idleWindowDone is #onIdleWindowDone (:120-122): the device wakes. The
+// request runs after d.mu is released, as activeWindowDone's.
+func (d *demoICD) idleWindowDone(gen uint64) {
 	d.mu.Lock()
-	icd := d.icd
+	if !d.window.takeLocked(gen) {
+		d.mu.Unlock()
+		return
+	}
+	modes := d.modes
 	d.mu.Unlock()
-	icd.RequestActiveMode()
+	modes.RequestActiveMode()
 }
 
 // stop ends the cadence (IcdTestEventServer.ts:124-129, #stopTimers).
@@ -155,10 +179,7 @@ func (d *demoICD) stop() {
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.timer != nil {
-		d.timer.Stop()
-		d.timer = nil
-	}
+	d.window.stopLocked()
 }
 
 // errICDCounter is a counter trigger on a node without the Check-In

@@ -42,8 +42,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"thingfabric.dev/go-fabric/cluster"
 	"thingfabric.dev/go-fabric/cluster/spec"
@@ -375,6 +377,18 @@ type Server struct {
 	// differences between it and the next one.
 	last     snapshot
 	lastExpr ExpressedState
+
+	// admitted holds, per enum attribute, the last defined value the host
+	// reported, served in place of an undefined one (R2-C2-wire-1553);
+	// before any, the first value of the enum the instance admits.
+	admitted map[uint32]*atomic.Uint32
+}
+
+// enumAttrs are the enum attributes [Server.MatterRead] holds to their
+// enum on the way out.
+var enumAttrs = []uint32{
+	AttrSmokeState, AttrCOState, AttrBatteryAlert, AttrDeviceMuted, AttrEndOfServiceAlert,
+	AttrInterconnectSmokeAlarm, AttrInterconnectCOAlarm, AttrContaminationState, AttrSmokeSensitivityLevel,
 }
 
 // Compile-time assertions.
@@ -435,6 +449,16 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("alarm: %w", err)
 	}
 	s.inst, s.held = srv.Instance, spec.NewSelfHeld(srv)
+	s.admitted = make(map[uint32]*atomic.Uint32, len(enumAttrs))
+	for _, id := range enumAttrs {
+		s.admitted[id] = new(atomic.Uint32)
+		for v := range uint64(256) {
+			if _, err := s.inst.CheckValue(id, v, nil); err == nil {
+				s.admitted[id].Store(uint32(v))
+				break
+			}
+		}
+	}
 	if cfg.ExpressedStatePriority != nil {
 		for _, e := range cfg.ExpressedStatePriority {
 			if !s.canExpress(e) || e == ExpressedNormal || e == ExpressedInoperative {
@@ -633,7 +657,8 @@ func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterRead resolves an attribute. Every attribute is non-nullable, so
 // a value is always returned; an attribute this configuration does not
-// serve reads as unsupported.
+// serve reads as unsupported. A host enum value outside its enum is
+// logged and the last defined one served instead (R2-C2-wire-1553).
 func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	if v, ok := s.inst.ReadGlobal(attrID); ok {
 		return v, true
@@ -646,32 +671,51 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	case AttrExpressedState:
 		return uint8(s.expressedOf(st)), true
 	case AttrSmokeState:
-		return uint8(st.SmokeState), true
+		return s.admit(attrID, uint8(st.SmokeState)), true
 	case AttrCOState:
-		return uint8(st.COState), true
+		return s.admit(attrID, uint8(st.COState)), true
 	case AttrBatteryAlert:
-		return uint8(st.BatteryAlert), true
+		return s.admit(attrID, uint8(st.BatteryAlert)), true
 	case AttrDeviceMuted:
-		return uint8(st.DeviceMuted), true
+		return s.admit(attrID, uint8(st.DeviceMuted)), true
 	case AttrTestInProgress:
 		return st.TestInProgress, true
 	case AttrHardwareFaultAlert:
 		return st.HardwareFaultAlert, true
 	case AttrEndOfServiceAlert:
-		return uint8(st.EndOfServiceAlert), true
+		return s.admit(attrID, uint8(st.EndOfServiceAlert)), true
 	case AttrInterconnectSmokeAlarm:
-		return uint8(st.InterconnectSmokeAlarm), true
+		return s.admit(attrID, uint8(st.InterconnectSmokeAlarm)), true
 	case AttrInterconnectCOAlarm:
-		return uint8(st.InterconnectCOAlarm), true
+		return s.admit(attrID, uint8(st.InterconnectCOAlarm)), true
 	case AttrContaminationState:
-		return uint8(st.ContaminationState), true
+		return s.admit(attrID, uint8(st.ContaminationState)), true
 	case AttrSmokeSensitivityLevel:
-		return uint8(st.SmokeSensitivityLevel), true
+		return s.admit(attrID, uint8(st.SmokeSensitivityLevel)), true
 	case AttrExpiryDate:
 		return st.ExpiryDate, true
 	default: // AttrUnmounted, the last one MatterAttributes can list
 		return st.Unmounted, true
 	}
+}
+
+// logger is the server's logger: the process default (Config carries
+// none).
+func (*Server) logger() *slog.Logger { return slog.Default() }
+
+// admit is the host's enum value v of attrID when the instance admits it,
+// remembered as the last admitted one; the last admitted one otherwise,
+// with a warning (R2-C2-wire-1553).
+func (s *Server) admit(attrID uint32, v uint8) uint8 {
+	last := s.admitted[attrID]
+	if _, err := s.inst.CheckValue(attrID, uint64(v), nil); err == nil {
+		last.Store(uint32(v))
+		return v
+	}
+	served := uint8(last.Load()) //nolint:gosec // a stored uint8
+	s.logger().Warn("matter.smokecoalarm.inbound_value_not_admitted",
+		slog.Int("attribute", int(attrID)), slog.Int("value", int(v)), slog.Int("served", int(served)))
+	return served
 }
 
 // MatterWrite applies the one writable attribute, SmokeSensitivityLevel

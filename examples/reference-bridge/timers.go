@@ -15,7 +15,9 @@ import (
 // the state a newer arming set up — complete the new travel at once, end
 // the new boost, drop the new timer. Every arming and every stop advance
 // the generation under the device's lock; the callback receives its
-// arming's generation and, holding the same lock, asks takeLocked first.
+// arming's generation and, holding the same lock, asks takeLocked first —
+// and acts in that critical section: an act after releasing it undoes an
+// arming made in between (R2-C2-conc-2602).
 // fakeReadings' gen (fleet_energy_market.go) is the same pattern.
 //
 // The zero value is ready; after arms through time.AfterFunc when nil (a
@@ -51,6 +53,12 @@ func (t *latestTimer) stopLocked() {
 // armedLocked reports whether an arming is pending. The caller holds the
 // device's lock.
 func (t *latestTimer) armedLocked() bool { return t.stop != nil }
+
+// latestLocked reports whether gen is still the latest arming, taken or
+// not: no arming and no stop came after it. A callback that took gen and
+// released the lock for a while asks it before it acts. The caller holds
+// the device's lock.
+func (t *latestTimer) latestLocked(gen uint64) bool { return gen == t.gen }
 
 // takeLocked reports whether gen is the pending arming and, if so, marks
 // it fired; a stale callback (false) does nothing. The caller holds the
@@ -101,4 +109,34 @@ func (q *orderedQueue) drain() {
 		q.mu.Unlock()
 		fn()
 	}
+}
+
+// deviceMutex is a device's lock: a sync.Mutex, unless a test routes it
+// through seam before the device runs. The window tests of R2-C2-conc-2602
+// install a first-in-first-out lock there, which hands the lock to the
+// waiter at the front on every Unlock and so puts an arming between a
+// timer callback's take and an act after releasing the lock without a
+// wall-clock wait (timers_window_test.go handOff). The daemon leaves seam
+// nil.
+type deviceMutex struct {
+	mu   sync.Mutex
+	seam sync.Locker
+}
+
+// Lock locks m.
+func (m *deviceMutex) Lock() {
+	if m.seam != nil {
+		m.seam.Lock()
+		return
+	}
+	m.mu.Lock()
+}
+
+// Unlock unlocks m.
+func (m *deviceMutex) Unlock() {
+	if m.seam != nil {
+		m.seam.Unlock()
+		return
+	}
+	m.mu.Unlock()
 }

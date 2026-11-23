@@ -594,10 +594,21 @@ func (m *demoElectricalMeter) log(err error) {
 // readings of the meter's two measurement endpoints (fakeReadingsTrigger).
 func (m *demoElectricalMeter) testEventTrigger(trigger uint64) bool {
 	switch trigger & smokeTriggerMask {
-	case triggerMeteringAttributesUpdate:
-		m.update()
-	case triggerMeteringAttributesClear:
-		m.clear()
+	case triggerMeteringAttributesUpdate, triggerMeteringAttributesClear:
+		m.mu.Lock()
+		built := m.metering != nil
+		m.mu.Unlock()
+		if !built {
+			// Not built — withheld by --spec-level: no such device, so not
+			// handled, as the tariff answers unbuilt (R2-P6-err-2650,
+			// R2-C2-err-2606).
+			return false
+		}
+		if trigger&smokeTriggerMask == triggerMeteringAttributesUpdate {
+			m.update()
+		} else {
+			m.clear()
+		}
 	default:
 		return m.fakeReadingsTrigger(trigger)
 	}

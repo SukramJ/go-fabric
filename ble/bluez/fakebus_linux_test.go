@@ -33,6 +33,11 @@ type fakeBus struct {
 	devices map[dbus.ObjectPath]*fakeDevice
 	sigs    chan *dbus.Signal
 	closed  bool
+	// beforeEmit, when set, runs once before the next Emit is recorded.
+	beforeEmit func()
+	// callsAtClose is len(calls) when Close ran: the calls made before
+	// the bus went away.
+	callsAtClose int
 	// afterManaged, when set, changes the objects (under mu, without a
 	// signal) once a GetManagedObjects answer is taken: a change BlueZ
 	// made between that read and the next.
@@ -136,6 +141,13 @@ func (b *fakeBus) Export(path dbus.ObjectPath, iface string, methods map[string]
 // bluetoothd holds, as BlueZ's property watch does.
 func (b *fakeBus) Emit(path dbus.ObjectPath, name string, values ...any) error {
 	b.mu.Lock()
+	hook := b.beforeEmit
+	b.beforeEmit = nil
+	b.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.emitted = append(b.emitted, &dbus.Signal{Path: path, Name: name, Body: copyBody(values)})
 	if name == sigPropsChanged && len(values) >= 2 && values[0] == ifaceAdvertise && b.adv != nil {
@@ -167,9 +179,27 @@ func (b *fakeBus) Close() error {
 	defer b.mu.Unlock()
 	if !b.closed {
 		b.closed = true
+		b.callsAtClose = len(b.calls)
 		close(b.sigs)
 	}
 	return nil
+}
+
+// calledBeforeClose is the calls made before Close, as "path method".
+func (b *fakeBus) calledBeforeClose() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.closed {
+		return append([]string(nil), b.calls...)
+	}
+	return append([]string(nil), b.calls[:b.callsAtClose]...)
+}
+
+// clearErr withdraws a failWith.
+func (b *fakeBus) clearErr(key string) {
+	b.mu.Lock()
+	delete(b.errs, key)
+	b.mu.Unlock()
 }
 
 func (b *fakeBus) emit(s *dbus.Signal) {

@@ -120,6 +120,16 @@ const CrossDeviceStagger = time.Second
 // review II, owner decision 55, R2-P3-ctl-lan-06, R2-P3-ble-01).
 const maxRaceAttempts = 16
 
+// maxRaceWaiting is how many of a race's candidates wait, found and not
+// yet released; past it the candidate found longest ago leaves the queue
+// and is not attempted, as the oldest unanswered attempt gives its place
+// to a later candidate. Each waiting candidate holds an entry and a
+// goroutine until the race is decided, so a sender announcing ever-new
+// matching instances would otherwise grow both for the race's length.
+// This module's own bound (review II, R2-C2-bound-2153), at the number of
+// places.
+const maxRaceWaiting = maxRaceAttempts
+
 // raceStaggerCeiling is the longest a candidate's start waits after it
 // was found, however many candidates stand before it: the time the
 // stagger takes to fill every place.
@@ -258,6 +268,7 @@ type raceAttempt struct {
 	device  string
 	foundAt time.Time
 	release chan struct{}
+	dropped chan struct{} // closed when it left the queue unreleased (maxRaceWaiting)
 
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -297,10 +308,17 @@ func (k *raceKind[W]) onDiscovered(s *Session[W], c Candidate) {
 		return
 	}
 	k.mu.Lock()
-	a := &raceAttempt{index: k.attemptCount, device: c.Device.InstanceID, foundAt: s.clock.Now(), release: make(chan struct{})}
+	a := &raceAttempt{index: k.attemptCount, device: c.Device.InstanceID, foundAt: s.clock.Now(), release: make(chan struct{}), dropped: make(chan struct{})}
 	k.attemptCount++
 	if !k.isDecided {
 		k.waiting = append(k.waiting, a)
+		if len(k.waiting) > maxRaceWaiting {
+			oldest := k.waiting[0]
+			k.waiting = slices.Delete(k.waiting, 0, 1)
+			close(oldest.dropped)
+			s.log.Info("matter.controller.discovery.candidate_dropped", slog.String("discovery", s.description),
+				slog.String("device", oldest.device), slog.String("candidate", a.device), slog.Int("max", maxRaceWaiting))
+		}
 		k.releaseLocked(s)
 	}
 	k.mu.Unlock()
@@ -411,6 +429,8 @@ func (k *raceKind[W]) run(s *Session[W], c Candidate, a *raceAttempt) {
 	select {
 	case <-a.release:
 		defer k.ended(s, a)
+	case <-a.dropped:
+		return
 	case <-k.decided:
 		return
 	}

@@ -103,3 +103,39 @@ func TestICDFlagsNeedICDLIT(t *testing.T) {
 		t.Error("an idle window past 18 h accepted")
 	}
 }
+
+// fakeICDModes counts the cadence's mode requests.
+type fakeICDModes struct{ idle, active int }
+
+func (m *fakeICDModes) EnterIdleMode()     { m.idle++ }
+func (m *fakeICDModes) RequestActiveMode() { m.active++ }
+
+// TestICDStaleWindowDoesNothing holds R2-C2-conc-2603 (a): a window's end
+// that fired before a newer window re-armed the timer, or before stop,
+// neither moves the mode machine nor re-arms; the newest window's end does.
+func TestICDStaleWindowDoesNothing(t *testing.T) {
+	var held heldTimers
+	modes := &fakeICDModes{}
+	d := newDemoICD(icdConfig(1, 300), slog.New(slog.DiscardHandler))
+	d.modes = modes
+	d.window.after = held.after
+	d.arm(d.active, d.activeWindowDone)
+	d.arm(d.idle, d.idleWindowDone)
+	held.fire(t, 0)
+	if modes.idle != 0 {
+		t.Fatalf("the replaced active window's end entered idle mode %d times", modes.idle)
+	}
+	held.fire(t, 1)
+	if modes.active != 1 {
+		t.Fatalf("the idle window's end requested active mode %d times, want 1", modes.active)
+	}
+	d.mu.Lock()
+	d.keepActive = true
+	d.mu.Unlock()
+	d.arm(d.active, d.activeWindowDone)
+	d.stop()
+	held.fire(t, 2)
+	if len(held.fns) != 3 || modes.idle != 0 {
+		t.Fatalf("the stopped window's end re-armed (%d armings, want 3) or went idle (%d)", len(held.fns), modes.idle)
+	}
+}

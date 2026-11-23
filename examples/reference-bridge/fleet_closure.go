@@ -38,7 +38,7 @@ const garageTravel = 2 * time.Second
 type demoGarage struct {
 	name string
 
-	mu sync.Mutex
+	mu deviceMutex
 	// travel is the running action (a travel or a settle), calibration
 	// the calibration run; a stale callback of either does nothing
 	// (latestTimer).
@@ -136,8 +136,13 @@ var arrivalOf = map[ccldef.TargetPositionEnum]ccldef.CurrentPositionEnum{
 }
 
 // MoveTo implements [ccldef.Mover]: the drive starts travelling and
-// arrives after garageTravel. The server sets MainState Moving and the
-// target once this returns.
+// arrives after garageTravel. The server sets the target once this
+// returns. The drive reports MainState Moving itself, in the critical
+// section that arms the travel: the arrival of a travel this one replaces
+// may have reported Stopped while the server had this command, and the
+// server keeps a report the drive made then over its own Moving
+// (cluster/closure ControlServer.recordMove) — the later report must be
+// this one (R2-C2-conc-2602).
 func (g *demoGarage) MoveTo(_ context.Context, target ccldef.TargetPositionEnum) error {
 	arrival := arrivalOf[target]
 	g.mu.Lock()
@@ -146,6 +151,7 @@ func (g *demoGarage) MoveTo(_ context.Context, target ccldef.TargetPositionEnum)
 			slog.Info("garage.arrived", slog.String("device", g.name), slog.Int("position", int(arrival)))
 		}
 	})
+	g.reportStateLocked(ccldef.MainStateMoving)
 	g.mu.Unlock()
 	slog.Info("garage.move", slog.String("device", g.name), slog.Int("target", int(target)))
 	return nil
@@ -189,20 +195,34 @@ func (g *demoGarage) settleLocked() {
 	g.travel.armLocked(garageSettle, func(gen uint64) { g.finish(gen, nil) })
 }
 
+// reportStateLocked reports the drive's MainState. Caller holds g.mu.
+func (g *demoGarage) reportStateLocked(state ccldef.MainStateEnum) {
+	if g.ctl == nil {
+		return
+	}
+	if err := g.ctl.Set(ccldef.Patch{MainState: &state}); err != nil {
+		slog.Warn("garage.report", slog.String("device", g.name), slog.Any("err", err))
+	}
+}
+
 // finish ends the running action armed as gen: the drive reports where it
 // is — at arrival, otherwise where it was — with the latch and speed the
 // action left it with, and Stopped. A stale action (one a newer MoveTo or
-// a Stop replaced) reports nothing; finish then returns false.
+// a Stop replaced) reports nothing; finish then returns false. It reports
+// in the critical section that took gen, so a MoveTo after the take waits
+// for the report and the server's Moving then stands (R2-C2-conc-2602):
+// the server takes a report from another goroutine while a MoveTo is with
+// the drive (cluster/closure's report-during-call test), so g.mu held over
+// the Set orders the two without a lock cycle.
 func (g *demoGarage) finish(gen uint64, arrival *ccldef.CurrentPositionEnum) bool {
 	g.mu.Lock()
+	defer g.mu.Unlock()
 	if !g.travel.takeLocked(gen) {
-		g.mu.Unlock()
 		return false
 	}
 	latch, speed := g.latchTo, g.speedTo
 	g.latchTo, g.speedTo = nil, nil
-	g.mu.Unlock()
-	srv := g.server()
+	srv := g.ctl
 	current := srv.Get().OverallCurrentState
 	if current == nil {
 		current = &ccldef.OverallCurrentStateStruct{}
@@ -224,23 +244,25 @@ func (g *demoGarage) finish(gen uint64, arrival *ccldef.CurrentPositionEnum) boo
 }
 
 // Calibrate implements [ccldef.Calibrator]: a calibration run that ends,
-// Stopped, after garageCalibration; the server sets Calibrating once this
-// returns.
+// Stopped, after garageCalibration. The drive reports Calibrating itself,
+// in the critical section that arms the run, for the reason MoveTo reports
+// Moving.
 func (g *demoGarage) Calibrate(context.Context) error {
 	g.mu.Lock()
 	g.calibration.armLocked(garageCalibration, func(gen uint64) {
+		// Reported in the critical section that took gen, as finish.
 		g.mu.Lock()
-		current := g.calibration.takeLocked(gen)
-		g.mu.Unlock()
-		if !current {
+		defer g.mu.Unlock()
+		if !g.calibration.takeLocked(gen) {
 			return
 		}
 		stopped := ccldef.MainStateStopped
-		if err := g.server().Set(ccldef.Patch{MainState: &stopped}); err != nil {
+		if err := g.ctl.Set(ccldef.Patch{MainState: &stopped}); err != nil {
 			slog.Warn("garage.calibrated", slog.String("device", g.name), slog.Any("err", err))
 		}
 		slog.Info("garage.calibrated", slog.String("device", g.name))
 	})
+	g.reportStateLocked(ccldef.MainStateCalibrating)
 	g.mu.Unlock()
 	slog.Info("garage.calibrate", slog.String("device", g.name))
 	return nil

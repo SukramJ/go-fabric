@@ -172,15 +172,21 @@ func newSubjectFacts(tree DeviceTypeTree) *subjectFacts {
 		byID: map[uint16]DeviceTypeSubject{}, parent: map[uint16]uint16{}, children: map[uint16][]uint16{},
 		node: tree.NodeConditions, shapes: map[uint16]map[uint32]shapeAnswer{},
 	}
-	for _, s := range tree.Endpoints {
+	// The first subject of an endpoint number is told from a later
+	// duplicate by its position in the tree, never by comparing interface
+	// values: a subject's dynamic type need not be comparable
+	// (R2-C2-api-0651).
+	first := map[uint16]int{}
+	for i, s := range tree.Endpoints {
 		if s != nil {
 			if _, dup := f.byID[s.EndpointNumber()]; !dup {
 				f.byID[s.EndpointNumber()] = s
+				first[s.EndpointNumber()] = i
 			}
 		}
 	}
-	for _, s := range tree.Endpoints {
-		if s == nil || f.byID[s.EndpointNumber()] != s {
+	for i, s := range tree.Endpoints {
+		if s == nil || first[s.EndpointNumber()] != i {
 			continue
 		}
 		ep := s.EndpointNumber()

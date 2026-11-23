@@ -124,11 +124,14 @@ type Messages struct {
 }
 
 // messagesInFlight is one present or cancel at the presenter; removed
-// marks a present whose fabric was removed meanwhile.
+// marks a present whose fabric was removed meanwhile, cancelled a present
+// whose id the same fabric cancelled meanwhile (R2-C2-conc-1201).
 type messagesInFlight struct {
-	id      []byte
-	fabric  uint8
-	removed bool
+	id        []byte
+	fabric    uint8
+	present   bool
+	removed   bool
+	cancelled bool
 }
 
 // beginFlightLocked records an id at the presenter; endFlightLocked takes
@@ -320,6 +323,7 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 		m.presenting++
 	}
 	flight := m.beginFlightLocked(msg.MessageId, fabric)
+	flight.present = true
 	m.mu.Unlock()
 	err := m.presenter.PresentMessage(ctx, msg.Clone())
 	m.mu.Lock()
@@ -331,21 +335,26 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 		m.unlock()
 		return messagesStatus(err)
 	}
-	if flight.removed {
+	switch {
+	case flight.removed:
 		// The fabric was removed while the presenter had the message: it
 		// is not queued under the removed index, and the presenter takes
 		// down what it showed. The id stays held until that cancel
 		// returned, so another fabric's present of it is refused meanwhile
 		// and not taken down by it (review II, R2-P6-sec-1201 rounds 2, 4).
-		m.unlock()
-		cancelErr := m.presenter.CancelMessage(ctx, slices.Clone(msg.MessageId))
-		m.mu.Lock()
-		m.endFlightLocked(flight)
-		m.unlock()
-		if cancelErr != nil {
-			return messagesStatus(cancelErr)
-		}
-		return bindingStatusError{code: im.StatusUnsupportedAccess, msg: fmt.Sprintf("core: Messages: fabric %d was removed while its message was presented", fabric)}
+		return m.takeDown(ctx, flight, bindingStatusError{code: im.StatusUnsupportedAccess, msg: fmt.Sprintf("core: Messages: fabric %d was removed while its message was presented", fabric)})
+	case flight.cancelled:
+		// The same fabric cancelled the id while the presenter had it: the
+		// present came first, the cancel after it, so the message is not
+		// queued and the presenter takes down what it showed — a cancel
+		// answered SUCCESS is not undone by the present it overtook
+		// (R2-C2-conc-1201).
+		return m.takeDown(ctx, flight, nil)
+	case !reserved && m.indexLocked(msg.MessageId) < 0 && len(m.messages)+m.presenting >= messagesMax:
+		// A re-present took no slot: its message left the queue while the
+		// presenter had it and the slot went to another present. The
+		// bound is checked again, not exceeded (R2-C2-conc-1201).
+		return m.takeDown(ctx, flight, bindingStatusError{code: im.StatusResourceExhausted, msg: "core: Messages: the queue holds its eight messages"})
 	}
 	m.endFlightLocked(flight)
 	defer m.unlock()
@@ -360,6 +369,33 @@ func (m *Messages) present(ctx context.Context, fabric uint8, req messagesdef.Pr
 	m.changedLocked(messagesdef.AttrMessages, messagesdef.AttrActiveMessageIds)
 	m.emitLocked(messagesdef.EventMessageQueued, messagesdef.MessageQueuedEvent{MessageId: slices.Clone(msg.MessageId), FabricIndex: fabric})
 	return nil
+}
+
+// takeDown answers a present whose message is not queued: the presenter
+// takes down what it showed, the flight ending only once that cancel
+// returned, and answer is the command's result unless the cancel failed.
+// Called with mu held; returns with it released.
+func (m *Messages) takeDown(ctx context.Context, flight *messagesInFlight, answer error) error {
+	m.unlock()
+	cancelErr := m.presenter.CancelMessage(ctx, slices.Clone(flight.id))
+	m.mu.Lock()
+	m.endFlightLocked(flight)
+	m.unlock()
+	if cancelErr != nil {
+		return messagesStatus(cancelErr)
+	}
+	return answer
+}
+
+// cancelPresentsLocked marks the accessing fabric's presents of id at the
+// presenter as cancelled: each then queues nothing (R2-C2-conc-1201).
+// Caller holds mu.
+func (m *Messages) cancelPresentsLocked(id []byte, fabric uint8) {
+	for _, f := range m.inFlight {
+		if f.present && f.fabric == fabric && bytes.Equal(f.id, id) {
+			f.cancelled = true
+		}
+	}
 }
 
 // cancel takes the accessing fabric's messages with the given ids down.
@@ -387,6 +423,11 @@ func (m *Messages) cancel(ctx context.Context, fabric uint8, ids [][]byte) error
 			// R2-P6-sec-1201 round 2).
 			flight = m.beginFlightLocked(id, fabric)
 		}
+		if !visible {
+			// Not queued: a present of it at the presenter is the one
+			// the cancel takes down, once that present returns.
+			m.cancelPresentsLocked(id, fabric)
+		}
 		m.mu.Unlock()
 		if !visible {
 			continue
@@ -399,6 +440,11 @@ func (m *Messages) cancel(ctx context.Context, fabric uint8, ids [][]byte) error
 			return messagesStatus(err)
 		}
 		m.mu.Lock()
+		// A re-present of the id that runs now must not queue it again
+		// once it returns (R2-C2-conc-1201); marked only after the
+		// presenter's cancel succeeded, so a refused cancel leaves both as
+		// they were.
+		m.cancelPresentsLocked(id, fabric)
 		if i := m.indexLocked(id); i >= 0 && m.messages[i].FabricIndex == fabric {
 			m.removeLocked(i)
 			changed = true

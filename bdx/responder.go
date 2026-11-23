@@ -178,10 +178,12 @@ func (r *Responder) mrpDelayFor(cfg ScopeConfig) *time.Duration {
 	return r.mrpDelay
 }
 
-func (r *Responder) now() time.Time {
+// sessionClock is the clock a session is built with, read under mu
+// (review II, R2-C2-conc-1905).
+func (r *Responder) sessionClock() clock.Clock {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return clock.Or(r.clock).Now()
+	return clock.Or(r.clock)
 }
 
 // ErrActiveSession is a scope disabled without force while a transfer of
@@ -359,7 +361,8 @@ func (r *Responder) HandleExchange(ctx context.Context, peer Peer, first Message
 	}
 	sessCtx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
-	s := &ServerSession{peer: peer, scope: scope, file: file, initType: t, init: init, cancel: cancel, lastActivity: r.now(), clock: clock.Or(r.clock)}
+	c := r.sessionClock()
+	s := &ServerSession{peer: peer, scope: scope, file: file, initType: t, init: init, cancel: cancel, lastActivity: c.Now(), clock: c}
 	m := NewMessenger(observedExchange{Exchange: ex, s: s}, entry.cfg.MessageTimeout)
 	opts := ServeOptions{
 		InitType: t, Init: init,

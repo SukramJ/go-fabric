@@ -195,11 +195,16 @@ func (m *Manager) Sender(ctx context.Context, fabricIndex uint8, groupID uint16)
 	if groupID == 0 {
 		return nil, ErrInvalidGroupID
 	}
+	// The clock is read before the fabric's read lock, and the counter
+	// is created with no lock of the manager held but its own: a store
+	// call under senderMu would hold up a second Sender, which held mu
+	// while it waited (review II, R2-C2-conc-0304).
+	nowMs := m.sendClock().UnixMilli()
 	f, err := m.rlockFabric(ctx, fabricIndex)
 	if err != nil {
 		return nil, err
 	}
-	keySetID, ek, err := f.currentKey(groupID, m.sendClock().UnixMilli())
+	keySetID, ek, err := f.currentKey(groupID, nowMs)
 	if err != nil {
 		m.mu.RUnlock()
 		return nil, err
@@ -208,6 +213,12 @@ func (m *Manager) Sender(ctx context.Context, fabricIndex uint8, groupID uint16)
 	m.mu.RUnlock()
 
 	key := senderKey{fabricIndex: fabricIndex, groupID: groupID, sessionID: ek.sessionID, key: hex.EncodeToString(ek.key)}
+	if s, err := m.cachedSender(key); s != nil || err != nil {
+		return s, err
+	}
+	if _, err := m.groupDataCounter(ctx); err != nil {
+		return nil, err
+	}
 	m.senderMu.Lock()
 	defer m.senderMu.Unlock()
 	if s, ok := m.senders[key]; ok {
@@ -215,9 +226,6 @@ func (m *Manager) Sender(ctx context.Context, fabricIndex uint8, groupID uint16)
 	}
 	if m.transport == nil {
 		return nil, ErrNoInterface
-	}
-	if _, err := m.groupDataCounter(ctx); err != nil {
-		return nil, err
 	}
 	s := &Sender{
 		m: m, fabricIndex: fabricIndex, groupID: groupID, sessionID: ek.sessionID, keySetID: keySetID,
@@ -228,6 +236,20 @@ func (m *Manager) Sender(ctx context.Context, fabricIndex uint8, groupID uint16)
 		slog.Int("fabric_index", int(fabricIndex)), slog.Int("group_id", int(groupID)),
 		slog.Int("session_id", int(ek.sessionID)), slog.Int("key_set", int(keySetID)), slog.String("address", address.String()))
 	return s, nil
+}
+
+// cachedSender is the cached session for key, or [ErrNoInterface] without
+// a transport; nil, nil when a new session is to be made.
+func (m *Manager) cachedSender(key senderKey) (*Sender, error) {
+	m.senderMu.Lock()
+	defer m.senderMu.Unlock()
+	if s, ok := m.senders[key]; ok {
+		return s, nil
+	}
+	if m.transport == nil {
+		return nil, ErrNoInterface
+	}
+	return nil, nil //nolint:nilnil // nil, nil is "make one": the cache holds none and a transport is set
 }
 
 // closeSenders closes and drops the cached sessions of a removed fabric:

@@ -80,7 +80,9 @@ type proxy struct {
 	// addrs are the host:port the proxy is dialled at, in order; the
 	// first is the one that answered last. Discovery replaces them when
 	// the proxy's DNS-SD records move.
-	addrs      []string
+	addrs []string
+	// mac is the device's MAC its last connection stated ([apiConn.mac]).
+	mac        string
 	api        *apiConn
 	flags      uint32
 	subscribed bool
@@ -138,6 +140,9 @@ func (p *proxy) dial(ctx context.Context) (*apiConn, error) {
 	p.mu.Lock()
 	if i := slices.Index(p.addrs, addr); i > 0 {
 		p.addrs = append([]string{addr}, slices.Delete(p.addrs, i, i+1)...)
+	}
+	if a.mac != "" {
+		p.mac = a.mac
 	}
 	p.mu.Unlock()
 	return a, nil

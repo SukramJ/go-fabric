@@ -108,7 +108,7 @@ func TestClosedSessionReleasesItsChunkedWrites(t *testing.T) {
 			now := b.clk().Now()
 			write := func(key mrp.ExchangeKey, p im.ConcreteAttributePath, more bool) (im.StatusCode, bool) {
 				t.Helper()
-				tx := b.routing.writeTransaction(key, more, now)
+				tx := b.routing.writeTransaction(key, more, monoOf(now))
 				if tx == nil {
 					return 0, false
 				}
@@ -131,7 +131,7 @@ func TestClosedSessionReleasesItsChunkedWrites(t *testing.T) {
 			// A chunk in hand when the session closes: its transaction was
 			// looked up before the close, its holds are taken after it.
 			late := mrp.ExchangeKey{SessionID: sid, ExchangeID: 1}
-			lateTx := b.routing.writeTransaction(late, true, now)
+			lateTx := b.routing.writeTransaction(late, true, monoOf(now))
 			tc.close(b, sid)
 			im.HandleWriteRequest(im.WithWriteTransaction(im.WithAuthModePASE(t.Context()), lateTx), holdDispatcher{}, im.WriteRequest{
 				MoreChunkedMessages: true,

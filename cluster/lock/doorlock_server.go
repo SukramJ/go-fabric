@@ -1385,28 +1385,46 @@ func (s *DoorLockServer) emit(events []queuedEvent) {
 // before, as a matter.js transaction rolls back; the events fn queued
 // leave either way, as matter.js's event observers have already run. The
 // caller holds op.
+//
+// Records an earlier [DoorLockServer.commitMoved] could not save are
+// pending: they are not fn's, so neither fn's refusal nor a failed save
+// drops them. commit saves them with its own changes, or alone when fn
+// refused or changed nothing; a save that fails leaves them pending for
+// the next transaction (R2-C2-store-1502).
 func (s *DoorLockServer) commit(ctx context.Context, fn func() error) error {
 	s.mu.Lock()
+	pending := s.dirty
+	s.dirty = false
 	before := cloneAuth(s.data)
 	err := fn()
-	dirty := s.dirty
+	own := s.dirty
 	s.dirty = false
-	if err != nil && dirty {
+	if err != nil && own {
 		s.data = before
-		dirty = false
+		own = false
 	}
+	save := own || pending
 	snapshot := s.data
-	if dirty {
+	if save {
 		snapshot = cloneAuth(s.data)
 	}
 	events := s.takeQueueLocked()
 	s.mu.Unlock()
-	if dirty && s.auth != nil {
+	if save && s.auth != nil {
 		if perr := s.auth.SaveDoorLockAuth(ctx, s.authKey, snapshot); perr != nil {
 			s.mu.Lock()
-			s.data = before
+			if own {
+				s.data = before
+			}
+			s.dirty = s.dirty || pending
 			s.mu.Unlock()
 			s.emit(events)
+			if !own {
+				// Only the pending records were not saved: fn's outcome
+				// stands, as commitMoved's does.
+				s.logger().Warn("matter.doorlock.records_not_saved", slog.String("reason", perr.Error()))
+				return err
+			}
 			return spec.Errorf(im.StatusFailure, "lock: save records: %v", perr)
 		}
 	}

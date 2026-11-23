@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -136,6 +137,25 @@ func (a *atomicWriteState) staged(attrID uint32) (any, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	v, ok := a.pending[attrID]
+	return v, ok
+}
+
+// snapshot is a copy of the values staged so far. A commit judges and
+// stores the snapshot it took when it began, so a value the peer stages
+// while the commit runs reaches neither its checks nor its store
+// (R2-C2-conc-1501).
+func (a *atomicWriteState) snapshot() atomicStaged {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return maps.Clone(a.pending)
+}
+
+// atomicStaged is a commit's snapshot of a state's staged values.
+type atomicStaged map[uint32]any
+
+// staged is the value the snapshot holds for attrID, if any.
+func (m atomicStaged) staged(attrID uint32) (any, bool) {
+	v, ok := m[attrID]
 	return v, ok
 }
 
@@ -437,6 +457,10 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 		return nil, err
 	}
 	defer st.close()
+	// Every pass reads the values staged when the commit began: the
+	// peer's own Presets or Schedules write is not under s.op and could
+	// otherwise replace a value between the checks and the store.
+	unit := st.snapshot()
 	statuses := make([]tdef.AtomicResponseAttributeStatusEntry, len(req.AttributeRequests))
 	for i, attr := range req.AttributeRequests {
 		statuses[i] = tdef.AtomicResponseAttributeStatusEntry{AttributeId: attr, StatusCode: tdef.StatusSuccess}
@@ -444,7 +468,7 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 	run := func(step string, fn func(attr uint32, v any) error) bool {
 		ok := true
 		for i, attr := range req.AttributeRequests {
-			v, staged := st.staged(attr)
+			v, staged := unit.staged(attr)
 			if !staged || statuses[i].StatusCode != tdef.StatusSuccess {
 				continue
 			}
@@ -455,7 +479,7 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 		}
 		return ok
 	}
-	staging := run("staging", func(attr uint32, v any) error { return s.precommitAtomic(st, attr, v) })
+	staging := run("staging", func(attr uint32, v any) error { return s.precommitAtomic(unit, attr, v) })
 	// The Schedules of the unit's transaction: the staged ones once they
 	// passed staging, the stored ones otherwise (persistedSchedules,
 	// ThermostatServer.ts:2051).
@@ -464,7 +488,7 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 		if attr != tdef.AttrSchedules || statuses[i].StatusCode != tdef.StatusSuccess {
 			continue
 		}
-		if v, staged := st.staged(attr); staged {
+		if v, staged := unit.staged(attr); staged {
 			unitSchedules, _ = v.([]Schedule)
 			if unitSchedules == nil {
 				unitSchedules = []Schedule{}
@@ -472,8 +496,8 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 		}
 	}
 	changed := run("validating", func(attr uint32, v any) error { return s.atomicChanged(attr, v, unitSchedules) })
-	done := staging && changed && s.commitAll(ctx, st, req.AttributeRequests, statuses)
-	if _, staged := st.staged(tdef.AttrPresets); done && staged {
+	done := staging && changed && s.commitAll(ctx, unit, req.AttributeRequests, statuses)
+	if _, staged := unit.staged(tdef.AttrPresets); done && staged {
 		// Once the whole unit committed: a reverted Presets commit leaves
 		// the suggestions as they were, as matter.js's rolled-back
 		// transaction does (ThermostatServer.ts:1792-1794 at b25ed960).
@@ -496,15 +520,15 @@ func (s *ThermostatServer) commitWrite(ctx context.Context, req tdef.AtomicReque
 // while committing "cannot be traced to one attribute, so it stands for
 // each of them" (AtomicWriteHandlerTest.ts:491-517 "discards a valid
 // Presets write when the Schedules write fails"; W3-clua1-02). The
-// caller holds s.op.
-func (s *ThermostatServer) commitAll(ctx context.Context, st *atomicWriteState, attrs []uint32, statuses []tdef.AtomicResponseAttributeStatusEntry) bool {
+// caller holds s.op; unit is the commit's snapshot of the staged values.
+func (s *ThermostatServer) commitAll(ctx context.Context, unit atomicStaged, attrs []uint32, statuses []tdef.AtomicResponseAttributeStatusEntry) bool {
 	s.mu.RLock()
 	prevPresets := deepcopy.Each(s.presets)
 	prevSchedules := deepcopy.Each(s.schedules)
 	s.mu.RUnlock()
 	var committed []uint32
 	for _, attr := range attrs {
-		v, staged := st.staged(attr)
+		v, staged := unit.staged(attr)
 		if !staged {
 			continue
 		}
@@ -580,9 +604,9 @@ func atomicAttributeName(attr uint32) string {
 // in st: a peer holds at most one atomic write on the cluster
 // (AtomicWriteHandler.ts:178-185 at b25ed960, in beginWrite),
 // so the pending value matter.js's getter finds for it
-// (pendingValueForAttributeAndPeer, :433-458) is this unit's. st is the
-// unit's state.
-func (s *ThermostatServer) precommitAtomic(st *atomicWriteState, attr uint32, v any) error {
+// (pendingValueForAttributeAndPeer, :433-458) is this unit's. unit is the
+// commit's snapshot of the state's staged values.
+func (s *ThermostatServer) precommitAtomic(unit atomicStaged, attr uint32, v any) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	switch attr {
@@ -600,7 +624,7 @@ func (s *ThermostatServer) precommitAtomic(st *atomicWriteState, attr uint32, v 
 			return spec.Errorf(im.StatusConstraintError, "thermo: staged Schedules: %v", err)
 		}
 		presets := s.presets
-		if pv, ok := st.staged(tdef.AttrPresets); ok {
+		if pv, ok := unit.staged(tdef.AttrPresets); ok {
 			if pending, isList := pv.([]Preset); isList {
 				presets = pending
 			}

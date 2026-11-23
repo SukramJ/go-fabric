@@ -320,6 +320,12 @@ func (s *gattServer) close() {
 	if err := s.c.Disconnect(); err != nil {
 		s.log.Debug("matter.btp.disconnect_failed", slog.String("peer", s.c.Remote()), slog.Any("err", err))
 	}
+	// The server's own close ends an indication's wait, whatever the
+	// platform made of Disconnect: a failed one leaves Disconnected open,
+	// and the subscription waiting on the handshake response's
+	// confirmation would hold the platform's C2 callback until the
+	// central drops (R2-C2-fsm-0205).
+	s.cancel()
 	if session != nil {
 		_ = session.Close()
 	}

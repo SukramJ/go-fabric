@@ -120,7 +120,7 @@ type ResumptionRecord struct {
 	ResumptionID []byte
 	// FabricIndex scopes the record to the fabric the original CASE
 	// session was established under. The resumed session is registered
-	// under this fabric — matter.js CaseServer.ts:151 destructures
+	// under this fabric — matter.js CaseServer.ts:155 destructures
 	// `fabric` straight from the record; there is no Sigma3 on the
 	// resume path, so the fabric can come from nowhere else.
 	FabricIndex uint8
@@ -131,7 +131,7 @@ type ResumptionRecord struct {
 	PeerNodeID uint64
 	// PeerCATs carries the CASE Authenticated Tags from the peer's NOC
 	// captured at the original Sigma3. The resume path re-grants them
-	// without re-validating the NOC — matter.js CaseServer.ts:151
+	// without re-validating the NOC — matter.js CaseServer.ts:155
 	// `caseAuthenticatedTags` from the record.
 	PeerCATs []uint32
 }
@@ -415,7 +415,11 @@ func (r *Responder) PeerCATs() []uint32 {
 // don't stamp it leave a zero (which is also the pre-resolver
 // fallback). Returns the operational FabricIndex (0 = unknown / not
 // set by daemon) and NodeID. Callers tolerant of fabric_index==0
-// fall back to their factory-time default fabric.
+// fall back to their factory-time default fabric. A resumption never
+// lands there with a stamped record: without a [FabricIndexResolver],
+// a record whose FabricIndex is set resumes only under a baseline
+// identity of the same FabricIndex — under an unstamped one (0) or none
+// (nil) it is a miss and the peer runs a full handshake (R2-C2-sec-0101).
 func (r *Responder) SessionIdentity() (fabricIndex uint8, nodeID uint64, ok bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -686,12 +690,13 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 
 	// Resolve the responder identity by the record's FabricIndex. The
 	// resume path has no Sigma3 (no NOC exchange), so the fabric is
-	// authoritative from the record alone — matter.js CaseServer.ts:151
+	// authoritative from the record alone — matter.js CaseServer.ts:155
 	// `const { sharedSecret, fabric, peerNodeId, caseAuthenticatedTags }
 	// = cx.resumptionRecord`. A resolver miss means the fabric was
 	// removed after the record was written; treat like an unknown id
 	// and fall through to Full Sigma.
 	identity, verifier := r.identity, r.verifier
+	byIndex := false
 	if r.identityResolver != nil {
 		if fir, ok := r.identityResolver.(FabricIndexResolver); ok {
 			id, ver, found := fir.ResolveFabricIndex(rec.FabricIndex)
@@ -699,7 +704,21 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 				return Sigma1ProcessResult{}, false, nil
 			}
 			identity, verifier = id, ver
+			byIndex = true
 		}
+	}
+	// Without the lookup by fabric index the baseline identity stands in
+	// only for a record of its own fabric: a record naming another fabric
+	// would resume that fabric's peer under the baseline's fabric
+	// (SessionIdentity) — fail closed, a miss (R2-C2-sec-0101). An
+	// unstamped baseline (fabric index 0) proves no fabric either: its
+	// caller falls back to its default fabric, so a stamped record under
+	// it is a miss too and an unstamped host pays one Full Sigma
+	// (decision 517). A nil baseline (NewResponder(nil, …) with an
+	// identity-only resolver) proves none and is a miss for a stamped
+	// record as well. Only an unstamped record (0) is not compared.
+	if !byIndex && rec.FabricIndex != 0 && (identity == nil || identity.FabricIndex != rec.FabricIndex) {
+		return Sigma1ProcessResult{}, false, nil
 	}
 
 	// Generate a fresh 16-byte local resumption id for the response.
@@ -772,7 +791,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 	// handshake established, and announcing it again would hand the peer
 	// a slot whose keys are the old ones. It takes a fresh id, as the
 	// full path does for its second handshake and as matter.js
-	// CaseServer.ts:173 does per Sigma1 (getNextAvailableSessionId).
+	// CaseServer.ts:175 does per Sigma1 (getNextAvailableSessionId).
 	sessionID, err := r.nextSessionIDLocked(r.idPending || r.state == responderStateFinished)
 	if err != nil {
 		release()

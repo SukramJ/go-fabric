@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 
@@ -317,6 +318,53 @@ func scalarClass(k reflect.Kind) int {
 	}
 }
 
+// numberFits reports whether src, a bool, number or string, converts to
+// t without changing its value: for numbers, an integer within t's range
+// (a negative one to an unsigned t refused), a float that is whole, finite
+// and within range to an integer t, and a float within range to a float t
+// (NaN and an infinity convert as they are). Go's conversion would wrap or truncate instead (review II,
+// R2-C2-api-1351). A bool or string always fits its own class.
+func numberFits(src reflect.Value, t reflect.Type) bool {
+	dst := reflect.New(t).Elem()
+	switch src.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		x := src.Int()
+		switch {
+		case dst.CanInt():
+			return !dst.OverflowInt(x)
+		case dst.CanUint():
+			return x >= 0 && !dst.OverflowUint(uint64(x))
+		default:
+			return true
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		x := src.Uint()
+		switch {
+		case dst.CanInt():
+			return x <= math.MaxInt64 && !dst.OverflowInt(int64(x))
+		case dst.CanUint():
+			return !dst.OverflowUint(x)
+		default:
+			return true
+		}
+	case reflect.Float32, reflect.Float64:
+		f := src.Float()
+		switch {
+		case dst.CanInt():
+			// -2^63 is an int64; 2^63 is not.
+			return f == math.Trunc(f) && f >= math.MinInt64 && f < -math.MinInt64 && !dst.OverflowInt(int64(f))
+		case dst.CanUint():
+			return f == math.Trunc(f) && f >= 0 && f < 2*-math.MinInt64 && !dst.OverflowUint(uint64(f))
+		case dst.CanFloat():
+			return !dst.OverflowFloat(f)
+		default:
+			return true
+		}
+	default:
+		return true
+	}
+}
+
 // Convert is the conversion the typed form reads every field through
 // ([StateOf]): v as a value of type t ([convert]). The device kit fills a
 // server's configuration from a declaration's Initial with it.
@@ -391,6 +439,9 @@ func convert(v any, t reflect.Type) (reflect.Value, bool) {
 		}
 		return out, true
 	case scalarClass(t.Kind()) != 0 && scalarClass(t.Kind()) == scalarClass(src.Kind()):
+		if !numberFits(src, t) {
+			return reflect.Value{}, false
+		}
 		return src.Convert(t), true
 	case t.Kind() == reflect.Struct && src.Type().ConvertibleTo(t):
 		return src.Convert(t), true
