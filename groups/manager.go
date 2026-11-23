@@ -181,7 +181,10 @@ type Manager struct {
 
 	// counter is the node-global group data message counter (counter.go),
 	// created on the first send; counterRandom is its random start.
-	counterMu     sync.Mutex
+	// counterMu serialises its creation, held across the store's counter
+	// read: a one-slot channel, so that a waiter is durably blocked for a
+	// testing/synctest bubble.
+	counterMu     chan struct{}
 	counter       *dataCounter
 	counterRandom func() (uint32, error)
 
@@ -229,6 +232,7 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 		receptionFull:   make(map[string]bool),
 		parkedReception: make(map[uint8]map[string]parkedKey),
 
+		counterMu:     make(chan struct{}, 1),
 		counterRandom: randomCounterStart,
 		senders:       make(map[senderKey]*Sender),
 		clock:         clock.System{},

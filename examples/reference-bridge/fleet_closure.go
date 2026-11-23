@@ -38,7 +38,7 @@ const garageTravel = 2 * time.Second
 type demoGarage struct {
 	name string
 
-	mu sync.Mutex
+	mu deviceMutex
 	// travel is the running action (a travel or a settle), calibration
 	// the calibration run; a stale callback of either does nothing
 	// (latestTimer).

@@ -176,8 +176,8 @@ func (c *dataCounter) aboutToRollover() {
 // groupDataCounter returns the node's group data counter, creating it on
 // first use. A failed creation is not cached, so the next send retries.
 func (m *Manager) groupDataCounter(ctx context.Context) (*dataCounter, error) {
-	m.counterMu.Lock()
-	defer m.counterMu.Unlock()
+	m.counterMu <- struct{}{}
+	defer func() { <-m.counterMu }()
 	if m.counter != nil {
 		return m.counter, nil
 	}

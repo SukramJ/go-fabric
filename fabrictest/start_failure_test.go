@@ -108,13 +108,10 @@ func TestFailedStartStopsTheNodeOnTheSitesClock(t *testing.T) {
 	defer cancelShort()
 	done := make(chan error, 1)
 	go func() { done <- d.Start(short) }()
-	select {
-	case err := <-done:
-		if err == nil {
-			t.Fatal("Start whose context ended during the node's start succeeded")
-		}
-	case <-time.After(45 * time.Second):
-		t.Fatal("the failed Start did not return: its stop of the node waits on a clock nobody moves")
+	// A stop of the node that waits on a clock nobody moves hangs here to
+	// the package timeout.
+	if err := <-done; err == nil {
+		t.Fatal("Start whose context ended during the node's start succeeded")
 	}
 	if err := d.Start(ctx); err != nil {
 		t.Fatalf("Start after the failed Start: %v", err)

@@ -50,14 +50,10 @@ func TestPAALookupWaitIsBounded(t *testing.T) {
 		p, ok := s.PAA(pki.paa.skid())
 		done <- answer{p.DER, ok}
 	}()
-	select {
-	case a := <-done:
-		if !a.ok || !bytes.Equal(a.der, damaged) {
-			t.Fatalf("PAA = %x, %v; want the stored bytes", a.der, a.ok)
-		}
-	case <-time.After(5 * time.Second):
-		release()
-		<-done
-		t.Fatal("PAA waited for the running update past its bound")
+	// An unbounded wait hangs here to the package timeout: the update in
+	// flight is released only when the test returns.
+	a := <-done
+	if !a.ok || !bytes.Equal(a.der, damaged) {
+		t.Fatalf("PAA = %x, %v; want the stored bytes", a.der, a.ok)
 	}
 }

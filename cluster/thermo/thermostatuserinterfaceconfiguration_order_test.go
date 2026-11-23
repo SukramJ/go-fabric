@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	tsuic "thingfabric.dev/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
 	"thingfabric.dev/go-fabric/cluster/thermo"
@@ -55,40 +55,43 @@ func (g *gatedSettings) SetSetting(_ context.Context, key, value string) error {
 // host stored A: the server served A while the Settings held B.
 func TestThermostatUIKeypadLockoutSaveAndStoreAreOneStep(t *testing.T) {
 	t.Parallel()
-	settings := &gatedSettings{
-		values: map[string]string{}, first: make(chan struct{}),
-		second: make(chan struct{}), release: make(chan struct{}),
-	}
-	srv := newTSUIC(t, thermo.ThermostatUIConfig{Settings: settings})
-	hostDone := make(chan error, 1)
-	go func() { hostDone <- srv.Set(tsuic.AttrKeypadLockout, tsuic.KeypadLockoutLockout1) }()
-	<-settings.first
-	writeDone := make(chan error, 1)
-	go func() {
-		writeDone <- srv.MatterWrite(context.Background(), tsuic.AttrKeypadLockout, uint64(tsuic.KeypadLockoutLockout2))
-	}()
-	// Before the fix the controller's write saves (and stores) at once;
-	// after it, it waits for the host's call to finish.
-	var writeErr error
-	written := false
-	select {
-	case <-settings.second:
-		writeErr, written = <-writeDone, true
-	case <-time.After(200 * time.Millisecond):
-	}
-	close(settings.release)
-	if err := <-hostDone; err != nil {
-		t.Fatalf("host Set: %v", err)
-	}
-	if !written {
-		writeErr = <-writeDone
-	}
-	if writeErr != nil {
-		t.Fatalf("controller write: %v", writeErr)
-	}
-	v, _ := srv.Value(tsuic.AttrKeypadLockout)
-	got, _, _ := settings.GetSetting(context.Background(), thermo.DefaultKeypadLockoutSetting)
-	if fmt.Sprintf("%d", v) != got {
-		t.Errorf("KeypadLockout serves %v while the Settings hold %q", v, got)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		settings := &gatedSettings{
+			values: map[string]string{}, first: make(chan struct{}),
+			second: make(chan struct{}), release: make(chan struct{}),
+		}
+		srv := newTSUIC(t, thermo.ThermostatUIConfig{Settings: settings})
+		hostDone := make(chan error, 1)
+		go func() { hostDone <- srv.Set(tsuic.AttrKeypadLockout, tsuic.KeypadLockoutLockout1) }()
+		<-settings.first
+		writeDone := make(chan error, 1)
+		go func() {
+			writeDone <- srv.MatterWrite(context.Background(), tsuic.AttrKeypadLockout, uint64(tsuic.KeypadLockoutLockout2))
+		}()
+		// Before the fix the controller's write saves (and stores) at once;
+		// after it, it waits for the host's call to finish.
+		var writeErr error
+		written := false
+		synctest.Wait() // the second call is through, or durably blocked behind the first
+		select {
+		case <-settings.second:
+			writeErr, written = <-writeDone, true
+		default:
+		}
+		close(settings.release)
+		if err := <-hostDone; err != nil {
+			t.Fatalf("host Set: %v", err)
+		}
+		if !written {
+			writeErr = <-writeDone
+		}
+		if writeErr != nil {
+			t.Fatalf("controller write: %v", writeErr)
+		}
+		v, _ := srv.Value(tsuic.AttrKeypadLockout)
+		got, _, _ := settings.GetSetting(context.Background(), thermo.DefaultKeypadLockoutSetting)
+		if fmt.Sprintf("%d", v) != got {
+			t.Errorf("KeypadLockout serves %v while the Settings hold %q", v, got)
+		}
+	})
 }

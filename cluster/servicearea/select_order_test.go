@@ -8,7 +8,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"thingfabric.dev/go-fabric/cluster/servicearea"
 	sa "thingfabric.dev/go-fabric/cluster/spec/servicearea"
@@ -48,36 +48,39 @@ func (o *orderingSelector) SelectAreas(_ context.Context, areas []uint32) (statu
 // device, and the first then overwrote it.
 func TestSelectAreasStoresTheSelectionTheDeviceAcceptedLast(t *testing.T) {
 	t.Parallel()
-	sel := &orderingSelector{first: make(chan struct{}), second: make(chan struct{}), release: make(chan struct{})}
-	cfg := vacuum(&device{})
-	cfg.Selector = sel
-	srv := newServer(t, cfg)
-	invoke := func(areas ...uint32) <-chan error {
-		done := make(chan error, 1)
-		go func() {
-			_, err := srv.MatterInvoke(context.Background(), sa.CmdSelectAreas, sa.SelectAreasRequest{NewAreas: areas})
-			done <- err
-		}()
-		return done
-	}
-	firstDone := invoke(7)
-	<-sel.first
-	secondDone := invoke(9)
-	select {
-	case <-sel.second: // before the fix: the second reaches the device at once
-	case <-time.After(200 * time.Millisecond):
-	}
-	close(sel.release)
-	for _, done := range []<-chan error{firstDone, secondDone} {
-		if err := <-done; err != nil {
-			t.Fatal(err)
+	synctest.Test(t, func(t *testing.T) {
+		sel := &orderingSelector{first: make(chan struct{}), second: make(chan struct{}), release: make(chan struct{})}
+		cfg := vacuum(&device{})
+		cfg.Selector = sel
+		srv := newServer(t, cfg)
+		invoke := func(areas ...uint32) <-chan error {
+			done := make(chan error, 1)
+			go func() {
+				_, err := srv.MatterInvoke(context.Background(), sa.CmdSelectAreas, sa.SelectAreasRequest{NewAreas: areas})
+				done <- err
+			}()
+			return done
 		}
-	}
-	sel.mu.Lock()
-	last := sel.accepted[len(sel.accepted)-1]
-	sel.mu.Unlock()
-	v, _ := srv.MatterRead(sa.AttrSelectedAreas)
-	if got := v.([]uint32); !slices.Equal(got, last) {
-		t.Errorf("SelectedAreas %v, want %v, the selection the device accepted last", got, last)
-	}
+		firstDone := invoke(7)
+		<-sel.first
+		secondDone := invoke(9)
+		synctest.Wait() // the second call is through, or durably blocked behind the first
+		select {
+		case <-sel.second: // before the fix: the second reaches the device at once
+		default:
+		}
+		close(sel.release)
+		for _, done := range []<-chan error{firstDone, secondDone} {
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+		}
+		sel.mu.Lock()
+		last := sel.accepted[len(sel.accepted)-1]
+		sel.mu.Unlock()
+		v, _ := srv.MatterRead(sa.AttrSelectedAreas)
+		if got := v.([]uint32); !slices.Equal(got, last) {
+			t.Errorf("SelectedAreas %v, want %v, the selection the device accepted last", got, last)
+		}
+	})
 }

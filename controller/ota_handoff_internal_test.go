@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"thingfabric.dev/go-fabric/controller/softwareupdate"
@@ -18,28 +19,26 @@ import (
 // so Close waits for p's hand-off while p's NodeDeleted still runs.
 func TestOTAHandoffReleasedOnlyWhenItsNodeDeletedReturned(t *testing.T) {
 	t.Parallel()
-	c := &Controller{}
-	p := softwareupdate.Peer{FabricIndex: 1, NodeID: 1}
-	q := softwareupdate.Peer{FabricIndex: 1, NodeID: 2}
-	op := c.otaHandoffs.start(p)
-	oq := c.otaHandoffs.start(q)
-	// q's run reported p failed to the host, then returned.
-	c.otaHandoffs.done(q, oq)
+	synctest.Test(t, func(t *testing.T) {
+		c := &Controller{}
+		p := softwareupdate.Peer{FabricIndex: 1, NodeID: 1}
+		q := softwareupdate.Peer{FabricIndex: 1, NodeID: 2}
+		op := c.otaHandoffs.start(p)
+		oq := c.otaHandoffs.start(q)
+		// q's run reported p failed to the host, then returned.
+		c.otaHandoffs.done(q, oq)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-	closed := make(chan struct{})
-	go func() {
-		c.otaHandoffs.close(ctx)
-		close(closed)
-	}()
-	select {
-	case <-closed:
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer cancel()
+		closed := make(chan struct{})
+		go func() {
+			c.otaHandoffs.close(ctx)
+			close(closed)
+		}()
+		<-closed // the bubble's clock ends ctx once close waits; a close that ignores it deadlocks the bubble
 		if ctx.Err() == nil {
 			t.Fatal("close returned while p's NodeDeleted was still running")
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("close did not return at its ctx")
-	}
-	c.otaHandoffs.done(p, op)
+		c.otaHandoffs.done(p, op)
+	})
 }

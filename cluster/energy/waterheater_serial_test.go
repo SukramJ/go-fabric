@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"thingfabric.dev/go-fabric/cluster/energy"
 	whm "thingfabric.dev/go-fabric/cluster/spec/waterheatermanagement"
@@ -45,44 +45,47 @@ func (g *gatedBooster) CancelBoost(ctx context.Context) error {
 // in between and the cancel then left BoostState Inactive.
 func TestWaterHeaterBoostAndCancelAreSerialised(t *testing.T) {
 	t.Parallel()
-	g := &gatedBooster{release: make(chan struct{}), inCancel: make(chan struct{}), boosted: make(chan struct{}, 1)}
-	srv2, err := energy.NewWaterHeaterManagement(energy.WaterHeaterConfig{
-		HeaterTypes: energy.HeatSourceImmersionElement1,
-		Initial:     energy.WaterHeaterState{TankVolume: 100},
-		Booster:     g,
+	synctest.Test(t, func(t *testing.T) {
+		g := &gatedBooster{release: make(chan struct{}), inCancel: make(chan struct{}), boosted: make(chan struct{}, 1)}
+		srv2, err := energy.NewWaterHeaterManagement(energy.WaterHeaterConfig{
+			HeaterTypes: energy.HeatSourceImmersionElement1,
+			Initial:     energy.WaterHeaterState{TankVolume: 100},
+			Booster:     g,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx := context.Background()
+		if _, err := srv2.MatterInvoke(ctx, whm.CmdBoost, whm.BoostRequest{BoostInfo: energy.BoostInfo{Duration: 5}}); err != nil {
+			t.Fatal(err)
+		}
+		<-g.boosted
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if _, err := srv2.MatterInvoke(ctx, whm.CmdCancelBoost, nil); err != nil {
+				t.Error(err)
+			}
+		}()
+		<-g.inCancel
+		go func() {
+			defer wg.Done()
+			if _, err := srv2.MatterInvoke(ctx, whm.CmdBoost, whm.BoostRequest{BoostInfo: energy.BoostInfo{Duration: 600}}); err != nil {
+				t.Error(err)
+			}
+		}()
+		// Release the cancel once the second Boost completed at the host —
+		// which the serialisation prevents — or once it waits behind the cancel.
+		synctest.Wait() // the second call is through, or durably blocked behind the first
+		select {
+		case <-g.boosted:
+		default:
+		}
+		close(g.release)
+		wg.Wait()
+		if got := srv2.BoostState(); got != energy.BoostStateActive {
+			t.Errorf("BoostState %d after Cancel then Boost, want Active (the host runs the newer boost)", got)
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	if _, err := srv2.MatterInvoke(ctx, whm.CmdBoost, whm.BoostRequest{BoostInfo: energy.BoostInfo{Duration: 5}}); err != nil {
-		t.Fatal(err)
-	}
-	<-g.boosted
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		if _, err := srv2.MatterInvoke(ctx, whm.CmdCancelBoost, nil); err != nil {
-			t.Error(err)
-		}
-	}()
-	<-g.inCancel
-	go func() {
-		defer wg.Done()
-		if _, err := srv2.MatterInvoke(ctx, whm.CmdBoost, whm.BoostRequest{BoostInfo: energy.BoostInfo{Duration: 600}}); err != nil {
-			t.Error(err)
-		}
-	}()
-	// Release the cancel once the second Boost completed at the host —
-	// which the serialisation prevents — or after a grace period.
-	select {
-	case <-g.boosted:
-	case <-time.After(200 * time.Millisecond):
-	}
-	close(g.release)
-	wg.Wait()
-	if got := srv2.BoostState(); got != energy.BoostStateActive {
-		t.Errorf("BoostState %d after Cancel then Boost, want Active (the host runs the newer boost)", got)
-	}
 }

@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
-	"sync"
 
 	"thingfabric.dev/go-fabric/cluster"
 	"thingfabric.dev/go-fabric/cluster/spec"
@@ -121,9 +120,11 @@ type ThermostatUIServer struct {
 // store in [ThermostatUIServer.SetAttributes], a controller's save in
 // persistingSink, and the check after a controller's store
 // ([ThermostatUIServer.MatterWriteCommit]). saved is the value last
-// written to the Settings, "" before the first.
+// written to the Settings, "" before the first. mu is a one-slot
+// channel, so that a waiter is durably blocked for a testing/synctest
+// bubble.
 type keypadSaves struct {
-	mu       sync.Mutex
+	mu       chan struct{}
 	saved    string
 	settings SettingStore
 	key      string
@@ -156,8 +157,8 @@ func (p persistingSink) MatterWriteAttribute(ctx context.Context, attrID uint32,
 	if attrID != tsuic.AttrKeypadLockout || p.keypad == nil {
 		return nil
 	}
-	p.keypad.mu.Lock()
-	defer p.keypad.mu.Unlock()
+	p.keypad.mu <- struct{}{}
+	defer func() { <-p.keypad.mu }()
 	if err := p.keypad.save(ctx, value); err != nil {
 		return spec.Errorf(im.StatusFailure, "thermostatuserinterfaceconfiguration: save KeypadLockout: %v", err)
 	}
@@ -212,7 +213,7 @@ func NewThermostatUserInterfaceConfiguration(cfg ThermostatUIConfig) (*Thermosta
 	var keypadSaver *keypadSaves
 	sink := cfg.Sink
 	if cfg.Settings != nil {
-		keypadSaver = &keypadSaves{settings: cfg.Settings, key: key}
+		keypadSaver = &keypadSaves{mu: make(chan struct{}, 1), settings: cfg.Settings, key: key}
 		sink = persistingSink{next: cfg.Sink, keypad: keypadSaver}
 	}
 	srv, err := spec.NewServer(tsuic.Definition, opts, spec.ServerConfig{
@@ -248,8 +249,8 @@ func (s *ThermostatUIServer) SetAttributes(values map[uint32]any) error {
 	if err != nil {
 		return fmt.Errorf("thermostatuserinterfaceconfiguration: %w", err)
 	}
-	s.keypad.mu.Lock()
-	defer s.keypad.mu.Unlock()
+	s.keypad.mu <- struct{}{}
+	defer func() { <-s.keypad.mu }()
 	old, _ := s.Value(tsuic.AttrKeypadLockout)
 	ctx := context.Background()
 	if err := s.keypad.save(ctx, v); err != nil {
@@ -292,8 +293,8 @@ func (s *ThermostatUIServer) MatterWriteCommit(ctx context.Context, attrID uint3
 	if err != nil || s.keypad == nil || !slices.Contains(changed, tsuic.AttrKeypadLockout) {
 		return changed, err
 	}
-	s.keypad.mu.Lock()
-	defer s.keypad.mu.Unlock()
+	s.keypad.mu <- struct{}{}
+	defer func() { <-s.keypad.mu }()
 	cur, _ := s.Value(tsuic.AttrKeypadLockout)
 	if fmt.Sprintf("%d", cur) == s.keypad.saved {
 		return changed, nil

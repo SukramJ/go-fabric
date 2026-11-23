@@ -15,7 +15,6 @@ import (
 	"log/slog"
 	"math"
 	"slices"
-	"sync"
 	"time"
 
 	"thingfabric.dev/go-fabric/clock"
@@ -142,7 +141,7 @@ type demoCamera struct {
 	camera *device.Camera
 	chime  *device.Chime
 
-	mu sync.Mutex
+	mu deviceMutex
 	// st keeps the state (attach).
 	st settings
 	// restored is the state read from st, applied by devices.

@@ -79,11 +79,14 @@ type OTASoftwareUpdateRequestor struct {
 	// persisted state and the query state: every field below it up to
 	// stopped, wg aside (a WaitGroup).
 	mu sync.Mutex
-	// persistMu serialises persist: snapshot and save are one step
-	// (R2-C2-store-1203). Taken before mu, never under it.
-	persistMu sync.Mutex
-	emitter   contract.EventEmitter
-	endpoint  uint16
+	// persistSem serialises persist: snapshot and save are one step
+	// (R2-C2-store-1203). Taken before mu, never under it. A one-slot
+	// channel rather than a sync.Mutex: a persist waiting behind a save
+	// held up in the store is then durably blocked, which a synctest
+	// bubble can observe.
+	persistSem chan struct{}
+	emitter    contract.EventEmitter
+	endpoint   uint16
 
 	// Attribute state.
 	defaults       []otadef.ProviderLocation
@@ -430,6 +433,7 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 	}
 	r := &OTASoftwareUpdateRequestor{
 		Instance:       otaRequestorInst,
+		persistSem:     make(chan struct{}, 1),
 		cfg:            cfg,
 		rnd:            cfg.Rand,
 		logger:         cfg.Logger,
@@ -1180,15 +1184,15 @@ func (r *OTASoftwareUpdateRequestor) load(ctx context.Context) error {
 }
 
 // persist stores the active providers and the update in progress. The
-// snapshot and its save are one step under persistMu: two persists store
+// snapshot and its save are one step under persistSem: two persists store
 // in the order of their snapshots, so an older one held up in the store
 // never lands after a newer one (review II, R2-C2-store-1203).
 func (r *OTASoftwareUpdateRequestor) persist(ctx context.Context) {
 	if r.cfg.Store == nil {
 		return
 	}
-	r.persistMu.Lock()
-	defer r.persistMu.Unlock()
+	r.persistSem <- struct{}{}
+	defer func() { <-r.persistSem }()
 	r.mu.Lock()
 	st := persistedState{}
 	for _, a := range r.active {

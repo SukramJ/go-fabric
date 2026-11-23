@@ -210,8 +210,9 @@ type Server struct {
 	// op serialises the server's own SelectAreas and SkipArea from the
 	// check to the store, so the stored selection is the one the
 	// Selector took last (R2-C2-conc-1554). The host setters do not take
-	// it, so a Selector or Skipper may call them.
-	op sync.Mutex
+	// it, so a Selector or Skipper may call them. A one-slot channel, so
+	// that a waiter is durably blocked for a testing/synctest bubble.
+	op chan struct{}
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -269,7 +270,7 @@ func New(cfg Config) (*Server, error) {
 	if cfg.InitialCurrentArea != nil && !cfg.CurrentArea {
 		return nil, fmt.Errorf("%w: InitialCurrentArea without CurrentArea", ErrConfig)
 	}
-	s := &Server{ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper}
+	s := &Server{ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper, op: make(chan struct{}, 1)}
 	srv, err := newHeld(sa.Definition, opts, s.MatterRead, s.invoke)
 	if err != nil {
 		return nil, fmt.Errorf("servicearea: %w", err)
@@ -610,8 +611,8 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 // invoke is the server's own SelectAreas and SkipArea, which
 // [spec.InvokeHeld] runs when the host registered no handler.
 func (s *Server) invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	s.op.Lock()
-	defer s.op.Unlock()
+	s.op <- struct{}{}
+	defer func() { <-s.op }()
 	s.commands.Add(1)
 	defer s.commands.Add(-1)
 	if cmdID == sa.CmdSelectAreas {

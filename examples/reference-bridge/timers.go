@@ -110,3 +110,33 @@ func (q *orderedQueue) drain() {
 		fn()
 	}
 }
+
+// deviceMutex is a device's lock: a sync.Mutex, unless a test routes it
+// through seam before the device runs. The window tests of R2-C2-conc-2602
+// install a first-in-first-out lock there, which hands the lock to the
+// waiter at the front on every Unlock and so puts an arming between a
+// timer callback's take and an act after releasing the lock without a
+// wall-clock wait (timers_window_test.go handOff). The daemon leaves seam
+// nil.
+type deviceMutex struct {
+	mu   sync.Mutex
+	seam sync.Locker
+}
+
+// Lock locks m.
+func (m *deviceMutex) Lock() {
+	if m.seam != nil {
+		m.seam.Lock()
+		return
+	}
+	m.mu.Lock()
+}
+
+// Unlock unlocks m.
+func (m *deviceMutex) Unlock() {
+	if m.seam != nil {
+		m.seam.Unlock()
+		return
+	}
+	m.mu.Unlock()
+}
