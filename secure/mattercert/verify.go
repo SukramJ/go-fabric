@@ -91,7 +91,8 @@ const (
 //   - The subject is a root's: an rcac-id, no node-id, no icac-id, no
 //     fabric id of 0, no CATs.
 //   - Subject == Issuer (self-signed: the RCAC-ID in both must match).
-//   - SubjectKeyIdentifier == AuthorityKeyIdentifier (self-signed key binding).
+//   - SubjectKeyIdentifier and AuthorityKeyIdentifier present, 20 bytes
+//     each, and equal (self-signed key binding).
 //   - BasicConstraints present with is-ca set.
 //   - KeyUsage extension present with keyCertSign set (cRLSign is NOT required).
 //   - BasicConstraints PathLenConstraint, when PRESENT, must be ≤ 1 (Matter
@@ -112,7 +113,9 @@ const (
 // with a firmware-signing-id is admitted, as matter.js admits it, where
 // chip's certificate-type test refuses it; and the key usage needs
 // keyCertSign only, as chip (:1141), where matter.js's Rcac.ts (:100-105)
-// refuses a key usage other than 0x0060 or 0x0061. The previous
+// refuses a key usage other than 0x0060 or 0x0061; and an extendedKeyUsage
+// extension is admitted, as chip (ValidateChipRCAC :1116-1144 reads none),
+// where matter.js's Rcac.ts (:107-110) refuses it. The previous
 // "PathLen must be present AND > 0" guards were stricter than chip and rejected the chip-tool / openssl
 // commissioner default RCAC (Path­LenConstraint absent), breaking
 // commissioning at SendTrustedRootCert with `BasicConstraints
@@ -146,12 +149,27 @@ func ValidateRCAC(c *Certificate) error {
 		return fmt.Errorf("%w: Subject RCAC-ID (0x%016X) != Issuer RCAC-ID (0x%016X); root must be self-signed",
 			ErrInvalidRCAC, c.Subject.MatterRCACID, c.Issuer.MatterRCACID)
 	}
+	// SubjectKeyId and AuthorityKeyId present and 20 bytes each: matter.js
+	// Rcac.ts:112-126 and chip (LoadCert CHIPCert.cpp:143-144, the
+	// FixedByteSpan<kKeyIdentifierLength> read TLVReader.h:481,
+	// CHIPCert.h:50) share the refusal; [DecodeDER] admits another length,
+	// so it is checked here (R2-C2-par-0150, decision 523).
+	if !c.Extensions.HasSubjectKeyID {
+		return fmt.Errorf("%w: subjectKeyIdentifier absent", ErrInvalidRCAC)
+	}
+	if !c.Extensions.HasAuthorityKeyID {
+		return fmt.Errorf("%w: authorityKeyIdentifier absent", ErrInvalidRCAC)
+	}
+	if n := len(c.Extensions.SubjectKeyID); n != keyIDSize {
+		return fmt.Errorf("%w: subjectKeyIdentifier of %d bytes, want %d", ErrInvalidRCAC, n, keyIDSize)
+	}
+	if n := len(c.Extensions.AuthorityKeyID); n != keyIDSize {
+		return fmt.Errorf("%w: authorityKeyIdentifier of %d bytes, want %d", ErrInvalidRCAC, n, keyIDSize)
+	}
 	// SubjectKeyId must equal AuthorityKeyId on a self-signed certificate.
 	// Mirrors chip CHIPCert.cpp:1133 mSubjectKeyId.data_equal(mAuthKeyId).
-	if c.Extensions.HasSubjectKeyID && c.Extensions.HasAuthorityKeyID {
-		if !bytesEqual(c.Extensions.SubjectKeyID, c.Extensions.AuthorityKeyID) {
-			return fmt.Errorf("%w: SubjectKeyId != AuthorityKeyId on self-signed RCAC", ErrInvalidRCAC)
-		}
+	if !bytesEqual(c.Extensions.SubjectKeyID, c.Extensions.AuthorityKeyID) {
+		return fmt.Errorf("%w: SubjectKeyId != AuthorityKeyId on self-signed RCAC", ErrInvalidRCAC)
 	}
 	// BasicConstraints must say is-ca: chip CHIPCert.cpp:1135
 	// `VerifyOrReturnError(certData.mCertFlags.Has(CertFlags::kIsCA),
