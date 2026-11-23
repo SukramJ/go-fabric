@@ -90,6 +90,7 @@ const (
 //
 //   - Subject == Issuer (self-signed: the RCAC-ID in both must match).
 //   - SubjectKeyIdentifier == AuthorityKeyIdentifier (self-signed key binding).
+//   - BasicConstraints present with is-ca set.
 //   - KeyUsage extension present with keyCertSign set (cRLSign is NOT required).
 //   - BasicConstraints PathLenConstraint, when PRESENT, must be ≤ 1 (Matter
 //     restricts depth to one ICAC). chip CHIPCert.cpp:1136-1139 wraps the
@@ -99,8 +100,10 @@ const (
 //     accepted because chip imposes no lower bound.
 //   - ECDSA self-signature verification: the RCAC must be signed by its own key.
 //
-// Mirrors connectedhomeip/src/credentials/CHIPCert.cpp:1116-1144
-// ValidateChipRCAC verbatim — the previous "PathLen must be present AND > 0"
+// Follows connectedhomeip/src/credentials/CHIPCert.cpp:1116-1144
+// ValidateChipRCAC, with one difference: the self-signed test compares
+// the subject's and issuer's RCAC-IDs, where chip compares the whole
+// subject and issuer DN (:1131). The previous "PathLen must be present AND > 0"
 // guards were stricter than chip and rejected the chip-tool / openssl
 // commissioner default RCAC (Path­LenConstraint absent), breaking
 // commissioning at SendTrustedRootCert with `BasicConstraints
@@ -113,8 +116,9 @@ func ValidateRCAC(c *Certificate) error {
 	if err := checkDNLimits(c, "RCAC"); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalidRCAC, err)
 	}
-	// Self-signed: Subject RCAC-ID must equal Issuer RCAC-ID.
-	// Mirrors chip CHIPCert.cpp:1131 mSubjectDN.IsEqual(mIssuerDN).
+	// Self-signed: Subject RCAC-ID must equal Issuer RCAC-ID. chip
+	// CHIPCert.cpp:1131 compares the whole DN, mSubjectDN.IsEqual(mIssuerDN);
+	// this compares the RCAC-IDs only.
 	if c.Subject.MatterRCACID != c.Issuer.MatterRCACID {
 		return fmt.Errorf("%w: Subject RCAC-ID (0x%016X) != Issuer RCAC-ID (0x%016X); root must be self-signed",
 			ErrInvalidRCAC, c.Subject.MatterRCACID, c.Issuer.MatterRCACID)
@@ -125,6 +129,12 @@ func ValidateRCAC(c *Certificate) error {
 		if !bytesEqual(c.Extensions.SubjectKeyID, c.Extensions.AuthorityKeyID) {
 			return fmt.Errorf("%w: SubjectKeyId != AuthorityKeyId on self-signed RCAC", ErrInvalidRCAC)
 		}
+	}
+	// BasicConstraints must say is-ca: chip CHIPCert.cpp:1135
+	// `VerifyOrReturnError(certData.mCertFlags.Has(CertFlags::kIsCA),
+	// CHIP_ERROR_CERT_USAGE_NOT_ALLOWED);` (R2-C2-par-0150).
+	if !c.Extensions.HasBasicConstraints || !c.Extensions.BasicConstraintsIsCA {
+		return fmt.Errorf("%w: BasicConstraints says the root is not a CA", ErrInvalidRCAC)
 	}
 	// KeyUsage must include keyCertSign. chip checks ONLY kKeyCertSign;
 	// cRLSign is NOT required by the Matter spec or chip.
