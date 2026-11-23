@@ -56,11 +56,11 @@ type ipTransport struct{ s *Scanner }
 func (ipTransport) Kind() TransportKind { return TransportIP }
 
 func (t ipTransport) FindContinuously(ctx context.Context, id Identifier, found func(Device)) error {
-	_, err := t.s.FindCommissionable(ctx, id, func(d Device) {
+	_, err := t.s.find(ctx, id, func(d Device) {
 		if len(d.Addresses) > 0 {
 			found(d)
 		}
-	})
+	}, false)
 	return err
 }
 

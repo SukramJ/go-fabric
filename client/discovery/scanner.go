@@ -290,7 +290,7 @@ type cachedDevice struct {
 
 type waiter struct {
 	identifier Identifier
-	seen       map[string]bool
+	seen       *instanceSet
 	push       func(Device)
 	cancel     func()
 }
@@ -298,11 +298,47 @@ type waiter struct {
 // notify delivers a device the waiter has not seen and selects. Mirrors
 // matter.js 0ceb202d CommissionableMdnsScanner.ts:188-194.
 func (w *waiter) notify(d *Device) {
-	if w.identifier.matches(d) && !w.seen[d.InstanceID] {
-		w.seen[d.InstanceID] = true
+	if w.identifier.matches(d) && w.seen.add(d.InstanceID) {
 		w.push(d.clone())
 	}
 }
+
+// maxSeenInstances is how many instance ids a search keeps to deliver
+// each device once. Past it the id seen longest ago is forgotten, so a
+// search a sender feeds ever-new matching instances does not grow for its
+// length; a forgotten device announced again is delivered again. The
+// cache holds no more records than this (maxCachedRecords), and a device
+// takes several, so every device the cache can hold at one time stays
+// remembered. This module's own bound (review II, R3-bound-3552).
+const maxSeenInstances = maxCachedRecords
+
+// instanceSet is the instance ids a search has delivered, at most
+// maxSeenInstances, the oldest forgotten first. Loop-only.
+type instanceSet struct {
+	ids   map[string]struct{}
+	order []string // a ring of the ids in the order added once full
+	next  int      // the ring's oldest entry once full
+}
+
+func newInstanceSet() *instanceSet { return &instanceSet{ids: map[string]struct{}{}} }
+
+// add records id and reports whether it was not recorded yet.
+func (s *instanceSet) add(id string) bool {
+	if _, ok := s.ids[id]; ok {
+		return false
+	}
+	if len(s.order) < maxSeenInstances {
+		s.order = append(s.order, id)
+	} else {
+		delete(s.ids, s.order[s.next])
+		s.order[s.next] = id
+		s.next = (s.next + 1) % maxSeenInstances
+	}
+	s.ids[id] = struct{}{}
+	return true
+}
+
+func (s *instanceSet) len() int { return len(s.ids) }
 
 type speculativeTarget struct {
 	cancel    func()
@@ -420,15 +456,25 @@ func (q *deliveryQueue) drain() []Device {
 // matter.js 0ceb202d CommissionableMdnsScanner.ts:165-256
 // (findCommissionableDevicesContinuously).
 func (s *Scanner) FindCommissionable(ctx context.Context, id Identifier, found func(Device)) ([]Device, error) {
+	return s.find(ctx, id, found, true)
+}
+
+// find is [Scanner.FindCommissionable]; with keep false it returns no
+// device, keeping none of those it delivers to found — the search of
+// [IPTransport], which runs until it is stopped and needs only found
+// (review II, R3-bound-3552).
+func (s *Scanner) find(ctx context.Context, id Identifier, found func(Device), keep bool) ([]Device, error) {
 	q := &deliveryQueue{signal: make(chan struct{}, 1)}
 	cancelled := make(chan struct{})
 	var once sync.Once
-	w := &waiter{identifier: id, seen: make(map[string]bool), push: q.push, cancel: func() { once.Do(func() { close(cancelled) }) }}
+	w := &waiter{identifier: id, seen: newInstanceSet(), push: q.push, cancel: func() { once.Do(func() { close(cancelled) }) }}
 	result := []Device{}
 	deliver := func() {
 		items := q.drain()
 		for i := range items {
-			result = append(result, items[i])
+			if keep {
+				result = append(result, items[i])
+			}
 			if found != nil {
 				found(items[i])
 			}
@@ -534,7 +580,7 @@ func (s *Scanner) register(w *waiter) bool {
 			continue
 		}
 		if len(d.Addresses) > 0 {
-			w.seen[d.InstanceID] = true
+			w.seen.add(d.InstanceID)
 			w.push(d.clone())
 			invoked = true
 		} else {
