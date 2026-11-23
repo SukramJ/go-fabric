@@ -48,6 +48,7 @@ func TestUncomparableRootServerIsServed(t *testing.T) {
 }
 
 func testUncomparableRootServer(t *testing.T, mk func(*spec.Server) contract.ClusterServer) {
+	t.Helper()
 	if _, ok := mk(nil).(ifaceServer); ok {
 		// node's predicates judge the value (TestComparableValueJudgesTheValue);
 		// past them bridge.reconciled (bridge/bridge.go:2813) still judges

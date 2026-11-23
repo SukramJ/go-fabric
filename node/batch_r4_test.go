@@ -70,6 +70,7 @@ func TestBatchUncomparableEndpoint(t *testing.T) {
 }
 
 func testUncomparableEndpoint(t *testing.T, mk func(endpoint.Spec, string) node.Endpoint) {
+	t.Helper()
 	t.Run("Add", func(t *testing.T) {
 		ctx := t.Context()
 		cfg := minimalConfig(nil)
