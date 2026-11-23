@@ -444,8 +444,17 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	// A device the level withheld has no endpoint and no number, only
 	// its record in the surface report; Forget drops that too.
 	a.n.dropWithheld(k)
+	// The erasure reads the reservation again after fn, but an Add of k
+	// in the batch has released it by then: the tree reserved now is in
+	// the op, so a device removed before the batch and added again in it
+	// starts new with its parts too (Fable N2 of the G5c diff read,
+	// decision 576).
+	tree := slices.Clone(reserved)
 	if removed != nil {
-		op.tree = reservationTree(removed.Spec())
+		tree = append(tree, reservationTree(removed.Spec())...)
+	}
+	if len(tree) > 0 {
+		op.tree = slices.Compact(slices.Sorted(slices.Values(tree)))
 	}
 	b.ops = append(b.ops, op)
 	return nil

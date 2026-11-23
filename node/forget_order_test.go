@@ -100,7 +100,9 @@ func TestForgetErasesAfterTheEndpointLeftTheWire(t *testing.T) {
 // state — as a Forget and a later Add are. A part of the device added
 // again starts new with it: its number is fresh too, so nothing naming
 // the forgotten part's endpoint reaches the new device (R3-store-3702
-// repair, decision 560).
+// repair, decision 560). That holds for a device removed before the
+// batch too, whose parts are then in its reservation, not in the set
+// (Fable N2 of the G5c diff read, decision 576).
 func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 	t.Parallel()
 	const partKey = "switch:1/light"
@@ -109,6 +111,8 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 		key   string
 		parts []string
 		build func(t *testing.T) node.Endpoint
+		// removeFirst removes the device in a call before the batch.
+		removeFirst bool
 	}{
 		{"device", "switch:1", nil, func(t *testing.T) node.Endpoint {
 			t.Helper()
@@ -117,7 +121,7 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 				t.Fatal(err)
 			}
 			return sw
-		}},
+		}, false},
 		{"device with part", "switch:1", []string{partKey}, func(t *testing.T) node.Endpoint {
 			t.Helper()
 			nd, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"})
@@ -128,7 +132,18 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 				t.Fatal(err)
 			}
 			return nd
-		}},
+		}, false},
+		{"device with part removed before the batch", "switch:1", []string{partKey}, func(t *testing.T) node.Endpoint {
+			t.Helper()
+			nd, err := device.NewBridgedNode(device.Options{StableKey: endpoint.StringKey("switch:1"), Name: "switch:1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := nd.AddPart(kitLight(t, partKey).Device); err != nil {
+				t.Fatal(err)
+			}
+			return nd
+		}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -155,6 +170,11 @@ func TestForgetAndAddInOneBatchStartsNew(t *testing.T) {
 			}
 			if got := dispatchWrite(t, n, attrPath(before, bdbidef.ClusterID, bdbidef.AttrNodeLabel), "old"); got != im.StatusSuccess {
 				t.Fatalf("NodeLabel write: %v", got)
+			}
+			if tc.removeFirst {
+				if err := n.Aggregator().Remove(ctx, endpoint.StringKey(key)); err != nil {
+					t.Fatal(err)
+				}
 			}
 			err := n.Aggregator().Partition(node.Scope).Batch(ctx, func(b *node.Batch) error {
 				if err := b.Forget(endpoint.StringKey(key)); err != nil {
