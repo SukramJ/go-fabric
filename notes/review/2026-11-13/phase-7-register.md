@@ -319,7 +319,7 @@ reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
 | R2-C2-bound-1101 | low | fixed `77a1fe699`, `778bb46cc` (256 key sets, decision 533); an unknown GroupKeySetId stays accepted, as chip; `BD-chip-JointFabricDatastore-RulesInServer` |
 | R2-C2-bound-1102 | low | fixed `c338f8a46`, `778bb46cc` (256 endpoints, decision 533) |
 | R2-C2-fsm-1402 | low | as matter.js (close-out plan) → `BD-chip-Transition-ReplaceEndsAsCancel`, paragraph |
-| R2-C2-wire-1605 | low | as chip → `BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer`, bullet |
+| R2-C2-wire-1605 | low | as chip's example delegates → `BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer`, bullet |
 | R2-C2-fsm-1451, -1452, -1458 | note, note, note | as chip → `BD-chip-AmbientContextSensing-RulesInServer`, paragraph |
 | R2-C2-fsm-1601 | note | as chip's example delegate → `BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer`, bullet |
 | R2-C2-fsm-1603 | note | as chip → `BD-chip-PushAvStreamTransport-RulesInServer`, paragraph |
