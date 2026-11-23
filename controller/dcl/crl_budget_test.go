@@ -42,10 +42,10 @@ func TestDERNodeBudgetBoundsTheWalk(t *testing.T) {
 		0x17, 0x0d, '2', '6', '0', '1', '0', '1', '0', '0', '0', '0', '0', '0', 'Z', // revocationDate
 		0x30, 0x0c, 0x30, 0x0a, 0x06, 0x03, 0x55, 0x1d, 0x15, 0x04, 0x03, 0x0a, 0x01, 0x01, // reasonCode
 	}
-	real := derSequenceOf(bytes.Repeat(entry, (maxCRLSize-6)/len(entry)))
-	n, err := derDecode(real)
+	genuine := derSequenceOf(bytes.Repeat(entry, (maxCRLSize-6)/len(entry)))
+	n, err := derDecode(genuine)
 	if err != nil {
-		t.Fatalf("a %d-byte list of real entries: %v", len(real), err)
+		t.Fatalf("a %d-byte list of real entries: %v", len(genuine), err)
 	}
 	if want := (maxCRLSize - 6) / len(entry); len(n.elements) != want {
 		t.Fatalf("decoded %d entries, want %d", len(n.elements), want)

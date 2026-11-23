@@ -151,8 +151,10 @@ func TestCertificatesPerRootAnswerBounded(t *testing.T) {
 	f := newFakeDCL(t)
 	root := mint(t, certSpec{cn: "Root", vid: u16(0xFFF1), ca: true, noAKID: true}, nil)
 	subject := base64.StdEncoding.EncodeToString(root.cert.RawSubject)
-	certs := []any{certRecord(root, subject, true)}
-	minted := []testCert{root}
+	certs := make([]any, 0, 1+maxCertificatesPerRootAnswer+4)
+	certs = append(certs, certRecord(root, subject, true))
+	minted := make([]testCert, 0, 1+maxCertificatesPerRootAnswer+4)
+	minted = append(minted, root)
 	for i := range maxCertificatesPerRootAnswer + 4 {
 		c := mint(t, certSpec{cn: fmt.Sprintf("Extra %d", i), vid: u16(0xFFF1), ca: true, noAKID: true}, nil)
 		minted = append(minted, c)
