@@ -78,6 +78,13 @@ type GroupKeyManagement struct {
 	// quiesced arms no next one (review II, R2-P6-err-1701 R3-a).
 	retrySeq     uint64
 	quiesceEpoch uint64
+	// mapHeld and tableHeld name each fabric whose GroupKeyMap rows, and
+	// whose GroupTable entries, the server last saw non-empty in the store:
+	// at construction, at a read, at a write or a group table change. The
+	// store's fabric cascade removes a fabric's rows before the drop runs,
+	// so the drop asks the store only for a fabric named here, and an empty
+	// answer is the attribute shrinking (review II, R4-par-4051a).
+	mapHeld, tableHeld map[uint8]bool
 	// reloadMu serialises reloadGroups: a failed reload's forget never
 	// lands after a concurrent reload that succeeded and found nothing
 	// stale to re-announce (review II, R2-P6-err-1701 R2-a). It is taken
@@ -95,6 +102,16 @@ type GroupKeyManagement struct {
 	// layer auto-tracking and chip's ember dirty-marking in
 	// src/app/clusters/group-key-mgmt-server/.
 	dataVersion cluster.DataVersionTracker
+	// changes reports what moves outside a write of this cluster: a
+	// fabric drop's removal of GroupKeyMap rows and GroupTable entries
+	// ([GroupKeyManagement.OnAttributeChange]).
+	changes cluster.AttributeChanges
+}
+
+// groupTableLister is the optional store capability the fabric drop reads
+// a fabric's GroupTable entries with ([store.Groups] has it).
+type groupTableLister interface {
+	ListGroupTable(ctx context.Context, fabricIndex uint8) ([]store.GroupTableEntry, error)
 }
 
 // GroupStoreFacade is the subset of [store.Store] this cluster uses.
@@ -239,10 +256,145 @@ func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKe
 		// (matter.js addEndpointForGroup reads state.maxGroupsPerFabric),
 		// and a membership change is a GroupTable change.
 		g.groups.SetMaxGroupsPerFabric(int(cfg.MaxGroupsPerFabric))
-		g.groups.OnGroupTableChanged(func(uint8) { g.dataVersion.Bump() })
+		g.groups.OnGroupTableChanged(func(f uint8) {
+			g.dataVersion.Bump()
+			g.markTableHeld(context.Background(), f)
+		})
 	}
 	g.dropMappingsToKeySet0(context.Background())
+	g.loadHeld(context.Background())
 	return g, nil
+}
+
+// loadHeld marks every fabric the store lists whose GroupKeyMap rows or
+// GroupTable entries are not empty (mapHeld, tableHeld). A store that
+// cannot list fabrics, or a list that fails, marks nothing: such a fabric
+// is marked at its next read, write or group table change.
+func (g *GroupKeyManagement) loadHeld(ctx context.Context) {
+	lister, ok := g.store.(fabricLister)
+	if !ok {
+		return
+	}
+	recs, err := lister.ListFabrics(ctx)
+	if err != nil {
+		return
+	}
+	for i := range recs {
+		f := recs[i].FabricIndex
+		if rows, err := g.store.ListGroupKeyMappings(ctx, f); err == nil {
+			g.markHeld(&g.mapHeld, f, len(rows) > 0)
+		}
+		g.markTableHeld(ctx, f)
+	}
+}
+
+// markTableHeld records whether the store holds GroupTable entries of
+// fabric; a store without the list, or a list that fails, leaves the mark.
+// A server without a group state serves an empty GroupTable and marks
+// nothing.
+func (g *GroupKeyManagement) markTableHeld(ctx context.Context, fabric uint8) {
+	if g.groups == nil {
+		return
+	}
+	n, ok := g.tableRows(ctx, fabric)
+	if ok {
+		g.markHeld(&g.tableHeld, fabric, n > 0)
+	}
+}
+
+// tableRows is the number of fabric's GroupTable entries the store holds;
+// false when the store cannot say.
+func (g *GroupKeyManagement) tableRows(ctx context.Context, fabric uint8) (int, bool) {
+	lister, ok := g.store.(groupTableLister)
+	if !ok {
+		return 0, false
+	}
+	rows, err := lister.ListGroupTable(ctx, fabric)
+	if err != nil {
+		return 0, false
+	}
+	return len(rows), true
+}
+
+// markHeld sets or clears fabric's mark in *held, under mu.
+func (g *GroupKeyManagement) markHeld(held *map[uint8]bool, fabric uint8, on bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if !on {
+		delete(*held, fabric)
+		return
+	}
+	if *held == nil {
+		*held = map[uint8]bool{}
+	}
+	(*held)[fabric] = true
+}
+
+// OnAttributeChange implements [contract.AttributeChangeNotifier]: a
+// fabric's removal ([GroupKeyManagement.MatterDropFabric]) that takes the
+// fabric's GroupKeyMap rows or GroupTable entries out of the attributes
+// advances the DataVersion once and tells the listeners of the attributes
+// that shrank, after its locks are released. A controller's write is
+// reported by the bridge itself (review II, R4-par-4051a, decision 614).
+func (g *GroupKeyManagement) OnAttributeChange(cb func(change contract.Change)) (unsubscribe func()) {
+	return g.changes.OnAttributeChange(cb)
+}
+
+// MatterDropFabric implements [contract.FabricScopedState]. The store's
+// fabric cascade removes the fabric's key sets, GroupKeyMap rows and
+// GroupTable entries, and the group state forgets the fabric
+// ([groups.Manager.ForgetFabric]); the server keeps nothing of its own. A
+// drop that takes GroupKeyMap rows or GroupTable entries out of the
+// attributes — a fabric the server saw rows of, whose rows the store no
+// longer holds — advances the DataVersion once and reports the attributes
+// that shrank; a drop that removes nothing — the second drop of a fabric,
+// the drop at an index whose rows the store holds — moves and reports
+// nothing (review II, R4-par-4051a, decision 614).
+func (g *GroupKeyManagement) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
+	g.writeMu.Lock()
+	g.mu.RLock()
+	mapHad, tableHad := g.mapHeld[fabricIndex], g.tableHeld[fabricIndex]
+	g.mu.RUnlock()
+	var moved []uint32
+	if mapHad {
+		// A list that fails keeps the mark, so a later drop asks again.
+		if rows, err := g.store.ListGroupKeyMappings(ctx, fabricIndex); err == nil && len(rows) == 0 {
+			g.markHeld(&g.mapHeld, fabricIndex, false)
+			moved = append(moved, groupKeyMgmtAttrGroupKeyMap)
+		}
+	}
+	if tableHad {
+		if n, ok := g.tableRows(ctx, fabricIndex); ok && n == 0 {
+			g.markHeld(&g.tableHeld, fabricIndex, false)
+			moved = append(moved, groupKeyMgmtAttrGroupTable)
+		}
+	}
+	if len(moved) > 0 {
+		g.dataVersion.Bump()
+	}
+	g.writeMu.Unlock()
+	if len(moved) > 0 {
+		g.changes.Notify(moved...)
+	}
+	return nil
+}
+
+// MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
+// whose GroupKeyMap rows or GroupTable entries the server saw held.
+func (g *GroupKeyManagement) MatterHeldFabrics() []uint8 {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	out := make([]uint8, 0, len(g.mapHeld)+len(g.tableHeld))
+	for f := range g.mapHeld {
+		out = append(out, f)
+	}
+	for f := range g.tableHeld {
+		if !g.mapHeld[f] {
+			out = append(out, f)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // dropMappingsToKeySet0 removes every stored GroupKeyMap entry that maps a
@@ -484,6 +636,8 @@ var (
 	_ contract.ClusterCommandInvokePrivilege  = (*GroupKeyManagement)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*GroupKeyManagement)(nil)
 	_ contract.ClusterQuiescer                = (*GroupKeyManagement)(nil)
+	_ contract.FabricScopedState              = (*GroupKeyManagement)(nil)
+	_ contract.AttributeChangeNotifier        = (*GroupKeyManagement)(nil)
 )
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -606,6 +760,9 @@ func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint3
 			mappings, err := g.store.ListGroupKeyMappings(ctx, fabric)
 			if err != nil {
 				return nil, false
+			}
+			if len(mappings) > 0 {
+				g.markHeld(&g.mapHeld, fabric, true)
 			}
 			for _, m := range mappings {
 				out = append(out, GroupKeyMapStruct{
@@ -842,6 +999,7 @@ func (g *GroupKeyManagement) MatterWriteChanged(ctx context.Context, attrID uint
 	if err := g.store.ReplaceGroupKeyMappings(ctx, fabric, mappings); err != nil {
 		return false, fmt.Errorf("core: GroupKeyMap write: %w", err)
 	}
+	g.markHeld(&g.mapHeld, fabric, len(mappings) > 0)
 	// A GroupKeyMap that changed advances DataVersion so DataVersionFilter
 	// evaluation detects the cluster changed; one written as it was held
 	// returned above.
@@ -1476,6 +1634,7 @@ func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint
 	if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: fabric, GroupID: groupID, GroupKeySetID: keySetID}); err != nil {
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
+	g.markHeld(&g.mapHeld, fabric, true)
 	g.dataVersion.Bump()
 	g.syncGroups(ctx, fabric)
 	return nil
