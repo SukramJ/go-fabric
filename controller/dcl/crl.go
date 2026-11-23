@@ -57,6 +57,14 @@ const (
 	// the stack overflow is fatal, so the depth is refused as malformed
 	// before it, with the same outcome for the point.
 	derMaxDepth = 32
+	// derMaxNodes bounds the elements one derDecode builds. The densest
+	// DER spends two bytes per element (a tag and a zero length); a real
+	// CRL entry — a serial, a revocation date, a reason-code extension —
+	// spends more than four bytes per element (34 bytes, 7 elements), so a
+	// CRL of real entries within maxCRLSize stays under maxCRLSize/4, and
+	// a body built only to multiply nodes is refused as malformed, like a
+	// nesting past derMaxDepth (review II, R2-C2-bound-1901).
+	derMaxNodes = maxCRLSize / 4
 )
 
 // The extensions parseCrl reads, by OID content as hex — KNOWN_CRL_EXTENSIONS
@@ -88,29 +96,29 @@ var errDERTruncated = errors.New(errDERTruncatedDescription)
 // #decodeAsn1 :444-463): the first TLV of data, a constructed one decoded
 // element by element, trailing bytes ignored.
 func derDecode(data []byte) (derNode, error) {
-	n, _, err := derDecodeRec(data, 0)
+	budget := derMaxNodes
+	n, _, err := derDecodeRec(data, 0, &budget)
 	return n, err
 }
 
-func derDecodeRec(data []byte, depth int) (derNode, []byte, error) {
-	if depth > derMaxDepth {
-		return derNode{}, nil, fmt.Errorf("dcl: DER nests deeper than %d levels", derMaxDepth)
-	}
+// derReadTLV reads the first TLV of data: its tag, its content and what
+// follows it.
+func derReadTLV(data []byte) (tag byte, content, rest []byte, err error) {
 	if len(data) < 2 {
-		return derNode{}, nil, errDERTruncated
+		return 0, nil, nil, errDERTruncated
 	}
 	tag, length := data[0], int(data[1])
-	rest := data[2:]
+	rest = data[2:]
 	if length&0x80 != 0 {
 		ll := length & 0x7f
 		if ll == 0 {
-			return derNode{}, nil, errors.New("dcl: DER forbids the indefinite-length encoding")
+			return 0, nil, nil, errors.New("dcl: DER forbids the indefinite-length encoding")
 		}
 		if ll > derMaxLengthBytes {
-			return derNode{}, nil, errors.New("dcl: DER length exceeds the maximum")
+			return 0, nil, nil, errors.New("dcl: DER length exceeds the maximum")
 		}
 		if len(rest) < ll {
-			return derNode{}, nil, errDERTruncated
+			return 0, nil, nil, errDERTruncated
 		}
 		// Accumulated in 64 bits and compared with what is left before it
 		// becomes an int, so a 5- or 6-byte length cannot wrap on a 32-bit
@@ -121,14 +129,29 @@ func derDecodeRec(data []byte, depth int) (derNode, []byte, error) {
 		}
 		rest = rest[ll:]
 		if long > uint64(len(rest)) {
-			return derNode{}, nil, errDERTruncated
+			return 0, nil, nil, errDERTruncated
 		}
 		length = int(long) //nolint:gosec // at most len(rest), checked above
 	}
 	if len(rest) < length {
-		return derNode{}, nil, errDERTruncated
+		return 0, nil, nil, errDERTruncated
 	}
-	content, rest := rest[:length], rest[length:]
+	return tag, rest[:length], rest[length:], nil
+}
+
+// derDecodeRec decodes the first TLV of data. budget is the number of
+// nodes the whole decode may still build: a constructed node's elements
+// are counted (headers only) and charged against it before they are
+// allocated, so a body that names more nodes than derMaxNodes is refused
+// without building them (review II, R2-C2-bound-1901).
+func derDecodeRec(data []byte, depth int, budget *int) (derNode, []byte, error) {
+	if depth > derMaxDepth {
+		return derNode{}, nil, fmt.Errorf("dcl: DER nests deeper than %d levels", derMaxDepth)
+	}
+	tag, content, rest, err := derReadTLV(data)
+	if err != nil {
+		return derNode{}, nil, err
+	}
 	if tag == derBitString {
 		if len(content) == 0 {
 			return derNode{tag: tag}, rest, nil
@@ -138,9 +161,19 @@ func derDecodeRec(data []byte, depth int) (derNode, []byte, error) {
 	if tag&derConstructed == 0 {
 		return derNode{tag: tag, bytes: content}, rest, nil
 	}
-	n := derNode{tag: tag, bytes: content, elements: []derNode{}}
+	count := 0
+	for r := content; len(r) > 0; count++ {
+		if _, _, r, err = derReadTLV(r); err != nil {
+			return derNode{}, nil, err
+		}
+	}
+	if count > *budget {
+		return derNode{}, nil, fmt.Errorf("dcl: DER holds more than %d elements", derMaxNodes)
+	}
+	*budget -= count
+	n := derNode{tag: tag, bytes: content, elements: make([]derNode, 0, count)}
 	for r := content; len(r) > 0; {
-		el, next, err := derDecodeRec(r, depth+1)
+		el, next, err := derDecodeRec(r, depth+1, budget)
 		if err != nil {
 			return derNode{}, nil, err
 		}
