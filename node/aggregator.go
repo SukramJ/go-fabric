@@ -792,8 +792,10 @@ func (b *Batch) Remove(key device.SourceKey) error {
 	// A held Replace of the key goes with the endpoint it replaces.
 	b.dropPendingLocked(key.String(), heldReplace)
 	b.dropLocked(part, i, key.String())
-	a.mu.Unlock()
+	// Appended under a.mu, as Add and Forget do: a.mu guards b.ops
+	// against a call racing the end of fn (fable-diff-g5g N4).
 	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key.String(), tree: reservationTree(removed.Spec())})
+	a.mu.Unlock()
 	return nil
 }
 
