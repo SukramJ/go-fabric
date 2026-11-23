@@ -259,9 +259,6 @@ func TestSharedNames(t *testing.T) {
 // the CHANGELOG qualifies by, the shared ones of the finding among them
 // (R2-C2-sup-2801), and none of the trees that are not public API.
 func TestPackageNamesOfTheModule(t *testing.T) {
-	if testing.Short() {
-		t.Skip("lists the module's packages")
-	}
 	t.Chdir(filepath.Join("..", ".."))
 	names, err := packageNames(root)
 	if err != nil {
