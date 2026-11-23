@@ -312,6 +312,11 @@ func (b *Bridge) unbindSessionRoute(sid uint16) {
 // nothing: only a secure session's removal schedules the check
 // (#deleteSession :770-788; #addSession :757-768 observes NodeSessions
 // only).
+//
+// A connection kept for its handshake carries no session any more: the
+// connection is told ([sessionsEndedNoter]), so the replies the bridge
+// sends to a peer's unsecured handshake frames do not keep its place at
+// the TCP listener's bound (R3-bound-3402).
 func (b *Bridge) releaseConnRouteLocked(r *connRoute) *connRoute {
 	r.sessions--
 	if r.sessions > 0 {
@@ -319,9 +324,19 @@ func (b *Bridge) releaseConnRouteLocked(r *connRoute) *connRoute {
 	}
 	r.sessions = 0
 	if r.liveHandshakesLocked(b.clk().Now()) > 0 {
+		if n, ok := r.conn.(sessionsEndedNoter); ok {
+			n.NoteSessionsEnded()
+		}
 		return nil
 	}
 	return r
+}
+
+// sessionsEndedNoter is the capability of a connection whose listener
+// counts what is sent on it as session traffic until told that its last
+// session ended (transport/tcp Conn.NoteSessionsEnded).
+type sessionsEndedNoter interface {
+	NoteSessionsEnded()
 }
 
 // liveHandshakesLocked counts the handshakes in flight on r, dropping a

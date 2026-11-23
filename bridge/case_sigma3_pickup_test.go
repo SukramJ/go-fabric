@@ -90,6 +90,6 @@ func TestCaseSetOnSessionEstablishedBesideSigma3(t *testing.T) {
 			a.SetOnSessionEstablished(func(sigma.SessionKeys, uint16) error { return nil })
 		}
 	})
-	_, _, _, _ = a.processSigma3(s3)
+	_, _, _, _, _ = a.processSigma3(s3)
 	wg.Wait()
 }
