@@ -15,10 +15,11 @@ import (
 )
 
 // hookTransport hands each request to the real transport; before, refuse
-// fails it with a transport error without sending it, and after, hold
-// blocks its answer until released.
+// fails it with a transport error without sending it and pause blocks it
+// until released, and after, hold blocks its answer until released.
 type hookTransport struct {
 	refuse func(*http.Request) bool
+	pause  func(*http.Request) bool
 	hold   func(*http.Request) bool
 	held   chan struct{}
 	resume chan struct{}
@@ -27,6 +28,10 @@ type hookTransport struct {
 func (h *hookTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if h.refuse != nil && h.refuse(r) {
 		return nil, errors.New("connection reset")
+	}
+	if h.pause != nil && h.pause(r) {
+		h.held <- struct{}{}
+		<-h.resume
 	}
 	resp, err := http.DefaultTransport.RoundTrip(r)
 	if h.hold != nil && h.hold(r) {
@@ -131,5 +136,52 @@ func TestClearKeepsAnActivationThatOverlapsIt(t *testing.T) {
 	}
 	if srv.State() != "disabled" || srv.Active() != nil {
 		t.Errorf("the overlapping activation was not reverted: %s, %x", srv.State(), srv.Active())
+	}
+}
+
+// A refused activation returns the flag to what it was before it, not to
+// configured: an earlier activation of this delegate that is still
+// uncommitted, and whose PUT lands after the refused one read no active
+// dataset, is still cleared by the revert (review II, R4-fsm-4302, the
+// Fable diff read's B1).
+func TestRefusedActivationKeepsAnEarlierUncommittedOne(t *testing.T) {
+	t.Parallel()
+	ds := fakeDataset(t)
+	ctx := context.Background()
+	h := &hookTransport{held: make(chan struct{}), resume: make(chan struct{})}
+	var paused atomic.Bool
+	h.pause = func(r *http.Request) bool {
+		return isPut(r, "/node/dataset/active") && paused.CompareAndSwap(false, true)
+	}
+	br, srv := newHookedBR(t, otbrtest.Options{}, h)
+
+	// Activation A is held before its PUT is sent.
+	first := make(chan error, 1)
+	go func() { first <- br.SetActiveDataset(ctx, ds) }()
+	<-h.held
+
+	// Activation B reads no active dataset and is refused with a 400.
+	srv.Fail(http.MethodPut, "/node/dataset/active", http.StatusBadRequest)
+	if err := br.SetActiveDataset(ctx, ds); err == nil {
+		t.Fatal("the refused activation succeeded")
+	}
+	srv.Fail(http.MethodPut, "/node/dataset/active", 0)
+
+	// A's PUT lands and A attaches; nothing commits it.
+	h.resume <- struct{}{}
+	if err := <-first; err != nil {
+		t.Fatal(err)
+	}
+	br.mu.Lock()
+	configured := br.configured
+	br.mu.Unlock()
+	if configured {
+		t.Error("the refused activation marked the earlier uncommitted one configured")
+	}
+	if err := br.RevertActiveDataset(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if srv.State() != "disabled" || srv.Active() != nil {
+		t.Errorf("the earlier uncommitted activation was not reverted: %s, %x", srv.State(), srv.Active())
 	}
 }
