@@ -92,8 +92,11 @@ func hasEndpointRecord(t *testing.T, eps *epmem.Store, key string) bool {
 // TestForgetSparesEveryServedEndpoint (review II, R3-store-3702, decision
 // 560): a Forget's erasure never takes what an endpoint serves, whichever
 // way the endpoint came to serve a key of the forgotten tree — a
-// Batch.Replace in the same batch, an Add of an earlier call, an endpoint
-// of another partition, or a part key forgotten by name. The served
+// Batch.Replace in the same batch, an Add of an earlier call or an
+// endpoint of another partition. (A part key forgotten by name while an
+// endpoint serves it, and a key a different device added in the same
+// batch takes, are refused instead: decision 567,
+// forget_refused_test.go.) The served
 // endpoint is held out of the reassembly before the erasure and served
 // again after it at the number it had before the Forget (an installed
 // endpoint keeps its number), and that number holds across a later,
@@ -138,14 +141,6 @@ func TestForgetSparesEveryServedEndpoint(t *testing.T) {
 				t.Helper()
 				ctx := t.Context()
 				return n.Aggregator().Forget(ctx, endpoint.StringKey("owner"))
-			},
-		},
-		{
-			name:  "part key forgotten by name",
-			setup: func(t *testing.T, n *node.Node) { t.Helper() },
-			forget: func(t *testing.T, n *node.Node) error {
-				t.Helper()
-				return n.Aggregator().Forget(t.Context(), endpoint.StringKey(partKey))
 			},
 		},
 		{

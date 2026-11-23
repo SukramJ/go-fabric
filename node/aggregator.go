@@ -375,6 +375,12 @@ type Batch struct {
 	// ops are the reservation changes of the batch's Add, Remove and
 	// Forget calls, applied in order after fn (reserve.go).
 	ops []reservationOp
+	// erasing maps every key a Forget of the batch erases to the key
+	// forgotten; added is the own keys of the devices the batch added. A
+	// key of erasing is no different device's to take in the batch
+	// (decision 567, [Batch.Forget]).
+	erasing map[string]string
+	added   map[string]bool
 }
 
 // Batch runs fn with a [Batch] bound to the partition. Each of its calls
@@ -473,6 +479,16 @@ func (b *Batch) Add(ep Endpoint) error {
 	if p, _ := a.findLocked(key); p != nil {
 		return fmt.Errorf("%w: %s", ErrDuplicateKey, key)
 	}
+	// A key a Forget of this batch erases is not a different device's
+	// to take: refused as a key another partition holds is (review II,
+	// R3-store-3702 edge, decision 567). The forgotten device added again
+	// takes its own keys back.
+	taken := surfaceEntries(ep)
+	for i := range taken {
+		if f, ok := b.erasing[taken[i].key]; ok && f != key {
+			return fmt.Errorf("%w: %s", ErrDuplicateKey, taken[i].key)
+		}
+	}
 	// Withheld only once the set takes the key, and never for a key it
 	// serves (review II, R2-P6-store-2414).
 	if err := a.n.recordWithheld(b.ctx, entries, a.servesLocked); err != nil {
@@ -486,6 +502,10 @@ func (b *Batch) Add(ep Endpoint) error {
 	part.eps = append(part.eps, ep)
 	a.detachSetLocked(key, detach)
 	b.changed = true
+	if b.added == nil {
+		b.added = map[string]bool{}
+	}
+	b.added[key] = true
 	// A returning key takes its reserved number back; the reservation is
 	// done with.
 	b.ops = append(b.ops, reservationOp{kind: opRelease, key: key})

@@ -103,12 +103,6 @@ type reservationOp struct {
 	// tree is the removed (or forgotten) endpoint's keys; nil for a
 	// release and for a forgotten key that was not in the set.
 	tree []string
-	// fresh marks a forgotten key that no endpoint served once the
-	// Forget had run: served again later in the batch, it is a new device
-	// and takes a fresh number. A forgotten key an endpoint still served
-	// (a part of another endpoint) is that endpoint's, which keeps its
-	// number (decision 560).
-	fresh bool
 }
 
 type reservationKind uint8
@@ -341,8 +335,10 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 // matter.js's `delete()` beside `close()` (endpoint/Endpoint.ts:987-992,
 // :1024-1032 at db021da0; ServerEndpointInitializer.ts:59-65
 // eraseDescendant). A key no partition holds and nothing is stored for is
-// no error; a key another partition holds is [ErrUnknownKey]. A key the
-// specification level withheld loses its withheld record in
+// no error; a key another partition holds is [ErrUnknownKey], and so is a
+// part key another endpoint, of any partition, serves: the part is that
+// endpoint's, and a Forget of it changes nothing (decision 567). A key
+// the specification level withheld loses its withheld record in
 // [Node.Surface].
 func (a *Aggregator) Forget(ctx context.Context, key device.SourceKey) error {
 	return a.Partition(Scope).Forget(ctx, key)
@@ -355,13 +351,22 @@ func (p *Partition) Forget(ctx context.Context, key device.SourceKey) error {
 
 // Forget removes the endpoint with key from the batch's partition if it
 // holds it and frees the numbers stored for key once fn returned; see
-// [Aggregator.Forget].
+// [Aggregator.Forget]. In a batch, a key of the forgotten device — its
+// tree or its reservation's — is no different device's to take: a device
+// the batch added before that serves one refuses the Forget
+// ([ErrUnknownKey]), one it adds after refuses that Add
+// ([ErrDuplicateKey]), as a key another partition holds refuses each
+// (decision 567); the forgotten device added again takes its keys back.
 func (b *Batch) Forget(key device.SourceKey) error {
 	if key == nil {
 		return ErrNoStableKey
 	}
 	k := key.String()
 	a := b.a
+	reserved, err := a.n.persisted.reservedTree(b.ctx, k)
+	if err != nil {
+		return err
+	}
 	a.mu.Lock()
 	part, i := a.findLocked(k)
 	if part != nil && part.scope != b.scope {
@@ -371,11 +376,29 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	var removed Endpoint
 	if part != nil {
 		removed = part.eps[i]
+	}
+	// A part key another endpoint serves is that endpoint's: refused as
+	// a key another partition holds is, before anything changed (review
+	// II, R3-store-3702 edge, decision 567).
+	if a.servesExceptLocked(k, removed) {
+		a.mu.Unlock()
+		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
+	erased := b.erasureSet(k, removed, reserved)
+	if a.takenByAddedLocked(b, erased, removed) {
+		a.mu.Unlock()
+		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
+	}
+	if part != nil {
 		b.dropLocked(part, i, k)
 	}
-	// A key still served once the Forget ran is a part of another
-	// endpoint: that endpoint keeps its number (decision 560).
-	op := reservationOp{kind: opErase, key: k, fresh: !a.servesLocked(k)}
+	if b.erasing == nil {
+		b.erasing = map[string]string{}
+	}
+	for _, e := range erased {
+		b.erasing[e] = k
+	}
+	op := reservationOp{kind: opErase, key: k}
 	a.mu.Unlock()
 	// A device the level withheld has no endpoint and no number, only
 	// its record in the surface report; Forget drops that too.
@@ -385,6 +408,49 @@ func (b *Batch) Forget(key device.SourceKey) error {
 	}
 	b.ops = append(b.ops, op)
 	return nil
+}
+
+// erasureSet is what a Forget of k erases, as far as the batch knows it
+// now: k, the tree of removed (the endpoint the Forget drops, nil for
+// none), the tree reserved for k and the trees of this batch's Removes of
+// k, which reserve only after fn ([Aggregator.erase] reads the
+// reservation then).
+func (b *Batch) erasureSet(k string, removed Endpoint, reserved []string) []string {
+	set := slices.Concat([]string{k}, reserved)
+	if removed != nil {
+		set = append(set, reservationTree(removed.Spec())...)
+	}
+	for _, op := range b.ops {
+		if op.kind == opReserve && op.key == k {
+			set = append(set, op.tree...)
+		}
+	}
+	return slices.Compact(slices.Sorted(slices.Values(set)))
+}
+
+// takenByAddedLocked reports whether a device b added, other than except,
+// serves a key of keys; a.mu is held.
+func (a *Aggregator) takenByAddedLocked(b *Batch, keys []string, except Endpoint) bool {
+	if len(b.added) == 0 {
+		return false
+	}
+	for _, p := range a.parts {
+		for _, ep := range p.eps {
+			if ep == except {
+				continue
+			}
+			if k, err := keyOf(ep.Spec()); err != nil || !b.added[k] {
+				continue
+			}
+			entries := surfaceEntries(ep)
+			for i := range entries {
+				if slices.Contains(keys, entries[i].key) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // splitErasures splits a batch's reservation ops into the ones applied
@@ -428,10 +494,10 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp)
 	fresh := map[string]bool{}
 	var errs []error
 	for _, op := range erase {
+		// No endpoint serves a forgotten key once its Forget ran
+		// (decision 567): served again, it is a new device.
 		forgotten[op.key] = true
-		if op.fresh {
-			fresh[op.key] = true
-		}
+		fresh[op.key] = true
 		for _, k := range op.tree {
 			forgotten[k] = true
 		}
