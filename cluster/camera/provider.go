@@ -43,6 +43,11 @@ const MaxSessionID uint16 = 65534
 // port.
 var ErrNoProviderPort = errors.New("camera: WebRtcTransportProvider needs a ProviderPort")
 
+// ErrNegativeMaxSessions reports a WebRtcTransportProvider built with a
+// negative [ProviderConfig.MaxSessions] or
+// [ProviderConfig.MaxSessionsPerFabric].
+var ErrNegativeMaxSessions = errors.New("camera: WebRtcTransportProvider session bound is negative")
+
 // ProviderConfig carries the construction parameters of a [Provider].
 type ProviderConfig struct {
 	// Port is the camera's WebRTC stack; required.
@@ -54,6 +59,22 @@ type ProviderConfig struct {
 	// turns: or stuns: ICE server needs it. nil reports known, as the
 	// camera app's IsUTCTimeNull (webrtc-provider-manager.cpp:830-836).
 	UTCTimeKnown func() bool
+	// MaxSessions bounds the provider's sessions, CurrentSessions entries
+	// the host set included: a new session over it is refused before a
+	// session id is taken and before the port is asked — ProvideOffer
+	// answers RESOURCE_EXHAUSTED, SolicitOffer is answered with an id and
+	// the requestor is then sent End with OutOfResources. The bound of the
+	// camera app's delegate, kMaxConcurrentWebRTCSessions (5; connectedhomeip
+	// examples/camera-app/linux/src/clusters/webrtc-provider/
+	// webrtc-provider-manager.cpp:39 at 6170af84). 0 is no bound beyond the
+	// session ids; negative is [ErrNegativeMaxSessions].
+	MaxSessions int
+	// MaxSessionsPerFabric bounds the sessions of one fabric, counted over
+	// the entries of the accessing fabric, the host's included, and refused
+	// as [ProviderConfig.MaxSessions] is: this module's own bound, so one
+	// fabric cannot take every session of the camera. 0 is no bound;
+	// negative is [ErrNegativeMaxSessions].
+	MaxSessionsPerFabric int
 	// DataVersion is an optional host-owned tracker.
 	//
 	// Deprecated: a host-owned tracker adds nothing — the wire carries the
@@ -99,6 +120,9 @@ type Provider struct {
 	// peers reaches a session's requestor for the camera's signals
 	// ([Provider.AttachPeerConnector]); nil until the node attaches one.
 	peers PeerConnector
+	// ends sends the End of a SolicitOffer refused at a session bound
+	// (provider_cap.go).
+	ends endQueue
 }
 
 // Compile-time assertions.
@@ -120,6 +144,9 @@ var (
 func NewProvider(cfg ProviderConfig) (*Provider, error) {
 	if cfg.Port == nil {
 		return nil, ErrNoProviderPort
+	}
+	if cfg.MaxSessions < 0 || cfg.MaxSessionsPerFabric < 0 {
+		return nil, fmt.Errorf("%w: MaxSessions %d, MaxSessionsPerFabric %d", ErrNegativeMaxSessions, cfg.MaxSessions, cfg.MaxSessionsPerFabric)
 	}
 	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}}
 	handlers := map[uint32]spec.CommandHandler{
@@ -448,11 +475,14 @@ func (p *Provider) solicitOffer(ctx context.Context, fields any) (any, error) {
 	if !p.view.autoSelect(r.usage, videos, audios) { // :735-740
 		return nil, spec.Errorf(im.StatusDynamicConstraintError, "WebRtcTransportProvider: the camera cannot provide StreamUsage %d", r.usage)
 	}
+	node, fabric := peerOf(ctx)
+	if p.atSessionBound(fabric) {
+		return p.refuseSolicitOffer(ctx, req, node, fabric, videos, audios)
+	}
 	id, err := p.generateSessionID() // :744-750
 	if err != nil {
 		return nil, err
 	}
-	node, fabric := peerOf(ctx)
 	args := OfferArgs{
 		SessionID: id, StreamUsage: req.StreamUsage, VideoStreams: videos, AudioStreams: audios,
 		IceServers: req.IceServers, IceTransportPolicy: req.IceTransportPolicy, MetadataEnabled: req.MetadataEnabled,
@@ -548,6 +578,9 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 		}
 		if err := p.checkTurnsOrStuns(req.IceServers); err != nil { // :1046-1051
 			return nil, err
+		}
+		if p.atSessionBound(fabric) {
+			return nil, errSessionBound
 		}
 		if args.SessionID, err = p.generateSessionID(); err != nil { // :1054-1060
 			return nil, err
