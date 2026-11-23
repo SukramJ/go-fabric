@@ -409,3 +409,76 @@ func TestDefaultClientRefusesRedirects(t *testing.T) {
 		t.Fatal("the host's own client was not used as given")
 	}
 }
+
+// formOutOfBand plays another writer of the border router (its own UI, a
+// second controller): a dataset put and the interface enabled, attached
+// after the server's polls — not an activation of this delegate.
+func formOutOfBand(t *testing.T, br *BorderRouter, srv *otbrtest.Server, ds []byte) {
+	t.Helper()
+	ctx := context.Background()
+	if err := br.c.setDataset(ctx, false, ds); err != nil {
+		t.Fatal(err)
+	}
+	if err := br.c.setState(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	srv.SetState("leader")
+}
+
+// Only an activation of this delegate leaves the dataset uncommitted: a
+// CommissioningComplete that finds the border router not attached does not
+// arm the fail-safe's revert against a dataset no activation of this node
+// set, and a revert that cleared returns the flag (review II,
+// R3-fsm-3350; decision 545, ahead of chip's
+// GenericThreadBorderRouterDelegate.cpp:186-212).
+func TestRevertTouchesOnlyAnUncommittedActivation(t *testing.T) {
+	t.Parallel()
+	ds := fakeDataset(t)
+	for _, noDelete := range []bool{false, true} {
+		// (a) a CommissioningComplete while the border router is detached.
+		br, srv := newBR(t, otbrtest.Options{Active: ds, NoDelete: noDelete})
+		ctx := context.Background()
+		srv.SetState("detached")
+		if err := br.CommitActiveDataset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		srv.SetState("leader")
+		if err := br.RevertActiveDataset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if srv.State() != "leader" || !bytes.Equal(srv.Active(), ds) {
+			t.Errorf("noDelete %v, commit while detached + revert: %s, %x, want leader with the dataset", noDelete, srv.State(), srv.Active())
+		}
+
+		// (b) commissioned while the border router had no network, the
+		// network formed out of band afterwards.
+		br, srv = newBR(t, otbrtest.Options{NoDelete: noDelete})
+		if err := br.CommitActiveDataset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		formOutOfBand(t, br, srv, ds)
+		if err := br.RevertActiveDataset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if srv.State() != "leader" || !bytes.Equal(srv.Active(), ds) {
+			t.Errorf("noDelete %v, fresh + formed out of band + revert: %s, %x, want leader with the dataset", noDelete, srv.State(), srv.Active())
+		}
+
+		// (c) a revert that cleared an activation leaves nothing armed: a
+		// network formed afterwards survives the next expiry.
+		br, srv = newBR(t, otbrtest.Options{AttachPolls: 2, NoDelete: noDelete})
+		if err := br.SetActiveDataset(ctx, ds); err != nil {
+			t.Fatal(err)
+		}
+		if err := br.RevertActiveDataset(ctx); err != nil || srv.State() != "disabled" {
+			t.Fatalf("noDelete %v, the uncommitted activation was not reverted: %v, %s", noDelete, err, srv.State())
+		}
+		formOutOfBand(t, br, srv, ds)
+		if err := br.RevertActiveDataset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if srv.State() != "leader" || !bytes.Equal(srv.Active(), ds) {
+			t.Errorf("noDelete %v, second revert: %s, %x, want leader with the dataset", noDelete, srv.State(), srv.Active())
+		}
+	}
+}

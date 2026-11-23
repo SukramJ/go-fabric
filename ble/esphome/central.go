@@ -106,14 +106,21 @@ type Central struct {
 	disc    *DiscoverOptions
 	rescans chan struct{}
 
-	// setMu guards proxies and skipped. Lock order: setMu before a
-	// proxy's mu, never after.
+	// setMu guards proxies, skipped, aliases and capped. Lock order:
+	// setMu before a proxy's mu, never after.
 	setMu   sync.Mutex
 	proxies []*proxy
 	// skipped are the discovered devices refused for good, by instance
 	// name, with the config_hash they were refused at: they are dialled
 	// again only when their configuration changes.
 	skipped map[string]string
+	// aliases are the discovered names whose connection stated the MAC of
+	// a device the set holds, by instance name: not dialled again, and
+	// taking no room, while that device stays in the set at an unchanged
+	// config_hash (review II, R3-bound-3302).
+	aliases map[string]alias
+	// capped are the names left out at the bound, logged once each.
+	capped map[string]bool
 
 	// mu guards callback, scanning and sightings.
 	mu        sync.Mutex
@@ -142,7 +149,7 @@ func NewCentral(proxies []Proxy, opts Options) (*Central, error) {
 		return nil, ErrNoProxies
 	}
 	opts.normalize()
-	c := &Central{opts: opts, log: opts.Logger, clk: opts.Clock, sightings: map[uint64]map[*proxy]sighting{}, skipped: map[string]string{}}
+	c := &Central{opts: opts, log: opts.Logger, clk: opts.Clock, sightings: map[uint64]map[*proxy]sighting{}, skipped: map[string]string{}, aliases: map[string]alias{}, capped: map[string]bool{}}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	if opts.Discover != nil {
 		d, err := opts.Discover.normalized()
