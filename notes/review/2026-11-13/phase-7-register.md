@@ -291,7 +291,7 @@ reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
 | ID | sev | disposition |
 | --- | --- | --- |
 | R2-C2-store-1001 | medium | fixed `d2a2a8351`: ConnectNetwork's switch-on of InterfaceEnabled is notified, so it is persisted |
-| R2-C2-conc-1201 | medium | fixed `2af4bedc5`, `eecc05c4c`: a same-fabric cancel wins over a present in flight, answered SUCCESS (decision 521); a re-present re-checks the bound of eight |
+| R2-C2-conc-1201 | medium | fixed `2af4bedc5`, `eecc05c4c`: a same-fabric cancel wins over a present in flight, answered SUCCESS (decision 521); a re-present re-checks the bound of eight. Regression R3-conc-3101 fixed (§ Run 3) |
 | R2-C2-conc-1002 | low | fixed `8501be40e` |
 | R2-C2-err-1003 | low | fixed `69574d9b9` |
 | R2-C2-store-1004 | low | fixed `8a788ca8e`; the owed clear is held in memory only |
@@ -299,13 +299,13 @@ reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
 | R2-C2-sec-1006, TM R3.2 | low | fixed as decided (515, 522) `3add1b0e7`, `5b9851c50`, `e1c409d39`: both fabric-blind `IsFailSafeArmed` ports deprecated, removable in v0.28.0, a once-log when the blind port answers the gate; `BD-chip-FailSafeOfTheAccessingFabric`. The gap itself closes with the removal |
 | R2-C2-conc-1202 | low | fixed `f695dfca8` |
 | R2-C2-store-1203 | low | fixed `94f4b93ae` |
-| R2-C2-conc-1205 | low | fixed `33ebadd12`, `5c080466b`; the activation is skipped when the scene left the table during the apply, where matter.js activates without a second lookup — no decision recorded, below |
+| R2-C2-conc-1205 | low | fixed `33ebadd12`, `5c080466b`; the activation is skipped when the scene left the table during the apply, where matter.js activates without a second lookup — decision 547: `by_design` divergence line (§ Run 3) |
 | R2-C2-store-1204 | low | as matter.js, a mirrored gap → findings register |
 | R2-C2-conc-1501 | medium | fixed `34d24684f`, `b3caa0c2a`: the commit judges and stores the values staged when it began |
 | R2-C2-store-1502 | medium | fixed `e9c078a8d` |
 | R2-C2-fsm-1550 | medium | fixed `802d3fe3a`: Stop keeps a drive report as MoveTo and Calibrate do; the departure from chip in `BD-chip-ClosureControl-RulesInServer` |
 | R2-P6-err-1560 | low | registered residue (decision 518): the findings row carries the reason a lock cannot close it |
-| R2-C2-store-1555 | low | fixed `d2ef44038` |
+| R2-C2-store-1555 | low | fixed `d2ef44038`. Regression R3-conc-3201 fixed (§ Run 3) |
 | R2-C2-wire-1553 | low | fixed: Pump `28ebbc469` (F2); SmokeCoAlarm and Valve `e38ab7bd9`, `a17c7f4e6` (F3, decision 520). Events and ExpressedState still read the raw host values (not a row) |
 | R2-C2-conc-1554 | low | fixed `aa9f2c91a` |
 | R2-C2-api-1552 | low | fixed `745ec2534` |
@@ -335,7 +335,7 @@ reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
 | R2-C2-bound-2151 | medium | fixed `f06d95c13` |
 | R2-C2-bound-2152 | medium | fixed `3d3eb9b81` (8 targets, decision 519) → `BD-Matter-Controller-HostDiscoveriesBounded`, paragraph |
 | R2-C2-api-2201 | medium | fixed `14c78cf45`: one Service per controller, `ErrServiceInUse` |
-| R2-C2-bound-2153 | low | fixed `d0a0e176c` → `BD-Matter-Controller-CommissioningRaceBounded`, paragraph |
+| R2-C2-bound-2153 | low | fixed `d0a0e176c` → `BD-Matter-Controller-CommissioningRaceBounded`, paragraph. Regression R3-bound-3501 fixed (§ Run 3) |
 | R2-C2-conc-2202 | low | fixed `bece8d3f7` |
 | R2-C2-sec-1802 | low | fixed `fcf44b25e` |
 | R2-C2-store-1801 | low | fixed `2611cf868` |
@@ -345,13 +345,13 @@ reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
 | R2-C2-conc-1904 | low | fixed `edc238f2d` (10 s) |
 | R2-C2-conc-1905 | low | fixed `d59348f25` |
 | R2-P7-C1-01 | low | (a) in part `66cd7974d`: the buffered download is sized from the record (×5.07 → ×2.07 of the image); (b) and (c) → decision 542, a brief of its own; the `MemoryBlobs` streaming half of (a) is open with it |
-| R2-C2-fsm-2302 | low | fixed `d6052a114`; a node deleted between the registry's open and the OTA start is still not forgotten (residue) |
+| R2-C2-fsm-2302 | low | fixed `d6052a114`; a node deleted between the registry's open and the OTA start is still not forgotten (residue). Regression R3-fsm-3801 fixed (§ Run 3), which also closes the residue |
 | R2-C2-conc-2301 | low | fixed `659f16939` |
 | R2-C2-store-2350 | low | fixed `f77e14123`, `550cfeb19`: Register returns the store's error, the registration stays in memory, as matter.js |
-| R2-C2-wire-2351 | low | fixed `a40a0ffa6` (the default subscription's filter saturates); the sustained re-subscription's own filter (`client/interaction/sustained.go`) wraps the same way — open, below |
+| R2-C2-wire-2351 | low | fixed `a40a0ffa6` (the default subscription's filter saturates); the sustained re-subscription's own filter (`client/interaction/sustained.go`) wraps the same way — fixed in run 3 (`4f224d9cd`, § Run 3) |
 | R2-C2-sec-2352 | low | as matter.js → `BD-Matter-Controller-CommissionableDiscoveryRefreshesCommissioned` |
 | R2-C2-conc-2353 | low | fixed `8c274c0bd`, `3df29512e`: Start during Disable is refused, Enable is a no-op, the mark is set after the stop as matter.js |
-| R2-C2-store-2401 | medium | fixed `4e4f56bdf`, `36c62ccfd` for a same-batch add |
+| R2-C2-store-2401 | medium | fixed `4e4f56bdf`, `36c62ccfd` for a same-batch add. Regression R3-store-3701 fixed; the Replace, earlier-Add and cross-partition forms are R3-store-3702, fixed (§ Run 3). Tests: `TestForgetAndAddFormerPartKeyInOneBatch` (restored by decision 575), `TestForgetLetsANewDeviceTakeAFormerKeyNoEndpointServes`, `TestForgetSparesEveryServedEndpoint` |
 | R2-C2-store-2402 | low | fixed `d8dedbfcc` |
 | R2-C2-sec-2451 | low | fixed as decided (524) `e1ff62504`, `bb60dbc18`: session events carry their fabric, the retrieved log shows a fabric its own peers only → `BD-chip-DiagLogs-BDX`, paragraph |
 | R2-C2-err-2456 | low | fixed `2522468d5` |
@@ -371,7 +371,7 @@ reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
 | R2-C2-err-0452 | low | fixed `31dfd8048` |
 | R2-C2-fsm-0451 | low | fixed `31dfd8048` |
 | R2-C2-api-0651 | low | fixed `8df3559ee` |
-| R2-C2-err-0450 | low | fixed `31dfd8048` (finishes R2-P6-err-0403) |
+| R2-C2-err-0450 | low | fixed `31dfd8048` (finishes R2-P6-err-0403). Regression R3-conc-3401 fixed (§ Run 3) |
 | R2-C2-err-0453 | low | fixed `31dfd8048`, `ef55e7313`, `258d8e643`: `Assemble` refuses an endpoint that serves nothing (decision 528) |
 | R2-C2-err-0455 | low | fixed `31dfd8048`, `7ffe0df79`: `ScenesConfig.ListFabrics`, FAILURE on the error, `Fabrics` deprecated (decision 527) |
 | R2-C2-par-0454 | low | kept (decision 530), comment and pin test `31dfd8048` → `BD-Matter-Bridge-IdentifyOnEveryBridgedEndpoint` |
@@ -382,9 +382,9 @@ reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
 | R2-C2-par-0502 | note | as matter.js → the findings row of R2-P6-bound-0405 (follow-on) closed |
 | R2-C2-bound-0403 | note | open: the invoke half of R2-P6-bound-0405 — `bridge/receive_dispatch.go` reads the snapshot of every cluster an invoke names before the access check (cost only; nothing delivered); proposed fix: take the endpoints from `im.DispatchEndpoints`. No C3 unit owned `bridge/` for it |
 | R2-C2-fsm-2001 | medium | fixed `532d4a4c6`, `f671b296c`, `0d406808b` (Linux tests run in Docker by the unit, CI runs them) |
-| R2-C2-bound-0201 | low | fixed `e9242a8a5`, `f671b296c` |
+| R2-C2-bound-0201 | low | fixed `e9242a8a5`, `f671b296c`. Regression R3-bound-3402 fixed (§ Run 3) |
 | R2-C2-err-2002 | low | fixed `532d4a4c6` |
-| R2-C2-bound-2003 | low | fixed `4d0d134b8`, `f671b296c` |
+| R2-C2-bound-2003 | low | fixed `4d0d134b8`, `f671b296c`. Regressions R3-bound-3302 and R3-sec-3303 fixed (§ Run 3) |
 | R2-C2-fsm-0205 | low | fixed `fea447c1c`, `784b8540f` |
 | R2-C2-test-0251 | low | fixed `23e51ebff` |
 | R2-C2-err-0252 | low | fixed `dc170dd03` |
@@ -405,8 +405,8 @@ reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
 
 | ID | where | what |
 | --- | --- | --- |
-| decision 537 | run 3, unit `cam` | A VideoStreamAllocate the port answers with a held stream's id and a disjoint frame-rate range is answered Success and serves MinFrameRate 30 > MaxFrameRate 10 (probe-measured by unit F3b); chip's `UpdateVideoStreamRangeParams` to read |
-| decision 538 | run 3, unit `sec` | `DecodeDER` keeps a key identifier of another length than 20 bytes for every certificate kind; chip's X.509 converter refuses it for every certificate (`CHIPCertFromX509.cpp:213`, `:232` at `6170af84`, Fable); matter.js's DER side needs a Fable note. The stale `ValidateRCAC` comment at `cluster/core/operational_credentials.go:3048-3049` → the REG fix pass |
+| decision 537 | run 3, unit `cam` | A VideoStreamAllocate the port answers with a held stream's id and a disjoint frame-rate range is answered Success and serves MinFrameRate 30 > MaxFrameRate 10 (probe-measured by unit F3b); chip's `UpdateVideoStreamRangeParams` to read — **closed** in run 3 as R3-wire-3601, line only: chip intersects without an emptiness check and answers with the reused id, `by_design` sentences in `BD-chip-CameraAvStreamManagement-RulesInServer` and `BD-matterjs-server-CameraStreamManagement` (§ Run 3) |
+| decision 538 | run 3, unit `sec` | `DecodeDER` keeps a key identifier of another length than 20 bytes for every certificate kind; chip's X.509 converter refuses it for every certificate (`CHIPCertFromX509.cpp:213`, `:232` at `6170af84`, Fable); matter.js's DER side needs a Fable note. The stale `ValidateRCAC` comment at `cluster/core/operational_credentials.go:3048-3049` → the REG fix pass — **closed** in run 3 as R3-par-3405, line only: the `by_design` sentence in `BD-chip-RCAC-RefusalsBothReferencesShare` (§ Run 3) |
 | decision 541, R2-C2-bound-0501 remainder (with R2-P7-C1-02) | a unit of its own after C3, candidate for run 3 or an issue | the persisted-subscription load at start and at re-establishment streamed with a byte budget, a new optional port across `bridge`, `store` and `im/subscription`, and the value-field decode; the design states its architecture section |
 | decision 542, R2-P7-C1-01 (b), (c) | a brief of its own, outside this pull request | Fable reads matter.js's SoftwareUpdateManager (retention, a download slot), then a wizard with the two values; the `MemoryBlobs` streaming question of (a) goes with it |
 | R2-C2-test-2802, clustergen half | run 3, or the integration that regenerates `cluster/spec` (F4's paths) | `script/clustergen/gen.go` still writes the "package-level initializer" annotation. Measured by unit F9 on its analyzer: dropping it lowers the redundant annotations by 1 049, surfaces the 52 unreached exports the finding names (the unreached ratchet from 22 to about 74 unless tests or annotations with a true reason are added), takes `reachabilityWhitelistRatchet[generated]` from 1101 to about 0 and the redundant ratchet to 57 — all three ratchets move in one commit. The 57 redundant hand annotations are a question of their own |
@@ -419,7 +419,108 @@ Read by the units or by the Fable diff reads; each needs a disposition
 - R2-C2-conc-1205: matter.js activates a recalled scene after the apply without a second lookup (`ScenesManagementServer.ts:461-462`, `:565-566` at `b25ed960`, Fable); this module skips the activation when the scene left the table during the apply — a `by_design` line if recorded as a divergence. Whether matter.js can reach the interleaving was not measured.
 - R2-C2-store-2401: `Batch.Replace` and an endpoint served from an earlier batch still reach the erasure of a served key (Fable diff read of F6, N3, N4; inferred, not run).
 - R2-C2-sec-2451: ring details outlive their fabric; a fabric index reused after a wrap within one ring's lifetime would read the old fabric's peers (Fable diff read of F7a, N4); the singleton handler's read-back of the session id (N3, older than C3).
-- R2-C2-wire-2351: the sustained re-subscription's `EventMin` wraps at 2^64-1 (`client/interaction/sustained.go`; measured by unit F5b).
-- R2-C2-fsm-2302: a node deleted between the registry's open and the OTA start.
+- R2-C2-wire-2351: the sustained re-subscription's `EventMin` wraps at 2^64-1 (`client/interaction/sustained.go`; measured by unit F5b). → fixed in run 3.
+- R2-C2-fsm-2302: a node deleted between the registry's open and the OTA start. → R3-fsm-3801, fixed in run 3.
 - R2-C2-par-0353: a client whose newest session is TCP, and a client with no session held, get their Check-In elsewhere than in matter.js (Fable diff read of F7a, round 2) — in `BD-Matter-ICD-CheckInAddressLastActive`, older than C3.
-- Unit F3: a CMAF `TrackName` of 17 characters passes every check before the port (unverified against chip).
+- Unit F3: a CMAF `TrackName` of 17 characters passes every check before the port (unverified against chip). → R3-wire-3602: a direct `MatterInvoke` only; on the wire the generated decoder refuses 17 characters with CONSTRAINT_ERROR (probe of run 3, unit `cam`); a `by_design` line.
+
+## Run 3 and its fix pull request (2026-11-23)
+
+**Run 3** read the seven units with a confirmed C3 medium in full, plus the C3
+fix diff, at `28255e842` (R3a, R3b and a third pass over appclim, facade and
+cpeer; every unit read). Fable's verify confirmed **5 mediums** (R3-bound-3501,
+a fix-regression of R2-C2-bound-2153; R3-store-3702, the carried remainder of
+R2-C2-store-2401; R3-par-3051; R3-fsm-3301; R3-fsm-3350), **no high**, and
+**8 fix-regressions of C3 at low** (R3-conc-3101, -3201, -3401, -bound-3302,
+-3402, -sec-3303, -store-3701, -fsm-3801). R3-fsm-3251 was struck (it is
+decision 150). Not converged, so decision 544 opened the fix pull request.
+
+**The fix pull request** ran on branch `review2/p7-r3fix` from `3114e60ba`
+(main after #586) in units on disjoint paths: G1 core, G2 appclim, G3 client,
+G4 controller root + `controller/client` + `controller/camera`, G5 facade,
+G6 request path, G7a `ble/bluez`, G7b `ble/esphome` + `thread/otbr`, G8 the
+`dcl` move, G9 `controller/commissioner` (#587), and the follow-ups the
+decisions opened (G2b, G3b, G3c, G4b, G5b to G5e, G6b, G7b2, G8b, G9b, G9c).
+An Opus refutation read every row at the head first, a fix-regression being
+only re-located (none refuted); each fixed row has a test that failed before
+its fix; Fable read the diffs of G1, G3, G3b, G3c, G4, G5 to G5e, G6, G6b, G7b
+and G8b and wrote the fact notes of G1, G2b and G4. Merges onto the branch:
+`08c9e7d49` G1, `b7ab2aa7d` G9, `2ab9981a8` G5, `a9523ba5e` G3 (wave R3F-A);
+`502e7a5c3` G3, `124189426` G5, `a60dfb7d1` G9, `8bb1c9efd` G2, `10bd28a61`
+G4, `4b0623964` G7a, `678be12ff` G7b (R3F-A2/B); `cdc52404a` G3, `1794fb118`
+G5, `607c220b6` G2, `67d109091` G4, `694a5ab0b` G9, `17bea4c88` G7b
+(R3F-B2); `a2e7b5e0b` G6, `fa1101500` G5 (R3F-C); `831536094` G8,
+`bcd620289` G6, `b6236ec07` G5 (R3F-C2). Severities are the verify's. Not
+reopened: R3-fsm-3251 (decision 150), the R2-C2-store-1004 residual,
+R2-C2-wire-0551's rest (decision 543). The notes of the run are not fixed.
+
+### The rows
+
+| ID | sev | disposition |
+| --- | --- | --- |
+| R3-par-3051 | medium | fixed `bedf73c67`: the Thread NetworkCommissioning server reports what the fail-safe's expiry, `Refresh` and the re-attach change, as chip reports at the same points; test `TestThreadNetworkCommissioningReportsChangesOutsideACommand`, guard `TestFailSafeParticipantsReportTheirChanges` |
+| R3-conc-3101 | low (regression of R2-C2-conc-1201) | fixed `47c24ceae`, `56c6ad7b7` (Fable diff read B1: a refused present inherits a skipped take-down); tests `TestMessagesCancelledPresentLeavesALaterPresent`, `TestMessagesPresentWaitsForATakeDown` (synctest since `23cd22e8e`), `TestMessagesRefusedPresentInheritsTheTakeDown` |
+| R3-conc-3102 | low | fixed `47c24ceae`, `56c6ad7b7`; test `TestMessagesRemovedPresentLeavesAReusedIndexPresent` |
+| R3-conc-3103 | low | fixed `10eecc5f5`; test `TestOTAProviderDropWithdrawsTheScopeOfAnEndedAttempt` |
+| R3-store-3052 | low | fixed `e4a16b88e`, `f80f31887`, the owed save the module's own mechanism (Fable fact note: matter.js strips on `deleting`, best-effort, no owed save — the row's reference cell "in one transaction" does not hold at the pin); tests `TestBindingDropOwesAFailedSave`, `TestBindingWriteSettlesAnOwedSave` |
+| R3-err-3053 | low | fixed `7ffd1c5f2`: FAILURE for a store failure, CONSTRAINT_ERROR for an unknown fabric only (fact note); test `TestSignVIDVerificationRequestStoreFailureIsFailure` |
+| R3-store-3151 | low | fixed `2e3a3d1f6`, `d92883796` (status only, as chip: CONSTRAINT_ERROR); test `TestSetDSTOffsetEmptyStoreFailureIsConstraintError` |
+| R3-err-3152 | low | fixed `79fe8024e`; test `TestOTARequestor_StartAfterLoadFailureRetries` |
+| R2-C2-conc-1205 / R3-conc-3104 | low / note | line only (decision 547): `BD-Matter-Scenes-RecallActivatesHeldScene` |
+| R3-conc-3201 | low (regression of R2-C2-store-1555) | fixed `ab06b5053`; test `TestThermostatUIKeypadListenerSetsAgain`; C3's `TestThermostatUIKeypadLockoutSaveAndStoreAreOneStep` green |
+| R3-store-3202 | low | fixed `ab06b5053`; test `TestThermostatUIEveryStorePathSavesKeypadLockout` |
+| R3-conc-3203 | low | fixed `ddd4df8e3`; test `TestWrittenSensitivityFollowsTheServersState`; the verdict-table guard repaired by a `boolcfg.Server` case `c216b0bb9` |
+| R3-conc-3252 | low | fixed `c5ab5ba3b`; tests `TestTemperatureControlCommandsStoreInTheOrderTheSetterHeard`, `TestTemperatureControlWaitingCommandEndsWithItsContext` |
+| R3-store-3253 | low | fixed `9de50a81e`, and `revertAtomic` by `a7aca9303` (decision 570); tests `TestClearedActivePresetReachesTheStoreAfterAFailedSave`, `TestRevertedPresetsReachTheStoreAfterAFailedRestore` |
+| R3-store-3254 | low | fixed `bed80b059` (key creation serialised per AuthStore) and `3f9c85c76` (`New` refuses an undecryptable stored credential with `ErrConfig`, decision 569) → `by_design` line; tests `TestConcurrentLocksOnOneStoreShareOneCredentialKey`, `TestNewRefusesCredentialsTheLoadedKeyDoesNotOpen`. Fact note: matter.js generates the key once and never test-decrypts (now measured); "every PIN on the lost key is refused" describes the module, not matter.js |
+| R3-conc-3207 | note | line only: `by_design` sentence in the thermostat atomic-write entry |
+| R3-bound-3501 | medium (regression of R2-C2-bound-2153) | fixed `586407670`, `4ceea0c30`, `5509529a7` (decisions 552, 559): the oldest waiting candidate takes a place at once; an ended attempt gives its place up at its cancel while fewer than 16 unwind → `BD-Matter-Controller-CommissioningRaceBounded` and the limits page corrected; tests `TestRace_DeviceFoundBehindAStreamOfCandidatesStartsWithinItsCeiling`, `TestRace_DeviceInABurstStartsWithinItsCeiling`, `TestRace_OverflowWhileReplacedAttemptsHaveNotReturnedIsBounded`; C3's `TestRace_WaitingCandidatesAreBounded` green |
+| R3-bound-3551 | low | fixed `62f4661a9` → sentence in the R2-P3-ctl-lan-09 entry; test `TestMonitorTakesOnlyUnicastDestinations` |
+| R3-bound-3552 | low | fixed `0529372aa` (no kept result, `seen` bounded), `68323f566`, `a2a529ed9`, `3b046227d` (at most 16 preparations, decisions 563, 565), `1f9543917` (the delivery queue bounded, decision 573) → `BD-Matter-Discovery-CommissionableSearchBounded`, three limits rows; tests `TestScanner_ContinuousSearchRetainsBoundedState`, `TestSession_ConcurrentPreparationsAreBounded`, `TestSession_PreparationBacklogEndsWithTheSearch`, `TestDeliveryQueue_BoundDropsTheOldest` |
+| R3-api-3553 | low | fixed `cae01b74f` (doc) |
+| R3-api-3580 | low | fixed `7e3946e67`, `686a73792` (clamp), `78d59e6cd` (`SubscribeRequest.Retries`, `DefaultSustainRetries` deprecated, decision 562), `d660766ec`, `5eb73faf9`, `28ec45e6c` (merged field by field, `NoMaximumInterval` / `NoJitter`, decision 566) → `BD-Matter-RetryScheduleInRange`; tests `TestRetrySchedule_NeverShrinksBelowItsFirstInterval`, `TestSustainRetries_NeverShrinkBelowTheFirstInterval`, `TestSustainRetriesMergeOverTheDefault`, `TestSustainedRetriesMergeOverTheDefault` |
+| R2-C2-wire-2351 rest | low | fixed `4f224d9cd` (the sustained site saturates; closes the row with C3's `a40a0ffa6`) → `by_design` line; test `TestSustainedEventMinAtTheTopOfTheRange` |
+| R3-bound-3555 | note | line only: mirrored, a `by_design` parity sentence |
+| R3-fsm-3801 | low (regression of R2-C2-fsm-2302) | fixed `da7003c53`: every node the registry templates takes `HooksFor`'s hooks; tests `TestUnavailableNodeTakesItsHooksFromHooksFor`, `TestOTAForgetsADeletedNodeThatFailedToLoad` |
+| R3-err-3651 | low | fixed `0c8e3f4cc`, `8f5812fe4` (decision 554, bytes) → `BD-Matter-Controller-CameraStringBytes`; test `TestStringBoundsCountBytes` |
+| R3-wire-3601 | low | line only (as chip, the server half; as matterjs-server, the controller half) → `by_design` sentences; closes decision 537 |
+| R3-wire-3602 | note | line only → `by_design` sentence (CONSTRAINT_ERROR at decode, from matter.js's schema; chip truncates) |
+| R3-wire-3653 | note | line only, mirrored → `by_design` sentence |
+| #584 | — | done per role (decisions 551, 561, 571): `node.NewAESGCMSealer`, `node.Reseal`, `node.ErrUnseal`, `node.ErrNoSealer` (`60ac6a3a6`, `f10571d39`); `controller.NewAESGCMSealer`, `controller.ErrUnseal`, `controller.ErrNoSealer`, `controller.ErrScrubIncomplete` (`f8e8ccdf7`, `b53c271c9`), beside the existing `controller.Reseal`; tests `TestFacadeAESGCMSealerIsTheStores`, `TestFacadeResealRotatesTheKey`, `TestFacadeSealedControllerDatabase`, `TestFacadeSealErrorsAreTheStores`; `docs/security.md` names the routes |
+| R3-store-3702 | medium (remainder of R2-C2-store-2401) | fixed `93c88ae72`, `059814254`, `f4c1a3dd6`, `7fa2d9600` (every served endpoint held out of the erasure, number kept, decision 560), `52c8ec5b7`, `b5770037f` then `c054d85b4` (567 narrowed by 575: refused only while another endpoint serves the key), `46da4b6bc` (the crash window, decision 568), `2cb6299d5` (decision 576); tests `TestForgetSparesEveryServedEndpoint`, `TestForgetRefusesAPartKeyAnotherEndpointServes`, `TestForgetLetsANewDeviceTakeAFormerKeyNoEndpointServes`, `TestForgetCrashKeepsTheHeldEndpointsNumber`, `TestForgetPendingRecordOfTheOldFormat`, `TestForgetAndAddInOneBatchStartsNew` |
+| R3-store-3701 | low (regression of R2-C2-store-2401) | fixed `93c88ae72`; tests `TestForgetBatchKeepsRetiredPartitionRetired`, `TestForgetBatchBeforeStartKeepsTheRetirement` |
+| #585 | — | done `19841b924` (decision 550): a withheld `Replace` takes the endpoint off the wire as `Remove` does, the key keeps its number; a failed replacement leaves the served endpoint; test `TestReplaceByAWithheldDeclaration` |
+| decision 580 (new row) | low | fixed `62e189f1d`: `Add` / `Replace` of a device whose own key or part key another endpoint serves is refused up front with `ErrDuplicateKey`; before, that reassembly and every later one failed ("two Specs share this StableKey", probe of G5d); test `TestAddOrReplaceRefusesAKeyAnotherEndpointServes`. Decision 582 (judged against the batch's end state, checked at commit) is unit G5f, landing after this section was written |
+| R3-conc-3750 | low | fixed `8ab0e5b12`; test `TestRefreshIPKOverlapInstallsTheNewerKeySet` |
+| R3-conc-3751 | low | fixed `29a143f66`; test `TestBasicWindowRefusedAfterItsInstallKeepsTheAdministratorsAcceptor` |
+| R3-conc-3752 | low | fixed `ea8a45020`; test `TestBindingSyncFollowsTheNewestTopology` |
+| R3-test-3802 | low | fixed `df04fb21e`, `5a9b50d18`; test `TestStartGivenUpLeavesTheBuildCountOnce` |
+| R3-conc-3401 | low (regression of R2-C2-err-0450) | fixed `1ebfa9e65`; test `TestClusterServersLeavesTheSourceSliceAlone`; C3's `TestNilMeasurementServerIsDropped` green |
+| R3-bound-3402 | low (regression of R2-C2-bound-0201) | fixed `11a1c2a3c` (option (b), `(*tcp.Conn).NoteSessionsEnded`), `7dacba4b5` (the two stale docs, decision 579); tests `TestLastSessionEndTellsTheConnection`, `TestSentMessagesAfterTheLastSessionEndedEarnNoPlace`; C3's `TestSentMessagesOfANotedConnectionKeepItsPlace` green |
+| R3-bound-3451 | low | fixed `2bb786a09`: one ring event per busy claim; test `TestBusyPaseRequestsRecordOneRingEventPerClaim` |
+| R3-sec-3403 | low | fixed `f78d3293b`, `e20df13fd`, `d1c3bb3b6` (decision 578, `diagevent.(*Ring).ForgetFabric`, copy-on-write after the Fable diff read); closes the R2-C2-sec-2451 residue; tests `TestRemovedFabricsEventsAreNotServedToItsIndexsNextHolder`, `TestFabricEventsRecordedBeforeTheDeferredCloseLeaveTheRing`, `TestForgetFabricRemovesOnlyThatIndex`, `TestForgetFabricUnderConcurrentRecording` |
+| R3-sec-3404 | low | fixed `3bae6da9a`, `6d3553bab`: the Sigma3 step carries the session it established; closes R2-C2-sec-2451's N3; test `TestSigma3EventNamesTheSessionItsStepEstablished` |
+| R3-par-3405 | note | line only (decision 538) → sentence in `BD-chip-RCAC-RefusalsBothReferencesShare`; closes decision 538's carried row |
+| R3-par-3406 | note | recorded, no finding: `BD-Matter-ICD-CheckInAddressLastActive` unchanged |
+| R3-fsm-3301 | medium | fixed `17bb663f7` (decision 555): the BlueZ peripheral follows its adapter object, application before advertisement; `Adapter1.Powered` not followed (decision 574). **Open, unverified** until a bluetoothd probe measures it: that bluetoothd drops both registrations with the adapter object, and whether it sends `Release` on shutdown or `Powered=false`. Tests `TestPeripheralFollowsTheAdapter` and six more in `peripheral_adapter_linux_test.go` |
+| R3-test-3304 | low | fixed `89425fa6e` (test only); test `TestPeripheralStaleReleaseLeavesTheNewRegistration` |
+| R3-err-3305 | note | line only: the BlueZ re-registration is retried without an end and without a trace; an optional logger is open |
+| R3-conc-3306 | note | line only: `readvertise` and `followAdapter` hold `advMu` across BlueZ calls; a host call may wait beyond its context for up to one attempt; open |
+| R3-fsm-3350 | medium | fixed `1107d514b` (decision 545, ahead of chip) → *Ahead* register row and `BD-Thread-TBRM-ChipLogic`; test `TestRevertTouchesOnlyAnUncommittedActivation` |
+| R3-bound-3302 | low (regression of R2-C2-bound-2003) | fixed `fa5333693`, `5eb426a8e`, `0ee010b06` (the sleep ratchet); test `TestSameDeviceAliasesAreDialledOnce` |
+| R3-sec-3303 | low (regression of R2-C2-bound-2003) | fixed `fa5333693` → sentence in `BD-Controller-BleOverEsphomeProxies`; tests `TestPlaintextMACDoesNotShadowAKeyedProxy`, `TestDiscoverPrefersTheKeyedEntry` |
+| R3-api-3780 | low | fixed `ca0814b74`, `37fd1cc96` (decisions 546, 553, 556, 577, 583): `controller/dcl`'s ledger client, OTA and vendor info moved to the role-neutral `dcl/`, forwarders at the old path, the one-way seam `internal/dclseam`, the ADR 0020 forbidden-import rule in `script/archcheck/layers.json`; tests `TestLayering`, `TestCheckReportsForbiddenImports`, `TestADR0020SiblingRuleIsInTheRules` |
+| R2-C2-doc-2453 | — | superseded by R3-api-3780 |
+| #587 | — | fixed `189a13da5`, `d1b61398f`, `d9da2552d` (decisions 557, 564, 572): a stored fabric label over 32 bytes is cut at load between two characters with a warning through `FabricConfig.Logger` (nil discards); tests `TestStoredFabricLabelOverTheBoundIsCutAtLoad`, `TestStoredFabricLabelCutIsWarnedAndSavedWithTheRotation`, `TestStoredFabricLabelCutWithoutLoggerIsDiscarded` |
+
+### Carried to run 4, or to a row of its own
+
+| ID | where | what |
+| --- | --- | --- |
+| resume-path read-back (candidate, low, sec; Fable diff read of G6, notes 2-3) | run 4, unit `diff-sec` | On `Sigma2Resume`, `settleHandshake` binds the route through the singleton `CaseAdapter`'s `establishedSession`, read back after `ProcessSigma1`; a Sigma3 or another resume in between makes the resume's source the route of another peer's session id — a misrouted reply address until the next authenticated message rebinds, no key or ACL state moves. `sigma3Step.PeerSessionParams` reads the handler back after the step in the same shape. Pre-existing; fix shape as R3-sec-3404 |
+| R3-sec-3403 residue (Fable diff read of G6b, notes 2-3) | run 4 | A close that resolved the fabric before `CloseFabric` and records after the second forget leaves one event with the removed index (same 253-allocation precondition); a host on the bare bridge that calls `EmitFabricRemoved` without the context form, or a registry without `CloseFabric`, gets the first forget only — said in that method's doc |
+| R3-fsm-3350 residue (Fable diff read of G7b, notes 1-2) | run 4, unit `radio` | A new activation set while a revert's `clear` runs can end with the flag `true` (fail-open; an activation counter would close it); at a firmware answering DELETE with 405 the flag returns to `true` while the dataset stays, and two comments say nothing is left |
+| R3-fsm-3301, R3-err-3305, R3-conc-3306 | a bluetoothd probe (decision 574) | the trigger measurement, then `Powered`, the logger and the lock shape |
+| R3-store-3703 | run 4, unit `facade` | `servedInErasure` continues after a `reservedTree` read error (note, unchanged) |
+| OTA requestor `fabricRemoved` (G1, unverified candidate) | run 4, unit `coresys` | the requestor persists at a fabric's removal only when the active state changed, so a failed persist is not retried by a later drop; not measured |
+| notes R3-doc-3255, -3280, -3282, -3285, -3452, -3581, -3781, -3782, -3783 | the scripted re-cite of the answered notes (fix plan §5) | Go doc comments outside this pull request's REG paths; not done here |
