@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -398,9 +399,13 @@ func (p *Partition) Endpoints() []Endpoint {
 //     (decision 567).
 //
 // The device of a held Add or Replace is judged as it is then — a part
-// added to it during fn counts. Every error of a held call arrives in the
-// result of [Partition.Batch]: those refusals, and what the applied call
-// itself returns ([ErrReservedKey], [ErrPolicyMismatch], a
+// added to it during fn counts. So is the device of an Add or a Replace
+// applied at the call: one that gained during fn a part whose key another
+// endpoint serves is refused with [ErrDuplicateKey] and undone — an Add
+// leaves the set, a Replace puts the replaced endpoint back — so the
+// batch never assembles two Specs under one key (decision 585). Every
+// error of a held call arrives in the result of [Partition.Batch]: those
+// refusals, and what the applied call itself returns ([ErrReservedKey], [ErrPolicyMismatch], a
 // *surface.WithheldError, a device's attach error). So a batch that takes
 // a key — or forgets a part key — and removes or forgets the endpoint
 // serving it gives the same outcome in either call order. A held change
@@ -429,6 +434,11 @@ type Batch struct {
 	// call with a key another endpoint served: judged after fn against
 	// the batch's end state, in call order (decisions 582, 585).
 	pending []pendingCall
+	// taken are the Adds and Replaces the batch applied, at the call or
+	// at commit, in that order: judged again at the end of commitPending,
+	// as a part added to the device during fn may collide (decision 585,
+	// fable-diff-g5g N1).
+	taken []takenCall
 	// done is set once fn returned: every later call is [ErrBatchDone].
 	// a.mu guards it.
 	done bool
@@ -455,6 +465,18 @@ type pendingCall struct {
 	ep       Endpoint
 	entries  []surfaceEntry
 	reserved []string
+}
+
+// takenCall is an Add or a Replace a [Batch] applied: ep under key in the
+// partition; for a Replace, old is the endpoint it replaced, oldDetach
+// that endpoint's detach and oldAt its index in the batch's detach list
+// (-1: none).
+type takenCall struct {
+	key       string
+	ep        Endpoint
+	old       Endpoint
+	oldDetach func()
+	oldAt     int
 }
 
 // Batch runs fn with a [Batch] bound to the partition. Each of its calls
@@ -607,6 +629,7 @@ func (b *Batch) addLocked(key string, ep Endpoint, entries []surfaceEntry) error
 	// A returning key takes its reserved number back; the reservation is
 	// done with.
 	b.ops = append(b.ops, reservationOp{kind: opRelease, key: key})
+	b.taken = append(b.taken, takenCall{key: key, ep: ep, oldAt: -1})
 	return nil
 }
 
@@ -687,12 +710,15 @@ func (b *Batch) replaceLocked(part *partition, i int, newKey string, ep Endpoint
 	if err != nil {
 		return err
 	}
+	t := takenCall{key: newKey, ep: ep, old: part.eps[i], oldDetach: old, oldAt: -1}
 	part.eps[i] = ep
 	a.detachSetLocked(newKey, detach)
 	if old != nil {
+		t.oldAt = len(b.detach)
 		b.detach = append(b.detach, old)
 	}
 	b.changed = true
+	b.taken = append(b.taken, t)
 	return nil
 }
 
@@ -781,6 +807,8 @@ func (b *Batch) dropLocked(part *partition, i int, key string) {
 	}
 	a.detachSetLocked(key, nil)
 	b.changed = true
+	// A take of the key is not the set's any more: not judged again.
+	b.taken = slices.DeleteFunc(b.taken, func(t takenCall) bool { return t.key == key })
 }
 
 // pendingIndex is the index of the batch's held call of kind on key, or
@@ -889,7 +917,58 @@ func (b *Batch) commitPending() error {
 			errs = append(errs, b.replaceLocked(part, i, t.key, t.ep, entries))
 		}
 	}
+	errs = append(errs, b.refuseLateCollisionsLocked()...)
 	return errors.Join(errs...)
+}
+
+// refuseLateCollisionsLocked judges every Add and Replace the batch
+// applied once more, its device as it is at the end of fn: a part added
+// to it during fn whose key — or its own key — another endpoint serves
+// would make the batch's reassembly, and every later one, assemble two
+// Specs under one key (decision 580). Such a take is refused with
+// [ErrDuplicateKey] and undone: an Add leaves the set and keeps the key's
+// reservation, a Replace puts the endpoint it replaced back (decision 585:
+// no path wedges; fable-diff-g5g N1). The takes are judged from the last
+// to the first, so of two that collide the later one goes. A take the
+// batch removed or replaced again is not the set's and not judged. a.mu
+// is held.
+func (b *Batch) refuseLateCollisionsLocked() []error {
+	a := b.a
+	var errs []error
+	for j := len(b.taken) - 1; j >= 0; j-- {
+		t := b.taken[j]
+		part, i := a.findLocked(t.key)
+		if part == nil || !sameEndpoint(part.eps[i], t.ep) {
+			continue
+		}
+		k, ok := a.servedOfExceptAtLocked(surfaceEntries(t.ep), part, i)
+		if !ok {
+			continue
+		}
+		errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, k))
+		if d := a.detach[t.key]; d != nil {
+			b.detach = append(b.detach, d)
+		}
+		if t.old == nil {
+			part.eps = slices.Delete(part.eps, i, i+1)
+			a.detachSetLocked(t.key, nil)
+			// Its release goes too: the key's reservation stays.
+			for r := len(b.ops) - 1; r >= 0; r-- {
+				if b.ops[r].kind == opRelease && b.ops[r].key == t.key {
+					b.ops = slices.Delete(b.ops, r, r+1)
+					break
+				}
+			}
+			continue
+		}
+		part.eps[i] = t.old
+		a.detachSetLocked(t.key, t.oldDetach)
+		if t.oldAt >= 0 {
+			// The replaced device stays bound: it is served again.
+			b.detach[t.oldAt] = func() {}
+		}
+	}
+	return errs
 }
 
 // recheckLocked runs the checks of a take's call again on ep as it is at
@@ -934,6 +1013,43 @@ func (a *Aggregator) servedOfLocked(entries []surfaceEntry, except Endpoint) (st
 		}
 	}
 	return "", false
+}
+
+// servedOfExceptAtLocked is servedOfLocked with the endpoint at i of part
+// (and its parts) left out, named by its place rather than compared, so
+// an endpoint of an uncomparable type is judged as any other; a.mu is
+// held.
+func (a *Aggregator) servedOfExceptAtLocked(entries []surfaceEntry, part *partition, i int) (string, bool) {
+	for e := range entries {
+		for _, p := range a.parts {
+			for j, ep := range p.eps {
+				if p == part && j == i {
+					continue
+				}
+				served := surfaceEntries(ep)
+				for s := range served {
+					if served[s].key == entries[e].key {
+						return entries[e].key, true
+					}
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+// sameEndpoint reports whether x and y are the same endpoint. An
+// endpoint of an uncomparable type cannot be told from another of its
+// type and counts as the same: the caller has matched it by its key.
+func sameEndpoint(x, y Endpoint) bool {
+	tx := reflect.TypeOf(x)
+	if tx != reflect.TypeOf(y) {
+		return false
+	}
+	if tx == nil || !tx.Comparable() {
+		return true
+	}
+	return x == y
 }
 
 // servesExceptLocked is servesLocked with the endpoint except (and its
