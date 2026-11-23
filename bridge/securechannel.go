@@ -717,8 +717,8 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 	// for the one Sigma3 that established it ([sigma3Step]).
 	step := &sigma3Step{handler: ch}
 	processSigma3 := func(p []byte) (uint8, []byte, error) {
-		op, reply, outcome, sid, named, err := processSigma3With(ch, p)
-		step.outcome, step.sessionID, step.named = outcome, sid, named
+		op, reply, err := processSigma3With(ch, p, step)
+		outcome := step.outcome
 		// A Sigma3 that fails drops nothing: an unacknowledged Sigma2
 		// goes on being retransmitted (owner decision 173).
 		if outcome == sigma3Established {
@@ -2570,7 +2570,7 @@ func (b *Bridge) handshakeCompleted(key HandshakeKey) bool {
 // this Sigma3 established it, so a Sigma3 of a handshake that had
 // completed already — the accepted one again included — binds no route.
 // The session is the one the step itself established (sessionID, named,
-// from [processSigma3With]), never read back from the handler afterwards:
+// set by [processSigma3With]), never read back from the handler afterwards:
 // on a singleton handler another peer's resume may have replaced the
 // handler's established session by then, and the route binding and the
 // diagnostics event would name that one (R3-sec-3404).
@@ -2601,23 +2601,27 @@ func (s *sigma3Step) PeerSessionParams() *sessionparams.Parameters {
 // handshake: a [CaseAdapter] says so itself; for any other handler a
 // success report is an establishment and everything else a failure — a
 // refusal comes back as a failure StatusReport reply, not as an error.
-// An establishment names its session (named) as the step set it: a
-// [CaseAdapter] returns the id it set under its lock; another handler
-// that reports its established session ([establishedSessionReporter]) is
-// asked once, at once after its step (R3-sec-3404).
-func processSigma3With(h CaseHandler, payload []byte) (opcode uint8, respPayload []byte, outcome sigma3Outcome, sessionID uint16, named bool, err error) {
+// The outcome goes into step, and an establishment names its session there
+// as the step set it: a [CaseAdapter] returns the id it set under its
+// lock; another handler that reports its established session
+// ([establishedSessionReporter]) is asked once, at once after its step
+// (R3-sec-3404).
+func processSigma3With(h CaseHandler, payload []byte, step *sigma3Step) (opcode uint8, respPayload []byte, err error) {
 	if a, ok := h.(*CaseAdapter); ok {
 		op, reply, outcome, sid, err := a.processSigma3(payload)
-		return op, reply, outcome, sid, outcome == sigma3Established, err
+		step.outcome, step.sessionID, step.named = outcome, sid, outcome == sigma3Established
+		return op, reply, err
 	}
 	op, reply, err := h.ProcessSigma3(payload)
 	if err == nil && establishedBy(op, reply) {
+		step.outcome = sigma3Established
 		if rep, ok := h.(establishedSessionReporter); ok {
-			sessionID, named = rep.establishedSession()
+			step.sessionID, step.named = rep.establishedSession()
 		}
-		return op, reply, sigma3Established, sessionID, named, nil
+		return op, reply, nil
 	}
-	return op, reply, sigma3Failed, 0, false, err
+	step.outcome = sigma3Failed
+	return op, reply, err
 }
 
 // forgetSigma1Replied removes the dedupe entry for a handshake. Called
