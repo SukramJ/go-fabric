@@ -317,7 +317,7 @@ func (k *raceKind[W]) onDiscovered(s *Session[W], c Candidate) {
 			k.waiting = slices.Delete(k.waiting, 0, 1)
 			close(oldest.dropped)
 			s.log.Info("matter.controller.discovery.candidate_dropped", slog.String("discovery", s.description),
-				slog.String("device", oldest.device), slog.String("candidate", a.device), slog.Int("bound", maxRaceWaiting))
+				slog.String("device", oldest.device), slog.String("candidate", a.device), slog.Int("max", maxRaceWaiting))
 		}
 		k.releaseLocked(s)
 	}

@@ -552,7 +552,7 @@ func (s *Service) deleteOldestService() {
 		return
 	}
 	s.names.logger.Debug("matter.discovery.srv_target_dropped",
-		slog.String("service", s.name.qname), slog.String("target", oldest.host), slog.Int("bound", maxServiceTargets))
+		slog.String("service", s.name.qname), slog.String("target", oldest.host), slog.Int("max", maxServiceTargets))
 	s.services.del(oldestKey)
 	oldest.name.off(oldest.observer)
 	s.onAddressChanged(oldest, Changes{Name: oldest.name, Deleted: oldest.name.records.values()})

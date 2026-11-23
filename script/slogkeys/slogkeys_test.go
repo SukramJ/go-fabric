@@ -139,6 +139,9 @@ var areaKeys = []string{
 	// controller/topology (review II, 6b wave 2): the nodes that claim one
 	// Thread address (matter.controller.topology.claim_collision).
 	"nodes",
+	// bridge (review II, C3): how many lines of a per-datagram warning
+	// went to Debug since its last Warn (bridge/rx_warn_limit.go).
+	"suppressed_since_last",
 }
 
 // skippedTop are the top-level directories the guard does not judge.

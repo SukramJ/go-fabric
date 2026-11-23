@@ -1260,7 +1260,7 @@ func (w *WiFiNetworkCommissioning) armedFor(ctx context.Context) bool {
 // (R2-C2-sec-1006, decision 515).
 func warnBlindFailSafePort(l *slog.Logger, server string) {
 	l.Warn("netcomm.failsafe_blind_port",
-		slog.String("server", server),
+		slog.String("kind", server),
 		slog.String("detail", "only the deprecated fabric-blind IsFailSafeArmed port is wired: "+
 			"the network commands pass in any fabric's fail-safe window; wire FailSafe "+
 			"(GeneralCommissioning.FailSafeFabric)"))
