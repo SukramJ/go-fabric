@@ -68,7 +68,10 @@ func (d *Device) base() *Device { return d }
 // and the change it guards are one step: no cycle forms between two
 // concurrent AddPart calls (R2-P6-conc-2521), and an attach sees the tree
 // it binds whole (R2-P6-fsm-2501). It is held only while the structure
-// changes, never while a host is called or a queue drains. Lock order:
+// changes, never while a queue drains. A bound AddPart's key check runs
+// under it and reads the node's endpoints, so a host's Endpoint.Spec is
+// called while it is held (R4-err-4704): a Spec must not change a device
+// tree. Lock order: the node's (its Aggregator's mu) before composeMu,
 // composeMu before a device's mu.
 var composeMu sync.Mutex
 

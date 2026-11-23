@@ -907,7 +907,7 @@ func (d *Device) composeLocked(parts []*Device, via deviceseam.Host, check func(
 		if former == d {
 			continue
 		}
-		// The move (packages/node/src/endpoint/Endpoint.ts:710-718): out of the former owner, then in.
+		// The move (packages/node/src/endpoint/Endpoint.ts:709-721 at b25ed960): out of the former owner, then in.
 		if former != nil {
 			former.mu.Lock()
 			former.parts = slices.DeleteFunc(former.parts, func(x *Device) bool { return x == p })
