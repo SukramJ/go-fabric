@@ -245,6 +245,7 @@ var floors = []packageFloor{
 		unmeasurable: true,
 		why:          "declaration-only seam (M9 module wave): a function variable cluster/core installs from its init, so the package holds no statement a test could execute",
 	},
+	{pkg: "thingfabric.dev/go-fabric/internal/dclseam", min: 0, unmeasurable: true, why: "function variables and a config type only: dcl installs them from its init, controller/dcl calls them (review II, R3-api-3780, decision 577)"},
 	{
 		pkg:          "thingfabric.dev/go-fabric/internal/exchangeseam",
 		min:          0,
