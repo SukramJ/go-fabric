@@ -496,13 +496,18 @@ func (s *Service) targets() string {
 }
 
 // updateService tracks one SRV target. Mirrors matter.js 0ceb202d
-// IpService.ts:249-277.
+// IpService.ts:249-277; a new target past maxServiceTargets first
+// displaces the one discovered or refreshed longest ago (this module's
+// own bound, R2-C2-bound-2152).
 func (s *Service) updateService(ttl time.Duration, target string, port, priority, weight uint16) {
 	key := hostKey(target, port)
 	if e, ok := s.services.get(key); ok {
 		e.discoveredAt = s.names.clock.Now()
 		e.ttl, e.port, e.priority, e.weight = ttl, port, priority, weight
 		return
+	}
+	for s.services.len() >= maxServiceTargets {
+		s.deleteOldestService()
 	}
 	e := &srvEntry{
 		name:         s.names.get(target),
@@ -529,6 +534,28 @@ func (s *Service) deleteService(target string, port uint16) {
 	s.services.del(key)
 	e.name.off(e.observer)
 	s.onAddressChanged(e, Changes{Name: e.name, Deleted: e.name.records.values()})
+}
+
+// deleteOldestService drops the SRV target discovered or refreshed
+// longest ago, the first in insertion order on a tie.
+func (s *Service) deleteOldestService() {
+	var (
+		oldestKey string
+		oldest    *srvEntry
+	)
+	for _, k := range s.services.snapshotKeys() {
+		if e, _ := s.services.get(k); oldest == nil || e.discoveredAt.Before(oldest.discoveredAt) {
+			oldestKey, oldest = k, e
+		}
+	}
+	if oldest == nil {
+		return
+	}
+	s.names.logger.Debug("matter.discovery.srv_target_dropped",
+		slog.String("service", s.name.qname), slog.String("target", oldest.host), slog.Int("bound", maxServiceTargets))
+	s.services.del(oldestKey)
+	oldest.name.off(oldest.observer)
+	s.onAddressChanged(oldest, Changes{Name: oldest.name, Deleted: oldest.name.records.values()})
 }
 
 // onAddressChanged. Mirrors matter.js 0ceb202d IpService.ts:296-313.
