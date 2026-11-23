@@ -12,6 +12,7 @@ import (
 
 	"thingfabric.dev/go-fabric/cluster/spec"
 	sa "thingfabric.dev/go-fabric/cluster/spec/servicearea"
+	"thingfabric.dev/go-fabric/internal/deepcopy"
 )
 
 // The typed server's optional interfaces: Handle ([spec.SelfHeld]), Emit
@@ -93,7 +94,7 @@ func (s *Server) setState(set map[uint32]bool, areas []Area, mapList []Map, sele
 		{sa.AttrSupportedAreas, func() error { return s.checkAreas(areas) }, func() { s.areas = slices.Clone(areas) }},
 		{sa.AttrSelectedAreas, func() error { return s.checkSelected(selected) }, func() { s.selected = slices.Clone(selected) }},
 		{sa.AttrCurrentArea, func() error { return s.checkCurrent(current) }, func() { s.current = clonePtr(current) }},
-		{sa.AttrProgress, func() error { return s.checkProgress(progress) }, func() { s.progress = slices.Clone(progress) }},
+		{sa.AttrProgress, func() error { return s.checkProgress(progress) }, func() { s.progress = deepcopy.Each(progress) }},
 	}
 	var changed []uint32
 	for _, st := range steps {
