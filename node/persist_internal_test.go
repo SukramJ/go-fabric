@@ -16,6 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/diagevent"
 	"thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/store"
@@ -194,6 +195,53 @@ func TestRingLogsCarryNoPeerDetail(t *testing.T) {
 	for _, kept := range []string{"closed its secure session", "lockout_duration=1m0s max_errors=20"} {
 		if !strings.Contains(out, kept) {
 			t.Errorf("the retrieved log lost %q:\n%s", kept, out)
+		}
+	}
+}
+
+// TestRingLogsServeTheAccessingFabricsOwnSessions (review II,
+// R2-C2-sec-2451, owner decision 524): a session event the bridge stamped
+// with its fabric ("fabric_index") shows the accessing fabric's own
+// controller its peer address and session id; another fabric's event, an
+// event with no fabric (a PASE commissioner's) and every event read with
+// no accessing fabric or fabric 0 (a PASE session) keep them out.
+func TestRingLogsServeTheAccessingFabricsOwnSessions(t *testing.T) {
+	t.Parallel()
+	ring := diagevent.NewRing(8)
+	r := ringLogs{ring}
+	const own, other, pase = "[fd00::1]:5540", "[fd00::2]:5540", "[fd00::3]:5540"
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "opened", Detail: map[string]string{"peer": own, "fabric_index": "1"}})
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "closed", Detail: map[string]string{"peer": own, "session_id": "11", "fabric_index": "1"}})
+	ring.Record(diagevent.Event{Kind: diagevent.KindSession, Message: "closed", Detail: map[string]string{"peer": other, "session_id": "22", "fabric_index": "2"}})
+	ring.Record(diagevent.Event{Kind: diagevent.KindPairing, Message: "busy", Detail: map[string]string{"peer": pase}})
+	read := func(ctx context.Context) string {
+		b, err := r.Logs(ctx, mattercore.IntentEndUserSupport)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	out := read(contract.WithAccessingFabric(context.Background(), 1, false))
+	for _, kept := range []string{"peer=" + own, "session_id=11"} {
+		if !strings.Contains(out, kept) {
+			t.Errorf("fabric 1's log lost its own %q:\n%s", kept, out)
+		}
+	}
+	for _, leak := range []string{other, "22", pase} {
+		if strings.Contains(out, leak) {
+			t.Errorf("fabric 1's log carries %q:\n%s", leak, out)
+		}
+	}
+	for name, ctx := range map[string]context.Context{
+		"no accessing fabric": context.Background(),
+		"fabric 0":            contract.WithAccessingFabric(context.Background(), 0, false),
+		"fabric 3":            contract.WithAccessingFabric(context.Background(), 3, false),
+	} {
+		out := read(ctx)
+		for _, leak := range []string{"peer=", "session_id="} {
+			if strings.Contains(out, leak) {
+				t.Errorf("%s: the log carries %q:\n%s", name, leak, out)
+			}
 		}
 	}
 }

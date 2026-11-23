@@ -58,8 +58,8 @@ func benchEpochKey(fabric uint8, keySet uint16, epoch int, shared bool) []byte {
 // newBenchManager is a manager over fabrics fabrics with keySets key sets
 // each, every set holding three epoch keys and mapped to a group of its
 // own. It returns the manager and the group session id of the first key.
-func newBenchManager(b *testing.B, fabrics, keySets int, shared bool) (m *Manager, firstSessionID uint16) {
-	b.Helper()
+func newBenchManager(tb testing.TB, fabrics, keySets int, shared bool) (m *Manager, firstSessionID uint16) {
+	tb.Helper()
 	st := newMemStore()
 	for f := 1; f <= fabrics; f++ {
 		idx := uint8(f) //nolint:gosec // G115: f ≤ 254
@@ -82,7 +82,7 @@ func newBenchManager(b *testing.B, fabrics, keySets int, shared bool) (m *Manage
 	}
 	var err error
 	if m, err = NewManager(st, nil); err != nil {
-		b.Fatal(err)
+		tb.Fatal(err)
 	}
 	first := testCompressed
 	if !shared {
@@ -90,23 +90,23 @@ func newBenchManager(b *testing.B, fabrics, keySets int, shared bool) (m *Manage
 	}
 	op, err := OperationalKey(benchEpochKey(1, 1, 0, shared), first)
 	if err != nil {
-		b.Fatal(err)
+		tb.Fatal(err)
 	}
 	if firstSessionID, err = SessionID(op); err != nil {
-		b.Fatal(err)
+		tb.Fatal(err)
 	}
 	return m, firstSessionID
 }
 
 // unusedSessionID is a group session id no epoch key of m carries.
-func unusedSessionID(b *testing.B, m *Manager) uint16 {
-	b.Helper()
+func unusedSessionID(tb testing.TB, m *Manager) uint16 {
+	tb.Helper()
 	for sid := range uint16(0xFFFF) {
 		if len(m.candidates(sid)) == 0 {
 			return sid
 		}
 	}
-	b.Fatal("every group session id is carried by a key")
+	tb.Fatal("every group session id is carried by a key")
 	return 0
 }
 

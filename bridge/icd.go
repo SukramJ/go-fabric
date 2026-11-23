@@ -130,12 +130,47 @@ func (b *Bridge) SendUnsecured(addr *net.UDPAddr, opcode uint8, payload []byte) 
 	return listener.Send(addr, datagram)
 }
 
-// PeerSessionAddress returns the last authenticated UDP address of a CASE
-// session of nodeID on fabricIndex, nil when the bridge holds none — the
-// cached operational address matter.js's Check-In sender prefers
-// (IcdManagementServer.ts:361-364, the peer descriptor's operationalAddress).
+// PeerSessionAddress returns the authenticated UDP address of the CASE
+// session of nodeID on fabricIndex the peer was active on last, nil when
+// the bridge holds none. matter.js's Check-In sender prefers the peer
+// descriptor's cached operationalAddress (IcdManagementServer.ts:362-365
+// at b25ed960), which it sets when a session is added and when that
+// session's network address changes (packages/protocol/src/peer/Peer.ts:141-164,
+// PeerSet.ts:116-124, :317-318), not at each receive; this module takes
+// the session the peer sent on last, as [Bridge.livePeerLink] does — the
+// registry's activity order, or its session list newest last — among
+// those with a UDP address; a registry without either is walked in no
+// order (review II, R2-C2-par-0353; by_design
+// BD-Matter-ICD-CheckInAddressLastActive).
 func (b *Bridge) PeerSessionAddress(fabricIndex uint8, nodeID uint64) *net.UDPAddr {
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
 	var found *net.UDPAddr
+	udp := func(id uint16) bool {
+		raw, _ := b.sessionPeerAddrs.Load(id)
+		addr, ok := raw.(*net.UDPAddr)
+		if !ok || addr == nil {
+			return false
+		}
+		found = addr
+		return true
+	}
+	if f, ok := reg.(newestPeerSessionFinder); ok {
+		if _, ok := f.NewestSessionForPeer(fabricIndex, nodeID, udp); ok {
+			return found
+		}
+		return nil
+	}
+	if lister, ok := reg.(peerSessionLister); ok {
+		ids := lister.SessionIDsForPeer(fabricIndex, nodeID)
+		for i := len(ids) - 1; i >= 0; i-- {
+			if udp(ids[i]) {
+				return found
+			}
+		}
+		return nil
+	}
 	b.sessionPeerAddrs.Range(func(k, v any) bool {
 		sid, ok := k.(uint16)
 		if !ok {

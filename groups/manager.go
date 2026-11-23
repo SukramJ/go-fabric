@@ -92,7 +92,14 @@ type fabricGroups struct {
 	// destination identifier's keys (ipk.go).
 	ipk   *keySet
 	idMap map[uint16]uint16
-	table map[uint16]*TableEntry
+	// bySession indexes the epoch keys of the key sets idMap maps a
+	// group to by their group session id, each list ordered by key set
+	// id: the receive path's candidates ([Manager.candidates]). Built
+	// once by loadFabric from keySets and idMap, which nothing changes
+	// afterwards — a change installs a newly loaded fabricGroups (review
+	// II, R2-C2-bound-0301).
+	bySession map[uint16][]candidate
+	table     map[uint16]*TableEntry
 	// props is the Groupcast cluster's per-group state (matter.js
 	// GroupcastServer groupProperties): existence of a Groupcast
 	// membership beyond the group table, its multicast address policy and
@@ -179,14 +186,18 @@ type Manager struct {
 	counterRandom func() (uint32, error)
 
 	// The send side (sender.go): the outbound group sessions, the
-	// socket they leave through, the exchange id counter and the clock
-	// that selects the current epoch key.
+	// socket they leave through and the exchange id counter. senderMu is
+	// never held across a store call nor taken while mu is held (review
+	// II, R2-C2-conc-0304).
 	senderMu       sync.Mutex
 	senders        map[senderKey]*Sender
 	transport      MulticastTransport
 	exchangeID     uint16
 	exchangeSeeded bool
-	clock          clock.Clock
+	// clock selects the current epoch key of a send and paces the owed
+	// reload; clockMu guards it alone, so reading it waits for no send.
+	clockMu sync.Mutex
+	clock   clock.Clock
 }
 
 // SetClock sets the clock that selects the current epoch key of a group
@@ -194,8 +205,8 @@ type Manager struct {
 // owed; nil is [clock.System]. Call it before the first send and before
 // the first forget.
 func (m *Manager) SetClock(c clock.Clock) {
-	m.senderMu.Lock()
-	defer m.senderMu.Unlock()
+	m.clockMu.Lock()
+	defer m.clockMu.Unlock()
 	m.clock = clock.Or(c)
 }
 
@@ -347,7 +358,29 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 	for _, g := range props {
 		f.props[g.GroupID] = GroupProperties{McastAddrPolicy: g.McastAddrPolicy, HasAuxiliaryACL: g.HasAuxiliaryACL}
 	}
+	f.indexSessions()
 	return f, nil
+}
+
+// indexSessions builds f.bySession from f.keySets and f.idMap.
+func (f *fabricGroups) indexSessions() {
+	inMap := make(map[uint16]bool, len(f.idMap))
+	for _, ks := range f.idMap {
+		inMap[ks] = true
+	}
+	ids := make([]uint16, 0, len(f.keySets))
+	for id := range f.keySets {
+		if inMap[id] {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	f.bySession = make(map[uint16][]candidate)
+	for _, id := range ids {
+		for _, e := range f.keySets[id].epochs {
+			f.bySession[e.sessionID] = append(f.bySession[e.sessionID], candidate{fabric: f, keySetID: id, epoch: e})
+		}
+	}
 }
 
 // deriveKeySet computes the operational form of a stored key set.
@@ -702,8 +735,8 @@ func (m *Manager) noteOwedResult(err error) {
 
 // monotonic is the send clock's monotonic reading.
 func (m *Manager) monotonic() time.Duration {
-	m.senderMu.Lock()
-	defer m.senderMu.Unlock()
+	m.clockMu.Lock()
+	defer m.clockMu.Unlock()
 	return clock.MonotonicOf(m.clock)
 }
 
@@ -1197,7 +1230,7 @@ func (m *Manager) Memberships(ctx context.Context) ([]Membership, error) {
 
 // sendClock is the time that selects a send's epoch key.
 func (m *Manager) sendClock() time.Time {
-	m.senderMu.Lock()
-	defer m.senderMu.Unlock()
+	m.clockMu.Lock()
+	defer m.clockMu.Unlock()
 	return m.clock.Now()
 }

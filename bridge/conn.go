@@ -717,6 +717,11 @@ func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 		b.logger.Debug("matter.tcp.evict.no_registry", slog.Int("session_id", int(sid)))
 		return
 	}
+	// The fabric is read before the close takes the session away.
+	detail := b.sessionEventDetail(sid, map[string]string{
+		"peer":       route.String(),
+		"session_id": strconv.Itoa(int(sid)),
+	})
 	// Close is the peer-lost close: no CloseSession echo, subscription
 	// cascade through the manager's close hook (secure/operational
 	// Manager.Close, NodeSession.ts:319-328 handlePeerClose →
@@ -731,9 +736,6 @@ func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 		Kind:     diagevent.KindSession,
 		Severity: diagevent.SeverityInfo,
 		Message:  "A TCP connection dropped; the secure session bound to it was closed.",
-		Detail: map[string]string{
-			"peer":       route.String(),
-			"session_id": strconv.Itoa(int(sid)),
-		},
+		Detail:   detail,
 	})
 }

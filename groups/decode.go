@@ -302,8 +302,11 @@ func (m *Manager) mappingAllows(c candidate, groupID uint16) bool {
 
 // candidates collects the epoch keys with sessionID of the key sets that
 // GroupKeyMap maps a group to, ordered by fabric index and key set id so
-// the outcome does not depend on map iteration. Mirrors matter.js
-// GroupSession.ts:366-376 at db021da0 (fabric.groups.isKeySetMapped).
+// the outcome does not depend on map iteration. Each fabric's keys are
+// looked up in its session index (fabricGroups.bySession), so the cost
+// is a walk of the fabrics whatever the datagram's session id (review II,
+// R2-C2-bound-0301). Mirrors matter.js GroupSession.ts:366-376 at
+// db021da0 (fabric.groups.isKeySetMapped).
 func (m *Manager) candidates(sessionID uint16) []candidate {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -314,26 +317,7 @@ func (m *Manager) candidates(sessionID uint16) []candidate {
 	slices.Sort(idxs)
 	var out []candidate
 	for _, idx := range idxs {
-		f := m.fabrics[idx]
-		inMap := make(map[uint16]bool, len(f.idMap))
-		for _, ks := range f.idMap {
-			inMap[ks] = true
-		}
-		ids := make([]uint16, 0, len(f.keySets))
-		for id := range f.keySets {
-			ids = append(ids, id)
-		}
-		slices.Sort(ids)
-		for _, id := range ids {
-			if !inMap[id] {
-				continue
-			}
-			for _, e := range f.keySets[id].epochs {
-				if e.sessionID == sessionID {
-					out = append(out, candidate{fabric: f, keySetID: id, epoch: e})
-				}
-			}
-		}
+		out = append(out, m.fabrics[idx].bySession[sessionID]...)
 	}
 	return out
 }

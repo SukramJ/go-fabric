@@ -27,7 +27,7 @@ func TestChunkStoredAfterTheSessionClosedHoldsNothing(t *testing.T) {
 
 	b.SessionClosed(sid)
 	late := mrp.ExchangeKey{SessionID: sid, ExchangeID: 1}
-	tx := b.routing.writeTransaction(late, true, now)
+	tx := b.routing.writeTransaction(late, true, monoOf(now))
 	if tx == nil {
 		t.Fatal("no transaction")
 	}
@@ -40,7 +40,7 @@ func TestChunkStoredAfterTheSessionClosedHoldsNothing(t *testing.T) {
 	if n := b.routing.openWriteTxs(sid); n != 0 {
 		t.Errorf("the closed session keeps %d chunked writes", n)
 	}
-	otherTx := b.routing.writeTransaction(mrp.ExchangeKey{SessionID: other, ExchangeID: 2}, false, now)
+	otherTx := b.routing.writeTransaction(mrp.ExchangeKey{SessionID: other, ExchangeID: 2}, false, monoOf(now))
 	resp := im.HandleWriteRequest(im.WithWriteTransaction(im.WithAuthModePASE(t.Context()), otherTx), holdDispatcher{}, im.WriteRequest{
 		Writes: []im.AttributeWrite{{Path: p, Value: im.AttributeValue{Value: "x"}}},
 	})

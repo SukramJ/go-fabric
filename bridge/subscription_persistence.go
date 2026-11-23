@@ -73,6 +73,15 @@ type resumptionState struct {
 	// former holds the subscriptions of the previous run, loaded at
 	// Start, until ReestablishFormerSubscriptions takes them.
 	former []subscription.PeerSubscription
+	// rows are the keys of the store's rows in the store's order, the
+	// least recently saved first, while rowsKnown: from a run that began
+	// on an emptied store every row is one this bridge saved, so the
+	// per-save bound and the re-establishment's order check read these
+	// keys instead of loading and decoding every row (review II,
+	// R2-C2-bound-0501). A store write that fails, or another store, makes
+	// them unknown until the next run; the load-based path serves then.
+	rows      []persistedRow
+	rowsKnown bool
 
 	// orderMu guards activated alone. It is a leaf: taken alone or under
 	// mu, never the other way round; under it only a subscription's own
@@ -100,6 +109,36 @@ type resumptionState struct {
 	initiating map[*caseInitiating]struct{}
 }
 
+// persistedRow is the key of one persisted subscription row.
+type persistedRow struct {
+	subscriptionID uint32
+	fabricIndex    uint8
+	peerNodeID     uint64
+}
+
+// noteSavedLocked records a successful save of row: it becomes the most
+// recent ([SubscriptionStore.SaveServerSubscription]).
+func (r *resumptionState) noteSavedLocked(row persistedRow) {
+	if !r.rowsKnown {
+		return
+	}
+	r.rows = slices.DeleteFunc(r.rows, func(x persistedRow) bool { return x.subscriptionID == row.subscriptionID })
+	r.rows = append(r.rows, row)
+}
+
+// noteDeletedLocked records a successful delete of the rows del matches.
+func (r *resumptionState) noteDeletedLocked(del func(persistedRow) bool) {
+	if r.rowsKnown {
+		r.rows = slices.DeleteFunc(r.rows, del)
+	}
+}
+
+// forgetRowsLocked makes the keys unknown: a store write failed, so the
+// store may hold what they do not say.
+func (r *resumptionState) forgetRowsLocked() {
+	r.rows, r.rowsKnown = nil, false
+}
+
 // caseInitiating is one CASE initiation of [Bridge.connectPeer]: its fabric
 // and the cancel of its context.
 type caseInitiating struct {
@@ -123,6 +162,7 @@ func (r *resumptionState) storeLocked() SubscriptionStore {
 func (b *Bridge) AttachSubscriptionStore(s SubscriptionStore) {
 	b.resumption.mu.Lock()
 	b.resumption.store = s
+	b.resumption.forgetRowsLocked()
 	b.resumption.mu.Unlock()
 }
 
@@ -161,6 +201,7 @@ func (b *Bridge) beginSubscriptionRun() {
 	b.resumption.mu.Lock()
 	defer b.resumption.mu.Unlock()
 	b.resumption.former = nil
+	b.resumption.forgetRowsLocked()
 	if b.resumption.disabled {
 		return
 	}
@@ -183,8 +224,11 @@ func (b *Bridge) beginSubscriptionRun() {
 	if len(rows) > 0 {
 		if err := st.ClearServerSubscriptions(ctx); err != nil {
 			b.logger.Warn("matter.subscription.persist.clear", slog.Any("err", err))
+			return
 		}
 	}
+	// The noop store keeps nothing, so there is nothing to keep keys of.
+	b.resumption.rowsKnown = b.resumption.store != nil
 	b.logger.Debug("matter.subscription.persist.loaded", slog.Int("former", len(b.resumption.former)))
 }
 
@@ -301,8 +345,10 @@ func (b *Bridge) persistOneLocked(ctx context.Context, m *subscription.Manager, 
 		b.logger.Warn("matter.subscription.persist.save",
 			slog.Int("subscription_id", int(subID)),
 			slog.Any("err", err))
+		b.resumption.forgetRowsLocked()
 		return
 	}
+	b.resumption.noteSavedLocked(persistedRow{subscriptionID: rec.SubscriptionID, fabricIndex: rec.FabricIndex, peerNodeID: rec.PeerNodeID})
 	b.boundPersistedSubscriptionsLocked(saveCtx, m, rec, sub.KeepSubscriptions, persistedRowQuota(m))
 }
 
@@ -333,9 +379,8 @@ func (b *Bridge) boundPersistedSubscriptionsLocked(ctx context.Context, m *subsc
 		return
 	}
 	st := b.resumption.storeLocked()
-	rows, err := st.LoadServerSubscriptions(ctx)
-	if err != nil {
-		b.logger.Warn("matter.subscription.persist.load", slog.Any("err", err))
+	rows, ok := b.persistedRowsLocked(ctx)
+	if !ok {
 		return
 	}
 	live := func(id uint32) bool {
@@ -347,17 +392,18 @@ func (b *Bridge) boundPersistedSubscriptionsLocked(ctx context.Context, m *subsc
 			b.logger.Warn("matter.subscription.persist.delete",
 				slog.Int("subscription_id", int(id)),
 				slog.Any("err", err))
+			b.resumption.forgetRowsLocked()
 			return false
 		}
+		b.resumption.noteDeletedLocked(func(x persistedRow) bool { return x.subscriptionID == id })
 		return true
 	}
-	var fabricRows []subscription.PeerSubscription
-	for _, row := range rows {
-		other, err := subscription.UnmarshalPeerSubscription(row)
-		if err != nil || other.FabricIndex != rec.FabricIndex {
+	var fabricRows []persistedRow
+	for _, other := range rows {
+		if other.fabricIndex != rec.FabricIndex {
 			continue
 		}
-		if !keepSubscriptions && other.PeerNodeID == rec.PeerNodeID && other.SubscriptionID != rec.SubscriptionID && !live(other.SubscriptionID) && drop(other.SubscriptionID) {
+		if !keepSubscriptions && other.peerNodeID == rec.PeerNodeID && other.subscriptionID != rec.SubscriptionID && !live(other.subscriptionID) && drop(other.subscriptionID) {
 			continue
 		}
 		fabricRows = append(fabricRows, other)
@@ -370,10 +416,34 @@ func (b *Bridge) boundPersistedSubscriptionsLocked(ctx context.Context, m *subsc
 		if excess == 0 {
 			return
 		}
-		if other.SubscriptionID != rec.SubscriptionID && !live(other.SubscriptionID) && drop(other.SubscriptionID) {
+		if other.subscriptionID != rec.SubscriptionID && !live(other.subscriptionID) && drop(other.subscriptionID) {
 			excess--
 		}
 	}
+}
+
+// persistedRowsLocked are the keys of the store's rows, the least
+// recently saved first: the bridge's own record while it holds one
+// (resumptionState.rows), otherwise every row loaded and decoded, an
+// undecodable one left out. False when the load failed.
+func (b *Bridge) persistedRowsLocked(ctx context.Context) ([]persistedRow, bool) {
+	if b.resumption.rowsKnown {
+		return slices.Clone(b.resumption.rows), true
+	}
+	raw, err := b.resumption.storeLocked().LoadServerSubscriptions(ctx)
+	if err != nil {
+		b.logger.Warn("matter.subscription.persist.load", slog.Any("err", err))
+		return nil, false
+	}
+	rows := make([]persistedRow, 0, len(raw))
+	for _, payload := range raw {
+		rec, err := subscription.UnmarshalPeerSubscription(payload)
+		if err != nil {
+			continue
+		}
+		rows = append(rows, persistedRow{subscriptionID: rec.SubscriptionID, fabricIndex: rec.FabricIndex, peerNodeID: rec.PeerNodeID})
+	}
+	return rows, true
 }
 
 // restoreCreationOrder puts the store's rows back into the order of
@@ -413,6 +483,17 @@ func (b *Bridge) restoreCreationOrder(ctx context.Context, former []subscription
 	st := b.resumption.storeLocked()
 	ctx, cancel := clock.WithTimeout(context.WithoutCancel(ctx), b.clk(), subscriptionStoreTimeout)
 	defer cancel()
+	if b.resumption.rowsKnown {
+		// The order check needs only the keys; the payloads are loaded
+		// when the order does not hold (review II, R2-C2-bound-0501).
+		known := b.resumption.rows
+		sorted := slices.IsSortedFunc(known, func(x, y persistedRow) int {
+			return cmp.Compare(orderOf(subscription.PeerSubscription{SubscriptionID: x.subscriptionID}), orderOf(subscription.PeerSubscription{SubscriptionID: y.subscriptionID}))
+		})
+		if sorted {
+			return
+		}
+	}
 	rows, err := st.LoadServerSubscriptions(ctx)
 	if err != nil {
 		b.logger.Warn("matter.subscription.persist.load", slog.Any("err", err))
@@ -441,7 +522,10 @@ func (b *Bridge) restoreCreationOrder(ctx context.Context, former []subscription
 			b.logger.Warn("matter.subscription.persist.save",
 				slog.Int("subscription_id", int(row.rec.SubscriptionID)),
 				slog.Any("err", err))
+			b.resumption.forgetRowsLocked()
+			continue
 		}
+		b.resumption.noteSavedLocked(persistedRow{subscriptionID: row.rec.SubscriptionID, fabricIndex: row.rec.FabricIndex, peerNodeID: row.rec.PeerNodeID})
 	}
 }
 
@@ -461,7 +545,10 @@ func (b *Bridge) forgetPersistedSubscription(subID uint32) {
 		b.logger.Warn("matter.subscription.persist.delete",
 			slog.Int("subscription_id", int(subID)),
 			slog.Any("err", err))
+		b.resumption.forgetRowsLocked()
+		return
 	}
+	b.resumption.noteDeletedLocked(func(x persistedRow) bool { return x.subscriptionID == subID })
 }
 
 // forgetFabricSubscriptions drops every record of a removed fabric, and
@@ -482,5 +569,8 @@ func (b *Bridge) forgetFabricSubscriptions(ctx context.Context, fabricIndex uint
 		b.logger.Warn("matter.subscription.persist.delete_fabric",
 			slog.Int("fabric_index", int(fabricIndex)),
 			slog.Any("err", err))
+		b.resumption.forgetRowsLocked()
+		return
 	}
+	b.resumption.noteDeletedLocked(func(x persistedRow) bool { return x.fabricIndex == fabricIndex })
 }
