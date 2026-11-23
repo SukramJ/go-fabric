@@ -93,7 +93,7 @@ type retrySchedule struct {
 }
 
 func newRetrySchedule(cfg Retries, random func() uint32) *retrySchedule {
-	cfg.InitialInterval, cfg.BackoffFactor, cfg.MaximumInterval, cfg.JitterFactor = inRange(cfg.InitialInterval, cfg.BackoffFactor, cfg.MaximumInterval, cfg.JitterFactor)
+	cfg = cfg.inRange()
 	return &retrySchedule{cfg: cfg, random: random, base: cfg.InitialInterval}
 }
 
@@ -121,26 +121,26 @@ func (r *retrySchedule) next() (time.Duration, bool) {
 // a backoff of 0 is 2 and one below 1 or NaN is 1, a maximum interval
 // below 0 is none (0), and a jitter factor is held to [0, 1], NaN taken as
 // 0. Every interval of the schedule is then at least the initial one.
-func inRange(initial time.Duration, backoff float64, maximum time.Duration, jitter float64) (time.Duration, float64, time.Duration, float64) {
-	if initial <= 0 {
-		initial = time.Second
+func (r Retries) inRange() Retries {
+	if r.InitialInterval <= 0 {
+		r.InitialInterval = time.Second
 	}
 	switch {
-	case backoff == 0:
-		backoff = 2
-	case !(backoff >= 1):
-		backoff = 1
+	case r.BackoffFactor == 0:
+		r.BackoffFactor = 2
+	case !(r.BackoffFactor >= 1):
+		r.BackoffFactor = 1
 	}
-	if maximum < 0 {
-		maximum = 0
+	if r.MaximumInterval < 0 {
+		r.MaximumInterval = 0
 	}
 	switch {
-	case !(jitter >= 0):
-		jitter = 0
-	case jitter > 1:
-		jitter = 1
+	case !(r.JitterFactor >= 0):
+		r.JitterFactor = 0
+	case r.JitterFactor > 1:
+		r.JitterFactor = 1
 	}
-	return initial, backoff, maximum, jitter
+	return r
 }
 
 // saturate converts to a Duration, holding at the largest one: matter.js
