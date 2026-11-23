@@ -40,6 +40,8 @@ type FloodlightCamera struct {
 // its parts, in this order: matter.js places a component on an endpoint
 // below the composite (DeviceTypeConformance.ts candidatesOf). Each
 // component must be given; further parts join with [Device.AddPart].
+// The components move all or none: a refused one leaves each where it
+// was.
 func NewFloodlightCamera(opts Options, onOffLight *OnOffLight, camera *Camera, decls ...Declaration) (*FloodlightCamera, error) {
 	if onOffLight == nil || camera == nil {
 		return nil, fmt.Errorf("%w: FloodlightCamera needs its components OnOffLight and Camera", ErrComposition)
@@ -52,10 +54,8 @@ func NewFloodlightCamera(opts Options, onOffLight *OnOffLight, camera *Camera, d
 		// Withheld by the specification level ([New]): no parts.
 		return &FloodlightCamera{Device: d}, err
 	}
-	for _, p := range []*Device{onOffLight.Device, camera.Device} {
-		if err := d.AddPart(p); err != nil {
-			return nil, err
-		}
+	if err := d.addParts(onOffLight.Device, camera.Device); err != nil {
+		return nil, err
 	}
 	return &FloodlightCamera{Device: d, onOffLight: onOffLight, camera: camera}, nil
 }

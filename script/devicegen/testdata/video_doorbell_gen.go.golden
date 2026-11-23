@@ -40,6 +40,8 @@ type VideoDoorbell struct {
 // its parts, in this order: matter.js places a component on an endpoint
 // below the composite (DeviceTypeConformance.ts candidatesOf). Each
 // component must be given; further parts join with [Device.AddPart].
+// The components move all or none: a refused one leaves each where it
+// was.
 func NewVideoDoorbell(opts Options, camera *Camera, doorbell *Doorbell, decls ...Declaration) (*VideoDoorbell, error) {
 	if camera == nil || doorbell == nil {
 		return nil, fmt.Errorf("%w: VideoDoorbell needs its components Camera and Doorbell", ErrComposition)
@@ -52,10 +54,8 @@ func NewVideoDoorbell(opts Options, camera *Camera, doorbell *Doorbell, decls ..
 		// Withheld by the specification level ([New]): no parts.
 		return &VideoDoorbell{Device: d}, err
 	}
-	for _, p := range []*Device{camera.Device, doorbell.Device} {
-		if err := d.AddPart(p); err != nil {
-			return nil, err
-		}
+	if err := d.addParts(camera.Device, doorbell.Device); err != nil {
+		return nil, err
 	}
 	return &VideoDoorbell{Device: d, camera: camera, doorbell: doorbell}, nil
 }

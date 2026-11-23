@@ -601,6 +601,8 @@ func writeComposite(w *bytes.Buffer, n, name string, components []string, import
 	w.WriteString("// its parts, in this order: matter.js places a component on an endpoint\n")
 	w.WriteString("// below the composite (DeviceTypeConformance.ts candidatesOf). Each\n")
 	w.WriteString("// component must be given; further parts join with [Device.AddPart].\n")
+	w.WriteString("// The components move all or none: a refused one leaves each where it\n")
+	w.WriteString("// was.\n")
 	fmt.Fprintf(w, "func New%s(opts Options, %s, decls ...Declaration) (*%s, error) {\n", n, strings.Join(params, ", "), n)
 	conds := make([]string, len(fields))
 	parts := make([]string, len(fields))
@@ -613,7 +615,9 @@ func writeComposite(w *bytes.Buffer, n, name string, components []string, import
 	fmt.Fprintf(w, "\tif %s {\n", strings.Join(conds, " || "))
 	fmt.Fprintf(w, "\t\treturn nil, fmt.Errorf(\"%%w: %s needs its components %s\", ErrComposition)\n\t}\n", name, strings.Join(components, " and "))
 	fmt.Fprintf(w, "\td, err := newOfSpec(Spec{Type: %sID, Options: opts, Declarations: decls})\n\tif d == nil {\n\t\treturn nil, err\n\t}\n\tif err != nil {\n\t\t// Withheld by the specification level ([New]): no parts.\n\t\treturn &%s{Device: d}, err\n\t}\n", n, n)
-	fmt.Fprintf(w, "\tfor _, p := range []*Device{%s} {\n\t\tif err := d.AddPart(p); err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t}\n", strings.Join(parts, ", "))
+	// All or none: a refused component leaves every component where it was
+	// (R2-C2-fsm-2506).
+	fmt.Fprintf(w, "\tif err := d.addParts(%s); err != nil {\n\t\treturn nil, err\n\t}\n", strings.Join(parts, ", "))
 	fmt.Fprintf(w, "\treturn &%s{Device: d, %s}, nil\n}\n", n, strings.Join(kv, ", "))
 	for i, c := range components {
 		cn := exportName(c)
