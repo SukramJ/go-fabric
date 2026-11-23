@@ -103,6 +103,12 @@ type reservationOp struct {
 	// tree is the removed (or forgotten) endpoint's keys; nil for a
 	// release and for a forgotten key that was not in the set.
 	tree []string
+	// fresh marks a forgotten key that no endpoint served once the
+	// Forget had run: served again later in the batch, it is a new device
+	// and takes a fresh number. A forgotten key an endpoint still served
+	// (a part of another endpoint) is that endpoint's, which keeps its
+	// number (decision 560).
+	fresh bool
 }
 
 type reservationKind uint8
@@ -113,8 +119,9 @@ const (
 	opErase
 )
 
-// applyReservations runs ops in order.
-func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp) error {
+// applyReservations runs ops in order. keep are the keys an erasure leaves
+// the endpoint record of ([Aggregator.erase]).
+func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp, keep []string) error {
 	p := a.n.persisted
 	var errs []error
 	for _, op := range ops {
@@ -126,7 +133,7 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 			// done for it must not erase it at the next New.
 			errs = append(errs, p.release(ctx, op.key), a.cancelForget(ctx, op.key))
 		case opErase:
-			errs = append(errs, a.erase(ctx, op))
+			errs = append(errs, a.erase(ctx, op, keep))
 		}
 	}
 	if err := errors.Join(errs...); err != nil {
@@ -138,7 +145,9 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 // erase frees every stored number of a forgotten key: its reservation's
 // tree, the tree it had in the set, and the key itself. The nonvolatile
 // persister lets go of the servers it met at those keys and erases the
-// nonvolatile values and UserLabel lists stored for them.
+// nonvolatile values and UserLabel lists stored for them. The endpoint
+// records of keep stay: a served endpoint the batch held back keeps its
+// number across the erasure (review II, R3-store-3702, decision 560).
 //
 // A Forget is several store writes. Before the first, the keys are
 // recorded as a forget in progress (forgetPendingKey); the record goes
@@ -146,7 +155,7 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp)
 // refused write or a crash left half done ([Aggregator.finishForgets]), so
 // a key's number never survives its values and reservation (review II,
 // R2-P6-store-2406). A store that refuses the record changes nothing.
-func (a *Aggregator) erase(ctx context.Context, op reservationOp) error {
+func (a *Aggregator) erase(ctx context.Context, op reservationOp, keep []string) error {
 	reserved, err := a.n.persisted.reservedTree(ctx, op.key)
 	if err != nil {
 		return err
@@ -155,14 +164,14 @@ func (a *Aggregator) erase(ctx context.Context, op reservationOp) error {
 	if err := a.markForget(ctx, keys, true); err != nil {
 		return err
 	}
-	return a.forgetKeys(ctx, keys)
+	return a.forgetKeys(ctx, keys, keep)
 }
 
 // forgetKeys is erase's writes for keys, recorded as a forget in progress:
 // the reservations released, the values erased, the endpoint records
-// removed — and then the record of the forget. A refused release leaves
-// the records, as before, for the forget's next run.
-func (a *Aggregator) forgetKeys(ctx context.Context, keys []string) error {
+// removed but those of keep — and then the record of the forget. A refused
+// release leaves the records, as before, for the forget's next run.
+func (a *Aggregator) forgetKeys(ctx context.Context, keys, keep []string) error {
 	var errs []error
 	for _, k := range keys {
 		if err := a.n.persisted.release(ctx, k); err != nil {
@@ -172,7 +181,8 @@ func (a *Aggregator) forgetKeys(ctx context.Context, keys []string) error {
 	released := len(errs) == 0
 	errs = append(errs, a.n.nonVolatile.forget(ctx, keys))
 	if released {
-		errs = append(errs, a.removeRecords(ctx, "", keys))
+		gone := slices.DeleteFunc(slices.Clone(keys), func(k string) bool { return slices.Contains(keep, k) })
+		errs = append(errs, a.removeRecords(ctx, "", gone))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return err
@@ -189,7 +199,7 @@ func (a *Aggregator) finishForgets(ctx context.Context) error {
 	}
 	var errs []error
 	for _, keys := range pending {
-		errs = append(errs, a.forgetKeys(ctx, keys))
+		errs = append(errs, a.forgetKeys(ctx, keys, nil))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return fmt.Errorf("node: finish a forget: %w", err)
@@ -363,11 +373,13 @@ func (b *Batch) Forget(key device.SourceKey) error {
 		removed = part.eps[i]
 		b.dropLocked(part, i, k)
 	}
+	// A key still served once the Forget ran is a part of another
+	// endpoint: that endpoint keeps its number (decision 560).
+	op := reservationOp{kind: opErase, key: k, fresh: !a.servesLocked(k)}
 	a.mu.Unlock()
 	// A device the level withheld has no endpoint and no number, only
 	// its record in the surface report; Forget drops that too.
 	a.n.dropWithheld(k)
-	op := reservationOp{kind: opErase, key: k}
 	if removed != nil {
 		op.tree = reservationTree(removed.Spec())
 	}
@@ -400,18 +412,25 @@ func splitErasures(ops []reservationOp) (pre, erase []reservationOp) {
 // what an endpoint serves (review II, R2-C2-store-2401, R3-store-3702).
 // held is their partitions and keys, for [Aggregator.holdBack]; cancel is
 // the stable keys they serve inside an erasure set, for
-// [Aggregator.cancelForget]. It only reads the partition list: a
+// [Aggregator.cancelForget]; keep is cancel without the forgotten keys
+// marked fresh, the keys whose endpoint records the erasure leaves, so a
+// held endpoint is served again at the number it had (decision 560) while
+// a forgotten key added again in the batch starts new. It only reads the partition list: a
 // partition retired meanwhile stays retired (R3-store-3701). Run after the
 // batch's pre ops: a re-added key's release has then dropped the
 // reservation it shared.
-func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp) (held []heldKey, cancel []string, err error) {
+func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp) (held []heldKey, cancel, keep []string, err error) {
 	if len(erase) == 0 {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	forgotten := map[string]bool{}
+	fresh := map[string]bool{}
 	var errs []error
 	for _, op := range erase {
 		forgotten[op.key] = true
+		if op.fresh {
+			fresh[op.key] = true
+		}
 		for _, k := range op.tree {
 			forgotten[k] = true
 		}
@@ -444,7 +463,12 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp)
 		}
 	}
 	a.mu.Unlock()
-	return held, cancel, errors.Join(errs...)
+	for _, k := range cancel {
+		if !fresh[k] {
+			keep = append(keep, k)
+		}
+	}
+	return held, cancel, keep, errors.Join(errs...)
 }
 
 // heldKey names an endpoint to hold back: its partition and its key.

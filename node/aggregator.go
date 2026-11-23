@@ -412,10 +412,13 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	// one, after the erasure, so it starts as a new device would — and so
 	// is every served endpoint, of any partition, whose own key or a part
 	// key the erasure reaches, however it came to serve it (review II,
-	// R2-C2-store-2401, R3-store-3702).
+	// R2-C2-store-2401, R3-store-3702); the erasure leaves such an
+	// endpoint's records, so it is served again at the number it had
+	// (decision 560) — only a key the batch forgot and serves anew starts
+	// with a fresh one.
 	pre, erase := splitErasures(b.ops)
-	resErr := p.a.applyReservations(ctx, pre)
-	served, cancel, findErr := p.a.servedInErasure(ctx, erase)
+	resErr := p.a.applyReservations(ctx, pre, nil)
+	served, cancel, keep, findErr := p.a.servedInErasure(ctx, erase)
 	resErr = errors.Join(resErr, findErr)
 	p.a.mu.Lock()
 	started := p.a.started
@@ -430,7 +433,7 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	for _, d := range b.detach {
 		d()
 	}
-	resErr = errors.Join(resErr, p.a.applyReservations(ctx, erase))
+	resErr = errors.Join(resErr, p.a.applyReservations(ctx, erase, keep))
 	// A key forgotten and added again in this batch is the new device's
 	// once served: an erasure that did not finish must not take it at the
 	// next New.
