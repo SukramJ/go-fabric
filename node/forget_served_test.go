@@ -4,7 +4,6 @@
 package node_test
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -31,9 +30,9 @@ func bridgedWithParts(t *testing.T, key string, parts ...string) *device.Bridged
 }
 
 // hasEndpointRecord reports whether the endpoint store holds a record of key.
-func hasEndpointRecord(t *testing.T, ctx context.Context, eps *epmem.Store, key string) bool {
+func hasEndpointRecord(t *testing.T, eps *epmem.Store, key string) bool {
 	t.Helper()
-	recs, err := eps.ListEndpoints(ctx, "")
+	recs, err := eps.ListEndpoints(t.Context(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,14 +57,16 @@ func TestForgetSparesEveryServedEndpoint(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		// setup runs after Start, with owner (part partKey) served.
-		setup func(t *testing.T, ctx context.Context, n *node.Node)
+		setup func(t *testing.T, n *node.Node)
 		// forget forgets owner, in whatever batch the case needs.
-		forget func(t *testing.T, ctx context.Context, n *node.Node) error
+		forget func(t *testing.T, n *node.Node) error
 	}{
 		{
 			name:  "replace in the same batch",
-			setup: func(t *testing.T, ctx context.Context, n *node.Node) {},
-			forget: func(t *testing.T, ctx context.Context, n *node.Node) error {
+			setup: func(t *testing.T, n *node.Node) { t.Helper() },
+			forget: func(t *testing.T, n *node.Node) error {
+				t.Helper()
+				ctx := t.Context()
 				return n.Aggregator().Batch(ctx, func(b *node.Batch) error {
 					if err := b.Forget(endpoint.StringKey("owner")); err != nil {
 						return err
@@ -76,7 +77,9 @@ func TestForgetSparesEveryServedEndpoint(t *testing.T) {
 		},
 		{
 			name: "added by an earlier call",
-			setup: func(t *testing.T, ctx context.Context, n *node.Node) {
+			setup: func(t *testing.T, n *node.Node) {
+				t.Helper()
+				ctx := t.Context()
 				if err := n.Aggregator().Remove(ctx, endpoint.StringKey("owner")); err != nil {
 					t.Fatal(err)
 				}
@@ -84,13 +87,17 @@ func TestForgetSparesEveryServedEndpoint(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			forget: func(t *testing.T, ctx context.Context, n *node.Node) error {
+			forget: func(t *testing.T, n *node.Node) error {
+				t.Helper()
+				ctx := t.Context()
 				return n.Aggregator().Forget(ctx, endpoint.StringKey("owner"))
 			},
 		},
 		{
 			name: "served in another partition",
-			setup: func(t *testing.T, ctx context.Context, n *node.Node) {
+			setup: func(t *testing.T, n *node.Node) {
+				t.Helper()
+				ctx := t.Context()
 				if err := n.Aggregator().Remove(ctx, endpoint.StringKey("owner")); err != nil {
 					t.Fatal(err)
 				}
@@ -98,7 +105,9 @@ func TestForgetSparesEveryServedEndpoint(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			forget: func(t *testing.T, ctx context.Context, n *node.Node) error {
+			forget: func(t *testing.T, n *node.Node) error {
+				t.Helper()
+				ctx := t.Context()
 				return n.Aggregator().Forget(ctx, endpoint.StringKey("owner"))
 			},
 		},
@@ -119,15 +128,15 @@ func TestForgetSparesEveryServedEndpoint(t *testing.T) {
 			if err := n.Start(ctx); err != nil {
 				t.Fatal(err)
 			}
-			tc.setup(t, ctx, n)
-			if err := tc.forget(t, ctx, n); err != nil {
+			tc.setup(t, n)
+			if err := tc.forget(t, n); err != nil {
 				t.Fatal(err)
 			}
 			first, ok := servedNumberOf(n, partKey)
 			if !ok {
 				t.Fatalf("%s is not served after the Forget", partKey)
 			}
-			if !hasEndpointRecord(t, ctx, eps, partKey) {
+			if !hasEndpointRecord(t, eps, partKey) {
 				t.Errorf("the Forget erased the endpoint record of the served key %s", partKey)
 			}
 			if err := n.Aggregator().Add(ctx, kitLight(t, "other")); err != nil {
@@ -198,7 +207,7 @@ func TestForgetBatchBeforeStartKeepsTheRetirement(t *testing.T) {
 	if err := first.Stop(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if !hasEndpointRecord(t, ctx, eps, "p/two") {
+	if !hasEndpointRecord(t, eps, "p/two") {
 		t.Fatal("no record of p/two after the first run")
 	}
 	cfg2 := minimalConfig(nil)
@@ -216,7 +225,7 @@ func TestForgetBatchBeforeStartKeepsTheRetirement(t *testing.T) {
 	if err := n.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if hasEndpointRecord(t, ctx, eps, "p/two") {
+	if hasEndpointRecord(t, eps, "p/two") {
 		t.Error("the retired scope's record p/two survived Start's assembly")
 	}
 }
