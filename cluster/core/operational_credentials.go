@@ -1114,8 +1114,10 @@ func (o *OperationalCredentials) lockNOCForRollback() {
 // OnMatterValueChanged implements [contract.ChangeNotifier]: cb fires when
 // the cluster's lists change outside a command on this cluster — a
 // fail-safe expiry or disarm (an ArmFailSafe command) rolling back an
-// AddNOC or UpdateNOC. A command on this cluster is reported by the
-// bridge itself; matter.js reports every state change of the behavior
+// AddNOC or UpdateNOC, a host's [OperationalCredentials.RemoveFabric] and
+// [OperationalCredentials.NotifyFabricRemoved]. A command on this cluster
+// is reported by the bridge itself (RemoveFabric fires cb for the command
+// too: the removal does not know who asked); matter.js reports every state change of the behavior
 // (TC-OPCREDS-3.8 step 24 waits for the reverted Fabrics).
 func (o *OperationalCredentials) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	if cb == nil {
@@ -2958,7 +2960,12 @@ func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex u
 	// Also bumps DataVersion — see [OperationalCredentials.NotifyFabricRemoved],
 	// which every fabric-removal surface (this wire command, REST revoke,
 	// factory reset) runs so none of them skip a consequence the others apply.
+	// The change notification is owed whoever asked for the removal: a
+	// host's revoke has no invoke path that would report Fabrics and
+	// CommissionedFabrics for it (review II, R4-par-4052). nocMu is released
+	// here (removeFabricRow), as the lock rule asks of a removal's report.
 	o.notifyFabricRemoved(fabricIndex)
+	o.notifyChanged()
 
 	o.mu.Lock()
 	hook := chainFabricHooks(o.facadeOnFabricRemoved, o.onFabricRemoved)
@@ -3083,12 +3090,17 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(ctx context.Con
 //     against this value; without the bump it reads "unchanged" and keeps
 //     showing the removed fabric until something unrelated bumps the
 //     cluster.
+//   - Fires the change notification ([OperationalCredentials.OnMatterValueChanged]),
+//     so a running subscription to Fabrics or CommissionedFabrics is
+//     reported the removal — no invoke path reports it for a removal that
+//     no command asked for.
 //   - Clears currentFabric and any pending commissioning state when they
 //     belonged to the removed fabric, mirroring the wire path's own
 //     cleanup so a subsequent CSR/AddNOC does not reuse stale state tied
 //     to a fabric that no longer exists.
 func (o *OperationalCredentials) NotifyFabricRemoved(fabricIndex uint8) {
 	o.notifyFabricRemoved(fabricIndex)
+	o.notifyChanged()
 }
 
 // notifyFabricRemoved is [OperationalCredentials.NotifyFabricRemoved].
