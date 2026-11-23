@@ -83,7 +83,10 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// across calls.
 	var inner []contract.ClusterServer
 	if ep.Source != nil {
-		inner = ep.Source.MatterClusterServers()
+		// Clipped, so the append below copies instead of writing into
+		// spare capacity the source keeps: the backing array is the
+		// host's, and dispatches run concurrently (R3-conc-3401).
+		inner = slices.Clip(ep.Source.MatterClusterServers())
 	}
 	// A measurement source's clusters follow the source's own: a sensor
 	// endpoint has no source servers, a host's endpoint with both has its
