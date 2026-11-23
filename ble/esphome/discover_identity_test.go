@@ -52,9 +52,9 @@ func (c *capture) count(msg string) int {
 // connection, not by the instance name.
 func TestDiscoveredAliasesOfOneDeviceAreOneProxy(t *testing.T) {
 	const n = 8
-	real := fake(t, esphometest.Options{Name: "real-proxy", MAC: "AABBCCDDEE21", Key: testKey})
-	ap := netip.MustParseAddrPort(real.Addr())
-	var b listBrowser
+	dev := fake(t, esphometest.Options{Name: "real-proxy", MAC: "AABBCCDDEE21", Key: testKey})
+	ap := netip.MustParseAddrPort(dev.Addr())
+	b := make(listBrowser, 0, n)
 	for i := range n {
 		b = append(b, instanceAt(fmt.Sprintf("alias-%03d", i), "aabbccddee21", ap))
 	}
@@ -65,7 +65,7 @@ func TestDiscoveredAliasesOfOneDeviceAreOneProxy(t *testing.T) {
 	if got := log.count("ble.esphome.proxy_discovered"); got != 1 {
 		t.Fatalf("%d proxies discovered for one device under %d names, want 1", got, n)
 	}
-	eventually(t, "one API client on the device", func() bool { return real.Clients() == 1 })
+	eventually(t, "one API client on the device", func() bool { return dev.Clients() == 1 })
 
 	ps, err := esphome.Discover(context.Background(), esphome.Options{Logger: slog.New(&capture{}), Discover: &esphome.DiscoverOptions{
 		Browser: b, Keys: esphome.Keys{"AA:BB:CC:DD:EE:21": testKey}, Timeout: 50 * time.Millisecond,
@@ -83,7 +83,7 @@ func TestDiscoveredAliasesOfOneDeviceAreOneProxy(t *testing.T) {
 // R2-C2-bound-2003.
 func TestDiscoveredProxiesAreBounded(t *testing.T) {
 	const n = esphome.MaxDiscoveredProxies + 2
-	var b listBrowser
+	b := make(listBrowser, 0, n)
 	for i := range n {
 		mac := fmt.Sprintf("AABBCCDD%04X", i)
 		f := fake(t, esphometest.Options{Name: fmt.Sprintf("proxy-%03d", i), MAC: mac})

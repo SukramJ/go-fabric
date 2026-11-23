@@ -144,7 +144,7 @@ func TestSentMessagesOfANotedConnectionKeepItsPlace(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 	handler := func(_ *Conn, _ []byte, release func()) { release() }
-	var held []*Conn
+	held := make([]*Conn, 0, MaxInboundConnections)
 	for i := range MaxInboundConnections {
 		c, cli := acceptFrom(t, l, i, handler)
 		go func() { _, _ = io.Copy(io.Discard, cli) }()

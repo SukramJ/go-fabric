@@ -125,6 +125,7 @@ func TestValidateRCACRefusesARootThatIsNotACAParityMatterJS(t *testing.T) {
 		{"is-ca false, no pathLen", func(o *rcacBuildOpts) { o.basicConstraintsIsCA, o.basicConstraintsHasPathLen = false, false }, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			o := validRCACOpts(priv)
 			tc.edit(&o)
 			c, err := mattercert.Decode(buildRCACTLV(t, priv, o))

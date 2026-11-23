@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/godbus/dbus/v5"
 
@@ -81,10 +80,8 @@ func TestPeripheralReleasedAdvertisementIsRegisteredAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	n := registrations(b)
-	if release, ok := b.method(p.advPath(), ifaceAdvertise, "Release").(func(dbus.Sender) *dbus.Error); ok {
-		_ = release(b.ownerSender())
-	}
-	time.Sleep(50 * time.Millisecond)
+	_ = p.release(b.ownerSender()) // a late Release, as bluetoothd may send one
+	p.readvertising.Wait()
 	if registrations(b) != n || advertised(p, b) {
 		t.Fatal("an advertisement was registered after StopAdvertising")
 	}
