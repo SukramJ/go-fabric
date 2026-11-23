@@ -31,6 +31,13 @@ type RetrySchedule struct {
 
 // DefaultSustainRetries is the schedule a sustained subscription retries
 // on: 15 s, doubling, at most an hour, a quarter of jitter, no timeout.
+// Every subscription reads it unsynchronised when it starts a schedule:
+// a host that changes it does so before its first subscription. A field
+// out of range is taken as the nearest value that keeps every interval at
+// least the first one: an initial interval of 0 or less as 1 s, a backoff
+// below 1 (or NaN) as 1, a maximum interval below 0 as none and a jitter
+// factor outside [0, 1] (or NaN) as the bound it passed (0 for NaN) — this
+// module's hardening (review II, R3-api-3580).
 // Mirrors matter.js
 // packages/protocol/src/action/client/subscription/SustainedSubscription.ts:614-630
 // (SustainedSubscription.DefaultRetrySchedule) at b25ed960.
@@ -59,11 +66,23 @@ type retries struct {
 func (r *retries) reset() { r.base = r.cfg.InitialInterval }
 
 func newRetries(cfg RetrySchedule, rand func() float64) *retries {
-	if cfg.InitialInterval == 0 {
+	if cfg.InitialInterval <= 0 {
 		cfg.InitialInterval = time.Second
 	}
-	if cfg.BackoffFactor == 0 {
+	switch {
+	case cfg.BackoffFactor == 0:
 		cfg.BackoffFactor = 2
+	case !(cfg.BackoffFactor >= 1):
+		cfg.BackoffFactor = 1
+	}
+	if cfg.MaximumInterval < 0 {
+		cfg.MaximumInterval = 0
+	}
+	switch {
+	case !(cfg.JitterFactor >= 0):
+		cfg.JitterFactor = 0
+	case cfg.JitterFactor > 1:
+		cfg.JitterFactor = 1
 	}
 	return &retries{cfg: cfg, rand: rand, base: cfg.InitialInterval}
 }

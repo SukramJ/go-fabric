@@ -18,6 +18,14 @@ import (
 // [Discovery] it takes the solicitor's default, in the schedule itself it
 // means "none" (no timeout, no count limit, no maximum, no jitter) or the
 // schedule's own default (initial interval 1 s, backoff ×2).
+//
+// A field out of range is taken as the nearest value that keeps every
+// interval at least the first one: an initial interval below 0 as unset,
+// a backoff below 1 (or NaN) as 1, a maximum interval below 0 as unset and
+// a jitter factor outside [0, 1] (or NaN) as the bound it passed (0 for
+// NaN). matter.js takes them as given; this module's hardening (review
+// II, R3-api-3580): a shrinking schedule without a timeout or count would
+// send a query on every loop turn.
 type Retries struct {
 	// Timeout bounds the schedule's total time.
 	Timeout time.Duration
@@ -85,12 +93,7 @@ type retrySchedule struct {
 }
 
 func newRetrySchedule(cfg Retries, random func() uint32) *retrySchedule {
-	if cfg.InitialInterval == 0 {
-		cfg.InitialInterval = time.Second
-	}
-	if cfg.BackoffFactor == 0 {
-		cfg.BackoffFactor = 2
-	}
+	cfg.InitialInterval, cfg.BackoffFactor, cfg.MaximumInterval, cfg.JitterFactor = inRange(cfg.InitialInterval, cfg.BackoffFactor, cfg.MaximumInterval, cfg.JitterFactor)
 	return &retrySchedule{cfg: cfg, random: random, base: cfg.InitialInterval}
 }
 
@@ -111,6 +114,33 @@ func (r *retrySchedule) next() (time.Duration, bool) {
 	r.soFar += interval
 	r.base = saturate(float64(r.base) * r.cfg.BackoffFactor)
 	return interval, true
+}
+
+// inRange gives a schedule's fields their defaults and brings the ones out
+// of range into it ([Retries]): an initial interval of 0 or less is 1 s,
+// a backoff of 0 is 2 and one below 1 or NaN is 1, a maximum interval
+// below 0 is none (0), and a jitter factor is held to [0, 1], NaN taken as
+// 0. Every interval of the schedule is then at least the initial one.
+func inRange(initial time.Duration, backoff float64, maximum time.Duration, jitter float64) (time.Duration, float64, time.Duration, float64) {
+	if initial <= 0 {
+		initial = time.Second
+	}
+	switch {
+	case backoff == 0:
+		backoff = 2
+	case !(backoff >= 1):
+		backoff = 1
+	}
+	if maximum < 0 {
+		maximum = 0
+	}
+	switch {
+	case !(jitter >= 0):
+		jitter = 0
+	case jitter > 1:
+		jitter = 1
+	}
+	return initial, backoff, maximum, jitter
 }
 
 // saturate converts to a Duration, holding at the largest one: matter.js
