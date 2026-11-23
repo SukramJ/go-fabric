@@ -642,22 +642,25 @@ func (s *ThermostatServer) activatePreset(ctx context.Context, handle []byte) er
 	if preset != nil {
 		next := st
 		var moved []string
+		var set []uint32
 		if st.heat && preset.HeatingSetpoint != nil {
 			lo, hi := st.effectiveLimits(true)
 			next.setSetpoint(true, unoccupied, min(max(int(*preset.HeatingSetpoint), lo), hi))
 			moved = append(moved, setpointKey(true, unoccupied))
+			set = append(set, setpointAttr(true, unoccupied))
 		}
 		if st.cool && preset.CoolingSetpoint != nil {
 			lo, hi := st.effectiveLimits(false)
 			next.setSetpoint(false, unoccupied, min(max(int(*preset.CoolingSetpoint), lo), hi))
 			moved = append(moved, setpointKey(false, unoccupied))
+			set = append(set, setpointAttr(false, unoccupied))
 		}
 		for _, key := range moved {
 			if err := next.reconcile(key); err != nil {
 				return err
 			}
 		}
-		if err := s.applyCommandSetpoints(ctx, st, next, "SetActivePresetRequest"); err != nil {
+		if err := s.applyCommandSetpoints(ctx, st, next, set, "SetActivePresetRequest"); err != nil {
 			return err
 		}
 	}

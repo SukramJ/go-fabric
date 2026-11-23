@@ -309,8 +309,9 @@ type ThermostatConfig struct {
 // one waits until it returned); the host never takes that queue. After
 // the Sink consented, the server stores on the state as it is then: the
 // value the Sink consented to, over whatever an inbound setter stored for
-// that attribute meanwhile, and — for a write — the companions the
-// reconcile computes on that state. When those, or the written setpoint
+// that attribute meanwhile, and — for a write and SetActivePresetRequest —
+// the companions the reconcile computes on that state; a setpoint
+// SetActivePresetRequest does not move keeps what is stored then. When those, or the written setpoint
 // itself, differ from what the Sink was told (an inbound setter moved a
 // setpoint while the Sink ran), the recomputed values are stored and the
 // server logs matter.thermostat.sink_companions_moved. The cover server's Mover
@@ -1753,7 +1754,17 @@ func (s *ThermostatServer) applyRaiseLower(ctx context.Context, unoccupied bool,
 // setpoint as the primary, matter.js's assignment order for
 // setActivePresetRequest (ThermostatServer.ts:309-314 at db021da0) — and a
 // refusal stores nothing. The caller holds s.op.
-func (s *ThermostatServer) applyCommandSetpoints(ctx context.Context, cur, next setpointState, what string) error {
+//
+// The Sink runs without s.mu. Once it consented, the server stores on the
+// state as it is then, as a write does (writeSetpoint): of set — the
+// setpoints the command assigns — those that move (next against cur) go
+// onto it with the value the Sink was told, and the reconcile computes the
+// companions afresh; a setpoint the command does not move keeps what an
+// inbound setter stored meanwhile. When a setpoint the Sink was told, or
+// one the re-run moves, ends at another value than the Sink was told, the
+// server logs matter.thermostat.sink_companions_moved; should the re-run
+// not reconcile, next is stored (R4-conc-4251).
+func (s *ThermostatServer) applyCommandSetpoints(ctx context.Context, cur, next setpointState, set []uint32, what string) error {
 	moves := setpointDiff(cur, next)
 	if len(moves) == 0 {
 		return nil
@@ -1771,7 +1782,25 @@ func (s *ThermostatServer) applyCommandSetpoints(ctx context.Context, cur, next 
 		}
 	}
 	s.mu.Lock()
-	changed := s.commitSetpoints(next)
+	// The state as it is now: an inbound setter may have moved a setpoint
+	// while the Sink ran; the limits cannot have moved (only writes change
+	// them, and writes wait in s.op).
+	now := s.setpointState()
+	stored, err := now.assignMoved(cur, next, set)
+	if err != nil {
+		s.logger().Warn("matter.thermostat.sink_reconcile_failed",
+			slog.String("command", what), slog.String("reason", err.Error()))
+		stored = next
+	}
+	if moved := companionsMoved(moves[0].AttrID, next, stored, moves[1:], setpointDiff(now, stored)); len(moved) > 0 {
+		attrs := make([]any, 0, len(moved)+1)
+		attrs = append(attrs, slog.String("command", what))
+		for _, c := range moved {
+			attrs = append(attrs, slog.Int(fmt.Sprintf("0x%04X", c.AttrID), int(c.Value)))
+		}
+		s.logger().Warn("matter.thermostat.sink_companions_moved", attrs...)
+	}
+	changed := s.commitSetpoints(stored)
 	s.mu.Unlock()
 	s.flushSetpointEvents(ctx)
 	s.changes.NotifyFrom(contract.OriginCommand, changed...)

@@ -130,6 +130,38 @@ func setpointAttr(heat, unoccupied bool) uint32 {
 	return thermoAttrOccupiedCoolingSetpoint
 }
 
+// assignMoved is st with every setpoint of set that next moves against
+// cur assigned next's value, reconciled with those setpoints as the
+// changed ones, in set's order.
+func (st setpointState) assignMoved(cur, next setpointState, set []uint32) (setpointState, error) {
+	var keys []string
+	for _, id := range set {
+		if v := next.value(id); v != cur.value(id) {
+			st.assign(id, v)
+			keys = append(keys, setpointKeyOf(id))
+		}
+	}
+	for _, key := range keys {
+		if err := st.reconcile(key); err != nil {
+			return st, err
+		}
+	}
+	return st, nil
+}
+
+// setpointKeyOf is the reconcile key of the setpoint attrID.
+func setpointKeyOf(attrID uint32) string {
+	switch attrID {
+	case thermoAttrOccupiedHeatingSetpoint:
+		return spOccupiedHeating
+	case thermoAttrUnoccupiedHeatingSetpoint:
+		return spUnoccHeating
+	case thermoAttrUnoccupiedCoolingSetpoint:
+		return spUnoccCooling
+	}
+	return spOccupiedCooling
+}
+
 // setpointKey is the reconcile key of the heating or cooling setpoint of
 // the occupied or the unoccupied pair.
 func setpointKey(heat, unoccupied bool) string {
