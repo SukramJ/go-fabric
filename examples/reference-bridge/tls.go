@@ -48,6 +48,11 @@ type tlsKeys struct {
 	st     settings
 	logger *slog.Logger
 	now    func() time.Time
+	// keptUnread is why the kept key set could not be read whole
+	// (attach); while it stands nothing is persisted over it, as the
+	// camera keeps a state it cannot read (R2-P6-store-2652,
+	// R2-C2-store-2605).
+	keptUnread error
 }
 
 // newTLSKeys returns the key store; attach binds it to the node's settings
@@ -62,33 +67,57 @@ func (k *tlsKeys) tlsConfig() *node.TLSConfig {
 }
 
 // attach loads the persisted keys from st and persists every later change.
+// A key set it cannot read, decode or take whole is logged, and kept: the
+// keys it did decode serve, and nothing is persisted over the setting
+// (keptUnread) — a later write of the in-memory set would drop the private
+// key of every certificate the node's TLS tables still list.
 func (k *tlsKeys) attach(ctx context.Context, st settings) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.st = st
 	v, ok, err := st.GetSetting(ctx, tlsKeysSetting)
-	if err != nil || !ok {
+	if err != nil {
+		k.keepUnreadLocked(fmt.Errorf("read %s: %w", tlsKeysSetting, err))
+		return
+	}
+	if !ok {
 		return
 	}
 	var stored map[string]string
 	if err := json.Unmarshal([]byte(v), &stored); err != nil {
-		k.logger.Warn("tlssim.load", slog.Any("err", err))
+		k.keepUnreadLocked(fmt.Errorf("decode %s: %w", tlsKeysSetting, err))
 		return
 	}
 	for id, b64 := range stored {
 		der, err := base64.StdEncoding.DecodeString(b64)
 		if err != nil {
+			k.keepUnreadLocked(fmt.Errorf("decode %s key %s: %w", tlsKeysSetting, id, err))
 			continue
 		}
-		if key, err := x509.ParseECPrivateKey(der); err == nil {
-			k.keys[id] = key
+		key, err := x509.ParseECPrivateKey(der)
+		if err != nil {
+			k.keepUnreadLocked(fmt.Errorf("decode %s key %s: %w", tlsKeysSetting, id, err))
+			continue
 		}
+		k.keys[id] = key
 	}
 }
 
-// persistLocked writes the key set; k.mu is held.
+// keepUnreadLocked records why the kept key set was not taken whole and
+// logs it once. Caller holds k.mu.
+func (k *tlsKeys) keepUnreadLocked(err error) {
+	if k.keptUnread != nil {
+		return
+	}
+	k.keptUnread = err
+	k.logger.Warn("tlssim.load", slog.Any("err", err),
+		slog.String("hint", "the TLS simulation keeps no key until the setting is repaired or removed and the daemon restarted"))
+}
+
+// persistLocked writes the key set — nothing while a kept key set it
+// could not read stands (keptUnread); k.mu is held.
 func (k *tlsKeys) persistLocked(ctx context.Context) {
-	if k.st == nil {
+	if k.st == nil || k.keptUnread != nil {
 		return
 	}
 	stored := make(map[string]string, len(k.keys))

@@ -87,15 +87,19 @@ func TestJointFabricSimKeepsItsAdministratorKey(t *testing.T) {
 		t.Fatalf("the CSR after a restart = %v; want the kept key", err)
 	}
 
-	// A broken setting is a new key, and without settings the key lives
-	// as long as the daemon.
+	// A broken setting is refused, not replaced by a new key
+	// (R2-C2-store-2605), and without settings the key lives as long as
+	// the daemon.
 	if err := st.SetSetting(ctx, jfKeySetting, "not base64"); err != nil {
 		t.Fatal(err)
 	}
 	broken := newDemoJointFabric(surface.Policies{}, logger)
 	broken.attach(st)
-	if csr, err := broken.IcacCsr(ctx); err != nil || csrKey(t, csr).Equal(key) {
-		t.Fatalf("the CSR over a broken setting = %v; want a new key", err)
+	if _, err := broken.IcacCsr(ctx); err == nil {
+		t.Fatal("the CSR over a broken setting drew a new key; want a refusal")
+	}
+	if v, _, _ := st.GetSetting(ctx, jfKeySetting); v != "not base64" {
+		t.Fatalf("the broken setting was overwritten: %q", v)
 	}
 	volatile := newDemoJointFabric(surface.Policies{}, logger)
 	if _, err := volatile.devices(); err != nil {

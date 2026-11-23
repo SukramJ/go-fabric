@@ -26,17 +26,15 @@ func TestSecretsComeFromAFileOrTheEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	var v uint
-	if err := (passcodeValue{&v}).Set("@" + file); err != nil || v != 34567812 {
-		t.Fatalf("@file: %d %v", v, err)
-	}
-	if err := (passcodeValue{&v}).Set("not a number"); err == nil || strings.Contains(err.Error(), "not a number") {
-		t.Fatalf("a malformed passcode: %v (the value must not be echoed)", err)
+	var verr error
+	if err := (passcodeValue{&v, &verr}).Set("@" + file); err != nil || verr != nil || v != 34567812 {
+		t.Fatalf("@file: %d %v %v", v, err, verr)
 	}
 	newSet := func() (*flag.FlagSet, *uint) {
 		fs := flag.NewFlagSet("t", flag.ContinueOnError)
 		p := new(uint)
 		*p = 20202021
-		fs.Var(passcodeValue{p}, "passcode", "")
+		fs.Var(passcodeValue{p, new(error)}, "passcode", "")
 		return fs, p
 	}
 	t.Setenv(passcodeEnv, "45678123")
@@ -67,5 +65,37 @@ func TestSecretsComeFromAFileOrTheEnvironment(t *testing.T) {
 	}
 	if got := pbkdfSalt("go-fabric-ref-salt"); string(got) != "go-fabric-ref-salt" {
 		t.Fatalf("--pbkdf-salt: %q", got)
+	}
+}
+
+// TestMalformedPasscodeIsNotEchoed holds R2-C2-sec-2601: a --passcode
+// that is not a decimal number is refused after the parse with a message
+// that does not carry it — package flag, which prints a failing Set's
+// value, sees no failure — and $GOFABRIC_PASSCODE is refused the same way.
+// Not parallel: it sets the environment.
+func TestMalformedPasscodeIsNotEchoed(t *testing.T) {
+	const secret = "2468135x"
+	var out bytes.Buffer
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	fs.SetOutput(&out)
+	f := flags{passcode: 20202021, discriminator: 3840, iterations: node.PBKDFIterationsMin}
+	fs.Var(passcodeValue{&f.passcode, &f.passcodeErr}, "passcode", "")
+	if err := fs.Parse([]string{"--passcode", secret}); err != nil {
+		t.Fatalf("the parse failed: %v", err)
+	}
+	_, _, err := checkFlags(f)
+	if err == nil || strings.Contains(err.Error(), secret) || strings.Contains(out.String(), secret) || !strings.Contains(err.Error(), "--passcode") {
+		t.Fatalf("checkFlags = %v, output %q: want a refusal naming the flag, not the value", err, out.String())
+	}
+	out.Reset()
+	t.Setenv(passcodeEnv, secret)
+	fs = flag.NewFlagSet("t", flag.ContinueOnError)
+	fs.SetOutput(&out)
+	fs.Var(passcodeValue{new(uint), new(error)}, "passcode", "")
+	if err := fs.Parse(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := passcodeFromEnv(fs); err == nil || strings.Contains(err.Error(), secret) || !strings.Contains(err.Error(), passcodeEnv) {
+		t.Fatalf("from $%s: %v", passcodeEnv, err)
 	}
 }

@@ -14,6 +14,10 @@ func TestA(t *testing.T) {
 	var x a.T
 	x.Called()
 	use(nil)
+	a.Annotated()
+	useOuter(a.Outer{})
 }
 
 func use(a.I) {}
+
+func useOuter(a.Outer) {}

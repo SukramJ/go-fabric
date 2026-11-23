@@ -114,11 +114,6 @@ func cmdOTAServe(e *env, args []string) error {
 		} else if err := offerAll(ctx, e, s, mgr, target, versionString, yes); err != nil {
 			return err
 		}
-		defer func() {
-			for _, f := range s.restore {
-				f()
-			}
-		}()
 		for {
 			select {
 			case <-e.ctx.Done():

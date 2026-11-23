@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -29,7 +30,7 @@ func TestParse(t *testing.T) {
 	got := parse(report, root)
 	want := []change{
 		{Line: "./cluster/spec.Bool: removed", Package: "cluster/spec", Symbol: "spec.Bool", Bare: "Bool", Path: "cluster/spec"},
-		{Line: "./controller/client.(*Cluster).Decoded: changed from func(uint32) (any, error) to func(uint32) any", Package: "controller/client", Symbol: "Cluster.Decoded"},
+		{Line: "./controller/client.(*Cluster).Decoded: changed from func(uint32) (any, error) to func(uint32) any", Package: "controller/client", Symbol: "client.Cluster.Decoded", Bare: "Cluster.Decoded", Path: "controller/client"},
 		{Line: "./node/old: removed", Package: "node/old", Symbol: "node/old"},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -46,7 +47,7 @@ func TestSplitRoot(t *testing.T) {
 	if c := qualify(split("Version", module), root); c.Symbol != "fabric.Version" || c.Path != "." {
 		t.Errorf("root symbol qualified: %+v", c)
 	}
-	if c := qualify(split("(*Driver).Close", module), root); c.Package != "." || c.Symbol != "Driver.Close" {
+	if c := qualify(split("(*Driver).Close", module), root); c.Package != "." || c.Symbol != "fabric.Driver.Close" {
 		t.Errorf("root method: %+v", c)
 	}
 }
@@ -207,5 +208,74 @@ func TestModulePath(t *testing.T) {
 	}
 	if _, err := modulePath(t.TempDir()); err == nil {
 		t.Error("modulePath of a directory without go.mod: no error")
+	}
+}
+
+// TestUnannouncedNeedsTheRepositoryPathOfASharedName holds R2-C2-sup-2801:
+// where two public packages share a name, a line naming the other one's
+// symbol of the same name does not announce the break, and a method is
+// named with its package as well — Server.Close alone names no package.
+func TestUnannouncedNeedsTheRepositoryPathOfASharedName(t *testing.T) {
+	shared := root
+	shared.Shared = map[string]bool{"onoff": true}
+	changes := parse("- ./cluster/onoff.Options: removed\n- ./cluster/onoff.(*Server).Close: removed\n", shared)
+	for _, line := range []string{
+		"- `cluster/spec/onoff.Options` and `Server.Close` are gone.\n",
+		"- `onoff.Options` and `onoff.Server.Close` are gone.\n",
+		"- `cluster/spec/onoff`: `Options` and `Server.Close` are gone.\n",
+	} {
+		if got := unannounced(changes, line); len(got) != 2 {
+			t.Errorf("%q announced %d of the two changes of cluster/onoff", line, 2-len(got))
+		}
+	}
+	for _, line := range []string{
+		"- `cluster/onoff.Options` and `cluster/onoff.Server.Close` are gone.\n",
+		"- `cluster/onoff`: `Options` and `Server.Close` are gone.\n",
+	} {
+		if got := unannounced(changes, line); len(got) != 0 {
+			t.Errorf("%q does not announce %+v", line, got)
+		}
+	}
+	// A name no other package carries is enough, a method's included.
+	changes = parse("- ./cluster/lock.Options: removed\n- ./cluster/lock.(*Server).Close: removed\n", shared)
+	if got := unannounced(changes, "- `lock.Options` and `lock.Server.Close` are gone.\n"); len(got) != 0 {
+		t.Errorf("the unique name does not announce %+v", got)
+	}
+	if got := unannounced(changes, "- `Server.Close` is gone.\n- `lock.Options` too.\n"); len(got) != 1 {
+		t.Errorf("a bare method announced the change: %+v", got)
+	}
+}
+
+// TestSharedNames: a name two packages carry is shared, one only one
+// carries is not.
+func TestSharedNames(t *testing.T) {
+	got := sharedNames([]string{"onoff", "spec", "onoff", "fabric", "lock"})
+	if want := map[string]bool{"onoff": true}; !reflect.DeepEqual(got, want) {
+		t.Errorf("sharedNames = %v, want %v", got, want)
+	}
+}
+
+// TestPackageNamesOfTheModule: the module's own listing finds the names
+// the CHANGELOG qualifies by, the shared ones of the finding among them
+// (R2-C2-sup-2801), and none of the trees that are not public API.
+func TestPackageNamesOfTheModule(t *testing.T) {
+	if testing.Short() {
+		t.Skip("lists the module's packages")
+	}
+	t.Chdir(filepath.Join("..", ".."))
+	names, err := packageNames(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(names, rootName) {
+		t.Errorf("the root package's name %q is not listed", rootName)
+	}
+	for _, internal := range []string{"udpseam", "apidiff", "chiptool"} {
+		if slices.Contains(names, internal) {
+			t.Errorf("%q is listed: not public API", internal)
+		}
+	}
+	if !sharedNames(names)["onoff"] {
+		t.Error("onoff (cluster/onoff and cluster/spec/onoff) is not shared")
 	}
 }

@@ -40,7 +40,9 @@
 // method of an exported defined type (listed as "Type.Method"; R2-P6-test-2806):
 // a host calls methods at least as often as functions. A method of an interface
 // type is a declaration, not code, and is not listed; nor is a method promoted
-// from an embedded type, which is listed on the type that declares it. A
+// from an embedded exported type, which is listed on the type that declares it.
+// One an unexported embedded type declares is listed on every exported type it
+// is promoted into (R2-C2-test-2803). A
 // method counts as reached when a test's call path calls it or takes its value
 // ([calledFrom]); RTA's own verdict would count every exported method of a type
 // that reaches an interface value, since reflection might call it.
@@ -187,7 +189,12 @@ type Inventory struct {
 	ByPackage    []PackageSummary   `json:"by_package"`
 	Unreachable  []UnreachableEntry `json:"unreachable"`
 	Whitelisted  []WhitelistEntry   `json:"whitelisted"`
-	Disagreement int                `json:"variant_disagreements"`
+	// RedundantAnnotations are the annotated identifiers a test reaches
+	// all the same: an exemption that states a reason the analyzer does
+	// not need (R2-C2-test-2802). They stay whitelisted; the list is held
+	// on its ratchet (TestReachabilityRedundantAnnotationsOnTheirRatchet).
+	RedundantAnnotations []WhitelistEntry `json:"redundant_annotations"`
+	Disagreement         int              `json:"variant_disagreements"`
 }
 
 // identKey identifies one exported identifier across all SSA package variants.
@@ -535,6 +542,9 @@ type identClass struct {
 	reachable   bool
 	whitelisted *WhitelistEntry
 	unreachable *UnreachableEntry
+	// redundant is set when an annotation whitelists the identifier and a
+	// variant reaches it all the same (R2-C2-test-2802).
+	redundant bool
 }
 
 // classify enumerates every exported identifier of this module and folds the
@@ -607,6 +617,9 @@ func classify(
 					e := entry
 					cls.whitelisted = &e
 				}
+				// Whitelisted all the same; asked so a redundant
+				// exemption is listed (R2-C2-test-2802).
+				cls.redundant = cls.redundant || isReachable(member, reachableFuncs, refs, p)
 				continue
 			}
 
@@ -634,10 +647,15 @@ func classify(
 }
 
 // exportedMethods returns the exported methods an exported defined type
-// declares, on the value or the pointer receiver: none for an alias (its
-// methods are the aliased type's, listed there), an interface (a method set
-// declaration, no code) or a non-type member. A method promoted from an
-// embedded type is not declared here and is listed on the type that declares it.
+// declares, on the value or the pointer receiver, and the exported methods
+// promoted into it from an embedded type that is not exported: none for
+// an alias (its methods are the aliased type's, listed there), an
+// interface (a method set declaration, no code) or a non-type member. A
+// method an exported type declares is listed on that type only, wherever
+// it is promoted to; one an unexported type declares has no exported type
+// of its own to be listed on, so it is listed on each exported type it is
+// promoted into (R2-C2-test-2803) — for a generic declarer, as its
+// generic method, which counts as reached when any instance is.
 func exportedMethods(member ssa.Member) []*types.Func {
 	t, ok := member.(*ssa.Type)
 	if !ok {
@@ -657,7 +675,32 @@ func exportedMethods(member ssa.Member) []*types.Func {
 			out = append(out, m)
 		}
 	}
+	mset := types.NewMethodSet(types.NewPointer(named))
+	for sel := range mset.Methods() {
+		m, ok := sel.Obj().(*types.Func)
+		if !ok || !m.Exported() || len(sel.Index()) < 2 {
+			continue
+		}
+		if declarer := receiverName(m); declarer != nil && !declarer.Obj().Exported() {
+			out = append(out, m.Origin())
+		}
+	}
 	return out
+}
+
+// receiverName is the defined type that declares method m, nil for an
+// interface method.
+func receiverName(m *types.Func) *types.Named {
+	recv := m.Signature().Recv()
+	if recv == nil {
+		return nil
+	}
+	t := recv.Type()
+	if p, ok := t.(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	named, _ := t.(*types.Named)
+	return named
 }
 
 // classifyOne folds one variant's verdict on an exported method into its
@@ -698,6 +741,7 @@ func classifyOne(
 			e := entry
 			cls.whitelisted = &e
 		}
+		cls.redundant = cls.redundant || reached
 		return 0
 	}
 	switch {
@@ -721,13 +765,16 @@ func classifyOne(
 // preserving the precedence whitelisted > reachable > unreachable.
 func foldClasses(order []identKey, classes map[identKey]*identClass, totalExported, disagreements int) Inventory {
 	var unreachableItems []UnreachableEntry
-	var whitelistedItems []WhitelistEntry
+	var whitelistedItems, redundantItems []WhitelistEntry
 	reachableCount := 0
 	for _, key := range order {
 		cls := classes[key]
 		switch {
 		case cls.whitelisted != nil:
 			whitelistedItems = append(whitelistedItems, *cls.whitelisted)
+			if cls.redundant {
+				redundantItems = append(redundantItems, *cls.whitelisted)
+			}
 		case cls.reachable:
 			reachableCount++
 		case cls.unreachable != nil:
@@ -737,6 +784,7 @@ func foldClasses(order []identKey, classes map[identKey]*identClass, totalExport
 
 	sortUnreachable(unreachableItems)
 	sortWhitelisted(whitelistedItems)
+	sortWhitelisted(redundantItems)
 
 	return Inventory{
 		Summary: Summary{
@@ -745,10 +793,11 @@ func foldClasses(order []identKey, classes map[identKey]*identClass, totalExport
 			Whitelisted:   len(whitelistedItems),
 			Unreachable:   len(unreachableItems),
 		},
-		ByPackage:    buildPackageSummary(unreachableItems),
-		Unreachable:  unreachableItems,
-		Whitelisted:  whitelistedItems,
-		Disagreement: disagreements,
+		ByPackage:            buildPackageSummary(unreachableItems),
+		Unreachable:          unreachableItems,
+		Whitelisted:          whitelistedItems,
+		RedundantAnnotations: redundantItems,
+		Disagreement:         disagreements,
 	}
 }
 

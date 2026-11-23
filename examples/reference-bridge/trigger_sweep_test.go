@@ -224,3 +224,79 @@ func TestStateForecastEsaTakesNoPowerAdjustmentCapability(t *testing.T) {
 		t.Fatalf("the ESA was handed a capability it does not serve:\n%s", logs.String())
 	}
 }
+
+// TestWithheldDevicesHandleNoTrigger holds R2-C2-err-2606 and is the
+// class guard of R2-P6-err-2650's rule: a device --spec-level can withhold
+// (its constructor returns withheldOr) is not built then, and answers
+// every TestEventTrigger "not handled", so the fleet's dispatch goes on and
+// a trigger for a withheld device fails as it does for every other. The
+// devices of a fleet that was never composed stand for withheld ones; the
+// table is held to the source: every type whose methods call withheldOr
+// and which has a testEventTrigger method is in it.
+func TestWithheldDevicesHandleNoTrigger(t *testing.T) {
+	t.Parallel()
+	f := newFleet()
+	handlers := map[string]func(uint64) bool{
+		"demoGarage":          f.garage.testEventTrigger,
+		"demoMeter":           f.meter.testEventTrigger,
+		"demoEnergyTariff":    f.energyTariff.testEventTrigger,
+		"demoElectricalMeter": f.electricalMeter.testEventTrigger,
+	}
+	for name, handle := range handlers {
+		for _, tr := range sweptTriggers {
+			if handle(tr.v) {
+				t.Errorf("withheld %s handled %s (%#x)", name, tr.name, tr.v)
+			}
+		}
+	}
+	withholds, triggers := map[string]bool{}, map[string]bool{}
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv == nil || len(fn.Recv.List) != 1 {
+				continue
+			}
+			recv := fn.Recv.List[0].Type
+			if star, ok := recv.(*ast.StarExpr); ok {
+				recv = star.X
+			}
+			id, ok := recv.(*ast.Ident)
+			if !ok {
+				continue
+			}
+			if fn.Name.Name == "testEventTrigger" {
+				triggers[id.Name] = true
+			}
+			ast.Inspect(fn, func(n ast.Node) bool {
+				if call, ok := n.(*ast.CallExpr); ok {
+					if f, ok := call.Fun.(*ast.Ident); ok && f.Name == "withheldOr" {
+						withholds[id.Name] = true
+					}
+				}
+				return true
+			})
+		}
+	}
+	for typ := range withholds {
+		if _, listed := handlers[typ]; triggers[typ] && !listed {
+			t.Errorf("%s can be withheld and handles test event triggers: add it to the table", typ)
+		}
+	}
+	for typ := range handlers {
+		if !withholds[typ] || !triggers[typ] {
+			t.Errorf("%s is in the table but is not a withholdable device with testEventTrigger", typ)
+		}
+	}
+}

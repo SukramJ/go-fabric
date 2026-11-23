@@ -20,15 +20,17 @@ type change struct {
 	// for the module's root package).
 	Package string
 	// Symbol is the name the CHANGELOG must carry: the symbol qualified by
-	// its package's name ("spec.Bool"), "Report.Values" for a method, the
+	// its package's name ("spec.Bool", "client.Cluster.Decoded" for a
+	// method), by the package's repository path where another public
+	// package shares the name ("cluster/onoff.Options"), the
 	// repository-relative path for a removed package.
 	Symbol string
-	// Bare is a package-level symbol without its package ("Bool"); empty
-	// for a method and a removed package.
+	// Bare is the symbol without its package ("Bool", "Cluster.Decoded");
+	// empty for a removed package.
 	Bare string
-	// Path is the repository-relative path of the package of a
-	// package-level symbol ("cluster/spec", "wifi/wpasupplicant"), which
-	// a CHANGELOG line names in backticks.
+	// Path is the repository-relative path of the symbol's package
+	// ("cluster/spec", "wifi/wpasupplicant"), which a CHANGELOG line names
+	// in backticks.
 	Path string
 }
 
@@ -89,11 +91,14 @@ func split(subject, modulePath string) change {
 }
 
 // qualify writes the name the CHANGELOG must carry for a change of the
-// module t: a package-level symbol qualified by its package's name, the
-// last element of its path (the root package's name for "."), so that a
-// line naming node.Options does not announce a break of onoff.Options
-// (R2-P6-sup-2802); a method as Type.Method, which names its type
-// already; a removed package by its repository-relative path.
+// module t: a symbol — a method as Type.Method — qualified by its
+// package's name, the last element of its path (the root package's name
+// for "."), so that a line naming node.Options does not announce a break
+// of onoff.Options (R2-P6-sup-2802); by the package's repository path
+// instead where another public package carries the same name (t.Shared),
+// so that a line naming cluster/spec/onoff.Options does not announce
+// cluster/onoff.Options, nor Server.Close any package's (R2-C2-sup-2801);
+// a removed package by its repository-relative path.
 func qualify(c change, t target) change {
 	repoPath := c.Package
 	if t.Dir != "." {
@@ -102,18 +107,19 @@ func qualify(c change, t target) change {
 			repoPath = t.Dir
 		}
 	}
-	switch {
-	case c.Symbol == c.Package: // a removed package
+	if c.Symbol == c.Package { // a removed package
 		c.Symbol = repoPath
-	case strings.Contains(c.Symbol, "."): // Type.Method
-	default:
-		name := path.Base(c.Package)
-		if c.Package == "." {
-			name = t.Name
-		}
-		c.Bare, c.Path = c.Symbol, repoPath
-		c.Symbol = name + "." + c.Symbol
+		return c
 	}
+	name := path.Base(c.Package)
+	if c.Package == "." {
+		name = t.Name
+	}
+	c.Bare, c.Path = c.Symbol, repoPath
+	if t.Shared[name] && repoPath != "." {
+		name = repoPath
+	}
+	c.Symbol = name + "." + c.Symbol
 	return c
 }
 
@@ -181,19 +187,24 @@ func unreleased(changelog, base string) (string, error) {
 
 // unannounced returns the changes the text does not announce. A change
 // is announced by a line that names its Symbol as a word of its own
-// ("spec.Bool", "cluster/spec.Bool", "Report.Values"), or, for a
-// package-level symbol, by a line that names its package in backticks, the
-// CHANGELOG's form ("- `cluster/lock`: `StateSource` is …"), and the bare
-// symbol as a word.
+// ("spec.Bool", "client.Cluster.Decoded"), or its repository path and the
+// bare symbol in one ("cluster/spec.Bool"), or its package in backticks,
+// the CHANGELOG's form ("- `cluster/lock`: `StateSource` is …"), and the
+// bare symbol as a word. A word does not continue a path: "onoff.Options"
+// is not a word of "cluster/spec/onoff.Options".
 func unannounced(changes []change, text string) []change {
 	lines := strings.Split(text, "\n")
 	var missing []change
 	for _, c := range changes {
 		named := word(c.Symbol)
+		var full *regexp.Regexp
+		if c.Path != "" && c.Path != "." {
+			full = word(c.Path + "." + c.Bare)
+		}
 		bare := word(c.Bare)
 		found := false
 		for _, l := range lines {
-			if named.MatchString(l) ||
+			if named.MatchString(l) || (full != nil && full.MatchString(l)) ||
 				(c.Bare != "" && strings.Contains(l, "`"+c.Path+"`") && bare.MatchString(l)) {
 				found = true
 				break
@@ -253,7 +264,9 @@ func moved(line, oldRoot, newRoot string) bool {
 	}
 }
 
-// word matches name as a word of its own.
+// word matches name as a word of its own: not preceded by a word
+// character, a path's slash or a qualifier's dot, nor followed by a word
+// character.
 func word(name string) *regexp.Regexp {
-	return regexp.MustCompile(`(^|[^\w])` + regexp.QuoteMeta(name) + `($|[^\w])`)
+	return regexp.MustCompile(`(^|[^\w/.])` + regexp.QuoteMeta(name) + `($|[^\w])`)
 }

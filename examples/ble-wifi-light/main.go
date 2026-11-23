@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strconv"
 	"syscall"
 
 	"thingfabric.dev/go-fabric/ble/bluez"
@@ -56,7 +57,10 @@ func parseFlags(args []string) (options, error) {
 	fs.StringVar(&o.wifiInterface, "wifi-interface", wpasupplicant.DefaultInterface, "the Wi-Fi interface wpa_supplicant manages")
 	fs.BoolVar(&o.noWiFi, "no-wifi", false, "no Wi-Fi: the node serves the Ethernet NetworkCommissioning and is reached over the host's present network (a test without a Wi-Fi radio)")
 	fs.StringVar(&o.storage, "storage", "ble-wifi-light.db", "the SQLite file of the node's state")
-	fs.UintVar(&o.passcode, "passcode", 20202021, "the setup passcode")
+	// The passcode is parsed as text and converted below: package flag
+	// reports a value its own parser refuses as `invalid value "<value>"`,
+	// the passcode in the text that reaches a log (R2-C2-sec-2601).
+	passcode := fs.String("passcode", "20202021", "the setup passcode")
 	fs.UintVar(&o.discriminator, "discriminator", 3840, "the 12-bit discriminator")
 	level := fs.String("log-level", "info", "debug, info, warn or error")
 	if err := fs.Parse(args); err != nil {
@@ -65,6 +69,13 @@ func parseFlags(args []string) (options, error) {
 	if err := o.logLevel.UnmarshalText([]byte(*level)); err != nil {
 		return options{}, fmt.Errorf("--log-level: %w", err)
 	}
+	n, err := strconv.ParseUint(*passcode, 10, 32)
+	if err != nil {
+		// The value is not echoed: it is the passcode, and the text
+		// reaches a log.
+		return options{}, errors.New("--passcode is not a decimal number")
+	}
+	o.passcode = uint(n)
 	if o.passcode > 99999998 {
 		// The value is not echoed: a passcode with a digit too many is
 		// still the device's passcode, and the text reaches a log.
