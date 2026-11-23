@@ -5,6 +5,7 @@ package discovery
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -419,16 +420,36 @@ func (s *Scanner) armCleanup() {
 	})
 }
 
+// maxQueuedDeliveries is how many devices a search's delivery queue holds
+// while its found has not taken them — found may wait, for a Prepare slot
+// of a discovery session, while the loop keeps delivering. Past it the
+// oldest queued device is dropped and the drop logged. It equals
+// maxSeenInstances: a device is queued as the waiter records its instance,
+// so a full queue holds the last maxSeenInstances instances recorded, the
+// device an overflow drops is the one the waiter forgets at the same push,
+// and its next announcement is delivered again. This module's own bound (review II, R3-bound-3552,
+// owner decision 573).
+const maxQueuedDeliveries = maxSeenInstances
+
 // deliveryQueue hands devices from the loop to a search's goroutine.
 type deliveryQueue struct {
-	// mu guards items.
-	mu     sync.Mutex
-	items  []Device
-	signal chan struct{}
+	// mu guards items and dropped.
+	mu    sync.Mutex
+	items []Device
+	// dropped counts the devices the bound dropped since the last drain.
+	dropped int
+	signal  chan struct{}
+	// logger receives the drops; nil logs nothing.
+	logger *slog.Logger
 }
 
 func (q *deliveryQueue) push(d Device) {
 	q.mu.Lock()
+	if len(q.items) >= maxQueuedDeliveries {
+		q.items[0] = Device{}
+		q.items = q.items[1:]
+		q.dropped++
+	}
 	q.items = append(q.items, d)
 	q.mu.Unlock()
 	select {
@@ -439,9 +460,13 @@ func (q *deliveryQueue) push(d Device) {
 
 func (q *deliveryQueue) drain() []Device {
 	q.mu.Lock()
-	defer q.mu.Unlock()
-	out := q.items
-	q.items = nil
+	out, dropped := q.items, q.dropped
+	q.items, q.dropped = nil, 0
+	q.mu.Unlock()
+	if dropped > 0 && q.logger != nil {
+		q.logger.Warn("matter.discovery.deliveries_dropped", slog.Int("dropped", dropped),
+			slog.String("reason", "a search queues at most "+strconv.Itoa(maxQueuedDeliveries)+" devices its callback has not taken; the oldest were dropped"))
+	}
 	return out
 }
 
@@ -464,7 +489,7 @@ func (s *Scanner) FindCommissionable(ctx context.Context, id Identifier, found f
 // [IPTransport], which runs until it is stopped and needs only found
 // (review II, R3-bound-3552).
 func (s *Scanner) find(ctx context.Context, id Identifier, found func(Device), keep bool) ([]Device, error) {
-	q := &deliveryQueue{signal: make(chan struct{}, 1)}
+	q := &deliveryQueue{signal: make(chan struct{}, 1), logger: s.names.logger}
 	cancelled := make(chan struct{})
 	var once sync.Once
 	w := &waiter{identifier: id, seen: newInstanceSet(), push: q.push, cancel: func() { once.Do(func() { close(cancelled) }) }}

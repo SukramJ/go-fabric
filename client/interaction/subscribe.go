@@ -91,10 +91,12 @@ type SubscribeRequest struct {
 	// Retries, for a sustained subscription, is the schedule it retries on:
 	// the attempts of one establishment, and the pause before it replaces
 	// a subscription the peer dropped before it lasted the current
-	// interval. The zero value is the default schedule —
-	// [DefaultSustainRetries] while that variable is kept; any other value
-	// is taken as [RetrySchedule] says, a zero field at the schedule's own
-	// default (review II, R3-api-3580, owner decision 562).
+	// interval. It is merged field by field over the default schedule —
+	// [DefaultSustainRetries] while that variable is kept: a zero field
+	// takes the default's field, so the zero value is the default
+	// schedule; [NoMaximumInterval] and [NoJitter] say "none" where zero
+	// cannot. The merged schedule is taken as [RetrySchedule] says (review
+	// II, R3-api-3580, owner decisions 562, 566).
 	Retries RetrySchedule
 	// BootstrapRead, for a sustained subscription, runs before an attempt
 	// until it succeeds — the hook of bootstrapWithRead
