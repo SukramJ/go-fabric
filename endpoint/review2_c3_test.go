@@ -265,10 +265,11 @@ func (failingFabricsStore) ListFabrics(context.Context) ([]store.FabricRecord, e
 	return nil, errors.New("store read fault")
 }
 
-// TestFabricSceneInfoOnAFabricListFault (R2-C2-err-0455): a store error
-// while listing the node's fabrics is not answered as a node without
-// fabrics (Success with an empty FabricSceneInfo): the accessing fabric
-// still reads its own entry, as it does without a fabric source.
+// TestFabricSceneInfoOnAFabricListFault (R2-C2-err-0455, decision 527): a
+// store error while listing the node's fabrics is not answered as a node
+// without fabrics (Success with an empty FabricSceneInfo), nor as one
+// holding only the accessing fabric: the read answers FAILURE, as on a
+// scene table the store cannot load.
 func TestFabricSceneInfoOnAFabricListFault(t *testing.T) {
 	t.Parallel()
 	mgr, err := groups.NewManager(failingFabricsStore{}, nil)
@@ -290,13 +291,8 @@ func TestFabricSceneInfoOnAFabricListFault(t *testing.T) {
 		t.Fatal("no stack ScenesManagement server")
 	}
 	ctx := im.WithFabricFilter(context.Background(), true, 1)
-	v, ok := scenes.MatterReadFiltered(ctx, 0x0002)
-	si, _ := v.([]mattercore.SceneInfoStruct)
-	if ok && len(si) == 0 {
-		t.Fatalf("FabricSceneInfo on a fabric-list fault = Success, empty: the accessing fabric's entry is gone")
-	}
-	if ok && (len(si) != 1 || si[0].FabricIndex != 1) {
-		t.Errorf("FabricSceneInfo on a fabric-list fault = %+v, want fabric 1's entry alone", si)
+	if v, ok := scenes.MatterReadFiltered(ctx, 0x0002); ok {
+		t.Fatalf("FabricSceneInfo on a fabric-list fault = %+v, Success; want FAILURE", v)
 	}
 }
 

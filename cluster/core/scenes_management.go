@@ -609,8 +609,21 @@ type ScenesConfig struct {
 	// the group — matter.js #groupExistentInFabric. Nil accepts only group 0.
 	GroupKnown func(ctx context.Context, fabric uint8, groupID uint16) bool
 	// Fabrics lists the node's fabrics, for FabricSceneInfo; nil serves the
-	// accessing fabric's entry alone.
+	// accessing fabric's entry alone. Consulted only while ListFabrics is
+	// nil. It cannot report a fabric list it failed to read: a store error
+	// becomes whatever list it returns.
+	//
+	// Deprecated: set ListFabrics, which reports the error, instead; this
+	// field keeps its behaviour until it goes and is removable in v0.28.0
+	// (review II, R2-C2-err-0455).
 	Fabrics func(ctx context.Context) []uint8
+	// ListFabrics lists the node's fabrics, for FabricSceneInfo. An error
+	// answers the FabricSceneInfo read FAILURE, as a scene table the store
+	// cannot load does: a fabric list that cannot be read is not a node
+	// without fabrics (R2-C2-err-0455, decision 527). Set, it is used and
+	// Fabrics is not; with both nil the accessing fabric's entry is served
+	// alone.
+	ListFabrics func(ctx context.Context) ([]uint8, error)
 }
 
 // ScenesManagement is the server.
@@ -793,11 +806,20 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 		// reads an empty list until its first scene or a restart. This
 		// module serves the entry from the start, on purpose (the
 		// by_design entry for FabricSceneInfo). Without the fabric list
-		// the accessing fabric still sees its own entry (W3-clucore-14).
+		// the accessing fabric still sees its own entry (W3-clucore-14). A
+		// fabric list the port cannot read fails the read, as the unloaded
+		// table above does (R2-C2-err-0455).
 		var fabrics []uint8
-		if s.cfg.Fabrics != nil {
-			fabrics = s.cfg.Fabrics(ctx)
-		} else if fabric != 0 {
+		switch {
+		case s.cfg.ListFabrics != nil:
+			f, err := s.cfg.ListFabrics(ctx)
+			if err != nil {
+				return nil, false
+			}
+			fabrics = f
+		case s.cfg.Fabrics != nil: //nolint:staticcheck // the deprecated port is served for its window (R2-C2-err-0455)
+			fabrics = s.cfg.Fabrics(ctx) //nolint:staticcheck // as above
+		case fabric != 0:
 			fabrics = []uint8{fabric}
 		}
 		st.mu.Lock()

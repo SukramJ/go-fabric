@@ -96,7 +96,7 @@ type ThreadNetworkCommissioningConfig struct {
 	// ([GeneralCommissioning.FailSafeFabric]); the network commands need
 	// the window of their accessing fabric (EnsureFailsafeIsArmed over
 	// IsFailSafeArmed(GetAccessingFabricIndex()),
-	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609 at
+	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609, :644 at
 	// 6170af84; by_design BD-chip-FailSafeOfTheAccessingFabric). Nil reads
 	// as disarmed until [ThreadNetworkCommissioning.AttachFailSafe] wires
 	// it, unless IsFailSafeArmed is set.
@@ -409,8 +409,8 @@ func (n *ThreadNetworkCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 
 // armedFor is connectedhomeip's EnsureFailsafeIsArmed(failSafeContext,
 // handler.GetAccessingFabricIndex()) (NetworkCommissioningCluster.cpp:155-172,
-// :380, :568, :609 at 6170af84): the window must be armed, and armed for
-// the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
+// :380, :568, :609, :644 at 6170af84): the window must be armed, and armed
+// for the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
 // ([ThreadNetworkCommissioningConfig.IsFailSafeArmed]) answers for any
 // fabric, as before, and is logged once (R2-C2-sec-1006).
 func (n *ThreadNetworkCommissioning) armedFor(ctx context.Context) bool {

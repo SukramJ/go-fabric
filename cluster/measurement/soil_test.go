@@ -149,11 +149,13 @@ func TestSoilMoistureMaterializes(t *testing.T) {
 	}
 }
 
-// TestSoilMaterializedReadKeepsNoPreviousReading pins the contract the
-// server's doc states (R2-C2-store-1453): the materialiser builds a new
-// server per call, so a reading outside the limits reads null through a
-// fresh materialisation, while one kept instance answers the previous
-// reading inside them.
+// TestSoilMaterializedReadKeepsNoPreviousReading pins the materialiser's
+// half of the contract the server's doc states (R2-C2-store-1453): the
+// materialiser builds a new server per call, so a reading outside the
+// limits reads null through a fresh materialisation, while one kept
+// instance answers the previous reading inside them. Keeping the instance
+// is the endpoint's (endpoint TestSoilLastReadingSurvivesAMaterialisation,
+// decision 526); the server opts in.
 func TestSoilMaterializedReadKeepsNoPreviousReading(t *testing.T) {
 	t.Parallel()
 	m := builtinMaterializers[contract.MeasurementSoilMoisture]
@@ -172,5 +174,8 @@ func TestSoilMaterializedReadKeepsNoPreviousReading(t *testing.T) {
 	}
 	if v := read(kept); v != uint8(40) {
 		t.Errorf("out of limits through the kept instance: %v, want 40", v)
+	}
+	if _, ok := kept.(interface{ MatterKeepInstance() }); !ok {
+		t.Error("SoilMeasurementServer does not opt into the endpoint's kept servers (MatterKeepInstance)")
 	}
 }

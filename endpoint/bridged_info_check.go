@@ -21,9 +21,10 @@ import (
 // beyond it refuses the assembly, naming the endpoint and the attribute:
 // the assembler serves a stated value as stated, never cut (R2-P6-wire-2502,
 // decision 201). device.New refuses the same values earlier, so a device
-// of package device never reaches this refusal. A part, or a Spec that
-// serves nothing ([ClusterServers]), serves no BridgedDeviceBasicInformation
-// and is not checked. The bridge's own VendorName, the fallback a bridged
+// of package device never reaches this refusal. A part serves no
+// BridgedDeviceBasicInformation and is not checked; nor is a Spec with no
+// Source, Measurement or PowerSource, which the assembler refuses as one
+// that would serve nothing (R2-C2-err-0453, decision 528). The bridge's own VendorName, the fallback a bridged
 // endpoint serves without one of its own, is checked once, by
 // [Config.Validate].
 func checkBridgedInfo(s *Spec, part bool) error {

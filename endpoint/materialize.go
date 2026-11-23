@@ -17,7 +17,6 @@ import (
 	"thingfabric.dev/go-fabric/cluster/onoff"
 	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"thingfabric.dev/go-fabric/contract"
-	"thingfabric.dev/go-fabric/im"
 	"thingfabric.dev/go-fabric/schema"
 )
 
@@ -352,27 +351,37 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 // source's own, and the device's battery — riding on this endpoint when
 // attachPowerSource picked it — follows them, so the primary function
 // stays first in the ServerList. Nil entries are left in; the caller drops
-// them.
+// them. A [StatefulServer] among them is the instance the endpoint keeps
+// ([Endpoint.keepStateful], R2-C2-store-1453).
 func (ep *Endpoint) materializedServers() []contract.ClusterServer {
-	mc := contract.MeasurementContext{EndpointID: ep.ID}
-	var out []contract.ClusterServer
-	if ep.Measurement != nil {
-		out = append(out, measurement.FromMeasurementClass(
-			ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc,
-		)...)
-	}
-	if ep.PowerSource != nil {
-		out = append(out,
-			measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource, mc)...)
-	}
-	return out
+	measured, battery := ep.materialize()
+	measured = ep.keepStateful(keptMeasurement, ep.Measurement, measured)
+	battery = ep.keepStateful(keptPowerSource, ep.PowerSource, battery)
+	return append(measured, battery...)
 }
 
-// measuredServers is [Endpoint.materializedServers] without its nil
-// entries: what an endpoint without a source serves before the stack's
-// clusters are added.
+// materialize runs the measurement's and the battery's materialisers and
+// keeps nothing.
+func (ep *Endpoint) materialize() (measured, battery []contract.ClusterServer) {
+	mc := contract.MeasurementContext{EndpointID: ep.ID}
+	if ep.Measurement != nil {
+		measured = measurement.FromMeasurementClass(ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc)
+	}
+	if ep.PowerSource != nil {
+		battery = measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource, mc)
+	}
+	return measured, battery
+}
+
+// measuredServers is what the endpoint's measurement and battery
+// materialise, without its nil entries and without touching the kept
+// servers: what an endpoint without a source serves before the stack's
+// clusters are added. The assembler asks it before the assembly is known to
+// succeed, so it must leave the endpoint's shared state alone
+// (R2-C2-fsm-0451).
 func (ep *Endpoint) measuredServers() []contract.ClusterServer {
-	return ep.dropNilServers(ep.materializedServers())
+	measured, battery := ep.materialize()
+	return ep.dropNilServers(append(measured, battery...))
 }
 
 // partClusterServers is the surface of a [Spec.Parts] endpoint: its own
@@ -578,20 +587,16 @@ func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.Cluste
 			return err == nil && ok
 		},
 		// A store error while listing the fabrics is not a node without
-		// fabrics: the read then serves what it serves without a fabric
-		// source — the accessing fabric's own entry — rather than Success
-		// with an empty list (R2-C2-err-0455).
-		Fabrics: func(ctx context.Context) []uint8 {
+		// fabrics: ListFabrics hands it on, and FabricSceneInfo answers
+		// FAILURE (R2-C2-err-0455, decision 527).
+		ListFabrics: func(ctx context.Context) ([]uint8, error) {
 			f, err := gm.StoredFabrics(ctx)
 			if err != nil {
-				ep.logger().Warn("endpoint: FabricSceneInfo: listing the fabrics failed; serving the accessing fabric's entry",
+				ep.logger().Warn("endpoint: FabricSceneInfo: listing the fabrics failed; the read answers FAILURE",
 					"endpoint", ep.ID, "err", err)
-				if _, fabric, _ := im.LookupFabricFilter(ctx); fabric != 0 {
-					return []uint8{fabric}
-				}
-				return nil
+				return nil, err
 			}
-			return f
+			return f, nil
 		},
 	})
 	if err != nil {

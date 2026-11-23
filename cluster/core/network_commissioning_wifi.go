@@ -138,7 +138,7 @@ type WiFiNetworkCommissioningConfig struct {
 	// ([GeneralCommissioning.FailSafeFabric]); the network commands need
 	// the window of their accessing fabric (EnsureFailsafeIsArmed over
 	// IsFailSafeArmed(GetAccessingFabricIndex()),
-	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609 at
+	// NetworkCommissioningCluster.cpp:155-172, :380, :568, :609, :644 at
 	// 6170af84; by_design BD-chip-FailSafeOfTheAccessingFabric).
 	FailSafe func() (fabricIndex uint8, armed bool)
 	// IsFailSafeArmed is the fabric-blind port (armed for any fabric,
@@ -1239,8 +1239,8 @@ func validCredentials(c []byte) bool {
 
 // armedFor is connectedhomeip's EnsureFailsafeIsArmed(failSafeContext,
 // handler.GetAccessingFabricIndex()) (NetworkCommissioningCluster.cpp:155-172,
-// :380, :568, :609 at 6170af84): the window must be armed, and armed for
-// the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
+// :380, :568, :609, :644 at 6170af84): the window must be armed, and armed
+// for the accessing fabric (FailSafeContext.h:76-79). A fabric-blind port
 // ([WiFiNetworkCommissioningConfig.IsFailSafeArmed]) answers for any
 // fabric, as before, and is logged once (R2-C2-sec-1006).
 func (w *WiFiNetworkCommissioning) armedFor(ctx context.Context) bool {
