@@ -30,6 +30,7 @@ func TestRegisterCloseBeforeAddLeavesNothingRegistered(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			r := NewSubscriptions(SubscriptionsConfig{Logger: log})
 			c := Bind(nil, Config{Subscriptions: r, Logger: log})
 			sub := r.newSubscription(peer, SubscribeRequest{}, log)
