@@ -76,6 +76,10 @@ const (
 	MaxGroupKeySet      = MaxGroups * 16
 	MaxFriendlyNameSize = 32
 	MaxACLs             = 64
+	// maxNodeKeySets bounds NodeKeySetList, the module's own bound where
+	// connectedhomeip keeps no capacity (R2-C2-bound-1101): as many entries
+	// as the datastore holds key sets.
+	maxNodeKeySets = MaxGroupKeySet
 	// maxDERCertLength bounds AnchorRootCA (Credentials::kMaxDERCertLength,
 	// CHIPCert.h:57).
 	maxDERCertLength = 600
