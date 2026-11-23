@@ -40,6 +40,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -65,6 +66,11 @@ type target struct {
 	// Name qualifies a symbol of the module's root package in the
 	// CHANGELOG ("fabric.Version", "esphome.Central").
 	Name string
+	// Shared are the package names more than one public package of the
+	// modules the guard compares carries ("onoff": cluster/onoff and
+	// cluster/spec/onoff); a symbol of such a package is named by its
+	// repository path (R2-C2-sup-2801).
+	Shared map[string]bool
 }
 
 // rootName is the root package's name (doc.go).
@@ -74,6 +80,18 @@ func run(check bool, base string) error {
 	targets, err := modules()
 	if err != nil {
 		return err
+	}
+	var names []string
+	for _, t := range targets {
+		n, err := packageNames(t)
+		if err != nil {
+			return err
+		}
+		names = append(names, n...)
+	}
+	shared := sharedNames(names)
+	for i := range targets {
+		targets[i].Shared = shared
 	}
 	head, err := output("git", "rev-parse", "HEAD")
 	if err != nil {
@@ -138,6 +156,51 @@ func modules() ([]target, error) {
 		targets = append(targets, target{Dir: dir, Path: module + "/" + dir, Name: path.Base(dir)})
 	}
 	return targets, nil
+}
+
+// packageNames lists the name — the last element of its path, t.Name for
+// the module's root package — of every public package of the module t at
+// the working tree: go list's packages outside the trees that are not
+// public API and outside every internal/ tree. A nested module is listed
+// in its own directory, without a workspace, and for Linux, as its export
+// is taken (runIn).
+func packageNames(t target) ([]string, error) {
+	cmd := exec.CommandContext(context.Background(), "go", "list", "./...")
+	cmd.Dir = t.Dir
+	cmd.Env = append(os.Environ(), "GOOS=linux", "GOWORK=off")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("go list ./... in %s: %w: %s", t.Dir, err, strings.TrimSpace(stderr.String()))
+	}
+	var names []string
+	for _, imp := range strings.Fields(string(out)) {
+		rel := strings.TrimPrefix(strings.TrimPrefix(imp, t.Path), "/")
+		switch {
+		case imp == t.Path:
+			names = append(names, t.Name)
+		case !strings.HasPrefix(imp, t.Path+"/"), isExcluded(rel), slices.Contains(strings.Split(rel, "/"), "internal"):
+		default:
+			names = append(names, path.Base(rel))
+		}
+	}
+	return names, nil
+}
+
+// sharedNames are the names that occur more than once in names.
+func sharedNames(names []string) map[string]bool {
+	seen := make(map[string]int, len(names))
+	for _, n := range names {
+		seen[n]++
+	}
+	shared := make(map[string]bool)
+	for n, c := range seen {
+		if c > 1 {
+			shared[n] = true
+		}
+	}
+	return shared
 }
 
 // tagPrefix is the prefix of a module's release tags: none for the root,
