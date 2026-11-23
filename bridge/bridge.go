@@ -2086,7 +2086,13 @@ func (b *Bridge) notifyFabricSessionsClosing(fabricIndex uint8, exceptSessionID 
 // EmitFabricRemoved is the bridge-side dispatch helper the daemon
 // invokes inside the [core.OperationalCredentials.SetOnFabricRemoved]
 // closure. Forwards to whatever closure the daemon wired via
-// [SetOnFabricRemoved]; nil-safe.
+// [SetOnFabricRemoved]; nil-safe. It drops the removed fabric's index from
+// the diagnostics ring once, at the call, and closes none of the fabric's
+// sessions: an event a session of the fabric records afterwards carries the
+// index again. A host that ends those sessions itself calls
+// [Bridge.EmitFabricRemovedContext] instead, which forgets the index again
+// after it closed them through a [SessionRegistry] that can close by fabric
+// (review II, R3-sec-3403, decision 584).
 func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
 	b.emitFabricRemoved(context.Background(), fabricIndex)
 }

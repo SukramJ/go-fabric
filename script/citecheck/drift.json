@@ -2519,15 +2519,6 @@
     "occurrences": 4
   },
   {
-    "file": "controller/dcl/ota_test.go",
-    "line": 310,
-    "citation": "DclOtaUpdateService.ts:811-816",
-    "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
-    "identifier": "maxApplicableSoftwareVersion",
-    "nearest": 833,
-    "occurrences": 15
-  },
-  {
     "file": "controller/dcl/revocation.go",
     "line": 712,
     "citation": "DclCertificateService.ts:2092-2104",
@@ -2544,15 +2535,6 @@
     "identifier": "nextUpdate",
     "nearest": 1941,
     "occurrences": 4
-  },
-  {
-    "file": "controller/dcl/types.go",
-    "line": 158,
-    "citation": "DclOtaUpdateService.ts:811-816",
-    "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
-    "identifier": "maxApplicableSoftwareVersion",
-    "nearest": 833,
-    "occurrences": 15
   },
   {
     "file": "controller/ota_observe_test.go",
@@ -2643,6 +2625,24 @@
     "identifier": "#cleanupObsoleteUpdates",
     "nearest": 3230,
     "occurrences": 1
+  },
+  {
+    "file": "dcl/ota_test.go",
+    "line": 310,
+    "citation": "DclOtaUpdateService.ts:811-816",
+    "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
+    "identifier": "maxApplicableSoftwareVersion",
+    "nearest": 833,
+    "occurrences": 15
+  },
+  {
+    "file": "dcl/types.go",
+    "line": 158,
+    "citation": "DclOtaUpdateService.ts:811-816",
+    "resolved": "packages/protocol/src/dcl/DclOtaUpdateService.ts",
+    "identifier": "maxApplicableSoftwareVersion",
+    "nearest": 833,
+    "occurrences": 15
   },
   {
     "file": "device/device.go",

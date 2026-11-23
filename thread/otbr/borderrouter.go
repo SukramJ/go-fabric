@@ -67,7 +67,8 @@ type BorderRouter struct {
 	// active dataset is uncommitted. A CommissioningComplete sets it true
 	// when the border router is attached and otherwise leaves it as it
 	// is; a clear returns it to true. chip saves IsThreadAttached() at
-	// every CommissioningComplete (:186-189); over REST the border router
+	// every CommissioningComplete (:186-189;
+	// ThreadBorderRouterManagementCluster.cpp:319-322); over REST the border router
 	// has other writers, so a commit while it is not attached must not arm
 	// the fail-safe's revert against a dataset no activation of this node
 	// set.
@@ -142,7 +143,7 @@ func (b *BorderRouter) Dataset(ctx context.Context, pending bool) ([]byte, error
 // SetActiveDataset (:127-143) attaches the border router to the dataset
 // and completes on kConnectivity_Established (:145-157). Over REST: an
 // activation onto a border router without an active dataset marks the
-// dataset not configured (SaveActiveDatasetConfigured(false), :130); the
+// dataset not configured (SaveActiveDatasetConfigured(false), :131); the
 // Thread interface is disabled first when a dataset is active, since the
 // OTBR refuses to replace it in place (409, OtbrRestClient.ts:421-422);
 // then PUT /node/dataset/active, PUT /node/state "enable", and /node/state

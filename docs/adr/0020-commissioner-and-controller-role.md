@@ -77,7 +77,14 @@ boundary:
    and `schema/`, and owns its state machine, its peer table, its
    certificate authority and its client-side interaction. `bridge/`,
    `node/`, `device/` and `endpoint/` do not import it and are not changed
-   for it. A host that embeds the responder keeps a module whose
+   for it. The rule is a guard: the `forbidden` list of
+   `script/archcheck/layers.json`, read by `TestLayering`, fails on a
+   non-test import of `controller/...` from `bridge/...`, `node/...`,
+   `device/...` or `endpoint/...`, with one reasoned exception, the test
+   support package `bridge/bridgetest` (review II, decisions 556, 583);
+   what a role and the responder both need lives in a role-neutral
+   package, as the ledger client does in `dcl/` (decision 553). A host
+   that embeds the responder keeps a module whose
    controller code is dead weight the linker drops.
 2. **`contract/` stays stdlib-only** and stays the responder's host
    boundary. The controller's host-facing surface is its own

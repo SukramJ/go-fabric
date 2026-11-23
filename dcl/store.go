@@ -13,8 +13,8 @@ import (
 )
 
 // Store keeps the trust store between runs — the "certificates" storage
-// of matter.js's DclCertificateService (DclCertificateService.ts:333-335:
-// the index and one DER per key identifier), here one blob the
+// of matter.js's DclCertificateService (DclCertificateService.ts:341-343
+// at b25ed960: the index and one DER per key identifier), here one blob the
 // CertificateStore of controller/dcl writes whole. What it keeps is a cache of ledger
 // answers: a blob that does not parse is logged and read as nothing
 // stored, and the next update refetches (review II, R2-P6-store-1910).

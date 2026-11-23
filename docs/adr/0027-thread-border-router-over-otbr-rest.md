@@ -106,7 +106,7 @@ The cluster surface is small: six attributes (`BorderRouterName`,
 `ActiveDatasetTimestamp`, `PendingDatasetTimestamp`;
 `thread-border-router-management.element.ts:25-32`), four commands, one
 optional feature `PC` (:22). The REST contract needs `net/http` only, which
-`controller/dcl` already uses; no sixth-plus dependency.
+`dcl` already uses; no sixth-plus dependency.
 
 ## Decision
 

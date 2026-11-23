@@ -139,7 +139,8 @@ DataVersion of the changed clusters
 
 **DCL (Distributed Compliance Ledger)** — The CSA's ledger of PAAs,
 Certification Declaration signers, revocation points and software
-versions. In go-fabric: [`controller/dcl`](https://github.com/thingfabric/go-fabric/tree/main/controller/dcl),
+versions. In go-fabric: [`dcl`](https://github.com/thingfabric/go-fabric/tree/main/dcl), the ledger client, and
+[`controller/dcl`](https://github.com/thingfabric/go-fabric/tree/main/controller/dcl), the trust store and revocation,
 opt-in; nothing reaches the network without a host-built client.
 
 **Device Type** — A defined device (On/Off Light, Thermostat, …) with the

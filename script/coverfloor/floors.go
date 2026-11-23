@@ -123,6 +123,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/controller/client/sqlstore", min: 89},
 	{pkg: "thingfabric.dev/go-fabric/controller/commissioner", min: 88},
 	{pkg: "thingfabric.dev/go-fabric/controller/dcl", min: 92},
+	{pkg: "thingfabric.dev/go-fabric/dcl", min: 90}, // review II run 3 (R3-api-3780): 90.8 when the ledger client moved here from controller/dcl
 	{
 		pkg: "thingfabric.dev/go-fabric/controller/softwareupdate",
 		min: 78,
