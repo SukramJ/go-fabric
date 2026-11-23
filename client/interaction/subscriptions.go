@@ -440,6 +440,13 @@ func (s *Subscription) reportStatusUnacknowledged(n int, status unacknowledgedRe
 	}
 }
 
+// isClosedNow reports whether Close has run.
+func (s *Subscription) isClosedNow() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.isClosed
+}
+
 // Close closes the subscription: its work is aborted, it leaves the
 // registry and the request's Closed callback runs — after a sustained
 // subscription's loop ended. The peer is told nothing

@@ -248,8 +248,15 @@ func (c *Interaction) Close(reason error) {
 // either is in the set Close snapshots or sees the interaction closed:
 // then it is closed once registered and register returns the close
 // reason, so no subscription outlives the interaction
-// (ClientInteraction.ts:1121, :1129, :1169, :1190 at b25ed960). s is not
-// yet registered, so no other goroutine closes it before add.
+// (ClientInteraction.ts:1121, :1129, :1169, :1190 at b25ed960).
+//
+// add runs outside closeMu, and s is in the set from before it runs, so
+// a Close on another goroutine — the interaction's, or one that reaches s
+// otherwise — can close s before add registers it; s.Close then deleted
+// nothing. A closed s is not added (an AddPeer would displace the live
+// subscription holding its id), and after add a closed s is deleted
+// again: a Close that set isClosed before the check is caught here, one
+// after it deletes s itself (review II, R2-C2-conc-2101).
 func (c *Interaction) register(s *Subscription, add func(*Subscription)) error {
 	registered := s.closed
 	s.closed = func() {
@@ -271,7 +278,12 @@ func (c *Interaction) register(s *Subscription, add func(*Subscription)) error {
 		c.estMu.Unlock()
 	}
 	c.closeMu.Unlock()
-	add(s)
+	if !s.isClosedNow() {
+		add(s)
+	}
+	if s.isClosedNow() {
+		s.reg.Delete(s)
+	}
 	if closed != nil {
 		s.Close()
 		return closed

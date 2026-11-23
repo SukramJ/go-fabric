@@ -348,3 +348,33 @@ func TestRace_AnsweredAttemptsKeepTheirPlaces(t *testing.T) {
 		_, _ = settledOutcome(t, r.s, r.clk, time.Second, time.Minute)
 	})
 }
+
+// TestRace_WaitingCandidatesAreBounded: with every place held by an
+// answered attempt, ever-new candidates wait; at most MaxRaceWaiting of
+// them do, the ones found longest ago leaving the queue unattempted, so
+// the race's entries and goroutines do not grow with what a sender
+// announces (review II, R2-C2-bound-2153).
+func TestRace_WaitingCandidatesAreBounded(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		ids := placeIDs()
+		r := newPlacesRace(t, func(string) bool { return true })
+		r.find(ids...)
+		r.advance(time.Duration(discovery.MaxRaceAttempts) * discovery.CrossDeviceStagger)
+		const late = 200
+		for i := range late {
+			r.find(fmt.Sprintf("late-%03d", i))
+		}
+		r.advance(2 * discovery.RaceStaggerCeiling)
+		if got := discovery.RaceWaiting(r.s); got > discovery.MaxRaceWaiting {
+			t.Fatalf("%d candidates wait after %d were found with every place held, want at most %d", got, late, discovery.MaxRaceWaiting)
+		}
+		r.s.Cancel(nil)
+		_, _ = settledOutcome(t, r.s, r.clk, time.Second, time.Minute)
+		for i := range late {
+			if started, _ := r.state(fmt.Sprintf("late-%03d", i)); started {
+				t.Fatalf("late-%03d started while every place was held", i)
+			}
+		}
+	})
+}

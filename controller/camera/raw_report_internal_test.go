@@ -71,3 +71,43 @@ func TestReportDropsListedRawSession(t *testing.T) {
 		t.Error("a report built before a new session under a reused id removed it")
 	}
 }
+
+// TestReportKeepsSessionAnsweredDuringItsDrop (review II, R2-C2-conc-2202):
+// a new raw session the camera answers under a listed id between the
+// report's read of the mark and the drop is not removed for the older
+// session's absence: the drop decides under recordMu, where learn records
+// the new session unlisted.
+func TestReportKeepsSessionAnsweredDuringItsDrop(t *testing.T) {
+	t.Parallel()
+	f := newPSFixture()
+	f.svc.reported = f.svc.reconcile
+	f.pastFirstBatch()
+	if _, err := f.establish(t, psEndpoint, psOfferRequest(nil)); err != nil {
+		t.Fatalf("establish: %v", err)
+	}
+	f.setCamera(psEndpoint, []sessionPeer{{9, psServer}})
+	f.batch() // lists 9
+	f.svc.w.startedUp(psCamera)
+	answered := false
+	f.svc.ps.dropping = func(providerKey) {
+		if answered {
+			return
+		}
+		answered = true
+		// The camera restarted and answers a new offer with 9 again.
+		if _, err := f.establish(t, psEndpoint, psOfferRequest(nil)); err != nil {
+			t.Errorf("establish during the drop: %v", err)
+		}
+	}
+	f.setCamera(psEndpoint, []sessionPeer{})
+	f.batch()
+	if !answered {
+		t.Fatal("the report did not decide to drop the listed session")
+	}
+	if !slices.ContainsFunc(f.sessions(), func(s wrdef.WebRTCSessionStruct) bool { return s.Id == 9 }) {
+		t.Errorf("requestor after a report raced a new session under the id = %+v, want the new session kept", f.sessions())
+	}
+	if _, ok := f.svc.ps.offerOf(f.svc.ps.key(target{psCamera, psEndpoint}, 9)); !ok {
+		t.Error("the new session's offer was dropped")
+	}
+}
