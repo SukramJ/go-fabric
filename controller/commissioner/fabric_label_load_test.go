@@ -157,3 +157,27 @@ func TestStoredFabricLabelCutIsWarnedThroughFabricConfigLogger(t *testing.T) {
 		}
 	})
 }
+
+// TestStoredFabricLabelCutWithoutLoggerIsDiscarded: a nil
+// FabricConfig.Logger discards the cut warning, the package's convention
+// (Config.Logger, NewFabricAuthority) — nothing reaches slog.Default
+// (decision 572, correcting 564). Not parallel: it swaps the process-wide
+// slog.Default, and the package's parallel tests start only after the
+// sequential ones.
+func TestStoredFabricLabelCutWithoutLoggerIsDiscarded(t *testing.T) {
+	c, st := storeWithLabel(t, strings.Repeat("ü", 32))
+	var out syncBuffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&out, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	f, err := NewFabric(c, FabricConfig{Store: st})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.CurrentLabel(); got != strings.Repeat("ü", 16) {
+		t.Errorf("served label %q", got)
+	}
+	if log := out.String(); strings.Contains(log, "matter.controller.fabric.stored_label_shortened") {
+		t.Errorf("a nil FabricConfig.Logger warned through slog.Default, want it discarded; log:\n%s", log)
+	}
+}
