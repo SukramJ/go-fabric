@@ -699,20 +699,28 @@ func (s *Scanner) onDiscovered(nm *Name) {
 // followPointers solicits the SRV/TXT a PTR target lacks, at most
 // speculativeTargetMax targets at a time. Mirrors matter.js 0ceb202d
 // CommissionableMdnsScanner.ts:281-339.
+//
+// A target not yet in the cache is created only once it is solicited:
+// a name created and then skipped at the bound would hold no record, no
+// observer and no solicitation, and nothing would delete it, so a flood
+// of PTRs to fresh instance names would grow the cache's names outside
+// maxCachedRecords (review II, R2-C2-bound-2151).
 func (s *Scanner) followPointers(nm *Name) {
 	for _, r := range nm.records.values() {
 		if r.Type != TypePTR || strings.HasPrefix(r.PTR, "_") {
 			continue
 		}
-		target := s.names.get(r.PTR)
+		target := s.names.maybeGet(r.PTR)
 		hasSRV, hasTXT := false, false
-		for _, tr := range target.records.values() {
-			switch tr.Type {
-			case TypeSRV:
-				hasSRV = true
-			case TypeTXT:
-				hasTXT = true
-			default:
+		if target != nil {
+			for _, tr := range target.records.values() {
+				switch tr.Type {
+				case TypeSRV:
+					hasSRV = true
+				case TypeTXT:
+					hasTXT = true
+				default:
+				}
 			}
 		}
 		var types []mdns.DNSType
@@ -728,6 +736,9 @@ func (s *Scanner) followPointers(nm *Name) {
 		key := strings.ToLower(r.PTR)
 		if s.speculative.has(key) || s.speculative.len() >= speculativeTargetMax {
 			continue
+		}
+		if target == nil {
+			target = s.names.get(r.PTR)
 		}
 		target.on(s.speculativeObserver)
 		cancel, _ := s.names.solicitor.discover(
