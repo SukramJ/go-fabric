@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"sync"
 
 	"thingfabric.dev/go-fabric/cluster"
@@ -198,11 +199,39 @@ func (st *ScenesState) logger() *slog.Logger { return slog.Default() }
 
 // scenesPending is a consequence waiting for the table to load. A keyed
 // one replaces the earlier one of the same key — a global scene's store,
-// which the next one overwrites whole — so repeated consequences while the
-// load fails do not grow the list (review II, R2-P6-store-1202).
+// which the next one overwrites whole; a removal of a fabric's scenes or of
+// one group's, which a second one repeats — and a fabric's removal of all
+// its scenes replaces its earlier group removals and global scene store,
+// which it undoes. So repeated consequences while the load fails do not
+// grow the list (review II, R2-P6-store-1202, R4-bound-4153).
 type scenesPending struct {
 	key   string
 	apply func()
+}
+
+// scenesGlobalKey, scenesGroupKey and scenesFabricKey are the pending keys
+// of a fabric's global scene store, of the removal of a group's scenes and
+// of the removal of all a fabric's scenes.
+func scenesGlobalKey(fabric uint8) string { return fmt.Sprintf("global/%d", fabric) }
+
+func scenesGroupKey(fabric uint8, groupID uint16) string {
+	return fmt.Sprintf("group/%d/%d", fabric, groupID)
+}
+
+func scenesFabricKey(fabric uint8) string { return fmt.Sprintf("fabric/%d", fabric) }
+
+// scenesReplaces reports whether a pending consequence of key replaces an
+// earlier one of old: the same key, or old a global scene store or group
+// removal of the fabric whose scenes key removes, which the removal undoes.
+func scenesReplaces(key, old string) bool {
+	if key == old {
+		return true
+	}
+	f, ok := strings.CutPrefix(key, "fabric/")
+	if !ok {
+		return false
+	}
+	return old == "global/"+f || strings.HasPrefix(old, "group/"+f+"/")
 }
 
 // NewScenesState returns an empty state; persist may be nil.
@@ -408,14 +437,15 @@ func (st *ScenesState) change(ctx context.Context, command bool, fabric uint8, m
 }
 
 // changeKeyed is [ScenesState.change] whose pending consequence, when key
-// is not empty, replaces the pending one of the same key. Caller holds mu.
+// is not empty, replaces the pending ones it makes redundant
+// (scenesReplaces). Caller holds mu.
 func (st *ScenesState) changeKeyed(ctx context.Context, command bool, fabric uint8, key string, mutate func() (im.StatusCode, bool)) im.StatusCode {
 	if !st.ensureLoaded(ctx) {
 		if command {
 			return im.StatusFailure
 		}
 		if key != "" {
-			st.pending = slices.DeleteFunc(st.pending, func(p scenesPending) bool { return p.key == key })
+			st.pending = slices.DeleteFunc(st.pending, func(p scenesPending) bool { return scenesReplaces(key, p.key) })
 		}
 		st.pending = append(st.pending, scenesPending{key: key, apply: func() { mutate() }})
 		return im.StatusSuccess
@@ -503,7 +533,7 @@ func (st *ScenesState) removeScenesForGroup(ctx context.Context, command bool, f
 	defer st.reportIfChanged(st.snapshot())
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	return st.change(ctx, command, fabric, func() (im.StatusCode, bool) {
+	return st.changeKeyed(ctx, command, fabric, scenesGroupKey(fabric, groupID), func() (im.StatusCode, bool) {
 		before := len(st.table)
 		st.table = slices.DeleteFunc(st.table, func(e SceneEntry) bool { return e.FabricIndex == fabric && e.GroupID == groupID })
 		if st.monitor == fabric {
@@ -532,7 +562,7 @@ func (st *ScenesState) removeScenesForFabric(ctx context.Context, fabric uint8) 
 	defer st.reportIfChanged(st.snapshot())
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	st.change(ctx, false, fabric, func() (im.StatusCode, bool) {
+	st.changeKeyed(ctx, false, fabric, scenesFabricKey(fabric), func() (im.StatusCode, bool) {
 		before := len(st.table)
 		st.table = slices.DeleteFunc(st.table, func(e SceneEntry) bool { return e.FabricIndex == fabric })
 		if st.monitor == fabric {
@@ -688,7 +718,7 @@ func (s *ScenesManagement) StoreGlobalScene(ctx context.Context, fabricIndex uin
 	// change waited for the load — never on a table not loaded yet, where
 	// it would be missed and a second (fabric, 0, 0) entry appended
 	// (review II, R2-P6-store-1202).
-	_ = st.changeKeyed(ctx, false, fabricIndex, fmt.Sprintf("global/%d", fabricIndex), func() (im.StatusCode, bool) {
+	_ = st.changeKeyed(ctx, false, fabricIndex, scenesGlobalKey(fabricIndex), func() (im.StatusCode, bool) {
 		entry := SceneEntry{
 			FabricIndex: fabricIndex, GroupID: scenesUndefinedGroup, SceneID: scenesGlobalSceneID,
 			Name: scenesGlobalSceneName, TransitionTime: 0, Values: values,
