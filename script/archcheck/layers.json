@@ -11,5 +11,8 @@
     {"name": "facade", "packages": ["node", "node/metrics/..."]},
     {"name": "support", "packages": [".", "conformance", "fabrictest", "cluster/spec/spectest", "bridge/bridgetest", "endpoint/endpointtest", "surface/surfacetest", "store/storetest", "controller/ble/bletest", "internal/paritytest", "internal/chiptool", "internal/chipdm", "examples/...", "script/...", "ble/...", "wifi/...", "thread/otbr/..."]}
   ],
-  "exceptions": []
+  "exceptions": [],
+  "forbidden": [
+    {"from": ["bridge", "node/...", "device/...", "endpoint/..."], "to": ["controller/..."], "reason": "ADR 0020 decision 1, controller/ is a sibling of bridge/ (decision 556); test files and the test support bridge/bridgetest are not held to it"}
+  ]
 }
