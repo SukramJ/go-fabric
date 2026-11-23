@@ -111,3 +111,49 @@ func TestStoredFabricLabelCutIsWarnedAndSavedWithTheRotation(t *testing.T) {
 		t.Errorf("DefaultFabric with a configured label of 33 bytes: %v, want ErrLabel", err)
 	}
 }
+
+// TestStoredFabricLabelCutIsWarnedThroughFabricConfigLogger: NewFabric
+// warns the cut of a stored label through FabricConfig.Logger, so a host
+// that loads its fabric without an authority gets the warning on its own
+// logger (go-fabric #587, decision 564). In DefaultFabric a configured
+// FabricConfig.Logger wins over the authority's.
+func TestStoredFabricLabelCutIsWarnedThroughFabricConfigLogger(t *testing.T) {
+	t.Parallel()
+	stored := strings.Repeat("ü", 32)
+	warned := func(out *syncBuffer) bool {
+		log := out.String()
+		return strings.Contains(log, "level=WARN") &&
+			strings.Contains(log, "matter.controller.fabric.stored_label_shortened") &&
+			strings.Contains(log, "max_bytes=32")
+	}
+	t.Run("NewFabric", func(t *testing.T) {
+		t.Parallel()
+		c, st := storeWithLabel(t, stored)
+		var out syncBuffer
+		f, err := NewFabric(c, FabricConfig{Store: st, Logger: slog.New(slog.NewTextHandler(&out, nil))})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := f.CurrentLabel(); got != strings.Repeat("ü", 16) {
+			t.Errorf("served label %q", got)
+		}
+		if !warned(&out) {
+			t.Errorf("no warning of the cut through FabricConfig.Logger; log:\n%s", out.String())
+		}
+	})
+	t.Run("DefaultFabric", func(t *testing.T) {
+		t.Parallel()
+		c, st := storeWithLabel(t, stored)
+		var authority, configured syncBuffer
+		a := NewFabricAuthority(c, slog.New(slog.NewTextHandler(&authority, nil)))
+		if _, err := a.DefaultFabric(FabricConfig{Store: st, Logger: slog.New(slog.NewTextHandler(&configured, nil))}, false); err != nil {
+			t.Fatal(err)
+		}
+		if !warned(&configured) {
+			t.Errorf("no warning of the cut through FabricConfig.Logger; log:\n%s", configured.String())
+		}
+		if warned(&authority) {
+			t.Errorf("the cut was warned through the authority's logger, want the configured one; log:\n%s", authority.String())
+		}
+	})
+}

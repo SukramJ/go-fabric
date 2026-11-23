@@ -63,6 +63,10 @@ type FabricConfig struct {
 	// record. matter.js has no such seam
 	// (Fabric.ts:50-76 keeps #keyPair).
 	OperationalSigner crypto.Signer
+	// Logger receives the fabric's load warnings — a stored label cut to
+	// [MaxLabelLength] bytes; nil is slog.Default. In
+	// [FabricAuthority.DefaultFabric] nil is the authority's logger.
+	Logger *slog.Logger
 }
 
 // ErrFabricMismatch is a stored fabric record that does not fit: its
@@ -134,7 +138,8 @@ func validLabel(label string) error {
 // storedLabel is a stored fabric label held to [MaxLabelLength] bytes: a
 // longer one — stored by v0.22.x, whose SetLabel bounded the label in
 // runes — is cut to the longest prefix of at most MaxLabelLength bytes
-// that ends between two characters, with a warning through log, as
+// that ends between two characters, with a warning through log (nil is
+// slog.Default), as
 // cluster/core BasicInformation.RestoreNodeLabel cuts a stored NodeLabel
 // (cluster/core/basic_information.go:969, shortenStored :990, the cut
 // truncateUTF8 in cluster/core/utf8.go). The cut stays in memory; the
@@ -206,17 +211,10 @@ func (f *Fabric) SetLabel(label string) error {
 //
 // A stored label longer than [MaxLabelLength] bytes is not refused: the
 // load cuts it to the bound between two characters and warns through
-// slog.Default (through the authority's logger in
-// [FabricAuthority.DefaultFabric]); the cut is stored with the record's
+// cfg.Logger (nil is slog.Default); the cut is stored with the record's
 // next save. cfg.Label itself is still [ErrLabel] when longer.
 func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
-	return newStoredFabric(c, cfg, nil)
-}
-
-// newStoredFabric is [NewFabric] with the logger a stored label's cut is
-// warned through; nil is slog.Default.
-func newStoredFabric(c *ca.CA, cfg FabricConfig, log *slog.Logger) (*Fabric, error) {
-	f, err := newFabricWith(c, cfg, log)
+	f, err := newFabric(c, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -226,11 +224,6 @@ func newStoredFabric(c *ca.CA, cfg FabricConfig, log *slog.Logger) (*Fabric, err
 
 // newFabric is [NewFabric] without the store kept for SetLabel.
 func newFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
-	return newFabricWith(c, cfg, nil)
-}
-
-// newFabricWith is newFabric with the logger loadFabric warns through.
-func newFabricWith(c *ca.CA, cfg FabricConfig, log *slog.Logger) (*Fabric, error) {
 	if c == nil {
 		return nil, errors.New("commissioner: NewFabric needs a CA")
 	}
@@ -243,7 +236,7 @@ func newFabricWith(c *ca.CA, cfg FabricConfig, log *slog.Logger) (*Fabric, error
 			return nil, fmt.Errorf("commissioner: load fabric: %w", err)
 		}
 		if ok {
-			return loadFabric(c, cfg, rec, log)
+			return loadFabric(c, cfg, rec)
 		}
 	}
 	if cfg.FabricID == 0 {
@@ -312,8 +305,8 @@ func newFabricWith(c *ca.CA, cfg FabricConfig, log *slog.Logger) (*Fabric, error
 // matter.js FabricManager's construction (FabricManager.ts:66-69,
 // Fabric.create over each stored Fabric.Config), for the one fabric a
 // controller owns. A stored label over [MaxLabelLength] bytes is cut
-// (storedLabel), warned through log.
-func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord, log *slog.Logger) (*Fabric, error) {
+// (storedLabel), warned through cfg.Logger.
+func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error) {
 	if cfg.FabricID != 0 && cfg.FabricID != rec.FabricID {
 		return nil, fmt.Errorf("%w: fabric id 0x%016X, stored 0x%016X", ErrFabricMismatch, cfg.FabricID, rec.FabricID)
 	}
@@ -326,7 +319,7 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord, log *slog.Logge
 	if rec.FabricID == 0 || !isOperationalNodeID(rec.RootNodeID) || len(rec.IPK) != 16 {
 		return nil, fmt.Errorf("%w: stored record is incomplete", ErrFabricMismatch)
 	}
-	rec.Label = storedLabel(rec.Label, log)
+	rec.Label = storedLabel(rec.Label, cfg.Logger)
 	if rec.FabricIndex == 0 {
 		rec.FabricIndex = 1
 	}
