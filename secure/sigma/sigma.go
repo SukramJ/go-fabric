@@ -221,9 +221,10 @@ type IdentityResolver interface {
 // resumed session is registered under the record's fabric; without it
 // (no resolver, or one that only implements [IdentityResolver]) the
 // responder resumes under its baseline identity only a record of the
-// baseline's own fabric — a record whose FabricIndex is set and differs
-// from a set [Identity.FabricIndex] falls through to Full Sigma (a zero
-// on either side is unstamped and not compared). Returning
+// baseline's own fabric — a record whose FabricIndex is set resumes only
+// under a baseline whose [Identity.FabricIndex] is the same — an
+// unstamped baseline (0) included; only an unstamped record (0) is not
+// compared — and otherwise falls through to Full Sigma. Returning
 // (_, _, false) means the record's fabric no longer has an installed
 // identity — the responder then falls through to Full Sigma.
 type FabricIndexResolver interface {
