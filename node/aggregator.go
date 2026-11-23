@@ -40,11 +40,13 @@ var (
 	// any partition, or with a key — its own or a part's — that another
 	// endpoint serves, itself or as a part (decision 580). In a [Batch]
 	// such a collision is judged against the batch's end state and the
-	// error arrives from [Partition.Batch], not from the call (decision
-	// 582).
+	// error arrives from [Partition.Batch], not from the call (decisions
+	// 582, 585).
 	ErrDuplicateKey = errors.New("node: an endpoint with this StableKey is already added")
 	// ErrUnknownKey: no endpoint with this key is added (to the partition
-	// asked).
+	// asked), or a Forget of a part key another endpoint serves (decision
+	// 567; in a [Batch] judged against its end state and returned from
+	// [Partition.Batch], decision 585).
 	ErrUnknownKey = errors.New("node: no endpoint with this StableKey")
 	// ErrKeyMismatch: a replacement whose StableKey is not the key of the
 	// endpoint it replaces.
@@ -55,6 +57,10 @@ var (
 	// ErrPartitionNotEmpty: [Aggregator.RetirePartition] of a partition
 	// that still holds endpoints.
 	ErrPartitionNotEmpty = errors.New("node: the partition still holds endpoints")
+	// ErrBatchDone: a call on a [Batch] after its fn returned. A Batch is
+	// valid only during the fn of [Partition.Batch] (or
+	// [Aggregator.Batch]); a later call changes nothing (decision 585).
+	ErrBatchDone = errors.New("node: the batch's fn has returned")
 )
 
 // Aggregator is the Aggregator endpoint's set of bridged endpoints —
@@ -65,9 +71,10 @@ var (
 // Remove only changes the set (Start's assembly is the first); after it,
 // each one reassembles the running bridge, and a [Aggregator.Batch]
 // reassembles once for many changes. A batch is judged against its end
-// state: a device whose key another endpoint serves is refused only when
-// that endpoint still serves it once the batch's calls ran, whatever
-// their order ([Batch], decision 582).
+// state: a device whose key the set holds or another endpoint serves, or
+// a Forget of a part key another endpoint serves, is refused only when
+// the collision is still there once the batch's calls ran, whatever their
+// order ([Batch], decisions 582, 585).
 //
 // Each stable key keeps its endpoint number: [Aggregator.Remove] reserves
 // it for the key's return, and only [Aggregator.Forget] (or
@@ -315,7 +322,10 @@ func (a *Aggregator) Remove(ctx context.Context, key device.SourceKey) error {
 func (a *Aggregator) Endpoints() []Endpoint { return a.Partition(Scope).Endpoints() }
 
 // Batch runs fn with a [Batch] on the default partition and reassembles
-// once for every change fn made; see [Partition.Batch].
+// once for every change fn made; see [Partition.Batch], which names every
+// error that arrives here rather than from a call of the batch
+// ([ErrDuplicateKey], [ErrUnknownKey], [ErrReservedKey],
+// [ErrPolicyMismatch], *surface.WithheldError, a device's attach error).
 func (a *Aggregator) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	return a.Partition(Scope).Batch(ctx, fn)
 }
@@ -373,16 +383,35 @@ func (p *Partition) Endpoints() []Endpoint {
 // call validates and applies its change at once and returns its own error,
 // and [Partition.Batch] reassembles after fn returns.
 //
-// A batch is judged against its end state (decision 582): an Add or a
-// Replace whose device — its own key or a part key — collides with a key
-// another endpoint serves is not refused at the call. The call returns
-// nil, and the change is held until fn returned; then it is applied if no
-// other endpoint serves any of its keys any more, and refused with
-// [ErrDuplicateKey] otherwise, in the result of [Partition.Batch]. So a
-// batch that takes a device and forgets or removes the endpoint serving
-// its key gives the same outcome in either call order. A held change takes
-// part in the batch's reassembly like any other; a later Replace of its
-// key in the batch replaces it, a later Remove or Forget drops it.
+// A batch is judged against its end state (decisions 582, 585): a call
+// that collides with a key another endpoint serves is not refused at the
+// call. It returns nil, and the change is held until fn returned; then
+// the held calls are judged, in call order, against the set fn left. The
+// calls held are:
+//
+//   - an Add of a key the set holds, or an Add or a Replace whose device —
+//     its own key or a part key — another endpoint serves: applied if no
+//     other endpoint serves any of its keys any more, refused with
+//     [ErrDuplicateKey] otherwise (decisions 580, 584);
+//   - a Forget of a part key another endpoint serves: applied if no other
+//     endpoint serves it any more, refused with [ErrUnknownKey] otherwise
+//     (decision 567).
+//
+// The device of a held Add or Replace is judged as it is then — a part
+// added to it during fn counts. Every error of a held call arrives in the
+// result of [Partition.Batch]: those refusals, and what the applied call
+// itself returns ([ErrReservedKey], [ErrPolicyMismatch], a
+// *surface.WithheldError, a device's attach error). So a batch that takes
+// a key — or forgets a part key — and removes or forgets the endpoint
+// serving it gives the same outcome in either call order. A held change
+// takes part in the batch's reassembly like any other. A later Replace,
+// Remove or Forget of a key the set holds acts on the set's endpoint, and
+// a held Add of that key stays held; of a key the set does not hold, it
+// acts on the held Add: a Replace replaces it, a Remove or Forget drops
+// it.
+//
+// A Batch is valid only during fn: a call after fn returned is refused
+// with [ErrBatchDone] and changes nothing.
 type Batch struct {
 	a     *Aggregator
 	scope string
@@ -396,20 +425,36 @@ type Batch struct {
 	// ops are the reservation changes of the batch's Add, Remove and
 	// Forget calls, applied in order after fn (reserve.go).
 	ops []reservationOp
-	// pending are the Add and Replace calls whose device collided at the
+	// pending are the Add, Replace and Forget calls that collided at the
 	// call with a key another endpoint served: judged after fn against
-	// the batch's end state, in call order (decision 582).
-	pending []pendingTake
+	// the batch's end state, in call order (decisions 582, 585).
+	pending []pendingCall
+	// done is set once fn returned: every later call is [ErrBatchDone].
+	// a.mu guards it.
+	done bool
 }
 
-// pendingTake is an Add (replace false) or a Replace a [Batch] judges
-// after fn: its device's own key or a part key collided, at the call,
-// with a key another endpoint served or another pending device declared.
-type pendingTake struct {
-	replace bool
-	key     string
-	ep      Endpoint
-	entries []surfaceEntry
+// pendingKind is the call a [pendingCall] holds.
+type pendingKind uint8
+
+const (
+	heldAdd pendingKind = iota
+	heldReplace
+	heldForget
+)
+
+// pendingCall is a call a [Batch] judges after fn. An Add or a Replace:
+// its device's own key or a part key collided, at the call, with a key
+// the set held, another endpoint served or another held device declared;
+// entries are its surface at the call, used to hold later takes behind
+// it. A Forget: another endpoint served its key; reserved is the tree
+// the store reserved for the key at the call.
+type pendingCall struct {
+	kind     pendingKind
+	key      string
+	ep       Endpoint
+	entries  []surfaceEntry
+	reserved []string
 }
 
 // Batch runs fn with a [Batch] bound to the partition. Each of its calls
@@ -419,12 +464,18 @@ type pendingTake struct {
 // a started node with at least one change applied reassembles exactly
 // once, and the devices removed or replaced are then unbound. What applied
 // stays applied whatever fails: one faulty device does not block a fleet.
-// Before the reassembly, the Add and Replace calls the batch held (a key
-// another endpoint served at the call; see [Batch]) are judged against
-// the set fn left: each one is applied, or refused with [ErrDuplicateKey]
-// when another endpoint still serves one of its keys (decision 582). The
-// result is errors.Join of fn's error, those refusals and the
-// reassembly's. Before [Node.Start] a batch only changes the set.
+// Before the reassembly, the calls the batch held (a key another endpoint
+// served at the call; see [Batch]) are judged against the set fn left:
+// each one is applied, or refused — an Add or a Replace with
+// [ErrDuplicateKey] when another endpoint still serves one of its keys,
+// a Forget with [ErrUnknownKey] (decisions 582, 585). The result is
+// errors.Join of fn's error, every error of a held call — those
+// refusals, [ErrUnknownKey] for a held Replace whose key left the
+// partition, [ErrReservedKey] or [ErrPolicyMismatch] of a device changed
+// during fn, the *surface.WithheldError of an applied declaration the
+// specification level withholds, a device's attach error — the store's
+// and the reassembly's. Before [Node.Start] a batch only changes the set.
+// The [Batch] is valid only during fn ([ErrBatchDone]).
 //
 // A batch is not a transaction: an Add or Remove from another goroutine
 // during fn reassembles on its own, and that assembly shows the changes
@@ -441,8 +492,9 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	}
 	b := &Batch{a: p.a, scope: p.scope, ctx: ctx}
 	fnErr := fn(b)
-	// The held takes are judged against the set fn left, before the
-	// reservations, so an applied one's release is among them.
+	// The held calls are judged against the set fn left, before the
+	// reservations, so an applied one's ops are among them; the batch
+	// takes no call from here on.
 	if takeErr := b.commitPending(); takeErr != nil {
 		fnErr = errors.Join(fnErr, takeErr)
 	}
@@ -498,8 +550,13 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	}
 }
 
-// Add adds ep to the batch's partition; see [Aggregator.Add].
+// Add adds ep to the batch's partition; see [Aggregator.Add]. An Add of
+// a key the set holds, or of a device another endpoint serves a key of,
+// is held and judged once fn returned ([Batch], decisions 582, 585).
 func (b *Batch) Add(ep Endpoint) error {
+	if b.isDone() {
+		return ErrBatchDone
+	}
 	key, err := keyOf(ep.Spec())
 	if err != nil {
 		return err
@@ -514,11 +571,17 @@ func (b *Batch) Add(ep Endpoint) error {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if p, _ := a.findLocked(key); p != nil || b.pendingIndex(key) >= 0 {
+	if b.done {
+		return ErrBatchDone
+	}
+	if b.pendingIndex(key, heldAdd) >= 0 {
 		return fmt.Errorf("%w: %s", ErrDuplicateKey, key)
 	}
-	if b.collidesLocked(entries, nil) {
-		b.pending = append(b.pending, pendingTake{key: key, ep: ep, entries: entries})
+	// A key the set holds is judged at the end like a key another
+	// endpoint serves: a Remove or Forget of it in the batch, before or
+	// after, lets the device in (decision 585).
+	if p, _ := a.findLocked(key); p != nil || b.collidesLocked(entries, nil) {
+		b.pending = append(b.pending, pendingCall{kind: heldAdd, key: key, ep: ep, entries: entries})
 		return nil
 	}
 	return b.addLocked(key, ep, entries)
@@ -554,8 +617,13 @@ func (b *Batch) addLocked(key string, ep Endpoint, entries []surfaceEntry) error
 // ([ErrDuplicateKey], from [Partition.Batch]) and changing nothing when
 // another endpoint still serves the key once fn returned (decisions 580,
 // 582); the replaced endpoint's own parts are not another's. A Replace of
-// a key the batch's Add holds replaces the held device.
+// a key the set does not hold but the batch's Add holds replaces the held
+// device; of a key the set holds, it replaces the set's endpoint and a
+// held Add of the key stays held ([Batch], decision 585).
 func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
+	if b.isDone() {
+		return ErrBatchDone
+	}
 	if key == nil {
 		return ErrNoStableKey
 	}
@@ -576,25 +644,29 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if j := b.pendingIndex(newKey); j >= 0 {
-		if !b.pending[j].replace {
-			// The batch's held Add of the key: the replacement is held
-			// in its place.
-			b.pending[j].ep, b.pending[j].entries = ep, entries
-			return nil
-		}
+	if b.done {
+		return ErrBatchDone
+	}
+	part, i := a.findLocked(newKey)
+	inSet := part != nil && part.scope == b.scope
+	if j := b.pendingIndex(newKey, heldAdd); j >= 0 && part == nil {
+		// The batch's held Add of a key the set does not hold: the
+		// replacement is held in its place.
+		b.pending[j].ep, b.pending[j].entries = ep, entries
+		return nil
+	}
+	if j := b.pendingIndex(newKey, heldReplace); j >= 0 {
 		// A later Replace supersedes the held one.
 		b.pending = slices.Delete(b.pending, j, j+1)
 	}
-	part, i := a.findLocked(newKey)
-	if part == nil || part.scope != b.scope {
+	if !inSet {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
 	if part.eps[i] == ep {
 		return nil
 	}
 	if b.collidesLocked(entries, part.eps[i]) {
-		b.pending = append(b.pending, pendingTake{replace: true, key: newKey, ep: ep, entries: entries})
+		b.pending = append(b.pending, pendingCall{kind: heldReplace, key: newKey, ep: ep, entries: entries})
 		return nil
 	}
 	return b.replaceLocked(part, i, newKey, ep, entries)
@@ -658,19 +730,30 @@ func withheldKeys(entries []surfaceEntry) []string {
 // [Aggregator.Remove]. The device is unbound after the batch's
 // reassembly. A key the specification level withheld (its Add returned
 // [surface.ErrWithheld]; no partition holds it) is known: Remove drops
-// its withheld record from [Node.Surface] and returns nil.
+// its withheld record from [Node.Surface] and returns nil. A Remove of a
+// key the set holds removes the set's endpoint, and a held Add of the key
+// stays held; of a key only the batch's held Add holds, it drops that Add
+// ([Batch], decision 585).
 func (b *Batch) Remove(key device.SourceKey) error {
 	if key == nil {
 		return ErrNoStableKey
 	}
 	a := b.a
 	a.mu.Lock()
-	if b.dropPendingLocked(key.String()) {
-		// The batch's own held Add: dropped, the set never held it.
+	if b.done {
+		a.mu.Unlock()
+		return ErrBatchDone
+	}
+	part, i := a.findLocked(key.String())
+	if part == nil && b.dropPendingLocked(key.String(), heldAdd) {
+		// The batch's own held Add: dropped, the set never held it; a
+		// withheld record of the key from before the batch goes too, as
+		// an applied Add's served declaration would have cleared it
+		// (fable-diff-g5f N5).
+		a.n.dropWithheld(key.String())
 		a.mu.Unlock()
 		return nil
 	}
-	part, i := a.findLocked(key.String())
 	if part == nil && a.n.dropWithheld(key.String()) {
 		a.mu.Unlock()
 		return nil
@@ -680,6 +763,8 @@ func (b *Batch) Remove(key device.SourceKey) error {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
 	removed := part.eps[i]
+	// A held Replace of the key goes with the endpoint it replaces.
+	b.dropPendingLocked(key.String(), heldReplace)
 	b.dropLocked(part, i, key.String())
 	a.mu.Unlock()
 	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key.String(), tree: reservationTree(removed.Spec())})
@@ -698,22 +783,28 @@ func (b *Batch) dropLocked(part *partition, i int, key string) {
 	b.changed = true
 }
 
-// pendingIndex is the index of the batch's held take of key, or -1.
-func (b *Batch) pendingIndex(key string) int {
-	return slices.IndexFunc(b.pending, func(t pendingTake) bool { return t.key == key })
+// pendingIndex is the index of the batch's held call of kind on key, or
+// -1; a.mu is held.
+func (b *Batch) pendingIndex(key string, kind pendingKind) int {
+	return slices.IndexFunc(b.pending, func(t pendingCall) bool { return t.key == key && t.kind == kind })
 }
 
-// dropPendingLocked drops the batch's held take of key, if any, and
-// reports whether it was an Add (the set does not hold its key from this
-// batch); a.mu is held.
-func (b *Batch) dropPendingLocked(key string) (wasAdd bool) {
-	j := b.pendingIndex(key)
+// dropPendingLocked drops the batch's held call of kind on key, if any,
+// and reports whether there was one; a.mu is held.
+func (b *Batch) dropPendingLocked(key string, kind pendingKind) bool {
+	j := b.pendingIndex(key, kind)
 	if j < 0 {
 		return false
 	}
-	wasAdd = !b.pending[j].replace
 	b.pending = slices.Delete(b.pending, j, j+1)
-	return wasAdd
+	return true
+}
+
+// isDone reports whether fn returned ([ErrBatchDone]).
+func (b *Batch) isDone() bool {
+	b.a.mu.Lock()
+	defer b.a.mu.Unlock()
+	return b.done
 }
 
 // collidesLocked reports whether a key of entries — an endpoint and its
@@ -725,6 +816,9 @@ func (b *Batch) collidesLocked(entries []surfaceEntry, except Endpoint) bool {
 		return true
 	}
 	for _, t := range b.pending {
+		if t.kind == heldForget {
+			continue
+		}
 		for i := range t.entries {
 			for j := range entries {
 				if t.entries[i].key == entries[j].key {
@@ -736,50 +830,79 @@ func (b *Batch) collidesLocked(entries []surfaceEntry, except Endpoint) bool {
 	return false
 }
 
-// commitPending judges the takes the batch held against the set fn left,
-// in call order: a take none of whose keys another endpoint serves is
-// applied as at its call, any other refused with [ErrDuplicateKey] and
-// nothing of it changed (decision 582; a set that took it would assemble
-// two Specs under one key, decision 580). A held Replace whose key the
-// partition no longer holds is [ErrUnknownKey].
+// commitPending ends the batch's calls ([ErrBatchDone] from here on) and
+// judges the calls the batch held against the set fn left, in call order
+// (decisions 582, 585). A held Add or Replace is judged by its device as
+// it is now — its surface computed and checked again, so a part added
+// during fn counts (fable-diff-g5f N1): applied as at its call when none
+// of its keys is the set's or another endpoint's, refused with
+// [ErrDuplicateKey] otherwise and nothing of it changed (a set that took
+// it would assemble two Specs under one key, decision 580). A held
+// Replace whose key the partition no longer holds is [ErrUnknownKey]. A
+// held Forget is applied when no other endpoint serves its key any more,
+// refused with [ErrUnknownKey] otherwise (decision 567).
 func (b *Batch) commitPending() error {
-	if len(b.pending) == 0 {
-		return nil
-	}
 	a := b.a
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	b.done = true
 	pending := b.pending
 	b.pending = nil
 	var errs []error
 	for _, t := range pending {
-		if !t.replace {
+		switch t.kind {
+		case heldForget:
+			errs = append(errs, b.commitForgetLocked(t))
+		case heldAdd:
+			entries, err := b.recheckLocked(t.ep)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
 			if p, _ := a.findLocked(t.key); p != nil {
 				errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, t.key))
 				continue
 			}
-			if k, ok := a.servedOfLocked(t.entries, nil); ok {
+			if k, ok := a.servedOfLocked(entries, nil); ok {
 				errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, k))
 				continue
 			}
-			errs = append(errs, b.addLocked(t.key, t.ep, t.entries))
-			continue
+			errs = append(errs, b.addLocked(t.key, t.ep, entries))
+		case heldReplace:
+			part, i := a.findLocked(t.key)
+			if part == nil || part.scope != b.scope {
+				errs = append(errs, fmt.Errorf("%w: %s", ErrUnknownKey, t.key))
+				continue
+			}
+			if part.eps[i] == t.ep {
+				continue
+			}
+			entries, err := b.recheckLocked(t.ep)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			if k, ok := a.servedOfLocked(entries, part.eps[i]); ok {
+				errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, k))
+				continue
+			}
+			errs = append(errs, b.replaceLocked(part, i, t.key, t.ep, entries))
 		}
-		part, i := a.findLocked(t.key)
-		if part == nil || part.scope != b.scope {
-			errs = append(errs, fmt.Errorf("%w: %s", ErrUnknownKey, t.key))
-			continue
-		}
-		if part.eps[i] == t.ep {
-			continue
-		}
-		if k, ok := a.servedOfLocked(t.entries, part.eps[i]); ok {
-			errs = append(errs, fmt.Errorf("%w: %s", ErrDuplicateKey, k))
-			continue
-		}
-		errs = append(errs, b.replaceLocked(part, i, t.key, t.ep, t.entries))
 	}
 	return errors.Join(errs...)
+}
+
+// recheckLocked runs the checks of a take's call again on ep as it is at
+// commit and returns its surface entries; a.mu is held.
+func (b *Batch) recheckLocked(ep Endpoint) ([]surfaceEntry, error) {
+	entries, err := b.a.n.checkSurface(ep)
+	if err != nil {
+		return nil, err
+	}
+	if err := b.a.n.checkMatterTime(ep); err != nil {
+		return nil, err
+	}
+	return entries, nil
 }
 
 // servesLocked reports whether the set holds an endpoint, or a part of
