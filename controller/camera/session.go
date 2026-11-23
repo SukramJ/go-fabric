@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"thingfabric.dev/go-fabric/clock"
+	"thingfabric.dev/go-fabric/cluster/spec"
 	csdef "thingfabric.dev/go-fabric/cluster/spec/cameraavstreammanagement"
 	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
@@ -589,7 +590,7 @@ func (req StartRequest) args() (startArgs, error) {
 	if req.Key != "" && jsLength(req.Key) > clientSessionKeyMaxLength {
 		return startArgs{}, invalidArguments("client_session_key must be a string of 1 to %d characters", clientSessionKeyMaxLength)
 	}
-	if req.ICETransportPolicy != "" && jsLength(req.ICETransportPolicy) > iceServerLimits.maxTransportPolicyLength {
+	if req.ICETransportPolicy != "" && spec.StringLength(req.ICETransportPolicy) > iceServerLimits.maxTransportPolicyLength {
 		return startArgs{}, invalidArguments("ice_transport_policy must be a string of 1 to %d characters", iceServerLimits.maxTransportPolicyLength)
 	}
 	if err := validateICEServers(req.ICEServers); err != nil {
@@ -734,7 +735,8 @@ func (b *AudioBounds) hints() (*audioHints, error) {
 	return &audioHints{codecs: upperCodecs(b.Codecs), channelCount: channelCount, sampleRate: sampleRate, bitRate: bitRate}, nil
 }
 
-// validateICEServers holds typed ICE servers to the struct's ceilings and
+// validateICEServers holds typed ICE servers to the struct's ceilings,
+// counted in UTF-8 bytes as toBoundedString counts them (R3-err-3651), and
 // this controller's floor of one character. Mirrors matterjs-server
 // packages/ws-controller/src/camera/webRtcProviderArguments.ts:56-120 at
 // 0bd06f2.
@@ -748,14 +750,14 @@ func validateICEServers(servers []wpdef.ICEServerStruct) error {
 			return invalidArguments("ice_servers[%d].urls takes 1 to %d URLs", i, l.maxUrls)
 		}
 		for _, u := range s.Urls {
-			if n := jsLength(u); n == 0 || n > l.maxURLLength {
+			if n := spec.StringLength(u); n == 0 || n > l.maxURLLength {
 				return invalidArguments("ice_servers[%d].urls takes URLs of 1 to %d characters", i, l.maxURLLength)
 			}
 		}
-		if s.Username != nil && (jsLength(*s.Username) == 0 || jsLength(*s.Username) > l.maxUsernameLength) {
+		if s.Username != nil && (*s.Username == "" || spec.StringLength(*s.Username) > l.maxUsernameLength) {
 			return invalidArguments("ice_servers[%d].username must be 1 to %d characters", i, l.maxUsernameLength)
 		}
-		if s.Credential != nil && (jsLength(*s.Credential) == 0 || jsLength(*s.Credential) > l.maxCredentialLength) {
+		if s.Credential != nil && (*s.Credential == "" || spec.StringLength(*s.Credential) > l.maxCredentialLength) {
 			return invalidArguments("ice_servers[%d].credential must be 1 to %d characters", i, l.maxCredentialLength)
 		}
 		if s.Caid != nil && int64(*s.Caid) > l.caid.max {

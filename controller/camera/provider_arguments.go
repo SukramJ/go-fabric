@@ -242,9 +242,10 @@ const (
 // at 0bd06f2.
 var originatingEndpointID = canonicalKey("originatingEndpointId")
 
-// stringConverter holds a string to the length its field states. Mirrors
+// stringConverter holds a string to the length its field states, counted
+// in UTF-8 bytes (toBoundedString). The converter's shape follows
 // matterjs-server packages/ws-controller/src/camera/webRtcProviderArguments.ts:122-137
-// at 0bd06f2.
+// at 0bd06f2, which counts UTF-16 code units (R3-err-3651).
 func stringConverter(f *spec.Field) fieldConverter {
 	if b := f.Constraint.Max; b.IsInt() {
 		return func(value json.RawMessage, name string) (wireValue, error) {
@@ -255,7 +256,7 @@ func stringConverter(f *spec.Field) fieldConverter {
 	if b := f.Constraint.Min; b.IsInt() {
 		return func(value json.RawMessage, name string) (wireValue, error) {
 			var s string
-			if jsonKind(value) != '"' || json.Unmarshal(value, &s) != nil || int64(jsLength(s)) < b.Int {
+			if jsonKind(value) != '"' || json.Unmarshal(value, &s) != nil || int64(spec.StringLength(s)) < b.Int {
 				return nil, invalidArguments("%s must be a string of at least %d characters", name, b.Int)
 			}
 			return stringValue(s), nil
