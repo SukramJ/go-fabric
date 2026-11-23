@@ -14,7 +14,7 @@ import (
 )
 
 // blindPortLog is the message the network servers log once when the
-// deprecated fabric-blind fail-safe port answers in place of FailSafe.
+// fabric-blind fail-safe port (deprecated) answers in place of FailSafe.
 const blindPortLog = "netcomm.failsafe_blind_port"
 
 func countBlindPortLogs(buf *bytes.Buffer) int {
