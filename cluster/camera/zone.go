@@ -136,6 +136,10 @@ type Zones struct {
 	triggers    []ZoneTrigger
 	lastZoneID  *uint16
 	sensitivity uint8
+	// refuseForTests, nil in production, stands for a table the schema
+	// refuses: a non-nil error from it fails [Zones.change] before the
+	// store, as a refused value does.
+	refuseForTests func() error
 }
 
 // Compile-time assertions.
@@ -417,6 +421,11 @@ func (z *Zones) change(attrID uint32, edit func(*zoneTables)) error {
 	t := zoneTables{zones: deepcopy.Each(z.zones), triggers: deepcopy.Each(z.triggers), lastZoneID: z.lastZoneID}
 	z.mu.Unlock()
 	edit(&t)
+	if z.refuseForTests != nil {
+		if err := z.refuseForTests(); err != nil {
+			return commitError(fmt.Errorf("camera: ZoneManagement: %w", err))
+		}
+	}
 	var v any = spec.List[Zone](nonNil(t.zones))
 	if attrID == zmdef.AttrTriggers {
 		v = spec.List[ZoneTrigger](nonNil(t.triggers))
@@ -515,7 +524,9 @@ func (z *Zones) assertFocusSupported(zone TwoDZone) error {
 // matter.js refuses a Name over 32 bytes and fewer than 3 vertices in the
 // interaction layer, before the command (ZoneManagementServerTest.ts:756-768
 // at b25ed960); Use and Color keep chip's ValidateTwoDCartesianZone
-// (ZoneManagementCluster.cpp:445-460 at 6170af84).
+// (ZoneManagementCluster.cpp:445-460 at 6170af84). A zone the port stored
+// but the table refuses is removed at the port again before the command
+// answers FAILURE ([undoAtPort], R2-C2-err-1602).
 func (z *Zones) createTwoDCartesianZone(ctx context.Context, fields any) (any, error) {
 	req, err := zoneRequestOf[zmdef.CreateTwoDCartesianZoneRequest](fields, "CreateTwoDCartesianZone")
 	if err != nil {
@@ -552,7 +563,7 @@ func (z *Zones) createTwoDCartesianZone(ctx context.Context, fields any) (any, e
 		})
 		t.lastZoneID = &id // :105
 	}); err != nil {
-		return nil, err
+		return nil, undoAtPort(err, func() error { return z.port.RemoveZone(ctx, id) })
 	}
 	return zmdef.CreateTwoDCartesianZoneResponse{ZoneId: id}, nil
 }
