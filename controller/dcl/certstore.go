@@ -857,6 +857,16 @@ const (
 	maxGitHubFilesPerUpdate = 1024
 )
 
+// maxCertificatesPerRootAnswer bounds the certificates one root's answer
+// (the approved certificates of one subject and key identifier) adds to
+// the store: an answer is a handful, and the index and the blob saveIndex
+// writes at every update otherwise grow with whatever the ledger sends —
+// about 2·10⁴ certificates per answer within its body bound, per root.
+// Past the bound the rest is not stored, logged once per answer (review II,
+// R2-C2-bound-1903). The value 16 is this module's judgement, not a
+// measured figure.
+const maxCertificatesPerRootAnswer = 16
+
 // fetchDclCertificates is #fetchDclCertificates (:1026-1043).
 func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProduction, force bool) error {
 	client := s.clientFor(isProduction)
@@ -881,8 +891,9 @@ func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProductio
 
 // fetchAndStoreCertificate is #fetchAndStoreCertificate (:1061-1148): one
 // root's certificates, each stored under its own key identifier once its
-// DER parses as a PAA and carries the key identifier the ledger states.
-// It reports whether the store holds a usable certificate for ref.
+// DER parses as a PAA and carries the key identifier the ledger states —
+// at most maxCertificatesPerRootAnswer of them, ref's own first. It
+// reports whether the store holds a usable certificate for ref.
 func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client *Client, ref SubjectReference, isProduction, force bool) bool {
 	refID := normalizeKeyID(ref.SubjectKeyID)
 	if !force {
@@ -910,9 +921,26 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 		s.log.Info("dcl.certificates.fetch_failed", slog.String("subject", ref.Subject), slog.String("skid", ref.SubjectKeyID), slog.Any("err", err))
 		return false
 	}
-	stored := false
+	// The certificates of the root asked for first, so the bound below
+	// never drops them for others the answer carries.
+	slices.SortStableFunc(certs, func(a, b Certificate) int {
+		aRef, bRef := normalizeKeyID(a.SubjectKeyID) == refID, normalizeKeyID(b.SubjectKeyID) == refID
+		switch {
+		case aRef && !bRef:
+			return -1
+		case bRef && !aRef:
+			return 1
+		}
+		return 0
+	})
+	stored, taken := false, 0
 	for i := range certs {
 		cert := &certs[i]
+		if taken == maxCertificatesPerRootAnswer {
+			s.log.Warn("dcl.certificates.too_many_in_answer", slog.String("subject", ref.Subject), slog.String("skid", ref.SubjectKeyID),
+				slog.Int("count", len(certs)), slog.Int("max", maxCertificatesPerRootAnswer))
+			break
+		}
 		if cert.SubjectKeyID == "" {
 			s.log.Warn("dcl.certificates.missing_skid", slog.String("subject", cert.Subject))
 			continue
@@ -931,6 +959,7 @@ func (s *CertificateStore) fetchAndStoreCertificate(ctx context.Context, client 
 			Subject: cert.Subject, SubjectAsText: cert.SubjectAsText, SubjectKeyID: id, SerialNumber: cert.SerialNumber,
 			VID: cert.VID, IsRoot: cert.IsRoot, IsProduction: isProduction, Kind: KindPAA,
 		}, isProduction)
+		taken++
 		stored = stored || id == refID
 	}
 	return stored
