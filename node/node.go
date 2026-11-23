@@ -1194,7 +1194,7 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 		// bound since may have dropped the hook's: the event stays owed,
 		// and the next start delivers it again.
 		ackCtx := context.WithoutCancel(ctx)
-		n.callbacks.Enqueue(func() {
+		n.queued("owed_fabric_event_ack", func() {
 			if n.callbacks.Dropped() != dropped {
 				n.logger.Warn("fabric.owed_event.kept_after_drop", slog.Int("fabric_index", int(idx)))
 				return
