@@ -97,7 +97,6 @@ type StateReader interface {
 // dst; false, with dst untouched, when v does not fit T. A value of type
 // T itself is stored without conversion. A generated
 // State.FromAttributeValues calls it per field.
-// fabric:reachable:reason="generic: every generated server_gen.go calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func Assign[T any](dst *T, v any) bool {
 	if t, ok := v.(T); ok {
 		*dst = t
@@ -130,7 +129,6 @@ func SetPatch(srv contract.ClusterServer, patch PatchValuer) error {
 // reads for its attribute (MatterRead), converted to the field's type
 // ([StateReader]). An attribute srv does not answer, or answers with a
 // value the field's type cannot hold, leaves the field at its zero value.
-// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func StateOf[S any, P interface {
 	*S
 	StateReader
@@ -162,7 +160,6 @@ func stateWith[S any, P interface {
 // [contract.ChangeNotifier] with every attribute it reports and
 // [contract.OriginUnknown] — the switch of device.Device.OnChanged. It returns the unsubscribe function; a server
 // that notifies nothing never calls fn.
-// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func OnChangedOf[S any, P interface {
 	*S
 	StateReader
@@ -198,7 +195,6 @@ func ChangesOf(srv contract.ClusterServer, fn func(contract.Change)) (unsubscrib
 // not added delivers nothing (by_design
 // BD-Matter-AsyncCallbacks-OnlyWhileAdded). It returns the unsubscribe
 // function.
-// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func OnChangedAsyncOf[S any, P interface {
 	*S
 	StateReader
@@ -217,7 +213,6 @@ func OnChangedAsyncOf[S any, P interface {
 // attribute's, and the attribute id; nil removes the veto. The server's own
 // rule ([ServerConfig.WriteRule]) stays in place either way.
 // [ErrNoWriteVeto] for a server that is no [BeforeWriteSetter].
-// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func OnWriteOf[S any, P interface {
 	*S
 	StateReader
@@ -241,7 +236,6 @@ func OnWriteOf[S any, P interface {
 // command back to the server. [ErrNoHandlers] for a server that is no
 // [CommandRegistrar], the server's refusal ([ErrNotAccepted]) for a
 // command it does not accept.
-// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func HandleOn[Req, Resp any](srv contract.ClusterServer, cmdID uint32, fn func(ctx context.Context, req Req) (Resp, error)) error {
 	reg, ok := srv.(CommandRegistrar)
 	if !ok {
@@ -268,7 +262,6 @@ func EmitOn(srv contract.ClusterServer, endpoint uint16, eventID uint32, data an
 // decoded request payload is asserted to Req (a payload of another type is
 // INVALID_COMMAND), and a response of type struct{} — a status-only
 // command — answers no payload. nil adapts to nil.
-// fabric:reachable:reason="generic: every generated server_gen.go and the typed tests call an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func HandlerOf[Req, Resp any](fn func(ctx context.Context, req Req) (Resp, error)) CommandHandler {
 	if fn == nil {
 		return nil

@@ -32,6 +32,9 @@ const (
 )
 
 // Feature is a DiagnosticLogs FeatureMap bit.
+//
+// Deprecated: the DiagnosticLogs cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // IntentEnum is the IntentEnum enum8.

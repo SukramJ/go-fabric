@@ -44,6 +44,9 @@ const (
 )
 
 // Feature is a JointFabricAdministrator FeatureMap bit.
+//
+// Deprecated: the JointFabricAdministrator cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ICACCSRResponseStatusCodeEnum is the ICACCSRResponseStatusCodeEnum enum8.

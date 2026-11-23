@@ -43,6 +43,9 @@ const (
 )
 
 // Feature is a TargetNavigator FeatureMap bit.
+//
+// Deprecated: the TargetNavigator cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // StatusEnum is the StatusEnum enum8.

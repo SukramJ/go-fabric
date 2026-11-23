@@ -29,6 +29,9 @@ const (
 )
 
 // Feature is a LaundryDryerControls FeatureMap bit.
+//
+// Deprecated: the LaundryDryerControls cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // DrynessLevelEnum is the DrynessLevelEnum enum8.

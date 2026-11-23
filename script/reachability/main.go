@@ -765,7 +765,10 @@ func classifyOne(
 // preserving the precedence whitelisted > reachable > unreachable.
 func foldClasses(order []identKey, classes map[identKey]*identClass, totalExported, disagreements int) Inventory {
 	var unreachableItems []UnreachableEntry
-	var whitelistedItems, redundantItems []WhitelistEntry
+	var whitelistedItems []WhitelistEntry
+	// Empty, not nil: the snapshot writes [] at 0, which the ratchet test
+	// tells apart from a snapshot older than the field (null).
+	redundantItems := []WhitelistEntry{}
 	reachableCount := 0
 	for _, key := range order {
 		cls := classes[key]

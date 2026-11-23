@@ -40,6 +40,9 @@ const (
 )
 
 // Feature is a Identify FeatureMap bit.
+//
+// Deprecated: the Identify cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // EffectIdentifierEnum is the EffectIdentifierEnum enum8.

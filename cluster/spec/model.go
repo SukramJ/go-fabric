@@ -217,14 +217,12 @@ func held(t Type, c Constraint, relaxed string) (Type, Constraint) {
 // the runtime starts such an element without a value, as it starts one
 // with no stated default, and a hand-written server resolves it. The
 // marker tells the two apart (W3-clugen-07).
-// fabric:reachable:reason="the Default of a generated attribute whose stated default is a field value; it is only ever a package-level initializer value, which RTA does not follow"
 type UnresolvedDefault struct {
 	Kind string
 	Name string
 }
 
 // NullDefault is the default of an element whose stated default is null.
-// fabric:reachable:reason="the Default of a generated attribute whose stated default is null; it is only ever a package-level initializer value, which RTA does not follow"
 type NullDefault struct{}
 
 // Mandatory mirrors ValueModel.mandatory (Conformance.isMandatory): the

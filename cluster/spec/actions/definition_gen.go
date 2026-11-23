@@ -55,6 +55,9 @@ const (
 )
 
 // Feature is a Actions FeatureMap bit.
+//
+// Deprecated: the Actions cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ActionErrorEnum is the ActionErrorEnum enum8.

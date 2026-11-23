@@ -648,6 +648,16 @@ func (g *generator) source() ([]byte, error) {
 		w.p("")
 	}
 	w.p("// Feature is a %s FeatureMap bit.", c.Name)
+	if len(c.Features) == 0 {
+		// Decision 548 (review II, R2-C2-test-2802): a cluster without
+		// features has no FeatureMap bit, no Feature constant and no
+		// Declare.Features field, so the type names nothing. It is marked
+		// now and no longer generated once the window of README §The
+		// deprecation window has passed.
+		w.p("//")
+		w.p("// Deprecated: the %s cluster has no features, so no value has this", c.Name)
+		w.p("// type and nothing takes one. No replacement. Removable in %s.", featurelessFeatureRemovable)
+	}
 	w.p("type Feature uint32")
 	w.p("")
 	if len(c.Features) > 0 {
@@ -2078,6 +2088,12 @@ func (g *generator) test() ([]byte, error) {
 	}
 	return out, nil
 }
+
+// featurelessFeatureRemovable is the release from which the deprecated
+// Feature type of a cluster without features may no longer be generated:
+// the second minor release after v0.26.0, the one that marks it (README
+// §The deprecation window, decision 548).
+const featurelessFeatureRemovable = "v0.28.0"
 
 // constantsTest writes TestConstantsMatchTheDefinition: the Feature
 // constants against Definition's feature bits, and every enum's and

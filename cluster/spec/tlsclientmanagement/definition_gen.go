@@ -41,6 +41,9 @@ const (
 )
 
 // Feature is a TlsClientManagement FeatureMap bit.
+//
+// Deprecated: the TlsClientManagement cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // StatusCodeEnum is the StatusCodeEnum enum8.

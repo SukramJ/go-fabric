@@ -248,7 +248,6 @@ func InvokeHeld(ctx context.Context, h *SelfHeld, cmdID uint32, fields any) (any
 // RequestOf returns a decoded request payload as the generated request
 // type T: the value as it is, or the value a non-nil *T points to — the
 // two forms a self-held server takes its cluster's generated requests in.
-// fabric:reachable:reason="generic: the self-held servers call instantiations of it, and RTA records the instantiation, not the generic declaration"
 func RequestOf[T any](fields any) (T, bool) {
 	switch v := fields.(type) {
 	case *T:

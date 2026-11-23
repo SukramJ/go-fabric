@@ -62,6 +62,9 @@ const (
 )
 
 // Feature is a BasicInformation FeatureMap bit.
+//
+// Deprecated: the BasicInformation cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // CapabilityMinimaStruct is the CapabilityMinimaStruct struct.

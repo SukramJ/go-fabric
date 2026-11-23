@@ -108,6 +108,11 @@ const reachabilityUnreachedRatchet = 22
 // by secure/operational at init and called by node/security.go.
 // The mock-fake-stub class 21 since phase 7: clock/clocktest's
 // Fake.AdvanceToNext, test support that production code never calls.
+// By hand 4 since decision 549 (review II, R2-C2-test-2802): the 57 hand
+// annotations a test reaches all the same are dropped; the 4 left are the
+// ones no test reaches: the constraint interfaces cluster/spec.Signed,
+// Unsigned and StateReader, and store.Eraser, the method set store.Port
+// embeds.
 // Generated 0 since the clustergen half of R2-C2-test-2802 (decision R3-3):
 // script/clustergen writes no annotation; the 52 generated types that only
 // it had covered — the empty Feature of a cluster without features and the
@@ -116,7 +121,7 @@ const reachabilityUnreachedRatchet = 22
 // so a generated annotation that returns is a visible change.
 var reachabilityWhitelistRatchet = map[string]int{
 	whitelistClassGenerated:         0,
-	whitelistClassHand:              61,
+	whitelistClassHand:              4,
 	string(autoWhitelistMockPrefix): 21,
 }
 
@@ -131,8 +136,10 @@ var reachabilityWhitelistRatchet = map[string]int{
 // Set at the tree that introduced it, measured at 009e8b790 with the
 // analyzer of this change: 1 106 (1 049 generated, 57 by hand). 57 since
 // the clustergen half of R2-C2-test-2802 (decision R3-3) dropped the
-// generated annotation: what is left is the 57 written by hand.
-const reachabilityRedundantRatchet = 57
+// generated annotation: what is left is the 57 written by hand. 0 since
+// decision 549 dropped those 57; at its goal, and exact, so an annotation a
+// test already reaches is refused.
+const reachabilityRedundantRatchet = 0
 
 const (
 	whitelistClassGenerated = "annotation: generated"

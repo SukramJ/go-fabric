@@ -48,6 +48,9 @@ const (
 )
 
 // Feature is a OtaSoftwareUpdateRequestor FeatureMap bit.
+//
+// Deprecated: the OtaSoftwareUpdateRequestor cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // AnnouncementReasonEnum is the AnnouncementReasonEnum enum8.

@@ -38,6 +38,9 @@ const (
 )
 
 // Feature is a WiFiNetworkManagement FeatureMap bit.
+//
+// Deprecated: the WiFiNetworkManagement cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // NetworkPassphraseRequestRequest is the NetworkPassphraseRequest command payload.

@@ -31,6 +31,9 @@ const (
 )
 
 // Feature is a FixedLabel FeatureMap bit.
+//
+// Deprecated: the FixedLabel cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // LabelStruct is the LabelStruct struct.

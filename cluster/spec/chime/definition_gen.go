@@ -43,6 +43,9 @@ const (
 )
 
 // Feature is a Chime FeatureMap bit.
+//
+// Deprecated: the Chime cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ChimeSoundStruct is the ChimeSoundStruct struct.

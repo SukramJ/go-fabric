@@ -31,6 +31,9 @@ const (
 )
 
 // Feature is a RelativeHumidityMeasurement FeatureMap bit.
+//
+// Deprecated: the RelativeHumidityMeasurement cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // Definition is the RelativeHumidityMeasurement cluster definition.
