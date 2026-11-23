@@ -197,7 +197,7 @@ func TestClientFailures(t *testing.T) {
 	ctx := context.Background()
 	f.json("/dcl/pki/root-certificates", 200, map[string]any{"approvedRootCertificates": map[string]any{"certs": []any{}, "schemaVersion": 0}})
 	f.mu.Lock()
-	f.delay = 300 * time.Millisecond
+	f.stall = true
 	f.mu.Unlock()
 	c := f.client()
 	c.Timeout = 50 * time.Millisecond
@@ -207,7 +207,7 @@ func TestClientFailures(t *testing.T) {
 		t.Fatalf("timeout: %v", err)
 	}
 	f.mu.Lock()
-	f.delay = 0
+	f.stall = false
 	f.mu.Unlock()
 	if (&Client{}).timeout() != DefaultTimeout || (&Client{}).baseURL() != ProductionURL || NewClient(TestNetURL).baseURL() != TestNetURL {
 		t.Fatal("defaults")
