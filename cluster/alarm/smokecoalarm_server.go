@@ -699,6 +699,10 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	}
 }
 
+// logger is the server's logger: the process default (Config carries
+// none).
+func (*Server) logger() *slog.Logger { return slog.Default() }
+
 // admit is the host's enum value v of attrID when the instance admits it,
 // remembered as the last admitted one; the last admitted one otherwise,
 // with a warning (R2-C2-wire-1553).
@@ -709,7 +713,7 @@ func (s *Server) admit(attrID uint32, v uint8) uint8 {
 		return v
 	}
 	served := uint8(last.Load()) //nolint:gosec // a stored uint8
-	slog.Default().Warn("matter.smokecoalarm.inbound_value_not_admitted",
+	s.logger().Warn("matter.smokecoalarm.inbound_value_not_admitted",
 		slog.Int("attribute", int(attrID)), slog.Int("value", int(v)), slog.Int("served", int(served)))
 	return served
 }

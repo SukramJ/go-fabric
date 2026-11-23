@@ -424,6 +424,10 @@ func nullableSeconds(seconds uint32, known bool) (any, bool) {
 	return seconds, true
 }
 
+// logger is the server's logger: the process default (Config carries
+// none).
+func (*Server) logger() *slog.Logger { return slog.Default() }
+
 // admitState is [nullableSeconds] for the two enum attributes, held to
 // ValveStateEnum: an undefined host value is logged and the last defined
 // one served instead, null before any (R2-C2-wire-1553). last holds that
@@ -437,7 +441,7 @@ func (s *Server) admitState(attrID uint32, last *atomic.Uint32, state State, kno
 		return uint8(state), true
 	}
 	prev := last.Load()
-	slog.Default().Warn("matter.valve.inbound_value_not_admitted",
+	s.logger().Warn("matter.valve.inbound_value_not_admitted",
 		slog.Int("attribute", int(attrID)), slog.Int("value", int(state)), slog.Int("served", int(prev)-1))
 	if prev == 0 {
 		return nil, true
