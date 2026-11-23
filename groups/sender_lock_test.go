@@ -17,7 +17,7 @@ type blockingCounterStore struct {
 	gate    chan struct{}
 }
 
-func (s *blockingCounterStore) GetMetadataCounter(ctx context.Context, key string) (uint64, bool, error) {
+func (s *blockingCounterStore) GetMetadataCounter(ctx context.Context, key string) (value uint64, ok bool, err error) {
 	select {
 	case s.entered <- struct{}{}:
 	default:

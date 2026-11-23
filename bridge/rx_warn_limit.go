@@ -57,14 +57,14 @@ func (l *rxWarnLimiter) allow(event string, at time.Duration) (warn bool, suppre
 
 // warnPerDatagram writes event at Warn once per [rxWarnInterval], with
 // the count of the lines in between, and at Debug otherwise.
-func (b *Bridge) warnPerDatagram(event string, attrs ...slog.Attr) {
+func (b *Bridge) warnPerDatagram(ctx context.Context, event string, attrs ...slog.Attr) {
 	warn, suppressed := b.rxWarns.allow(event, clock.MonotonicOf(b.clk()))
 	if !warn {
-		b.logger.LogAttrs(context.Background(), slog.LevelDebug, event, attrs...)
+		b.logger.LogAttrs(ctx, slog.LevelDebug, event, attrs...)
 		return
 	}
 	if suppressed > 0 {
 		attrs = append(attrs, slog.Int("suppressed_since_last", suppressed))
 	}
-	b.logger.LogAttrs(context.Background(), slog.LevelWarn, event, attrs...)
+	b.logger.LogAttrs(ctx, slog.LevelWarn, event, attrs...)
 }

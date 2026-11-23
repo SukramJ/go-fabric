@@ -97,6 +97,13 @@ func TestTimedSweepIntervalIsMonotonic(t *testing.T) {
 	}
 }
 
+// sweepTimedDeadlines is the sweep the ack pump and the TimedRequest
+// site run, at b's clock.
+func (b *Bridge) sweepTimedDeadlines() int {
+	c := b.clk()
+	return b.routing.maybeSweepExpiredTimedDeadlines(c.Now(), clock.MonotonicOf(c))
+}
+
 // monoOf is the monotonic reading [clock.MonotonicOf] gives for t on a
 // clock without one: its offset from the Unix epoch.
 func monoOf(t time.Time) time.Duration { return t.Sub(time.Unix(0, 0)) }

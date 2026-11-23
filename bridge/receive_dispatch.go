@@ -593,13 +593,6 @@ func (b *Bridge) chunkWriteTransaction(key mrp.ExchangeKey, more bool) *im.Write
 	return b.routing.writeTransaction(key, more, clock.MonotonicOf(b.clk()))
 }
 
-// sweepTimedDeadlines is [exchangeRouting.maybeSweepExpiredTimedDeadlines]
-// at the bridge clock's reading.
-func (b *Bridge) sweepTimedDeadlines() int {
-	c := b.clk()
-	return b.routing.maybeSweepExpiredTimedDeadlines(c.Now(), clock.MonotonicOf(c))
-}
-
 // applyWrite runs a WriteRequest that passed the interaction's checks —
 // a first message, or a chunk that continues one — and answers it.
 func (b *Bridge) applyWrite(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.WriteRequest, txKey mrp.ExchangeKey) error {
