@@ -59,7 +59,7 @@ type BorderRouter struct {
 	c   *Client
 	cfg BorderRouterConfig
 
-	// mu guards configured.
+	// mu guards configured and activations.
 	mu sync.Mutex
 	// configured is chip's ActiveDatasetConfigured, narrowed to this
 	// delegate's own activations (review II, R3-fsm-3350; decision 545):
@@ -73,6 +73,10 @@ type BorderRouter struct {
 	// the fail-safe's revert against a dataset no activation of this node
 	// set.
 	configured bool
+	// activations counts the activations that set configured false. A
+	// clear returns the flag to true only when no activation started
+	// while it ran (review II, R4-fsm-4303).
+	activations uint64
 }
 
 var _ threadbr.BorderRouter = (*BorderRouter)(nil)
@@ -161,6 +165,7 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 	if current == nil {
 		b.mu.Lock()
 		b.configured = false
+		b.activations++
 		b.mu.Unlock()
 	} else if bytes.Equal(current, dataset) {
 		if role, err := b.c.State(ctx); err == nil && role.Attached() {
@@ -179,6 +184,17 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 		return b.reenable(ctx, current != nil, err)
 	}
 	return b.awaitAttached(ctx)
+}
+
+// settle returns the flag to configured unless an activation started
+// after the one counted as since: that activation's dataset is still
+// uncommitted (review II, R4-fsm-4303).
+func (b *BorderRouter) settle(since uint64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.activations == since {
+		b.configured = true
+	}
 }
 
 // reenable is the step back of an activation that disabled the Thread
@@ -217,8 +233,14 @@ func (b *BorderRouter) awaitAttached(ctx context.Context) error {
 }
 
 // clear disables the Thread interface and deletes the active dataset; on
-// success nothing of this delegate's is left for a revert.
+// success nothing is left armed: the dataset is deleted or, at a 405,
+// left in place with the interface disabled. An activation that started
+// while the clear ran keeps its flag (review II, R4-doc-4304,
+// R4-fsm-4303).
 func (b *BorderRouter) clear(ctx context.Context) error {
+	b.mu.Lock()
+	since := b.activations
+	b.mu.Unlock()
 	if err := b.c.setState(ctx, false); err != nil {
 		return err
 	}
@@ -236,10 +258,9 @@ func (b *BorderRouter) clear(ctx context.Context) error {
 			return err
 		}
 	}
-	// Nothing of this delegate's is left to revert.
-	b.mu.Lock()
-	b.configured = true
-	b.mu.Unlock()
+	// Nothing is left armed: the dataset is deleted or, at a 405, left
+	// in place with the interface disabled.
+	b.settle(since)
 	return nil
 }
 
