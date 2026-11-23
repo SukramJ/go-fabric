@@ -1952,7 +1952,14 @@ func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8
 	}
 	invoking := mattercore.InvokeSessionIDFromContext(ctx)
 	b.closeFabricSessionsGracefully(reg, fabricIndex, invoking)
-	closeNow := func() { closer.CloseFabric(fabricIndex) }
+	closeNow := func() {
+		closer.CloseFabric(fabricIndex)
+		// An event of a session that closed itself while the response
+		// was out (the peer's CloseSession, a TCP drop) was recorded
+		// with the removed index after emitFabricRemoved forgot it
+		// (review II, R3-sec-3403, decision 578).
+		b.diagRing().ForgetFabric(fabricIndex)
+	}
 	if !im.DeferAfterResponse(ctx, closeNow) {
 		closeNow()
 	}
@@ -2097,6 +2104,11 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	// Its groups go with it: keys, group table, reception state and the
 	// multicast memberships only it used.
 	b.groupMessagingPort().ForgetFabric(fabricIndex)
+	// Its index leaves the diagnostics ring's events: the index is
+	// allocated again, and its next holder must not read the removed
+	// fabric's sessions as its own (review II, R3-sec-3403, decision
+	// 578).
+	b.diagRing().ForgetFabric(fabricIndex)
 	// And its scenes (fabric-scoped scene table entries).
 	if topo := b.Topology(); topo != nil {
 		for _, ep := range topo.Endpoints {

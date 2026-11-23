@@ -4,6 +4,7 @@
 package diagevent
 
 import (
+	"reflect"
 	"slices"
 	"sync"
 	"testing"
@@ -248,4 +249,75 @@ func TestDetailKeysAreTheirNames(t *testing.T) {
 			t.Errorf("detail key %q, want %q", got, want)
 		}
 	}
+}
+
+// TestForgetFabricRemovesOnlyThatIndex (R3-sec-3403, decision 578): the
+// removed fabric's index leaves every held event that names it; the
+// events stay, with their other details, and another fabric's index and
+// an event without one are untouched. Index 0 and a nil ring change
+// nothing.
+func TestForgetFabricRemovesOnlyThatIndex(t *testing.T) {
+	t.Parallel()
+	r := NewRing(4)
+	r.Record(Event{Message: "a", Detail: map[string]string{DetailFabricIndex: "2", DetailPeer: "p-a"}})
+	r.Record(Event{Message: "c", Detail: map[string]string{DetailFabricIndex: "3", DetailPeer: "p-c"}})
+	r.Record(Event{Message: "none", Detail: map[string]string{DetailPeer: "p-pase"}})
+	r.Record(Event{Message: "a2", Detail: map[string]string{DetailFabricIndex: "2"}})
+	before := r.Snapshot()
+
+	r.ForgetFabric(0)
+	(*Ring)(nil).ForgetFabric(2)
+	if got := r.Snapshot(); !reflect.DeepEqual(got, before) {
+		t.Fatalf("ForgetFabric(0) changed the ring: %v", got)
+	}
+
+	r.ForgetFabric(2)
+	got := map[string]map[string]string{}
+	for _, e := range r.Snapshot() {
+		got[e.Message] = e.Detail
+	}
+	want := map[string]map[string]string{
+		"a":    {DetailPeer: "p-a"},
+		"c":    {DetailFabricIndex: "3", DetailPeer: "p-c"},
+		"none": {DetailPeer: "p-pase"},
+		"a2":   {},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("after ForgetFabric(2): %v, want %v", got, want)
+	}
+	// A snapshot taken before keeps what it was handed.
+	for _, e := range before {
+		if e.Message == "a" && e.Detail[DetailFabricIndex] != "2" {
+			t.Fatal("ForgetFabric changed a snapshot handed out before it")
+		}
+	}
+}
+
+// TestForgetFabricUnderConcurrentRecording runs ForgetFabric beside
+// Record and Snapshot; -race holds it. An observer is registered, so
+// Record hands its event over outside the ring's lock while ForgetFabric
+// strips the key: an in-place delete on the entry's map would be a
+// concurrent map clone and write — a runtime fatal, -race or not.
+func TestForgetFabricUnderConcurrentRecording(t *testing.T) {
+	t.Parallel()
+	r := NewRing(8)
+	r.Observe(func(e Event) { _ = e.Detail[DetailFabricIndex] })
+	var wg sync.WaitGroup
+	for g := range 4 {
+		wg.Go(func() {
+			for i := range 200 {
+				switch (g + i) % 3 {
+				case 0:
+					r.Record(Event{Message: "x", Detail: map[string]string{DetailFabricIndex: "2"}})
+				case 1:
+					for _, e := range r.Snapshot() {
+						_ = e.Detail[DetailFabricIndex]
+					}
+				default:
+					r.ForgetFabric(2)
+				}
+			}
+		})
+	}
+	wg.Wait()
 }
