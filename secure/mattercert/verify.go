@@ -85,8 +85,8 @@ const (
 	KeyUsageCRLSign uint16 = 1 << 6
 )
 
-// ValidateRCAC checks the structural invariants that chip enforces on Root
-// CA certificates beyond what the chain verifier already covers:
+// ValidateRCAC checks the structural invariants that matter.js and chip
+// enforce on Root CA certificates (each rule below names its source) beyond what the chain verifier already covers:
 //
 //   - The subject is a root's: an rcac-id, no node-id, no icac-id, no
 //     fabric id of 0, no CATs.
