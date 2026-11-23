@@ -120,3 +120,32 @@ func TestFailedStartStopsTheNodeOnTheSitesClock(t *testing.T) {
 		t.Fatalf("Start after the failed Start: %v", err)
 	}
 }
+
+// TestFailedStopIsFinishedByTheNext (review II, R2-C2-test-2502): a Stop
+// that fails — here its context ended before it began — leaves the device
+// running, so the next Stop (or the site's closer) stops the node, and a
+// Start after it succeeds.
+func TestFailedStopIsFinishedByTheNext(t *testing.T) {
+	t.Parallel()
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	d := site.AddDevice(fabrictest.Topology{Bridged: []node.Endpoint{newPlug(t)}})
+	ended, cancelEnded := context.WithCancel(context.Background())
+	cancelEnded()
+	if err := d.Stop(ended); err == nil {
+		t.Fatal("Stop with an ended context succeeded")
+	}
+	if !d.Running() {
+		t.Error("the device reads stopped after a Stop that failed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := d.Stop(ctx); err != nil {
+		t.Fatalf("Stop after the failed Stop: %v", err)
+	}
+	if d.Running() {
+		t.Error("the device reads running after its Stop")
+	}
+	if err := d.Start(ctx); err != nil {
+		t.Fatalf("Start after the failed and the finished Stop: %v", err)
+	}
+}

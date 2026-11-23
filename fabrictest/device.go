@@ -438,6 +438,20 @@ func (d *Device) Stop(ctx context.Context) error {
 	if !running {
 		return nil
 	}
+	if err := d.stopNode(ctx, n); err != nil {
+		// The node is not stopped (node.Stop: the next Stop finishes the
+		// work): the device stays running, so the next Stop and the
+		// site's closer still reach it (review II, R2-C2-test-2502).
+		d.mu.Lock()
+		d.running = true
+		d.mu.Unlock()
+		return err
+	}
+	return nil
+}
+
+// stopNode is Stop's work on n; d.actMu is held.
+func (d *Device) stopNode(ctx context.Context, n *node.Node) error {
 	if err := d.site.Run(ctx, n.Stop); err != nil { // the stop's own timers on the site's clock, as Start
 		return err
 	}
