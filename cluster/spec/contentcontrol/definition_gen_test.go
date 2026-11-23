@@ -136,6 +136,10 @@ func TestTypedServer(t *testing.T) {
 	device.FromAttributeValues(func(id uint32) (any, bool) { v, ok := stored[id]; return v, ok })
 	peer, absent := StateFrom(spectest.WireValues(t, stored))
 	spectest.EqualState(t, peer, device)
+	// Each State holds the patch it was read from, so a value
+	// FromAttributeValues reads but does not store fails here.
+	spectest.StateHoldsPatch(t, device, sample)
+	spectest.StateHoldsPatch(t, back, full)
 	if len(absent) != 0 {
 		t.Errorf("StateFrom: %v absent, want none", absent)
 	}

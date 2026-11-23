@@ -143,3 +143,44 @@ func equalValue(a, b reflect.Value) bool {
 		return reflect.DeepEqual(a.Interface(), b.Interface())
 	}
 }
+
+// StateHoldsPatch reports, as test errors, every field patch sets that
+// state does not hold: for each non-nil pointer field of the generated
+// Patch patch, the generated State state's field of the same name equals
+// the value it points to — the State's pointer field (a nullable
+// attribute) by the value it points to. A generated typed test reads a
+// patch's stored values into a State ([spec.StateReader]) and holds the
+// State to the patch with it, so a value FromAttributeValues reads but
+// does not store is caught (review II, R2-C2-test-2701).
+func StateHoldsPatch(tb testing.TB, state, patch any) {
+	tb.Helper()
+	s, p := reflect.ValueOf(state), reflect.ValueOf(patch)
+	if s.Kind() != reflect.Struct || p.Kind() != reflect.Struct {
+		tb.Errorf("StateHoldsPatch(%T, %T): want two structs", state, patch)
+		return
+	}
+	for i := range p.NumField() {
+		f := p.Type().Field(i)
+		pv := p.Field(i)
+		if !f.IsExported() || pv.Kind() != reflect.Pointer || pv.IsNil() {
+			continue
+		}
+		sv := s.FieldByName(f.Name)
+		if !sv.IsValid() {
+			tb.Errorf("%T has no field %s", state, f.Name)
+			continue
+		}
+		want := pv.Elem()
+		got := sv
+		if sv.Kind() == reflect.Pointer && sv.Type() == pv.Type() {
+			if sv.IsNil() {
+				tb.Errorf("%s = nil, want %+v", f.Name, want.Interface())
+				continue
+			}
+			got = sv.Elem()
+		}
+		if !equalValue(got, want) {
+			tb.Errorf("%s = %+v, want %+v", f.Name, got.Interface(), want.Interface())
+		}
+	}
+}

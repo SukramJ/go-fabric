@@ -77,3 +77,40 @@ func TestEqualState(t *testing.T) {
 	}
 	spectest.EqualState(t, nil, nil)
 }
+
+// TestStateHoldsPatch holds a State to every field a Patch sets, a
+// nullable field through its pointer, and reports a field the State
+// leaves at its zero value (review II, R2-C2-test-2701).
+func TestStateHoldsPatch(t *testing.T) {
+	t.Parallel()
+	type state struct {
+		A uint16
+		N *uint8
+		L []int
+	}
+	type patch struct {
+		A    *uint16
+		N    *uint8
+		L    *[]int
+		Null []uint32
+	}
+	a, n, l := uint16(1), uint8(2), []int{3}
+	p := patch{A: &a, N: &n, L: &l, Null: []uint32{9}}
+	spectest.StateHoldsPatch(t, state{A: 1, N: &n, L: []int{3}}, p)
+	spectest.StateHoldsPatch(t, state{}, patch{})
+	for name, s := range map[string]state{
+		"plain":    {N: &n, L: []int{3}},
+		"nullable": {A: 1, L: []int{3}},
+		"list":     {A: 1, N: &n},
+	} {
+		if errs := run(t, func(r *recorder) { spectest.StateHoldsPatch(r, s, p) }); len(errs) != 1 {
+			t.Errorf("%s: %d errors, want 1: %v", name, len(errs), errs)
+		}
+	}
+	if errs := run(t, func(r *recorder) { spectest.StateHoldsPatch(r, struct{}{}, p) }); len(errs) != 3 {
+		t.Errorf("a State without the fields: %d errors, want 3: %v", len(errs), errs)
+	}
+	if errs := run(t, func(r *recorder) { spectest.StateHoldsPatch(r, 1, p) }); len(errs) != 1 {
+		t.Errorf("a non-struct: %d errors, want 1", len(errs))
+	}
+}
