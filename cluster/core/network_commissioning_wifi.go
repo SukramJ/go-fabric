@@ -150,8 +150,8 @@ type WiFiNetworkCommissioningConfig struct {
 	//
 	// Deprecated: wire FailSafe, the fabric-aware port
 	// ([GeneralCommissioning.FailSafeFabric]), instead; this field keeps
-	// its behaviour until it goes and is removable in the next minor
-	// release (review II, R2-C2-sec-1006).
+	// its behaviour until it goes and is removable in v0.28.0
+	// (review II, R2-C2-sec-1006).
 	IsFailSafeArmed func() bool
 	// SetBreadcrumb writes GeneralCommissioning's Breadcrumb
 	// (UpdateBreadcrumb, :589-593); nil writes none.
