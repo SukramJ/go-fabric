@@ -395,7 +395,7 @@ func (e *Endpoint) identifyServer() *mattercore.Identify {
 // topology still serving in-flight reads and the incoming one — may
 // reference it concurrently, hence the internal mutex.
 type endpointState struct {
-	// mu guards configVersion, identify, nodeLabel and trackers.
+	// mu guards configVersion, identify, kept, nodeLabel and trackers.
 	mu       sync.Mutex
 	trackers map[uint32]*contract.DataVersionTracker
 	identify *mattercore.Identify
@@ -419,6 +419,10 @@ type endpointState struct {
 	// binding is the Binding server [mountBinding] mounts, created on first
 	// use.
 	binding *mattercore.Binding
+	// kept holds the [StatefulServer] instances the endpoint's
+	// materialisers built, kept across materialisations
+	// ([Endpoint.keepStateful]); it goes with the state.
+	kept map[keptKey]keptServer
 	// nilServerLogged is set once [Endpoint.dropNilServers] logged a
 	// dropped nil server for this endpoint.
 	nilServerLogged atomic.Bool
