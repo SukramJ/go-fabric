@@ -274,8 +274,8 @@ func (a *Aggregator) RetirePartition(ctx context.Context, name string) error {
 }
 
 // Add adds ep under the Aggregator — matter.js `aggregator.add(endpoint)`
-// (endpoint/Endpoint.ts:755-770) — and binds a device to the node; a running node
-// reassembles. A device another node holds is refused
+// (endpoint/Endpoint.ts:755-770, the insertion :774, at b25ed960) — and
+// binds a device to the node; a running node reassembles. A device another node holds is refused
 // ([device.ErrAddedElsewhere]), and so is one whose key, or a part's, an
 // endpoint of any partition already serves ([ErrDuplicateKey]). It adds
 // to the default partition.
@@ -290,9 +290,10 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // (device types, server list) the one change a controller sees. The old
 // endpoint is unbound after the reassembly. It mirrors matter.js replacing
 // a part: `close()` keeps the endpoint's number reservation
-// (endpoint/Endpoint.ts:1024-1032, ServerEndpointInitializer.ts:67-69,
-// where `delete()` would erase it, endpoint/Endpoint.ts:987-992) and the new endpoint
-// with the same id is assigned it (ServerEndpointInitializer.ts:34-42).
+// (endpoint/Endpoint.ts:998-1007, ServerEndpointInitializer.ts:67-69,
+// where `delete()` would erase it, endpoint/Endpoint.ts:961-966, at
+// b25ed960) and the new endpoint with the same id is assigned it
+// (ServerEndpointInitializer.ts:34-42).
 // A replacement that fails validation ([ErrKeyMismatch],
 // [ErrPolicyMismatch], a part key another endpoint serves:
 // [ErrDuplicateKey], …) changes nothing. A replacement the

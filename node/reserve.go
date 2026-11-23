@@ -100,8 +100,9 @@ func (p persisted) release(ctx context.Context, key string) error {
 type reservationOp struct {
 	kind reservationKind
 	key  string
-	// tree is the removed (or forgotten) endpoint's keys; nil for a
-	// release and for a forgotten key that was not in the set.
+	// tree is the removed endpoint's keys; for a forgotten key, the tree
+	// the store reserved for it at the call and, when the set held it,
+	// the dropped endpoint's keys (decision 576); nil for a release.
 	tree []string
 }
 
@@ -372,9 +373,10 @@ func (a *Aggregator) eraseScope(ctx context.Context, scope string) error {
 // parts it had: a later Add of key gets a fresh number, as a new device
 // would. It erases what the node stored for those keys' servers too — the
 // nonvolatile attribute values the module holds and the UserLabel lists —
-// so the later Add starts from its declaration. It is the counterpart of [Aggregator.Remove], which keeps them —
-// matter.js's `delete()` beside `close()` (endpoint/Endpoint.ts:987-992,
-// :1024-1032 at db021da0; ServerEndpointInitializer.ts:59-65
+// so the later Add starts from its declaration. It is the counterpart of
+// [Aggregator.Remove], which keeps them — matter.js's `delete()` beside
+// `close()` (endpoint/Endpoint.ts:961-966, `erase()` :953-956, `close()`
+// :998-1007 at b25ed960; ServerEndpointInitializer.ts:59-65
 // eraseDescendant). A key no partition holds and nothing is stored for is
 // no error; a key another partition holds is [ErrUnknownKey], and so is a
 // part key another endpoint, of any partition, serves: the part is that
