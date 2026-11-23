@@ -25,10 +25,10 @@ func TestSceneRecallBypassesTheHostHandler(t *testing.T) {
 	lc := engineServer(newDevice(100, true), nil)
 	st := core.NewScenesState(nil)
 	scenes, err := core.NewScenesManagement(core.ScenesConfig{
-		State:      st,
-		Siblings:   func() []contract.ClusterServer { return []contract.ClusterServer{lc} },
-		GroupKnown: func(context.Context, uint8, uint16) bool { return true },
-		Fabrics:    func(context.Context) []uint8 { return []uint8{1} },
+		State:       st,
+		Siblings:    func() []contract.ClusterServer { return []contract.ClusterServer{lc} },
+		GroupKnown:  func(context.Context, uint8, uint16) bool { return true },
+		ListFabrics: func(context.Context) ([]uint8, error) { return []uint8{1}, nil },
 	})
 	if err != nil {
 		t.Fatal(err)
