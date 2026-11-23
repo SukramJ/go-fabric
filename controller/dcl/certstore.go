@@ -895,7 +895,7 @@ const (
 // measured figure.
 const maxCertificatesPerRootAnswer = 16
 
-// fetchDclCertificates is #fetchDclCertificates (:1026-1043).
+// fetchDclCertificates is #fetchDclCertificates (:1136-1153 at b25ed960).
 func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProduction, force bool) error {
 	client := s.clientFor(isProduction)
 	refs, err := client.RootCertificates(ctx)
@@ -917,7 +917,7 @@ func (s *CertificateStore) fetchDclCertificates(ctx context.Context, isProductio
 	return nil
 }
 
-// fetchAndStoreCertificate is #fetchAndStoreCertificate (:1061-1148): one
+// fetchAndStoreCertificate is #fetchAndStoreCertificate (:1171-1258 at b25ed960): one
 // root's certificates, each stored under its own key identifier once its
 // DER parses as a PAA and carries the key identifier the ledger states —
 // at most maxCertificatesPerRootAnswer of them, ref's own first. It

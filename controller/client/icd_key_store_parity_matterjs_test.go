@@ -76,11 +76,12 @@ func TestIcdClientKeyStoreParity(t *testing.T) {
 // TestIcdClientRegisterFailsWhenTheStoreRefuses holds R2-C2-store-2350:
 // Register returns the store's error when the commit that stores the new
 // registration fails, the registration staying committed in memory. As
-// matter.js: "#commitIfOwned runs write() and transaction.commit() in a
-// try, on failure follows the committed registration again and rethrows;
-// register awaits it" (IcdClient.ts:356-372, :576-591 at b25ed960), and
-// "the memory state staying after a phase-two failure is matter.js's too"
-// (IcdClientTest.ts:805-824).
+// matter.js: #commitIfOwned runs write() and transaction.commit() in a
+// try, on failure follows the committed registration again and rethrows,
+// and register awaits it (IcdClient.ts:356-372, :576-591 at b25ed960).
+// The memory state staying after a phase-two failure is shown for the
+// offered key (IcdClientTest.ts:806-824 at b25ed960); register goes
+// through the same #commitIfOwned.
 func TestIcdClientRegisterFailsWhenTheStoreRefuses(t *testing.T) {
 	t.Parallel()
 	st := &failingICDStore{}

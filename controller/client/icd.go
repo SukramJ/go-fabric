@@ -818,8 +818,8 @@ func (c *ICDClient) registerOnPeer(op *icdOperation, opts ICDRegisterOptions) er
 	}
 	// A store that refused the registration fails the call; the
 	// registration stays committed in memory (review II, R2-C2-store-2350;
-	// matter.js: #commitIfOwned "on failure follows the committed
-	// registration again and rethrows; register awaits it",
+	// matter.js: #commitIfOwned on failure follows the committed
+	// registration again and rethrows, and register awaits it,
 	// IcdClient.ts:356-372, :576-591 at b25ed960).
 	return stored
 }
