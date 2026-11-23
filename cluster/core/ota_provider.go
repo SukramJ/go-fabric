@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"math"
 	"slices"
+	"sync"
 	"time"
 
 	"thingfabric.dev/go-fabric/bdx"
@@ -47,6 +48,14 @@ type OTAProvider struct {
 	mgr     OTAUpdateManager
 	storage *otaImageStorage
 	logger  *slog.Logger
+
+	// scopeMu guards scopeOwner: the attempt whose query last enabled a
+	// requestor's BDX scope and has not yet checked whether it ended
+	// meanwhile (settleScope). Only that attempt withdraws the scope, so
+	// a superseded query does not withdraw the scope a newer query of the
+	// same requestor enabled (review II, R2-C2-conc-1202).
+	scopeMu    sync.Mutex
+	scopeOwner map[OTAPeer]*OTAUpdateAttempt
 }
 
 // OTAPeer is the requestor a provider talks to: matter.js PeerAddress, its
@@ -498,6 +507,13 @@ func (p *OTAProvider) answerQuery(ctx context.Context, req provdef.QueryImageReq
 		}
 		imageURI = uri
 	}
+	// The attempt may have ended since OfferUpdate — its fabric removed,
+	// or a newer query of the requestor — while the host's observer and
+	// the transfer options ran: an ended attempt is offered nothing
+	// (review II, R2-C2-conc-1202).
+	if attempt.Ended() {
+		return provdef.QueryImageResponse{Status: provdef.StatusNotAvailable}, nil
+	}
 
 	// OP:305-314.
 	p.mgr.OfferAnswered(attempt)
@@ -564,10 +580,26 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAtt
 	opts := p.mgr.BDXTransferOptionsFor(peer)
 	opts.PreferredDriverModes = []bdx.DriverMode{bdx.ReceiverDrive}
 	opts.MessageTimeout = otaBdxMessageTimeout
+	p.scopeMu.Lock()
+	if attempt.Ended() {
+		// Ended since OfferUpdate: nothing is enabled for it, and the
+		// query answers NotAvailable (R2-C2-conc-1202). Checked under
+		// scopeMu, so a newer query's scope enabled before this point is
+		// not withdrawn by this attempt's settleScope.
+		p.scopeMu.Unlock()
+		return "", false
+	}
 	if !responder.EnablePeerForScope(peer.bdx(), otaScope, p.storage, opts) {
+		p.scopeMu.Unlock()
 		p.logger.Info("ota.provider.bdx_not_enabled", slog.Uint64("node_id", peer.NodeID))
 		return "", true
 	}
+	if p.scopeOwner == nil {
+		p.scopeOwner = make(map[OTAPeer]*OTAUpdateAttempt)
+	}
+	p.scopeOwner[peer] = attempt
+	p.scopeMu.Unlock()
+	defer p.settleScope(peer, attempt)
 	off := responder.OnSessionStarted(func(s *bdx.ServerSession, scope string) {
 		sp := s.Peer()
 		if scope != otaScope || sp.FabricIndex != peer.FabricIndex || sp.NodeID != peer.NodeID {
@@ -595,6 +627,28 @@ func (p *OTAProvider) offerBDX(peer OTAPeer, img OTAImage, attempt *OTAUpdateAtt
 	}
 	// OP:300; the image is `ota/<file>` (SoftwareUpdateManager.ts:711).
 	return bdx.FileDesignator(otaScope + "/" + string(img.FileDesignator)).BdxURI(nodeID), false
+}
+
+// settleScope ends attempt's claim on peer's BDX scope once its offer is
+// in place: when the attempt ended meanwhile — a fabric removal ran
+// before the scope existed, so its withdrawal missed it — and no newer
+// query of the requestor enabled the scope since, the scope is withdrawn,
+// or a later fabric on the index with the same node id could fetch from
+// it (owner decision 167; review II, R2-C2-conc-1202). An attempt that
+// ends later has its scope withdrawn by the fabric's drop.
+func (p *OTAProvider) settleScope(peer OTAPeer, attempt *OTAUpdateAttempt) {
+	p.scopeMu.Lock()
+	defer p.scopeMu.Unlock()
+	if p.scopeOwner[peer] != attempt {
+		return // a newer query of the requestor holds the scope
+	}
+	delete(p.scopeOwner, peer)
+	if !attempt.Ended() {
+		return
+	}
+	if err := p.cfg.BDX.DisablePeerForScope(peer.bdx(), otaScope, true); err != nil {
+		p.logger.Info("ota.provider.bdx_close_failed", slog.Any("err", err))
+	}
 }
 
 // ApplyUpdateRequest decides a requestor's ApplyUpdateRequest: the

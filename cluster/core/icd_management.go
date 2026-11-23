@@ -568,7 +568,7 @@ func (s *ICDManagement) loadClients(ctx context.Context) ([]icdClient, error) {
 
 // Stop is matter.js's goingOffline reaction (IcdManagementServer.ts:291, :345-347):
 // the mode machine stops without a transition. It waits for the Check-In
-// pass in flight. Idempotent.
+// pass in flight; none starts after it (startCheckIns). Idempotent.
 func (s *ICDManagement) Stop() {
 	s.mode.Stop()
 	s.mu.Lock()
@@ -764,21 +764,27 @@ func (s *ICDManagement) activeEntered() {
 }
 
 // startCheckIns runs one Check-In pass in the background unless one is in
-// flight; the pass is counted work of the host (internal/inflight).
+// flight; the pass is counted work of the host (internal/inflight). A
+// stopped server starts none: the mode machine calls OnActiveEntered after
+// releasing its lock, so a wake decided before Stop can arrive after it.
+// started is read and the pass counted under mu, which Stop clears it
+// under before it waits, so no pass is added beside or after that wait
+// (review II, R2-C2-conc-1005).
 func (s *ICDManagement) startCheckIns() {
 	if !s.cfg.has(icddef.FeatureCheckInProtocolSupport) || !s.sending.CompareAndSwap(false, true) {
 		return
 	}
 	s.mu.Lock()
 	ctx := s.life
-	s.mu.Unlock()
-	if ctx == nil {
+	if ctx == nil || !s.started {
+		s.mu.Unlock()
 		s.sending.Store(false)
 		return
 	}
+	s.passes.Add(1)
+	s.mu.Unlock()
 	g := inflight.Of(s.clock)
 	g.Enter(inflight.ICDCheckIns)
-	s.passes.Add(1)
 	go func() {
 		defer s.passes.Done()
 		defer g.Leave(inflight.ICDCheckIns)
@@ -822,6 +828,9 @@ func (s *ICDManagement) sendCheckIns(ctx context.Context) {
 			}
 			if !s.backOff.ShouldSend(key) {
 				continue
+			}
+			if ctx.Err() != nil {
+				return // stopped: not even the counter is written (R2-C2-conc-1005)
 			}
 			if !s.coveredCheckIn(ctx, counter) {
 				return
