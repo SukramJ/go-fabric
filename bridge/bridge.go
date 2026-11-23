@@ -162,7 +162,9 @@
 //     call: it walks the already-attached slice for the Descriptor
 //     cluster (0x001D) and installs the provider on it. Called first, or
 //     with no Descriptor mounted, it returns false and wires nothing —
-//     check the bool.
+//     check the bool. Once installed, the override holds: a later
+//     AttachRootClusters / AttachAggregatorClusters hands its new
+//     Descriptor the host's provider again.
 //   - AttachCommissioningWindow — silent, and fails open on one check.
 //     The window is wired into the root's GeneralCommissioning by
 //     whichever of this call and AttachRootClusters comes second: a
@@ -480,9 +482,14 @@ type Bridge struct {
 	fabricStateByNode atomic.Bool
 	// rootPartsByHost and aggregatorPartsByHost record that the host
 	// attached its own PartsList provider (AttachRootPartsListProvider,
-	// AttachAggregatorPartsListProvider); without one, Start installs the
-	// bridge's own (installDefaultPartsListProviders).
+	// AttachAggregatorPartsListProvider), rootPartsHost and
+	// aggregatorPartsHost keep it, so every later AttachRootClusters /
+	// AttachAggregatorClusters hands the new Descriptor the host's
+	// provider again (review II, R2-C2-api-0601); without one, Start and
+	// the attach calls install the bridge's own
+	// (installDefaultPartsListProviders).
 	rootPartsByHost, aggregatorPartsByHost bool
+	rootPartsHost, aggregatorPartsHost     func() []uint16
 	// aggregatorClusters carry the cluster servers attached to the
 	// Aggregator endpoint (EP 1) — Descriptor (mandatory) + optional
 	// Identify. Apple-bridge topology fix: EP 1 hosts the
@@ -2259,7 +2266,9 @@ func (b *Bridge) CommissioningWindow() *CommissioningWindow {
 // The root's Descriptor among servers gets the bridge's live PartsList, as
 // [Bridge.Start] installs it, unless the host attached its own provider
 // ([Bridge.AttachRootPartsListProvider]) — before Start and after it alike
-// (review II, R2-P6-api-0604).
+// (review II, R2-P6-api-0604). Then it gets the host's provider: an
+// override holds for every later attach until the bridge stops (review II,
+// R2-C2-api-0601).
 func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
 	b.wireDeviceLoad(cp)
@@ -2267,7 +2276,9 @@ func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	b.wireFailSafeExpiry(cp)
 	b.mu.Lock()
 	b.rootClusters = cp
-	if !b.rootPartsByHost {
+	if b.rootPartsByHost {
+		setPartsListProvider(cp, b.rootPartsHost)
+	} else {
 		setPartsListProvider(cp, b.rootPartsList)
 	}
 	window := b.commissioningWindow
@@ -2301,7 +2312,7 @@ func (b *Bridge) AttachRootPartsListProvider(provider func() []uint16) bool {
 	if !setPartsListProvider(b.rootClusters, provider) {
 		return false
 	}
-	b.rootPartsByHost = true
+	b.rootPartsByHost, b.rootPartsHost = true, provider
 	return true
 }
 
@@ -2385,12 +2396,16 @@ func (b *Bridge) liveEndpointIDs(keep func(*endpoint.Endpoint) bool) []uint16 {
 // The Aggregator's Descriptor among servers gets the bridge's live
 // PartsList, as [Bridge.Start] installs it, unless the host attached its
 // own provider ([Bridge.AttachAggregatorPartsListProvider]) — before Start
-// and after it alike (review II, R2-P6-api-0604).
+// and after it alike (review II, R2-P6-api-0604). Then it gets the host's
+// provider: an override holds for every later attach (review II,
+// R2-C2-api-0601).
 func (b *Bridge) AttachAggregatorClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
 	b.mu.Lock()
 	b.aggregatorClusters = cp
-	if !b.aggregatorPartsByHost {
+	if b.aggregatorPartsByHost {
+		setPartsListProvider(cp, b.aggregatorPartsHost)
+	} else {
 		setPartsListProvider(cp, b.aggregatorPartsList)
 	}
 	if b.topology != nil {
@@ -2414,7 +2429,7 @@ func (b *Bridge) AttachAggregatorPartsListProvider(provider func() []uint16) boo
 	if !setPartsListProvider(b.aggregatorClusters, provider) {
 		return false
 	}
-	b.aggregatorPartsByHost = true
+	b.aggregatorPartsByHost, b.aggregatorPartsHost = true, provider
 	return true
 }
 
