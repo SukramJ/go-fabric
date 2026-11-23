@@ -390,8 +390,14 @@ type ThermostatServer struct {
 	// is taken inside op and outside mu; the inbound setters take it
 	// without op, as they take mu (issue #63). It is a one-slot channel, so
 	// that a waiter is durably blocked for a testing/synctest bubble.
-	persist  chan struct{}
-	features uint32
+	persist chan struct{}
+	// presetsBehind, guarded by persist, marks a pair memory holds that
+	// the PresetStore refused: a direct setpoint change ended the active
+	// preset in memory and its save failed. The next save of the pair
+	// clears it; a direct change that ends nothing saves the pair again
+	// while it is set (R3-store-3253).
+	presetsBehind bool
+	features      uint32
 	// matterTime is the Matter time TSUGGEST reads
 	// ([ThermostatServer.AttachMatterTime]); nil without one.
 	matterTime atomic.Pointer[clock.MatterTime]
