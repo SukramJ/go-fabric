@@ -534,13 +534,24 @@ func (c *Controller) Commission(ctx context.Context, d *Device, opts CommissionO
 // controller go on (bridge/securechannel.go, completeEstablishment after
 // the send), and lists no session still establishing
 // (operational.Manager.Sessions).
+//
+// The fabric is told by the controller's compressed fabric id, as the
+// device stores it: every controller defaults to one node id, so peer and
+// local node ids alone match a session on another controller's fabric of
+// the same device (review II, R2-C2-test-2503; the class of
+// R2-P6-test-2514, [Pair.Grant]).
 func (c *Controller) awaitDeviceSession(ctx context.Context, d *Device, deviceNodeID uint64) error {
 	c.mu.RLock()
 	controllerNodeID := c.opts.NodeID
+	var cfid [8]byte
+	if c.fabric != nil {
+		cfid = c.fabric.Identity.CompressedFabricID
+	}
 	c.mu.RUnlock()
 	return c.site.Eventually(ctx, "the device's CASE session with the controller", func() bool {
-		return d.listsCASESession(func(_ uint8, peer, local uint64) bool {
-			return peer == controllerNodeID && local == deviceNodeID
+		index, ok := d.fabricIndexOf(ctx, cfid, deviceNodeID)
+		return ok && d.listsCASESession(func(fabric uint8, peer, local uint64) bool {
+			return fabric == index && peer == controllerNodeID && local == deviceNodeID
 		})
 	})
 }

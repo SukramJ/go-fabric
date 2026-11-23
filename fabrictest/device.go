@@ -535,6 +535,25 @@ func (d *Device) AwaitCASESession(ctx context.Context, fabricIndex uint8, peerNo
 	})
 }
 
+// fabricIndexOf returns the index of the device's fabric with
+// compressedFabricID on which it is node nodeID; false when it holds none.
+func (d *Device) fabricIndexOf(ctx context.Context, compressedFabricID [8]byte, nodeID uint64) (uint8, bool) {
+	n := d.Node()
+	if n == nil {
+		return 0, false
+	}
+	fabrics, err := n.FabricInfos(ctx)
+	if err != nil {
+		return 0, false
+	}
+	for _, f := range fabrics {
+		if f.CompressedFabricID == compressedFabricID && f.NodeID == nodeID {
+			return f.FabricIndex, true
+		}
+	}
+	return 0, false
+}
+
 // listsCASESession reports whether the device's node lists an
 // established CASE session match accepts, by its fabric index, peer node
 // id and local node id. Sessions omits a session still establishing
