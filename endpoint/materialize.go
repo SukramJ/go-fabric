@@ -355,24 +355,34 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 // them. A [StatefulServer] among them is the instance the endpoint keeps
 // ([Endpoint.keepStateful], R2-C2-store-1453).
 func (ep *Endpoint) materializedServers() []contract.ClusterServer {
+	measured, battery := ep.materialize()
+	measured = ep.keepStateful(keptMeasurement, ep.Measurement, measured)
+	battery = ep.keepStateful(keptPowerSource, ep.PowerSource, battery)
+	return append(measured, battery...)
+}
+
+// materialize runs the measurement's and the battery's materialisers and
+// keeps nothing.
+func (ep *Endpoint) materialize() (measured, battery []contract.ClusterServer) {
 	mc := contract.MeasurementContext{EndpointID: ep.ID}
-	var measured, battery []contract.ClusterServer
 	if ep.Measurement != nil {
 		measured = measurement.FromMeasurementClass(ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc)
 	}
 	if ep.PowerSource != nil {
 		battery = measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource, mc)
 	}
-	measured = ep.keepStateful(keptMeasurement, ep.Measurement, measured)
-	battery = ep.keepStateful(keptPowerSource, ep.PowerSource, battery)
-	return append(measured, battery...)
+	return measured, battery
 }
 
-// measuredServers is [Endpoint.materializedServers] without its nil
-// entries: what an endpoint without a source serves before the stack's
-// clusters are added.
+// measuredServers is what the endpoint's measurement and battery
+// materialise, without its nil entries and without touching the kept
+// servers: what an endpoint without a source serves before the stack's
+// clusters are added. The assembler asks it before the assembly is known to
+// succeed, so it must leave the endpoint's shared state alone
+// (R2-C2-fsm-0451).
 func (ep *Endpoint) measuredServers() []contract.ClusterServer {
-	return ep.dropNilServers(ep.materializedServers())
+	measured, battery := ep.materialize()
+	return ep.dropNilServers(append(measured, battery...))
 }
 
 // partClusterServers is the surface of a [Spec.Parts] endpoint: its own

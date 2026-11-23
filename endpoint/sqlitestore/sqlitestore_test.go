@@ -15,6 +15,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"thingfabric.dev/go-fabric/cluster/onoff"
+	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/endpoint/endpointtest"
 	"thingfabric.dev/go-fabric/endpoint/sqlitestore"
@@ -302,7 +304,7 @@ func assembleTwice(t *testing.T, s endpoint.Store, key endpoint.SourceKey) (boot
 	snap := []endpoint.Snapshot{{
 		Scope: "site",
 		Endpoints: []endpoint.Spec{{
-			StableKey: key, DeviceType: 0x0100, FriendlyName: "lamp",
+			StableKey: key, DeviceType: 0x0100, FriendlyName: "lamp", Source: lampSource(t),
 		}},
 	}}
 	var ids [2]uint16
@@ -318,6 +320,25 @@ func assembleTwice(t *testing.T, s endpoint.Store, key endpoint.SourceKey) (boot
 		ids[i] = topo.Endpoints[2].ID
 	}
 	return ids[0], ids[1]
+}
+
+// lamp is an OnOffLight source: the assembler refuses a Spec with no
+// Source, Measurement or PowerSource, which would serve nothing
+// (R2-C2-err-0453, decision 528).
+type lamp struct{ onoff *onoff.Server }
+
+func (lamp) MatterDeviceType() uint16 { return 0x0100 }
+func (l lamp) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{l.onoff}
+}
+
+func lampSource(t *testing.T) lamp {
+	t.Helper()
+	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, Bridged: true})
+	if err != nil {
+		t.Fatalf("onoff.New: %v", err)
+	}
+	return lamp{onoff: srv}
 }
 
 // TestKeyDecoderListsTheHostsKey drives the real assembler: the endpoint

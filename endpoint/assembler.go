@@ -349,13 +349,15 @@ func (a *Assembler) buildEndpointTree(ctx context.Context, run *assemblyRun, sco
 		return nil, err
 	}
 	// An endpoint with no source serves only what its measurement and its
-	// battery materialise. A Measurement or PowerSource that materialises
-	// nothing — a host defect, such as an unregistered measurement class —
-	// would leave an endpoint of the topology, listed in its parent's
-	// PartsList, that serves no cluster, not even a Descriptor
-	// (R2-C2-err-0453); refused here, naming the key.
-	if ep.Source == nil && (ep.Measurement != nil || ep.PowerSource != nil) && len(ep.measuredServers()) == 0 {
-		return nil, fmt.Errorf("endpoint: %s: no Source, and its Measurement or PowerSource materialises no cluster: the endpoint would serve nothing", spec.StableKey)
+	// battery materialise. A spec with none of the three, or a Measurement
+	// or PowerSource that materialises nothing — a host defect, such as an
+	// unregistered measurement class — would leave an endpoint of the
+	// topology, listed in its parent's PartsList, that serves no cluster,
+	// not even a Descriptor (R2-C2-err-0453, decision 528); refused here,
+	// naming the key. A part is held to the same rule: it serves nothing
+	// either ([ClusterServers]).
+	if ep.Source == nil && len(ep.measuredServers()) == 0 {
+		return nil, fmt.Errorf("endpoint: %s: no Source, and no Measurement or PowerSource that materialises a cluster: the endpoint would serve nothing", spec.StableKey)
 	}
 	ep.ParentEndpointID = parent
 	ep.Part = part
