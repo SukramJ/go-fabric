@@ -1182,7 +1182,7 @@ func caseFailureProtocolCode(err error) uint16 {
 // R2-P3-rr-dev-01, R2-P4-nv-03, R2-P4-nw-01; phase 7, decisions 284, 286;
 // [Bridge.dispatchSigma3]).
 func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload []byte, err error) {
-	opcode, respPayload, _, err = a.processSigma3(payload)
+	opcode, respPayload, _, _, err = a.processSigma3(payload)
 	return opcode, respPayload, err
 }
 
@@ -1201,10 +1201,12 @@ const (
 )
 
 // processSigma3 is [CaseAdapter.ProcessSigma3] with the outcome of this
-// one call, which the bridge binds the session's route and records its
-// establishment by: read back from shared state it could belong to
-// another, concurrent Sigma3.
-func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload []byte, outcome sigma3Outcome, err error) {
+// one call and, when it established the session, the session's id as this
+// call set it under a.mu — the bridge binds the session's route and
+// records its establishment by them: read back from shared state either
+// could belong to another, concurrent Sigma3 or a resume that ran on the
+// adapter since (R3-sec-3404).
+func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload []byte, outcome sigma3Outcome, sessionID uint16, err error) {
 	// Held across the responder's step so the check of an established
 	// handshake and the establishment itself are one step for concurrent
 	// Sigma3 datagrams; released before the callbacks.
@@ -1212,7 +1214,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	r := a.responder
 	if r == nil {
 		a.mu.Unlock()
-		return 0, nil, sigma3Failed, errors.New("bridge: CaseAdapter without responder")
+		return 0, nil, sigma3Failed, 0, errors.New("bridge: CaseAdapter without responder")
 	}
 	if a.established {
 		// Every Sigma3 after establishment is acknowledged and not
@@ -1223,7 +1225,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		// db021da0), and a repeat on its exchange is a duplicate that does
 		// not reach it (packages/protocol/src/protocol/MessageExchange.ts:501-511).
 		a.mu.Unlock()
-		return 0, nil, sigma3OfCompleted, nil
+		return 0, nil, sigma3OfCompleted, 0, nil
 	}
 	if err := r.ProcessSigma3(payload); err != nil {
 		a.mu.Unlock()
@@ -1231,7 +1233,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		// terminates the CASE exchange immediately instead of retransmitting
 		// Sigma3. Mirrors chip CASESession.cpp error-exit pattern.
 		a.handshakeFailed()
-		return mrp.SCOpcodeStatusReport, caseSigma3Refusal(), sigma3Failed, nil //nolint:nilerr // Sigma3 failure is converted to a StatusReport wire frame; the caller receives nil err by design
+		return mrp.SCOpcodeStatusReport, caseSigma3Refusal(), sigma3Failed, 0, nil //nolint:nilerr // Sigma3 failure is converted to a StatusReport wire frame; the caller receives nil err by design
 	}
 	// onEstablished must fire EXACTLY ONCE per CASE handshake. Apple's
 	// MRP-layer retransmits Sigma3 when our StatusReport ACK is
@@ -1240,7 +1242,8 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	// double-registers the same session-id in opMgr and confuses Apple's
 	// session table.
 	a.established = true
-	a.establishedSessionID = r.SessionID()
+	sessionID = r.SessionID()
+	a.establishedSessionID = sessionID
 	onEstablished := a.onEstablished
 	a.mu.Unlock()
 	// A host that installs establishing (node) installs the session
@@ -1252,14 +1255,14 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		keys, ok := r.SessionKeys()
 		if !ok {
 			a.sigma3PickupFailed()
-			return 0, nil, sigma3Failed, errors.New("bridge: CASE keys missing after Sigma3 success")
+			return 0, nil, sigma3Failed, 0, errors.New("bridge: CASE keys missing after Sigma3 success")
 		}
 		if err := onEstablished(keys, r.PeerSessionID()); err != nil {
 			a.sigma3PickupFailed()
-			return 0, nil, sigma3Failed, fmt.Errorf("bridge: CASE session pickup: %w", err)
+			return 0, nil, sigma3Failed, 0, fmt.Errorf("bridge: CASE session pickup: %w", err)
 		}
 	}
-	return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3Established, nil
+	return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3Established, sessionID, nil
 }
 
 // sigma3PickupFailed ends a handshake whose Sigma3 the responder verified

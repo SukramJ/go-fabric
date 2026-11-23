@@ -98,3 +98,54 @@ func TestBusyPaseRequestsRecordOneRingEventPerClaim(t *testing.T) {
 		t.Fatalf("ring holds %d busy events after a busy request of a second claim, want 2", n)
 	}
 }
+
+// resumedBetweenHandler answers Sigma3 with success, establishing sid; the
+// first read of the session it established after that sees sid, every
+// later one another session's — as the shared [CaseAdapter] state reads
+// once a second peer's resume (ProcessSigma1) ran on the singleton handler
+// between the Sigma3 step and the bridge's read-back.
+type resumedBetweenHandler struct {
+	sigma2ThenSuccessHandler
+	sid, other uint16
+	reads      *atomic.Int32
+}
+
+func (h resumedBetweenHandler) establishedSession() (uint16, bool) {
+	if h.reads.Add(1) == 1 {
+		return h.sid, true
+	}
+	return h.other, true
+}
+
+// TestSigma3EventNamesTheSessionItsStepEstablished (R3-sec-3404): the
+// route binding and the diagnostics event of a completed Sigma3 use the
+// session id the Sigma3 step established, not one read back from the
+// handler later — a resume of another peer on the singleton handler in
+// between would put this Sigma3's peer address under the other session's
+// fabric, where that fabric's RetrieveLogs shows it.
+func TestSigma3EventNamesTheSessionItsStepEstablished(t *testing.T) {
+	t.Parallel()
+	const sid, other = 0x4242, 0x5151
+	r := newUnsecuredRig(t)
+	ring := diagevent.NewRing(16)
+	r.b.AttachDiagnosticEvents(ring)
+	r.b.mu.Lock()
+	r.b.sessions = sessionTable{sid: {3, 0x1234}, other: {5, 0x5678}}
+	r.b.mu.Unlock()
+	r.b.AttachCaseHandler(resumedBetweenHandler{sid: sid, other: other, reads: new(atomic.Int32)})
+	hdr, proto := r.request(mrp.SCOpcodeSigma1, 0x5009)
+	if err := r.b.dispatchSecureChannel(r.peer.LocalAddr(), hdr, proto, []byte{0x15, 0x18}); err != nil {
+		t.Fatalf("Sigma1: %v", err)
+	}
+	hdr, proto = r.request(mrp.SCOpcodeSigma3, 0x5009)
+	if err := r.b.dispatchSecureChannel(r.peer.LocalAddr(), hdr, proto, []byte{0x15, 0x18}); err != nil {
+		t.Fatalf("Sigma3: %v", err)
+	}
+	evs := sessionEvents(ring)
+	if len(evs) != 1 {
+		t.Fatalf("%d session events, want 1: %+v", len(evs), evs)
+	}
+	if got := evs[0].Detail[diagevent.DetailFabricIndex]; got != "3" {
+		t.Errorf("the Sigma3's event names fabric %q, want the established session's fabric 3", got)
+	}
+}
