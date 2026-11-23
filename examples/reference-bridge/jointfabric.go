@@ -108,7 +108,11 @@ func (j *demoJointFabric) IcacCsr(ctx context.Context) ([]byte, error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if j.key == nil {
-		j.loadKeyLocked(ctx)
+		// A kept key that cannot be read is not replaced: the
+		// administrator's ICAC was issued for it (R2-C2-store-2605).
+		if err := j.loadKeyLocked(ctx); err != nil {
+			return nil, err
+		}
 	}
 	if j.key == nil {
 		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -125,21 +129,30 @@ func (j *demoJointFabric) IcacCsr(ctx context.Context) ([]byte, error) {
 	return x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{SignatureAlgorithm: x509.ECDSAWithSHA256}, j.key)
 }
 
-func (j *demoJointFabric) loadKeyLocked(ctx context.Context) {
+// loadKeyLocked reads the kept administrator key into j.key: nil and no
+// key when none is kept, an error when one is kept and cannot be read or
+// decoded. j.mu is held.
+func (j *demoJointFabric) loadKeyLocked(ctx context.Context) error {
 	if j.st == nil {
-		return
+		return nil
 	}
 	v, ok, err := j.st.GetSetting(ctx, jfKeySetting)
-	if err != nil || !ok {
-		return
+	if err != nil {
+		return fmt.Errorf("read %s: %w", jfKeySetting, err)
+	}
+	if !ok {
+		return nil
 	}
 	der, err := base64.StdEncoding.DecodeString(v)
 	if err != nil {
-		return
+		return fmt.Errorf("decode %s: %w", jfKeySetting, err)
 	}
-	if key, err := x509.ParseECPrivateKey(der); err == nil {
-		j.key = key
+	key, err := x509.ParseECPrivateKey(der)
+	if err != nil {
+		return fmt.Errorf("decode %s: %w", jfKeySetting, err)
 	}
+	j.key = key
+	return nil
 }
 
 // jfSync is the DatastoreSync of --jointfabric-sim: it reaches no member
