@@ -31,12 +31,11 @@ const (
 
 // Feature is a ThermostatUserInterfaceConfiguration FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the ThermostatUserInterfaceConfiguration cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // KeypadLockoutEnum is the KeypadLockoutEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type KeypadLockoutEnum uint8
 
 // KeypadLockoutEnum values.
@@ -50,8 +49,6 @@ const (
 )
 
 // KeypadLockoutEnumDef describes KeypadLockoutEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var KeypadLockoutEnumDef = &spec.Enum{Name: "KeypadLockoutEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoLockout", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Lockout1", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -62,8 +59,6 @@ var KeypadLockoutEnumDef = &spec.Enum{Name: "KeypadLockoutEnum", Bits: 8, Values
 }}
 
 // ScheduleProgrammingVisibilityEnum is the ScheduleProgrammingVisibilityEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ScheduleProgrammingVisibilityEnum uint8
 
 // ScheduleProgrammingVisibilityEnum values.
@@ -73,16 +68,12 @@ const (
 )
 
 // ScheduleProgrammingVisibilityEnumDef describes ScheduleProgrammingVisibilityEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ScheduleProgrammingVisibilityEnumDef = &spec.Enum{Name: "ScheduleProgrammingVisibilityEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "ScheduleProgrammingPermitted", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "ScheduleProgrammingDenied", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // TemperatureDisplayModeEnum is the TemperatureDisplayModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TemperatureDisplayModeEnum uint8
 
 // TemperatureDisplayModeEnum values.
@@ -92,8 +83,6 @@ const (
 )
 
 // TemperatureDisplayModeEnumDef describes TemperatureDisplayModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TemperatureDisplayModeEnumDef = &spec.Enum{Name: "TemperatureDisplayModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Celsius", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Fahrenheit", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

@@ -30,7 +30,6 @@ import "thingfabric.dev/go-fabric/tlv"
 //
 // The zero Value encodes TLV null, as [Null] does. [Value.Get] returns the
 // value and whether it is one.
-// fabric:reachable:reason="generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration"
 type Value[T any] struct {
 	v   T
 	put Put[T]
@@ -54,11 +53,9 @@ func (v Value[T]) IsNull() bool { return v.put == nil }
 
 // Uint is an unsigned integer, enum or bitmap of any width — a generated
 // enum or bitmap type (onoffdef.StartUpOnOffEnum) keeps its type.
-// fabric:reachable:reason="generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration"
 func Uint[T Unsigned](v T) Value[T] { return Value[T]{v: v, put: PutUint[T]} }
 
 // Int is a signed integer of any width.
-// fabric:reachable:reason="generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration"
 func Int[T Signed](v T) Value[T] { return Value[T]{v: v, put: PutInt[T]} }
 
 // Uint8 is a uint8 (and an enum8 or map8 without its generated type).
@@ -101,5 +98,4 @@ func String(v string) Value[string] { return Value[string]{v: v, put: PutString}
 func Bytes(v []byte) Value[[]byte] { return Value[[]byte]{v: v, put: PutBytes} }
 
 // Null is the null of a nullable attribute of type T.
-// fabric:reachable:reason="generic: every typed write instantiates it, and RTA records the instantiation, not the generic declaration"
 func Null[T any]() Value[T] { return Value[T]{} }

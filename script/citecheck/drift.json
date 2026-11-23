@@ -1528,7 +1528,7 @@
   },
   {
     "file": "cluster/measurement/measurement.go",
-    "line": 1913,
+    "line": 1911,
     "citation": "packages/model/src/standard/elements/power-source-cluster.element.ts:135",
     "resolved": "packages/model/src/standard/elements/power-source-cluster.element.ts",
     "at": "db021da0",

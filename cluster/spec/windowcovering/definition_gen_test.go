@@ -23,6 +23,20 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureLift, FeatureTilt, FeaturePositionAwareLift, FeaturePositionAwareTilt)
+	spectest.CheckBitmap[ConfigStatusBitmap](t, ConfigStatusBitmapDef, ConfigStatusOperational, ConfigStatusOnlineReserved, ConfigStatusLiftMovementReversed, ConfigStatusLiftPositionAware, ConfigStatusTiltPositionAware, ConfigStatusLiftEncoderControlled, ConfigStatusTiltEncoderControlled)
+	spectest.CheckEnum[EndProductTypeEnum](t, EndProductTypeEnumDef, EndProductTypeRollerShade, EndProductTypeRomanShade, EndProductTypeBalloonShade, EndProductTypeWovenWood, EndProductTypePleatedShade, EndProductTypeCellularShade, EndProductTypeLayeredShade, EndProductTypeLayeredShade2D, EndProductTypeSheerShade, EndProductTypeTiltOnlyInteriorBlind, EndProductTypeInteriorBlind, EndProductTypeVerticalBlindStripCurtain, EndProductTypeInteriorVenetianBlind, EndProductTypeExteriorVenetianBlind, EndProductTypeLateralLeftCurtain, EndProductTypeLateralRightCurtain, EndProductTypeCentralCurtain, EndProductTypeRollerShutter, EndProductTypeExteriorVerticalScreen, EndProductTypeAwningTerracePatio, EndProductTypeAwningVerticalScreen, EndProductTypeTiltOnlyPergola, EndProductTypeSwingingShutter, EndProductTypeSlidingShutter, EndProductTypeUnknown)
+	spectest.CheckBitmap[ModeBitmap](t, ModeBitmapDef, ModeMotorDirectionReversed, ModeCalibrationMode, ModeMaintenanceMode, ModeLedFeedback)
+	spectest.CheckEnum[MovementStatus](t, MovementStatusDef, MovementStatusStopped, MovementStatusOpening, MovementStatusClosing)
+	spectest.CheckBitmap[OperationalStatusBitmap](t, OperationalStatusBitmapDef, OperationalStatusGlobal, OperationalStatusLift, OperationalStatusTilt)
+	spectest.CheckBitmap[SafetyStatusBitmap](t, SafetyStatusBitmapDef, SafetyStatusRemoteLockout, SafetyStatusTamperDetection, SafetyStatusFailedCommunication, SafetyStatusPositionFailure, SafetyStatusThermalProtection, SafetyStatusObstacleDetected, SafetyStatusPower, SafetyStatusStopInput, SafetyStatusMotorJammed, SafetyStatusHardwareFailure, SafetyStatusManualOperation, SafetyStatusProtection)
+	spectest.CheckEnum[TypeEnum](t, TypeEnumDef, TypeRollershade, TypeRollershade2Motor, TypeRollershadeExterior, TypeRollershadeExterior2Motor, TypeDrapery, TypeAwning, TypeShutter, TypeTiltBlindTiltOnly, TypeTiltBlindLift, TypeProjectorScreen, TypeUnknown)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

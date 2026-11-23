@@ -46,8 +46,6 @@ const (
 )
 
 // Feature is a ServiceArea FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -80,8 +78,6 @@ func (v *AreaInfoStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AreaInfoStructDef describes AreaInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AreaInfoStructDef = &spec.Struct{Name: "AreaInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "LocationInfo", Type: spec.Type{Name: "locationdesc", Kind: spec.KindStruct, Struct: LocationdescDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 	{ID: 1, Name: "LandmarkInfo", Type: spec.Type{Name: "LandmarkInfoStruct", Kind: spec.KindStruct, Struct: LandmarkInfoStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
@@ -113,8 +109,6 @@ func (v *Locationdesc) DecodeTLV(n spec.Node) error {
 }
 
 // LocationdescDef describes locationdesc.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LocationdescDef = &spec.Struct{Name: "locationdesc", Fields: []spec.Field{
 	{ID: 0, Name: "LocationName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128", Max: &spec.Bound{Int: 128}}},
 	{ID: 1, Name: "FloorNumber", Type: spec.Type{Name: "int16", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
@@ -144,8 +138,6 @@ func (v *LandmarkInfoStruct) DecodeTLV(n spec.Node) error {
 }
 
 // LandmarkInfoStructDef describes LandmarkInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LandmarkInfoStructDef = &spec.Struct{Name: "LandmarkInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "LandmarkTag", Type: spec.Type{Name: "tag", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "RelativePositionTag", Type: spec.Type{Name: "tag", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
@@ -177,8 +169,6 @@ func (v *AreaStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AreaStructDef describes AreaStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AreaStructDef = &spec.Struct{Name: "AreaStruct", Fields: []spec.Field{
 	{ID: 0, Name: "AreaId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "MapId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
@@ -208,16 +198,12 @@ func (v *MapStruct) DecodeTLV(n spec.Node) error {
 }
 
 // MapStructDef describes MapStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MapStructDef = &spec.Struct{Name: "MapStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MapId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
 }}
 
 // OperationalStatusEnum is the OperationalStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OperationalStatusEnum uint8
 
 // OperationalStatusEnum values.
@@ -229,8 +215,6 @@ const (
 )
 
 // OperationalStatusEnumDef describes OperationalStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperationalStatusEnumDef = &spec.Enum{Name: "OperationalStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Pending", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Operating", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -289,8 +273,6 @@ func (v ProgressStruct) Clone() ProgressStruct {
 }
 
 // ProgressStructDef describes ProgressStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ProgressStructDef = &spec.Struct{Name: "ProgressStruct", Fields: []spec.Field{
 	{ID: 0, Name: "AreaId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Status", Type: spec.Type{Name: "OperationalStatusEnum", Kind: spec.KindEnum, Bits: 8, Enum: OperationalStatusEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -299,8 +281,6 @@ var ProgressStructDef = &spec.Struct{Name: "ProgressStruct", Fields: []spec.Fiel
 }}
 
 // SelectAreasStatus is the SelectAreasStatus enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SelectAreasStatus uint8
 
 // SelectAreasStatus values.
@@ -312,8 +292,6 @@ const (
 )
 
 // SelectAreasStatusDef describes SelectAreasStatus.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SelectAreasStatusDef = &spec.Enum{Name: "SelectAreasStatus", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "UnsupportedArea", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -322,8 +300,6 @@ var SelectAreasStatusDef = &spec.Enum{Name: "SelectAreasStatus", Bits: 8, Values
 }}
 
 // SkipAreaStatus is the SkipAreaStatus enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SkipAreaStatus uint8
 
 // SkipAreaStatus values.
@@ -335,8 +311,6 @@ const (
 )
 
 // SkipAreaStatusDef describes SkipAreaStatus.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SkipAreaStatusDef = &spec.Enum{Name: "SkipAreaStatus", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "InvalidAreaList", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

@@ -39,12 +39,11 @@ const (
 
 // Feature is a ApplicationBasic FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the ApplicationBasic cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ApplicationStatusEnum is the ApplicationStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ApplicationStatusEnum uint8
 
 // ApplicationStatusEnum values.
@@ -56,8 +55,6 @@ const (
 )
 
 // ApplicationStatusEnumDef describes ApplicationStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ApplicationStatusEnumDef = &spec.Enum{Name: "ApplicationStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Stopped", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "ActiveVisibleFocus", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -88,8 +85,6 @@ func (v *ApplicationStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ApplicationStructDef describes ApplicationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ApplicationStructDef = &spec.Struct{Name: "ApplicationStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CatalogVendorId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ApplicationId", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

@@ -42,7 +42,8 @@ const (
 
 // Feature is a ThreadNetworkDirectory FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the ThreadNetworkDirectory cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ThreadNetworkStruct is the ThreadNetworkStruct struct.
@@ -90,8 +91,6 @@ func (v ThreadNetworkStruct) Clone() ThreadNetworkStruct {
 }
 
 // ThreadNetworkStructDef describes ThreadNetworkStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThreadNetworkStructDef = &spec.Struct{Name: "ThreadNetworkStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ExtendedPanId", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "8", Value: &spec.Bound{Int: 8}}},
 	{ID: 1, Name: "NetworkName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 16", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 16}}},

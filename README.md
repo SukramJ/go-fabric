@@ -213,6 +213,7 @@ becomes permissible in:
 | `cluster/spec.ServerConfig.BeforeWrite` | `ServerConfig.WriteRule` for a server's own rule (no host veto replaces it); `Server.SetBeforeWrite` / the typed `OnWrite` for the host's veto | `v0.25.0` |
 | `cluster/spec.Server.Notify`, `NotifyFrom`, `ChangedFrom`, `ReportFrom` | `Server.Set` for a held value, `Server.MarkChanged` (or `MarkQuietChanged` for a quieter attribute) for one the host computes on read | `v0.25.0` |
 | `cluster/spec.Server.Emit`, `cluster/spec.EmitOn`, `<cluster>def.Server.Emit<Event>` | `Server.EmitEvent`, `<cluster>def.Server.Record<Event>`: the event goes out on the endpoint the server is mounted on (`spec.ErrNotMounted` before) | `v0.25.0` |
+| `cluster/spec/<cluster>.Feature` of the 39 generated clusters without features (Binding, Identify, …; the type's doc says so) | none: the cluster has no FeatureMap bit, so no value has the type | `v0.28.0` |
 | `im.InvokeResponse.HasCommandData` | none; range over `InvokeResponse.Responses` and test `IsStatus` | `v0.26.0` |
 | `client/exchange.Manager.HandlePeerLoss` | `Manager.HandlePeerLossBefore`, which cuts by registration order | `v0.26.0` |
 | `cluster/spec.RequestCheck.Unchecked` | none; a command with its own refusal states `RequestCheck.Refusal` | `v0.26.0` |

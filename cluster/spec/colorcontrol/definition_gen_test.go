@@ -23,6 +23,24 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureHueSaturation, FeatureEnhancedHue, FeatureColorLoop, FeatureXy, FeatureColorTemperature)
+	spectest.CheckBitmap[ColorCapabilitiesBitmap](t, ColorCapabilitiesBitmapDef, ColorCapabilitiesHueSaturation, ColorCapabilitiesEnhancedHue, ColorCapabilitiesColorLoop, ColorCapabilitiesXy, ColorCapabilitiesColorTemperature)
+	spectest.CheckEnum[ColorLoopActionEnum](t, ColorLoopActionEnumDef, ColorLoopActionDeactivate, ColorLoopActionActivateFromColorLoopStartEnhancedHue, ColorLoopActionActivateFromEnhancedCurrentHue)
+	spectest.CheckEnum[ColorLoopDirectionEnum](t, ColorLoopDirectionEnumDef, ColorLoopDirectionDecrement, ColorLoopDirectionIncrement)
+	spectest.CheckEnum[ColorModeEnum](t, ColorModeEnumDef, ColorModeCurrentHueAndCurrentSaturation, ColorModeCurrentXAndCurrentY, ColorModeColorTemperatureMireds)
+	spectest.CheckEnum[DirectionEnum](t, DirectionEnumDef, DirectionShortest, DirectionLongest, DirectionUp, DirectionDown)
+	spectest.CheckEnum[DriftCompensationEnum](t, DriftCompensationEnumDef, DriftCompensationNone, DriftCompensationOtherOrUnknown, DriftCompensationTemperatureMonitoring, DriftCompensationOpticalLuminanceMonitoringAndFeedback, DriftCompensationOpticalColorMonitoringAndFeedback)
+	spectest.CheckEnum[EnhancedColorModeEnum](t, EnhancedColorModeEnumDef, EnhancedColorModeCurrentHueAndCurrentSaturation, EnhancedColorModeCurrentXAndCurrentY, EnhancedColorModeColorTemperatureMireds, EnhancedColorModeEnhancedCurrentHueAndCurrentSaturation)
+	spectest.CheckEnum[MoveModeEnum](t, MoveModeEnumDef, MoveModeStop, MoveModeUp, MoveModeDown)
+	spectest.CheckBitmap[OptionsBitmap](t, OptionsBitmapDef, OptionsExecuteIfOff)
+	spectest.CheckEnum[StepModeEnum](t, StepModeEnumDef, StepModeUp, StepModeDown)
+	spectest.CheckBitmap[UpdateFlagsBitmap](t, UpdateFlagsBitmapDef, UpdateFlagsUpdateAction, UpdateFlagsUpdateDirection, UpdateFlagsUpdateTime, UpdateFlagsUpdateStartHue)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

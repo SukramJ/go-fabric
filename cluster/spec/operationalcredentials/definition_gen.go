@@ -56,12 +56,11 @@ const (
 
 // Feature is a OperationalCredentials FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the OperationalCredentials cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // CertificateChainTypeEnum is the CertificateChainTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CertificateChainTypeEnum uint8
 
 // CertificateChainTypeEnum values.
@@ -71,8 +70,6 @@ const (
 )
 
 // CertificateChainTypeEnumDef describes CertificateChainTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CertificateChainTypeEnumDef = &spec.Enum{Name: "CertificateChainTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "DacCertificate", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 2, Name: "PaiCertificate", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -146,8 +143,6 @@ func (v FabricDescriptorStruct) Clone() FabricDescriptorStruct {
 }
 
 // FabricDescriptorStructDef describes FabricDescriptorStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var FabricDescriptorStructDef = &spec.Struct{Name: "FabricDescriptorStruct", Fields: []spec.Field{
 	{ID: 1, Name: "RootPublicKey", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "65", Value: &spec.Bound{Int: 65}}},
 	{ID: 2, Name: "VendorId", Type: spec.Type{Name: "vendor-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
@@ -225,8 +220,6 @@ func (v NOCStruct) Clone() NOCStruct {
 }
 
 // NOCStructDef describes NOCStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NOCStructDef = &spec.Struct{Name: "NOCStruct", Fields: []spec.Field{
 	{ID: 1, Name: "Noc", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 400", Max: &spec.Bound{Int: 400}}},
 	{ID: 2, Name: "Icac", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 400", Max: &spec.Bound{Int: 400}}},
@@ -235,8 +228,6 @@ var NOCStructDef = &spec.Struct{Name: "NOCStruct", Fields: []spec.Field{
 }}
 
 // NodeOperationalCertStatusEnum is the NodeOperationalCertStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type NodeOperationalCertStatusEnum uint8
 
 // NodeOperationalCertStatusEnum values.
@@ -254,8 +245,6 @@ const (
 )
 
 // NodeOperationalCertStatusEnumDef describes NodeOperationalCertStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NodeOperationalCertStatusEnumDef = &spec.Enum{Name: "NodeOperationalCertStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ok", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "InvalidPublicKey", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

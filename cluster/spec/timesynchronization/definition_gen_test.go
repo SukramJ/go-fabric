@@ -23,6 +23,17 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureTimeZone, FeatureNtpClient, FeatureNtpServer, FeatureTimeSyncClient)
+	spectest.CheckEnum[GranularityEnum](t, GranularityEnumDef, GranularityNoTimeGranularity, GranularityMinutesGranularity, GranularitySecondsGranularity, GranularityMillisecondsGranularity, GranularityMicrosecondsGranularity)
+	spectest.CheckEnum[StatusCodeEnum](t, StatusCodeEnumDef, StatusCodeTimeNotAccepted)
+	spectest.CheckEnum[TimeSourceEnum](t, TimeSourceEnumDef, TimeSourceNone, TimeSourceUnknown, TimeSourceAdmin, TimeSourceNodeTimeCluster, TimeSourceNonMatterSntp, TimeSourceNonMatterNtp, TimeSourceMatterSntp, TimeSourceMatterNtp, TimeSourceMixedNtp, TimeSourceNonMatterSntpnts, TimeSourceNonMatterNtpnts, TimeSourceMatterSntpnts, TimeSourceMatterNtpnts, TimeSourceMixedNtpnts, TimeSourceCloudSource, TimeSourcePtp, TimeSourceGnss)
+	spectest.CheckEnum[TimeZoneDatabaseEnum](t, TimeZoneDatabaseEnumDef, TimeZoneDatabaseFull, TimeZoneDatabasePartial, TimeZoneDatabaseNone)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

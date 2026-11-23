@@ -14,7 +14,6 @@ import (
 // the empty list ("default": []). The attribute state ignores it — a list
 // attribute starts absent, as before — and [Instance.PatchDefaults] gives
 // a struct field that states it an empty list of its own.
-// fabric:reachable:reason="the Default of a generated element whose stated default is the empty list; it is only ever a package-level initializer value, which RTA does not follow"
 type EmptyListDefault struct{}
 
 // PatchDefaults returns value — what the host hands attrID as its initial

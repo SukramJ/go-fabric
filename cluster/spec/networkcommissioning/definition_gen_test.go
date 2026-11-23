@@ -23,6 +23,17 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureWiFiNetworkInterface, FeatureThreadNetworkInterface, FeatureEthernetNetworkInterface)
+	spectest.CheckEnum[NetworkCommissioningStatusEnum](t, NetworkCommissioningStatusEnumDef, NetworkCommissioningStatusSuccess, NetworkCommissioningStatusOutOfRange, NetworkCommissioningStatusBoundsExceeded, NetworkCommissioningStatusNetworkIdNotFound, NetworkCommissioningStatusDuplicateNetworkId, NetworkCommissioningStatusNetworkNotFound, NetworkCommissioningStatusRegulatoryError, NetworkCommissioningStatusAuthFailure, NetworkCommissioningStatusUnsupportedSecurity, NetworkCommissioningStatusOtherConnectionFailure, NetworkCommissioningStatusIpv6Failed, NetworkCommissioningStatusIpBindFailed, NetworkCommissioningStatusUnknownError)
+	spectest.CheckBitmap[ThreadCapabilitiesBitmap](t, ThreadCapabilitiesBitmapDef, ThreadCapabilitiesIsBorderRouterCapable, ThreadCapabilitiesIsRouterCapable, ThreadCapabilitiesIsSleepyEndDeviceCapable, ThreadCapabilitiesIsFullThreadDevice, ThreadCapabilitiesIsSynchronizedSleepyEndDeviceCapable)
+	spectest.CheckEnum[WiFiBandEnum](t, WiFiBandEnumDef, WiFiBandV2G4, WiFiBandV3G65, WiFiBandV5G, WiFiBandV6G, WiFiBandV60G, WiFiBandV1G)
+	spectest.CheckBitmap[WiFiSecurityBitmap](t, WiFiSecurityBitmapDef, WiFiSecurityUnencrypted, WiFiSecurityWep, WiFiSecurityWpaPersonal, WiFiSecurityWpa2Personal, WiFiSecurityWpa3Personal)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

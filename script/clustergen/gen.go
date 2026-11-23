@@ -648,8 +648,16 @@ func (g *generator) source() ([]byte, error) {
 		w.p("")
 	}
 	w.p("// Feature is a %s FeatureMap bit.", c.Name)
-	w.p("//")
-	w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
+	if len(c.Features) == 0 {
+		// Decision 548 (review II, R2-C2-test-2802): a cluster without
+		// features has no FeatureMap bit, no Feature constant and no
+		// Declare.Features field, so the type names nothing. It is marked
+		// now and no longer generated once the window of README §The
+		// deprecation window has passed.
+		w.p("//")
+		w.p("// Deprecated: the %s cluster has no features, so no value has this", c.Name)
+		w.p("// type and nothing takes one. No replacement. Removable in %s.", featurelessFeatureRemovable)
+	}
 	w.p("type Feature uint32")
 	w.p("")
 	if len(c.Features) > 0 {
@@ -834,8 +842,6 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 	switch di.kind {
 	case kindEnum:
 		w.p("// %s is the %s %s.", di.goName, d.Name, d.Type)
-		w.p("//")
-		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("type %s %s", di.goName, goInt(di.bits, false))
 		w.p("")
 		if len(d.Fields) > 0 {
@@ -855,8 +861,6 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 			w.p("")
 		}
 		w.p("// %sDef describes %s.", di.goName, d.Name)
-		w.p("//")
-		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("var %sDef = &spec.Enum{Name: %q, Bits: %d, Values: []spec.EnumValue{", di.goName, d.Name, di.bits)
 		for _, f := range d.Fields {
 			if f.ID != nil {
@@ -873,8 +877,6 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 		w.p("")
 	case kindBitmap:
 		w.p("// %s is the %s %s.", di.goName, d.Name, d.Type)
-		w.p("//")
-		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("type %s %s", di.goName, goInt(di.bits, false))
 		w.p("")
 		type member struct {
@@ -909,8 +911,6 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 			w.p("")
 		}
 		w.p("// %sDef describes %s.", di.goName, d.Name)
-		w.p("//")
-		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("var %sDef = &spec.Bitmap{Name: %q, Bits: %d, Members: []spec.BitmapMember{", di.goName, d.Name, di.bits)
 		for _, m := range members {
 			w.p("\t{Name: %q, Bit: %d, Width: %d%s},", m.name, m.bit, m.width, confField(m.conformance))
@@ -920,8 +920,6 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 	case kindStruct:
 		g.writePayload(w, &payload{goName: di.goName, what: d.Name, fields: di.fields}, "the "+d.Name+" struct")
 		w.p("// %sDef describes %s.", di.goName, d.Name)
-		w.p("//")
-		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("var %sDef = &spec.Struct{Name: %q, Fields: %s}", di.goName, d.Name, g.fieldsLiteral("struct "+d.Name, di.fields))
 		w.p("")
 	default:
@@ -2050,6 +2048,7 @@ func (g *generator) test() ([]byte, error) {
 	w.p("\tt.Parallel()")
 	w.p("\tspectest.CheckDefinition(t, Definition)")
 	w.p("}")
+	g.constantsTest(w)
 	trips := g.roundTrips()
 	if len(trips) > 0 {
 		w.p("")
@@ -2088,6 +2087,52 @@ func (g *generator) test() ([]byte, error) {
 		return nil, fmt.Errorf("gofmt test: %w\n%s", err, w.String())
 	}
 	return out, nil
+}
+
+// featurelessFeatureRemovable is the release from which the deprecated
+// Feature type of a cluster without features may no longer be generated:
+// the second minor release after v0.26.0, the one that marks it (README
+// §The deprecation window, decision 548).
+const featurelessFeatureRemovable = "v0.28.0"
+
+// constantsTest writes TestConstantsMatchTheDefinition: the Feature
+// constants against Definition's feature bits, and every enum's and
+// bitmap's constants against its descriptor, through the type the
+// constants are declared with. Definition is held against the snapshot by
+// TestDefinitionMatchesSnapshot, so a constant that drifted from its bit
+// fails here (R2-C2-test-2802: the types are reached by a test, not
+// annotated as reachable).
+func (g *generator) constantsTest(w *writer) {
+	w.p("")
+	w.p("// TestConstantsMatchTheDefinition holds the generated constants")
+	w.p("// against the definition and the datatype descriptors.")
+	w.p("func TestConstantsMatchTheDefinition(t *testing.T) {")
+	w.p("\tt.Parallel()")
+	features := make([]string, 0, 2+len(g.c.Features))
+	features = append(features, "t", "Definition")
+	for _, f := range g.c.Features {
+		features = append(features, "Feature"+exportName(featureTitle(f)))
+	}
+	w.p("\tspectest.CheckFeatures[Feature](%s)", strings.Join(features, ", "))
+	for _, di := range g.dataList {
+		args := []string{"t", di.goName + "Def"}
+		switch di.kind {
+		case kindEnum:
+			for _, f := range di.dt.Fields {
+				if f.ID != nil {
+					args = append(args, g.prefix(di)+exportName(f.Name))
+				}
+			}
+		case kindBitmap:
+			for _, f := range di.dt.Fields {
+				args = append(args, g.prefix(di)+exportName(f.Name))
+			}
+		default:
+			continue
+		}
+		w.p("\tspectest.Check%s[%s](%s)", di.kind, di.goName, strings.Join(args, ", "))
+	}
+	w.p("}")
 }
 
 // roundTrips is the body of the generated TestCodecsRoundTrip, one line

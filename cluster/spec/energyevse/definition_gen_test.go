@@ -23,6 +23,18 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureChargingPreferences, FeatureSoCReporting, FeaturePlugAndCharge, FeatureRfid, FeatureV2X)
+	spectest.CheckBitmap[TargetDayOfWeekBitmap](t, TargetDayOfWeekBitmapDef, TargetDayOfWeekSunday, TargetDayOfWeekMonday, TargetDayOfWeekTuesday, TargetDayOfWeekWednesday, TargetDayOfWeekThursday, TargetDayOfWeekFriday, TargetDayOfWeekSaturday)
+	spectest.CheckEnum[EnergyTransferStoppedReasonEnum](t, EnergyTransferStoppedReasonEnumDef, EnergyTransferStoppedReasonEvStopped, EnergyTransferStoppedReasonEvseStopped, EnergyTransferStoppedReasonOther)
+	spectest.CheckEnum[FaultStateEnum](t, FaultStateEnumDef, FaultStateNoError, FaultStateMeterFailure, FaultStateOverVoltage, FaultStateUnderVoltage, FaultStateOverCurrent, FaultStateContactWetFailure, FaultStateContactDryFailure, FaultStateGroundFault, FaultStatePowerLoss, FaultStatePowerQuality, FaultStatePilotShortCircuit, FaultStateEmergencyStop, FaultStateEvDisconnected, FaultStateWrongPowerSupply, FaultStateLiveNeutralSwap, FaultStateOverTemperature, FaultStateOther)
+	spectest.CheckEnum[StateEnum](t, StateEnumDef, StateNotPluggedIn, StatePluggedInNoDemand, StatePluggedInDemand, StatePluggedInCharging, StatePluggedInDischarging, StateSessionEnding, StateFault)
+	spectest.CheckEnum[SupplyStateEnum](t, SupplyStateEnumDef, SupplyStateDisabled, SupplyStateChargingEnabled, SupplyStateDischargingEnabled, SupplyStateDisabledError, SupplyStateDisabledDiagnostics, SupplyStateEnabled)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

@@ -32,7 +32,8 @@ const (
 
 // Feature is a FixedLabel FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the FixedLabel cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // LabelStruct is the LabelStruct struct.
@@ -58,8 +59,6 @@ func (v *LabelStruct) DecodeTLV(n spec.Node) error {
 }
 
 // LabelStructDef describes LabelStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LabelStructDef = &spec.Struct{Name: "LabelStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Label", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},
 	{ID: 1, Name: "Value", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 16", Max: &spec.Bound{Int: 16}}},

@@ -45,8 +45,6 @@ const (
 )
 
 // Feature is a Groups FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -55,8 +53,6 @@ const (
 )
 
 // NameSupportBitmap is the NameSupportBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type NameSupportBitmap uint8
 
 // NameSupportBitmap bits; a member wider than one bit is its mask.
@@ -65,15 +61,11 @@ const (
 )
 
 // NameSupportBitmapDef describes NameSupportBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NameSupportBitmapDef = &spec.Bitmap{Name: "NameSupportBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "GroupNames", Bit: 7, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // Status is the status enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Status uint8
 
 // Status values.
@@ -114,8 +106,6 @@ const (
 )
 
 // StatusDef describes status.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusDef = &spec.Enum{Name: "status", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success"},
 	{Value: 1, Name: "Failure"},

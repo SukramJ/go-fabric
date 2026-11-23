@@ -41,12 +41,11 @@ const (
 
 // Feature is a Identify FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the Identify cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // EffectIdentifierEnum is the EffectIdentifierEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EffectIdentifierEnum uint8
 
 // EffectIdentifierEnum values.
@@ -60,8 +59,6 @@ const (
 )
 
 // EffectIdentifierEnumDef describes EffectIdentifierEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EffectIdentifierEnumDef = &spec.Enum{Name: "EffectIdentifierEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Blink", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Breathe", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -72,8 +69,6 @@ var EffectIdentifierEnumDef = &spec.Enum{Name: "EffectIdentifierEnum", Bits: 8, 
 }}
 
 // EffectVariantEnum is the EffectVariantEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EffectVariantEnum uint8
 
 // EffectVariantEnum values.
@@ -82,15 +77,11 @@ const (
 )
 
 // EffectVariantEnumDef describes EffectVariantEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EffectVariantEnumDef = &spec.Enum{Name: "EffectVariantEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Default", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // IdentifyTypeEnum is the IdentifyTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type IdentifyTypeEnum uint8
 
 // IdentifyTypeEnum values.
@@ -104,8 +95,6 @@ const (
 )
 
 // IdentifyTypeEnumDef describes IdentifyTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var IdentifyTypeEnumDef = &spec.Enum{Name: "IdentifyTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "None", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "LightOutput", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

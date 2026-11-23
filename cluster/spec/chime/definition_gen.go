@@ -44,7 +44,8 @@ const (
 
 // Feature is a Chime FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the Chime cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ChimeSoundStruct is the ChimeSoundStruct struct.
@@ -70,8 +71,6 @@ func (v *ChimeSoundStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ChimeSoundStructDef describes ChimeSoundStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ChimeSoundStructDef = &spec.Struct{Name: "ChimeSoundStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ChimeId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 48", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 48}}},

@@ -36,12 +36,11 @@ const (
 
 // Feature is a OtaSoftwareUpdateProvider FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the OtaSoftwareUpdateProvider cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ApplyUpdateActionEnum is the ApplyUpdateActionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ApplyUpdateActionEnum uint8
 
 // ApplyUpdateActionEnum values.
@@ -52,8 +51,6 @@ const (
 )
 
 // ApplyUpdateActionEnumDef describes ApplyUpdateActionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ApplyUpdateActionEnumDef = &spec.Enum{Name: "ApplyUpdateActionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Proceed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "AwaitNextAction", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -61,8 +58,6 @@ var ApplyUpdateActionEnumDef = &spec.Enum{Name: "ApplyUpdateActionEnum", Bits: 8
 }}
 
 // DownloadProtocolEnum is the DownloadProtocolEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DownloadProtocolEnum uint8
 
 // DownloadProtocolEnum values.
@@ -74,8 +69,6 @@ const (
 )
 
 // DownloadProtocolEnumDef describes DownloadProtocolEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DownloadProtocolEnumDef = &spec.Enum{Name: "DownloadProtocolEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "BdxSynchronous", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "BdxAsynchronous", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -84,8 +77,6 @@ var DownloadProtocolEnumDef = &spec.Enum{Name: "DownloadProtocolEnum", Bits: 8, 
 }}
 
 // StatusEnum is the StatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusEnum uint8
 
 // StatusEnum values.
@@ -97,8 +88,6 @@ const (
 )
 
 // StatusEnumDef describes StatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "UpdateAvailable", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Busy", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

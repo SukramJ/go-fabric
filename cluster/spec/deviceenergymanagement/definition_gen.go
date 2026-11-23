@@ -60,8 +60,6 @@ const (
 )
 
 // Feature is a DeviceEnergyManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -76,8 +74,6 @@ const (
 )
 
 // AdjustmentCauseEnum is the AdjustmentCauseEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AdjustmentCauseEnum uint8
 
 // AdjustmentCauseEnum values.
@@ -87,16 +83,12 @@ const (
 )
 
 // AdjustmentCauseEnumDef describes AdjustmentCauseEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AdjustmentCauseEnumDef = &spec.Enum{Name: "AdjustmentCauseEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "LocalOptimization", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "GridOptimization", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // CauseEnum is the CauseEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CauseEnum uint8
 
 // CauseEnum values.
@@ -109,8 +101,6 @@ const (
 )
 
 // CauseEnumDef describes CauseEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CauseEnumDef = &spec.Enum{Name: "CauseEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NormalCompletion", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Offline", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -180,8 +170,6 @@ func (v ConstraintsStruct) Clone() ConstraintsStruct {
 }
 
 // ConstraintsStructDef describes ConstraintsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ConstraintsStructDef = &spec.Struct{Name: "ConstraintsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "StartTime", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 1, Name: "Duration", Type: spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 86400", Max: &spec.Bound{Int: 86400}}},
@@ -234,8 +222,6 @@ func (v CostStruct) Clone() CostStruct {
 }
 
 // CostStructDef describes CostStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CostStructDef = &spec.Struct{Name: "CostStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CostType", Type: spec.Type{Name: "CostTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: CostTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Value", Type: spec.Type{Name: "int32", Kind: spec.KindInt, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -244,8 +230,6 @@ var CostStructDef = &spec.Struct{Name: "CostStruct", Fields: []spec.Field{
 }}
 
 // CostTypeEnum is the CostTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CostTypeEnum uint8
 
 // CostTypeEnum values.
@@ -257,8 +241,6 @@ const (
 )
 
 // CostTypeEnumDef describes CostTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CostTypeEnumDef = &spec.Enum{Name: "CostTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Financial", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "GhgEmissions", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -267,8 +249,6 @@ var CostTypeEnumDef = &spec.Enum{Name: "CostTypeEnum", Bits: 8, Values: []spec.E
 }}
 
 // ESAStateEnum is the ESAStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ESAStateEnum uint8
 
 // ESAStateEnum values.
@@ -281,8 +261,6 @@ const (
 )
 
 // ESAStateEnumDef describes ESAStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ESAStateEnumDef = &spec.Enum{Name: "ESAStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Offline", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Online", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -292,8 +270,6 @@ var ESAStateEnumDef = &spec.Enum{Name: "ESAStateEnum", Bits: 8, Values: []spec.E
 }}
 
 // ESATypeEnum is the ESATypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ESATypeEnum uint8
 
 // ESATypeEnum values.
@@ -316,8 +292,6 @@ const (
 )
 
 // ESATypeEnumDef describes ESATypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ESATypeEnumDef = &spec.Enum{Name: "ESATypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Evse", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Value: 1, Name: "SpaceHeating", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -412,8 +386,6 @@ func (v ForecastStruct) Clone() ForecastStruct {
 }
 
 // ForecastStructDef describes ForecastStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ForecastStructDef = &spec.Struct{Name: "ForecastStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ForecastId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ActiveSlotNumber", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
@@ -605,8 +577,6 @@ func (v SlotStruct) Clone() SlotStruct {
 }
 
 // SlotStructDef describes SlotStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SlotStructDef = &spec.Struct{Name: "SlotStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MinDuration", Type: spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "MaxDuration", Type: spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -629,8 +599,6 @@ var SlotStructDef = &spec.Struct{Name: "SlotStruct", Fields: []spec.Field{
 }}
 
 // ForecastUpdateReasonEnum is the ForecastUpdateReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ForecastUpdateReasonEnum uint8
 
 // ForecastUpdateReasonEnum values.
@@ -641,8 +609,6 @@ const (
 )
 
 // ForecastUpdateReasonEnumDef describes ForecastUpdateReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ForecastUpdateReasonEnumDef = &spec.Enum{Name: "ForecastUpdateReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "InternalOptimization", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "LocalOptimization", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -650,8 +616,6 @@ var ForecastUpdateReasonEnumDef = &spec.Enum{Name: "ForecastUpdateReasonEnum", B
 }}
 
 // OptOutStateEnum is the OptOutStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OptOutStateEnum uint8
 
 // OptOutStateEnum values.
@@ -663,8 +627,6 @@ const (
 )
 
 // OptOutStateEnumDef describes OptOutStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OptOutStateEnumDef = &spec.Enum{Name: "OptOutStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoOptOut", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "LocalOptOut", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -711,8 +673,6 @@ func (v PowerAdjustCapabilityStruct) Clone() PowerAdjustCapabilityStruct {
 }
 
 // PowerAdjustCapabilityStructDef describes PowerAdjustCapabilityStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PowerAdjustCapabilityStructDef = &spec.Struct{Name: "PowerAdjustCapabilityStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PowerAdjustCapability", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "PowerAdjustStruct", Kind: spec.KindStruct, Struct: PowerAdjustStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}},
 	{ID: 1, Name: "Cause", Type: spec.Type{Name: "PowerAdjustReasonEnum", Kind: spec.KindEnum, Bits: 8, Enum: PowerAdjustReasonEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -747,8 +707,6 @@ func (v *PowerAdjustStruct) DecodeTLV(n spec.Node) error {
 }
 
 // PowerAdjustStructDef describes PowerAdjustStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PowerAdjustStructDef = &spec.Struct{Name: "PowerAdjustStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MinPower", Type: spec.Type{Name: "power-mW", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "MaxPower", Type: spec.Type{Name: "power-mW", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min minPower", Min: &spec.Bound{Ref: "minPower"}}},
@@ -757,8 +715,6 @@ var PowerAdjustStructDef = &spec.Struct{Name: "PowerAdjustStruct", Fields: []spe
 }}
 
 // PowerAdjustReasonEnum is the PowerAdjustReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PowerAdjustReasonEnum uint8
 
 // PowerAdjustReasonEnum values.
@@ -769,8 +725,6 @@ const (
 )
 
 // PowerAdjustReasonEnumDef describes PowerAdjustReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PowerAdjustReasonEnumDef = &spec.Enum{Name: "PowerAdjustReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoAdjustment", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "LocalOptimizationAdjustment", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -818,8 +772,6 @@ func (v SlotAdjustmentStruct) Clone() SlotAdjustmentStruct {
 }
 
 // SlotAdjustmentStructDef describes SlotAdjustmentStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SlotAdjustmentStructDef = &spec.Struct{Name: "SlotAdjustmentStruct", Fields: []spec.Field{
 	{ID: 0, Name: "SlotIndex", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 1, Name: "NominalPower", Type: spec.Type{Name: "power-mW", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "PFR", Op: spec.ConfName, Name: "PFR"}, Constraint: spec.Constraint{Text: "desc", Desc: true}},

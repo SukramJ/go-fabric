@@ -65,8 +65,6 @@ const (
 )
 
 // Feature is a MediaPlayback FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -79,8 +77,6 @@ const (
 )
 
 // CharacteristicEnum is the CharacteristicEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CharacteristicEnum uint8
 
 // CharacteristicEnum values.
@@ -106,8 +102,6 @@ const (
 )
 
 // CharacteristicEnumDef describes CharacteristicEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CharacteristicEnumDef = &spec.Enum{Name: "CharacteristicEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "ForcedSubtitles", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "DescribesVideo", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -152,16 +146,12 @@ func (v *PlaybackPositionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // PlaybackPositionStructDef describes PlaybackPositionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PlaybackPositionStructDef = &spec.Struct{Name: "PlaybackPositionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "UpdatedAt", Type: spec.Type{Name: "epoch-us", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Position", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 }}
 
 // PlaybackStateEnum is the PlaybackStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PlaybackStateEnum uint8
 
 // PlaybackStateEnum values.
@@ -173,8 +163,6 @@ const (
 )
 
 // PlaybackStateEnumDef describes PlaybackStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PlaybackStateEnumDef = &spec.Enum{Name: "PlaybackStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Playing", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Paused", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -183,8 +171,6 @@ var PlaybackStateEnumDef = &spec.Enum{Name: "PlaybackStateEnum", Bits: 8, Values
 }}
 
 // StatusEnum is the StatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusEnum uint8
 
 // StatusEnum values.
@@ -198,8 +184,6 @@ const (
 )
 
 // StatusEnumDef describes StatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "InvalidStateForCommand", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -264,8 +248,6 @@ func (v TrackAttributesStruct) Clone() TrackAttributesStruct {
 }
 
 // TrackAttributesStructDef describes TrackAttributesStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TrackAttributesStructDef = &spec.Struct{Name: "TrackAttributesStruct", Fields: []spec.Field{
 	{ID: 0, Name: "LanguageCode", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
 	{ID: 1, Name: "Characteristics", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "CharacteristicEnum", Kind: spec.KindEnum, Bits: 8, Enum: CharacteristicEnumDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
@@ -304,8 +286,6 @@ func (v TrackStruct) Clone() TrackStruct {
 }
 
 // TrackStructDef describes TrackStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TrackStructDef = &spec.Struct{Name: "TrackStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Id", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
 	{ID: 1, Name: "TrackAttributes", Type: spec.Type{Name: "TrackAttributesStruct", Kind: spec.KindStruct, Struct: TrackAttributesStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

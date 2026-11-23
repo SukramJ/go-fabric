@@ -23,6 +23,16 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureOther, FeaturePassiveInfrared, FeatureUltrasonic, FeaturePhysicalContact, FeatureActiveInfrared, FeatureRadar, FeatureRfSensing, FeatureVision, FeatureOccupancyEvent)
+	spectest.CheckBitmap[OccupancyBitmap](t, OccupancyBitmapDef, OccupancyOccupied)
+	spectest.CheckBitmap[OccupancySensorTypeBitmap](t, OccupancySensorTypeBitmapDef, OccupancySensorTypeBitmapPir, OccupancySensorTypeBitmapUltrasonic, OccupancySensorTypeBitmapPhysicalContact)
+	spectest.CheckEnum[OccupancySensorTypeEnum](t, OccupancySensorTypeEnumDef, OccupancySensorTypeEnumPir, OccupancySensorTypeEnumUltrasonic, OccupancySensorTypeEnumPirAndUltrasonic, OccupancySensorTypeEnumPhysicalContact)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

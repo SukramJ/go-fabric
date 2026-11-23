@@ -49,14 +49,12 @@ var NotifyActivity func(sess any, received bool)
 // true) its messages are processed and SessionsFor lists it; the per-peer
 // cap ignores it until CompleteSecureSessionEstablishment. It returns the
 // *exchange.Session. Set by client/exchange's init.
-// fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
 var NewEstablishingSecureSession func(m, cfg any) (any, error)
 
 // ActivateSecureSession ends the establishment of sess (an
 // *exchange.Session from NewEstablishingSecureSession): it is listed, and
 // the messages it held are delivered in the order received. Set by
 // client/exchange's init.
-// fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
 var ActivateSecureSession func(sess any)
 
 // SendNotifyingTransmission is exchange.Exchange.Send on x (an
@@ -66,7 +64,6 @@ var ActivateSecureSession func(sess any)
 // ExchangeSendOptions.onTransmitted (MessageExchange.ts:132-137 at
 // b25ed960); the CASE responder's Success completes its session's
 // establishment with it. Set by client/exchange's init.
-// fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
 var SendNotifyingTransmission func(ctx context.Context, x any, opcode uint8, payload []byte, opts any, onTransmitted func()) error
 
 // CompleteSecureSessionEstablishment ends the establishment of sess (a
@@ -76,5 +73,4 @@ var SendNotifyingTransmission func(ctx context.Context, x any, opcode uint8, pay
 // inside the establishment — after the session became established, before
 // what the establishment sets off (the per-peer cap) — and only in the
 // call that established it. Set by client/exchange's init.
-// fabric:reachable:reason="assigned by client/exchange at init and called by client/handshake; a function variable installed through a seam has no call edge the analyzer can follow"
 var CompleteSecureSessionEstablishment func(sess any, onEstablished func()) bool

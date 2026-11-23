@@ -53,8 +53,6 @@ const (
 )
 
 // Feature is a ZoneManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -88,8 +86,6 @@ func (v *TwoDCartesianVertexStruct) DecodeTLV(n spec.Node) error {
 }
 
 // TwoDCartesianVertexStructDef describes TwoDCartesianVertexStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TwoDCartesianVertexStructDef = &spec.Struct{Name: "TwoDCartesianVertexStruct", Fields: []spec.Field{
 	{ID: 0, Name: "X", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Y", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -147,8 +143,6 @@ func (v TwoDCartesianZoneStruct) Clone() TwoDCartesianZoneStruct {
 }
 
 // TwoDCartesianZoneStructDef describes TwoDCartesianZoneStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TwoDCartesianZoneStructDef = &spec.Struct{Name: "TwoDCartesianZoneStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
 	{ID: 1, Name: "Use", Type: spec.Type{Name: "ZoneUseEnum", Kind: spec.KindEnum, Bits: 8, Enum: ZoneUseEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -157,8 +151,6 @@ var TwoDCartesianZoneStructDef = &spec.Struct{Name: "TwoDCartesianZoneStruct", F
 }}
 
 // ZoneUseEnum is the ZoneUseEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ZoneUseEnum uint8
 
 // ZoneUseEnum values.
@@ -169,8 +161,6 @@ const (
 )
 
 // ZoneUseEnumDef describes ZoneUseEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ZoneUseEnumDef = &spec.Enum{Name: "ZoneUseEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Motion", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Privacy", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -178,8 +168,6 @@ var ZoneUseEnumDef = &spec.Enum{Name: "ZoneUseEnum", Bits: 8, Values: []spec.Enu
 }}
 
 // ZoneEventStoppedReasonEnum is the ZoneEventStoppedReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ZoneEventStoppedReasonEnum uint8
 
 // ZoneEventStoppedReasonEnum values.
@@ -189,16 +177,12 @@ const (
 )
 
 // ZoneEventStoppedReasonEnumDef describes ZoneEventStoppedReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ZoneEventStoppedReasonEnumDef = &spec.Enum{Name: "ZoneEventStoppedReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "ActionStopped", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Timeout", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ZoneEventTriggeredReasonEnum is the ZoneEventTriggeredReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ZoneEventTriggeredReasonEnum uint8
 
 // ZoneEventTriggeredReasonEnum values.
@@ -207,8 +191,6 @@ const (
 )
 
 // ZoneEventTriggeredReasonEnumDef describes ZoneEventTriggeredReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ZoneEventTriggeredReasonEnumDef = &spec.Enum{Name: "ZoneEventTriggeredReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Motion", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
@@ -257,8 +239,6 @@ func (v ZoneInformationStruct) Clone() ZoneInformationStruct {
 }
 
 // ZoneInformationStructDef describes ZoneInformationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ZoneInformationStructDef = &spec.Struct{Name: "ZoneInformationStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ZoneId", Type: spec.Type{Name: "ZoneID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ZoneType", Type: spec.Type{Name: "ZoneTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: ZoneTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -267,8 +247,6 @@ var ZoneInformationStructDef = &spec.Struct{Name: "ZoneInformationStruct", Field
 }}
 
 // ZoneTypeEnum is the ZoneTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ZoneTypeEnum uint8
 
 // ZoneTypeEnum values.
@@ -277,15 +255,11 @@ const (
 )
 
 // ZoneTypeEnumDef describes ZoneTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ZoneTypeEnumDef = &spec.Enum{Name: "ZoneTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "TwoDcartZone", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ZoneSourceEnum is the ZoneSourceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ZoneSourceEnum uint8
 
 // ZoneSourceEnum values.
@@ -295,8 +269,6 @@ const (
 )
 
 // ZoneSourceEnumDef describes ZoneSourceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ZoneSourceEnumDef = &spec.Enum{Name: "ZoneSourceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Mfg", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "User", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -352,8 +324,6 @@ func (v ZoneTriggerControlStruct) Clone() ZoneTriggerControlStruct {
 }
 
 // ZoneTriggerControlStructDef describes ZoneTriggerControlStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ZoneTriggerControlStructDef = &spec.Struct{Name: "ZoneTriggerControlStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ZoneId", Type: spec.Type{Name: "ZoneID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "InitialDuration", Type: spec.Type{Name: "elapsed-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 65535", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 65535}}},

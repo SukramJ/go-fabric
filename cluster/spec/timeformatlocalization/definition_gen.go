@@ -30,8 +30,6 @@ const (
 )
 
 // Feature is a TimeFormatLocalization FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -40,8 +38,6 @@ const (
 )
 
 // CalendarTypeEnum is the CalendarTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CalendarTypeEnum uint8
 
 // CalendarTypeEnum values.
@@ -62,8 +58,6 @@ const (
 )
 
 // CalendarTypeEnumDef describes CalendarTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CalendarTypeEnumDef = &spec.Enum{Name: "CalendarTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Buddhist", Conformance: spec.Conformance{Text: "O.a+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
 	{Value: 1, Name: "Chinese", Conformance: spec.Conformance{Text: "O.a+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
@@ -81,8 +75,6 @@ var CalendarTypeEnumDef = &spec.Enum{Name: "CalendarTypeEnum", Bits: 8, Values: 
 }}
 
 // HourFormatEnum is the HourFormatEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type HourFormatEnum uint8
 
 // HourFormatEnum values.
@@ -93,8 +85,6 @@ const (
 )
 
 // HourFormatEnumDef describes HourFormatEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var HourFormatEnumDef = &spec.Enum{Name: "HourFormatEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "12Hr", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "24Hr", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

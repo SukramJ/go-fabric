@@ -107,8 +107,6 @@ const (
 )
 
 // Feature is a ColorControl FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -121,8 +119,6 @@ const (
 )
 
 // ColorCapabilitiesBitmap is the ColorCapabilitiesBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ColorCapabilitiesBitmap uint16
 
 // ColorCapabilitiesBitmap bits; a member wider than one bit is its mask.
@@ -135,8 +131,6 @@ const (
 )
 
 // ColorCapabilitiesBitmapDef describes ColorCapabilitiesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ColorCapabilitiesBitmapDef = &spec.Bitmap{Name: "ColorCapabilitiesBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "HueSaturation", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "HS", Op: spec.ConfName, Name: "HS"}},
 	{Name: "EnhancedHue", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "EHUE", Op: spec.ConfName, Name: "EHUE"}},
@@ -146,8 +140,6 @@ var ColorCapabilitiesBitmapDef = &spec.Bitmap{Name: "ColorCapabilitiesBitmap", B
 }}
 
 // ColorLoopActionEnum is the ColorLoopActionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ColorLoopActionEnum uint8
 
 // ColorLoopActionEnum values.
@@ -158,8 +150,6 @@ const (
 )
 
 // ColorLoopActionEnumDef describes ColorLoopActionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ColorLoopActionEnumDef = &spec.Enum{Name: "ColorLoopActionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Deactivate", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "ActivateFromColorLoopStartEnhancedHue", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -167,8 +157,6 @@ var ColorLoopActionEnumDef = &spec.Enum{Name: "ColorLoopActionEnum", Bits: 8, Va
 }}
 
 // ColorLoopDirectionEnum is the ColorLoopDirectionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ColorLoopDirectionEnum uint8
 
 // ColorLoopDirectionEnum values.
@@ -178,16 +166,12 @@ const (
 )
 
 // ColorLoopDirectionEnumDef describes ColorLoopDirectionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ColorLoopDirectionEnumDef = &spec.Enum{Name: "ColorLoopDirectionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Decrement", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Increment", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ColorModeEnum is the ColorModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ColorModeEnum uint8
 
 // ColorModeEnum values.
@@ -198,8 +182,6 @@ const (
 )
 
 // ColorModeEnumDef describes ColorModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ColorModeEnumDef = &spec.Enum{Name: "ColorModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "CurrentHueAndCurrentSaturation", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "CurrentXAndCurrentY", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -207,8 +189,6 @@ var ColorModeEnumDef = &spec.Enum{Name: "ColorModeEnum", Bits: 8, Values: []spec
 }}
 
 // DirectionEnum is the DirectionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DirectionEnum uint8
 
 // DirectionEnum values.
@@ -220,8 +200,6 @@ const (
 )
 
 // DirectionEnumDef describes DirectionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DirectionEnumDef = &spec.Enum{Name: "DirectionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Shortest", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Longest", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -230,8 +208,6 @@ var DirectionEnumDef = &spec.Enum{Name: "DirectionEnum", Bits: 8, Values: []spec
 }}
 
 // DriftCompensationEnum is the DriftCompensationEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DriftCompensationEnum uint8
 
 // DriftCompensationEnum values.
@@ -244,8 +220,6 @@ const (
 )
 
 // DriftCompensationEnumDef describes DriftCompensationEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DriftCompensationEnumDef = &spec.Enum{Name: "DriftCompensationEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "None", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "OtherOrUnknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -255,8 +229,6 @@ var DriftCompensationEnumDef = &spec.Enum{Name: "DriftCompensationEnum", Bits: 8
 }}
 
 // EnhancedColorModeEnum is the EnhancedColorModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EnhancedColorModeEnum uint8
 
 // EnhancedColorModeEnum values.
@@ -268,8 +240,6 @@ const (
 )
 
 // EnhancedColorModeEnumDef describes EnhancedColorModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EnhancedColorModeEnumDef = &spec.Enum{Name: "EnhancedColorModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "CurrentHueAndCurrentSaturation", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "CurrentXAndCurrentY", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -278,8 +248,6 @@ var EnhancedColorModeEnumDef = &spec.Enum{Name: "EnhancedColorModeEnum", Bits: 8
 }}
 
 // MoveModeEnum is the MoveModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MoveModeEnum uint8
 
 // MoveModeEnum values.
@@ -290,8 +258,6 @@ const (
 )
 
 // MoveModeEnumDef describes MoveModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MoveModeEnumDef = &spec.Enum{Name: "MoveModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Stop", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Up", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -299,8 +265,6 @@ var MoveModeEnumDef = &spec.Enum{Name: "MoveModeEnum", Bits: 8, Values: []spec.E
 }}
 
 // OptionsBitmap is the OptionsBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OptionsBitmap uint8
 
 // OptionsBitmap bits; a member wider than one bit is its mask.
@@ -309,15 +273,11 @@ const (
 )
 
 // OptionsBitmapDef describes OptionsBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OptionsBitmapDef = &spec.Bitmap{Name: "OptionsBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "ExecuteIfOff", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // StepModeEnum is the StepModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StepModeEnum uint8
 
 // StepModeEnum values.
@@ -327,16 +287,12 @@ const (
 )
 
 // StepModeEnumDef describes StepModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StepModeEnumDef = &spec.Enum{Name: "StepModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "Up", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 3, Name: "Down", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // UpdateFlagsBitmap is the UpdateFlagsBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type UpdateFlagsBitmap uint8
 
 // UpdateFlagsBitmap bits; a member wider than one bit is its mask.
@@ -348,8 +304,6 @@ const (
 )
 
 // UpdateFlagsBitmapDef describes UpdateFlagsBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var UpdateFlagsBitmapDef = &spec.Bitmap{Name: "UpdateFlagsBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "UpdateAction", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "UpdateDirection", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

@@ -23,6 +23,21 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeaturePowerAdjustment, FeaturePowerForecastReporting, FeatureStateForecastReporting, FeatureStartTimeAdjustment, FeaturePausable, FeatureForecastAdjustment, FeatureConstraintBasedAdjustment)
+	spectest.CheckEnum[AdjustmentCauseEnum](t, AdjustmentCauseEnumDef, AdjustmentCauseLocalOptimization, AdjustmentCauseGridOptimization)
+	spectest.CheckEnum[CauseEnum](t, CauseEnumDef, CauseNormalCompletion, CauseOffline, CauseFault, CauseUserOptOut, CauseCancelled)
+	spectest.CheckEnum[CostTypeEnum](t, CostTypeEnumDef, CostTypeFinancial, CostTypeGhgEmissions, CostTypeComfort, CostTypeTemperature)
+	spectest.CheckEnum[ESAStateEnum](t, ESAStateEnumDef, ESAStateOffline, ESAStateOnline, ESAStateFault, ESAStatePowerAdjustActive, ESAStatePaused)
+	spectest.CheckEnum[ESATypeEnum](t, ESATypeEnumDef, ESATypeEvse, ESATypeSpaceHeating, ESATypeWaterHeating, ESATypeSpaceCooling, ESATypeSpaceHeatingCooling, ESATypeBatteryStorage, ESATypeSolarPv, ESATypeFridgeFreezer, ESATypeWashingMachine, ESATypeDishwasher, ESATypeCooking, ESATypeHomeWaterPump, ESATypeIrrigationWaterPump, ESATypePoolPump, ESATypeOther)
+	spectest.CheckEnum[ForecastUpdateReasonEnum](t, ForecastUpdateReasonEnumDef, ForecastUpdateReasonInternalOptimization, ForecastUpdateReasonLocalOptimization, ForecastUpdateReasonGridOptimization)
+	spectest.CheckEnum[OptOutStateEnum](t, OptOutStateEnumDef, OptOutStateNoOptOut, OptOutStateLocalOptOut, OptOutStateGridOptOut, OptOutStateOptOut)
+	spectest.CheckEnum[PowerAdjustReasonEnum](t, PowerAdjustReasonEnumDef, PowerAdjustReasonNoAdjustment, PowerAdjustReasonLocalOptimizationAdjustment, PowerAdjustReasonGridOptimizationAdjustment)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

@@ -1022,7 +1022,6 @@ func NewElectricalPowerServer(src contract.FloatMeasurementSource) *ElectricalPo
 // NewElectricalPowerServerFromReadings wraps a consolidated electrical group,
 // so all four ElectricalPowerMeasurement readings the host provides reach
 // the cluster instead of only ActivePower.
-// fabric:reachable:reason="called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow"
 func NewElectricalPowerServerFromReadings(r ElectricalReadingsSource) *ElectricalPowerServer {
 	return &ElectricalPowerServer{src: r, readings: r, dc: directCurrent(r)}
 }
@@ -1030,7 +1029,6 @@ func NewElectricalPowerServerFromReadings(r ElectricalReadingsSource) *Electrica
 // ElectricalReadingsSource is a consolidated electrical group: the typed
 // multi-attribute surface plus the single-value surface every measurement
 // source carries (which reports the group's headline reading, active power).
-// fabric:reachable:reason="called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow"
 type ElectricalReadingsSource interface {
 	contract.ElectricalReadings
 	contract.FloatMeasurementSource
@@ -1967,7 +1965,6 @@ type PowerTopologyServer struct {
 var _ contract.ClusterDataVersion = (*PowerTopologyServer)(nil)
 
 // NewPowerTopologyServer returns the NODE-topology server.
-// fabric:reachable:reason="called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow"
 func NewPowerTopologyServer() *PowerTopologyServer { return &PowerTopologyServer{} }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].

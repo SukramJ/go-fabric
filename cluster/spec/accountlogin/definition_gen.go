@@ -40,7 +40,8 @@ const (
 
 // Feature is a AccountLogin FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the AccountLogin cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // GetSetupPinRequest is the GetSetupPin command payload.

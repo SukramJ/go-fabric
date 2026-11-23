@@ -23,6 +23,15 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureOnOff)
+	spectest.CheckEnum[ModeChangeStatus](t, ModeChangeStatusDef, ModeChangeStatusSuccess, ModeChangeStatusUnsupportedMode, ModeChangeStatusGenericFailure, ModeChangeStatusInvalidInMode)
+	spectest.CheckEnum[ModeTag](t, ModeTagDef, ModeTagAuto, ModeTagQuick, ModeTagQuiet, ModeTagLowNoise, ModeTagLowEnergy, ModeTagVacation, ModeTagMin, ModeTagMax, ModeTagNight, ModeTagDay, ModeTagNoOptimization, ModeTagDeviceOptimization, ModeTagLocalOptimization, ModeTagGridOptimization)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

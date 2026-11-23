@@ -48,8 +48,6 @@ const (
 )
 
 // Feature is a AmbientContextSensing FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -105,8 +103,6 @@ func (v AmbientContextTypeStruct) Clone() AmbientContextTypeStruct {
 }
 
 // AmbientContextTypeStructDef describes AmbientContextTypeStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AmbientContextTypeStructDef = &spec.Struct{Name: "AmbientContextTypeStruct", Fields: []spec.Field{
 	{ID: 0, Name: "AmbientContextSensed", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "semtag", Kind: spec.KindStruct, Struct: SemtagDef}}}, Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}, Constraint: spec.Constraint{Text: "max 2", Max: &spec.Bound{Int: 2}}},
 }}
@@ -155,8 +151,6 @@ func (v Semtag) Clone() Semtag {
 }
 
 // SemtagDef describes semtag.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SemtagDef = &spec.Struct{Name: "semtag", Fields: []spec.Field{
 	{ID: 0, Name: "MfgCode", Type: spec.Type{Name: "vendor-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
 	{ID: 1, Name: "NamespaceId", Type: spec.Type{Name: "namespace", Kind: spec.KindEnum, Bits: 8, Enum: NamespaceDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -165,8 +159,6 @@ var SemtagDef = &spec.Struct{Name: "semtag", Fields: []spec.Field{
 }}
 
 // Namespace is the namespace enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Namespace uint8
 
 // Namespace values.
@@ -202,8 +194,6 @@ const (
 )
 
 // NamespaceDef describes namespace.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NamespaceDef = &spec.Enum{Name: "namespace", Bits: 8, Values: []spec.EnumValue{
 	{Value: 1, Name: "CommonClosure"},
 	{Value: 2, Name: "CommonCompassDirection"},
@@ -290,8 +280,6 @@ func (v HoldTimeLimitsStruct) Clone() HoldTimeLimitsStruct {
 }
 
 // HoldTimeLimitsStructDef describes HoldTimeLimitsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var HoldTimeLimitsStructDef = &spec.Struct{Name: "HoldTimeLimitsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "HoldTimeMin", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 	{ID: 1, Name: "HoldTimeMax", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}, Constraint: spec.Constraint{Text: "min maxOf(holdTimeMin, 10)", Min: &spec.Bound{Expr: "{\"type\":\"maxOf\",\"args\":[{\"type\":\"reference\",\"name\":\"holdTimeMin\"},10]}"}}},
@@ -343,8 +331,6 @@ func (v ObjectCountConfigStruct) Clone() ObjectCountConfigStruct {
 }
 
 // ObjectCountConfigStructDef describes ObjectCountConfigStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ObjectCountConfigStructDef = &spec.Struct{Name: "ObjectCountConfigStruct", Fields: []spec.Field{
 	{ID: 0, Name: "CountingObject", Type: spec.Type{Name: "semtag", Kind: spec.KindStruct, Struct: SemtagDef}, Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}},
 	{ID: 1, Name: "ObjectCountThreshold", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -444,8 +430,6 @@ func (v PredictedActivityStruct) Clone() PredictedActivityStruct {
 }
 
 // PredictedActivityStructDef describes PredictedActivityStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PredictedActivityStructDef = &spec.Struct{Name: "PredictedActivityStruct", Fields: []spec.Field{
 	{ID: 0, Name: "StartTimestamp", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}, Constraint: spec.Constraint{Text: "max endTimestamp - 1", Max: &spec.Bound{Expr: "{\"type\":\"-\",\"lhs\":{\"type\":\"reference\",\"name\":\"endTimestamp\"},\"rhs\":1}"}}},
 	{ID: 1, Name: "EndTimestamp", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}, Constraint: spec.Constraint{Text: "min startTimestamp + 1", Min: &spec.Bound{Expr: "{\"type\":\"+\",\"lhs\":{\"type\":\"reference\",\"name\":\"startTimestamp\"},\"rhs\":1}"}}},

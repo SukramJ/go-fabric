@@ -23,6 +23,16 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureAdvancedSeek, FeatureVariableSpeed, FeatureTextTracks, FeatureAudioTracks, FeatureAudioAdvance)
+	spectest.CheckEnum[CharacteristicEnum](t, CharacteristicEnumDef, CharacteristicForcedSubtitles, CharacteristicDescribesVideo, CharacteristicEasyToRead, CharacteristicFrameBased, CharacteristicMainProgram, CharacteristicOriginalContent, CharacteristicVoiceOverTranslation, CharacteristicCaption, CharacteristicSubtitle, CharacteristicAlternate, CharacteristicSupplementary, CharacteristicCommentary, CharacteristicDubbedTranslation, CharacteristicDescription, CharacteristicMetadata, CharacteristicEnhancedAudioIntelligibility, CharacteristicEmergency, CharacteristicKaraoke)
+	spectest.CheckEnum[PlaybackStateEnum](t, PlaybackStateEnumDef, PlaybackStatePlaying, PlaybackStatePaused, PlaybackStateNotPlaying, PlaybackStateBuffering)
+	spectest.CheckEnum[StatusEnum](t, StatusEnumDef, StatusSuccess, StatusInvalidStateForCommand, StatusNotAllowed, StatusNotActive, StatusSpeedOutOfRange, StatusSeekOutOfRange)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

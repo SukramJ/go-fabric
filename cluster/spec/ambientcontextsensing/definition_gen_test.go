@@ -23,6 +23,14 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureHumanActivity, FeatureObjectCounting, FeatureObjectIdentification, FeatureSoundIdentification, FeaturePredictedActivity)
+	spectest.CheckEnum[Namespace](t, NamespaceDef, NamespaceCommonClosure, NamespaceCommonCompassDirection, NamespaceCommonCompassLocation, NamespaceCommonDirection, NamespaceCommonLevel, NamespaceCommonLocation, NamespaceCommonNumber, NamespaceCommonPosition, NamespaceElectricalMeasurement, NamespaceCommodityTariffChronology, NamespaceCommodityTariffCommodity, NamespaceLaundry, NamespacePowerSource, NamespaceCommonAreaNamespace, NamespaceCommonLandmarkNamespace, NamespaceCommonRelativePosition, NamespaceCommodityTariffFlow, NamespaceRefrigerator, NamespaceRoomAirConditioner, NamespaceSwitches, NamespaceClosure, NamespaceClosurePanel, NamespaceClosureCovering, NamespaceClosureWindow, NamespaceClosureCabinet, NamespaceIdentifiedObject, NamespaceIdentifiedSound, NamespaceIdentifiedHumanActivity)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

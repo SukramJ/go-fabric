@@ -47,8 +47,6 @@ const (
 )
 
 // Feature is a FanControl FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -62,8 +60,6 @@ const (
 )
 
 // AirflowDirectionEnum is the AirflowDirectionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AirflowDirectionEnum uint8
 
 // AirflowDirectionEnum values.
@@ -73,16 +69,12 @@ const (
 )
 
 // AirflowDirectionEnumDef describes AirflowDirectionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AirflowDirectionEnumDef = &spec.Enum{Name: "AirflowDirectionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Forward", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Reverse", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // FanModeEnum is the FanModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type FanModeEnum uint8
 
 // FanModeEnum values.
@@ -97,8 +89,6 @@ const (
 )
 
 // FanModeEnumDef describes FanModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var FanModeEnumDef = &spec.Enum{Name: "FanModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Off", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Low", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -110,8 +100,6 @@ var FanModeEnumDef = &spec.Enum{Name: "FanModeEnum", Bits: 8, Values: []spec.Enu
 }}
 
 // FanModeSequenceEnum is the FanModeSequenceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type FanModeSequenceEnum uint8
 
 // FanModeSequenceEnum values.
@@ -125,8 +113,6 @@ const (
 )
 
 // FanModeSequenceEnumDef describes FanModeSequenceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var FanModeSequenceEnumDef = &spec.Enum{Name: "FanModeSequenceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "OffLowMedHigh", Conformance: spec.Conformance{Text: "[!AUT].a", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: false, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfNot, Args: []spec.Conformance{{Op: spec.ConfName, Name: "AUT"}}}}}}}},
 	{Value: 1, Name: "OffLowHigh", Conformance: spec.Conformance{Text: "[!AUT].a", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "a", Num: 1, OrMore: false, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfNot, Args: []spec.Conformance{{Op: spec.ConfName, Name: "AUT"}}}}}}}},
@@ -137,8 +123,6 @@ var FanModeSequenceEnumDef = &spec.Enum{Name: "FanModeSequenceEnum", Bits: 8, Va
 }}
 
 // RockBitmap is the RockBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type RockBitmap uint8
 
 // RockBitmap bits; a member wider than one bit is its mask.
@@ -149,8 +133,6 @@ const (
 )
 
 // RockBitmapDef describes RockBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RockBitmapDef = &spec.Bitmap{Name: "RockBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "RockLeftRight", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "RockUpDown", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -158,8 +140,6 @@ var RockBitmapDef = &spec.Bitmap{Name: "RockBitmap", Bits: 8, Members: []spec.Bi
 }}
 
 // StepDirectionEnum is the StepDirectionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StepDirectionEnum uint8
 
 // StepDirectionEnum values.
@@ -169,16 +149,12 @@ const (
 )
 
 // StepDirectionEnumDef describes StepDirectionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StepDirectionEnumDef = &spec.Enum{Name: "StepDirectionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Increase", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Decrease", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // WindBitmap is the WindBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type WindBitmap uint8
 
 // WindBitmap bits; a member wider than one bit is its mask.
@@ -188,8 +164,6 @@ const (
 )
 
 // WindBitmapDef describes WindBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WindBitmapDef = &spec.Bitmap{Name: "WindBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "SleepWind", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "NaturalWind", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

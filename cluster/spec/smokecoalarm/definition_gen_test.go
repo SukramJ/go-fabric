@@ -23,6 +23,19 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureSmokeAlarm, FeatureCoAlarm)
+	spectest.CheckEnum[AlarmStateEnum](t, AlarmStateEnumDef, AlarmStateNormal, AlarmStateWarning, AlarmStateCritical)
+	spectest.CheckEnum[ContaminationStateEnum](t, ContaminationStateEnumDef, ContaminationStateNormal, ContaminationStateLow, ContaminationStateWarning, ContaminationStateCritical)
+	spectest.CheckEnum[EndOfServiceEnum](t, EndOfServiceEnumDef, EndOfServiceNormal, EndOfServiceExpired)
+	spectest.CheckEnum[ExpressedStateEnum](t, ExpressedStateEnumDef, ExpressedStateNormal, ExpressedStateSmokeAlarm, ExpressedStateCoAlarm, ExpressedStateBatteryAlert, ExpressedStateTesting, ExpressedStateHardwareFault, ExpressedStateEndOfService, ExpressedStateInterconnectSmoke, ExpressedStateInterconnectCo, ExpressedStateInoperative)
+	spectest.CheckEnum[MuteStateEnum](t, MuteStateEnumDef, MuteStateNotMuted, MuteStateMuted)
+	spectest.CheckEnum[SensitivityEnum](t, SensitivityEnumDef, SensitivityHigh, SensitivityStandard, SensitivityLow)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

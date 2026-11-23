@@ -33,7 +33,8 @@ const (
 
 // Feature is a SoilMeasurement FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the SoilMeasurement cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // MeasurementAccuracyStruct is the MeasurementAccuracyStruct struct.
@@ -86,8 +87,6 @@ func (v MeasurementAccuracyStruct) Clone() MeasurementAccuracyStruct {
 }
 
 // MeasurementAccuracyStructDef describes MeasurementAccuracyStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MeasurementAccuracyStructDef = &spec.Struct{Name: "MeasurementAccuracyStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MeasurementType", Type: spec.Type{Name: "MeasurementTypeEnum", Kind: spec.KindEnum, Bits: 16, Enum: MeasurementTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Measured", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -97,8 +96,6 @@ var MeasurementAccuracyStructDef = &spec.Struct{Name: "MeasurementAccuracyStruct
 }}
 
 // MeasurementTypeEnum is the MeasurementTypeEnum enum16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MeasurementTypeEnum uint16
 
 // MeasurementTypeEnum values.
@@ -124,8 +121,6 @@ const (
 )
 
 // MeasurementTypeEnumDef describes MeasurementTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MeasurementTypeEnumDef = &spec.Enum{Name: "MeasurementTypeEnum", Bits: 16, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Voltage", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -238,8 +233,6 @@ func (v MeasurementAccuracyRangeStruct) Clone() MeasurementAccuracyRangeStruct {
 }
 
 // MeasurementAccuracyRangeStructDef describes MeasurementAccuracyRangeStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MeasurementAccuracyRangeStructDef = &spec.Struct{Name: "MeasurementAccuracyRangeStruct", Fields: []spec.Field{
 	{ID: 0, Name: "RangeMin", Type: spec.Type{Name: "int64", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "-2^62 to 2^62", Min: &spec.Bound{Expr: "{\"type\":\"^\",\"lhs\":-2,\"rhs\":62}"}, Max: &spec.Bound{Expr: "{\"type\":\"^\",\"lhs\":2,\"rhs\":62}"}}},
 	{ID: 1, Name: "RangeMax", Type: spec.Type{Name: "int64", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "-2^62 to 2^62", Min: &spec.Bound{Expr: "{\"type\":\"^\",\"lhs\":-2,\"rhs\":62}"}, Max: &spec.Bound{Expr: "{\"type\":\"^\",\"lhs\":2,\"rhs\":62}"}}},

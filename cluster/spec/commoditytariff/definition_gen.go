@@ -57,8 +57,6 @@ const (
 )
 
 // Feature is a CommodityTariff FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -72,8 +70,6 @@ const (
 )
 
 // AuxiliaryLoadSettingEnum is the AuxiliaryLoadSettingEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AuxiliaryLoadSettingEnum uint8
 
 // AuxiliaryLoadSettingEnum values.
@@ -84,8 +80,6 @@ const (
 )
 
 // AuxiliaryLoadSettingEnumDef describes AuxiliaryLoadSettingEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AuxiliaryLoadSettingEnumDef = &spec.Enum{Name: "AuxiliaryLoadSettingEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Off", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "On", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -128,8 +122,6 @@ func (v AuxiliaryLoadSwitchesSettingsStruct) Clone() AuxiliaryLoadSwitchesSettin
 }
 
 // AuxiliaryLoadSwitchesSettingsStructDef describes AuxiliaryLoadSwitchesSettingsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AuxiliaryLoadSwitchesSettingsStructDef = &spec.Struct{Name: "AuxiliaryLoadSwitchesSettingsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "SwitchStates", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "AuxiliaryLoadSwitchSettingsStruct", Kind: spec.KindStruct, Struct: AuxiliaryLoadSwitchSettingsStructDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8", Max: &spec.Bound{Int: 8}}},
 }}
@@ -157,16 +149,12 @@ func (v *AuxiliaryLoadSwitchSettingsStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AuxiliaryLoadSwitchSettingsStructDef describes AuxiliaryLoadSwitchSettingsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AuxiliaryLoadSwitchSettingsStructDef = &spec.Struct{Name: "AuxiliaryLoadSwitchSettingsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Number", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "RequiredState", Type: spec.Type{Name: "AuxiliaryLoadSettingEnum", Kind: spec.KindEnum, Bits: 8, Enum: AuxiliaryLoadSettingEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // BlockModeEnum is the BlockModeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type BlockModeEnum uint8
 
 // BlockModeEnum values.
@@ -177,8 +165,6 @@ const (
 )
 
 // BlockModeEnumDef describes BlockModeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BlockModeEnumDef = &spec.Enum{Name: "BlockModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoBlock", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Combined", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -224,16 +210,12 @@ func (v CalendarPeriodStruct) Clone() CalendarPeriodStruct {
 }
 
 // CalendarPeriodStructDef describes CalendarPeriodStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CalendarPeriodStructDef = &spec.Struct{Name: "CalendarPeriodStruct", Fields: []spec.Field{
 	{ID: 0, Name: "StartDate", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "min startDate", Min: &spec.Bound{Ref: "startDate"}}},
 	{ID: 1, Name: "DayPatternIds", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 7", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 7}}},
 }}
 
 // DayEntryRandomizationTypeEnum is the DayEntryRandomizationTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DayEntryRandomizationTypeEnum uint8
 
 // DayEntryRandomizationTypeEnum values.
@@ -246,8 +228,6 @@ const (
 )
 
 // DayEntryRandomizationTypeEnumDef describes DayEntryRandomizationTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DayEntryRandomizationTypeEnumDef = &spec.Enum{Name: "DayEntryRandomizationTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "None", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Fixed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -317,8 +297,6 @@ func (v DayEntryStruct) Clone() DayEntryStruct {
 }
 
 // DayEntryStructDef describes DayEntryStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DayEntryStructDef = &spec.Struct{Name: "DayEntryStruct", Fields: []spec.Field{
 	{ID: 0, Name: "DayEntryId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "StartTime", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 1499", Max: &spec.Bound{Int: 1499}}},
@@ -328,8 +306,6 @@ var DayEntryStructDef = &spec.Struct{Name: "DayEntryStruct", Fields: []spec.Fiel
 }}
 
 // DayPatternDayOfWeekBitmap is the DayPatternDayOfWeekBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DayPatternDayOfWeekBitmap uint8
 
 // DayPatternDayOfWeekBitmap bits; a member wider than one bit is its mask.
@@ -344,8 +320,6 @@ const (
 )
 
 // DayPatternDayOfWeekBitmapDef describes DayPatternDayOfWeekBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DayPatternDayOfWeekBitmapDef = &spec.Bitmap{Name: "DayPatternDayOfWeekBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Sunday", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Monday", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -398,8 +372,6 @@ func (v DayPatternStruct) Clone() DayPatternStruct {
 }
 
 // DayPatternStructDef describes DayPatternStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DayPatternStructDef = &spec.Struct{Name: "DayPatternStruct", Fields: []spec.Field{
 	{ID: 0, Name: "DayPatternId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "DaysOfWeek", Type: spec.Type{Name: "DayPatternDayOfWeekBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: DayPatternDayOfWeekBitmapDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -448,8 +420,6 @@ func (v DayStruct) Clone() DayStruct {
 }
 
 // DayStructDef describes DayStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DayStructDef = &spec.Struct{Name: "DayStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Date", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "DayType", Type: spec.Type{Name: "DayTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: DayTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -457,8 +427,6 @@ var DayStructDef = &spec.Struct{Name: "DayStruct", Fields: []spec.Field{
 }}
 
 // DayTypeEnum is the DayTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DayTypeEnum uint8
 
 // DayTypeEnum values.
@@ -470,8 +438,6 @@ const (
 )
 
 // DayTypeEnumDef describes DayTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DayTypeEnumDef = &spec.Enum{Name: "DayTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Standard", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Holiday", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -480,8 +446,6 @@ var DayTypeEnumDef = &spec.Enum{Name: "DayTypeEnum", Bits: 8, Values: []spec.Enu
 }}
 
 // PeakPeriodSeverityEnum is the PeakPeriodSeverityEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PeakPeriodSeverityEnum uint8
 
 // PeakPeriodSeverityEnum values.
@@ -493,8 +457,6 @@ const (
 )
 
 // PeakPeriodSeverityEnumDef describes PeakPeriodSeverityEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PeakPeriodSeverityEnumDef = &spec.Enum{Name: "PeakPeriodSeverityEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unused", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -525,8 +487,6 @@ func (v *PeakPeriodStruct) DecodeTLV(n spec.Node) error {
 }
 
 // PeakPeriodStructDef describes PeakPeriodStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PeakPeriodStructDef = &spec.Struct{Name: "PeakPeriodStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Severity", Type: spec.Type{Name: "PeakPeriodSeverityEnum", Kind: spec.KindEnum, Bits: 8, Enum: PeakPeriodSeverityEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "PeakPeriod", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -633,8 +593,6 @@ func (v TariffComponentStruct) Clone() TariffComponentStruct {
 }
 
 // TariffComponentStructDef describes TariffComponentStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffComponentStructDef = &spec.Struct{Name: "TariffComponentStruct", Fields: []spec.Field{
 	{ID: 0, Name: "TariffComponentId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Price", Type: spec.Type{Name: "TariffPriceStruct", Kind: spec.KindStruct, Struct: TariffPriceStructDef}, Conformance: spec.Conformance{Text: "[PRICE].b+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptionalIf, Args: []spec.Conformance{{Op: spec.ConfName, Name: "PRICE"}}}}}, Quality: spec.Quality{Nullable: true}},
@@ -695,8 +653,6 @@ func (v TariffPriceStruct) Clone() TariffPriceStruct {
 }
 
 // TariffPriceStructDef describes TariffPriceStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffPriceStructDef = &spec.Struct{Name: "TariffPriceStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PriceType", Type: spec.Type{Name: "TariffPriceTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: TariffPriceTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Price", Type: spec.Type{Name: "money", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "O.c+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "c", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
@@ -704,8 +660,6 @@ var TariffPriceStructDef = &spec.Struct{Name: "TariffPriceStruct", Fields: []spe
 }}
 
 // TariffPriceTypeEnum is the TariffPriceTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TariffPriceTypeEnum uint8
 
 // TariffPriceTypeEnum values.
@@ -718,8 +672,6 @@ const (
 )
 
 // TariffPriceTypeEnumDef describes TariffPriceTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffPriceTypeEnumDef = &spec.Enum{Name: "TariffPriceTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Standard", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Critical", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -776,8 +728,6 @@ func (v PowerThresholdStruct) Clone() PowerThresholdStruct {
 }
 
 // PowerThresholdStructDef describes PowerThresholdStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PowerThresholdStructDef = &spec.Struct{Name: "PowerThresholdStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PowerThreshold", Type: spec.Type{Name: "power-mW", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "O.b", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: false, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
 	{ID: 1, Name: "ApparentPowerThreshold", Type: spec.Type{Name: "power-mVA", Kind: spec.KindInt, Bits: 64}, Conformance: spec.Conformance{Text: "O.b", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: false, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
@@ -785,8 +735,6 @@ var PowerThresholdStructDef = &spec.Struct{Name: "PowerThresholdStruct", Fields:
 }}
 
 // PowerThresholdSourceEnum is the PowerThresholdSourceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PowerThresholdSourceEnum uint8
 
 // PowerThresholdSourceEnum values.
@@ -797,8 +745,6 @@ const (
 )
 
 // PowerThresholdSourceEnumDef describes PowerThresholdSourceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PowerThresholdSourceEnumDef = &spec.Enum{Name: "PowerThresholdSourceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Contract", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Regulator", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -849,8 +795,6 @@ func (v TariffInformationStruct) Clone() TariffInformationStruct {
 }
 
 // TariffInformationStructDef describes TariffInformationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffInformationStructDef = &spec.Struct{Name: "TariffInformationStruct", Fields: []spec.Field{
 	{ID: 0, Name: "TariffLabel", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 128", Max: &spec.Bound{Int: 128}}},
 	{ID: 1, Name: "ProviderName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 128", Max: &spec.Bound{Int: 128}}},
@@ -881,8 +825,6 @@ func (v *Currency) DecodeTLV(n spec.Node) error {
 }
 
 // CurrencyDef describes currency.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CurrencyDef = &spec.Struct{Name: "currency", Fields: []spec.Field{
 	{ID: 0, Name: "Currency", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 999", Max: &spec.Bound{Int: 999}}},
 	{ID: 1, Name: "DecimalPoints", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -938,8 +880,6 @@ func (v TariffPeriodStruct) Clone() TariffPeriodStruct {
 }
 
 // TariffPeriodStructDef describes TariffPeriodStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffPeriodStructDef = &spec.Struct{Name: "TariffPeriodStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Label", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "max 128", Max: &spec.Bound{Int: 128}}},
 	{ID: 1, Name: "DayEntryIds", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 20", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 20}}},
@@ -947,8 +887,6 @@ var TariffPeriodStructDef = &spec.Struct{Name: "TariffPeriodStruct", Fields: []s
 }}
 
 // TariffUnitEnum is the TariffUnitEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TariffUnitEnum uint8
 
 // TariffUnitEnum values.
@@ -958,8 +896,6 @@ const (
 )
 
 // TariffUnitEnumDef describes TariffUnitEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TariffUnitEnumDef = &spec.Enum{Name: "TariffUnitEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "KWh", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "KVAh", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

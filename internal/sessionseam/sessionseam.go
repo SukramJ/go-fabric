@@ -33,14 +33,12 @@ import "thingfabric.dev/go-fabric/secure/sigma"
 // placeholder under id is overwritten, a live session under it closed — and
 // returns the *operational.Entry. TEST SUPPORT ONLY: production code
 // installs under a Stake.
-// fabric:reachable:reason="assigned by secure/operational at init and called by the module's test fixtures; a function variable installed through a seam has no call edge the analyzer can follow"
 var OpenAt func(m any, id uint16, initiator bool, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (entry any, err error)
 
 // CloseEntry closes e (an *operational.Entry) in m (a
 // *operational.Manager) only while e still holds its session id, as
 // Manager.Close would close that id, and reports whether it did. An id
 // another session or stake holds by then is left alone.
-// fabric:reachable:reason="assigned by secure/operational at init and called by node/security.go; a function variable installed through a seam has no call edge the analyzer can follow"
 var CloseEntry func(m, e any) bool
 
 // OpenEstablishing installs a CASE responder session under stake (an
@@ -50,7 +48,6 @@ var CloseEntry func(m, e any) bool
 // cap leave it out until [CompleteEstablishment] (matter.js
 // CaseServer.ts:177-190, :314-327 at b25ed960, `establishing: true`).
 // Returns the *operational.Entry.
-// fabric:reachable:reason="assigned by secure/operational at init and called by node/security.go; a function variable installed through a seam has no call edge the analyzer can follow"
 var OpenEstablishing func(m, stake any, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (entry any, err error)
 
 // CompleteEstablishment ends the establishment of e (an *operational.Entry
@@ -58,5 +55,4 @@ var OpenEstablishing func(m, stake any, fabricIndex uint8, localNodeID, peerNode
 // and the per-peer cap counts it and runs. Reports true when e is
 // established — also when it already was — and false when it was closed
 // while establishing (matter.js NodeSession.ts:241-251 at b25ed960).
-// fabric:reachable:reason="assigned by secure/operational at init and called by node/security.go; a function variable installed through a seam has no call edge the analyzer can follow"
 var CompleteEstablishment func(m, e any) bool

@@ -90,8 +90,6 @@ const (
 )
 
 // Feature is a CameraAvStreamManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -170,8 +168,6 @@ func (v AudioCapabilitiesStruct) Clone() AudioCapabilitiesStruct {
 }
 
 // AudioCapabilitiesStructDef describes AudioCapabilitiesStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AudioCapabilitiesStructDef = &spec.Struct{Name: "AudioCapabilitiesStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MaxNumberOfChannels", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 	{ID: 1, Name: "SupportedCodecs", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "AudioCodecEnum", Kind: spec.KindEnum, Bits: 8, Enum: AudioCodecEnumDef}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -180,8 +176,6 @@ var AudioCapabilitiesStructDef = &spec.Struct{Name: "AudioCapabilitiesStruct", F
 }}
 
 // AudioCodecEnum is the AudioCodecEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type AudioCodecEnum uint8
 
 // AudioCodecEnum values.
@@ -191,8 +185,6 @@ const (
 )
 
 // AudioCodecEnumDef describes AudioCodecEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AudioCodecEnumDef = &spec.Enum{Name: "AudioCodecEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Opus", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "AacLc", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -239,8 +231,6 @@ func (v *AudioStreamStruct) DecodeTLV(n spec.Node) error {
 }
 
 // AudioStreamStructDef describes AudioStreamStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AudioStreamStructDef = &spec.Struct{Name: "AudioStreamStruct", Fields: []spec.Field{
 	{ID: 0, Name: "AudioStreamId", Type: spec.Type{Name: "AudioStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "StreamUsage", Type: spec.Type{Name: "StreamUsageEnum", Kind: spec.KindEnum, Bits: 8, Enum: StreamUsageEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -253,8 +243,6 @@ var AudioStreamStructDef = &spec.Struct{Name: "AudioStreamStruct", Fields: []spe
 }}
 
 // StreamUsageEnum is the StreamUsageEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StreamUsageEnum uint8
 
 // StreamUsageEnum values.
@@ -266,8 +254,6 @@ const (
 )
 
 // StreamUsageEnumDef describes StreamUsageEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StreamUsageEnumDef = &spec.Enum{Name: "StreamUsageEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Internal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Recording", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -347,8 +333,6 @@ func (v AVMetadataStruct) Clone() AVMetadataStruct {
 }
 
 // AVMetadataStructDef describes AVMetadataStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var AVMetadataStructDef = &spec.Struct{Name: "AVMetadataStruct", Fields: []spec.Field{
 	{ID: 1, Name: "UtcTime", Type: spec.Type{Name: "epoch-us", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 	{ID: 2, Name: "MotionZonesActive", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ZoneManagement.ZoneID", Kind: spec.KindUint, Bits: 16}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -357,8 +341,6 @@ var AVMetadataStructDef = &spec.Struct{Name: "AVMetadataStruct", Fields: []spec.
 }}
 
 // ImageCodecEnum is the ImageCodecEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ImageCodecEnum uint8
 
 // ImageCodecEnum values.
@@ -368,8 +350,6 @@ const (
 )
 
 // ImageCodecEnumDef describes ImageCodecEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ImageCodecEnumDef = &spec.Enum{Name: "ImageCodecEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Jpeg", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Heic", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -401,8 +381,6 @@ func (v *RateDistortionTradeOffPointsStruct) DecodeTLV(n spec.Node) error {
 }
 
 // RateDistortionTradeOffPointsStructDef describes RateDistortionTradeOffPointsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RateDistortionTradeOffPointsStructDef = &spec.Struct{Name: "RateDistortionTradeOffPointsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Codec", Type: spec.Type{Name: "VideoCodecEnum", Kind: spec.KindEnum, Bits: 8, Enum: VideoCodecEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Resolution", Type: spec.Type{Name: "VideoResolutionStruct", Kind: spec.KindStruct, Struct: VideoResolutionStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -410,8 +388,6 @@ var RateDistortionTradeOffPointsStructDef = &spec.Struct{Name: "RateDistortionTr
 }}
 
 // VideoCodecEnum is the VideoCodecEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type VideoCodecEnum uint8
 
 // VideoCodecEnum values.
@@ -423,8 +399,6 @@ const (
 )
 
 // VideoCodecEnumDef describes VideoCodecEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var VideoCodecEnumDef = &spec.Enum{Name: "VideoCodecEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "H264", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Hevc", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -455,8 +429,6 @@ func (v *VideoResolutionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // VideoResolutionStructDef describes VideoResolutionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var VideoResolutionStructDef = &spec.Struct{Name: "VideoResolutionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Width", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 	{ID: 1, Name: "Height", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -509,8 +481,6 @@ func (v SnapshotCapabilitiesStruct) Clone() SnapshotCapabilitiesStruct {
 }
 
 // SnapshotCapabilitiesStructDef describes SnapshotCapabilitiesStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SnapshotCapabilitiesStructDef = &spec.Struct{Name: "SnapshotCapabilitiesStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Resolution", Type: spec.Type{Name: "VideoResolutionStruct", Kind: spec.KindStruct, Struct: VideoResolutionStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "MaxFrameRate", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -591,8 +561,6 @@ func (v SnapshotStreamStruct) Clone() SnapshotStreamStruct {
 }
 
 // SnapshotStreamStructDef describes SnapshotStreamStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SnapshotStreamStructDef = &spec.Struct{Name: "SnapshotStreamStruct", Fields: []spec.Field{
 	{ID: 0, Name: "SnapshotStreamId", Type: spec.Type{Name: "SnapshotStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "ImageCodec", Type: spec.Type{Name: "ImageCodecEnum", Kind: spec.KindEnum, Bits: 8, Enum: ImageCodecEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -608,8 +576,6 @@ var SnapshotStreamStructDef = &spec.Struct{Name: "SnapshotStreamStruct", Fields:
 }}
 
 // TriStateAutoEnum is the TriStateAutoEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TriStateAutoEnum uint8
 
 // TriStateAutoEnum values.
@@ -620,8 +586,6 @@ const (
 )
 
 // TriStateAutoEnumDef describes TriStateAutoEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TriStateAutoEnumDef = &spec.Enum{Name: "TriStateAutoEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Off", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "On", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -629,8 +593,6 @@ var TriStateAutoEnumDef = &spec.Enum{Name: "TriStateAutoEnum", Bits: 8, Values: 
 }}
 
 // TwoWayTalkSupportTypeEnum is the TwoWayTalkSupportTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TwoWayTalkSupportTypeEnum uint8
 
 // TwoWayTalkSupportTypeEnum values.
@@ -641,8 +603,6 @@ const (
 )
 
 // TwoWayTalkSupportTypeEnumDef describes TwoWayTalkSupportTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TwoWayTalkSupportTypeEnumDef = &spec.Enum{Name: "TwoWayTalkSupportTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NotSupported", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "HalfDuplex", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -693,8 +653,6 @@ func (v VideoSensorParamsStruct) Clone() VideoSensorParamsStruct {
 }
 
 // VideoSensorParamsStructDef describes VideoSensorParamsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var VideoSensorParamsStructDef = &spec.Struct{Name: "VideoSensorParamsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "SensorWidth", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 64", Min: &spec.Bound{Int: 64}}},
 	{ID: 1, Name: "SensorHeight", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 64", Min: &spec.Bound{Int: 64}}},
@@ -780,8 +738,6 @@ func (v VideoStreamStruct) Clone() VideoStreamStruct {
 }
 
 // VideoStreamStructDef describes VideoStreamStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var VideoStreamStructDef = &spec.Struct{Name: "VideoStreamStruct", Fields: []spec.Field{
 	{ID: 0, Name: "VideoStreamId", Type: spec.Type{Name: "VideoStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "StreamUsage", Type: spec.Type{Name: "StreamUsageEnum", Kind: spec.KindEnum, Bits: 8, Enum: StreamUsageEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -827,8 +783,6 @@ func (v *ViewportStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ViewportStructDef describes ViewportStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ViewportStructDef = &spec.Struct{Name: "ViewportStruct", Fields: []spec.Field{
 	{ID: 0, Name: "X1", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Y1", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -837,8 +791,6 @@ var ViewportStructDef = &spec.Struct{Name: "ViewportStruct", Fields: []spec.Fiel
 }}
 
 // ThreeLevelAutoEnum is the ThreeLevelAutoEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ThreeLevelAutoEnum uint8
 
 // ThreeLevelAutoEnum values.
@@ -850,8 +802,6 @@ const (
 )
 
 // ThreeLevelAutoEnumDef describes ThreeLevelAutoEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThreeLevelAutoEnumDef = &spec.Enum{Name: "ThreeLevelAutoEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Auto", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

@@ -51,8 +51,6 @@ const (
 )
 
 // Feature is a CameraAvSettingsUserLevelManagement FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -87,8 +85,6 @@ func (v *DPTZStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DPTZStructDef describes DPTZStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DPTZStructDef = &spec.Struct{Name: "DPTZStruct", Fields: []spec.Field{
 	{ID: 0, Name: "VideoStreamId", Type: spec.Type{Name: "CameraAvStreamManagement.VideoStreamID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Viewport", Type: spec.Type{Name: "ViewportStruct", Kind: spec.KindStruct, Struct: ViewportStructDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -123,8 +119,6 @@ func (v *ViewportStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ViewportStructDef describes ViewportStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ViewportStructDef = &spec.Struct{Name: "ViewportStruct", Fields: []spec.Field{
 	{ID: 0, Name: "X1", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Y1", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -167,8 +161,6 @@ func (v MPTZPresetStruct) Clone() MPTZPresetStruct {
 }
 
 // MPTZPresetStructDef describes MPTZPresetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MPTZPresetStructDef = &spec.Struct{Name: "MPTZPresetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PresetId", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to maxPresets", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Ref: "maxPresets"}}},
 	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
@@ -230,8 +222,6 @@ func (v MPTZStruct) Clone() MPTZStruct {
 }
 
 // MPTZStructDef describes MPTZStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MPTZStructDef = &spec.Struct{Name: "MPTZStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Pan", Type: spec.Type{Name: "int16", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "MPAN", Op: spec.ConfName, Name: "MPAN"}, Constraint: spec.Constraint{Text: "panMin to panMax", Min: &spec.Bound{Ref: "panMin"}, Max: &spec.Bound{Ref: "panMax"}}},
 	{ID: 1, Name: "Tilt", Type: spec.Type{Name: "int16", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "MTILT", Op: spec.ConfName, Name: "MTILT"}, Constraint: spec.Constraint{Text: "tiltMin to tiltMax", Min: &spec.Bound{Ref: "tiltMin"}, Max: &spec.Bound{Ref: "tiltMax"}}},
@@ -239,8 +229,6 @@ var MPTZStructDef = &spec.Struct{Name: "MPTZStruct", Fields: []spec.Field{
 }}
 
 // PhysicalMovementEnum is the PhysicalMovementEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PhysicalMovementEnum uint8
 
 // PhysicalMovementEnum values.
@@ -250,8 +238,6 @@ const (
 )
 
 // PhysicalMovementEnumDef describes PhysicalMovementEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PhysicalMovementEnumDef = &spec.Enum{Name: "PhysicalMovementEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Idle", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Moving", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

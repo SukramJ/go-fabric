@@ -40,7 +40,8 @@ const (
 
 // Feature is a WebRtcTransportRequestor FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the WebRtcTransportRequestor cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // WebRTCSessionStruct is the WebRTCSessionStruct struct.
@@ -140,8 +141,6 @@ func (v WebRTCSessionStruct) Clone() WebRTCSessionStruct {
 }
 
 // WebRTCSessionStructDef describes WebRTCSessionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WebRTCSessionStructDef = &spec.Struct{Name: "WebRTCSessionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Id", Type: spec.Type{Name: "WebRTCSessionID", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "PeerNodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -156,8 +155,6 @@ var WebRTCSessionStructDef = &spec.Struct{Name: "WebRTCSessionStruct", Fields: [
 }}
 
 // StreamUsageEnum is the StreamUsageEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StreamUsageEnum uint8
 
 // StreamUsageEnum values.
@@ -169,8 +166,6 @@ const (
 )
 
 // StreamUsageEnumDef describes StreamUsageEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StreamUsageEnumDef = &spec.Enum{Name: "StreamUsageEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Internal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Recording", Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -244,8 +239,6 @@ func (v ICEServerStruct) Clone() ICEServerStruct {
 }
 
 // ICEServerStructDef describes ICEServerStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ICEServerStructDef = &spec.Struct{Name: "ICEServerStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Urls", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "string", Kind: spec.KindString}}}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 10[max 2000]", Max: &spec.Bound{Int: 10}, Entry: &spec.Constraint{Text: "max 2000", Max: &spec.Bound{Int: 2000}}}},
 	{ID: 1, Name: "Username", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 508", Max: &spec.Bound{Int: 508}}},
@@ -279,8 +272,6 @@ func (v *ICECandidateStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ICECandidateStructDef describes ICECandidateStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ICECandidateStructDef = &spec.Struct{Name: "ICECandidateStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Candidate", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "SdpMid", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},

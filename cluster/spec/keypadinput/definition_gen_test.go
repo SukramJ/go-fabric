@@ -23,6 +23,15 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureNavigationKeyCodes, FeatureLocationKeys, FeatureNumberKeys)
+	spectest.CheckEnum[CecKeyCodeEnum](t, CecKeyCodeEnumDef, CecKeyCodeSelect, CecKeyCodeUp, CecKeyCodeDown, CecKeyCodeLeft, CecKeyCodeRight, CecKeyCodeRightUp, CecKeyCodeRightDown, CecKeyCodeLeftUp, CecKeyCodeLeftDown, CecKeyCodeRootMenu, CecKeyCodeSetupMenu, CecKeyCodeContentsMenu, CecKeyCodeFavoriteMenu, CecKeyCodeExit, CecKeyCodeMediaTopMenu, CecKeyCodeMediaContextSensitiveMenu, CecKeyCodeNumberEntryMode, CecKeyCodeNumber11, CecKeyCodeNumber12, CecKeyCodeNumber0OrNumber10, CecKeyCodeNumbers1, CecKeyCodeNumbers2, CecKeyCodeNumbers3, CecKeyCodeNumbers4, CecKeyCodeNumbers5, CecKeyCodeNumbers6, CecKeyCodeNumbers7, CecKeyCodeNumbers8, CecKeyCodeNumbers9, CecKeyCodeDot, CecKeyCodeEnter, CecKeyCodeClear, CecKeyCodeNextFavorite, CecKeyCodeChannelUp, CecKeyCodeChannelDown, CecKeyCodePreviousChannel, CecKeyCodeSoundSelect, CecKeyCodeInputSelect, CecKeyCodeDisplayInformation, CecKeyCodeHelp, CecKeyCodePageUp, CecKeyCodePageDown, CecKeyCodePower, CecKeyCodeVolumeUp, CecKeyCodeVolumeDown, CecKeyCodeMute, CecKeyCodePlay, CecKeyCodeStop, CecKeyCodePause, CecKeyCodeRecord, CecKeyCodeRewind, CecKeyCodeFastForward, CecKeyCodeEject, CecKeyCodeForward, CecKeyCodeBackward, CecKeyCodeStopRecord, CecKeyCodePauseRecord, CecKeyCodeAngle, CecKeyCodeSubPicture, CecKeyCodeVideoOnDemand, CecKeyCodeElectronicProgramGuide, CecKeyCodeTimerProgramming, CecKeyCodeInitialConfiguration, CecKeyCodeSelectBroadcastType, CecKeyCodeSelectSoundPresentation, CecKeyCodePlayFunction, CecKeyCodePausePlayFunction, CecKeyCodeRecordFunction, CecKeyCodePauseRecordFunction, CecKeyCodeStopFunction, CecKeyCodeMuteFunction, CecKeyCodeRestoreVolumeFunction, CecKeyCodeTuneFunction, CecKeyCodeSelectMediaFunction, CecKeyCodeSelectAvInputFunction, CecKeyCodeSelectAudioInputFunction, CecKeyCodePowerToggleFunction, CecKeyCodePowerOffFunction, CecKeyCodePowerOnFunction, CecKeyCodeF1Blue, CecKeyCodeF2Red, CecKeyCodeF3Green, CecKeyCodeF4Yellow, CecKeyCodeF5, CecKeyCodeData)
+	spectest.CheckEnum[StatusEnum](t, StatusEnumDef, StatusSuccess, StatusUnsupportedKey, StatusInvalidKeyInCurrentState)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

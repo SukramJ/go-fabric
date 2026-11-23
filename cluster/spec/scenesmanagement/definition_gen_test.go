@@ -23,6 +23,15 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureSceneNames)
+	spectest.CheckBitmap[CopyModeBitmap](t, CopyModeBitmapDef, CopyModeCopyAllScenes)
+	spectest.CheckEnum[Status](t, StatusDef, StatusSuccess, StatusFailure, StatusInvalidSubscription, StatusUnsupportedAccess, StatusUnsupportedEndpoint, StatusInvalidAction, StatusUnsupportedCommand, StatusInvalidCommand, StatusUnsupportedAttribute, StatusConstraintError, StatusUnsupportedWrite, StatusResourceExhausted, StatusNotFound, StatusInvalidDataType, StatusUnsupportedRead, StatusDataVersionMismatch, StatusTimeout, StatusUnsupportedNode, StatusBusy, StatusAccessRestricted, StatusUnsupportedCluster, StatusNeedsTimedInteraction, StatusUnsupportedEvent, StatusPathsExhausted, StatusTimedRequestMismatch, StatusFailsafeRequired, StatusInvalidInState, StatusNoCommandResponse, StatusTermsAndConditionsChanged, StatusMaintenanceRequired, StatusDynamicConstraintError, StatusAlreadyExists, StatusInvalidTransportType)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

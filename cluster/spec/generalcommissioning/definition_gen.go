@@ -55,8 +55,6 @@ const (
 )
 
 // Feature is a GeneralCommissioning FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -88,16 +86,12 @@ func (v *BasicCommissioningInfo) DecodeTLV(n spec.Node) error {
 }
 
 // BasicCommissioningInfoDef describes BasicCommissioningInfo.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BasicCommissioningInfoDef = &spec.Struct{Name: "BasicCommissioningInfo", Fields: []spec.Field{
 	{ID: 0, Name: "FailSafeExpiryLengthSeconds", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "MaxCumulativeFailsafeSeconds", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 }}
 
 // CommissioningErrorEnum is the CommissioningErrorEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CommissioningErrorEnum uint8
 
 // CommissioningErrorEnum values.
@@ -113,8 +107,6 @@ const (
 )
 
 // CommissioningErrorEnumDef describes CommissioningErrorEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CommissioningErrorEnumDef = &spec.Enum{Name: "CommissioningErrorEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ok", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "ValueOutsideRange", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -127,8 +119,6 @@ var CommissioningErrorEnumDef = &spec.Enum{Name: "CommissioningErrorEnum", Bits:
 }}
 
 // NetworkRecoveryReasonEnum is the NetworkRecoveryReasonEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type NetworkRecoveryReasonEnum uint8
 
 // NetworkRecoveryReasonEnum values.
@@ -139,8 +129,6 @@ const (
 )
 
 // NetworkRecoveryReasonEnumDef describes NetworkRecoveryReasonEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NetworkRecoveryReasonEnumDef = &spec.Enum{Name: "NetworkRecoveryReasonEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}},
 	{Value: 1, Name: "Auth", Conformance: spec.Conformance{Text: "P, M", Op: spec.ConfOtherwise, Args: []spec.Conformance{{Op: spec.ConfProvisional}, {Op: spec.ConfMandatory}}}},
@@ -148,8 +136,6 @@ var NetworkRecoveryReasonEnumDef = &spec.Enum{Name: "NetworkRecoveryReasonEnum",
 }}
 
 // RegulatoryLocationTypeEnum is the RegulatoryLocationTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type RegulatoryLocationTypeEnum uint8
 
 // RegulatoryLocationTypeEnum values.
@@ -160,8 +146,6 @@ const (
 )
 
 // RegulatoryLocationTypeEnumDef describes RegulatoryLocationTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RegulatoryLocationTypeEnumDef = &spec.Enum{Name: "RegulatoryLocationTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Indoor", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Outdoor", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

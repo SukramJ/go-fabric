@@ -106,8 +106,6 @@ const (
 )
 
 // Feature is a ThreadNetworkDiagnostics FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -119,8 +117,6 @@ const (
 )
 
 // ConnectionStatusEnum is the ConnectionStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ConnectionStatusEnum uint8
 
 // ConnectionStatusEnum values.
@@ -130,8 +126,6 @@ const (
 )
 
 // ConnectionStatusEnumDef describes ConnectionStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ConnectionStatusEnumDef = &spec.Enum{Name: "ConnectionStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Connected", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "NotConnected", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -196,8 +190,6 @@ func (v *NeighborTableStruct) DecodeTLV(n spec.Node) error {
 }
 
 // NeighborTableStructDef describes NeighborTableStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NeighborTableStructDef = &spec.Struct{Name: "NeighborTableStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ExtAddress", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Age", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -216,8 +208,6 @@ var NeighborTableStructDef = &spec.Struct{Name: "NeighborTableStruct", Fields: [
 }}
 
 // NetworkFaultEnum is the NetworkFaultEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type NetworkFaultEnum uint8
 
 // NetworkFaultEnum values.
@@ -229,8 +219,6 @@ const (
 )
 
 // NetworkFaultEnumDef describes NetworkFaultEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NetworkFaultEnumDef = &spec.Enum{Name: "NetworkFaultEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "LinkDown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -291,8 +279,6 @@ func (v *OperationalDatasetComponents) DecodeTLV(n spec.Node) error {
 }
 
 // OperationalDatasetComponentsDef describes OperationalDatasetComponents.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperationalDatasetComponentsDef = &spec.Struct{Name: "OperationalDatasetComponents", Fields: []spec.Field{
 	{ID: 0, Name: "ActiveTimestampPresent", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "PendingTimestampPresent", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -355,8 +341,6 @@ func (v *RouteTableStruct) DecodeTLV(n spec.Node) error {
 }
 
 // RouteTableStructDef describes RouteTableStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RouteTableStructDef = &spec.Struct{Name: "RouteTableStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ExtAddress", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Rloc16", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -371,8 +355,6 @@ var RouteTableStructDef = &spec.Struct{Name: "RouteTableStruct", Fields: []spec.
 }}
 
 // RoutingRoleEnum is the RoutingRoleEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type RoutingRoleEnum uint8
 
 // RoutingRoleEnum values.
@@ -387,8 +369,6 @@ const (
 )
 
 // RoutingRoleEnumDef describes RoutingRoleEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var RoutingRoleEnumDef = &spec.Enum{Name: "RoutingRoleEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unspecified", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Unassigned", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -422,8 +402,6 @@ func (v *SecurityPolicy) DecodeTLV(n spec.Node) error {
 }
 
 // SecurityPolicyDef describes SecurityPolicy.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SecurityPolicyDef = &spec.Struct{Name: "SecurityPolicy", Fields: []spec.Field{
 	{ID: 0, Name: "RotationTime", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Flags", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

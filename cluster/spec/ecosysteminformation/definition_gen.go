@@ -33,7 +33,8 @@ const (
 
 // Feature is a EcosystemInformation FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the EcosystemInformation cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // DeviceTypeStruct is the DeviceTypeStruct struct.
@@ -59,8 +60,6 @@ func (v *DeviceTypeStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DeviceTypeStructDef describes DeviceTypeStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DeviceTypeStructDef = &spec.Struct{Name: "DeviceTypeStruct", Fields: []spec.Field{
 	{ID: 0, Name: "DeviceType", Type: spec.Type{Name: "devtype-id", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Revision", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
@@ -159,8 +158,6 @@ func (v EcosystemDeviceStruct) Clone() EcosystemDeviceStruct {
 }
 
 // EcosystemDeviceStructDef describes EcosystemDeviceStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EcosystemDeviceStructDef = &spec.Struct{Name: "EcosystemDeviceStruct", Fields: []spec.Field{
 	{ID: 0, Name: "DeviceName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}, FabricSensitive: true},
 	{ID: 1, Name: "DeviceNameLastEdit", Type: spec.Type{Name: "epoch-us", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "DeviceName", Op: spec.ConfName, Name: "DeviceName"}, FabricSensitive: true, Default: float64(0)},
@@ -201,8 +198,6 @@ func (v *EcosystemLocationStruct) DecodeTLV(n spec.Node) error {
 }
 
 // EcosystemLocationStructDef describes EcosystemLocationStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EcosystemLocationStructDef = &spec.Struct{Name: "EcosystemLocationStruct", Fields: []spec.Field{
 	{ID: 0, Name: "UniqueLocationId", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}, FabricSensitive: true},
 	{ID: 1, Name: "LocationDescriptor", Type: spec.Type{Name: "locationdesc", Kind: spec.KindStruct, Struct: LocationdescDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, FabricSensitive: true},
@@ -236,8 +231,6 @@ func (v *Locationdesc) DecodeTLV(n spec.Node) error {
 }
 
 // LocationdescDef describes locationdesc.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LocationdescDef = &spec.Struct{Name: "locationdesc", Fields: []spec.Field{
 	{ID: 0, Name: "LocationName", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128", Max: &spec.Bound{Int: 128}}},
 	{ID: 1, Name: "FloorNumber", Type: spec.Type{Name: "int16", Kind: spec.KindInt, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},

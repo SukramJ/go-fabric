@@ -23,6 +23,15 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureCalendarFormat)
+	spectest.CheckEnum[CalendarTypeEnum](t, CalendarTypeEnumDef, CalendarTypeBuddhist, CalendarTypeChinese, CalendarTypeCoptic, CalendarTypeEthiopian, CalendarTypeGregorian, CalendarTypeHebrew, CalendarTypeIndian, CalendarTypeIslamic, CalendarTypeJapanese, CalendarTypeKorean, CalendarTypePersian, CalendarTypeTaiwanese, CalendarTypeUseActiveLocale)
+	spectest.CheckEnum[HourFormatEnum](t, HourFormatEnumDef, HourFormatV12Hr, HourFormatV24Hr, HourFormatUseActiveLocale)
+}
+
 // TestCloneIsDeep holds every generated Clone to a deep copy
 // (decision 142): spectest.CheckClone fills a value to every depth,
 // clones it and overwrites the clone through its lists and pointers.

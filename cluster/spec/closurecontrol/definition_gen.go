@@ -53,8 +53,6 @@ const (
 )
 
 // Feature is a ClosureControl FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -71,8 +69,6 @@ const (
 )
 
 // ClosureErrorEnum is the ClosureErrorEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ClosureErrorEnum uint8
 
 // ClosureErrorEnum values.
@@ -85,8 +81,6 @@ const (
 )
 
 // ClosureErrorEnumDef describes ClosureErrorEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ClosureErrorEnumDef = &spec.Enum{Name: "ClosureErrorEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "PhysicallyBlocked", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "BlockedBySensor", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -98,8 +92,6 @@ var ClosureErrorEnumDef = &spec.Enum{Name: "ClosureErrorEnum", Bits: 8, Values: 
 }}
 
 // CurrentPositionEnum is the CurrentPositionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CurrentPositionEnum uint8
 
 // CurrentPositionEnum values.
@@ -113,8 +105,6 @@ const (
 )
 
 // CurrentPositionEnumDef describes CurrentPositionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CurrentPositionEnumDef = &spec.Enum{Name: "CurrentPositionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "FullyClosed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "FullyOpened", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -125,8 +115,6 @@ var CurrentPositionEnumDef = &spec.Enum{Name: "CurrentPositionEnum", Bits: 8, Va
 }}
 
 // LatchControlModesBitmap is the LatchControlModesBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LatchControlModesBitmap uint8
 
 // LatchControlModesBitmap bits; a member wider than one bit is its mask.
@@ -136,16 +124,12 @@ const (
 )
 
 // LatchControlModesBitmapDef describes LatchControlModesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LatchControlModesBitmapDef = &spec.Bitmap{Name: "LatchControlModesBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "RemoteLatching", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"}},
 	{Name: "RemoteUnlatching", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"}},
 }}
 
 // MainStateEnum is the MainStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MainStateEnum uint8
 
 // MainStateEnum values.
@@ -161,8 +145,6 @@ const (
 )
 
 // MainStateEnumDef describes MainStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MainStateEnumDef = &spec.Enum{Name: "MainStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Stopped", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Moving", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -232,8 +214,6 @@ func (v OverallCurrentStateStruct) Clone() OverallCurrentStateStruct {
 }
 
 // OverallCurrentStateStructDef describes OverallCurrentStateStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OverallCurrentStateStructDef = &spec.Struct{Name: "OverallCurrentStateStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Position", Type: spec.Type{Name: "CurrentPositionEnum", Kind: spec.KindEnum, Bits: 8, Enum: CurrentPositionEnumDef}, Conformance: spec.Conformance{Text: "PS", Op: spec.ConfName, Name: "PS"}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Default: spec.NullDefault{}},
 	{ID: 1, Name: "Latch", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "desc", Desc: true}, Default: spec.NullDefault{}},
@@ -242,8 +222,6 @@ var OverallCurrentStateStructDef = &spec.Struct{Name: "OverallCurrentStateStruct
 }}
 
 // ThreeLevelAutoEnum is the ThreeLevelAutoEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ThreeLevelAutoEnum uint8
 
 // ThreeLevelAutoEnum values.
@@ -255,8 +233,6 @@ const (
 )
 
 // ThreeLevelAutoEnumDef describes ThreeLevelAutoEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThreeLevelAutoEnumDef = &spec.Enum{Name: "ThreeLevelAutoEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Auto", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -319,8 +295,6 @@ func (v OverallTargetStateStruct) Clone() OverallTargetStateStruct {
 }
 
 // OverallTargetStateStructDef describes OverallTargetStateStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OverallTargetStateStructDef = &spec.Struct{Name: "OverallTargetStateStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Position", Type: spec.Type{Name: "TargetPositionEnum", Kind: spec.KindEnum, Bits: 8, Enum: TargetPositionEnumDef}, Conformance: spec.Conformance{Text: "PS", Op: spec.ConfName, Name: "PS"}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
 	{ID: 1, Name: "Latch", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "LT", Op: spec.ConfName, Name: "LT"}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
@@ -328,8 +302,6 @@ var OverallTargetStateStructDef = &spec.Struct{Name: "OverallTargetStateStruct",
 }}
 
 // TargetPositionEnum is the TargetPositionEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TargetPositionEnum uint8
 
 // TargetPositionEnum values.
@@ -342,8 +314,6 @@ const (
 )
 
 // TargetPositionEnumDef describes TargetPositionEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TargetPositionEnumDef = &spec.Enum{Name: "TargetPositionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "MoveToFullyClosed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "MoveToFullyOpen", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

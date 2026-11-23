@@ -35,8 +35,6 @@ const (
 )
 
 // Feature is a EnergyPreference FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -83,16 +81,12 @@ func (v BalanceStruct) Clone() BalanceStruct {
 }
 
 // BalanceStructDef describes BalanceStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var BalanceStructDef = &spec.Struct{Name: "BalanceStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Step", Type: spec.Type{Name: "percent", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Fixed: true}, Constraint: spec.Constraint{Text: "max 100", Max: &spec.Bound{Int: 100}}},
 	{ID: 1, Name: "Label", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Fixed: true}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
 }}
 
 // EnergyPriorityEnum is the EnergyPriorityEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EnergyPriorityEnum uint8
 
 // EnergyPriorityEnum values.
@@ -104,8 +98,6 @@ const (
 )
 
 // EnergyPriorityEnumDef describes EnergyPriorityEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EnergyPriorityEnumDef = &spec.Enum{Name: "EnergyPriorityEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Comfort", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Speed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

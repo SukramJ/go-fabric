@@ -23,6 +23,22 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeaturePricing, FeatureFriendlyCredit, FeatureAuxiliaryLoad, FeaturePeakPeriod, FeaturePowerThreshold, FeatureRandomization)
+	spectest.CheckEnum[AuxiliaryLoadSettingEnum](t, AuxiliaryLoadSettingEnumDef, AuxiliaryLoadSettingOff, AuxiliaryLoadSettingOn, AuxiliaryLoadSettingNone)
+	spectest.CheckEnum[BlockModeEnum](t, BlockModeEnumDef, BlockModeNoBlock, BlockModeCombined, BlockModeIndividual)
+	spectest.CheckEnum[DayEntryRandomizationTypeEnum](t, DayEntryRandomizationTypeEnumDef, DayEntryRandomizationTypeNone, DayEntryRandomizationTypeFixed, DayEntryRandomizationTypeRandom, DayEntryRandomizationTypeRandomPositive, DayEntryRandomizationTypeRandomNegative)
+	spectest.CheckBitmap[DayPatternDayOfWeekBitmap](t, DayPatternDayOfWeekBitmapDef, DayPatternDayOfWeekSunday, DayPatternDayOfWeekMonday, DayPatternDayOfWeekTuesday, DayPatternDayOfWeekWednesday, DayPatternDayOfWeekThursday, DayPatternDayOfWeekFriday, DayPatternDayOfWeekSaturday)
+	spectest.CheckEnum[DayTypeEnum](t, DayTypeEnumDef, DayTypeStandard, DayTypeHoliday, DayTypeDynamic, DayTypeEvent)
+	spectest.CheckEnum[PeakPeriodSeverityEnum](t, PeakPeriodSeverityEnumDef, PeakPeriodSeverityUnused, PeakPeriodSeverityLow, PeakPeriodSeverityMedium, PeakPeriodSeverityHigh)
+	spectest.CheckEnum[TariffPriceTypeEnum](t, TariffPriceTypeEnumDef, TariffPriceTypeStandard, TariffPriceTypeCritical, TariffPriceTypeVirtual, TariffPriceTypeIncentive, TariffPriceTypeIncentiveSignal)
+	spectest.CheckEnum[PowerThresholdSourceEnum](t, PowerThresholdSourceEnumDef, PowerThresholdSourceContract, PowerThresholdSourceRegulator, PowerThresholdSourceEquipment)
+	spectest.CheckEnum[TariffUnitEnum](t, TariffUnitEnumDef, TariffUnitKWh, TariffUnitKVAh)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

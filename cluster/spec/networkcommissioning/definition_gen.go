@@ -54,8 +54,6 @@ const (
 )
 
 // Feature is a NetworkCommissioning FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -66,8 +64,6 @@ const (
 )
 
 // NetworkCommissioningStatusEnum is the NetworkCommissioningStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type NetworkCommissioningStatusEnum uint8
 
 // NetworkCommissioningStatusEnum values.
@@ -88,8 +84,6 @@ const (
 )
 
 // NetworkCommissioningStatusEnumDef describes NetworkCommissioningStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NetworkCommissioningStatusEnumDef = &spec.Enum{Name: "NetworkCommissioningStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "OutOfRange", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -145,16 +139,12 @@ func (v NetworkInfoStruct) Clone() NetworkInfoStruct {
 }
 
 // NetworkInfoStructDef describes NetworkInfoStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var NetworkInfoStructDef = &spec.Struct{Name: "NetworkInfoStruct", Fields: []spec.Field{
 	{ID: 0, Name: "NetworkId", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "1 to 32", Min: &spec.Bound{Int: 1}, Max: &spec.Bound{Int: 32}}},
 	{ID: 1, Name: "Connected", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ThreadCapabilitiesBitmap is the ThreadCapabilitiesBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ThreadCapabilitiesBitmap uint16
 
 // ThreadCapabilitiesBitmap bits; a member wider than one bit is its mask.
@@ -167,8 +157,6 @@ const (
 )
 
 // ThreadCapabilitiesBitmapDef describes ThreadCapabilitiesBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThreadCapabilitiesBitmapDef = &spec.Bitmap{Name: "ThreadCapabilitiesBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "IsBorderRouterCapable", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 	{Name: "IsRouterCapable", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
@@ -234,8 +222,6 @@ func (v ThreadInterfaceScanResultStruct) Clone() ThreadInterfaceScanResultStruct
 }
 
 // ThreadInterfaceScanResultStructDef describes ThreadInterfaceScanResultStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThreadInterfaceScanResultStructDef = &spec.Struct{Name: "ThreadInterfaceScanResultStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PanId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 65534", Max: &spec.Bound{Int: 65534}}},
 	{ID: 1, Name: "ExtendedPanId", Type: spec.Type{Name: "uint64", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -248,8 +234,6 @@ var ThreadInterfaceScanResultStructDef = &spec.Struct{Name: "ThreadInterfaceScan
 }}
 
 // WiFiBandEnum is the WiFiBandEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type WiFiBandEnum uint8
 
 // WiFiBandEnum values.
@@ -263,8 +247,6 @@ const (
 )
 
 // WiFiBandEnumDef describes WiFiBandEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WiFiBandEnumDef = &spec.Enum{Name: "WiFiBandEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "2G4", Conformance: spec.Conformance{Text: "O.b+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
 	{Value: 1, Name: "3G65", Conformance: spec.Conformance{Text: "O.b+", Op: spec.ConfChoice, Choice: &spec.Choice{Name: "b", Num: 1, OrMore: true, OrLess: false}, Args: []spec.Conformance{{Op: spec.ConfOptional}}}},
@@ -347,8 +329,6 @@ func (v WiFiInterfaceScanResultStruct) Clone() WiFiInterfaceScanResultStruct {
 }
 
 // WiFiInterfaceScanResultStructDef describes WiFiInterfaceScanResultStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WiFiInterfaceScanResultStructDef = &spec.Struct{Name: "WiFiInterfaceScanResultStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Security", Type: spec.Type{Name: "WiFiSecurityBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: WiFiSecurityBitmapDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Ssid", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
@@ -359,8 +339,6 @@ var WiFiInterfaceScanResultStructDef = &spec.Struct{Name: "WiFiInterfaceScanResu
 }}
 
 // WiFiSecurityBitmap is the WiFiSecurityBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type WiFiSecurityBitmap uint8
 
 // WiFiSecurityBitmap bits; a member wider than one bit is its mask.
@@ -373,8 +351,6 @@ const (
 )
 
 // WiFiSecurityBitmapDef describes WiFiSecurityBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var WiFiSecurityBitmapDef = &spec.Bitmap{Name: "WiFiSecurityBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Unencrypted", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Wep", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

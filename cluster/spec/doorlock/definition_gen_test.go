@@ -23,6 +23,38 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeaturePinCredential, FeatureRfidCredential, FeatureFingerCredentials, FeatureWeekDayAccessSchedules, FeatureDoorPositionSensor, FeatureFaceCredentials, FeatureCredentialOverTheAirAccess, FeatureUser, FeatureYearDayAccessSchedules, FeatureHolidaySchedules, FeatureUnbolting, FeatureAliroProvisioning, FeatureAliroBleuwb)
+	spectest.CheckEnum[AlarmCodeEnum](t, AlarmCodeEnumDef, AlarmCodeLockJammed, AlarmCodeLockFactoryReset, AlarmCodeLockRadioPowerCycled, AlarmCodeWrongCodeEntryLimit, AlarmCodeFrontEsceutcheonRemoved, AlarmCodeDoorForcedOpen, AlarmCodeDoorAjar, AlarmCodeForcedUser)
+	spectest.CheckBitmap[AlarmMaskBitmap](t, AlarmMaskBitmapDef, AlarmMaskLockJammed, AlarmMaskLockFactoryReset, AlarmMaskLockRadioPowerCycled, AlarmMaskWrongCodeEntryLimit, AlarmMaskFrontEscutcheonRemoved, AlarmMaskDoorForcedOpen)
+	spectest.CheckBitmap[ConfigurationRegisterBitmap](t, ConfigurationRegisterBitmapDef, ConfigurationRegisterLocalProgramming, ConfigurationRegisterKeypadInterface, ConfigurationRegisterRemoteInterface, ConfigurationRegisterSoundVolume, ConfigurationRegisterAutoRelockTime, ConfigurationRegisterLedSettings)
+	spectest.CheckEnum[CredentialRuleEnum](t, CredentialRuleEnumDef, CredentialRuleSingle, CredentialRuleDual, CredentialRuleTri)
+	spectest.CheckBitmap[CredentialRulesBitmap](t, CredentialRulesBitmapDef, CredentialRulesSingle, CredentialRulesDual, CredentialRulesTri)
+	spectest.CheckEnum[CredentialTypeEnum](t, CredentialTypeEnumDef, CredentialTypeProgrammingPin, CredentialTypePin, CredentialTypeRfid, CredentialTypeFingerprint, CredentialTypeFingerVein, CredentialTypeFace, CredentialTypeAliroCredentialIssuerKey, CredentialTypeAliroEvictableEndpointKey, CredentialTypeAliroNonEvictableEndpointKey)
+	spectest.CheckEnum[DataOperationTypeEnum](t, DataOperationTypeEnumDef, DataOperationTypeAdd, DataOperationTypeClear, DataOperationTypeModify)
+	spectest.CheckBitmap[DaysMaskBitmap](t, DaysMaskBitmapDef, DaysMaskSunday, DaysMaskMonday, DaysMaskTuesday, DaysMaskWednesday, DaysMaskThursday, DaysMaskFriday, DaysMaskSaturday)
+	spectest.CheckEnum[DoorStateEnum](t, DoorStateEnumDef, DoorStateDoorOpen, DoorStateDoorClosed, DoorStateDoorJammed, DoorStateDoorForcedOpen, DoorStateDoorUnspecifiedError, DoorStateDoorAjar)
+	spectest.CheckEnum[EventTypeEnum](t, EventTypeEnumDef, EventTypeOperation, EventTypeProgramming, EventTypeAlarm)
+	spectest.CheckEnum[LEDSettingEnum](t, LEDSettingEnumDef, LEDSettingNoLedSignal, LEDSettingNoLedSignalAccessAllowed, LEDSettingLedSignalAll)
+	spectest.CheckBitmap[LocalProgrammingFeaturesBitmap](t, LocalProgrammingFeaturesBitmapDef, LocalProgrammingFeaturesAddUsersCredentialsSchedules, LocalProgrammingFeaturesModifyUsersCredentialsSchedules, LocalProgrammingFeaturesClearUsersCredentialsSchedules, LocalProgrammingFeaturesAdjustSettings)
+	spectest.CheckEnum[LockDataTypeEnum](t, LockDataTypeEnumDef, LockDataTypeUnspecified, LockDataTypeProgrammingCode, LockDataTypeUserIndex, LockDataTypeWeekDaySchedule, LockDataTypeYearDaySchedule, LockDataTypeHolidaySchedule, LockDataTypePin, LockDataTypeRfid, LockDataTypeFingerprint, LockDataTypeFingerVein, LockDataTypeFace, LockDataTypeAliroCredentialIssuerKey, LockDataTypeAliroEvictableEndpointKey, LockDataTypeAliroNonEvictableEndpointKey)
+	spectest.CheckEnum[LockOperationTypeEnum](t, LockOperationTypeEnumDef, LockOperationTypeLock, LockOperationTypeUnlock, LockOperationTypeNonAccessUserEvent, LockOperationTypeForcedUserEvent, LockOperationTypeUnlatch)
+	spectest.CheckEnum[LockStateEnum](t, LockStateEnumDef, LockStateNotFullyLocked, LockStateLocked, LockStateUnlocked, LockStateUnlatched)
+	spectest.CheckEnum[LockTypeEnum](t, LockTypeEnumDef, LockTypeDeadBolt, LockTypeMagnetic, LockTypeOther, LockTypeMortise, LockTypeRim, LockTypeLatchBolt, LockTypeCylindricalLock, LockTypeTubularLock, LockTypeInterconnectedLock, LockTypeDeadLatch, LockTypeDoorFurniture, LockTypeEurocylinder)
+	spectest.CheckEnum[OperatingModeEnum](t, OperatingModeEnumDef, OperatingModeNormal, OperatingModeVacation, OperatingModePrivacy, OperatingModeNoRemoteLockUnlock, OperatingModePassage)
+	spectest.CheckBitmap[OperatingModesBitmap](t, OperatingModesBitmapDef, OperatingModesNormal, OperatingModesVacation, OperatingModesPrivacy, OperatingModesNoRemoteLockUnlock, OperatingModesPassage, OperatingModesAlwaysSet)
+	spectest.CheckEnum[OperationErrorEnum](t, OperationErrorEnumDef, OperationErrorUnspecified, OperationErrorInvalidCredential, OperationErrorDisabledUserDenied, OperationErrorRestricted, OperationErrorInsufficientBattery)
+	spectest.CheckEnum[OperationSourceEnum](t, OperationSourceEnumDef, OperationSourceUnspecified, OperationSourceManual, OperationSourceProprietaryRemote, OperationSourceKeypad, OperationSourceAuto, OperationSourceButton, OperationSourceSchedule, OperationSourceRemote, OperationSourceRfid, OperationSourceBiometric, OperationSourceAliro)
+	spectest.CheckEnum[SoundVolumeEnum](t, SoundVolumeEnumDef, SoundVolumeSilent, SoundVolumeLow, SoundVolumeHigh, SoundVolumeMedium)
+	spectest.CheckEnum[StatusCodeEnum](t, StatusCodeEnumDef, StatusCodeDuplicate, StatusCodeOccupied)
+	spectest.CheckEnum[UserStatusEnum](t, UserStatusEnumDef, UserStatusAvailable, UserStatusOccupiedEnabled, UserStatusOccupiedDisabled)
+	spectest.CheckEnum[UserTypeEnum](t, UserTypeEnumDef, UserTypeUnrestrictedUser, UserTypeYearDayScheduleUser, UserTypeWeekDayScheduleUser, UserTypeProgrammingUser, UserTypeNonAccessUser, UserTypeForcedUser, UserTypeDisposableUser, UserTypeExpiringUser, UserTypeScheduleRestrictedUser, UserTypeRemoteOnlyUser)
+	spectest.CheckEnum[Status](t, StatusDef, StatusSuccess, StatusFailure, StatusInvalidSubscription, StatusUnsupportedAccess, StatusUnsupportedEndpoint, StatusInvalidAction, StatusUnsupportedCommand, StatusInvalidCommand, StatusUnsupportedAttribute, StatusConstraintError, StatusUnsupportedWrite, StatusResourceExhausted, StatusNotFound, StatusInvalidDataType, StatusUnsupportedRead, StatusDataVersionMismatch, StatusTimeout, StatusUnsupportedNode, StatusBusy, StatusAccessRestricted, StatusUnsupportedCluster, StatusNeedsTimedInteraction, StatusUnsupportedEvent, StatusPathsExhausted, StatusTimedRequestMismatch, StatusFailsafeRequired, StatusInvalidInState, StatusNoCommandResponse, StatusTermsAndConditionsChanged, StatusMaintenanceRequired, StatusDynamicConstraintError, StatusAlreadyExists, StatusInvalidTransportType)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {

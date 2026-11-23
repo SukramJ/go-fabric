@@ -56,12 +56,11 @@ const (
 
 // Feature is a Actions FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the Actions cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ActionErrorEnum is the ActionErrorEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ActionErrorEnum uint8
 
 // ActionErrorEnum values.
@@ -71,16 +70,12 @@ const (
 )
 
 // ActionErrorEnumDef describes ActionErrorEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ActionErrorEnumDef = &spec.Enum{Name: "ActionErrorEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Unknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Interrupted", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ActionStateEnum is the ActionStateEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ActionStateEnum uint8
 
 // ActionStateEnum values.
@@ -92,8 +87,6 @@ const (
 )
 
 // ActionStateEnumDef describes ActionStateEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ActionStateEnumDef = &spec.Enum{Name: "ActionStateEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Inactive", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Active", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -136,8 +129,6 @@ func (v *ActionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ActionStructDef describes ActionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ActionStructDef = &spec.Struct{Name: "ActionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ActionId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128{32}", Max: &spec.Bound{Int: 128}, CpMax: 32}},
@@ -148,8 +139,6 @@ var ActionStructDef = &spec.Struct{Name: "ActionStruct", Fields: []spec.Field{
 }}
 
 // ActionTypeEnum is the ActionTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ActionTypeEnum uint8
 
 // ActionTypeEnum values.
@@ -164,8 +153,6 @@ const (
 )
 
 // ActionTypeEnumDef describes ActionTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ActionTypeEnumDef = &spec.Enum{Name: "ActionTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Other", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Scene", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -177,8 +164,6 @@ var ActionTypeEnumDef = &spec.Enum{Name: "ActionTypeEnum", Bits: 8, Values: []sp
 }}
 
 // CommandBits is the CommandBits map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type CommandBits uint16
 
 // CommandBits bits; a member wider than one bit is its mask.
@@ -198,8 +183,6 @@ const (
 )
 
 // CommandBitsDef describes CommandBits.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var CommandBitsDef = &spec.Bitmap{Name: "CommandBits", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "InstantAction", Bit: 0, Width: 1},
 	{Name: "InstantActionWithTransition", Bit: 1, Width: 1},
@@ -260,8 +243,6 @@ func (v EndpointListStruct) Clone() EndpointListStruct {
 }
 
 // EndpointListStructDef describes EndpointListStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EndpointListStructDef = &spec.Struct{Name: "EndpointListStruct", Fields: []spec.Field{
 	{ID: 0, Name: "EndpointListId", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 128{32}", Max: &spec.Bound{Int: 128}, CpMax: 32}},
@@ -270,8 +251,6 @@ var EndpointListStructDef = &spec.Struct{Name: "EndpointListStruct", Fields: []s
 }}
 
 // EndpointListTypeEnum is the EndpointListTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type EndpointListTypeEnum uint8
 
 // EndpointListTypeEnum values.
@@ -282,8 +261,6 @@ const (
 )
 
 // EndpointListTypeEnumDef describes EndpointListTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var EndpointListTypeEnumDef = &spec.Enum{Name: "EndpointListTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Other", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Room", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

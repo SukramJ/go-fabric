@@ -38,8 +38,6 @@ const (
 )
 
 // Feature is a ElectricalGridConditions FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -82,8 +80,6 @@ func (v *ElectricalGridConditionsStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ElectricalGridConditionsStructDef describes ElectricalGridConditionsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ElectricalGridConditionsStructDef = &spec.Struct{Name: "ElectricalGridConditionsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "PeriodStart", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "PeriodEnd", Type: spec.Type{Name: "epoch-s", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}, Constraint: spec.Constraint{Text: "min periodStart + 1", Min: &spec.Bound{Expr: "{\"type\":\"+\",\"lhs\":{\"type\":\"reference\",\"name\":\"periodStart\"},\"rhs\":1}"}}},
@@ -94,8 +90,6 @@ var ElectricalGridConditionsStructDef = &spec.Struct{Name: "ElectricalGridCondit
 }}
 
 // ThreeLevelEnum is the ThreeLevelEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ThreeLevelEnum uint8
 
 // ThreeLevelEnum values.
@@ -106,8 +100,6 @@ const (
 )
 
 // ThreeLevelEnumDef describes ThreeLevelEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ThreeLevelEnumDef = &spec.Enum{Name: "ThreeLevelEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Medium", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

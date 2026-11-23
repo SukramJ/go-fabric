@@ -49,8 +49,6 @@ const (
 )
 
 // Feature is a OccupancySensing FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -92,8 +90,6 @@ func (v *HoldTimeLimitsStruct) DecodeTLV(n spec.Node) error {
 }
 
 // HoldTimeLimitsStructDef describes HoldTimeLimitsStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var HoldTimeLimitsStructDef = &spec.Struct{Name: "HoldTimeLimitsStruct", Fields: []spec.Field{
 	{ID: 0, Name: "HoldTimeMin", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 	{ID: 1, Name: "HoldTimeMax", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min maxOf(holdTimeMin, 10)", Min: &spec.Bound{Expr: "{\"type\":\"maxOf\",\"args\":[{\"type\":\"reference\",\"name\":\"holdTimeMin\"},10]}"}}},
@@ -101,8 +97,6 @@ var HoldTimeLimitsStructDef = &spec.Struct{Name: "HoldTimeLimitsStruct", Fields:
 }}
 
 // OccupancyBitmap is the OccupancyBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OccupancyBitmap uint8
 
 // OccupancyBitmap bits; a member wider than one bit is its mask.
@@ -111,15 +105,11 @@ const (
 )
 
 // OccupancyBitmapDef describes OccupancyBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OccupancyBitmapDef = &spec.Bitmap{Name: "OccupancyBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Occupied", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // OccupancySensorTypeBitmap is the OccupancySensorTypeBitmap map8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OccupancySensorTypeBitmap uint8
 
 // OccupancySensorTypeBitmap bits; a member wider than one bit is its mask.
@@ -130,8 +120,6 @@ const (
 )
 
 // OccupancySensorTypeBitmapDef describes OccupancySensorTypeBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OccupancySensorTypeBitmapDef = &spec.Bitmap{Name: "OccupancySensorTypeBitmap", Bits: 8, Members: []spec.BitmapMember{
 	{Name: "Pir", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "Ultrasonic", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -139,8 +127,6 @@ var OccupancySensorTypeBitmapDef = &spec.Bitmap{Name: "OccupancySensorTypeBitmap
 }}
 
 // OccupancySensorTypeEnum is the OccupancySensorTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OccupancySensorTypeEnum uint8
 
 // OccupancySensorTypeEnum values.
@@ -152,8 +138,6 @@ const (
 )
 
 // OccupancySensorTypeEnumDef describes OccupancySensorTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OccupancySensorTypeEnumDef = &spec.Enum{Name: "OccupancySensorTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Pir", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Ultrasonic", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

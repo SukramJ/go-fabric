@@ -45,8 +45,6 @@ const (
 )
 
 // Feature is a Messages FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -58,8 +56,6 @@ const (
 )
 
 // FutureMessagePreferenceEnum is the FutureMessagePreferenceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type FutureMessagePreferenceEnum uint8
 
 // FutureMessagePreferenceEnum values.
@@ -72,8 +68,6 @@ const (
 )
 
 // FutureMessagePreferenceEnumDef describes FutureMessagePreferenceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var FutureMessagePreferenceEnumDef = &spec.Enum{Name: "FutureMessagePreferenceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Allowed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Increased", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -83,8 +77,6 @@ var FutureMessagePreferenceEnumDef = &spec.Enum{Name: "FutureMessagePreferenceEn
 }}
 
 // MessageControlBitmap is the MessageControlBitmap map16.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MessageControlBitmap uint16
 
 // MessageControlBitmap bits; a member wider than one bit is its mask.
@@ -97,8 +89,6 @@ const (
 )
 
 // MessageControlBitmapDef describes MessageControlBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MessageControlBitmapDef = &spec.Bitmap{Name: "MessageControlBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "ConfirmationRequired", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "CONF", Op: spec.ConfName, Name: "CONF"}},
 	{Name: "ResponseRequired", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "RESP", Op: spec.ConfName, Name: "RESP"}},
@@ -108,8 +98,6 @@ var MessageControlBitmapDef = &spec.Bitmap{Name: "MessageControlBitmap", Bits: 1
 }}
 
 // MessagePriorityEnum is the MessagePriorityEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MessagePriorityEnum uint8
 
 // MessagePriorityEnum values.
@@ -121,8 +109,6 @@ const (
 )
 
 // MessagePriorityEnumDef describes MessagePriorityEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MessagePriorityEnumDef = &spec.Enum{Name: "MessagePriorityEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Low", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Medium", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -153,8 +139,6 @@ func (v *MessageResponseOptionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // MessageResponseOptionStructDef describes MessageResponseOptionStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MessageResponseOptionStructDef = &spec.Struct{Name: "MessageResponseOptionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MessageResponseId", Type: spec.Type{Name: "uint32", Kind: spec.KindUint, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 	{ID: 1, Name: "Label", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 32", Max: &spec.Bound{Int: 32}}},
@@ -231,8 +215,6 @@ func (v MessageStruct) Clone() MessageStruct {
 }
 
 // MessageStructDef describes MessageStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MessageStructDef = &spec.Struct{Name: "MessageStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MessageId", Type: spec.Type{Name: "MessageID", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "16", Value: &spec.Bound{Int: 16}}, FabricSensitive: true},
 	{ID: 1, Name: "Priority", Type: spec.Type{Name: "MessagePriorityEnum", Kind: spec.KindEnum, Bits: 8, Enum: MessagePriorityEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, FabricSensitive: true},

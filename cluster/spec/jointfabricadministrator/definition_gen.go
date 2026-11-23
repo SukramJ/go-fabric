@@ -45,12 +45,11 @@ const (
 
 // Feature is a JointFabricAdministrator FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the JointFabricAdministrator cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // ICACCSRResponseStatusCodeEnum is the ICACCSRResponseStatusCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ICACCSRResponseStatusCodeEnum uint8
 
 // ICACCSRResponseStatusCodeEnum values.
@@ -64,8 +63,6 @@ const (
 )
 
 // ICACCSRResponseStatusCodeEnumDef describes ICACCSRResponseStatusCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ICACCSRResponseStatusCodeEnumDef = &spec.Enum{Name: "ICACCSRResponseStatusCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ok", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Busy", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -76,8 +73,6 @@ var ICACCSRResponseStatusCodeEnumDef = &spec.Enum{Name: "ICACCSRResponseStatusCo
 }}
 
 // ICACResponseStatusEnum is the ICACResponseStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ICACResponseStatusEnum uint8
 
 // ICACResponseStatusEnum values.
@@ -88,8 +83,6 @@ const (
 )
 
 // ICACResponseStatusEnumDef describes ICACResponseStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ICACResponseStatusEnumDef = &spec.Enum{Name: "ICACResponseStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ok", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "InvalidPublicKey", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -97,8 +90,6 @@ var ICACResponseStatusEnumDef = &spec.Enum{Name: "ICACResponseStatusEnum", Bits:
 }}
 
 // TransferAnchorResponseStatusEnum is the TransferAnchorResponseStatusEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TransferAnchorResponseStatusEnum uint8
 
 // TransferAnchorResponseStatusEnum values.
@@ -109,8 +100,6 @@ const (
 )
 
 // TransferAnchorResponseStatusEnumDef describes TransferAnchorResponseStatusEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TransferAnchorResponseStatusEnumDef = &spec.Enum{Name: "TransferAnchorResponseStatusEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ok", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "TransferAnchorStatusDatastoreBusy", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

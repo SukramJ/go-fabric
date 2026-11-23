@@ -33,12 +33,11 @@ const (
 
 // Feature is a IlluminanceMeasurement FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the IlluminanceMeasurement cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // LightSensorTypeEnum is the LightSensorTypeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type LightSensorTypeEnum uint8
 
 // LightSensorTypeEnum values.
@@ -48,8 +47,6 @@ const (
 )
 
 // LightSensorTypeEnumDef describes LightSensorTypeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var LightSensorTypeEnumDef = &spec.Enum{Name: "LightSensorTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Photodiode", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Cmos", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

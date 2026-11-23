@@ -44,12 +44,11 @@ const (
 
 // Feature is a CommissionerControl FeatureMap bit.
 //
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+// Deprecated: the CommissionerControl cluster has no features, so no value has this
+// type and nothing takes one. No replacement. Removable in v0.28.0.
 type Feature uint32
 
 // SupportedDeviceCategoryBitmap is the SupportedDeviceCategoryBitmap map32.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type SupportedDeviceCategoryBitmap uint32
 
 // SupportedDeviceCategoryBitmap bits; a member wider than one bit is its mask.
@@ -58,15 +57,11 @@ const (
 )
 
 // SupportedDeviceCategoryBitmapDef describes SupportedDeviceCategoryBitmap.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var SupportedDeviceCategoryBitmapDef = &spec.Bitmap{Name: "SupportedDeviceCategoryBitmap", Bits: 32, Members: []spec.BitmapMember{
 	{Name: "FabricSynchronization", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 }}
 
 // Status is the status enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Status uint8
 
 // Status values.
@@ -107,8 +102,6 @@ const (
 )
 
 // StatusDef describes status.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusDef = &spec.Enum{Name: "status", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success"},
 	{Value: 1, Name: "Failure"},

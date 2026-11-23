@@ -62,8 +62,6 @@ const (
 )
 
 // Feature is a TimeSynchronization FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -100,8 +98,6 @@ func (v *DSTOffsetStruct) DecodeTLV(n spec.Node) error {
 }
 
 // DSTOffsetStructDef describes DSTOffsetStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DSTOffsetStructDef = &spec.Struct{Name: "DSTOffsetStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Offset", Type: spec.Type{Name: "int32", Kind: spec.KindInt, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 1, Name: "ValidStarting", Type: spec.Type{Name: "epoch-us", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -131,16 +127,12 @@ func (v *FabricScopedTrustedTimeSourceStruct) DecodeTLV(n spec.Node) error {
 }
 
 // FabricScopedTrustedTimeSourceStructDef describes FabricScopedTrustedTimeSourceStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var FabricScopedTrustedTimeSourceStructDef = &spec.Struct{Name: "FabricScopedTrustedTimeSourceStruct", Fields: []spec.Field{
 	{ID: 0, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "Endpoint", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // GranularityEnum is the GranularityEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type GranularityEnum uint8
 
 // GranularityEnum values.
@@ -153,8 +145,6 @@ const (
 )
 
 // GranularityEnumDef describes GranularityEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GranularityEnumDef = &spec.Enum{Name: "GranularityEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "NoTimeGranularity", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "MinutesGranularity", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -164,8 +154,6 @@ var GranularityEnumDef = &spec.Enum{Name: "GranularityEnum", Bits: 8, Values: []
 }}
 
 // StatusCodeEnum is the StatusCodeEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type StatusCodeEnum uint8
 
 // StatusCodeEnum values.
@@ -174,15 +162,11 @@ const (
 )
 
 // StatusCodeEnumDef describes StatusCodeEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var StatusCodeEnumDef = &spec.Enum{Name: "StatusCodeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 2, Name: "TimeNotAccepted", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // TimeSourceEnum is the TimeSourceEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TimeSourceEnum uint8
 
 // TimeSourceEnum values.
@@ -207,8 +191,6 @@ const (
 )
 
 // TimeSourceEnumDef describes TimeSourceEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TimeSourceEnumDef = &spec.Enum{Name: "TimeSourceEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "None", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Unknown", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -230,8 +212,6 @@ var TimeSourceEnumDef = &spec.Enum{Name: "TimeSourceEnum", Bits: 8, Values: []sp
 }}
 
 // TimeZoneDatabaseEnum is the TimeZoneDatabaseEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type TimeZoneDatabaseEnum uint8
 
 // TimeZoneDatabaseEnum values.
@@ -242,8 +222,6 @@ const (
 )
 
 // TimeZoneDatabaseEnumDef describes TimeZoneDatabaseEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TimeZoneDatabaseEnumDef = &spec.Enum{Name: "TimeZoneDatabaseEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Full", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Partial", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -291,8 +269,6 @@ func (v TimeZoneStruct) Clone() TimeZoneStruct {
 }
 
 // TimeZoneStructDef describes TimeZoneStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TimeZoneStructDef = &spec.Struct{Name: "TimeZoneStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Offset", Type: spec.Type{Name: "int32", Kind: spec.KindInt, Bits: 32}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "-43200 to 50400", Min: &spec.Bound{Int: -43200}, Max: &spec.Bound{Int: 50400}}},
 	{ID: 1, Name: "ValidAt", Type: spec.Type{Name: "epoch-us", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -325,8 +301,6 @@ func (v *TrustedTimeSourceStruct) DecodeTLV(n spec.Node) error {
 }
 
 // TrustedTimeSourceStructDef describes TrustedTimeSourceStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var TrustedTimeSourceStructDef = &spec.Struct{Name: "TrustedTimeSourceStruct", Fields: []spec.Field{
 	{ID: 0, Name: "FabricIndex", Type: spec.Type{Name: "fabric-idx", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{ID: 1, Name: "NodeId", Type: spec.Type{Name: "node-id", Kind: spec.KindUint, Bits: 64}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

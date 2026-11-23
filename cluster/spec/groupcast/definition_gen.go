@@ -50,8 +50,6 @@ const (
 )
 
 // Feature is a Groupcast FeatureMap bit.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -62,8 +60,6 @@ const (
 )
 
 // GroupcastTestingEnum is the GroupcastTestingEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type GroupcastTestingEnum uint8
 
 // GroupcastTestingEnum values.
@@ -74,8 +70,6 @@ const (
 )
 
 // GroupcastTestingEnumDef describes GroupcastTestingEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GroupcastTestingEnumDef = &spec.Enum{Name: "GroupcastTestingEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "DisableTesting", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "EnableListenerTesting", Conformance: spec.Conformance{Text: "LN", Op: spec.ConfName, Name: "LN"}},
@@ -83,8 +77,6 @@ var GroupcastTestingEnumDef = &spec.Enum{Name: "GroupcastTestingEnum", Bits: 8, 
 }}
 
 // GroupcastTestResultEnum is the GroupcastTestResultEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type GroupcastTestResultEnum uint8
 
 // GroupcastTestResultEnum values.
@@ -98,8 +90,6 @@ const (
 )
 
 // GroupcastTestResultEnumDef describes GroupcastTestResultEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var GroupcastTestResultEnumDef = &spec.Enum{Name: "GroupcastTestResultEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "GeneralError", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -173,8 +163,6 @@ func (v MembershipStruct) Clone() MembershipStruct {
 }
 
 // MembershipStructDef describes MembershipStruct.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MembershipStructDef = &spec.Struct{Name: "MembershipStruct", Fields: []spec.Field{
 	{ID: 0, Name: "GroupId", Type: spec.Type{Name: "group-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "min 1", Min: &spec.Bound{Int: 1}}},
 	{ID: 1, Name: "Endpoints", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "endpoint-no", Kind: spec.KindUint, Bits: 16}}}, Conformance: spec.Conformance{Text: "LN", Op: spec.ConfName, Name: "LN"}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
@@ -185,8 +173,6 @@ var MembershipStructDef = &spec.Struct{Name: "MembershipStruct", Fields: []spec.
 }}
 
 // MulticastAddrPolicyEnum is the MulticastAddrPolicyEnum enum8.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type MulticastAddrPolicyEnum uint8
 
 // MulticastAddrPolicyEnum values.
@@ -196,8 +182,6 @@ const (
 )
 
 // MulticastAddrPolicyEnumDef describes MulticastAddrPolicyEnum.
-//
-// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var MulticastAddrPolicyEnumDef = &spec.Enum{Name: "MulticastAddrPolicyEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "IanaAddr", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "PerGroup", Conformance: spec.Conformance{Text: "PGA", Op: spec.ConfName, Name: "PGA"}},

@@ -23,6 +23,38 @@ func TestDefinitionMatchesSnapshot(t *testing.T) {
 	spectest.CheckDefinition(t, Definition)
 }
 
+// TestConstantsMatchTheDefinition holds the generated constants
+// against the definition and the datatype descriptors.
+func TestConstantsMatchTheDefinition(t *testing.T) {
+	t.Parallel()
+	spectest.CheckFeatures[Feature](t, Definition, FeatureHeating, FeatureCooling, FeatureOccupancy, FeatureSetback, FeatureAutoMode, FeatureLocalTemperatureNotExposed, FeatureMatterScheduleConfiguration, FeaturePresets, FeatureEvents, FeatureThermostatSuggestions)
+	spectest.CheckEnum[ACCapacityFormatEnum](t, ACCapacityFormatEnumDef, ACCapacityFormatBtUh)
+	spectest.CheckEnum[ACCompressorTypeEnum](t, ACCompressorTypeEnumDef, ACCompressorTypeUnknown, ACCompressorTypeT1, ACCompressorTypeT2, ACCompressorTypeT3)
+	spectest.CheckBitmap[ACErrorCodeBitmap](t, ACErrorCodeBitmapDef, ACErrorCodeCompressorFail, ACErrorCodeRoomSensorFail, ACErrorCodeOutdoorSensorFail, ACErrorCodeCoilSensorFail, ACErrorCodeFanFail)
+	spectest.CheckEnum[ACLouverPositionEnum](t, ACLouverPositionEnumDef, ACLouverPositionClosed, ACLouverPositionOpen, ACLouverPositionQuarter, ACLouverPositionHalf, ACLouverPositionThreeQuarters)
+	spectest.CheckEnum[ACRefrigerantTypeEnum](t, ACRefrigerantTypeEnumDef, ACRefrigerantTypeUnknown, ACRefrigerantTypeR22, ACRefrigerantTypeR410A, ACRefrigerantTypeR407C)
+	spectest.CheckEnum[ACTypeEnum](t, ACTypeEnumDef, ACTypeUnknown, ACTypeCoolingFixed, ACTypeHeatPumpFixed, ACTypeCoolingInverter, ACTypeHeatPumpInverter)
+	spectest.CheckEnum[ControlSequenceOfOperationEnum](t, ControlSequenceOfOperationEnumDef, ControlSequenceOfOperationCoolingOnly, ControlSequenceOfOperationCoolingWithReheat, ControlSequenceOfOperationHeatingOnly, ControlSequenceOfOperationHeatingWithReheat, ControlSequenceOfOperationCoolingAndHeating, ControlSequenceOfOperationCoolingAndHeatingWithReheat)
+	spectest.CheckBitmap[HVACSystemTypeBitmap](t, HVACSystemTypeBitmapDef, HVACSystemTypeCoolingStage, HVACSystemTypeHeatingStage, HVACSystemTypeHeatingIsHeatPump, HVACSystemTypeHeatingUsesFuel)
+	spectest.CheckBitmap[OccupancyBitmap](t, OccupancyBitmapDef, OccupancyOccupied)
+	spectest.CheckEnum[PresetScenarioEnum](t, PresetScenarioEnumDef, PresetScenarioOccupied, PresetScenarioUnoccupied, PresetScenarioSleep, PresetScenarioWake, PresetScenarioVacation, PresetScenarioGoingToSleep, PresetScenarioUserDefined)
+	spectest.CheckBitmap[PresetTypeFeaturesBitmap](t, PresetTypeFeaturesBitmapDef, PresetTypeFeaturesAutomatic, PresetTypeFeaturesSupportsNames)
+	spectest.CheckBitmap[ProgrammingOperationModeBitmap](t, ProgrammingOperationModeBitmapDef, ProgrammingOperationModeScheduleActive, ProgrammingOperationModeAutoRecovery, ProgrammingOperationModeEconomy)
+	spectest.CheckBitmap[RelayStateBitmap](t, RelayStateBitmapDef, RelayStateHeat, RelayStateCool, RelayStateFan, RelayStateHeatStage2, RelayStateCoolStage2, RelayStateFanStage2, RelayStateFanStage3)
+	spectest.CheckBitmap[RemoteSensingBitmap](t, RemoteSensingBitmapDef, RemoteSensingLocalTemperature, RemoteSensingOutdoorTemperature, RemoteSensingOccupancy)
+	spectest.CheckBitmap[ScheduleDayOfWeekBitmap](t, ScheduleDayOfWeekBitmapDef, ScheduleDayOfWeekSunday, ScheduleDayOfWeekMonday, ScheduleDayOfWeekTuesday, ScheduleDayOfWeekWednesday, ScheduleDayOfWeekThursday, ScheduleDayOfWeekFriday, ScheduleDayOfWeekSaturday, ScheduleDayOfWeekAway)
+	spectest.CheckBitmap[ScheduleModeBitmap](t, ScheduleModeBitmapDef, ScheduleModeHeatSetpointPresent, ScheduleModeCoolSetpointPresent)
+	spectest.CheckEnum[SystemModeEnum](t, SystemModeEnumDef, SystemModeOff, SystemModeAuto, SystemModeCool, SystemModeHeat, SystemModeEmergencyHeat, SystemModePrecooling, SystemModeFanOnly, SystemModeDry, SystemModeSleep)
+	spectest.CheckBitmap[ScheduleTypeFeaturesBitmap](t, ScheduleTypeFeaturesBitmapDef, ScheduleTypeFeaturesSupportsPresets, ScheduleTypeFeaturesSupportsSetpoints, ScheduleTypeFeaturesSupportsNames, ScheduleTypeFeaturesSupportsOff)
+	spectest.CheckEnum[SetpointChangeSourceEnum](t, SetpointChangeSourceEnumDef, SetpointChangeSourceManual, SetpointChangeSourceSchedule, SetpointChangeSourceExternal)
+	spectest.CheckEnum[SetpointRaiseLowerModeEnum](t, SetpointRaiseLowerModeEnumDef, SetpointRaiseLowerModeHeat, SetpointRaiseLowerModeCool, SetpointRaiseLowerModeBoth)
+	spectest.CheckEnum[StartOfWeekEnum](t, StartOfWeekEnumDef, StartOfWeekSunday, StartOfWeekMonday, StartOfWeekTuesday, StartOfWeekWednesday, StartOfWeekThursday, StartOfWeekFriday, StartOfWeekSaturday)
+	spectest.CheckEnum[TemperatureSetpointHoldEnum](t, TemperatureSetpointHoldEnumDef, TemperatureSetpointHoldSetpointHoldOff, TemperatureSetpointHoldSetpointHoldOn)
+	spectest.CheckEnum[ThermostatRunningModeEnum](t, ThermostatRunningModeEnumDef, ThermostatRunningModeOff, ThermostatRunningModeCool, ThermostatRunningModeHeat)
+	spectest.CheckBitmap[ThermostatSuggestionNotFollowingReasonBitmap](t, ThermostatSuggestionNotFollowingReasonBitmapDef, ThermostatSuggestionNotFollowingReasonDemandResponseEvent, ThermostatSuggestionNotFollowingReasonOngoingHold, ThermostatSuggestionNotFollowingReasonSchedule, ThermostatSuggestionNotFollowingReasonOccupancy, ThermostatSuggestionNotFollowingReasonVacationMode, ThermostatSuggestionNotFollowingReasonTimeOfUseCostSavings, ThermostatSuggestionNotFollowingReasonPreCoolingOrPreHeating, ThermostatSuggestionNotFollowingReasonConflictingSuggestions)
+	spectest.CheckEnum[Status](t, StatusDef, StatusSuccess, StatusFailure, StatusInvalidSubscription, StatusUnsupportedAccess, StatusUnsupportedEndpoint, StatusInvalidAction, StatusUnsupportedCommand, StatusInvalidCommand, StatusUnsupportedAttribute, StatusConstraintError, StatusUnsupportedWrite, StatusResourceExhausted, StatusNotFound, StatusInvalidDataType, StatusUnsupportedRead, StatusDataVersionMismatch, StatusTimeout, StatusUnsupportedNode, StatusBusy, StatusAccessRestricted, StatusUnsupportedCluster, StatusNeedsTimedInteraction, StatusUnsupportedEvent, StatusPathsExhausted, StatusTimedRequestMismatch, StatusFailsafeRequired, StatusInvalidInState, StatusNoCommandResponse, StatusTermsAndConditionsChanged, StatusMaintenanceRequired, StatusDynamicConstraintError, StatusAlreadyExists, StatusInvalidTransportType)
+}
+
 // TestCodecsRoundTrip encodes a populated value of every generated
 // struct and payload and decodes it back.
 func TestCodecsRoundTrip(t *testing.T) {
