@@ -99,3 +99,15 @@ func BeforeStartBindingSync(n *Node, fn func()) { n.bindSync.testBeforeStartSync
 // AttachedBindings is the endpoints whose Binding server the binding
 // manager listens to.
 func AttachedBindings(n *Node) []uint16 { return n.bindings.Attached() }
+
+// FloodCallbacks queues k no-op callbacks on n's callback queue, as k
+// ObserveAsync deliveries would (review II, R4-err-4751).
+func FloodCallbacks(n *Node, k int) {
+	for range k {
+		n.callbacks.Enqueue(func() {})
+	}
+}
+
+// CallbacksDropped is the number of callbacks n's queue dropped at its
+// bound.
+func CallbacksDropped(n *Node) uint64 { return n.callbacks.Dropped() }

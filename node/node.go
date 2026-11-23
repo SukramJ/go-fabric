@@ -115,7 +115,12 @@ type Node struct {
 	// fabric event whose hooks queued one is acknowledged behind them
 	// (deliverOwedFabricEvents).
 	queuedCalls atomic.Uint64
-	advertiser  mdns.Advertiser
+	// owedHooks is set while deliverOwedFabricEvents runs an owed event's
+	// fabric hooks: an ObserveAsync OnFabricRemoved or OnFabricUpdated
+	// queued then is exempt from the callback queue's drop rule (queued;
+	// decision 615).
+	owedHooks  atomic.Bool
+	advertiser mdns.Advertiser
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
 	ownsAdvertiser bool
@@ -1155,7 +1160,7 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 	for i := range owed {
 		ev := &owed[i]
 		idx := ev.Fabric.FabricIndex
-		queued, dropped := n.queuedCalls.Load(), n.callbacks.Dropped()
+		queued := n.queuedCalls.Load()
 		switch ev.Kind {
 		case store.FabricPendingAdd:
 			removed[idx] = true
@@ -1171,11 +1176,11 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 				continue
 			}
 			n.logger.Warn("fabric.rolled_back_at_start", slog.Int("fabric_index", int(idx)))
-			n.fabricRemovedWith(ctx, fabricInfoOf(ev.Fabric))
+			n.owedHookCalls(func() { n.fabricRemovedWith(ctx, fabricInfoOf(ev.Fabric)) })
 		case store.FabricPendingUpdate:
 			n.logger.Warn("fabric.update_rolled_back_at_start", slog.Int("fabric_index", int(idx)))
 			n.closeClientFabricSessions(ctx, idx)
-			n.notifyFabricUpdated(ctx, idx)
+			n.owedHookCalls(func() { n.notifyFabricUpdated(ctx, idx) })
 		default:
 			n.logger.Warn("fabric.owed_event.unknown_kind", slog.Int("fabric_index", int(idx)), slog.String("kind", ev.Kind.String()))
 		}
@@ -1190,17 +1195,12 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 		}
 		// An ObserveAsync hook only queued its call: the event is
 		// acknowledged behind it on the same queue, once it ran (decision
-		// 600, review II R4-err-4751). A queue that dropped a call at its
-		// bound since may have dropped the hook's: the event stays owed,
-		// and the next start delivers it again.
+		// 600, review II R4-err-4751). The hook's call and the
+		// acknowledgement are exempt from the queue's drop rule (decision
+		// 615): a full queue drops other callbacks, never these, so the
+		// hook runs in this process and the acknowledgement after it.
 		ackCtx := context.WithoutCancel(ctx)
-		n.queued("owed_fabric_event_ack", func() {
-			if n.callbacks.Dropped() != dropped {
-				n.logger.Warn("fabric.owed_event.kept_after_drop", slog.Int("fabric_index", int(idx)))
-				return
-			}
-			ack(ackCtx)
-		})
+		n.queuedExempt("owed_fabric_event_ack", func() { ack(ackCtx) })
 	}
 	recs := n.root.OperationalCredentials.RolledBackFabrics()
 	for i := range recs {
@@ -1210,6 +1210,15 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 		n.logger.Warn("fabric.rolled_back_at_start", slog.Int("fabric_index", int(recs[i].FabricIndex)))
 		n.fabricRemovedWith(ctx, fabricInfoOf(recs[i]))
 	}
+}
+
+// owedHookCalls runs fn, an owed fabric event's hook fan-out, with the
+// ObserveAsync fabric hooks it queues exempt from the callback queue's
+// drop rule (owedHooks, queued; decision 615). The lifecycle slot is held.
+func (n *Node) owedHookCalls(fn func()) {
+	n.owedHooks.Store(true)
+	defer n.owedHooks.Store(false)
+	fn()
 }
 
 // fabricRemovedWith is the facade's fabricRemoved for info's fabric, then

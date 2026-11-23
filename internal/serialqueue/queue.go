@@ -8,6 +8,7 @@ package serialqueue
 
 import (
 	"log/slog"
+	"slices"
 	"sync"
 
 	"thingfabric.dev/go-fabric/internal/inflight"
@@ -24,7 +25,9 @@ import (
 // (`matter.callbacks.dropped`); when the queue runs empty again the
 // episode's count and the queue's total are logged at warn
 // (`matter.callbacks.overflow_ended`), so a host callback slower than the events
-// behind it costs those events, not unbounded memory. A callback
+// behind it costs those events, not unbounded memory. A callback queued
+// with [Queue.EnqueueExempt] is never dropped and not counted against
+// [Bound]; its caller bounds how many it queues. A callback
 // must not stop its own queue's owner: the stop would wait for the
 // callback that called it.
 type Queue struct {
@@ -32,9 +35,11 @@ type Queue struct {
 	// drain; it is taken before mu.
 	life sync.Mutex
 	// mu guards items, running and stopped; cond waits on mu.
-	mu      sync.Mutex
-	cond    *sync.Cond
-	items   []item
+	mu    sync.Mutex
+	cond  *sync.Cond
+	items []item
+	// exempt is the number of items queued with EnqueueExempt.
+	exempt  int
 	dropped uint64 // callbacks dropped at the bound, over the queue's life
 	// overflowing is set by a drop and cleared when the queue runs empty:
 	// one warning per episode, not one per dropped callback.
@@ -50,10 +55,12 @@ type Queue struct {
 	group func() *inflight.Group
 }
 
-// item is one queued callback and the group it is counted in.
+// item is one queued callback and the group it is counted in; an exempt
+// one is never dropped at the bound.
 type item struct {
-	fn func()
-	g  *inflight.Group
+	fn     func()
+	g      *inflight.Group
+	exempt bool
 }
 
 // CountIn makes every callback enqueued from now on count as work of the
@@ -67,7 +74,8 @@ func (q *Queue) CountIn(group func() *inflight.Group) {
 }
 
 // Bound is the number of queued callbacks that have not started a queue
-// holds; the one running is not counted.
+// holds; the one running and the exempt ones ([Queue.EnqueueExempt]) are
+// not counted.
 const Bound = 1024
 
 // New returns a queue that is not running.
@@ -78,7 +86,21 @@ func New() *Queue {
 }
 
 // Enqueue queues fn; a no-op for nil or while the queue does not run.
-func (q *Queue) Enqueue(fn func()) {
+// Past [Bound] the oldest queued callback that is not exempt is dropped.
+func (q *Queue) Enqueue(fn func()) { q.enqueue(fn, false) }
+
+// EnqueueExempt queues fn as [Queue.Enqueue] does, but exempt from the
+// drop rule: it is never dropped and does not count against [Bound], so
+// it runs in its place in the order while the queue runs (a no-op for nil
+// or while the queue does not run). The queue does not bound the exempt
+// callbacks; the caller does. The node queues its owed fabric events'
+// ObserveAsync hooks and their acknowledgements with it at start — at most
+// one call per owed event and async fabric hook plus one acknowledgement
+// per owed event, the few rollbacks the store owes (review II,
+// R4-err-4751, decision 615).
+func (q *Queue) EnqueueExempt(fn func()) { q.enqueue(fn, true) }
+
+func (q *Queue) enqueue(fn func(), exempt bool) {
 	if fn == nil {
 		return
 	}
@@ -87,27 +109,43 @@ func (q *Queue) Enqueue(fn func()) {
 	if !q.running {
 		return
 	}
-	it := item{fn: fn}
+	it := item{fn: fn, exempt: exempt}
 	if q.group != nil {
 		it.g = q.group()
 		it.g.Enter(inflight.DeviceCallbacks)
 	}
-	if len(q.items) >= Bound {
-		old := q.items[0]
-		q.items[0] = item{}
-		q.items = q.items[1:]
-		q.dropped++
-		old.g.Leave(inflight.DeviceCallbacks)
-		if !q.overflowing {
-			q.overflowing = true
-			q.episodeBase = q.dropped - 1
-			q.logger().Warn("matter.callbacks.dropped",
-				slog.Int("max", Bound),
-				slog.Uint64("dropped", q.dropped))
-		}
+	if !exempt && len(q.items)-q.exempt >= Bound {
+		q.dropOldestLocked()
+	}
+	if exempt {
+		q.exempt++
 	}
 	q.items = append(q.items, it)
 	q.cond.Signal()
+}
+
+// dropOldestLocked drops the oldest queued callback that is not exempt,
+// counts it and logs the first drop of an episode; q.mu is held and at
+// least one such callback is queued.
+func (q *Queue) dropOldestLocked() {
+	i := slices.IndexFunc(q.items, func(it item) bool { return !it.exempt })
+	old := q.items[i]
+	if i == 0 {
+		// The common case, no exempt callback ahead: no copy.
+		q.items[0] = item{}
+		q.items = q.items[1:]
+	} else {
+		q.items = slices.Delete(q.items, i, i+1)
+	}
+	q.dropped++
+	old.g.Leave(inflight.DeviceCallbacks)
+	if !q.overflowing {
+		q.overflowing = true
+		q.episodeBase = q.dropped - 1
+		q.logger().Warn("matter.callbacks.dropped",
+			slog.Int("max", Bound),
+			slog.Uint64("dropped", q.dropped))
+	}
 }
 
 // SetLogger sets the logger of the queue's warnings; nil logs through
@@ -192,6 +230,9 @@ func (q *Queue) run(done chan struct{}) {
 		it := q.items[0]
 		q.items[0] = item{}
 		q.items = q.items[1:]
+		if it.exempt {
+			q.exempt--
+		}
 		log := q.logger()
 		q.mu.Unlock()
 		if ended {

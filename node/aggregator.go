@@ -39,7 +39,8 @@ var (
 	ErrNoStableKey = errors.New("node: endpoint without a StableKey")
 	// ErrDuplicateKey: an endpoint with the key of one already added, in
 	// any partition, or with a key — its own or a part's — that another
-	// endpoint serves, itself or as a part (decision 580). In a [Batch]
+	// endpoint serves, itself or as a part (decision 580), or whose tree
+	// holds one key twice (decision 617; review II, R4-api-4790). In a [Batch]
 	// such a collision is judged against the batch's end state and the
 	// error arrives from [Partition.Batch], not from the call (decisions
 	// 582, 585).
@@ -1020,10 +1021,11 @@ func (b *Batch) addedLocked(key string, ep Endpoint) (int, bool) {
 // applied once more, its device as it is at the end of fn: a part added
 // to it during fn whose key — or its own key — another endpoint serves
 // would make the batch's reassembly, and every later one, assemble two
-// Specs under one key (decision 580). Such a take is refused with
-// [ErrDuplicateKey] and undone: an Add leaves the set and keeps the key's
-// reservation, a Replace puts the endpoint it replaced back (decision 585:
-// no path wedges; fable-diff-g5g N1). The takes are judged from the last
+// Specs under one key (decision 580), and so would a tree that came to
+// hold one key twice itself (R4-api-4790, decision 617). Such a take is
+// refused with [ErrDuplicateKey] and undone: an Add leaves the set and
+// keeps the key's reservation, a Replace puts the endpoint it replaced
+// back (decision 585: no path wedges; fable-diff-g5g N1). The takes are judged from the last
 // to the first, so of two that collide the later one goes; after a
 // Replace is undone, all are judged again against the endpoint put back.
 // A take the batch removed or replaced again is not the set's and not
@@ -1037,7 +1039,11 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 		if part == nil || !sameEndpoint(part.eps[i], t.ep) {
 			continue
 		}
-		k, ok := a.servedOfLocked(surfaceEntries(t.ep), part, i)
+		entries := surfaceEntries(t.ep)
+		k, ok := duplicateKey(entries)
+		if !ok {
+			k, ok = a.servedOfLocked(entries, part, i)
+		}
 		if !ok {
 			continue
 		}

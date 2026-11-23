@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"thingfabric.dev/go-fabric/internal/serialqueue"
 	"thingfabric.dev/go-fabric/node"
 	"thingfabric.dev/go-fabric/store"
 )
@@ -65,5 +66,54 @@ func TestOwedFabricRemovalAckedAfterTheQueuedHookRan(t *testing.T) {
 	}
 	if owed, err := store.New(openDB(t, path)).OwedFabricEvents(context.Background()); err != nil || len(owed) != 0 {
 		t.Fatalf("owed events after the hook ran: %+v, %v; want none", owed, err)
+	}
+}
+
+// TestOwedFabricRemovalSurvivesAFullCallbackQueue (review II,
+// R4-err-4751, decision 615): an owed event's ObserveAsync hooks and its
+// acknowledgement are exempt from the callback queue's drop rule — a
+// queue that overflows while the first hook still runs drops the other
+// callbacks, but the second hook runs in this process and the event is
+// acknowledged after it.
+func TestOwedFabricRemovalSurvivesAFullCallbackQueue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "node.db")
+	seedPendingAdd(t, path)
+	db := openDB(t, path)
+	cfg := minimalConfig(db)
+	counting := &ackCountingStore{Port: store.New(db)}
+	cfg.Store.Credentials = counting
+	n := newNode(t, cfg)
+	entered, release := make(chan struct{}), make(chan struct{})
+	n.ObserveAsync(node.Observers{OnFabricRemoved: func(node.FabricInfo) {
+		close(entered)
+		<-release
+	}})
+	var second atomic.Int32
+	n.ObserveAsync(node.Observers{OnFabricRemoved: func(node.FabricInfo) {
+		if got := counting.acks.Load(); got != 0 {
+			t.Errorf("%d acknowledgements before the second hook ran; want none", got)
+		}
+		second.Add(1)
+	}})
+	if err := n.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	<-entered
+	node.FloodCallbacks(n, serialqueue.Bound+10)
+	close(release)
+	if err := n.Stop(context.Background()); err != nil { // drains the callback queue
+		t.Fatalf("Stop: %v", err)
+	}
+	if got := node.CallbacksDropped(n); got == 0 {
+		t.Fatal("the flood dropped nothing; the test does not fill the queue")
+	}
+	if got := second.Load(); got != 1 {
+		t.Fatalf("the second hook ran %d times; want once, in this process", got)
+	}
+	if got := counting.acks.Load(); got != 1 {
+		t.Fatalf("%d acknowledgements after the hooks ran; want 1", got)
+	}
+	if owed, err := store.New(openDB(t, path)).OwedFabricEvents(context.Background()); err != nil || len(owed) != 0 {
+		t.Fatalf("owed events after the hooks ran: %+v, %v; want none", owed, err)
 	}
 }
