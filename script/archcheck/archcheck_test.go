@@ -38,11 +38,21 @@ type exception struct {
 
 // forbidden is a rule the layer order cannot state: a package matching one
 // of From must not import a package matching one of To, whatever their
-// layers. A pattern is a layers.json pattern ("x" or "x/...").
+// layers. A pattern is a layers.json pattern ("x" or "x/..."). Except names
+// the packages a from-pattern matches that the rule still does not hold, each
+// with its own reason (decision 583).
 type forbidden struct {
-	From   []string `json:"from"`
-	To     []string `json:"to"`
-	Reason string   `json:"reason"`
+	From   []string          `json:"from"`
+	To     []string          `json:"to"`
+	Except []forbiddenExcept `json:"except"`
+	Reason string            `json:"reason"`
+}
+
+// forbiddenExcept is one reasoned exception of a forbidden rule: Package (an
+// exact module-relative path) may import what the rule's to-patterns match.
+type forbiddenExcept struct {
+	Package string `json:"package"`
+	Reason  string `json:"reason"`
 }
 
 type rules struct {
@@ -59,6 +69,11 @@ func matchesAny(patterns []string, path string) bool {
 		}
 	}
 	return false
+}
+
+// excepted reports whether pkg is one of f's reasoned exceptions.
+func excepted(f forbidden, pkg string) bool {
+	return slices.ContainsFunc(f.Except, func(e forbiddenExcept) bool { return e.Package == pkg })
 }
 
 // matcher assigns a module-relative package path to a layer index.
@@ -140,12 +155,25 @@ func check(r rules, graph map[string][]string) []string {
 			out = append(out, fmt.Sprintf("%s -> %s (%s -> %s)", from, to, r.Layers[lf].Name, r.Layers[lt].Name))
 		}
 	}
+	usedExcept := map[[2]string]bool{} // {rule reason, package}
 	for _, from := range pkgs {
 		for _, to := range graph[from] {
 			for _, f := range r.Forbidden {
-				if matchesAny(f.From, from) && matchesAny(f.To, to) {
-					out = append(out, fmt.Sprintf("forbidden import: %s -> %s (%s)", from, to, f.Reason))
+				if !matchesAny(f.From, from) || !matchesAny(f.To, to) {
+					continue
 				}
+				if excepted(f, from) {
+					usedExcept[[2]string{f.Reason, from}] = true
+					continue
+				}
+				out = append(out, fmt.Sprintf("forbidden import: %s -> %s (%s)", from, to, f.Reason))
+			}
+		}
+	}
+	for _, f := range r.Forbidden {
+		for _, e := range f.Except {
+			if !usedExcept[[2]string{f.Reason, e.Package}] {
+				out = append(out, fmt.Sprintf("stale forbidden exception: %s no longer imports what the rule forbids (%s); remove it from layers.json", e.Package, f.Reason))
 			}
 		}
 	}
@@ -182,6 +210,14 @@ func loadRules(t *testing.T) rules {
 	for _, f := range r.Forbidden {
 		if len(f.From) == 0 || len(f.To) == 0 || strings.TrimSpace(f.Reason) == "" {
 			t.Fatalf("layers.json: forbidden rule %+v needs from, to and a reason", f)
+		}
+		for _, e := range f.Except {
+			if e.Package == "" || strings.HasSuffix(e.Package, "/...") || strings.TrimSpace(e.Reason) == "" {
+				t.Fatalf("layers.json: forbidden exception %+v needs an exact package and a reason", e)
+			}
+			if !matchesAny(f.From, e.Package) {
+				t.Fatalf("layers.json: forbidden exception %s matches none of the rule's from-patterns %q", e.Package, f.From)
+			}
 		}
 	}
 	return r
@@ -326,6 +362,48 @@ func TestCheckReportsUpwardStaleAndUnassigned(t *testing.T) {
 	}
 }
 
+// TestCheckReportsForbiddenSubPackages is the fixture of decision 583
+// (review II, R3-api-3780): a from-pattern bridge/... holds every non-test
+// sub-package of bridge, so bridge/x importing controller/... is reported,
+// while bridge/bridgetest, the rule's one reasoned exception, is not; and an
+// exception whose package no longer imports what the rule forbids is reported
+// as stale.
+func TestCheckReportsForbiddenSubPackages(t *testing.T) {
+	r := rules{
+		Layers: []layerDef{
+			{Name: "roles", Packages: []string{"bridge", "bridge/x", "controller/..."}},
+			{Name: "facade", Packages: []string{"node"}},
+			{Name: "support", Packages: []string{"bridge/bridgetest", "node/nodetest"}},
+		},
+		Forbidden: []forbidden{{
+			From: []string{"bridge/...", "node/..."},
+			To:   []string{"controller/..."},
+			Except: []forbiddenExcept{
+				{Package: "bridge/bridgetest", Reason: "test support"},
+				{Package: "node/nodetest", Reason: "test support"},
+			},
+			Reason: "siblings",
+		}},
+	}
+	graph := map[string][]string{
+		"bridge":                 nil,
+		"bridge/x":               {"controller/ca"},
+		"bridge/bridgetest":      {"controller/ca", "controller/attestation"},
+		"node":                   nil,
+		"node/nodetest":          nil,
+		"controller/ca":          nil,
+		"controller/attestation": nil,
+	}
+	got := check(r, graph)
+	want := []string{
+		"forbidden import: bridge/x -> controller/ca (siblings)",
+		"stale forbidden exception: node/nodetest no longer imports what the rule forbids (siblings); remove it from layers.json",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("check = %q, want %q", got, want)
+	}
+}
+
 // TestCheckReportsForbiddenImports is the forbidden rule's fixture
 // (review II, R3-api-3780, decision 556): an edge the layer order allows is
 // still reported when a forbidden rule names both ends, whichever layer
@@ -359,21 +437,36 @@ func TestCheckReportsForbiddenImports(t *testing.T) {
 	}
 }
 
-// TestADR0020SiblingRuleIsInTheRules holds the rule file to decision 556:
-// the forbidden rule that keeps bridge, node, device and endpoint off
-// controller/... is present, so deleting it from layers.json fails here
-// rather than silently disarming TestLayering.
+// TestADR0020SiblingRuleIsInTheRules holds the rule file to decisions 556
+// and 583: the forbidden rule that keeps bridge, node, device and endpoint
+// and every sub-package of them off controller/... is present, so deleting
+// or narrowing it in layers.json fails here rather than silently disarming
+// TestLayering; and its only exception is bridge/bridgetest, with a reason.
 func TestADR0020SiblingRuleIsInTheRules(t *testing.T) {
 	r := loadRules(t)
-	for _, from := range []string{"bridge", "node", "node/metrics/prom", "device", "device/light", "endpoint", "endpoint/sqlitestore"} {
+	for _, from := range []string{
+		"bridge", "bridge/x", "node", "node/metrics/prom",
+		"device", "device/light", "endpoint", "endpoint/sqlitestore", "endpoint/endpointtest",
+	} {
 		for _, to := range []string{"controller", "controller/dcl", "controller/attestation"} {
 			hit := false
 			for _, f := range r.Forbidden {
-				hit = hit || (matchesAny(f.From, from) && matchesAny(f.To, to))
+				hit = hit || (matchesAny(f.From, from) && matchesAny(f.To, to) && !excepted(f, from))
 			}
 			if !hit {
-				t.Errorf("no forbidden rule in layers.json keeps %s off %s (ADR 0020 decision 1, decision 556)", from, to)
+				t.Errorf("no forbidden rule in layers.json keeps %s off %s (ADR 0020 decision 1, decisions 556, 583)", from, to)
 			}
 		}
+	}
+	var exc []string
+	for _, f := range r.Forbidden {
+		if matchesAny(f.To, "controller") {
+			for _, e := range f.Except {
+				exc = append(exc, e.Package)
+			}
+		}
+	}
+	if !slices.Equal(exc, []string{"bridge/bridgetest"}) {
+		t.Errorf("ADR 0020 rule exceptions = %q, want only bridge/bridgetest (decision 583)", exc)
 	}
 }

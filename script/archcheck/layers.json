@@ -13,6 +13,6 @@
   ],
   "exceptions": [],
   "forbidden": [
-    {"from": ["bridge", "node/...", "device/...", "endpoint/..."], "to": ["controller/..."], "reason": "ADR 0020 decision 1, controller/ is a sibling of bridge/ (decision 556); test files and the test support bridge/bridgetest are not held to it"}
+    {"from": ["bridge/...", "node/...", "device/...", "endpoint/..."], "to": ["controller/..."], "except": [{"package": "bridge/bridgetest", "reason": "test support layer (support), not the bridge role: its Commissioner wires the module's own controller (controller/ca, controller/commissioner, controller/attestation's test store) to commission a device under test over the wire (bridge/bridgetest/commissioner.go); no non-test package of bridge, node, device or endpoint imports it, so the role code stays off controller/ (decision 583)"}], "reason": "ADR 0020 decision 1, controller/ is a sibling of bridge/, node/, device/ and endpoint/ and every package below them (decisions 556, 583); test files are not held to it"}
   ]
 }
