@@ -1055,6 +1055,15 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 					break
 				}
 			}
+			// A reassembly that ran during fn may have served the take
+			// and stored numbers for its tree: the tree is reserved as a
+			// Remove reserves it, so a later Forget of the key erases its
+			// parts' numbers too — without the keys another endpoint
+			// serves (the collision's, not the take's) and joined with
+			// the reservation the key held before (review II,
+			// R4-store-4702).
+			tree := slices.DeleteFunc(reservationTree(t.ep.Spec()), a.servesLocked)
+			b.ops = append(b.ops, reservationOp{kind: opReserve, key: t.key, tree: tree, join: true})
 			continue
 		}
 		part.eps[i] = t.old

@@ -104,6 +104,10 @@ type reservationOp struct {
 	// the store reserved for it at the call and, when the set held it,
 	// the dropped endpoint's keys (decision 576); nil for a release.
 	tree []string
+	// join reserves tree joined with the tree the store reserves for key
+	// already, rather than in its place: an undone Add keeps both
+	// (refuseLateCollisionsLocked).
+	join bool
 }
 
 type reservationKind uint8
@@ -122,7 +126,20 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp,
 	for _, op := range ops {
 		switch op.kind {
 		case opReserve:
-			errs = append(errs, p.reserve(ctx, op.tree))
+			tree := slices.Clone(op.tree)
+			if op.join {
+				prior, err := p.reservedTree(ctx, op.key)
+				if err != nil {
+					errs = append(errs, err)
+					continue
+				}
+				for _, k := range prior {
+					if !slices.Contains(tree, k) {
+						tree = append(tree, k)
+					}
+				}
+			}
+			errs = append(errs, p.reserve(ctx, tree))
 		case opRelease:
 			// A returning key is no longer forgotten: a forget left half
 			// done for it must not erase it at the next New.
