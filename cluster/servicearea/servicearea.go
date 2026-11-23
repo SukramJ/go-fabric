@@ -207,6 +207,11 @@ type Server struct {
 	// setter on another goroutine while a command runs is still counted
 	// as the command's.
 	commands atomic.Int32
+	// op serialises the server's own SelectAreas and SkipArea from the
+	// check to the store, so the stored selection is the one the
+	// Selector took last (R2-C2-conc-1554). The host setters do not take
+	// it, so a Selector or Skipper may call them.
+	op sync.Mutex
 
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
@@ -605,6 +610,8 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 // invoke is the server's own SelectAreas and SkipArea, which
 // [spec.InvokeHeld] runs when the host registered no handler.
 func (s *Server) invoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	s.op.Lock()
+	defer s.op.Unlock()
 	s.commands.Add(1)
 	defer s.commands.Add(-1)
 	if cmdID == sa.CmdSelectAreas {
