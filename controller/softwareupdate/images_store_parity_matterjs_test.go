@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"thingfabric.dev/go-fabric/bdx/otaimage"
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // The image-store cases of matter.js's DclOtaUpdateServiceTest

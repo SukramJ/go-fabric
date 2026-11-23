@@ -11,7 +11,7 @@
 // packages/protocol/src/dcl/DclCertificateService.ts:344-348, :1466-1536
 // at db021da0; the manifest's fields are SeedTypes.ts SeedSource and
 // CertSeedEntry), as a [attestation.PAAStore] of its own that
-// attestation.Trust layers with the online dcl.CertificateStore.
+// attestation.Trust layers with the online ctldcl.CertificateStore.
 //
 // The snapshot holds trust anchors only. Revocation stays online (a relying
 // party's duty under the Matter PKI Certificate Policy, §1.4.5, §4.9.6):
@@ -33,7 +33,8 @@ import (
 
 	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/controller/attestation"
-	"thingfabric.dev/go-fabric/controller/dcl"
+	ctldcl "thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // SourceFile is the manifest's name in the snapshot directory.
@@ -150,12 +151,12 @@ func load(fsys fs.FS, now time.Time) (*Snapshot, error) {
 	if err := json.Unmarshal(b, &s.src); err != nil {
 		return nil, fmt.Errorf("snapshot: %s: %w", SourceFile, err)
 	}
-	errPAA := s.consume(fsys, s.src.PAA, dcl.KindPAA, PAADir, now)
-	errCD := s.consume(fsys, s.src.CDSigners, dcl.KindCDSigner, CDSignerDir, now)
+	errPAA := s.consume(fsys, s.src.PAA, ctldcl.KindPAA, PAADir, now)
+	errCD := s.consume(fsys, s.src.CDSigners, ctldcl.KindCDSigner, CDSignerDir, now)
 	return s, errors.Join(errVendors, errPAA, errCD)
 }
 
-func (s *Snapshot) consume(fsys fs.FS, sec Section, kind dcl.Kind, dir string, now time.Time) error {
+func (s *Snapshot) consume(fsys fs.FS, sec Section, kind ctldcl.Kind, dir string, now time.Time) error {
 	if sec.ExpectedCount != len(sec.Entries) {
 		return fmt.Errorf("%w: %s lists %d entries, expectedCount %d", ErrMalformed, dir, len(sec.Entries), sec.ExpectedCount)
 	}
@@ -181,7 +182,7 @@ func (s *Snapshot) consume(fsys fs.FS, sec Section, kind dcl.Kind, dir string, n
 				continue
 			}
 		}
-		c, err := dcl.CheckTrustStoreCertificate(der, kind, skid)
+		c, err := ctldcl.CheckTrustStoreCertificate(der, kind, skid)
 		if err != nil {
 			s.skipped++
 			continue
@@ -192,7 +193,7 @@ func (s *Snapshot) consume(fsys fs.FS, sec Section, kind dcl.Kind, dir string, n
 		if _, ok := s.cdSigners[skid]; ok {
 			continue
 		}
-		if kind == dcl.KindPAA {
+		if kind == ctldcl.KindPAA {
 			s.paas[skid] = attestation.PAA{DER: der, Production: true, FetchedAt: s.src.BuiltAt}
 			continue
 		}

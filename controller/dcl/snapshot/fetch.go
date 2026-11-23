@@ -17,7 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"thingfabric.dev/go-fabric/controller/dcl"
+	ctldcl "thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // CDSignerKeyIDs are the key identifiers of the production Certification
@@ -64,7 +65,7 @@ func Fetch(ctx context.Context, client *dcl.Client, cdSigners []string, dir stri
 			return Source{}, fmt.Errorf("snapshot: root %s: %w", ref.SubjectKeyID, err)
 		}
 		for i := range certs {
-			if e, der, ok := entryOf(&certs[i], dcl.KindPAA, PAADir); ok && !hasEntry(src.PAA, e) {
+			if e, der, ok := entryOf(&certs[i], ctldcl.KindPAA, PAADir); ok && !hasEntry(src.PAA, e) {
 				src.PAA.Entries, files[e.File] = append(src.PAA.Entries, e), der
 			}
 		}
@@ -75,7 +76,7 @@ func Fetch(ctx context.Context, client *dcl.Client, cdSigners []string, dir stri
 			return Source{}, fmt.Errorf("snapshot: CD signer %s: %w", skid, err)
 		}
 		for i := range certs {
-			if e, der, ok := entryOf(&certs[i], dcl.KindCDSigner, CDSignerDir); ok && !hasEntry(src.CDSigners, e) {
+			if e, der, ok := entryOf(&certs[i], ctldcl.KindCDSigner, CDSignerDir); ok && !hasEntry(src.CDSigners, e) {
 				src.CDSigners.Entries, files[e.File] = append(src.CDSigners.Entries, e), der
 			}
 		}
@@ -115,16 +116,16 @@ func Fetch(ctx context.Context, client *dcl.Client, cdSigners []string, dir stri
 
 // entryOf is one ledger certificate as a snapshot entry, ok false for one
 // that is not usable as kind.
-func entryOf(c *dcl.Certificate, kind dcl.Kind, dir string) (Entry, []byte, bool) {
+func entryOf(c *dcl.Certificate, kind ctldcl.Kind, dir string) (Entry, []byte, bool) {
 	skid := strings.ToUpper(strings.ReplaceAll(c.SubjectKeyID, ":", ""))
 	if skid == "" {
 		return Entry{}, nil, false
 	}
-	der, err := dcl.PEMToDER(c.PEMCert)
+	der, err := ctldcl.PEMToDER(c.PEMCert)
 	if err != nil {
 		return Entry{}, nil, false
 	}
-	x, err := dcl.CheckTrustStoreCertificate(der, kind, skid)
+	x, err := ctldcl.CheckTrustStoreCertificate(der, kind, skid)
 	if err != nil {
 		return Entry{}, nil, false
 	}

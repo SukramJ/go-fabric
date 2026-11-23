@@ -15,8 +15,8 @@ import (
 	"os"
 	"time"
 
-	"thingfabric.dev/go-fabric/controller/dcl"
 	"thingfabric.dev/go-fabric/controller/dcl/snapshot"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 func main() {

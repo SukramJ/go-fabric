@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // GitHubConfig names the development-certificate repository — matter.js
@@ -20,7 +22,7 @@ import (
 type GitHubConfig struct {
 	// APIURL is the GitHub API; empty is https://api.github.com. It is
 	// the host's choice, so its request and the redirects it answers go
-	// through the ledger client's HTTP client ([Client].HTTPClient or
+	// through the ledger client's HTTP client ([dcl.Client].HTTPClient or
 	// http.DefaultClient), not through the guarded client of the URLs its
 	// answers name.
 	APIURL string
@@ -53,14 +55,14 @@ type githubClient struct {
 	// http asks the repository's tree at the configured APIURL; named
 	// fetches every URL an API answer names (a subtree, a file), foreign
 	// data as a URL a ledger record names is, so through the download
-	// client of a ledger-named URL ([Client].AllowPrivateDestinations).
+	// client of a ledger-named URL ([dcl.Client].AllowPrivateDestinations).
 	http, named *http.Client
 }
 
 // newGitHubClient is the GitHub client of the store whose ledger client
 // is c: c's HTTP client for the configured APIURL, c's ledger-named
 // download client for the URLs the API's answers name.
-func newGitHubClient(cfg GitHubConfig, c *Client) *githubClient {
+func newGitHubClient(cfg GitHubConfig, c *dcl.Client) *githubClient {
 	d := DefaultGitHubConfig
 	if cfg.APIURL == "" {
 		cfg.APIURL = d.APIURL
@@ -74,7 +76,7 @@ func newGitHubClient(cfg GitHubConfig, c *Client) *githubClient {
 	if cfg.CDSignerCertPath == "" {
 		cfg.CDSignerCertPath = d.CDSignerCertPath
 	}
-	return &githubClient{cfg: cfg, http: c.httpClient(), named: c.ledgerURLClient()}
+	return &githubClient{cfg: cfg, http: httpClient(c), named: ledgerURLClient(c)}
 }
 
 // gitHubHTTPError is Github.HttpError (Github.ts:29-41).
@@ -199,7 +201,7 @@ func (d *githubDir) find(ctx context.Context, name string) (githubEntry, error) 
 func (d *githubDir) fetch(ctx context.Context, url string, named bool) ([]byte, error) {
 	if timeout := d.g.cfg.Timeout; timeout >= 0 {
 		if timeout == 0 {
-			timeout = DefaultTimeout
+			timeout = dcl.DefaultTimeout
 		}
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -223,5 +225,5 @@ func (d *githubDir) fetch(ctx context.Context, url string, named bool) ([]byte, 
 		return nil, &gitHubHTTPError{msg: fmt.Sprintf("HTTP error %s (%d) from %s", http.StatusText(resp.StatusCode), resp.StatusCode, url), status: resp.StatusCode}
 	}
 	// Bounded as the ledger's answers are (maxResponseBody, W4-ctlint-10).
-	return io.ReadAll(http.MaxBytesReader(nil, resp.Body, maxResponseBody))
+	return io.ReadAll(http.MaxBytesReader(nil, resp.Body, maxResponseBody()))
 }

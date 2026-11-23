@@ -26,6 +26,7 @@ import (
 
 	"thingfabric.dev/go-fabric/bdx/otaimage"
 	"thingfabric.dev/go-fabric/controller/attestation"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // The CRL revocation check of DclCertificateService.isRevoked
@@ -248,10 +249,10 @@ func (s *CertificateStore) IsRevoked(akid, serial []byte, issuerDN string) (bool
 // cached).
 func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid string) (revocationLookup, error) {
 	empty := revocationLookup{complete: true}
-	client := s.opts.Client.withTimeout(revocationTimeout)
+	client := withTimeout(s.opts.Client, revocationTimeout)
 	points, err := client.RevocationPointsByIssuer(ctx, akid)
 	if err != nil {
-		if IsNotFound(err) {
+		if dcl.IsNotFound(err) {
 			s.log.Debug("dcl.revocation.none", slog.String("akid", akid))
 			return empty, nil
 		}
@@ -260,9 +261,9 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 		return revocationLookup{}, err
 	}
 	// CRL entries for exactly the issuer asked about (§11.23.11.7).
-	var crlPoints []RevocationPoint
+	var crlPoints []dcl.RevocationPoint
 	for i := range points {
-		if p := &points[i]; p.RevocationType == RevocationTypeCRL && normalizeKeyID(p.IssuerSubjectKeyID) == akid {
+		if p := &points[i]; p.RevocationType == dcl.RevocationTypeCRL && normalizeKeyID(p.IssuerSubjectKeyID) == akid {
 			crlPoints = append(crlPoints, *p)
 		}
 	}
@@ -331,7 +332,7 @@ func (s *CertificateStore) fetchAndValidateRevocation(ctx context.Context, akid 
 // boundPoints is points up to maxCRLPointsPerIssuer — cut when some were
 // dropped, logged once — and the number of them per vendor, counted once
 // for step 7.2.
-func (s *CertificateStore) boundPoints(akid string, points []RevocationPoint) (_ []RevocationPoint, perVID map[uint16]int, cut bool) {
+func (s *CertificateStore) boundPoints(akid string, points []dcl.RevocationPoint) (_ []dcl.RevocationPoint, perVID map[uint16]int, cut bool) {
 	if cut = len(points) > maxCRLPointsPerIssuer; cut {
 		s.log.Warn("dcl.revocation.too_many_points", slog.String("akid", akid), slog.Int("count", len(points)),
 			slog.Int("max", maxCRLPointsPerIssuer),
@@ -347,7 +348,7 @@ func (s *CertificateStore) boundPoints(akid string, points []RevocationPoint) (_
 
 // processRevocationPoint is #processRevocationPoint (:1510-1565): the
 // signer chain, the CRL download, its size and digest, its authentication.
-func (s *CertificateStore) processRevocationPoint(ctx context.Context, p RevocationPoint, partitioned bool) (revocationEntry, error) {
+func (s *CertificateStore) processRevocationPoint(ctx context.Context, p dcl.RevocationPoint, partitioned bool) (revocationEntry, error) {
 	auth, err := s.anchorCRLSigner(p)
 	if err != nil {
 		if isRejected(err) {
@@ -396,7 +397,7 @@ const maxCRLSize = 1 << 20
 // schema text it carries reads "All URLs SHALL use either the http or
 // https scheme" (packages/types/src/dcl/device-attestation-revocation.ts:98-101
 // at db021da0); either way the destination is guarded
-// ([Client].AllowPrivateDestinations) and the CRL is authenticated by its
+// ([dcl.Client].AllowPrivateDestinations) and the CRL is authenticated by its
 // signature. The body is read up to the point's DataFileSize plus one
 // byte — a longer body then fails processRevocationPoint's size check —
 // and, without a DataFileSize, up to maxCRLSize, past which it is a
@@ -411,7 +412,7 @@ func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string, data
 	if err != nil {
 		return nil, err
 	}
-	resp, err := s.opts.Client.ledgerURLClient().Do(req)
+	resp, err := ledgerURLClient(s.opts.Client).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +420,7 @@ func (s *CertificateStore) downloadCRL(ctx context.Context, dataURL string, data
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		msg := fmt.Sprintf("Failed to fetch CRL from %s: %d", dataURL, resp.StatusCode)
 		if resp.StatusCode >= 500 || resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode == http.StatusTooManyRequests {
-			return nil, &Error{Message: msg}
+			return nil, &dcl.Error{Message: msg}
 		}
 		return nil, rejected("%s", msg)
 	}
@@ -449,7 +450,7 @@ type crlAuthority struct {
 
 // authenticateCRL is #authenticateCrl (:1568-1624), Matter Core §6.2.6.1
 // steps 7-10.
-func authenticateCRL(p RevocationPoint, crlDER []byte, auth crlAuthority, partitioned bool) (revocationEntry, error) {
+func authenticateCRL(p dcl.RevocationPoint, crlDER []byte, auth crlAuthority, partitioned bool) (revocationEntry, error) {
 	crl, err := parseCRL(crlDER, auth.name)
 	if err != nil {
 		return revocationEntry{}, err
@@ -524,7 +525,7 @@ func verifyCRLSignature(signer *x509.Certificate, tbs, algorithm, value []byte) 
 // distribution point and the authority whose revocations it signs, per
 // Matter Core §6.2.6.1 steps 2-5 and 9 and the signer forms of
 // §11.23.11.6.
-func (s *CertificateStore) anchorCRLSigner(p RevocationPoint) (crlAuthority, error) {
+func (s *CertificateStore) anchorCRLSigner(p dcl.RevocationPoint) (crlAuthority, error) {
 	entrySKID := normalizeKeyID(p.IssuerSubjectKeyID)
 
 	// Step 2.
@@ -562,7 +563,7 @@ func (s *CertificateStore) anchorCRLSigner(p RevocationPoint) (crlAuthority, err
 
 // checkSignerForm is :1642-1670: the signer forms of §11.23.11.6 and the
 // vendor and product of §6.2.6.1 steps 3-4.
-func checkSignerForm(p RevocationPoint, signer, delegator *trustCert, selfSigned bool) error {
+func checkSignerForm(p dcl.RevocationPoint, signer, delegator *trustCert, selfSigned bool) error {
 	// RFC 5280 §6.3.3(f) and the §11.23.11.6 formats: every signer may sign
 	// CRLs, and only a PAA or PAI signs as CA.
 	if signer.x509.KeyUsage&x509.KeyUsageCRLSign == 0 {
@@ -601,7 +602,7 @@ func checkSignerForm(p RevocationPoint, signer, delegator *trustCert, selfSigned
 // crlAuthorityOf is :1672-1705, step 5 and the step 9 authority: the
 // approved PAA a self-signed PAA signer must be byte for byte, the PAA
 // that issued a delegated PAA signer, or the PAI a PAI entry names.
-func (s *CertificateStore) crlAuthorityOf(p RevocationPoint, signer *trustCert, signerDER []byte, delegator *trustCert, selfSigned bool) (*trustCert, error) {
+func (s *CertificateStore) crlAuthorityOf(p dcl.RevocationPoint, signer *trustCert, signerDER []byte, delegator *trustCert, selfSigned bool) (*trustCert, error) {
 	switch {
 	case p.IsPAA && selfSigned:
 		approved, err := s.trustedPAADER(hexUpper(signer.x509.SubjectKeyId))

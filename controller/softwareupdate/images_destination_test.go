@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // withChecksum is info with its record's whole-file checksum: the

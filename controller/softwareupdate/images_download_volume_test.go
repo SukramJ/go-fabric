@@ -28,7 +28,7 @@ import (
 
 	"thingfabric.dev/go-fabric/bdx"
 	"thingfabric.dev/go-fabric/bdx/otaimage"
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // volumeBlobs is a streamed backend that records, per writer, how many

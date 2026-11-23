@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 	secattestation "thingfabric.dev/go-fabric/secure/attestation"
 )
 

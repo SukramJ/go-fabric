@@ -10,7 +10,7 @@ import (
 	"thingfabric.dev/go-fabric/bdx"
 	"thingfabric.dev/go-fabric/bdx/otaimage"
 	mattercore "thingfabric.dev/go-fabric/cluster/core"
-	"thingfabric.dev/go-fabric/controller/dcl"
+	"thingfabric.dev/go-fabric/dcl"
 )
 
 // The node features a host reaches beside its Config (gate 2, G2-9): the
