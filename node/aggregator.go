@@ -920,9 +920,14 @@ func (b *Batch) commitPending() error {
 	// later one moved its collision away. The held calls stay in
 	// b.pending while they are judged, so an applied Forget drops a held
 	// Add of its key made before it, as at its call. What still collides
-	// when none applies is refused.
+	// when none applies is refused — with the refusal its last judgement
+	// returned: judged once more, a call could apply against a surface
+	// that moved since (a host Endpoint's live Spec) and drop a held call
+	// from under the judgement (review II, R4-fsm-4701).
+	var refused map[int]error
 	for {
 		applied := false
+		refused = map[int]error{}
 		for _, forgets := range []bool{true, false} {
 			for j := 0; j < len(b.pending) && !applied; j++ {
 				t := b.pending[j]
@@ -933,6 +938,7 @@ func (b *Batch) commitPending() error {
 				blocked, err := b.judgeLocked(t)
 				if blocked {
 					b.pending = slices.Insert(b.pending, j, t)
+					refused[t.seq] = err
 					continue
 				}
 				errs = append(errs, err)
@@ -946,9 +952,10 @@ func (b *Batch) commitPending() error {
 			break
 		}
 	}
+	// The last round applied nothing: each held call was judged in it
+	// once, against the set as it is now, and blocked.
 	for _, t := range b.pending {
-		_, err := b.judgeLocked(t)
-		errs = append(errs, err)
+		errs = append(errs, refused[t.seq])
 	}
 	b.pending = nil
 	errs = append(errs, b.refuseLateCollisionsLocked()...)
