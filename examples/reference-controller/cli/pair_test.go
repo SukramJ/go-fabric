@@ -57,3 +57,17 @@ func TestNetworkSecretSources(t *testing.T) {
 		t.Errorf("a missing file: %v, want the flag named", err)
 	}
 }
+
+// TestPairMalformedPasscodeIsNotEchoed holds R2-C2-sec-2601: a --passcode
+// that is not a decimal number is refused with a message that names the
+// flag and not the value, neither in the error nor on stderr — package
+// flag, which prints a failing value, parses it as text.
+func TestPairMalformedPasscodeIsNotEchoed(t *testing.T) {
+	const secret = "2468135x"
+	var log bytes.Buffer
+	stderr = &log
+	err := run([]string{"--db", t.TempDir() + "/x.db", "pair", "--passcode", secret, "--discriminator", "3840"}, strings.NewReader(""), &bytes.Buffer{})
+	if err == nil || strings.Contains(err.Error(), secret) || strings.Contains(log.String(), secret) || !strings.Contains(err.Error(), "--passcode") {
+		t.Fatalf("pair --passcode %s = %v, stderr %q: want a refusal that names the flag and not the value", secret, err, log.String())
+	}
+}

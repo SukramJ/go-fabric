@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -147,6 +148,7 @@ var errBLENeedsNetwork = errors.New("pair --ble needs --wifi-ssid and --wifi-cre
 func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line: the command's whole surface, BLE adapter and proxies included
 	var code, label string
 	var passcode, discriminator uint
+	var passcodeArg string
 	var nodeIDArg string
 	var wifiSSID, wifiCredentials, threadDataset string
 	var useBLE bool
@@ -164,7 +166,11 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 		fs.StringVar(&wifiCredentials, "wifi-credentials", "", "the Wi-Fi network's passphrase (with --wifi-ssid), or @file; default $"+wifiCredentialsEnv)
 		fs.StringVar(&threadDataset, "thread-dataset", "", "the Thread operational dataset the device is to join, as hex, or @file; default $"+threadDatasetEnv)
 		fs.StringVar(&code, "code", "", "the QR code (MT:…) or the manual code (11 or 21 digits)")
-		fs.UintVar(&passcode, "passcode", 0, "the setup passcode (with --discriminator, instead of --code)")
+		// The passcode is parsed as text and converted below: package
+		// flag reports a value its own parser refuses as `invalid value
+		// "<value>"`, the passcode in the text that reaches a log
+		// (R2-C2-sec-2601).
+		fs.StringVar(&passcodeArg, "passcode", "", "the setup passcode (with --discriminator, instead of --code)")
 		fs.UintVar(&discriminator, "discriminator", 0, "the 12-bit long discriminator")
 		fs.StringVar(&nodeIDArg, "node-id", "", "the node id to assign (default random)")
 		fs.StringVar(&label, "label", "", "writes the node's BasicInformation.NodeLabel after pairing")
@@ -174,6 +180,15 @@ func cmdPair(e *env, args []string) error { //nolint:funlen // one flag per line
 	}
 	if err := wantArgs("pair", pos, 0, 0); err != nil {
 		return err
+	}
+	if passcodeArg != "" {
+		n, err := strconv.ParseUint(passcodeArg, 10, 32)
+		if err != nil {
+			// The value is not echoed: it is the passcode of the device
+			// being paired, and the text reaches a log.
+			return errors.New("--passcode is not a decimal number")
+		}
+		passcode = uint(n)
 	}
 	var pr pairing
 	switch {

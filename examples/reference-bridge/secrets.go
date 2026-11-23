@@ -37,7 +37,20 @@ func secretValue(flagName, value string) (string, error) {
 }
 
 // passcodeValue is --passcode: a decimal passcode, or @file.
-type passcodeValue struct{ v *uint }
+//
+// Set does not fail on a value that is not a decimal number: package flag
+// reports a failing Set as `invalid value "<value>" for flag -passcode`,
+// the passcode itself in the text that reaches a log (R2-C2-sec-2601). It
+// records the value-free errPasscodeNotDecimal in err instead, which
+// checkFlags reports after the parse.
+type passcodeValue struct {
+	v   *uint
+	err *error
+}
+
+// errPasscodeNotDecimal is a --passcode that is not a decimal number. The
+// value is not in it: it is the passcode, and the text reaches a log.
+var errPasscodeNotDecimal = errors.New("--passcode is not a decimal number")
 
 func (p passcodeValue) String() string {
 	if p.v == nil {
@@ -47,17 +60,18 @@ func (p passcodeValue) String() string {
 }
 
 func (p passcodeValue) Set(s string) error {
+	// A file that cannot be read is an error flag may print: its text
+	// names the file, never the passcode.
 	s, err := secretValue("--passcode", s)
 	if err != nil {
 		return err
 	}
 	n, err := strconv.ParseUint(strings.TrimSpace(s), 10, 32)
 	if err != nil {
-		// The value is not echoed: it is the passcode, and the text
-		// reaches a log.
-		return errors.New("--passcode is not a decimal number")
+		*p.err = errPasscodeNotDecimal
+		return nil
 	}
-	*p.v = uint(n)
+	*p.v, *p.err = uint(n), nil
 	return nil
 }
 
@@ -75,6 +89,9 @@ func passcodeFromEnv(fs *flag.FlagSet) error {
 	}
 	if err := fs.Set("passcode", v); err != nil {
 		return fmt.Errorf("$%s: %w", passcodeEnv, err)
+	}
+	if p, ok := fs.Lookup("passcode").Value.(passcodeValue); ok && *p.err != nil {
+		return fmt.Errorf("$%s: %w", passcodeEnv, *p.err)
 	}
 	return nil
 }

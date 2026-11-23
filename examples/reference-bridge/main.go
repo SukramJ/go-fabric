@@ -99,6 +99,8 @@ type flags struct {
 	wifiSimSSIDs                                   string
 	otbr, sealKey                                  string
 	passcode, discriminator, customFlow            uint
+	// passcodeErr is a --passcode that did not parse (passcodeValue).
+	passcodeErr error
 	iterations                                     int
 	advertise, osHostName, otaHarness, wifi        bool
 	wifiSim                                        bool
@@ -123,7 +125,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.tcp, "tcp", "true", "Matter TCP: true (accept and open connections), false, or incoming / outgoing comma-separated; incoming listens on the UDP port, both are advertised in the operational T key")
 	flag.StringVar(&f.label, "label", "go-fabric reference bridge", "operator-visible bridge name (BasicInformation.NodeLabel)")
 	f.passcode = 20202021
-	flag.Var(passcodeValue{&f.passcode}, "passcode", "Matter setup passcode (8 digits, not trivially guessable), or @file holding it; default $"+passcodeEnv+" when set — change it for anything real")
+	flag.Var(passcodeValue{&f.passcode, &f.passcodeErr}, "passcode", "Matter setup passcode (8 digits, not trivially guessable), or @file holding it; default $"+passcodeEnv+" when set — change it for anything real")
 	flag.UintVar(&f.discriminator, "discriminator", 3840, "12-bit commissioning discriminator")
 	flag.UintVar(&f.customFlow, "custom-flow", 0, "the commissioning flow the onboarding payload states: 0 Standard, 1 User-Intent, 2 Custom (node.Commissioning.Flow; flow 1 and 2 print the long manual code with vendor and product id). Under 1 an uncommissioned daemon opens no commissioning window by itself (node.Commissioning.WindowOnDemand): it is not commissionable until the app pipe's UserIntentCommissioningStart opens the window, the user action the flow stands for; see control.go")
 	flag.IntVar(&f.iterations, "pbkdf-iterations", 1000, "SPAKE2+ PBKDF2 iteration count")
@@ -177,6 +179,9 @@ func parseFlags() flags {
 func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 	if f.discriminator > node.MaxDiscriminator {
 		return 0, 0, fmt.Errorf("--discriminator %d exceeds the 12-bit maximum %d", f.discriminator, node.MaxDiscriminator)
+	}
+	if f.passcodeErr != nil {
+		return 0, 0, f.passcodeErr
 	}
 	// setupPasscodeMax is the Matter §5.1.1.6 upper bound; the narrowing
 	// below is safe exactly because of this check.
