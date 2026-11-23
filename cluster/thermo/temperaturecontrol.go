@@ -137,6 +137,12 @@ type TemperatureControlServer struct {
 	ext      *cluster.DataVersionTracker
 	cfg      TemperatureControlConfig
 
+	// op serialises SetTemperature from the Setter's call to the store,
+	// so the attribute ends at the value the Setter heard last
+	// (R3-conc-3252); a one-slot channel, so a waiter can leave with its
+	// request context. The change is reported after op is released.
+	op chan struct{}
+
 	// mu guards level and setpoint.
 	mu       sync.Mutex
 	setpoint int16
@@ -160,7 +166,7 @@ func NewTemperatureControl(cfg TemperatureControlConfig) (*TemperatureControlSer
 	if cfg.Setter == nil {
 		return nil, ErrNoTemperatureSetter
 	}
-	s := &TemperatureControlServer{ext: cfg.DataVersion, cfg: cfg}
+	s := &TemperatureControlServer{ext: cfg.DataVersion, cfg: cfg, op: make(chan struct{}, 1)}
 	srv, err := newHeld(tc.Definition, spec.Options{Features: uint32(cfg.Features)}, s.MatterRead, s.invoke)
 	if err != nil {
 		return nil, fmt.Errorf("thermo: %w", err)
@@ -329,21 +335,39 @@ func (s *TemperatureControlServer) invoke(ctx context.Context, _ uint32, fields 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.cfg.Setter.SetTemperature(ctx, req.TargetTemperature, req.TargetTemperatureLevel); err != nil {
-		if errors.Is(err, ErrTemperatureRefused) {
-			// INVALID_IN_STATE, as chip answers a change the device
-			// cannot accept (TemperatureControlCluster.cpp:191, :215).
-			return nil, tcStatusError{im.StatusInvalidInState, fmt.Sprintf("thermo: SetTemperature: %v", err)}
-		}
-		return nil, fmt.Errorf("thermo: SetTemperature: %w", err)
+	// One command at a time from the Setter's call to the store: two
+	// controllers' SetTemperature store in the order the Setter heard them
+	// (R3-conc-3252).
+	select {
+	case s.op <- struct{}{}:
+	case <-ctx.Done():
+		return nil, fmt.Errorf("thermo: SetTemperature: %w", ctx.Err())
 	}
-	// The requested value becomes the attribute's, as chip's
-	// SetTemperatureSetpoint / SetSelectedTemperatureLevel set it
-	// (TemperatureControlCluster.cpp:127, :138).
-	if number {
-		s.apply(contract.OriginCommand, tc.AttrTemperatureSetpoint, func() bool { return swap(&s.setpoint, *req.TargetTemperature) })
-	} else {
-		s.apply(contract.OriginCommand, tc.AttrSelectedTemperatureLevel, func() bool { return swap(&s.level, *req.TargetTemperatureLevel) })
+	attr, changed, err := func() (uint32, bool, error) {
+		defer func() { <-s.op }()
+		if err := s.cfg.Setter.SetTemperature(ctx, req.TargetTemperature, req.TargetTemperatureLevel); err != nil {
+			if errors.Is(err, ErrTemperatureRefused) {
+				// INVALID_IN_STATE, as chip answers a change the device
+				// cannot accept (TemperatureControlCluster.cpp:191, :215).
+				return 0, false, tcStatusError{im.StatusInvalidInState, fmt.Sprintf("thermo: SetTemperature: %v", err)}
+			}
+			return 0, false, fmt.Errorf("thermo: SetTemperature: %w", err)
+		}
+		// The requested value becomes the attribute's, as chip's
+		// SetTemperatureSetpoint / SetSelectedTemperatureLevel set it
+		// (TemperatureControlCluster.cpp:127, :138).
+		if number {
+			return tc.AttrTemperatureSetpoint, s.change(func() bool { return swap(&s.setpoint, *req.TargetTemperature) }), nil
+		}
+		return tc.AttrSelectedTemperatureLevel, s.change(func() bool { return swap(&s.level, *req.TargetTemperatureLevel) }), nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+	// Reported after op is released: a change listener that invokes
+	// SetTemperature on this goroutine does not wait for this command.
+	if changed {
+		s.report(contract.OriginCommand, attr)
 	}
 	return nil, nil
 }
@@ -376,12 +400,20 @@ func (s *TemperatureControlServer) SetSelectedTemperatureLevel(l uint8) error {
 
 // apply runs change under the lock and reports attr when it changed.
 func (s *TemperatureControlServer) apply(origin contract.Origin, attr uint32, change func() bool) {
-	s.mu.Lock()
-	changed := change()
-	s.mu.Unlock()
-	if !changed {
-		return
+	if s.change(change) {
+		s.report(origin, attr)
 	}
+}
+
+// change runs change under the lock and returns its verdict.
+func (s *TemperatureControlServer) change(change func() bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return change()
+}
+
+// report advances the data version and tells the listeners of attr.
+func (s *TemperatureControlServer) report(origin contract.Origin, attr uint32) {
 	s.tracker().Bump()
 	s.NotifyFrom(origin, attr)
 }

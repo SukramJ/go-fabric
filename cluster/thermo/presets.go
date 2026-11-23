@@ -342,6 +342,9 @@ func (s *ThermostatServer) savePresets(ctx context.Context, presets []Preset, ac
 	if err := s.presetStore.SavePresets(ctx, EncodePresets(presets), bytes.Clone(active)); err != nil {
 		return fmt.Errorf("thermo: save presets: %w", err)
 	}
+	// Every caller stores the pair it saved before it releases persist:
+	// the store is at memory again (R3-store-3253).
+	s.presetsBehind = false
 	return nil
 }
 
@@ -536,8 +539,18 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 	s.lockPersist()
 	s.mu.Lock()
 	if s.activePresetHandle == nil || s.occupiedLocked() == unoccupied {
+		// Nothing ends; a pair an earlier clear could not save is saved
+		// now (R3-store-3253).
+		presets, active := s.presets, s.activePresetHandle
 		s.mu.Unlock()
+		var err error
+		if s.presetsBehind {
+			err = s.savePresets(ctx, presets, active)
+		}
 		s.unlockPersist()
+		if err != nil {
+			s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))
+		}
 		return false
 	}
 	previous := s.activePresetHandle
@@ -545,7 +558,13 @@ func (s *ThermostatServer) clearActivePresetOnDirectWrite(ctx context.Context, u
 	reevaluate = s.trackOverrideLocked(nil, true)
 	presets := s.presets
 	s.mu.Unlock()
+	// The setpoint is already changed, so the preset ends in memory
+	// whatever the store answers; a refused save marks the pair behind
+	// and the next save of it retries.
 	err := s.savePresets(ctx, presets, nil)
+	if err != nil {
+		s.presetsBehind = true
+	}
 	s.unlockPersist()
 	if err != nil {
 		s.logger().Warn("matter.thermostat.active_preset_not_saved", slog.String("reason", err.Error()))

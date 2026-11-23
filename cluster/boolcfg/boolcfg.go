@@ -154,6 +154,11 @@ type Server struct {
 	// seam that holds one publish while another path stores and publishes.
 	publishing func(values map[uint32]any)
 
+	// sinkSet, when set, runs once the Sink of a controller's
+	// CurrentSensitivityLevel write set the field, before the generated
+	// server stores the write: a test seam that holds the write there.
+	sinkSet func()
+
 	// mu guards active, current, enabled, endpoint, fault and suppressed.
 	mu         sync.Mutex
 	endpoint   uint16
@@ -323,13 +328,25 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) { return s.srv.MatterRead
 // MatterWrite applies a CurrentSensitivityLevel write, the one writable
 // attribute; the definition answers every other write.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	return s.srv.MatterWrite(ctx, attrID, value)
+	_, err := s.MatterWriteChanged(ctx, attrID, value)
+	return err
 }
 
 // MatterWriteChanged implements [contract.ChangeReportingWriter]: the
 // generated server's write and its verdict.
+//
+// A write's Sink sets the field and the generated server stores the
+// written level after it, so a host's SetCurrentSensitivityLevel between
+// the two leaves the field at the host's level and the store at the
+// written one. After every accepted CurrentSensitivityLevel write, the
+// field is published again, so the store ends at the field as after every
+// publish (R3-conc-3203); the publish stores nothing when they agree.
 func (s *Server) MatterWriteChanged(ctx context.Context, attrID uint32, value any) (bool, error) {
-	return s.srv.MatterWriteChanged(ctx, attrID, value)
+	changed, err := s.srv.MatterWriteChanged(ctx, attrID, value)
+	if err == nil && attrID == def.AttrCurrentSensitivityLevel {
+		s.publish(contract.OriginHostSet, map[uint32]any{def.AttrCurrentSensitivityLevel: nil})
+	}
+	return changed, err
 }
 
 // MatterInvoke dispatches an accepted command; the generated server
@@ -421,6 +438,9 @@ func (k sensitivitySink) MatterWriteAttribute(ctx context.Context, _ uint32, val
 	s.mu.Lock()
 	s.current = level
 	s.mu.Unlock()
+	if s.sinkSet != nil {
+		s.sinkSet()
+	}
 	return nil
 }
 
