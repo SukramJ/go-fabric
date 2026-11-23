@@ -135,6 +135,19 @@ type Chunker struct {
 	current         im.ReportData
 	pending         []im.ReportData
 	emitted, done   bool
+	// The greedy fill keeps the chunk's encoded size as it grows instead
+	// of re-encoding the chunk for every report it adds, which costs the
+	// square of the reports per chunk (R2-C2-bound-0555). A report array
+	// is a flat TLV container (im.ReportData.MarshalTLV writes StartArray,
+	// each entry, EndContainer; an array only when it has an entry), so a
+	// chunk's size is the empty chunk's, plus each array's open and close
+	// once it has an entry, plus each entry's own bytes. The three
+	// constants are measured with the chunker's own encoder, not assumed:
+	// freshSize at construction, an array's overhead from its first entry.
+	currentSize                 int
+	freshSize                   int
+	attrOverhead, eventOverhead int
+	attrMeasured, eventMeasured bool
 }
 
 // New chunks the reports of template's subscription (its
@@ -146,6 +159,10 @@ func New(template im.ReportData, budget, hardCap int, write im.AttributeValueWri
 	template.Reports, template.EventReports, template.MoreChunkedMessages = nil, nil, false
 	c := &Chunker{template: template, budget: budget, hardCap: hardCap, write: Writer(write), attributes: attributes, events: events}
 	c.current = c.fresh()
+	if body, err := c.encode(c.current); err == nil {
+		c.freshSize = len(body)
+	}
+	c.currentSize = c.freshSize
 	return c
 }
 
@@ -225,12 +242,27 @@ func (c *Chunker) nextEvent() (im.EventReport, bool) {
 }
 
 // closeCurrent hands out the chunk being filled — more follows: the entry
-// that did not fit it — and starts the next with seed.
-func (c *Chunker) closeCurrent(seed im.ReportData) {
+// that did not fit it — and starts the next with seed, whose encoded size
+// is seedSize.
+func (c *Chunker) closeCurrent(seed im.ReportData, seedSize int) {
 	full := c.current
 	full.MoreChunkedMessages = true
 	c.pending = append(c.pending, full)
 	c.current = seed
+	c.currentSize = seedSize
+}
+
+// measureOverhead is the bytes a report array adds to a chunk beyond its
+// entries — its open and its close — measured from alone, a chunk of the
+// one entry e of encoded size aloneSize, and the same chunk with e twice:
+// the second copy adds e's own bytes alone.
+func (c *Chunker) measureOverhead(aloneSize int, twice im.ReportData) (int, error) {
+	body, err := c.encode(twice)
+	if err != nil {
+		return 0, err
+	}
+	entry := len(body) - aloneSize
+	return aloneSize - c.freshSize - entry, nil
 }
 
 func (c *Chunker) addAttributeReport(rep im.AttributeReport) error {
@@ -248,46 +280,62 @@ func (c *Chunker) addAttributeReport(rep im.AttributeReport) error {
 		}
 		return nil
 	}
-	rep, err := c.capOversizedAttributeReport(rep)
+	rep, aloneSize, err := c.capOversizedAttributeReport(rep)
 	if err != nil {
 		return err
+	}
+	if !c.attrMeasured {
+		twice := c.fresh()
+		twice.Reports = []im.AttributeReport{rep, rep}
+		if c.attrOverhead, err = c.measureOverhead(aloneSize, twice); err != nil {
+			return err
+		}
+		c.attrMeasured = true
+	}
+	// What rep adds to the chunk: its own bytes, and the array's open and
+	// close when it is the array's first entry.
+	added := aloneSize - c.freshSize
+	if len(c.current.Reports) > 0 {
+		added -= c.attrOverhead
 	}
 	current := c.current
-	candidate := current
-	candidate.Reports = append(candidate.Reports, rep)
-	body, err := c.encode(candidate)
-	if err != nil {
-		return err
-	}
-	if len(body) > c.budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
+	if c.currentSize+added > c.budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
 		seed := c.fresh()
 		seed.Reports = []im.AttributeReport{rep}
-		c.closeCurrent(seed)
+		c.closeCurrent(seed, aloneSize)
 		return nil
 	}
-	c.current = candidate
+	c.current.Reports = append(c.current.Reports, rep)
+	c.currentSize += added
 	return nil
 }
 
 func (c *Chunker) addEventReport(ev im.EventReport) error {
-	ev, err := c.capOversizedEventReport(ev)
+	ev, aloneSize, err := c.capOversizedEventReport(ev)
 	if err != nil {
 		return err
+	}
+	if !c.eventMeasured {
+		twice := c.fresh()
+		twice.EventReports = []im.EventReport{ev, ev}
+		if c.eventOverhead, err = c.measureOverhead(aloneSize, twice); err != nil {
+			return err
+		}
+		c.eventMeasured = true
+	}
+	added := aloneSize - c.freshSize
+	if len(c.current.EventReports) > 0 {
+		added -= c.eventOverhead
 	}
 	current := c.current
-	candidate := current
-	candidate.EventReports = append(candidate.EventReports, ev)
-	body, err := c.encode(candidate)
-	if err != nil {
-		return err
-	}
-	if len(body) > c.budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
+	if c.currentSize+added > c.budget && (len(current.Reports) > 0 || len(current.EventReports) > 0) {
 		seed := c.fresh()
 		seed.EventReports = []im.EventReport{ev}
-		c.closeCurrent(seed)
+		c.closeCurrent(seed, aloneSize)
 		return nil
 	}
-	c.current = candidate
+	c.current.EventReports = append(c.current.EventReports, ev)
+	c.currentSize += added
 	return nil
 }
 
@@ -385,13 +433,21 @@ func SplitList(rd im.ReportData, rep im.AttributeReport, budget int, write im.At
 	if len(members) == 0 {
 		return nil, false
 	}
+	// The head grows by one member's bytes at a time: a [List] is written
+	// as StartArray, each member by PutRawElement with an anonymous tag,
+	// EndContainer ([Writer]), so a member adds what that one call writes —
+	// measured by the same call — and the head is encoded once, not once
+	// per member (R2-C2-bound-0555).
 	head := rep
+	head.Value = im.AttributeValue{Value: members[:1]}
+	headSize := size(head)
 	n := 1
 	for n < len(members) {
-		head.Value = im.AttributeValue{Value: members[:n+1]}
-		if size(head) > budget {
+		grown := headSize + memberSize(write, members[n])
+		if grown > budget {
 			break
 		}
+		headSize = grown
 		n++
 	}
 	head.Value = im.AttributeValue{Value: members[:n]}
@@ -406,24 +462,33 @@ func SplitList(rd im.ReportData, rep im.AttributeReport, budget int, write im.At
 	return out, true
 }
 
+// memberSize is the bytes write adds for m as one member of a [List].
+func memberSize(write im.AttributeValueWriter, m []byte) int {
+	enc := tlv.NewEncoder()
+	write(enc, tlv.AnonymousTag(), im.AttributeValue{Value: Member(m)})
+	b, err := enc.Bytes()
+	if err != nil {
+		return len(m)
+	}
+	return len(b)
+}
+
 // capOversizedAttributeReport downgrades rep to an
 // AttributeStatusIB(ResourceExhausted) when its own encoded size — alone,
 // with no sibling report in the chunk — already breaches the hard cap:
-// such an entry can never occupy a chunk by itself.
-func (c *Chunker) capOversizedAttributeReport(rep im.AttributeReport) (im.AttributeReport, error) {
-	if rep.IsStatus {
-		return rep, nil
-	}
+// such an entry can never occupy a chunk by itself. size is the encoded
+// size of a chunk holding the returned report alone.
+func (c *Chunker) capOversizedAttributeReport(rep im.AttributeReport) (out im.AttributeReport, size int, err error) {
 	alone := c.fresh()
 	alone.Reports = []im.AttributeReport{rep}
 	aloneBody, err := c.encode(alone)
 	if err != nil {
-		return im.AttributeReport{}, err
+		return im.AttributeReport{}, 0, err
 	}
-	if len(aloneBody) <= c.hardCap {
-		return rep, nil
+	if rep.IsStatus || len(aloneBody) <= c.hardCap {
+		return rep, len(aloneBody), nil
 	}
-	return AttributeStatus(rep, im.StatusResourceExhausted), nil
+	return c.capOversizedAttributeReport(AttributeStatus(rep, im.StatusResourceExhausted))
 }
 
 // anyPartOversized reports a part of a split list too large for any
@@ -434,7 +499,7 @@ func (c *Chunker) capOversizedAttributeReport(rep im.AttributeReport) (im.Attrib
 // it, matter/clusters/attribute.cpp:110-116 at 6170af84 — TC-TLSCERT-2.9).
 func (c *Chunker) anyPartOversized(parts []im.AttributeReport) (bool, error) {
 	for _, part := range parts {
-		capped, err := c.capOversizedAttributeReport(part)
+		capped, _, err := c.capOversizedAttributeReport(part)
 		if err != nil {
 			return false, err
 		}
@@ -455,22 +520,19 @@ func AttributeStatus(rep im.AttributeReport, status im.StatusCode) im.AttributeR
 
 // capOversizedEventReport is [Chunker.capOversizedAttributeReport]'s twin
 // for an EventReport.
-func (c *Chunker) capOversizedEventReport(ev im.EventReport) (im.EventReport, error) {
-	if ev.IsStatus {
-		return ev, nil
-	}
+func (c *Chunker) capOversizedEventReport(ev im.EventReport) (out im.EventReport, size int, err error) {
 	alone := c.fresh()
 	alone.EventReports = []im.EventReport{ev}
 	aloneBody, err := c.encode(alone)
 	if err != nil {
-		return im.EventReport{}, err
+		return im.EventReport{}, 0, err
 	}
-	if len(aloneBody) <= c.hardCap {
-		return ev, nil
+	if ev.IsStatus || len(aloneBody) <= c.hardCap {
+		return ev, len(aloneBody), nil
 	}
-	return im.EventReport{
+	return c.capOversizedEventReport(im.EventReport{
 		Path:     ev.Path,
 		IsStatus: true,
 		Status:   im.StatusIB{Status: im.StatusResourceExhausted},
-	}, nil
+	})
 }
