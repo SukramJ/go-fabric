@@ -608,7 +608,7 @@ func (b *Binding) SetBeforeWrite(fn func(ctx context.Context, attrID uint32, val
 // [Binding.OnChange] observers — matter.js limitNodeDataToAllowedFabrics
 // strips a departed fabric's fabric-scoped attribute entries from every
 // endpoint (packages/node/src/behavior/cluster/FabricScopedDataHandler.ts:
-// 109-122).
+// 41-73, the filter at :62-68, and :114-123).
 //
 // A persisted list ([Binding.Persist]) is saved; the fabric is gone
 // whether or not the save succeeds, so a failed save still drops the
