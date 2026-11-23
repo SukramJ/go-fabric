@@ -189,6 +189,18 @@ func (a *Aggregator) partLocked(scope string) *partition {
 	return p
 }
 
+// findPartLocked returns the partition of scope, nil for none; unlike
+// partLocked it creates nothing and takes no scope off the retired list.
+// a.mu is held.
+func (a *Aggregator) findPartLocked(scope string) *partition {
+	for _, p := range a.parts {
+		if p.scope == scope {
+			return p
+		}
+	}
+	return nil
+}
+
 // findLocked returns the partition and index of the endpoint with key, in
 // any partition; nil, -1 for none. a.mu is held.
 func (a *Aggregator) findLocked(key string) (part *partition, idx int) {
@@ -391,20 +403,20 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	// R2-P6-conc-2405, N-finp-3). A key forgotten and added again in the
 	// batch is held out of the first reassembly and served by a second
 	// one, after the erasure, so it starts as a new device would — and so
-	// is a device the batch added whose own key or a part key the erasure
-	// reaches, a part of the forgotten device among them (review II,
-	// R2-C2-store-2401).
+	// is every served endpoint, of any partition, whose own key or a part
+	// key the erasure reaches, however it came to serve it (review II,
+	// R2-C2-store-2401, R3-store-3702).
 	pre, erase := splitErasures(b.ops)
 	resErr := p.a.applyReservations(ctx, pre)
-	readded, cancel, findErr := p.a.readdedInErasure(ctx, b.scope, b.ops, erase)
+	served, cancel, findErr := p.a.servedInErasure(ctx, erase)
 	resErr = errors.Join(resErr, findErr)
 	p.a.mu.Lock()
 	started := p.a.started
 	p.a.mu.Unlock()
 	var err error
 	var restore func() bool
-	if b.changed && started {
-		restore = p.a.holdBack(b.scope, readded)
+	if (b.changed || len(served) > 0) && started {
+		restore = p.a.holdBack(served)
 		err = p.a.reassemble(ctx)
 	}
 	// Unbound after the reassembly: no controller reaches them any more.
