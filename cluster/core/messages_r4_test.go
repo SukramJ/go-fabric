@@ -117,8 +117,13 @@ func TestMessagesRepresentWaitsForAVisibleCancel(t *testing.T) {
 
 // TestMessagesRemoveFabricTakesItsMessagesDown: a removed fabric's queued
 // messages, presented or not, are taken down at the presenter, each once;
-// another fabric's stays (review II, R4-fsm-4103, decision 598).
+// another fabric's stays (review II, R4-fsm-4103, decision 598). The
+// take-down runs after the drop (decision 624): the bubble waits for it.
 func TestMessagesRemoveFabricTakesItsMessagesDown(t *testing.T) {
+	synctest.Test(t, testMessagesRemoveFabricTakesItsMessagesDown)
+}
+
+func testMessagesRemoveFabricTakesItsMessagesDown(t *testing.T) {
 	p := newR4DisplayPresenter()
 	m, err := NewMessages(MessagesConfig{Presenter: p})
 	if err != nil {
@@ -138,6 +143,7 @@ func TestMessagesRemoveFabricTakesItsMessagesDown(t *testing.T) {
 	if err := m.MatterDropFabric(context.Background(), 1); err != nil {
 		t.Fatalf("drop: %v", err)
 	}
+	synctest.Wait()
 	for _, id := range []byte{1, 2} {
 		if isQueued(m, flightID(id)) || p.isShown(flightID(id)) {
 			t.Errorf("message %d of the removed fabric: queued=%v shown=%v, want neither", id, isQueued(m, flightID(id)), p.isShown(flightID(id)))
@@ -152,6 +158,7 @@ func TestMessagesRemoveFabricTakesItsMessagesDown(t *testing.T) {
 	if err := m.MatterDropFabric(context.Background(), 1); err != nil {
 		t.Fatalf("second drop: %v", err)
 	}
+	synctest.Wait()
 	if n := p.cancelsOf(flightID(1)); n != 1 {
 		t.Errorf("a second drop cancelled again: %d", n)
 	}
@@ -184,6 +191,7 @@ func TestMessagesRemoveFabricHoldsTheIDsUntilTheCancelReturned(t *testing.T) {
 		if err := <-dropDone; err != nil {
 			t.Fatalf("drop: %v", err)
 		}
+		synctest.Wait() // the take-down runs after the drop (decision 624)
 		if err == nil {
 			t.Error("another fabric's present of the id answered SUCCESS while the removal's cancel ran")
 		}
@@ -191,4 +199,67 @@ func TestMessagesRemoveFabricHoldsTheIDsUntilTheCancelReturned(t *testing.T) {
 			t.Errorf("queue and display disagree: queued=%v shown=%v", isQueued(m, flightID(1)), p.isShown(flightID(1)))
 		}
 	})
+}
+
+// TestMessagesRemoveFabricDoesNotWaitForThePresenter: the removal's
+// take-down runs after the drop, off the removal path — a presenter whose
+// CancelMessage blocks delays neither RemoveFabric nor MatterDropFabric,
+// so the fabric's teardown and the NOCResponse do not wait for the host's
+// display; the id stays held against another fabric until the cancel
+// returned, and the cancel still runs once (review II, R4-fsm-4103,
+// fable-diff-h2.md N1, decision 624).
+func TestMessagesRemoveFabricDoesNotWaitForThePresenter(t *testing.T) {
+	for _, via := range []string{"MatterDropFabric", "RemoveFabric"} {
+		t.Run(via, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				p := newR4DisplayPresenter()
+				m, err := NewMessages(MessagesConfig{Presenter: p})
+				if err != nil {
+					t.Fatal(err)
+				}
+				ctx1 := im.WithFabricFilter(context.Background(), true, 1)
+				ctx2 := im.WithFabricFilter(context.Background(), true, 2)
+				if _, err := m.MatterInvoke(ctx1, messagesdef.CmdPresentMessagesRequest, flightReq(1)); err != nil {
+					t.Fatal(err)
+				}
+				p.mu.Lock()
+				p.blockCancel = flightID(1)
+				p.mu.Unlock()
+				returned := make(chan error, 1)
+				go func() {
+					if via == "RemoveFabric" {
+						m.RemoveFabric(1)
+						returned <- nil
+						return
+					}
+					returned <- m.MatterDropFabric(context.Background(), 1)
+				}()
+				<-p.entered
+				synctest.Wait()
+				select {
+				case err := <-returned:
+					if err != nil {
+						t.Errorf("drop: %v", err)
+					}
+				default:
+					close(p.release)
+					t.Fatalf("%s has not returned while the presenter's cancel blocks; want it to return after the drop", via)
+				}
+				if isQueued(m, flightID(1)) {
+					t.Error("the removed fabric's message is still queued after the drop returned")
+				}
+				if _, err := m.MatterInvoke(ctx2, messagesdef.CmdPresentMessagesRequest, flightReq(1)); err == nil {
+					t.Error("another fabric's present of the id answered SUCCESS while the removal's cancel ran")
+				}
+				close(p.release)
+				synctest.Wait()
+				if n := p.cancelsOf(flightID(1)); n != 1 {
+					t.Errorf("cancelled at the presenter %d times, want 1", n)
+				}
+				if _, err := m.MatterInvoke(ctx2, messagesdef.CmdPresentMessagesRequest, flightReq(1)); err != nil {
+					t.Errorf("another fabric's present after the cancel returned: %v, want SUCCESS", err)
+				}
+			})
+		})
+	}
 }
