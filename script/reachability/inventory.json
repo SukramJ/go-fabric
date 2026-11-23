@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10439,
+  "entry_points": 10442,
   "initializers": 370,
   "entry_packages": [
     ".",
@@ -295,10 +295,10 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28237,
-    "reachable": 21075,
-    "whitelisted": 7139,
-    "unreachable": 23
+    "total_exported": 28242,
+    "reachable": 21079,
+    "whitelisted": 7141,
+    "unreachable": 22
   },
   "by_package": [
     {
@@ -338,12 +338,6 @@
       "unreachable_other": 0
     },
     {
-      "package": "cluster/measurement",
-      "unreachable_funcs": 2,
-      "unreachable_types": 0,
-      "unreachable_other": 0
-    },
-    {
       "package": "controller/client",
       "unreachable_funcs": 2,
       "unreachable_types": 0,
@@ -351,6 +345,12 @@
     },
     {
       "package": "client/exchange",
+      "unreachable_funcs": 1,
+      "unreachable_types": 0,
+      "unreachable_other": 0
+    },
+    {
+      "package": "cluster/measurement",
       "unreachable_funcs": 1,
       "unreachable_types": 0,
       "unreachable_other": 0
@@ -451,13 +451,6 @@
       "identifier": "HeldBooleanState.Set",
       "file": "cluster/measurement/booleanstate_held.go",
       "line": 68,
-      "kind": "method"
-    },
-    {
-      "package": "cluster/measurement",
-      "identifier": "SoilMeasurementServer.MatterKeepInstance",
-      "file": "cluster/measurement/soil.go",
-      "line": 103,
       "kind": "method"
     },
     {
@@ -12409,7 +12402,7 @@
       "identifier": "DownloadProtocol",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/core/ota_software_update_requestor.go",
-      "line": 200
+      "line": 203
     },
     {
       "package": "cluster/core",
@@ -12780,14 +12773,14 @@
       "identifier": "TestGeneralCommissioningArmRunningTheStartHookRefusedAfterClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_commissioning_arm_after_close_test.go",
-      "line": 77
+      "line": 73
     },
     {
       "package": "cluster/core",
       "identifier": "TestGeneralCommissioningArmWaitingForARollbackRefusedAfterClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_commissioning_arm_after_close_test.go",
-      "line": 36
+      "line": 29
     },
     {
       "package": "cluster/core",
@@ -28194,7 +28187,7 @@
       "identifier": "KeypadLockout",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 54
+      "line": 53
     },
     {
       "package": "cluster/thermo",
@@ -28243,7 +28236,7 @@
       "identifier": "ScheduleProgrammingVisibility",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 57
+      "line": 56
     },
     {
       "package": "cluster/thermo",
@@ -28271,7 +28264,7 @@
       "identifier": "SettingStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 107
+      "line": 106
     },
     {
       "package": "cluster/thermo",
@@ -28292,7 +28285,7 @@
       "identifier": "TemperatureDisplayMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 52
+      "line": 51
     },
     {
       "package": "cluster/thermo",
@@ -28796,7 +28789,7 @@
       "identifier": "TestOTAHandoffReleasedOnlyWhenItsNodeDeletedReturned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/ota_handoff_internal_test.go",
-      "line": 19
+      "line": 20
     },
     {
       "package": "controller",
@@ -35702,6 +35695,13 @@
     },
     {
       "package": "diagevent",
+      "identifier": "TestDetailKeysAreTheirNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "diagevent/ring_test.go",
+      "line": 240
+    },
+    {
+      "package": "diagevent",
       "identifier": "TestObserve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "diagevent/ring_test.go",
@@ -37672,7 +37672,7 @@
       "identifier": "TestCameraRecordingEndActsUnderTheLockThatTookIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/timers_window_test.go",
-      "line": 111
+      "line": 160
     },
     {
       "package": "examples/reference-bridge",
@@ -38015,7 +38015,7 @@
       "identifier": "TestGarageReportsActUnderTheLockThatTookThem",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/timers_window_test.go",
-      "line": 54
+      "line": 102
     },
     {
       "package": "examples/reference-bridge",
@@ -39842,7 +39842,7 @@
       "identifier": "TestConcreteEventPathWithSentinelValuesSelectsNoOtherEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/review2_c3_test.go",
-      "line": 167
+      "line": 254
     },
     {
       "package": "im",
@@ -40623,6 +40623,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestInvokeResponseWithoutMandatedFieldsIsDiscarded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/review2_c3_test.go",
+      "line": 180
+    },
+    {
+      "package": "im",
       "identifier": "TestInvokeResponse_HasCommandData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_batch_test.go",
@@ -41144,7 +41151,7 @@
       "identifier": "TestSingleWriteIsBusyOnAHoldTakenSinceBusyBefore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/review2_c3_test.go",
-      "line": 230
+      "line": 317
     },
     {
       "package": "im",

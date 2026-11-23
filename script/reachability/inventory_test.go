@@ -184,9 +184,7 @@ func TestReachabilityRedundantAnnotationsOnTheirRatchet(t *testing.T) {
 	t.Parallel()
 	inv := loadReachabilityInventory(t)
 	if inv.RedundantAnnotations == nil {
-		// reachability-check fails a snapshot older than its analyzer, so
-		// the skip cannot outlive the next regeneration.
-		t.Skip("inventory.json predates redundant_annotations; run `make reachability`")
+		t.Fatal("inventory.json carries no redundant_annotations: it predates the analyzer; run `make reachability`")
 	}
 	if n := len(*inv.RedundantAnnotations); n != reachabilityRedundantRatchet {
 		t.Errorf("%d redundant annotations, ratchet %d — set reachabilityRedundantRatchet to %d "+
