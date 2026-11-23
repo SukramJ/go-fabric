@@ -326,7 +326,8 @@ func (a *Aggregator) Endpoints() []Endpoint { return a.Partition(Scope).Endpoint
 // once for every change fn made; see [Partition.Batch], which names every
 // error that arrives here rather than from a call of the batch
 // ([ErrDuplicateKey], [ErrUnknownKey], [ErrReservedKey],
-// [ErrPolicyMismatch], *surface.WithheldError, a device's attach error).
+// [ErrPolicyMismatch], the refusal of a server that needs the node's
+// Matter time, *surface.WithheldError, a device's attach error).
 func (a *Aggregator) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	return a.Partition(Scope).Batch(ctx, fn)
 }
@@ -407,17 +408,18 @@ func (p *Partition) Endpoints() []Endpoint {
 // batch never assembles two Specs under one key (decision 585). Every
 // error of a held call arrives in the result of [Partition.Batch]: those
 // refusals, and what the applied call itself returns ([ErrReservedKey],
-// [ErrPolicyMismatch], a *surface.WithheldError, a device's attach
-// error). So a batch that takes a key — or forgets a part key — and
+// [ErrPolicyMismatch], the refusal of a server that needs the node's
+// Matter time, a *surface.WithheldError, a device's attach error). So a batch that takes a key — or forgets a part key — and
 // removes or forgets the endpoint serving it gives the same outcome in
 // either call order. A Forget of a key that a device the batch added
 // serves as a part is not refused for it: the device keeps the key and
 // starts new with it, before or after the Forget (fable-diff-g5g N2). A
 // held change takes part in the batch's reassembly like any other. A
-// later Replace, Remove or Forget of a key the set holds acts on the
-// set's endpoint, and a held Add of that key stays held; of a key the set
-// does not hold, it acts on the held Add: a Replace replaces it, a Remove
-// or Forget drops it.
+// later Replace, Remove or Forget of a key the batch's partition holds
+// acts on the partition's endpoint, and a held Add of that key stays
+// held; of a key another partition holds, it is [ErrUnknownKey] and the
+// held Add stays; of a key no partition holds, it acts on the held Add: a
+// Replace replaces it, a Remove or Forget drops it.
 //
 // A Batch is valid only during fn: a call after fn returned is refused
 // with [ErrBatchDone] and changes nothing.
@@ -503,10 +505,13 @@ type takenCall struct {
 // a Forget with [ErrUnknownKey] (decisions 582, 585). The result is
 // errors.Join of fn's error, every error of a held call — those
 // refusals, [ErrUnknownKey] for a held Replace whose key left the
-// partition, [ErrReservedKey] or [ErrPolicyMismatch] of a device changed
-// during fn, the *surface.WithheldError of an applied declaration the
-// specification level withholds, a device's attach error — the store's
-// and the reassembly's. Before [Node.Start] a batch only changes the set.
+// partition, [ErrReservedKey], [ErrPolicyMismatch] or the refusal of a
+// server that needs the node's Matter time of a device changed during
+// fn, the *surface.WithheldError of an applied declaration the
+// specification level withholds, a device's attach error —, then the
+// [ErrDuplicateKey] of each device the batch added or replaced at the
+// call that gained during fn a part key another endpoint serves (the
+// take undone, see [Batch]), and the store's and the reassembly's errors. Before [Node.Start] a batch only changes the set.
 // The [Batch] is valid only during fn ([ErrBatchDone]).
 //
 // A batch is not a transaction: an Add or Remove from another goroutine
