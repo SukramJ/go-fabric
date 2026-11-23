@@ -877,21 +877,24 @@ func (tx *WriteTransaction) followsLastQueued(p ConcreteAttributePath, fabricInd
 // chunked or already holds an attribute — taken before the write is
 // applied, so no other exchange writes it meanwhile
 // (InteractionServer.ts:536-543). It reports false, and takes nothing,
-// when another interaction holds the attribute: the check and the take are
-// one step under the table's lock. A path without an endpoint is never
-// held.
+// when another interaction holds the attribute — also for a write that
+// would take no hold itself: the check and the take are one step under
+// the table's lock. A path without an endpoint is never held.
 func (tx *WriteTransaction) hold(p ConcreteAttributePath, fabricIndex uint8, more bool) bool {
 	if tx.holds == nil || !p.HasEndpoint {
 		return true
 	}
 	tx.holds.mu.Lock()
 	defer tx.holds.mu.Unlock()
-	if !more && len(tx.held) == 0 {
-		return true
-	}
+	// Another interaction's hold is checked first, for a write that takes
+	// none as well: one that took the hold since busyBefore makes the path
+	// BUSY however this write is chunked (R2-C2-conc-0554).
 	k := holdKey(fabricIndex, p.Endpoint, p.Cluster, p.Attribute)
 	if holder, ok := tx.holds.held[k]; ok && holder != tx {
 		return false
+	}
+	if !more && len(tx.held) == 0 {
+		return true
 	}
 	if tx.holds.held == nil {
 		tx.holds.held = make(map[writeHoldKey]*WriteTransaction)

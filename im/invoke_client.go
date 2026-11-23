@@ -164,6 +164,14 @@ func readInvokeResponseIB(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (I
 			if err != nil {
 				return InvokeResponseEntry{}, err
 			}
+			// The server's per-command outcome is no client's: a command
+			// response whose CommandFields is no structure does not decode —
+			// the response is an error, never a Success without fields
+			// (R2-C2-wire-0551).
+			if inv.fieldsNotStructure {
+				return InvokeResponseEntry{}, fmt.Errorf("%w: command response %v: CommandFields is not a structure",
+					ErrInvalidInvokeRequest, inv.Path)
+			}
 			ent.Path, ent.Response, ent.HasResponse = inv.Path, inv.Fields, inv.Fields != nil
 			ent.CommandRef, ent.HasCommandRef = inv.CommandRef, inv.HasCommandRef
 			members++

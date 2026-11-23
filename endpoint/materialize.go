@@ -17,6 +17,7 @@ import (
 	"thingfabric.dev/go-fabric/cluster/onoff"
 	bdbidef "thingfabric.dev/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 	"thingfabric.dev/go-fabric/schema"
 )
 
@@ -81,34 +82,28 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// Source / measurement-driven cluster servers come first so the
 	// dispatcher's wildcard read enumerates them in the same order
 	// across calls.
-	mc := contract.MeasurementContext{EndpointID: ep.ID}
 	var inner []contract.ClusterServer
 	if ep.Source != nil {
-		inner = ep.dropNilServers(ep.Source.MatterClusterServers())
+		inner = ep.Source.MatterClusterServers()
 	}
 	// A measurement source's clusters follow the source's own: a sensor
 	// endpoint has no source servers, a host's endpoint with both has its
 	// other clusters there.
-	if ep.Measurement != nil {
-		inner = append(inner, measurement.FromMeasurementClass(
-			ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc,
-		)...)
-	}
-	// The device's battery rides on this endpoint when attachPowerSource
-	// picked it. Appended after the endpoint's own clusters so the primary
-	// function stays first in the ServerList.
-	if ep.PowerSource != nil {
-		inner = append(inner,
-			measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource, mc)...)
-	}
+	inner = append(inner, ep.materializedServers()...)
+	// Every server set the source and the materialisers hand over passes
+	// dropNilServers once, the battery's and a host-registered measurement
+	// kind's included (R2-C2-err-0450, the half of R2-P6-err-0403 its fix
+	// did not reach).
+	inner = ep.dropNilServers(inner)
 
 	if len(inner) == 0 && ep.Source == nil {
 		// Defensive: a bridged endpoint with neither source nor
-		// measurement contributes no cluster surface; the topology
-		// would be malformed but we must not panic mid-dispatch. A
-		// source that serves no cluster of its own is a composed device
-		// whose device type mandates none (an Oven: its cavity is a part)
-		// and still gets the bridged node's surface below.
+		// measurement contributes no cluster surface. The assembler
+		// refuses such a spec (R2-C2-err-0453); an endpoint built by hand
+		// still must not panic mid-dispatch. A source that serves no
+		// cluster of its own is a composed device whose device type
+		// mandates none (an Oven: its cavity is a part) and still gets the
+		// bridged node's surface below.
 		return nil
 	}
 	// Group membership is stack state: the stack's Groups server goes
@@ -300,21 +295,20 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// — primary first, BridgedNode last. Mirror that order.
 	deviceTypes := descriptorDeviceTypes(ep)
 
-	// Spec §1.4: Identify (0x0003) is mandatory on every endpoint other
-	// than Root and NetworkCommissioning. Apple Home's HAP-service
-	// rebuild step uses the cluster's presence as a structural gate —
-	// without Identify in ServerList the pair fails with HAPErrorDomain
-	// Code=24 ("Failed to rebuild HAP services") regardless of how
-	// complete the rest of the cluster surface is. matter.js mirrors
-	// this: every device-type definition under
-	// `packages/node/src/devices/*.ts` lists Identify in the mandatory
-	// cluster set (verified for contact-sensor, temperature-sensor,
-	// occupancy-sensor, light-sensor, pressure-sensor, humidity-sensor,
-	// air-quality-sensor, water-leak-detector, generic-switch,
-	// window-covering, on-off-plug-in-unit). Mounting Identify here, in
-	// front of the source / measurement clusters, keeps it discoverable
-	// at the lowest cluster ID and ensures the ServerList builder picks
-	// it up automatically.
+	// Identify (0x0003) is mounted on every bridged endpoint that is no
+	// part, whatever its device type: Apple Home's HAP-service rebuild
+	// step uses the cluster's presence as a structural gate — without
+	// Identify in ServerList the pair fails with HAPErrorDomain Code=24
+	// ("Failed to rebuild HAP services") regardless of how complete the
+	// rest of the cluster surface is. This departs from the device types
+	// that do not mandate Identify — ElectricalSensor (0x0510),
+	// PowerSource (0x0011) — whose endpoint then serves a cluster the
+	// device type does not list; a part mounts it only where its device
+	// type mandates it (partClusterServers). The departure is deliberate
+	// and recorded in notes/parity/by_design.md (R2-C2-par-0454).
+	// Mounting Identify here, in front of the source / measurement
+	// clusters, keeps it discoverable at the lowest cluster ID and ensures
+	// the ServerList builder picks it up automatically.
 	//
 	// The instance comes from the endpoint, not from this call: Identify
 	// is the one bridged cluster server that owns mutable state
@@ -351,6 +345,34 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	}
 	installServerList(descriptor, out)
 	return out
+}
+
+// materializedServers is what the endpoint's measurement and its battery
+// materialise, in that order: the measurement's clusters follow the
+// source's own, and the device's battery — riding on this endpoint when
+// attachPowerSource picked it — follows them, so the primary function
+// stays first in the ServerList. Nil entries are left in; the caller drops
+// them.
+func (ep *Endpoint) materializedServers() []contract.ClusterServer {
+	mc := contract.MeasurementContext{EndpointID: ep.ID}
+	var out []contract.ClusterServer
+	if ep.Measurement != nil {
+		out = append(out, measurement.FromMeasurementClass(
+			ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc,
+		)...)
+	}
+	if ep.PowerSource != nil {
+		out = append(out,
+			measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource, mc)...)
+	}
+	return out
+}
+
+// measuredServers is [Endpoint.materializedServers] without its nil
+// entries: what an endpoint without a source serves before the stack's
+// clusters are added.
+func (ep *Endpoint) measuredServers() []contract.ClusterServer {
+	return ep.dropNilServers(ep.materializedServers())
 }
 
 // partClusterServers is the surface of a [Spec.Parts] endpoint: its own
@@ -412,19 +434,17 @@ func installServerList(descriptor *mattercore.Descriptor, mounted []contract.Clu
 //  3. A reflective fallback that walks any exported fields via
 //     fmt.Sprintf("%+v", key) so non-EndpointKey shapes still produce
 //     a deterministic, key-distinguishing string.
-//  4. Last-ditch literal "go-fabric-bridged-<addr>" — only reached
-//     when key is nil; never fall back to a single literal because
-//     duplicates fail Apple Home pair (verified against the
-//     in-tree decoder; all five bridged endpoints had collapsed onto
-//     one SHA-256 of a single constant string).
+//
+// A key that renders empty — nil, or a [SourceKey] whose String is "" —
+// has nothing to keep it apart from another, and no fallback can: the
+// former "go-fabric-bridged-%p" printed one constant for a nil key, the
+// collapse it was meant to prevent (duplicates fail Apple Home pair:
+// verified against the in-tree decoder, all five bridged endpoints had
+// collapsed onto one SHA-256 of a single constant string). The
+// [Assembler] therefore refuses such a key (R2-C2-err-0452); an endpoint
+// built by hand with one hashes the empty rendering.
 func uniqueIDFor(key any) string {
 	s := renderSourceKey(key)
-	if s == "" {
-		// Nil / un-renderable key — guarantee uniqueness via the key
-		// pointer address so Apple does not collapse the endpoint into
-		// a duplicate HMAccessory.
-		s = fmt.Sprintf("go-fabric-bridged-%p", key)
-	}
 	// Mix the per-boot salt in so Apple's HAP cache sees a fresh
 	// fingerprint after every daemon restart; see package bootid.
 	salt := bootid.Salt()
@@ -557,8 +577,20 @@ func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.Cluste
 			ok, err := gm.HasKeyMapping(ctx, fabric, groupID)
 			return err == nil && ok
 		},
+		// A store error while listing the fabrics is not a node without
+		// fabrics: the read then serves what it serves without a fabric
+		// source — the accessing fabric's own entry — rather than Success
+		// with an empty list (R2-C2-err-0455).
 		Fabrics: func(ctx context.Context) []uint8 {
-			f, _ := gm.StoredFabrics(ctx)
+			f, err := gm.StoredFabrics(ctx)
+			if err != nil {
+				ep.logger().Warn("endpoint: FabricSceneInfo: listing the fabrics failed; serving the accessing fabric's entry",
+					"endpoint", ep.ID, "err", err)
+				if _, fabric, _ := im.LookupFabricFilter(ctx); fabric != 0 {
+					return []uint8{fabric}
+				}
+				return nil
+			}
 			return f
 		},
 	})
