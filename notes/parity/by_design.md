@@ -233,6 +233,10 @@ unit removes the line with the row.
 | BD-Matter-Commissioner-FailSafeKeptThroughConsent | `ControllerCommissioningFlow.ts:293` at `db021da0`: the BLE re-arm period is the constant `BTP_IDLE_ALIVE_INTERVAL = Seconds(25)`, the period of the timer `:922-926`, which runs on BLE only (`:920`) (presence); the flow has no joint-fabric trust-verification stage (absence: no `jcm`/`JointFabric` under `packages/protocol/src/peer/`, re-checked by that grep) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts`<br>`packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"const BTP_IDLE_ALIVE_INTERVAL = Seconds(25);"`<br>`"if (this.interaction.channelType === ChannelType.BLE) {"` | connectedhomeip for the consent wait (`src/controller/jcm/DeviceCommissioner.cpp:430-441`, `:63-73` at `6170af84`); the period min(25 s, half the fail-safe) and the re-arm off BLE while Consent waits are this module's own (review II, R2-P6-fsm-1860, owner decision 215) | no |
 | BD-Matter-CASEClient-SessionBeforeSigma3 | `CaseClient.ts:336-369` at `db021da0`: the initiator awaits the responder's Success (`:336`) before it creates the session (`:343-358`, `delayManagerRegistration` at `:356`) and adds it to the manager (`:369`) (presence) | `packages/protocol/src/session/case/CaseClient.ts` | `"            await abort.attempt(messenger.waitForSuccess({ description: \"Sigma3-Success\" }));"` | this module's own rule (owner decision 269): registered before Sigma3, what arrives held until the Success. connectedhomeip serves the initiator's session from the Success as well — `OnSuccessStatusReport` ends in `Finish()` (`src/protocols/secure_channel/CASESession.cpp:2315-2339` at `6170af84`), which activates it (`src/protocols/secure_channel/PairingSession.cpp:42-66`) — and drops a message on a session not yet active (`src/transport/SessionManager.cpp:1007-1012`) | no |
 | BD-Matter-PASE-TimedLockout | `DeviceCommissioner.ts:198` at `b25ed960`: once a window's failed commissioning attempts reach `MAX_FAILED_COMMISSIONING_ATTEMPTS` = 20 (`:44`; counted at `:181-199` from a PASE pairing that fails before its session is established, `:251`, and a fail-safe that ends without commissioning, `:160-174`), matter.js closes the window (`#closeWindow`, `:318-334`) and keeps PASE refused by no timer afterwards (presence: the close the count ends in) | `packages/protocol/src/protocol/DeviceCommissioner.ts` | `"        this.#close(() => window).catch(error => logger.error(\"Error closing the commissioning window\", error));"` | this module's own rule (`bridge/securechannel.go`, `paseLockoutCooldown`; the one count `recordFailedAttempt`, its fail-safe half `failSafeSessionsClosed` in `bridge/pase_close.go`): an uncommissioned daemon answers PASE from its configured passcode with no window open, so the refusal needs its own expiry; connectedhomeip ends the refusal with the window (`CommissioningWindowManager.cpp:160-192`, as `bridge/securechannel.go` cites it; not re-read at this lift, unverified) | no |
+| BD-Matter-SecretRedaction-ShapeMismatchFailsClosed | `SecretRedaction.ts:107-108` and `:114-115` at `b25ed960` (`redactValue`, `:91-122`): the value is returned unchanged for an array model whose value is not an array and for an object model whose value is not a plain object (presence) | `packages/model/src/logic/SecretRedaction.ts` | `"!Array.isArray(value)) {\n                    return value;"` | this module's own rule (review II, R2-C2-sec-1303, owner decision 525) | no |
+| BD-Matter-Controller-CrlDerNodeBudget | `DerCodec.ts:436-440` at `b25ed960` (`#decodeRec`, `:429-442`): every element of a constructed node is pushed while bytes remain, no element count (presence) | `packages/general/src/codec/DerCodec.ts` | `"elements.push(this.#decodeRec(elementsReader));"` | this module's own rule (review II, R2-C2-bound-1901) | no |
+| BD-Matter-Controller-OtaVersionsPerCheckBounded | `DclOtaUpdateService.ts:238-240` (the newer versions, highest first) and `:253` at `b25ed960`: every newer version is looked up until one applies, no cap in `:235-253` (presence) | `packages/protocol/src/dcl/DclOtaUpdateService.ts` | `"for (const version of newerVersions) {"` | this module's own rule (review II, R2-C2-bound-1902) | no |
+| BD-Matter-Controller-DclCertificatesPerAnswerBounded | `DclCertificateService.ts:1206-1249` at `b25ed960`: every certificate of an answer is stored through `#storeCertificate` (`:1236-1245`), no cap (presence) | `packages/protocol/src/dcl/DclCertificateService.ts` | `"for (const cert of certs) {"` | this module's own rule (review II, R2-C2-bound-1903) | no |
 
 ---
 
@@ -384,6 +388,12 @@ it to the device.
 **Rationale.** A bridge cannot accept a mode change on the device's behalf;
 the tag rules are the specification's and the same for every host.
 
+Review II, close-out C3 (R2-C2-par-1456): the derivations' required-tag and
+exclusive-tag rules match a mode tag by value alone and do not read
+`mfgCode`, as matter.js: `modeTags.some(({ value }) => value === …ModeTag.Normal)`
+(`packages/node/src/behaviors/laundry-washer-mode/LaundryWasherModeServer.ts:26-27`,
+`packages/node/src/behaviors/rvc-run-mode/RvcRunModeServer.ts:26-27`,
+`:33-34`, `:42-44` at `b25ed960`; only these two derivations were read).
 
 ### BD-Matter-ModeSelect-HostOwnsTheMode — ModeSelect serves neither StartUpMode nor OnMode, and reads null without a source
 
@@ -2081,6 +2091,26 @@ the transfer where chip calls it twice (`BDXDiagnosticLogsProvider.cpp:194`,
 By design (ADR 0021). The second EndLogCollection is a chip quirk with
 no observable effect; the pin moves on its own schedule.
 
+Review II, close-out C3 (R2-C2-sec-2451, owner decision 524): the log a
+RetrieveLogsRequest is served is the node's diagnostic ring with
+node-scoped details only; a session event the bridge attributes to a fabric
+(`fabric_index`) also shows that fabric's own controller its peer address
+and session id, while other fabrics' events, PASE events and a request
+without an accessing fabric show neither (`node/node.go` `ringLogs`,
+`bridge/diag_session_fabric.go`). The request is Operate on any fabric
+(`packages/model/src/standard/elements/diagnostic-logs.element.ts:24` at
+`b25ed960`) and the ring is node-wide. matter.js has no server logic
+(`packages/node/src/behaviors/diagnostic-logs/DiagnosticLogsServer.ts:14` at
+`b25ed960`); chip's example provider serves one host-configured file per
+intent and names no fabric
+(`examples/all-clusters-app/linux/diagnostic-logs-provider-delegate-impl.cpp:93-96`,
+`:153-156`, `:170-179` at `6170af84`). The detail allow-list fails closed
+for a key a later bridge site adds; the event message is served unfiltered
+and is a constant string at every bridge site today. Pinned by
+`node:TestRingLogsCarryNoPeerDetail`,
+`node:TestRingLogsServeTheAccessingFabricsOwnSessions` and
+`bridge:TestSessionEventsNameTheirFabric`.
+
 ### BD-Matter-KeySetReadAllIndicesOrder — key set ids listed in id order
 
 matter.js `GroupKeyManagementServer.keySetReadAllIndices` lists key set 0
@@ -2303,6 +2333,8 @@ Review II, phase 6a (owner decision 150: chip's behaviour mirrored and named her
 - (R2-P6-fsm-1616) EnableCharging on a faulted EVSE or one in diagnostics stores ChargingEnabledUntil, the command's limit and MinimumChargeCurrent and recomputes MaximumChargeCurrent before the fault check answers FAILURE (`EnergyEvseDelegateImpl.cpp:72-117`, check `:1010-1016`); EnableDischarging likewise stores DischargingEnabledUntil and its limit and recomputes MaximumDischargeCurrent (`:148-156`, check `:1072-1076`) — `evse.go` `enableCharging`.
 - (R2-P6-wire-1617) DEM's start-time and constraint checks add controller-supplied uint32 times without an overflow check and a host forecast's `EndTime - StartTime` underflows, as chip's (`DeviceEnergyManagementCluster.cpp:462`, `:470`, `:778-779`) — `devicemanagement.go`.
 - (R2-P6-fsm-1623) A PauseRequest refused by the host during a power adjustment stops the adjustment's timer and leaves `powerAdjustInProgress` set (chip `DeviceEnergyManagementDelegateImpl.cpp:499-509`, the timer cancelled at `:501`): the adjustment never ends by itself — no PowerAdjustEnd, the capability's cause stays — CancelPowerAdjustRequest answers INVALID_IN_STATE for the ESAState Online the failure sets, and a new PowerAdjustRequest recovers (`devicemanagement.go` `pauseFailureLocked`, `cancelPowerAdjustRequest`, `powerAdjustRequest`). chip's consequence is inferred.
+- (R2-C2-fsm-1601, review II close-out C3) A second PowerAdjustRequest the host refuses while an adjustment runs cancels the running timer and answers FAILURE — no re-arm, no failure handling; `powerAdjustInProgress` stays set and ESAState stays PowerAdjustActive (`cluster/energy/devicemanagement.go`), the shape of chip's example delegate (`examples/energy-management/device-energy-management/src/DeviceEnergyManagementDelegateImpl.cpp:106-109`, `:125-132`, `:149`, `:162`, `:175`, `:188-200`), as R2-P6-fsm-1623. The source is chip's `examples/`, not `src/`; whether to keep mirroring that strand is the owner's.
+- (R2-C2-wire-1605, review II close-out C3) EnergyEvse's SessionDuration (`now - startTime`, `cluster/energy/evse.go`) and DeviceEnergyManagement's PowerAdjustEnd Duration (`now - powerAdjustStartUtc`, `cluster/energy/devicemanagement.go`) are uint32 differences without a guard, so a Matter time set backwards yields a value near 2^32, as chip's example delegates: `uint32_t duration = matterEpochSeconds - mStartTime;` (`examples/evse-app/evse-common/src/EnergyEvseDelegateImpl.cpp:1819`) and `event.duration = timeNowUtc - mPowerAdjustmentStartTimeUtc;` (`examples/energy-management/device-energy-management/src/DeviceEnergyManagementDelegateImpl.cpp:314`).
 
 ### BD-matterjs-server-NetworkTopology — the controller's network graph after matterjs-server's NetworkTopologyService
 
@@ -2759,8 +2791,9 @@ it. Owner decision 2026-10-11 (report P, question 2).
 
 matter.js's device files list them as behaviours of the type
 (`EndpointFile.ts`); here the endpoint assembler mounts them on every
-endpoint whose type asks for them (`endpoint/materialize.go`
-ClusterServers, partClusterServers, mountGroups, mountScenes) and replaces
+endpoint whose type asks for them, and Identify on every bridged endpoint
+that is no part (`BD-Matter-Bridge-IdentifyOnEveryBridgedEndpoint`)
+(`endpoint/materialize.go` ClusterServers, partClusterServers, mountGroups, mountScenes) and replaces
 a source-supplied Groups or ScenesManagement with the stack's. `device/`
 skips them (`device/device.go` `assemblerMounted`) and refuses a
 `WithServer` or a declaration for them, so there is one
@@ -5893,21 +5926,28 @@ armed and `MatchesFabricIndex` (`FailSafeContext.h:76-79, :92-96` at
 Management `:212`; Joint Fabric Administrator `:325, :369`; Network
 Commissioning's AddOrUpdate, RemoveNetwork and ConnectNetwork through
 `EnsureFailsafeIsArmed`, `NetworkCommissioningCluster.cpp:155-172, :380,
-:568, :609`). This module follows chip (owner decision 2026-11-01, review
+:568, :609, :644`). This module follows chip (owner decision 2026-11-01, review
 W3-clusec-03, W3-club1-02, W3-clua2-01, and the W3 PR for the Thread and
 Wi-Fi NetworkCommissioning servers): the node's fail-safe port is
 `core.GeneralCommissioning.FailSafeFabric` (armed, and for which fabric), the
 servers test it with `core.FailSafeArmedFor`; the two NetworkCommissioning
 servers take it through `AttachFailSafe` / `Config.FailSafe` and keep the
-fabric-blind `IsFailSafeArmed` port for a host without one; UpdateNOC keeps
+fabric-blind `IsFailSafeArmed` port for a host without one, deprecated
+since review II (R2-C2-sec-1006, decision 515) and removable in v0.28.0: a
+server wired with that port alone gates on any fabric's window, and logs
+`netcomm.failsafe_blind_port` once when it does — a decided exception to
+README §The deprecation window, rule 2 (decision 522: the blind port opens
+network commissioning to a foreign fabric's window); UpdateNOC keeps
 matter.js's own answer for another fabric's window, ConstraintError
 (`OperationalCredentialsServer.ts:355-360`). Reasoning: another fabric must
 not consume or roll back the commissioning state of a window it did not arm.
 Pinned by `TestParityOpcreds_FailSafeOfAnotherFabricIsNotArmed`,
 `TestThreadBorderRouterManagementCluster_FailsafeOfAnotherFabric`,
 `TestICACCommandsNeedTheAccessingFabricsFailSafe`,
-`TestThreadNetworkCommissioningFailSafeOfAnotherFabric` and
-`TestWiFiNetworkCommissioningFailSafeOfAnotherFabric`.
+`TestThreadNetworkCommissioningFailSafeOfAnotherFabric`,
+`TestWiFiNetworkCommissioningFailSafeOfAnotherFabric`,
+`TestWiFiNetworkCommissioningBlindFailSafePortLogsOnce` and
+`TestThreadNetworkCommissioningBlindFailSafePortLogsOnce`.
 
 ### BD-chip-ClosureControl-RulesInServer — the ClosureControl command rules are connectedhomeip's; matter.js has none
 
@@ -5982,6 +6022,20 @@ tests `TestHandleCalibrate`, `TestHandleMoveToAllFeatures`,
 Review II, phase 4 (2026-11-14): connectedhomeip's
 `examples/closure-app/linux/ClosureManager.cpp` is outside the exports the
 review read and was not re-read; what this entry says of it is unverified.
+
+Review II, close-out C3 (R2-C2-fsm-1550, with R2-P1-clu-01 and
+R2-P6-fsm-1580): MoveTo, Calibrate and Stop keep a MainState (for MoveTo
+also a reached target) the drive reported while the mover had the command,
+inline or from another goroutine, and do not overwrite it with the outcome
+written after the mover returned (`stateReports`,
+`cluster/closure/closurecontrol_server.go`). connectedhomeip writes Stopped
+after a successful delegate Stop unconditionally
+(`src/app/clusters/closure-control-server/ClosureControlCluster.cpp:544-548`
+at `6170af84`) and Moving after MoveTo (`:623-634`), so a report from inside
+the delegate ends as Stopped or Moving there and as the report here.
+Reason: a report from another goroutine has no serial order in which the
+command's outcome is newer, and the module keeps one rule for both cases.
+Pinned by `cluster/closure:TestClosureControlReportDuringTheCallIsKept`.
 
 ### BD-chip-Valve-RulesInServer — the valve's rules, Level and TimeSync are connectedhomeip's; matter.js has none
 
@@ -6192,6 +6246,22 @@ client only), so the kit refuses a kit `Declare` for it and a host mounts
 Pinned by `ambient_chip_test.go` (chip's 15 cases, 14 by meaning) and
 `ambient_rules_test.go`.
 
+Review II, close-out C3, three rules as chip (`AmbientContextSensingCluster.cpp`
+at `6170af84`): a change of ObjectCountConfig stores the threshold and does
+not re-derive the held count or ObjectCountThresholdReached — chip's
+`SetObjectCountConfig` stores, notifies and persists and calls nothing that
+touches the count; the flag is re-derived only where
+`UpdateDetectionAttributes` runs (`SetObjectCount`, `AddDetection`, a limit
+change, expiry; `:303-367`, `:636-645`, `:380`) (R2-C2-fsm-1451). At
+SimultaneousDetectionLimit `AddDetection` drops the oldest detection first,
+with no end event, and only then searches for the same detection, so a
+repeat of the oldest is allocated as new and DetectStart is sent again
+(`:214-233`, `:236-248`, `:251-267`, `:285-288`) (R2-C2-fsm-1452). A new
+AmbientContextTypeSupported list from the host neither filters the held
+detections nor re-checks ObjectCountConfig: chip's
+`SetAmbientContextTypeSupported` checks the list, copies it and notifies
+(`:190-203`) (R2-C2-fsm-1458).
+
 ### BD-chip-TlsCertificateManagement-RulesInServer — root and client certificate tables follow connectedhomeip behind the `CertificatePort`; reads serve the full certificate
 
 matter.js's `TlsCertificateManagementServer.ts:14` at `862ad75f` is the
@@ -6359,6 +6429,33 @@ certification cases).
 
 Review II, phase 6a (R2-P6-sec-1602, owner decision 150): ModifyPushTransport runs the transport options' constraint checks and the stream checks only, as chip's HandleModifyPushTransport (`PushAVStreamTransportLogic.cpp:1291`, `:1326-1332`, delegate `:1335` at `6170af84`): Allocate's TLS-endpoint lookup, URL-form, stream-usage, zone-id, segment-duration, bandwidth and pre-roll checks (`:1005`, `:1016`, `:1074`, `:1088`, `:1124`, `:1159`, `:1173`) are not run on the new options; the connection keeps its fabric. The port doc says so (`PushTransportPort`, generated from `script/clustergen/ports_camera.go`).
 
+Review II, close-out C3 (R2-C2-err-1602, decision 534): when a table
+refuses an entry the port has already created, the server undoes it at the
+port before it answers FAILURE — a new WebRTC session gets
+EndSession(UnknownReason) (`cluster/camera/provider.go`), a push transport
+DeallocatePushTransport (`cluster/camera/pushtransport.go`), a new video,
+audio or snapshot stream its Video/Audio/SnapshotStreamDeallocate
+(`cluster/camera/avstream.go`), a zone RemoveZone
+(`cluster/camera/zone.go`); a session or stream the port reused is kept,
+since a controller can still end it. chip has no such teardown at the two
+sites read: its WebRTC `UpsertSession` has no failure path, and PushAV
+reverts its table and answers FAILURE without `DeallocatePushTransport`
+(`src/app/clusters/webrtc-transport-provider-server/WebRTCTransportProviderCluster.cpp:308-330`,
+`:803-811`, `:1104-1111`;
+`src/app/clusters/push-av-stream-transport-server/PushAVStreamTransportLogic.cpp:152-160`,
+`:1194-1209` at `6170af84`). For the AV stream allocations and the zone
+create chip was not read (unverified). The refusal is this module's own
+(the R2-P6-err-1611 schema check), so the teardown is too. Pinned by
+`cluster/camera:TestProviderEndsTheSessionItCouldNotStore`,
+`TestPushDeallocatesTheConnectionItCouldNotStore` and
+`TestRefusedCommitUndoesThePortsAllocation`.
+
+Review II, close-out C3 (R2-C2-fsm-1603): an expiry whose deallocation the
+port refuses leaves the connection in place, with no retry, as chip: its
+expiry callback logs "Deallocation Failed" and returns, and
+`RemoveTimerAppState` is in the success branch only
+(`PushAVStreamTransportLogic.cpp:264-291` at `6170af84`).
+
 ### BD-matterjs-server-CameraStreamManagement — the controller manages a camera's streams and WebRTC sessions, ahead of matter.js
 
 matter.js at `862ad75f` gives the controller side of cameras the
@@ -6486,6 +6583,25 @@ Review II, phase 6a (R2-P6-sec-1106, owner decision 129): RefreshNode fetches th
 Review II, phase 6a (R2-P6-bound-1113): AddGroup holds GroupList to MaxGroups — tighter than connectedhomeip, whose AddGroup has no capacity test (`src/app/server/JointFabricDatastore.cpp:1360-1385`; its capacity tests are `:183`, `:1159`, `:1227`, `:1684`, `:1930`, `:2122` only, at `6170af84`). RefreshNode refuses a fetched list longer than the per-command cap of that list (memberships and bindings MaxGroups, ACL entries MaxACLs) with ErrNoMemory before anything changes, so no truncated list is pushed; the table's total is not bounded, as chip's merges append without one (`:389`, `:562`, `:959`). After a wipe a push already collected calls no port; the store's last record is a second plaintext copy of the epoch keys in memory until the next save (chip's buffers are self-zeroizing, `JointFabricDatastore.h:532-559`) — recorded, not changed.
 
 Review II, phase 6a (R2-P6-par-1115): UpdateGroup refuses a group whose stored CAT is the Administrator or the Anchor CAT and takes the request's GroupCAT unchecked — mirrored: connectedhomeip `src/app/server/JointFabricDatastore.cpp:1418-1423`, `:1491-1500` at `6170af84` (AddGroup, `:1367`, checks the request's). A group can so be moved onto a reserved CAT, after which it can be neither updated nor removed by command.
+
+Review II, close-out C3 (R2-C2-bound-1101, R2-C2-bound-1102, decision 533):
+NodeKeySetList holds at most `MaxGroupKeySet` (256) entries — UpdateGroup and
+AddGroupIDToEndpointForNode answer ErrNoMemory before any change — and a
+refresh whose node lists more than 256 endpoints ends with ErrNoMemory
+before any change, the node staying Pending. Both are this module's own
+bounds; whether chip bounds these two lists was not read (unverified).
+AddGroup and UpdateGroup accept a GroupKeySetID the datastore does not hold,
+with Success, as chip: `groupEntry.groupKeySetID = commandData.groupKeySetID`
+is copied without any lookup in `mGroupKeySetList`
+(`src/app/server/JointFabricDatastore.cpp:1375`); UpdateGroup's key set
+branch (`:1473-1487`) and `AddNodeKeySetEntry` (`:2225-2280`) never consult
+it; `IsGroupKeySetEntryPresent` (`:1169-1180`) has no caller on these
+paths; chip's tests fix the acceptance
+(`src/app/server/tests/TestJointFabricDatastore.cpp:336-339`, `:370-393`) at
+`6170af84`. matter.js has no server logic
+(`packages/node/src/behaviors/joint-fabric-datastore/JointFabricDatastoreServer.ts:14`
+at `b25ed960`). Pinned by `cluster/jointfabric:TestNodeKeySetListIsBounded`
+and `TestRefreshEndpointListIsBounded`.
 
 ### BD-chip-JointFabricAdministrator-RulesInServer — the administrator's commands and the commissionee's trust verification follow connectedhomeip; the anchor is recorded at CommissioningComplete as chip's example app does
 
@@ -8424,6 +8540,17 @@ Review II, U3-ctl-lan-1 (owner decision 240): past the record bound the cache ev
 
 matter.js starts a host discovery for every SRV target without address records: its `hosts.added` handler (`packages/general/src/net/dns-sd/IpServiceResolution.ts:39` at `b25ed960`) skips a host with A/AAAA records (`:40-47`), and every other host gets `hostResolvers.set` (`:54`) and `solicitor.discover` in `workers.add` (`:55-63`) — no count, no bound. Here a resolution runs at most `maxHostDiscoveries` = 4 host discoveries at once (`client/discovery/operational.go`); the rest wait in SRV order until a target is dropped, a host with cached addresses takes none, and an address that arrives ends the resolution as before. The rule and its number are this module's own. The cache's eviction order of the same row is in `BD-Matter-Controller-DnssdCacheBounded`. Review II, U3-ctl-lan-1. Pinned by `client/discovery:TestOperational_ResolveBoundsItsHostDiscoveries`. Register row above; the row closes when matter.js bounds a resolution's host discoveries.
 
+Review II, close-out C3 (R2-C2-bound-2152, decision 519): a Service tracks
+at most `maxServiceTargets` = 8 SRV targets (2 × `maxHostDiscoveries`,
+`client/discovery/names.go`), the one discovered or refreshed longest ago
+going first (`client/discovery/service.go`), so a LAN sender cannot set the
+number of a peer's connection attempts through extra SRV targets while the
+peer has no session. 8 rather than 5 keeps the waiting-target case
+`TestOperational_ResolveBoundsItsHostDiscoveries` holds. Whether matter.js
+bounds SRV targets per service or connection attempts per peer was not read
+(unverified); no register row of its own. Pinned by
+`client/discovery:TestService_SRVTargetsAreBounded`.
+
 ### BD-Matter-Controller-DnssdTTLCeiling — the controller caches a DNS-SD record for at most 75 minutes
 
 matter.js lets a record expire at its TTL times a grace factor
@@ -9005,6 +9132,15 @@ matter.js staggers the race's attempts by their registration index: `CROSS_DEVIC
 
 Review II, N3-rwrace-2: an attempt over BLE is answered once the peripheral accepted the connection (`ble.Dial`). Pinned by `controller/ble:TestDialMarksTheRaceAttemptAnsweredOnConnect`.
 
+Review II, close-out C3 (R2-C2-bound-2153): at most `maxRaceWaiting` = 16
+(= `maxRaceAttempts`) candidates wait unreleased; past it the one found
+longest ago is dropped unattempted and logged
+(`matter.controller.discovery.candidate_dropped`;
+`client/discovery/session_kinds.go`). This module's own bound beside
+`maxRaceAttempts` (decision 55); whether matter.js bounds the waiting
+candidates was not read (unverified). Pinned by
+`client/discovery:TestRace_WaitingCandidatesAreBounded`.
+
 ### BD-Matter-BTP-SendQueueBounded — a BTP session's send queue holds at most 255 messages
 
 matter.js queues every outgoing message: `sendMatterMessage` pushes it onto `queuedOutgoingMatterMessages` (`packages/protocol/src/ble/BtpSessionHandler.ts:390` at `b25ed960`), an array declared without a limit (`:42`). connectedhomeip chains each message onto its send queue, `mSendQueue->AddToEnd`, with no count (`src/ble/BLEEndPoint.cpp:591-602` at `6170af84`). Here (`transport/btp/session.go`) a session's queue of messages waiting for room in the peer's window holds at most `maxQueuedMessages` = `MaximumWindowSize` = 255; a `Send` past it is refused with a `FlowError`, the queued messages stay and the session lives. The number and what happens at it are both chosen, with no reference: the number is the largest window a session may negotiate — as many messages as that window has segments — and refusing the newest message was chosen over closing the session. How many messages wait is the peer's to decide, since the ack-received timeout (`AckTimeout`, 15 s) bounds an unacknowledged window in time only. Who reaches it: a sender to a central that acknowledges too little for 255 messages to leave. A commissioning does not, its messages being paced by acknowledgements and responses; that is the fix agent's reasoning, not a measurement. Review II, phase 3 rework. Pinned by `transport/btp:TestSession_SendQueueIsBounded`; the limit is in `docs/guides/limits.md`. Register row above; the row closes when matter.js bounds the queue.
@@ -9423,6 +9559,9 @@ matter.js couples on every step (onStep → `couple`, `packages/node/src/behavio
 
 matter.js's replace stops silently: `this.stop(name)` (`packages/node/src/behavior/Transitions.ts:124` at `b25ed960`), and `stop` deletes the state and stops the timer with no report (`:263-284`). connectedhomeip stops the running transition before any new one and sets RemainingTime to 0, reportable when the stopped transition was 1 s or longer (`src/app/clusters/level-control/LevelControlCluster.cpp:351`, `:731-735`, `:701-706` at `6170af84`); `UpdateRemainingTime` does nothing without the Lighting feature (`:680`) or when the value is unchanged (`:684`). Here a command that ends a running transition without starting a gradual one (immediate, already at the target, unknown value, no distance, at the bound) ends it as a cancel: Settled for the name, RemainingTime by cancel's rule, reported only where something was reported before (`cluster/transition/transition.go` startLocked → endedLocked). At most one extra report, which chip also makes (`:387-388` after `:351`). Review II, R2-P6-fsm-1402, owner decision 209.
 
+Review II, close-out C3 (R2-C2-fsm-1402; matter.js decides, close-out plan
+C2 result): a ColorControl command of another colour mode, or of the other hue attribute, stops the running transition silently, without a RemainingTime report. That is matter.js's: its `stopAllColorMovement` uses the silent `transitions.stop` (the reporting one is `cancel`), which `Engine.Stop` (`cluster/transition`) mirrors (`packages/node/src/behaviors/color-control/ColorControlServer.ts:843-848`, `packages/node/src/behavior/Transitions.ts:263` at `b25ed960`). connectedhomeip differs: an immediate MoveToHue replaces an XY/CT transition and calls `SetQuietReportRemainingTime(0, new)`, so it reports RemainingTime 0 (`src/app/clusters/color-control-server/ColorControlCluster.cpp:1570-1571`, `:1601-1603` at `6170af84`). The same-property rule of this entry does not reach the cross-property stop.
+
 ### BD-chip-ColorControl-LoopTimeZero — ColorLoopTime 0 turns the colour loop once a second, as connectedhomeip
 
 matter.js divides by the loop time (`Math.floor(MAX_ENHANCED_HUE_VALUE / this.state.colorLoopTime)`, `packages/node/src/behaviors/color-control/ColorControlServer.ts:1201-1210`, `:1208` at `b25ed960`), and its engine takes the non-finite rate as immediate and, without a target, drops it (`packages/node/src/behavior/Transitions.ts:133-136`), so ColorLoopSet or a scene with Time 0 sets ColorLoopActive over nothing. connectedhomeip guards it: `loopTimeSec = (mColorLoop.timeSec == 0) ? 1u : mColorLoop.timeSec` (`src/app/clusters/color-control-server/ColorControlCluster.cpp:913` at `6170af84`, in `TickColorLoop`, `:902`). Here ColorLoopTime 0 turns the loop once a second; the attribute keeps reading 0 (`cluster/light/colorcontrol_commands.go` startColorLoopLogic). Review II, R2-P6-fsm-1412 (the Time-0 half), owner decision 209.
@@ -9541,4 +9680,32 @@ matter.js's `ServerSubscription.close(flushViaSession)` (`packages/node/src/node
 
 ### BD-Matter-ICD-CheckInAddressLastActive — the Check-In goes to the address of the session the client sent on last, not the session added last
 
-matter.js's Check-In sender resolves the peer's cached `operationalAddress` (`packages/node/src/behaviors/icd-management/IcdManagementServer.ts:362-365` at `b25ed960`), which is set when a session is added and on that session's `networkAddressChanged` (`packages/protocol/src/peer/Peer.ts:141-164`) and on adoption (`PeerSet.ts:116-124`, `:317-318`), not at each receive. `Bridge.PeerSessionAddress` (`bridge/icd.go`) takes the UDP session the client was active on last, as `livePeerLink` chooses. The two differ only when an older session A (address X) and a newer session B (address Y) are held and the client then sends on A from the unchanged X: matter.js sends the Check-In to Y, this module to X. Reason: the session the client last used is the address it last proved reachable at. Review II, R2-C2-par-0353. Guard: `bridge:TestPeerSessionAddressIsTheNewestSessions`.
+matter.js's Check-In sender resolves the peer's cached `operationalAddress` (`packages/node/src/behaviors/icd-management/IcdManagementServer.ts:362-365` at `b25ed960`), which is set when a session is added and on that session's `networkAddressChanged` (`packages/protocol/src/peer/Peer.ts:141-164`) and on adoption (`PeerSet.ts:116-124`, `:317-318`), not at each receive. `Bridge.PeerSessionAddress` (`bridge/icd.go`) takes the UDP session the client was active on last, as `livePeerLink` chooses. Among held UDP sessions the two differ when an older session A (address X) and a newer session B (address Y) are held and the client then sends on A from the unchanged X: matter.js sends the Check-In to Y, this module to X. Two more differences, both older than this entry: a TCP session added last — matter.js sets a `tcp` address with the mDNS port (`Peer.ts:150-158`) and its sender picks the TCP interface for it (`IcdManagementServer.ts:367-370`), where `PeerSessionAddress` skips every session without a UDP address and returns an older UDP session's address or none; and no session held — matter.js keeps the cached address (the session's `closing` handler removes the session and does not clear it, `Peer.ts:168-174`), where this module resolves the address over DNS-SD (`node/icd.go`). Reason: the session the client last used is the address it last proved reachable at. Review II, R2-C2-par-0353. Guard: `bridge:TestPeerSessionAddressIsTheNewestSessions`.
+
+### BD-Matter-SecretRedaction-ShapeMismatchFailsClosed — a secret-bearing value whose wire form is another type than its model is redacted whole
+
+matter.js's `redactValue` returns the value unchanged for an array model whose value is not an array and for an object model whose value is not a plain object (`packages/model/src/logic/SecretRedaction.ts:91-122`, `:107-108`, `:114-115` at `b25ed960`); both tests cover a scalar too. Here `redactValue` (`cluster/spec/redact.go`) replaces a secret-bearing list or struct whose TLV node is another type than its model — a struct read as a TLV list, a list as a structure, either as a scalar — by "(redacted)" under its tag; a TLV list under a list model (a list, not an array) is redacted whole too. Reason: a value whose shape the model cannot walk may hold the secret anywhere, so the module's logs fail closed, and the "fails closed" sentence of `bridge/log_redact.go` names the case (owner decision 525). Review II, R2-C2-sec-1303. Pinned by `cluster/spec:TestRedactShapes`. Register row above; the row closes when matter.js redacts a mismatched shape.
+
+### BD-Matter-Controller-CrlDerNodeBudget — a CRL's DER decode counts its elements against a budget
+
+matter.js's `#decodeRec` (`packages/general/src/codec/DerCodec.ts:429-442` at `b25ed960`) pushes every element of a constructed node while bytes remain, with no element count (`:436-440`). Here (`controller/dcl/crl.go`) the decode counts each constructed node's children from their headers and charges them against `derMaxNodes` = `maxCRLSize`/4 (262 144 elements per decode) before it allocates them, and refuses a CRL past it. The budget is this module's judgement: a 1 MiB list of real entries (serial, date and reason-code extension, 34 bytes and 7 elements each) still decodes. Review II, R2-C2-bound-1901. Pinned by `controller/dcl:TestDERNodeBudgetBoundsTheWalk`. Register row above; the row closes when matter.js bounds a decode.
+
+### BD-Matter-Controller-OtaVersionsPerCheckBounded — an OTA check looks up at most the 64 highest listed versions
+
+matter.js takes the newer versions highest first (`packages/protocol/src/dcl/DclOtaUpdateService.ts:238-240` at `b25ed960`) and looks up every one until one applies (`:253`, `for (const version of newerVersions)`), with no cap in `:235-253`. Here (`controller/dcl/ota.go` `maxOTAVersionsPerCheck`) a check looks up at most the 64 highest and logs the cut (`dcl.ota.too_many_versions`). The result differs: with more than 64 newer versions listed and none of the highest 64 applicable, this module finds no update where matter.js would find one. 64 is this module's judgement. Review II, R2-C2-bound-1902. Pinned by `controller/dcl:TestOTAVersionsExaminedPerCheckAreBounded`. Register row above; the row closes when matter.js bounds a check.
+
+### BD-Matter-Controller-DclCertificatesPerAnswerBounded — one root's ledger answer adds at most 16 certificates
+
+matter.js stores every certificate of an answer (`for (const cert of certs)` through `#storeCertificate`, `packages/protocol/src/dcl/DclCertificateService.ts:1206-1249`, `:1236-1245` at `b25ed960`), with no cap. Here (`controller/dcl/certstore.go` `maxCertificatesPerRootAnswer`) one `RootCertificateBySubject` answer adds at most 16 valid certificates, the asked-for root's key sorted first, and logs the cut (`dcl.certificates.too_many_in_answer`); last-wins among the certificates of one key is unchanged. Not measured: with more than 16 valid certificates under the asked-for key, the 16th is kept where matter.js keeps the last. Review II, R2-C2-bound-1903. Pinned by `controller/dcl:TestCertificatesPerRootAnswerBounded`. Register row above; the row closes when matter.js bounds an answer.
+
+### BD-chip-RCAC-RefusalsBothReferencesShare — `ValidateRCAC` refuses what both references refuse in a root and keeps two leniencies, one from each
+
+`ValidateRCAC` (`secure/mattercert/verify.go`) refuses what both references refuse in a root: an icac-id, a fabric id of 0 and CATs in the subject (chip `src/credentials/CHIPCert.cpp:1129`, `ChipDN::GetCertType` `:606-687` at `6170af84`; matter.js `packages/protocol/src/certificate/kinds/Rcac.ts:69-71`, `:74-76`, `:84-86` at `b25ed960`), and a subjectKeyIdentifier or authorityKeyIdentifier that is absent or not 20 bytes (matter.js `Rcac.ts:112-126`; chip `CHIPCert.cpp:143-144`, `src/lib/core/TLVReader.h:481`, `src/credentials/CHIPCert.h:50`), besides is-CA (chip `:1135`; matter.js `:94-96`). It keeps two leniencies: a root subject with a firmware-signing-id is admitted, as matter.js admits it (`packages/protocol/src/certificate/kinds/definitions/operational.ts:59`; `Rcac.verify`, `:55-136`, has no test for it), where chip refuses it (`:648-650`); and the key usage needs keyCertSign only, as chip (`:1141`), where matter.js refuses a key usage other than 0x0060 or 0x0061 (`Rcac.ts:100-105`) — so a root with keyCertSign and without cRLSign is accepted (`secure/mattercert:TestValidateRCAC_CRLSignAbsent`). The self-signature test compares the RCAC-IDs where chip compares the whole subject and issuer DN (`:1131`): an issuer DN that carries an icac-id or CATs beside the matching rcac-id passes here, refused by chip through that comparison; matter.js's `Rcac.verify` has no issuer test either. <!-- REG-fix 539/535/540 --> Reason: owner decisions 516 and 523 — the refusals both references share are taken; for the two leniencies the owner chose the reference named with each, with no further reason recorded. Review II, R2-C2-par-0150. Pinned by `secure/mattercert:TestValidateRCACRefusesARootSubjectOfAnotherKindParityMatterJS`, `TestValidateRCACRefusesAKeyIdentifierOfAnotherLengthParityMatterJS` and `TestValidateRCACRefusals`.
+
+### BD-Matter-Bridge-IdentifyOnEveryBridgedEndpoint — Identify is mounted on every bridged endpoint that is no part, whatever its device type
+
+matter.js mounts Identify only where an endpoint's device type lists it: ElectricalSensor mandates PowerTopology only and mounts nothing; BridgedNode mandates and mounts Parts, Index and BridgedDeviceBasicInformation; no `Identify` in `electrical-sensor.ts`, `power-source.ts` or `bridged-node.ts` (`packages/node/src/endpoints/electrical-sensor.ts:63-69`, `:72-79`; `packages/node/src/endpoints/bridged-node.ts:118-131`, `:134-145` at `b25ed960`). `endpoint/materialize.go` `ClusterServers` puts the endpoint's Identify first on every bridged endpoint that is no part (a part only where its type mandates it, `partClusterServers`), so an ElectricalSensor (0x0510) or PowerSource (0x0011) endpoint serves a cluster its type does not list. Reason: Apple Home's HAP-service rebuild uses Identify's presence as a structural gate (HAPErrorDomain Code 24 without it) — the module's own record, not re-measured in review II. `BD-Matter-Identify-TriggerEffectEverywhere` rests on this mount. Review II, R2-C2-par-0454, decision 530. Pinned by `endpoint:TestIdentifyOnEveryBridgedEndpointNotOnEveryPart`, which fails when the snapshot's 0x0510 mandates Identify.
+
+### BD-Matter-Controller-CommissionableDiscoveryRefreshesCommissioned — a commissionable discovery refreshes a matching commissioned node's record, as matter.js
+
+`ForDevice` (`controller/client/addresses.go`) matches a node by its commissionable instance id, commissioned or not, and overwrites the match's descriptor (addresses, TXT fields, discriminator, mode) before the commission is refused with `ErrAlreadyCommissioned`. matter.js's `find` takes any readable node, and one whose construction is still initialising (`packages/node/src/node/client/Peers.ts:999`), with no commissioned filter (`:997-1007`); it matches by `RemoteDescriptor.is`, which compares peer addresses only when both descriptors carry one (`packages/node/src/behavior/system/commissioning/RemoteDescriptor.ts:38-40`) and otherwise a non-empty device identifier of the discovered one (`:45-47`); the match gets `agent.commissioning.descriptor = descriptor` unconditionally (`Peers.ts:377-396`, `:389-392`; the setter `CommissioningClient.ts:694-696` at `b25ed960`). Mirrored. The record's integrity and availability are at stake, no access — CASE authenticates (inferred). Refreshing only an uncommissioned match would be a divergence, the owner's to choose. Review II, R2-C2-sec-2352.
