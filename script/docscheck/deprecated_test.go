@@ -379,7 +379,7 @@ func checkDeprecatedTable(idents []deprecatedIdent, rows []tableRow, groups map[
 			case isGroupPattern(n):
 				want, ok := groups[n]
 				if !ok {
-					out = append(out, fmt.Sprintf("README.md:%d: `%s` is a group pattern the test's deprecatedGroups does not list", r.line, n))
+					out = append(out, fmt.Sprintf("README.md:%d: %#q is a group pattern the test's deprecatedGroups does not list", r.line, n))
 					continue
 				}
 				printed[n] = true
@@ -394,23 +394,23 @@ func checkDeprecatedTable(idents []deprecatedIdent, rows []tableRow, groups map[
 					}
 				}
 				if len(matched) != want {
-					out = append(out, fmt.Sprintf("README.md:%d: group `%s` matches %d deprecated identifiers, deprecatedGroups says %d", r.line, n, len(matched), want))
+					out = append(out, fmt.Sprintf("README.md:%d: group %#q matches %d deprecated identifiers, deprecatedGroups says %d", r.line, n, len(matched), want))
 				}
 			case qualifiedName.MatchString(n):
 				d, ok := byName[n]
 				if !ok {
-					out = append(out, fmt.Sprintf("README.md:%d: `%s` is not a deprecated identifier of the tree (removed, renamed, or the paragraph lost its Deprecated:)", r.line, n))
+					out = append(out, fmt.Sprintf("README.md:%d: %#q is not a deprecated identifier of the tree (removed, renamed, or the paragraph lost its Deprecated:)", r.line, n))
 					continue
 				}
 				matched = []deprecatedIdent{d}
 			default:
-				out = append(out, fmt.Sprintf("README.md:%d: `%s` is neither a qualified name (pkg/path.Name[.Member]) nor a group pattern", r.line, n))
+				out = append(out, fmt.Sprintf("README.md:%d: %#q is neither a qualified name (pkg/path.Name[.Member]) nor a group pattern", r.line, n))
 				continue
 			}
 			for _, d := range matched {
 				namedBy[d.name] = append(namedBy[d.name], n)
 				if d.release != "" && r.release != "" && d.release != r.release {
-					out = append(out, fmt.Sprintf("README.md:%d: `%s` is removable in %s by the row, in %s by its paragraph (%s)", r.line, d.name, r.release, d.release, d.pos))
+					out = append(out, fmt.Sprintf("README.md:%d: %#q is removable in %s by the row, in %s by its paragraph (%s)", r.line, d.name, r.release, d.release, d.pos))
 				}
 			}
 		}
@@ -433,7 +433,7 @@ func checkDeprecatedTable(idents []deprecatedIdent, rows []tableRow, groups map[
 	}
 	for g := range groups {
 		if !printed[g] {
-			out = append(out, fmt.Sprintf("deprecatedGroups lists `%s`, which the table no longer prints; delete the entry", g))
+			out = append(out, fmt.Sprintf("deprecatedGroups lists %#q, which the table no longer prints; delete the entry", g))
 		}
 	}
 	sort.Strings(out)
@@ -538,8 +538,9 @@ func h() {}
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got []string
-	for _, d := range deprecatedIn(fset, f, "x/demo", "x/demo/demo.go") {
+	found := deprecatedIn(fset, f, "x/demo", "x/demo/demo.go")
+	got := make([]string, 0, len(found))
+	for _, d := range found {
 		got = append(got, d.name+" "+d.kind+" "+d.release)
 	}
 	want := []string{
