@@ -36,8 +36,14 @@ func TestBindingDropFabricReportsTheSaveError(t *testing.T) {
 	if got := b.MatterHeldFabrics(); !slices.Equal(got, []uint8{2}) {
 		t.Errorf("held after the drop %v, want [2]", got)
 	}
-	if err := b.MatterDropFabric(context.Background(), 1); err != nil {
-		t.Errorf("a second MatterDropFabric(1) = %v, want nil: nothing held", err)
+	// Nothing of fabric 1 is held, but the failed save is owed: the second
+	// drop retries it and answers the store's refusal again
+	// (R3-store-3052).
+	if err := b.MatterDropFabric(context.Background(), 1); !errors.Is(err, refused) {
+		t.Errorf("a second MatterDropFabric(1) = %v, want the owed save's error", err)
+	}
+	if got := b.MatterHeldFabrics(); !slices.Equal(got, []uint8{2}) {
+		t.Errorf("held after the second drop %v, want [2]", got)
 	}
 }
 

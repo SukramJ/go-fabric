@@ -992,6 +992,9 @@ func (r *OTASoftwareUpdateRequestor) enableOrDisableUpdates(v bool) {
 // ones when there are none, a query is scheduled 2-12 minutes out (or at
 // the regular interval right after an update), and an update that was in
 // progress is reported as applied or failed.
+//
+// A Start whose load fails returns its error and leaves the requestor not
+// started, so the host or the node may call Start again (R3-err-3152).
 func (r *OTASoftwareUpdateRequestor) Start(ctx context.Context) error {
 	r.mu.Lock()
 	if r.started {
@@ -1001,6 +1004,9 @@ func (r *OTASoftwareUpdateRequestor) Start(ctx context.Context) error {
 	r.started = true
 	r.mu.Unlock()
 	if err := r.load(ctx); err != nil {
+		r.mu.Lock()
+		r.started = false
+		r.mu.Unlock()
 		return err
 	}
 	r.online(ctx)
