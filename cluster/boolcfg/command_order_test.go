@@ -6,6 +6,7 @@ package boolcfg_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -62,7 +63,7 @@ func newGatedEnable(t *testing.T) (*boolcfg.Server, *gatedEnableDelegate) {
 	return srv, d
 }
 
-func enableDisable(srv *boolcfg.Server, ctx context.Context, alarms boolcfg.AlarmMode, done chan<- error) {
+func enableDisable(ctx context.Context, srv *boolcfg.Server, alarms boolcfg.AlarmMode, done chan<- error) {
 	_, err := srv.MatterInvoke(ctx, def.CmdEnableDisableAlarm, def.EnableDisableAlarmRequest{AlarmsToEnableDisable: alarms})
 	done <- err
 }
@@ -77,9 +78,9 @@ func TestEnableDisableAlarmStoresInTheOrderTheDelegateHeard(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, d := newGatedEnable(t)
 		doneA, doneB := make(chan error, 1), make(chan error, 1)
-		go enableDisable(srv, context.Background(), boolcfg.AlarmVisual, doneA)
+		go enableDisable(context.Background(), srv, boolcfg.AlarmVisual, doneA)
 		<-d.entered
-		go enableDisable(srv, context.Background(), boolcfg.AlarmAudible, doneB)
+		go enableDisable(context.Background(), srv, boolcfg.AlarmAudible, doneB)
 		synctest.Wait() // B is through, or waits behind A
 		close(d.release)
 		for _, done := range []chan error{doneA, doneB} {
@@ -91,7 +92,7 @@ func TestEnableDisableAlarmStoresInTheOrderTheDelegateHeard(t *testing.T) {
 		if got := srv.State().AlarmsEnabled; got != last {
 			t.Errorf("AlarmsEnabled 0x%02X; the Delegate heard 0x%02X last (order %v)", got, last, d.heard)
 		}
-		if got, _ := srv.MatterRead(def.AttrAlarmsEnabled); fmt.Sprint(got) != fmt.Sprint(uint8(last)) {
+		if got, _ := srv.MatterRead(def.AttrAlarmsEnabled); fmt.Sprint(got) != strconv.FormatUint(uint64(last), 10) {
 			t.Errorf("AlarmsEnabled serves %v; the Delegate heard 0x%02X last", got, last)
 		}
 	})
@@ -107,11 +108,11 @@ func TestWaitingAlarmCommandEndsWithItsContext(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv, d := newGatedEnable(t)
 		doneA := make(chan error, 1)
-		go enableDisable(srv, context.Background(), boolcfg.AlarmVisual, doneA)
+		go enableDisable(context.Background(), srv, boolcfg.AlarmVisual, doneA)
 		<-d.entered
 		ctx, cancel := context.WithCancel(context.Background())
 		doneB := make(chan error, 1)
-		go enableDisable(srv, ctx, boolcfg.AlarmAudible, doneB)
+		go enableDisable(ctx, srv, boolcfg.AlarmAudible, doneB)
 		synctest.Wait()
 		cancel()
 		if err := <-doneB; err == nil {
@@ -122,7 +123,7 @@ func TestWaitingAlarmCommandEndsWithItsContext(t *testing.T) {
 			if again {
 				again = false
 				done := make(chan error, 1)
-				enableDisable(srv, context.Background(), boolcfg.AlarmVisual|boolcfg.AlarmAudible, done)
+				enableDisable(context.Background(), srv, boolcfg.AlarmVisual|boolcfg.AlarmAudible, done)
 				<-done
 			}
 		})
