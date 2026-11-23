@@ -64,6 +64,13 @@ func TestProviderConfig(t *testing.T) {
 	if _, err := camera.NewProvider(camera.ProviderConfig{}); !errors.Is(err, camera.ErrNoProviderPort) {
 		t.Fatal(err)
 	}
+	// A negative session bound is a construction error (issue #590,
+	// decision 607); 0 is no bound.
+	for _, cfg := range []camera.ProviderConfig{{Port: &mockProvider{}, MaxSessions: -1}, {Port: &mockProvider{}, MaxSessionsPerFabric: -1}} {
+		if _, err := camera.NewProvider(cfg); !errors.Is(err, camera.ErrNegativeMaxSessions) {
+			t.Fatalf("%+v: %v, want ErrNegativeMaxSessions", cfg, err)
+		}
+	}
 }
 
 func TestSolicitOfferRules(t *testing.T) {
