@@ -463,7 +463,7 @@ func (p *Provider) solicitOffer(ctx context.Context, fields any) (any, error) {
 		return nil, portError("SolicitOffer", err)
 	}
 	if err := p.upsertSession(contract.OriginCommand, session); err != nil { // :811
-		return nil, spec.Errorf(im.StatusFailure, "%v", err)
+		return nil, p.abandonSession(ctx, session.Id, err)
 	}
 	resp := wpdef.SolicitOfferResponse{WebRtcSessionId: session.Id, DeferredOffer: deferred}
 	if req.VideoStreamId != nil { // :826-830
@@ -559,6 +559,11 @@ func (p *Provider) provideOffer(ctx context.Context, fields any) (any, error) {
 		return nil, portError("ProvideOffer", err)
 	}
 	if err := p.upsertSession(contract.OriginCommand, session); err != nil { // :1111
+		if req.WebRtcSessionId.Null {
+			return nil, p.abandonSession(ctx, session.Id, err)
+		}
+		// A re-offer: the table still holds the session as it was, and
+		// the controller can end it.
 		return nil, spec.Errorf(im.StatusFailure, "%v", err)
 	}
 	resp := wpdef.ProvideOfferResponse{WebRtcSessionId: session.Id}
@@ -617,6 +622,19 @@ func (p *Provider) provideIceCandidates(ctx context.Context, fields any) (any, e
 		return nil, portError("ProvideICECandidates", err)
 	}
 	return nil, nil
+}
+
+// abandonSession ends at the port a new session the port created but
+// CurrentSessions refused to store (cause), and returns the command's
+// FAILURE. Without it the session would run on with no table entry, and
+// a controller's EndSession would answer NOT_FOUND (R2-C2-err-1602). The
+// reason is UnknownReason, as a removed fabric's sessions end; the port's
+// error, if any, joins the FAILURE's message.
+func (p *Provider) abandonSession(ctx context.Context, id uint16, cause error) error {
+	if err := p.port.EndSession(ctx, id, endReasonUnknown); err != nil {
+		return spec.Errorf(im.StatusFailure, "%v (ending the session at the port: %v)", cause, err)
+	}
+	return spec.Errorf(im.StatusFailure, "%v", cause)
 }
 
 // maxEndReason is the highest WebRTCEndReasonEnum value (UnknownReason).

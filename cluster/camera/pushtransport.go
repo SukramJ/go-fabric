@@ -755,11 +755,17 @@ func (p *PushTransport) allocate(ctx context.Context, fields any) (any, error) {
 }
 
 // commitAllocation stores an allocated connection and arms its expiry
-// (:1198-1217).
+// (:1198-1217). A connection CurrentConnections refuses is deallocated at
+// the port before the command answers FAILURE: the port allocated it, and
+// no controller could deallocate a connection the table does not hold
+// (R2-C2-err-1602). The port's error, if any, joins the FAILURE's message.
 func (p *PushTransport) commitAllocation(ctx context.Context, conn TransportConfiguration, expirySeconds *uint32) error {
 	if err := p.change(func(next []TransportConfiguration) ([]TransportConfiguration, bool) {
 		return append(next, conn.Clone()), true
 	}); err != nil {
+		if derr := p.port.DeallocatePushTransport(ctx, conn.ConnectionId); derr != nil {
+			return commitError(fmt.Errorf("%w (deallocating at the port: %v)", err, derr)) //nolint:errorlint // the port's error is context, not a cause
+		}
 		return commitError(err)
 	}
 	if expirySeconds != nil {

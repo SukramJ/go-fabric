@@ -6,6 +6,7 @@ package camera_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"thingfabric.dev/go-fabric/cluster/camera"
@@ -120,6 +121,12 @@ func (s streamlessProvider) SolicitOffer(ctx context.Context, args camera.OfferA
 	return session, deferred, err
 }
 
+func (s streamlessProvider) ProvideOffer(ctx context.Context, args camera.OfferArgs) (camera.ProviderSession, error) {
+	session, err := s.mockProvider.ProvideOffer(ctx, args)
+	session.VideoStreams, session.AudioStreams = nil, nil
+	return session, err
+}
+
 // TestProviderStoresNoStreamlessSession: a session the port returns
 // without VideoStreams and AudioStreams fails CurrentSessions' "O.a+" and
 // is not stored — the command answers FAILURE and the table stays empty.
@@ -140,6 +147,40 @@ func TestProviderStoresNoStreamlessSession(t *testing.T) {
 	}
 	if l := readList[camera.ProviderSession](t, p, wpdef.AttrCurrentSessions); len(l) != 0 {
 		t.Errorf("CurrentSessions = %+v", l)
+	}
+}
+
+// TestProviderEndsTheSessionItCouldNotStore (R2-C2-err-1602): the port
+// created the session, the table refused it, so the server ends it at the
+// port before it answers FAILURE — no controller can end a session the
+// table does not hold.
+func TestProviderEndsTheSessionItCouldNotStore(t *testing.T) {
+	t.Parallel()
+	u, ep := wpdef.StreamUsageLiveView, uint16(1)
+	for name, call := range map[string]struct {
+		cmd    uint32
+		fields any
+	}{
+		"SolicitOffer": {wpdef.CmdSolicitOffer, solicit(wpdef.StreamUsageLiveView)},
+		"ProvideOffer": {wpdef.CmdProvideOffer, wpdef.ProvideOfferRequest{
+			WebRtcSessionId: spec.NullOf[uint16](), Sdp: "v=0", StreamUsage: &u, OriginatingEndpointId: &ep, VideoStreamId: nnull(),
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			m := &mockProvider{}
+			p, _ := newProvider(t, cameraStreams(), func(c *camera.ProviderConfig) {
+				c.Port = streamlessProvider{m}
+			})
+			if _, err := p.MatterInvoke(peer(1, 0x55), call.cmd, call.fields); statusOf(err) != im.StatusFailure {
+				t.Fatalf("%s with a streamless session: %v, want FAILURE", name, err)
+			}
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			if len(m.offers) != 1 || !slices.Equal(m.ended, []uint16{m.offers[0].SessionID}) {
+				t.Errorf("offers %d, ended %v; want the offered session ended", len(m.offers), m.ended)
+			}
+		})
 	}
 }
 
