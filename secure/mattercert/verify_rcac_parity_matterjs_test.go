@@ -13,6 +13,7 @@ import (
 
 	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/secure/mattercert"
+	"thingfabric.dev/go-fabric/tlv"
 )
 
 // A verifier built from the root certificate checks the authorityKeyIdentifier
@@ -128,6 +129,53 @@ func TestValidateRCACRefusesARootThatIsNotACAParityMatterJS(t *testing.T) {
 			t.Parallel()
 			o := validRCACOpts(priv)
 			tc.edit(&o)
+			c, err := mattercert.Decode(buildRCACTLV(t, priv, o))
+			if err != nil {
+				t.Fatalf("Decode: %v", err)
+			}
+			err = mattercert.ValidateRCAC(c)
+			if tc.ok {
+				if err != nil {
+					t.Fatalf("ValidateRCAC = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, mattercert.ErrInvalidRCAC) {
+				t.Fatalf("ValidateRCAC = %v, want ErrInvalidRCAC", err)
+			}
+		})
+	}
+}
+
+// A self-signed root whose subject carries an icac-id, a fabric id of 0
+// or CATs is refused: both references refuse them (connectedhomeip
+// src/credentials/CHIPCert.cpp:1129, ChipDN::GetCertType :606-687 at
+// 6170af84; matter.js packages/protocol/src/certificate/kinds/Rcac.ts:69-71,
+// :74-76, :84-86 at b25ed960). A firmware-signing-id stays admitted, as
+// matter.js admits it, and so does a fabric id other than 0.
+// R2-C2-par-0150, decision 516.
+func TestValidateRCACRefusesARootSubjectOfAnotherKindParityMatterJS(t *testing.T) {
+	t.Parallel()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		extra func(e *tlv.Encoder)
+		ok    bool
+	}{
+		{"plain root (control)", nil, true},
+		{"fabric id 1", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(21), 1) }, true},
+		{"firmware-signing-id", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(18), 7) }, true},
+		{"icac-id", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(19), 2) }, false},
+		{"fabric id 0", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(21), 0) }, false},
+		{"one CAT", func(e *tlv.Encoder) { e.PutUint(tlv.ContextTag(22), 0x0001_0001) }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			o := validRCACOpts(priv)
+			o.subjectExtra = tc.extra
 			c, err := mattercert.Decode(buildRCACTLV(t, priv, o))
 			if err != nil {
 				t.Fatalf("Decode: %v", err)
