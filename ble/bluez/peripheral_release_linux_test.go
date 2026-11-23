@@ -137,3 +137,44 @@ func TestPeripheralCloseDisconnectsServedCentrals(t *testing.T) {
 		t.Fatalf("calls before the bus closed %q: want the central's Disconnect and the UnregisterApplication", calls)
 	}
 }
+
+// TestPeripheralReleaseAfterOwedUnregisterStaysSilent: a Release that
+// follows a StopAdvertising whose UnregisterAdvertisement went unanswered
+// does not register the advertisement again — the host asked for silence,
+// and BlueZ releasing the advertisement settles the owed unregister. A
+// later Advertise registers afresh (Fable diff read of C3-A, B2).
+func TestPeripheralReleaseAfterOwedUnregisterStaysSilent(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	ctx := context.Background()
+	data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+	if err := p.Advertise(ctx, contract.BLEAdvertisement{Data: data}); err != nil {
+		t.Fatal(err)
+	}
+	unregAdv := ifaceAdvertising + ".UnregisterAdvertisement"
+	b.failWith(unregAdv, dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"})
+	if err := p.StopAdvertising(ctx); err == nil {
+		t.Fatal("StopAdvertising with an unanswered unregister succeeded")
+	}
+	n := registrations(b)
+	releaseAsBluetoothd(t, p, b)
+	p.readvertising.Wait()
+	if registrations(b) != n || advertised(p, b) {
+		t.Fatal("a Release after StopAdvertising registered the advertisement again")
+	}
+	if b.exported(p.advPath()) {
+		t.Fatal("the released advertisement is still exported")
+	}
+	p.mu.Lock()
+	registered, owed, adv := p.registered, p.advOwed, p.adv
+	p.mu.Unlock()
+	if registered || owed || adv != nil {
+		t.Fatalf("after the Release: registered %v, owed %v, adv kept %v", registered, owed, adv != nil)
+	}
+	b.clearErr(unregAdv)
+	if err := p.Advertise(ctx, contract.BLEAdvertisement{Data: data}); err != nil {
+		t.Fatal(err)
+	}
+	if registrations(b) != n+1 || !advertised(p, b) {
+		t.Fatalf("a later Advertise: registrations %d (want %d), advertised %v", registrations(b), n+1, advertised(p, b))
+	}
+}

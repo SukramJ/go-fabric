@@ -514,8 +514,9 @@ func (p *peripheral) release(sender dbus.Sender) *dbus.Error {
 // and registers the advertisement again, pausing readvertiseFirst and
 // doubling up to readvertiseMax after each failure. It stops when the
 // registration it saw was replaced meanwhile, when an Advertise registered
-// it, when StopAdvertising withdrew it (adv nil) or owes an unregister,
-// and when the peripheral closes.
+// it, when StopAdvertising withdrew it (adv nil, or an unregister owed
+// when the release came: the advertisement is then forgotten), and when
+// the peripheral closes.
 func (p *peripheral) readvertise(gen uint64) {
 	defer p.readvertising.Done()
 	pause := readvertiseFirst
@@ -530,9 +531,21 @@ func (p *peripheral) readvertise(gen uint64) {
 				p.advMu.Unlock()
 				return
 			}
+			// An owed unregister means StopAdvertising withdrew this
+			// advertisement and only its UnregisterAdvertisement went
+			// unanswered: the Release settles it, and the radio stays
+			// silent as the host asked.
+			owed := p.advOwed
 			p.registered, p.advOwed = false, false
+			if owed {
+				p.adv = nil
+			}
 			p.mu.Unlock()
 			p.unexportAdvertisement()
+			if owed {
+				p.advMu.Unlock()
+				return
+			}
 			p.mu.Lock()
 		}
 		stop := p.closed || p.registered || p.advOwed || p.adv == nil
