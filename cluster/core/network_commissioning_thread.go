@@ -791,15 +791,21 @@ func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	backup := n.backup
 	n.backup = nil
 	// Networks is reported after every revert, as the staged network may
-	// have moved; the three Last… attributes when an empty backup cleared
-	// them (OnAttributeChange).
+	// have moved (OnAttributeChange).
 	moved := []uint32{netcommAttrNetworks}
 	if backup != nil {
 		n.staging = backup
-		if len(backup) == 0 {
-			n.lastNetworkID, n.lastConnectErr, n.lastStatus = nil, nil, nil
+	}
+	// With no network left after the revert — Networks reads empty — the
+	// three Last… attributes are cleared, whether or not the window changed
+	// the staged network: a window that saw only a ScanNetworks leaves its
+	// LastNetworkingStatus otherwise (R4-par-4002; the Wi-Fi server's rule).
+	// They are reported when one of them held a value.
+	if _, ok := extPANIDOf(n.staging); !ok {
+		if len(n.lastNetworkID) > 0 || n.lastConnectErr != nil || n.lastStatus != nil {
 			moved = append(moved, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
 		}
+		n.lastNetworkID, n.lastConnectErr, n.lastStatus = nil, nil, nil
 	}
 	staging := slices.Clone(n.staging)
 	n.mu.Unlock()
