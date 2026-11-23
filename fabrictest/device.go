@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	_ "modernc.org/sqlite" // the device's SQLite stores with Options.StoreOnDisk (node.Store.DB)
 
@@ -215,12 +216,16 @@ func (d *Device) startLocked(ctx context.Context) error {
 	// end: the build waits on no clock and under -race on a loaded machine
 	// takes longer than a second.
 	d.group.Enter(inflight.NodeBuild)
-	building := true
-	defer func() {
-		if building {
+	// leaveBuild ends the count once, whoever calls it first: the start
+	// callback below, which Site.Run runs on its own goroutine and may give
+	// up on before it ran, or a failed Start (review II, R3-test-3802).
+	var left atomic.Bool
+	leaveBuild := func() {
+		if left.CompareAndSwap(false, true) {
 			d.group.Leave(inflight.NodeBuild)
 		}
-	}()
+	}
+	defer leaveBuild()
 	cfg := d.config()
 	n, err := node.New(ctx, cfg)
 	if err != nil {
@@ -243,10 +248,7 @@ func (d *Device) startLocked(ctx context.Context) error {
 		// node's timers on the site's clock — unpaced and unbounded it
 		// would never return (review II, R2-C2-test-2501). The node.build
 		// count ends first, or it would hold the clock without a budget.
-		if building {
-			building = false
-			d.group.Leave(inflight.NodeBuild)
-		}
+		leaveBuild()
 		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
 		defer cancel()
 		d.site.logTeardown(fmt.Sprintf("device %d: stop after a failed start", d.index), d.site.Run(stopCtx, n.Stop))
@@ -283,8 +285,7 @@ func (d *Device) startLocked(ctx context.Context) error {
 	// directly would wait forever on a response that never comes.
 	if err := d.site.Run(ctx, func(ctx context.Context) error {
 		// The node's Start counts its own work from here.
-		building = false
-		d.group.Leave(inflight.NodeBuild)
+		leaveBuild()
 		return n.Start(ctx)
 	}); err != nil {
 		return fmt.Errorf("start: %w", err)
