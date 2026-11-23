@@ -491,7 +491,7 @@ The commissioner checks the device's attestation against a trust store:
   service.
 - **`dcl.OpenCertificateStore`** is the opt-in trust store from the CSA
   Distributed Compliance Ledger. Nothing in `controller/dcl` reaches the
-  network unless you construct a `dcl.Client` and hand it over. The ledger
+  network unless you construct a `dcl.Client` (package `dcl`) and hand it over. The ledger
   then learns the key identifiers of the PAAs, PAIs and CD signers of the
   devices you attest; no device identity, passcode or fabric key is sent.
 
@@ -1019,7 +1019,7 @@ admits these images and logs each admission
 `UpdateInfoFromImage`, a local image, or `Images.Store` without a ledger
 record — may come over `http:` from any address and needs no checksum.
 
-*Source: `controller/dcl/ota.go` (`OTAVersions.Download`, `OTAVersions.DownloadHostURL`), `controller/dcl/client.go` (`Client.AllowPrivateDestinations`, `newGuardedClient`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`, `ImagesConfig.AllowUnverifiedLedgerImages`).*
+*Source: `dcl/ota.go` (`OTAVersions.Download`, `OTAVersions.DownloadHostURL`), `dcl/client.go` (`Client.AllowPrivateDestinations`, `newGuardedClient`), `controller/softwareupdate/images.go` (`Images.DownloadUpdate`, `Images.UpdateInfoFromURL`, `ImagesConfig.AllowUnverifiedLedgerImages`).*
 
 ### TCP
 
