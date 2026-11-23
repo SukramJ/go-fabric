@@ -263,3 +263,163 @@ full-cut run 2: N3-rwrace-1 (unit `ctl`) and U-ctr-1 rest (units `hs`,
 | --- | --- | --- | --- |
 | R2-P7-C1-01 | low | open → full-cut run 2, unit `dcl` | With a ledger and no streaming store, an image download is held in a growing buffer and cloned into the memory store: a download allocated about four times the size bound (measured at a 4 MiB bound; ≈1 GB at the 256 MiB default by an ad-hoc run, not a test), and a refused checksum has held the whole image (`controller/softwareupdate/images.go:178`, `:1116`). The byte bound holds. matter.js applies no size bound (`DclOtaUpdateService.ts:711-724`). |
 | R2-P7-C1-02 | low | open → full-cut run 2, unit `sub` | The persisted subscriptions are loaded and decoded all at once at start (`store/server_subscriptions.go:60-80`, `bridge/subscription_persistence.go:170-186`), and the per-fabric bound loads every fabric's rows on every save (`:336`). Inferred from the measured row size of concrete paths, not run: ≈37 MB at 254 fabrics on UDP, ≈2 GB with TCP on. matter.js loads everything too, with no cap on the number of stored subscriptions or their bytes in the lines read (`SubscriptionStore.ts:50-61`); chip is bounded by construction (`CHIPConfig.h:799`, `:935`, `:965`; `SimpleSubscriptionResumptionStorage.h:75-91`). |
+
+## Close-out C3: the fix pull request of the full-cut run 2 (2026-11-23)
+
+Owner decision 514 (close-out wizard W5): the run did not converge (11
+medium confirmed by the Fable verify), so C3 fixes the mediums and every low
+that survives a refutation, and run 3 follows as a delta run. Branch
+`review2/p7-c3` from `c7531a5c9`; eleven units on disjoint paths (F1 core,
+F2 appclim, F3 applight + appinfra, F4 spec + generators, F5a cpeer + cam,
+F5b ctl + chs + dcl, F6 facade, F7a bridge + groups, F7b endpoint + im, F8
+net + sec + radio, F9 examples + guards) and the follow-ups the decisions
+opened (F1b, F3b, F5c, F6b, F7c, F8b, F8c). Per unit an Opus refutation read
+every row at the head first (none refuted); each fixed row has a test that
+failed before its fix; Fable read the diffs of F1, F1b, F5b, F6, F7a, F8, F8b
+and F8c and the reference lines every entry below rests on. The commit ids
+are those of the unit branches, merged onto `review2/p7-c3` (merges
+`d23e49cfb` F1, `3160b565f` F2, `4941c5702` F5a, `e203e1f49` F8, `09e57c28a`
+and `72d379b0f` the A follow-ups, `05d675f6a` F3, `f0d155df4` F4,
+`29fe97d65` F6, `1b1f3efbe` F7b, `d8ae192ee` F5b, `8cc43d6d4` F7a,
+`a4c462f38` F9, `676dc47c1` F7c, `05b2e8d5f` F6b, `155e3ca92` F3b,
+`0cbc7e9a3` F8c, `75ec45c3b` F5c). Severities are the verify's. Not
+reopened (decided before): R2-P6-sec-0104, R2-P6-par-0105 (decisions 139,
+156), store-0408. The notes of the run are not fixed in C3.
+
+### The rows
+
+| ID | sev | disposition |
+| --- | --- | --- |
+| R2-C2-store-1001 | medium | fixed `d2a2a8351`: ConnectNetwork's switch-on of InterfaceEnabled is notified, so it is persisted |
+| R2-C2-conc-1201 | medium | fixed `2af4bedc5`, `eecc05c4c`: a same-fabric cancel wins over a present in flight, answered SUCCESS (decision 521); a re-present re-checks the bound of eight |
+| R2-C2-conc-1002 | low | fixed `8501be40e` |
+| R2-C2-err-1003 | low | fixed `69574d9b9` |
+| R2-C2-store-1004 | low | fixed `8a788ca8e`; the owed clear is held in memory only |
+| R2-C2-conc-1005 | low | fixed `e604fbd02` |
+| R2-C2-sec-1006, TM R3.2 | low | fixed as decided (515, 522) `3add1b0e7`, `5b9851c50`, `e1c409d39`: both fabric-blind `IsFailSafeArmed` ports deprecated, removable in v0.28.0, a once-log when the blind port answers the gate; `BD-chip-FailSafeOfTheAccessingFabric`. The gap itself closes with the removal |
+| R2-C2-conc-1202 | low | fixed `f695dfca8` |
+| R2-C2-store-1203 | low | fixed `94f4b93ae` |
+| R2-C2-conc-1205 | low | fixed `33ebadd12`, `5c080466b`; the activation is skipped when the scene left the table during the apply, where matter.js activates without a second lookup — no decision recorded, below |
+| R2-C2-store-1204 | low | as matter.js, a mirrored gap → findings register |
+| R2-C2-conc-1501 | medium | fixed `34d24684f`, `b3caa0c2a`: the commit judges and stores the values staged when it began |
+| R2-C2-store-1502 | medium | fixed `e9c078a8d` |
+| R2-C2-fsm-1550 | medium | fixed `802d3fe3a`: Stop keeps a drive report as MoveTo and Calibrate do; the departure from chip in `BD-chip-ClosureControl-RulesInServer` |
+| R2-P6-err-1560 | low | registered residue (decision 518): the findings row carries the reason a lock cannot close it |
+| R2-C2-store-1555 | low | fixed `d2ef44038` |
+| R2-C2-wire-1553 | low | fixed: Pump `28ebbc469` (F2); SmokeCoAlarm and Valve `e38ab7bd9`, `a17c7f4e6` (F3, decision 520). Events and ExpressedState still read the raw host values (not a row) |
+| R2-C2-conc-1554 | low | fixed `aa9f2c91a` |
+| R2-C2-api-1552 | low | fixed `745ec2534` |
+| R2-C2-conc-1551 | low | fixed `4110bb86c` |
+| R2-C2-fsm-1401 | low | fixed `8241ae731` |
+| R2-C2-wire-1454 | low | fixed `7e832b9ce` |
+| R2-C2-store-1453 | low | fixed as decided (526) `c40ceaf36`, `6724ef228`: the endpoint keeps an opted-in materialised server across rebuilds; the opt-in interface moves to `contract/` in the REG fix pass (decision 540) |
+| R2-C2-err-1602 | low | fixed `6a515d59d` (WebRTC provider, push transport), `06116c31d` (AV streams, zones; decision 534); `BD-chip-PushAvStreamTransport-RulesInServer` |
+| R2-P6-conc-1606 (follow-on) | low | fixed `ae05da993` → findings row closed |
+| R2-C2-conc-1604 | low | fixed `4fd7708b5` |
+| R2-C2-bound-1101 | low | fixed `77a1fe699`, `778bb46cc` (256 key sets, decision 533); an unknown GroupKeySetId stays accepted, as chip; `BD-chip-JointFabricDatastore-RulesInServer` |
+| R2-C2-bound-1102 | low | fixed `c338f8a46`, `778bb46cc` (256 endpoints, decision 533) |
+| R2-C2-fsm-1402 | low | as matter.js (close-out plan) → `BD-chip-Transition-ReplaceEndsAsCancel`, paragraph |
+| R2-C2-wire-1605 | low | as chip → `BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer`, bullet |
+| R2-C2-fsm-1451, -1452, -1458 | note, note, note | as chip → `BD-chip-AmbientContextSensing-RulesInServer`, paragraph |
+| R2-C2-fsm-1601 | note | as chip's example delegate → `BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer`, bullet |
+| R2-C2-fsm-1603 | note | as chip → `BD-chip-PushAvStreamTransport-RulesInServer`, paragraph |
+| R2-C2-par-1456 | note | as matter.js → `BD-Matter-ModeBaseRulesInServer`, paragraph |
+| R2-P6-par-1360 | low | as matter.js, a mirrored gap; the findings row stays open |
+| R2-C2-conc-1302 | low | fixed `38f536cee`, `8cab43437`; dependents (a value naming a sibling stored meanwhile) are not re-judged — not this row |
+| R2-C2-api-1351 | low | fixed `c76b3041f` |
+| R2-C2-test-2701 | low | fixed `f4d37d52b` (generated tests call `spectest.StateHoldsPatch`) |
+| R2-C2-fsm-2506 | low | fixed `8c320e5ef` (template, regenerated) |
+| R2-C2-bound-1301 | low | line only (decision 529). The *Ahead* row the decision names is not written: the tree has no cap (`cluster/spec/request_check.go` unchanged), and an *Ahead* row records an implementation — open for the coordinator |
+| R2-C2-sec-1303 | low | fixed as decided (525) `4c3727988`, `9ebea724c` → `BD-Matter-SecretRedaction-ShapeMismatchFailsClosed`, *Ahead* row |
+| R2-C2-conc-2101 | medium | fixed `7f912436d`, `8f4772b2e` |
+| R2-C2-bound-2151 | medium | fixed `f06d95c13` |
+| R2-C2-bound-2152 | medium | fixed `3d3eb9b81` (8 targets, decision 519) → `BD-Matter-Controller-HostDiscoveriesBounded`, paragraph |
+| R2-C2-api-2201 | medium | fixed `14c78cf45`: one Service per controller, `ErrServiceInUse` |
+| R2-C2-bound-2153 | low | fixed `d0a0e176c` → `BD-Matter-Controller-CommissioningRaceBounded`, paragraph |
+| R2-C2-conc-2202 | low | fixed `bece8d3f7` |
+| R2-C2-sec-1802 | low | fixed `fcf44b25e` |
+| R2-C2-store-1801 | low | fixed `2611cf868` |
+| R2-C2-bound-1901 | low | fixed `3079725fc`, `db840534a` → `BD-Matter-Controller-CrlDerNodeBudget`, *Ahead* row |
+| R2-C2-bound-1902 | low | fixed `f2c61c0cf` → `BD-Matter-Controller-OtaVersionsPerCheckBounded`, *Ahead* row, with the result it changes |
+| R2-C2-bound-1903 | low | fixed `704671c50`, `db840534a` → `BD-Matter-Controller-DclCertificatesPerAnswerBounded`, *Ahead* row |
+| R2-C2-conc-1904 | low | fixed `edc238f2d` (10 s) |
+| R2-C2-conc-1905 | low | fixed `d59348f25` |
+| R2-P7-C1-01 | low | (a) in part `66cd7974d`: the buffered download is sized from the record (×5.07 → ×2.07 of the image); (b) and (c) → decision 542, a brief of its own; the `MemoryBlobs` streaming half of (a) is open with it |
+| R2-C2-fsm-2302 | low | fixed `d6052a114`; a node deleted between the registry's open and the OTA start is still not forgotten (residue) |
+| R2-C2-conc-2301 | low | fixed `659f16939` |
+| R2-C2-store-2350 | low | fixed `f77e14123`, `550cfeb19`: Register returns the store's error, the registration stays in memory, as matter.js |
+| R2-C2-wire-2351 | low | fixed `a40a0ffa6` (the default subscription's filter saturates); the sustained re-subscription's own filter (`client/interaction/sustained.go`) wraps the same way — open, below |
+| R2-C2-sec-2352 | low | as matter.js → `BD-Matter-Controller-CommissionableDiscoveryRefreshesCommissioned` |
+| R2-C2-conc-2353 | low | fixed `8c274c0bd`, `3df29512e`: Start during Disable is refused, Enable is a no-op, the mark is set after the stop as matter.js |
+| R2-C2-store-2401 | medium | fixed `4e4f56bdf`, `36c62ccfd` for a same-batch add |
+| R2-C2-store-2402 | low | fixed `d8dedbfcc` |
+| R2-C2-sec-2451 | low | fixed as decided (524) `e1ff62504`, `bb60dbc18`: session events carry their fabric, the retrieved log shows a fabric its own peers only → `BD-chip-DiagLogs-BDX`, paragraph |
+| R2-C2-err-2456 | low | fixed `2522468d5` |
+| R2-C2-test-2501 | low | fixed `884f82735` |
+| R2-C2-test-2502 | low | fixed `046cf1a18`; its class in `Device.FactoryReset` `56dc9f7c3` (decision 532) |
+| R2-C2-test-2503 | low | fixed `7046eff40` |
+| R2-C2-fsm-0401 | low | fixed `d84739663` |
+| R2-C2-conc-0402 | low | fixed `d84739663` |
+| R2-C2-fsm-0350 | low | fixed `4f5dacb12`, `9da535654`; guard `TestNoWallClockIntervalsInBridge` |
+| R2-C2-par-0353 | low | fixed `87609e5ee`, `8b13cdbf5` → `BD-Matter-ICD-CheckInAddressLastActive` |
+| R2-C2-bound-0303 | low | fixed `7a144a78e`, `9da535654` |
+| R2-C2-bound-0501 | low | in part `97c058f1c` (the per-save bound reads the bridge's own row keys); the load at start → decision 541, a unit of its own |
+| R2-C2-api-0601 | low | fixed `60c8880e9` |
+| R2-C2-bound-0301 | low | fixed `9f022633d`; closes the per-call rebuild of U3-lan-dev-1 (group decode), § Close-out C1 above |
+| R2-C2-conc-0304 | low | fixed `33133ef1c` |
+| R2-C2-bound-0302 | low | carried: the rate limit is a decision (phase-0 register); if taken, it routes through `warnPerDatagram` of R2-C2-bound-0303 |
+| R2-C2-err-0452 | low | fixed `31dfd8048` |
+| R2-C2-fsm-0451 | low | fixed `31dfd8048` |
+| R2-C2-api-0651 | low | fixed `8df3559ee` |
+| R2-C2-err-0450 | low | fixed `31dfd8048` (finishes R2-P6-err-0403) |
+| R2-C2-err-0453 | low | fixed `31dfd8048`, `ef55e7313`, `258d8e643`: `Assemble` refuses an endpoint that serves nothing (decision 528) |
+| R2-C2-err-0455 | low | fixed `31dfd8048`, `7ffe0df79`: `ScenesConfig.ListFabrics`, FAILURE on the error, `Fabrics` deprecated (decision 527) |
+| R2-C2-par-0454 | low | kept (decision 530), comment and pin test `31dfd8048` → `BD-Matter-Bridge-IdentifyOnEveryBridgedEndpoint` |
+| R2-C2-wire-0551 | low | fixed `34f1128af` (fields not a structure), `e28d968a8` (a typed reject, decision 531); a response without CommandFields whose reader refuses `{}` → the REG fix pass (decision 535) |
+| R2-C2-wire-0553 | low | fixed `34f1128af` |
+| R2-C2-conc-0554 | low | fixed `34f1128af` |
+| R2-C2-bound-0555 | low | fixed `dd71bb87e` |
+| R2-C2-par-0502 | note | as matter.js → the findings row of R2-P6-bound-0405 (follow-on) closed |
+| R2-C2-bound-0403 | note | open: the invoke half of R2-P6-bound-0405 — `bridge/receive_dispatch.go` reads the snapshot of every cluster an invoke names before the access check (cost only; nothing delivered); proposed fix: take the endpoints from `im.DispatchEndpoints`. No C3 unit owned `bridge/` for it |
+| R2-C2-fsm-2001 | medium | fixed `532d4a4c6`, `f671b296c`, `0d406808b` (Linux tests run in Docker by the unit, CI runs them) |
+| R2-C2-bound-0201 | low | fixed `e9242a8a5`, `f671b296c` |
+| R2-C2-err-2002 | low | fixed `532d4a4c6` |
+| R2-C2-bound-2003 | low | fixed `4d0d134b8`, `f671b296c` |
+| R2-C2-fsm-0205 | low | fixed `fea447c1c`, `784b8540f` |
+| R2-C2-test-0251 | low | fixed `23e51ebff` |
+| R2-C2-err-0252 | low | fixed `dc170dd03` |
+| R2-C2-sec-0101 | low | fixed `8fc62b688`, `c9053a807`, `441307837`: a stamped record resumes only under a baseline of its fabric — an unstamped (0) or absent baseline included (decision 517); an unstamped record is still not compared |
+| R2-C2-par-0150 | low | fixed `0d0df573a` (is-CA), `0d6578208` (decision 516), `778746a9e`, `dbdf8548c` (decision 523); the extendedKeyUsage refusal → the REG fix pass (decision 539) → `BD-chip-RCAC-RefusalsBothReferencesShare` |
+| R2-C2-conc-2602 | low | fixed `12b1c7243` (closes the act-after-take residual of R2-P6-conc-2607 / -2651) |
+| R2-C2-conc-2603 | low | fixed `47bd00c22` |
+| R2-C2-err-2606 | low | fixed `50d98e112` |
+| R2-C2-sec-2601 | low | fixed `62b9ac85b`, `47f628e2f`, `af1b4d7ac` |
+| R2-C2-store-2605 | low | fixed `0aca76d5c` |
+| R2-C2-err-2651 | low | fixed `d4d7d1b38` |
+| R2-C2-err-2652 | low | fixed `22fed9904` |
+| R2-C2-sup-2801 | low | fixed `67d5320e1` |
+| R2-C2-test-2802 | low | the analyzer half fixed `cab3352b3` (`redundant_annotations`, ratchet 1106); the clustergen half → run 3, below |
+| R2-C2-test-2803 | low | fixed `cab3352b3` |
+
+### Carried to run 3, or to a unit of its own
+
+| ID | where | what |
+| --- | --- | --- |
+| decision 537 | run 3, unit `cam` | A VideoStreamAllocate the port answers with a held stream's id and a disjoint frame-rate range is answered Success and serves MinFrameRate 30 > MaxFrameRate 10 (probe-measured by unit F3b); chip's `UpdateVideoStreamRangeParams` to read |
+| decision 538 | run 3, unit `sec` | `DecodeDER` keeps a key identifier of another length than 20 bytes for every certificate kind; chip's X.509 converter refuses it for every certificate (`CHIPCertFromX509.cpp:213`, `:232` at `6170af84`, Fable); matter.js's DER side needs a Fable note. The stale `ValidateRCAC` comment at `cluster/core/operational_credentials.go:3048-3049` → the REG fix pass |
+| decision 541, R2-C2-bound-0501 remainder (with R2-P7-C1-02) | a unit of its own after C3, candidate for run 3 or an issue | the persisted-subscription load at start and at re-establishment streamed with a byte budget, a new optional port across `bridge`, `store` and `im/subscription`, and the value-field decode; the design states its architecture section |
+| decision 542, R2-P7-C1-01 (b), (c) | a brief of its own, outside this pull request | Fable reads matter.js's SoftwareUpdateManager (retention, a download slot), then a wizard with the two values; the `MemoryBlobs` streaming question of (a) goes with it |
+| R2-C2-test-2802, clustergen half | run 3, or the integration that regenerates `cluster/spec` (F4's paths) | `script/clustergen/gen.go` still writes the "package-level initializer" annotation. Measured by unit F9 on its analyzer: dropping it lowers the redundant annotations by 1 049, surfaces the 52 unreached exports the finding names (the unreached ratchet from 22 to about 74 unless tests or annotations with a true reason are added), takes `reachabilityWhitelistRatchet[generated]` from 1101 to about 0 and the redundant ratchet to 57 — all three ratchets move in one commit. The 57 redundant hand annotations are a question of their own |
+
+### Raised in C3, not decided
+
+Read by the units or by the Fable diff reads; each needs a disposition
+(run 3, a row, or nothing):
+
+- R2-C2-conc-1205: matter.js activates a recalled scene after the apply without a second lookup (`ScenesManagementServer.ts:461-462`, `:565-566` at `b25ed960`, Fable); this module skips the activation when the scene left the table during the apply — a `by_design` line if recorded as a divergence. Whether matter.js can reach the interleaving was not measured.
+- R2-C2-store-2401: `Batch.Replace` and an endpoint served from an earlier batch still reach the erasure of a served key (Fable diff read of F6, N3, N4; inferred, not run).
+- R2-C2-sec-2451: ring details outlive their fabric; a fabric index reused after a wrap within one ring's lifetime would read the old fabric's peers (Fable diff read of F7a, N4); the singleton handler's read-back of the session id (N3, older than C3).
+- R2-C2-wire-2351: the sustained re-subscription's `EventMin` wraps at 2^64-1 (`client/interaction/sustained.go`; measured by unit F5b).
+- R2-C2-fsm-2302: a node deleted between the registry's open and the OTA start.
+- R2-C2-par-0353: a client whose newest session is TCP, and a client with no session held, get their Check-In elsewhere than in matter.js (Fable diff read of F7a, round 2) — in `BD-Matter-ICD-CheckInAddressLastActive`, older than C3.
+- Unit F3: a CMAF `TrackName` of 17 characters passes every check before the port (unverified against chip).
