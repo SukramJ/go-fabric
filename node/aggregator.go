@@ -1118,7 +1118,7 @@ func (a *Aggregator) servedOfLocked(entries []surfaceEntry, part *partition, i i
 
 // servesExceptAtLocked is servesLocked with the endpoint at i of part
 // (and its parts) left out, part nil: none. The endpoint left out is named
-// by its place, never compared, so an endpoint of an uncomparable type is
+// by its place, never compared, so an endpoint that cannot be compared is
 // judged as any other, and another endpoint of its type is not left out
 // with it (review II, R4-api-4703); a.mu is held.
 func (a *Aggregator) servesExceptAtLocked(key string, part *partition, i int) bool {
@@ -1138,16 +1138,26 @@ func (a *Aggregator) servesExceptAtLocked(key string, part *partition, i int) bo
 	return false
 }
 
+// comparableValue reports whether x can be compared with == and used as a
+// map key without a panic. It judges the value, not its type: a struct of
+// a comparable type whose interface field holds a slice panics on ==
+// though its type is comparable (review II, R4-api-4703, R4-api-4753,
+// the Fable diff read's B1). A nil x is not comparable.
+func comparableValue(x any) bool {
+	v := reflect.ValueOf(x)
+	return v.IsValid() && v.Comparable()
+}
+
 // sameEndpoint reports whether x and y are the same endpoint, for a
-// caller that matched both by one key. An endpoint of an uncomparable
-// type cannot be told from another of its type and counts as the same:
-// the key matched it.
+// caller that matched both by one key. An endpoint that is a value that
+// cannot be compared cannot be told from another of its type and counts
+// as the same: the key matched it.
 func sameEndpoint(x, y Endpoint) bool {
 	tx := reflect.TypeOf(x)
 	if tx != reflect.TypeOf(y) {
 		return false
 	}
-	if tx == nil || !tx.Comparable() {
+	if tx == nil || !comparableValue(x) || !comparableValue(y) {
 		return true
 	}
 	return x == y
@@ -1155,13 +1165,12 @@ func sameEndpoint(x, y Endpoint) bool {
 
 // sameInstance reports whether y is the very endpoint x — the one
 // instance, so a Replace by it changes nothing the set serves. An
-// endpoint of an uncomparable type cannot be shown to be the instance it
-// replaces and never is: a Replace by one is applied, as a Replace by a
-// new pointer is (review II, R4-api-4703). [Batch.Replace]'s no-op and a
-// held Replace's are judged by it.
+// endpoint that is a value that cannot be compared cannot be shown to be
+// the instance it replaces and never is: a Replace by one is applied, as
+// a Replace by a new pointer is (review II, R4-api-4703). [Batch.Replace]'s
+// no-op and a held Replace's are judged by it.
 func sameInstance(x, y Endpoint) bool {
-	tx := reflect.TypeOf(x)
-	if tx == nil || tx != reflect.TypeOf(y) || !tx.Comparable() {
+	if reflect.TypeOf(x) != reflect.TypeOf(y) || !comparableValue(x) || !comparableValue(y) {
 		return false
 	}
 	return x == y
