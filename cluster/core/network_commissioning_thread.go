@@ -179,8 +179,9 @@ var (
 // fail-safe's expiry ([ThreadNetworkCommissioning.OnFailSafeExpired]), the
 // re-attach of the reverted network after an abandoned ConnectNetwork and
 // [ThreadNetworkCommissioning.Refresh] change Networks, InterfaceEnabled
-// and — when the reverted backup was empty — LastNetworkingStatus,
-// LastNetworkID and LastConnectErrorValue outside a command of this
+// and — when no network is left after the revert and one of them held a
+// value — LastNetworkingStatus, LastNetworkID and LastConnectErrorValue
+// outside a command of this
 // cluster (the bridge reports a command's effect on the cluster it
 // invoked), so each tells the listeners once the lock is released, as the
 // Wi-Fi server does ([WiFiNetworkCommissioning.OnAttributeChange];
