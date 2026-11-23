@@ -3045,8 +3045,12 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(ctx context.Con
 	if !root.IsRoot() {
 		return nil, fmt.Errorf("%w: cert is not a root CA", errOpcredsInvalidArg)
 	}
-	// Validate RCAC structural invariants: self-signed (Subject==Issuer),
-	// KeyUsage keyCertSign+cRLSign bits present, BasicConstraints PathLen>0.
+	// Validate RCAC structural invariants, as mattercert.ValidateRCAC
+	// states them: a root subject, self-signed (subject and issuer
+	// RCAC-ID equal), SubjectKeyId and AuthorityKeyId of 20 bytes and
+	// equal, BasicConstraints is-ca with a PathLenConstraint of at most 1
+	// when present, KeyUsage with keyCertSign (cRLSign not required), no
+	// extendedKeyUsage, and a valid self-signature.
 	// Mirrors chip OperationalCredentialsCluster.cpp HandleAddTrustedRootCertificate
 	// which calls ValidateChipRCAC before storing the root.
 	if err := mattercert.ValidateRCAC(root); err != nil {
