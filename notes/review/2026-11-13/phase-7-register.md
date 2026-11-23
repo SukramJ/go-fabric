@@ -214,3 +214,52 @@ The other units of the round (integration, 2026-11-21):
   a CommissioningComplete answered OK (F-b25ed960-53, closed, `a4964f83`;
   decisions 409–411). New open row F-b25ed960-54 (the fail-safe-expiry
   close deferred for every interaction), P4-D (decision 412).
+
+## Close-out C1: the held rows (2026-11-23)
+
+Owner decision 513 (the close-out wizard, 2026-11-23): the rows phase 6
+held back are released before the full-cut run 2. Read at go-fabric `f455c5883`,
+matter.js `b25ed960`, connectedhomeip `6170af84`; every reference line below
+was re-read at those pins (Fable), every go-fabric line at the branch. Rows
+that stated a missing input now have it: the measurements are tests and
+benchmarks on this branch (`d09a765bf`, `6f7257d09`, `30d15900a`), run on
+darwin/arm64. Two rows stay held until their fix merges and go into the
+full-cut run 2: N3-rwrace-1 (unit `ctl`) and U-ctr-1 rest (units `hs`,
+`facade`).
+
+### Closed by a reference read
+
+| ID | verdict | lines |
+| --- | --- | --- |
+| R2-P3-rr-ctl-02 | accepted, no code (decision 247): the commissioning race replaces the first attempt in start order that heard nothing, so the replacement can end a genuine device's attempt while it waits out a silent first address; 16 places and the 16 s stagger ceiling (decision 55) unchanged. matter.js bounds neither | `client/discovery/session_kinds.go:121`, `:126`, `:378-397`; matter.js `ParallelPaseDiscovery.ts:102-103` |
+| N3-ctl-3 | accepted: a repeated Sigma1 random is refused while pending and for 60 s (256 kept); the residue is the rule's stated cost, one handshake delayed for a sender already on the path. matter.js keeps the random only for the handshake in hand (`CaseServer.ts:407`); chip was not read for it | `client/handshake/server.go:136-137`, `:161-179`, `:388-393`; matter.js `CaseClient.ts:120` |
+| N-net-1 (b) | mirrored: the mDNS receive path checks no hop limit, as both references (`BD-Matter-MdnsOnLinkSource`) | `mdns/socket.go:136-152`, `:589`, `:645`; matter.js `NodeJsUdpSocket.ts:225-232`; chip `UDPEndPointImplSockets.cpp:538-553` |
+| N-rw3req-3 | mirrored: the unencrypted reception window accepts a forward jump past the window, as both references | `transport/mrp/window.go:133-155`; matter.js `MessageReceptionState.ts:193-218`; chip `PeerMessageCounter.h:283-303` |
+| N-bridge2-3, TM R3b.4 | mirrored and bounded: the BDX responder's exchange exists before its first message is judged, as matter.js; at most 30 exchanges per secure session, the least recently active closed (R2-P6-bound-0307, R2-P6-sec-0302) | `bridge/bdx_responder.go:48-55`, `:240-255`; matter.js `BdxProtocol.ts:110`, `:130-137`, `ExchangeManager.ts:62`, `:587-605` |
+| TM R3b.2 | nothing found: a group key holder reaches only the groups mapped to a key set holding its key, on that key's fabric; the ACL then needs a Group entry that names the group or lists no subject (`endpoint/dispatcher.go:1863`). The key set is the unit of trust in both references | `groups/decode.go:250-252`, `:283-301`, `:404-409`; `endpoint/dispatcher.go:1849-1880`; matter.js `GroupSession.ts:432-434`; chip `SessionManager.cpp:1139-1144` |
+| N4-f3-2 | the replay half fixed (R2-P6-sec-0301); the rest is the exchange slot rule, as matter.js — and narrower since decision 277: a Sigma1 of other bytes reaches the slot rule only if it acknowledges the waiting reply or none waits | `bridge/receive.go:1441-1466`; `bridge/securechannel.go:1994-2008`, `:2024-2027`; matter.js `MessageExchange.ts:514-524`, `:534-547` |
+| TM R3.2 | as chip for a node built through `node/`: the network commissioning commands need the fail-safe armed by the accessing fabric. A host that wires the fabric-blind fail-safe port instead gets a gate that names no fabric — taken into the full-cut run 2 (unit `coresec`) | `cluster/core/network_commissioning_wifi.go:1212-1224`; `cluster/core/general_commissioning.go:1678-1684`; `node/root.go:300`; chip `NetworkCommissioningCluster.cpp:155-157`, `:609` |
+| TM R3.6 | nothing: the group reception state is kept per operational key, whose salt is the compressed fabric id — per fabric as in matter.js as long as no two fabrics of a node share a compressed id (inferred; the AddNOC conflict rule not re-read); the comment says so | `groups/decode.go:500-530`; `groups/keys.go:31-41`; matter.js `GroupSession.ts:294`, `FabricGroups.ts:207-225` |
+| TM R3.3 | nothing: the ICD client quota is per fabric; the Check-In goes to a session's address on that fabric, else the DNS-SD name under that fabric's compressed id, as matter.js | `cluster/core/icd_management.go:1058-1063`, `:1074-1077`; `node/icd.go:213-231`; matter.js `IcdCheckInSender.ts:45-68` |
+| TM R3.5 first half | mirrored by both references; recorded at `notes/parity/matter_behaviour_findings.md:609` | `cluster/core/ota_software_update_requestor.go:744-788`; matter.js `OtaSoftwareUpdateRequestorServer.ts:384-391`, `:423-438`; chip `DefaultOTARequestor.cpp:332-334` |
+| TM R3.8 rest | nothing found: group state, group keys and persisted subscriptions of a removed fabric go with it (the stored group keys and key map by cascade, the subscription rows deleted explicitly, `bridge/subscription_persistence.go:480`); a binding's kept resolution of a removed fabric is dropped by the binding worker once the peer set no longer holds the address (R2-P6-bound-2104) — the residue is transient, its order against the peer delete inferred, not run | `bridge/bridge.go:2074-2083`; `bridge/subscription_persistence.go:467-487`; `groups/manager.go:770-796`; `store/schema.sql:104-116`, `:134-140`; `binding/resolve.go:583`, `:605-626`; `binding/manager.go:366-367` |
+
+### Closed by a measurement
+
+| ID | measurement | verdict |
+| --- | --- | --- |
+| U3-ctl-dev-1 second half, U-alloc-1 (device parts), U3-admin-1 (large path set) | `store` `BenchmarkServerSubscriptionSave`, `…LoadFabricQuota`: a request filling the default TCP payload carries at most 5816 concrete paths, stored as a 288 KB row in 1.3 ms; with concrete paths the 10 000-path ceiling (`im/read.go:934`, any path shape, `bridge/subscribe.go:2150`) needs a request larger than a default TCP message carries; paths naming fewer fields were not measured and may reach it | bounded (paths per row, 16 rows per fabric by default, fabrics); the load at start reads every row at once → R2-P7-C1-02 |
+| U3-admin-1 (TCP) | `transport/tcp` `TestConnectionAtItsInFlightBound`: at 64 messages in flight (`transport/tcp/conn.go:36`) one goroutine each, ≈4.4 MB per connection; past it the reader waits for a slot and reads nothing more, and every message arrives in order once the slot frees | bounded |
+| U3-lan-dev-1 (group decode) | `groups` `BenchmarkDecodeUnopenedDatagram`: a datagram no key opens costs ≈1 µs at a realistic key count and ≈0.29 ms at the maximum (254 fabrics × 19 key sets × 3 keys), linear in the keys, whatever its session id | bounded; the per-call rebuild of the candidates (`groups/decode.go:307`) → full-cut run 2, unit `hs` |
+| U3-lan-dev-1 (truncated queries) | `mdns` `TestTruncatedQueryBesideAFullTable`: with the table of held truncated queries full (64 × 64 questions, `mdns/answer.go:83`, `:89`), a legitimate truncated query is answered at once with every record — only the known-answer suppression of its continuation is lost; the table empties after 500 ms | bounded |
+| U3-ctl-lan-1 (4) | `secure/spake2` `BenchmarkPBKDF`: 0.26 ms at 1000 iterations, 26 ms at the maximum 100 000 (`secure/spake2/wire.go:484-502`, checked before any derivation, `client/handshake/pase.go:121`); at most 16 attempts of a commissioning race at once | bounded |
+| U3-ctl-lan-1 (5) | `client/handshake` `BenchmarkFabricListDestinationLookup`, `node` `BenchmarkCaseResolveSigma1Destination`: ≈280 ns per fabric and key, a miss walks the whole list (70 µs at 254 fabrics on the controller, 283 µs at the node's maximum); the 32-byte compare showed no position dependence on arm64 | bounded; the lookup is linear in the fabric list. The timing of the lookup and of its compare, measured on arm64 only → full-cut run 2, units `chs`, `facade` |
+| U3-ctl-lan-1 (3) | read in 6b: the border-router registry bounded at 256 entries and 512 instances | bounded |
+| U3-net-1 (images) | `controller/softwareupdate` `TestImagesDownloadVolumeAboveTheBound`, `…RefusedByItsChecks`: nothing past the size bound + 1 reaches the store (`controller/dcl/ota.go:311-318`, `:345-375`), nothing stays after a refused check | bounded; the buffered store's memory → R2-P7-C1-01 |
+
+### Raised by the measurements
+
+| ID | sev | disposition | claim |
+| --- | --- | --- | --- |
+| R2-P7-C1-01 | low | open → full-cut run 2, unit `dcl` | With a ledger and no streaming store, an image download is held in a growing buffer and cloned into the memory store: a download allocated about four times the size bound (measured at a 4 MiB bound; ≈1 GB at the 256 MiB default by an ad-hoc run, not a test), and a refused checksum has held the whole image (`controller/softwareupdate/images.go:178`, `:1116`). The byte bound holds. matter.js applies no size bound (`DclOtaUpdateService.ts:711-724`). |
+| R2-P7-C1-02 | low | open → full-cut run 2, unit `sub` | The persisted subscriptions are loaded and decoded all at once at start (`store/server_subscriptions.go:60-80`, `bridge/subscription_persistence.go:170-186`), and the per-fabric bound loads every fabric's rows on every save (`:336`). Inferred from the measured row size of concrete paths, not run: ≈37 MB at 254 fabrics on UDP, ≈2 GB with TCP on. matter.js loads everything too, with no cap on the number of stored subscriptions or their bytes in the lines read (`SubscriptionStore.ts:50-61`); chip is bounded by construction (`CHIPConfig.h:799`, `:935`, `:965`; `SimpleSubscriptionResumptionStorage.h:75-91`). |
