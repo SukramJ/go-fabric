@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10656,
+  "entry_points": 10665,
   "initializers": 372,
   "entry_packages": [
     ".",
@@ -296,21 +296,15 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28484,
-    "reachable": 22272,
-    "whitelisted": 6187,
-    "unreachable": 25
+    "total_exported": 28486,
+    "reachable": 22276,
+    "whitelisted": 6188,
+    "unreachable": 22
   },
   "by_package": [
     {
       "package": "cluster/jointfabric",
       "unreachable_funcs": 4,
-      "unreachable_types": 0,
-      "unreachable_other": 0
-    },
-    {
-      "package": "controller/dcl",
-      "unreachable_funcs": 3,
       "unreachable_types": 0,
       "unreachable_other": 0
     },
@@ -473,27 +467,6 @@
       "file": "controller/client/icd.go",
       "line": 391,
       "kind": "method"
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "IsNotFound",
-      "file": "controller/dcl/moved.go",
-      "line": 279,
-      "kind": "func"
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "NewClient",
-      "file": "controller/dcl/moved.go",
-      "line": 286,
-      "kind": "func"
-    },
-    {
-      "package": "controller/dcl",
-      "identifier": "VerifyImage",
-      "file": "controller/dcl/moved.go",
-      "line": 293,
-      "kind": "func"
     },
     {
       "package": "icd",
@@ -26620,6 +26593,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/dcl/guard_proxy_dial_test.go",
       "line": 54
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestMovedForwardersDelegate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/moved_test.go",
+      "line": 20
     },
     {
       "package": "controller/dcl",
