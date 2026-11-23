@@ -120,6 +120,20 @@ func TestAggregatorReplaceAndTopology(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer sub.Close()
+	// The priming report first: Updated receives it too
+	// (client/interaction/subscribe.go:71-72), so the Replace's change
+	// report is counted after it (issue #589).
+	primed := 0
+	for len(reports) > 0 {
+		if r := <-reports; r != nil {
+			if _, ok := r.Value(before, descdef.ClusterID, descdef.AttrDeviceTypeList); ok {
+				primed++
+			}
+		}
+	}
+	if primed != 1 {
+		t.Fatalf("the priming report carried the DeviceTypeList %d times, want once", primed)
+	}
 
 	dimmer, err := device.NewDimmableLight(opts("lamp"))
 	if err != nil {
@@ -158,7 +172,7 @@ func TestAggregatorReplaceAndTopology(t *testing.T) {
 		}
 	}
 	if seen != 1 {
-		t.Errorf("the Replace reported the Descriptor %d times, want once", seen)
+		t.Errorf("the Replace reported the Descriptor %d times after the priming report, want once", seen)
 	}
 	got, err := fabrictest.Read(ctx, pair, types)
 	if err != nil || len(got.Value.Children) == 0 || got.Value.Children[0].Children[0].El.Uint != uint64(device.DimmableLightID) {
