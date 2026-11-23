@@ -69,6 +69,23 @@ const (
 	SeverityError   Severity = "error"
 )
 
+// Detail keys a session event carries. They are the names a host reading
+// [Ring.Snapshot] and the node's DiagnosticLogs provider share; the
+// values are decimal or the address's text.
+const (
+	// DetailPeer is the network address of the controller at the other
+	// end of the session or the handshake.
+	DetailPeer = "peer"
+	// DetailSessionID is the secure session's local id (decimal).
+	DetailSessionID = "session_id"
+	// DetailFabricIndex is the session's fabric (decimal FabricIndex),
+	// set when the bridge can name it: a PASE session and one it cannot
+	// resolve carry none. The node's DiagnosticLogs provider serves a
+	// controller [DetailPeer] and [DetailSessionID] only for an event of
+	// its own fabric (review II, R2-C2-sec-2451, decision 524).
+	DetailFabricIndex = "fabric_index"
+)
+
 // Event is one recorded moment.
 type Event struct {
 	At       time.Time

@@ -1876,13 +1876,9 @@ var ringLogsDetail = map[string]bool{
 // ringLogsOwnDetail is the event details a retrieved log carries only
 // for an event of the accessing fabric's own session.
 var ringLogsOwnDetail = map[string]bool{
-	"peer":       true,
-	"session_id": true,
+	diagevent.DetailPeer:      true,
+	diagevent.DetailSessionID: true,
 }
-
-// ringLogsFabricDetail is the detail key the bridge names a session
-// event's fabric under (bridge diagDetailFabricIndex).
-const ringLogsFabricDetail = "fabric_index"
 
 // Logs implements [mattercore.LogProvider].
 func (r ringLogs) Logs(ctx context.Context, intent uint8) ([]byte, error) {
@@ -1896,7 +1892,7 @@ func (r ringLogs) Logs(ctx context.Context, intent uint8) ([]byte, error) {
 	var b strings.Builder
 	for _, e := range r.ring.Snapshot() {
 		fmt.Fprintf(&b, "%s %s %s", e.At.UTC().Format(time.RFC3339), e.Kind, e.Message)
-		own := accessing != "" && e.Detail[ringLogsFabricDetail] == accessing
+		own := accessing != "" && e.Detail[diagevent.DetailFabricIndex] == accessing
 		for _, k := range slices.Sorted(maps.Keys(e.Detail)) {
 			if !ringLogsDetail[k] && (!own || !ringLogsOwnDetail[k]) {
 				continue

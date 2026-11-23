@@ -757,7 +757,7 @@ func (b *Bridge) dispatchSigma3(src net.Addr, requestHdr *message.Header, proto 
 		Kind:     diagevent.KindSession,
 		Severity: diagevent.SeverityInfo,
 		Message:  "A controller completed a secure-session handshake with the bridge.",
-		Detail:   b.establishedEventDetail(step, map[string]string{"peer": srcString(src)}),
+		Detail:   b.establishedEventDetail(step, map[string]string{diagevent.DetailPeer: srcString(src)}),
 	})
 	return nil
 }
@@ -855,7 +855,7 @@ func (b *Bridge) dispatchPase(
 				Severity: diagevent.SeverityWarning,
 				Message: "A commissioner tried to pair while another pairing was already " +
 					"in progress; its attempt was dropped and it will retry.",
-				Detail: map[string]string{"peer": srcString(src)},
+				Detail: map[string]string{diagevent.DetailPeer: srcString(src)},
 			})
 			return nil
 		}
@@ -2815,8 +2815,8 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 	}
 	// The fabric is read before the close takes the session away.
 	detail := b.sessionEventDetail(requestHdr.SessionID, map[string]string{
-		"peer":       srcString(src),
-		"session_id": strconv.Itoa(int(requestHdr.SessionID)),
+		diagevent.DetailPeer:      srcString(src),
+		diagevent.DetailSessionID: strconv.Itoa(int(requestHdr.SessionID)),
 	})
 	if err := reg.Close(requestHdr.SessionID); err != nil {
 		// Already gone — racing a local reap / fabric teardown.

@@ -719,8 +719,8 @@ func (b *Bridge) evictSession(sid uint16, route *connRoute) {
 	}
 	// The fabric is read before the close takes the session away.
 	detail := b.sessionEventDetail(sid, map[string]string{
-		"peer":       route.String(),
-		"session_id": strconv.Itoa(int(sid)),
+		diagevent.DetailPeer:      route.String(),
+		diagevent.DetailSessionID: strconv.Itoa(int(sid)),
 	})
 	// Close is the peer-lost close: no CloseSession echo, subscription
 	// cascade through the manager's close hook (secure/operational
