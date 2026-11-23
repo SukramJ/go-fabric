@@ -254,9 +254,17 @@ A host whose devices come from several sources that load on their own
 gives each a partition: `Aggregator().Partition(name)` has the same
 `Add`, `Replace`, `Remove` and `Forget`, under its own snapshot scope.
 `RetirePartition(ctx, name)` drops the stored numbers of a source the
-host no longer has, without a handle, reserved ones included. `Batch(ctx, fn)` applies many
-changes and reassembles once after `fn`; each change in it returns its
-own error and stays applied when another fails. A `Replace` by a
+host no longer has, without a handle, reserved ones included.
+`Batch(ctx, fn)` applies many changes and reassembles once after `fn`,
+and what applied stays applied when another change fails. It is judged
+against its end state: a change that collides with a key another
+endpoint serves, or a key already in the set, returns nil at the call
+and is held until `fn` returns; then it applies if the collision is gone
+— a `Remove` or `Forget` of the other endpoint, before or after it in
+`fn`, gives the same outcome — or is refused. Those refusals and the
+errors of a held change arrive in `Batch`'s result, not from the call
+(`ErrDuplicateKey`, `ErrUnknownKey` and the others its doc names); a
+call after `fn` returned is `ErrBatchDone`. A `Replace` by a
 declaration the specification level withholds takes the device off the
 wire as `Remove` does — the key keeps its number — and records it as
 withheld in `Node.Surface`; a replacement that fails validation changes
