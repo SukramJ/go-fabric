@@ -540,6 +540,18 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	if part == nil || part.scope != b.scope {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
+	// A device this batch added takes no key a Forget of the batch
+	// erases through a Replace either, as [Batch.Add] refuses it
+	// (review II, R3-store-3702 edge, decision 567). A device from
+	// before the batch keeps what decision 560 gave it.
+	if b.added[newKey] {
+		taken := surfaceEntries(ep)
+		for j := range taken {
+			if f, ok := b.erasing[taken[j].key]; ok && f != newKey {
+				return fmt.Errorf("%w: %s", ErrDuplicateKey, taken[j].key)
+			}
+		}
+	}
 	if part.eps[i] == ep {
 		return nil
 	}
