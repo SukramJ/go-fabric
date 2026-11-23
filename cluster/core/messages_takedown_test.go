@@ -8,7 +8,7 @@ import (
 	"context"
 	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	messagesdef "thingfabric.dev/go-fabric/cluster/spec/messages"
 )
@@ -150,9 +150,15 @@ func TestMessagesRemovedPresentLeavesAReusedIndexPresent(t *testing.T) {
 // TestMessagesPresentWaitsForATakeDown (R3-conc-3101): a present of the id
 // that begins while a cancelled present's take-down runs at the presenter
 // reaches the presenter only after that cancel returned, so the presenter
-// keeps the new message.
+// keeps the new message. In a synctest bubble: synctest.Wait returns once
+// P2 is durably blocked or done, so "P2 did not reach the presenter" is
+// measured, not guessed from a wall-clock window (TestSleepRatchet).
 func TestMessagesPresentWaitsForATakeDown(t *testing.T) {
 	t.Parallel()
+	synctest.Test(t, testMessagesPresentWaitsForATakeDown)
+}
+
+func testMessagesPresentWaitsForATakeDown(t *testing.T) {
 	p := newDisplayPresenter(true)
 	m, err := NewMessages(MessagesConfig{Presenter: p})
 	if err != nil {
@@ -171,10 +177,11 @@ func TestMessagesPresentWaitsForATakeDown(t *testing.T) {
 	<-p.cancelIn // P1's take-down is at the presenter
 	p2 := make(chan error, 1)
 	go func() { p2 <- m.present(ctx, 1, req) }()
+	synctest.Wait() // P2 waits for the take-down, or has reached the presenter
 	select {
 	case <-p.presentsAfter:
 		t.Error("P2 reached the presenter while P1's take-down ran there")
-	case <-time.After(50 * time.Millisecond):
+	default:
 	}
 	close(p.cancelGo)
 	if err := <-p1; err != nil {
