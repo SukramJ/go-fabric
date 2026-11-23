@@ -22,7 +22,11 @@
 // that fails removes the network it added and selects the one it was on
 // again, a join that succeeds removes the one it was on. A removal that
 // fails is retried before the next join and at Close while wpa_supplicant
-// still lists the network.
+// still lists the network. An AddNetwork that ends without
+// wpa_supplicant's answer (the join's bound or context ended in the call,
+// or the bus daemon gave up) may still have been carried out: the network
+// that appeared in the interface's Networks meanwhile is removed the same
+// way.
 //
 // What it does not do, on purpose: it saves nothing into wpa_supplicant's
 // configuration (the node's store holds the committed network and the

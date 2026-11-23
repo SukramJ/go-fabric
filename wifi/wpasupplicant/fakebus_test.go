@@ -74,6 +74,14 @@ type fakeBus struct {
 	// nextNetworks, while not empty, are the paths AddNetwork answers, in
 	// order; fakeNetwork after them.
 	nextNetworks []dbus.ObjectPath
+	// addLate: AddNetwork waits until its caller's context ends, then
+	// lists the network all the same and fails with the context's error —
+	// a request wpa_supplicant carries out after the caller stopped
+	// waiting. addEntered, when set, is closed once the call has come.
+	addLate    bool
+	addEntered chan struct{}
+	// onAdd runs on AddNetwork under mu, before a fail answers it.
+	onAdd func(b *fakeBus)
 }
 
 // Watch implements bus: the subscription is recorded, with the calls.
@@ -159,6 +167,22 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 			hook()
 		}
 	}
+	if method == ifaceInterface+".AddNetwork" {
+		b.mu.Lock()
+		late, entered := b.addLate, b.addEntered
+		b.mu.Unlock()
+		if late {
+			if entered != nil {
+				close(entered)
+			}
+			<-ctx.Done()
+			b.mu.Lock()
+			defer b.mu.Unlock()
+			b.calls = append(b.calls, fakeCall{path: path, method: method, args: args, afterClose: b.closed})
+			b.addLocked()
+			return nil, ctx.Err()
+		}
+	}
 	// A call on an ended context fails, as godbus's CallWithContext does.
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -168,6 +192,9 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	b.calls = append(b.calls, fakeCall{path: path, method: method, args: args, afterClose: b.closed})
 	if b.closed {
 		return nil, dbus.ErrClosed
+	}
+	if method == ifaceInterface+".AddNetwork" && b.onAdd != nil {
+		b.onAdd(b)
 	}
 	if err := b.fail[method]; err != nil {
 		return nil, err
@@ -214,15 +241,7 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 			}()
 		}
 	case ifaceInterface + ".AddNetwork":
-		n := fakeNetwork
-		if len(b.nextNetworks) > 0 {
-			n, b.nextNetworks = b.nextNetworks[0], b.nextNetworks[1:]
-		}
-		if v, ok := b.props["Networks"]; ok {
-			listed, _ := v.Value().([]dbus.ObjectPath)
-			b.props["Networks"] = dbus.MakeVariant(append(slices.Clone(listed), n))
-		}
-		return []any{n}, nil
+		return []any{b.addLocked()}, nil
 	case ifaceInterface + ".RemoveNetwork":
 		if cur, _ := b.props["CurrentNetwork"].Value().(dbus.ObjectPath); cur == args[0] {
 			b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
@@ -251,4 +270,18 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 		b.selected <- struct{}{}
 	}
 	return nil, nil
+}
+
+// addLocked adds a network — the next of nextNetworks, else fakeNetwork —
+// to Networks when that is served, and returns its path; b.mu is held.
+func (b *fakeBus) addLocked() dbus.ObjectPath {
+	n := fakeNetwork
+	if len(b.nextNetworks) > 0 {
+		n, b.nextNetworks = b.nextNetworks[0], b.nextNetworks[1:]
+	}
+	if v, ok := b.props["Networks"]; ok {
+		listed, _ := v.Value().([]dbus.ObjectPath)
+		b.props["Networks"] = dbus.MakeVariant(append(slices.Clone(listed), n))
+	}
+	return n
 }

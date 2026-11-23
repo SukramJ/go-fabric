@@ -805,7 +805,9 @@ func (d *Driver) removePrevious(ctx context.Context, prev dbus.ObjectPath) {
 // addNetwork hands the network to wpa_supplicant: the part of
 // ConnectNetwork before the State walk. prev is the interface's
 // CurrentNetwork, kept until the join has ended ("" when none). A
-// non-empty debugText is the failure; then nothing was added.
+// non-empty debugText is the failure; then the driver holds no network of
+// this join: an AddNetwork that ended without wpa_supplicant's answer is
+// settled by [Driver.settleUnanswered].
 func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidAttr slog.Attr) (network, prev dbus.ObjectPath, debugText string) {
 	args, refusal := networkArgs(ssid, credentials)
 	if refusal != "" {
@@ -823,6 +825,15 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 			prev = cur
 		}
 	}
+	// The networks listed before the call, to tell the one an unanswered
+	// AddNetwork may have added (nil when the read failed).
+	var before []dbus.ObjectPath
+	if v, err := d.property(ctx, "Networks"); err == nil {
+		before, _ = v.Value().([]dbus.ObjectPath)
+		if before == nil {
+			before = []dbus.ObjectPath{}
+		}
+	}
 	// The one call that carries the credential: neither its arguments nor
 	// its error's text (which a service may build from them) is logged or
 	// returned — only the D-Bus error name.
@@ -832,6 +843,9 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 	}
 	if err != nil {
 		d.log.Warn("wpasupplicant: failed to add network", ssidAttr, slog.String("reason", errName(err)))
+		if !refused(err) {
+			d.settleUnanswered(ctx, before)
+		}
 		return "", "", "add network: " + errName(err)
 	}
 	// A path wpa_supplicant hands out now is this join's network, not one
@@ -842,6 +856,62 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 	d.mu.Unlock()
 	d.log.Info("wpasupplicant: added network", ssidAttr, slog.String("path", string(network)))
 	return network, prev, ""
+}
+
+// refused reports whether err is wpa_supplicant's own answer to a call —
+// a D-Bus error reply other than the bus daemon's NoReply — so the call
+// was not carried out. A context error, NoReply, a closed connection or an
+// answer the driver cannot read leaves open whether it was.
+func refused(err error) bool {
+	var de dbus.Error
+	var dep *dbus.Error
+	switch {
+	case errors.As(err, &de):
+		return de.Name != errNoReply
+	case errors.As(err, &dep):
+		return dep.Name != errNoReply
+	}
+	return false
+}
+
+// errNoReply is the bus daemon's error when the service did not answer in
+// time: the request was delivered and may still be carried out.
+const errNoReply = "org.freedesktop.DBus.Error.NoReply"
+
+// settleUnanswered handles an AddNetwork that ended without
+// wpa_supplicant's answer (review II, R4-err-4351): wpa_supplicant may
+// have carried it out, and the network it added — with the credential —
+// has a path the driver was never handed. Every path the interface's
+// Networks lists now and did not list in before is owed and swept at once
+// (and, while its removal fails, before the next join and at Close), so
+// the credential stays in the node's store only. The read runs on a
+// context of its own bounded by removeTimeout, as the join's may have
+// ended; with no before (its read failed) or a failed read nothing can be
+// told apart and nothing is owed, which is logged.
+func (d *Driver) settleUnanswered(ctx context.Context, before []dbus.ObjectPath) {
+	if before == nil {
+		d.log.Warn("wpasupplicant: cannot tell whether the unanswered network was added", slog.String("reason", "the networks before the call are unknown"))
+		return
+	}
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
+	defer cancel()
+	v, err := d.property(rctx, "Networks")
+	if err != nil {
+		d.log.Warn("wpasupplicant: cannot tell whether the unanswered network was added", slog.String("reason", errName(err)))
+		return
+	}
+	listed, _ := v.Value().([]dbus.ObjectPath)
+	added := false
+	for _, n := range listed {
+		if !slices.Contains(before, n) {
+			d.log.Info("wpasupplicant: an unanswered AddNetwork added a network", slog.String("path", string(n)))
+			d.owe(n)
+			added = true
+		}
+	}
+	if added {
+		d.sweep(ctx)
+	}
 }
 
 // await follows the interface's State to the join's verdict.
