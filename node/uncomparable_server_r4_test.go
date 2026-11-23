@@ -22,12 +22,41 @@ type valueServer struct {
 	tags []string
 }
 
+// ifaceServer is a host cluster server whose type is comparable but whose
+// value is not when meta holds a slice: a map key or == on it panics
+// (review II, R4-api-4753, the Fable diff read's B1).
+type ifaceServer struct {
+	*spec.Server
+	meta any
+}
+
 // TestUncomparableRootServerIsServed (review II, R4-api-4753): a server
 // the host mounts on the root through Config.RootServers whose dynamic
 // type is uncomparable — with a writable nonvolatile attribute and a
 // setter — is served and written without a panic; it is the host's, so
 // nothing is stored for it.
 func TestUncomparableRootServerIsServed(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		mk   func(*spec.Server) contract.ClusterServer
+	}{
+		{"uncomparable type", func(s *spec.Server) contract.ClusterServer { return valueServer{Server: s, tags: []string{"host"}} }},
+		{"interface field holding a slice", func(s *spec.Server) contract.ClusterServer { return ifaceServer{Server: s, meta: []string{"host"}} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) { testUncomparableRootServer(t, tc.mk) })
+	}
+}
+
+func testUncomparableRootServer(t *testing.T, mk func(*spec.Server) contract.ClusterServer) {
+	t.Helper()
+	if _, ok := mk(nil).(ifaceServer); ok {
+		// node's predicates judge the value (TestComparableValueJudgesTheValue);
+		// past them bridge.reconciled (bridge/bridge.go:2813) still judges
+		// the type and Start panics in reconcileQuiescers
+		// (bridge/bridge.go:2748) — outside this unit's paths, handed to
+		// the coordinator (review II, R4-api-4753, fix-h9 repair).
+		t.Skip("bridge.reconciled judges the server's type, not its value: open finding outside node/")
+	}
 	mem := memstore.New()
 	cfg := minimalConfig(nil)
 	cfg.Store = node.Store{Credentials: mem, Endpoints: epmem.New()}
@@ -38,7 +67,7 @@ func TestUncomparableRootServerIsServed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.RootServers = []contract.ClusterServer{valueServer{Server: srv, tags: []string{"host"}}}
+	cfg.RootServers = []contract.ClusterServer{mk(srv)}
 	var n *node.Node
 	noPanic(t, "Start", func() { n, _ = nvRun(t, cfg, nvCase{}) })
 	path := attrPath(0, fancontroldef.ClusterID, fancontroldef.AttrFanMode)

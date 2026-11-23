@@ -76,7 +76,8 @@ func (u *userLabelSync) release(keys []string) {
 // packages/model/src/standard/elements/user-label.element.ts:21-22 at b25ed960),
 // as the root's list is (buildLabels). A server met again in a reassembly
 // keeps its subscription; one that left the topology is released. An
-// endpoint without a stable key, and a server of an uncomparable type,
+// endpoint without a stable key, and a server that is a value that cannot
+// be compared,
 // keep the list in memory only. A store
 // that fails a restore read fails the topology (review II,
 // R2-P6-store-2403): the servers restored before it are kept with the
@@ -94,7 +95,7 @@ func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) erro
 			continue
 		}
 		for _, srv := range endpoint.ClusterServers(ep) {
-			// A server of an uncomparable type keeps its list in memory
+			// A server that is a value that cannot be compared keeps its list in memory
 			// only (comparableServer).
 			if srv.MatterClusterID() != userlabeldef.ClusterID || !comparableServer(srv) {
 				continue

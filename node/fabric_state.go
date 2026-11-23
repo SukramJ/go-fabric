@@ -6,7 +6,6 @@ package node
 import (
 	"context"
 	"log/slog"
-	"reflect"
 
 	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/endpoint"
@@ -26,7 +25,7 @@ func (n *Node) fabricStateServers(ts ...*endpoint.Topology) []contract.FabricSco
 			if !ok {
 				continue
 			}
-			if reflect.TypeOf(s).Comparable() {
+			if comparableValue(s) {
 				if seen[s] {
 					continue
 				}

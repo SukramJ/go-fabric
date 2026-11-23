@@ -27,6 +27,27 @@ type valueEndpoint struct {
 
 func (v valueEndpoint) Spec() endpoint.Spec { return v.s }
 
+// ifaceEndpoint is a host Endpoint whose type is comparable (its Spec is
+// held by pointer) but whose
+// value is not when meta holds a slice: == on two of them panics
+// (review II, R4-api-4703, the Fable diff read's B1).
+type ifaceEndpoint struct {
+	s    *endpoint.Spec
+	meta any
+}
+
+func (v ifaceEndpoint) Spec() endpoint.Spec { return *v.s }
+
+// uncomparableEndpoints are the host Endpoints whose values cannot be
+// compared: one by its type, one by the value an interface field holds.
+var uncomparableEndpoints = []struct {
+	name string
+	mk   func(s endpoint.Spec, tag string) node.Endpoint
+}{
+	{"uncomparable type", func(s endpoint.Spec, tag string) node.Endpoint { return valueEndpoint{s: s, tags: []string{tag}} }},
+	{"interface field holding a slice", func(s endpoint.Spec, tag string) node.Endpoint { return ifaceEndpoint{s: &s, meta: []string{tag}} }},
+}
+
 // noPanic runs fn and turns a panic into a test failure naming what.
 func noPanic(t *testing.T, what string, fn func()) {
 	t.Helper()
@@ -43,13 +64,42 @@ func noPanic(t *testing.T, what string, fn func()) {
 // through a held Replace, and by a withheld declaration — and never
 // panics on the host's goroutine; the new endpoint's Spec is served.
 func TestBatchUncomparableEndpoint(t *testing.T) {
+	for _, tc := range uncomparableEndpoints {
+		t.Run(tc.name, func(t *testing.T) { testUncomparableEndpoint(t, tc.mk) })
+	}
+}
+
+func testUncomparableEndpoint(t *testing.T, mk func(endpoint.Spec, string) node.Endpoint) {
+	t.Helper()
+	t.Run("Add", func(t *testing.T) {
+		ctx := t.Context()
+		cfg := minimalConfig(nil)
+		cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+		n := newNode(t, cfg)
+		agg := n.Aggregator()
+		if err := n.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		noPanic(t, "Add", func() {
+			for _, ep := range []node.Endpoint{mk(bridgedWithParts(t, "u", "up").Spec(), "a"), mk(kitLight(t, "v").Spec(), "b")} {
+				if err := agg.Add(ctx, ep); err != nil {
+					t.Fatalf("Add: %v", err)
+				}
+			}
+		})
+		for _, k := range []string{"u", "up", "v"} {
+			if _, ok := servedNumberOf(n, k); !ok {
+				t.Fatalf("after Add: %s not served", k)
+			}
+		}
+	})
 	t.Run("Replace", func(t *testing.T) {
 		ctx := t.Context()
 		cfg := minimalConfig(nil)
 		cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
 		n := newNode(t, cfg)
 		agg := n.Aggregator()
-		if err := agg.Add(ctx, valueEndpoint{s: kitLight(t, "u").Spec(), tags: []string{"a"}}); err != nil {
+		if err := agg.Add(ctx, mk(kitLight(t, "u").Spec(), "a")); err != nil {
 			t.Fatal(err)
 		}
 		if err := n.Start(ctx); err != nil {
@@ -57,7 +107,7 @@ func TestBatchUncomparableEndpoint(t *testing.T) {
 		}
 		spec := bridgedWithParts(t, "u", "up").Spec()
 		noPanic(t, "Replace", func() {
-			if err := agg.Replace(ctx, endpoint.StringKey("u"), valueEndpoint{s: spec, tags: []string{"b"}}); err != nil {
+			if err := agg.Replace(ctx, endpoint.StringKey("u"), mk(spec, "b")); err != nil {
 				t.Fatalf("Replace: %v", err)
 			}
 		})
@@ -71,7 +121,7 @@ func TestBatchUncomparableEndpoint(t *testing.T) {
 		cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
 		n := newNode(t, cfg)
 		agg := n.Aggregator()
-		for _, ep := range []node.Endpoint{valueEndpoint{s: kitLight(t, "u").Spec(), tags: []string{"a"}}, bridgedWithParts(t, "o", "p")} {
+		for _, ep := range []node.Endpoint{mk(kitLight(t, "u").Spec(), "a"), bridgedWithParts(t, "o", "p")} {
 			if err := agg.Add(ctx, ep); err != nil {
 				t.Fatal(err)
 			}
@@ -83,7 +133,7 @@ func TestBatchUncomparableEndpoint(t *testing.T) {
 		noPanic(t, "held Replace", func() {
 			err = agg.Batch(ctx, func(b *node.Batch) error {
 				// Held: o serves p; applied once o's Remove moved it away.
-				if err := b.Replace(endpoint.StringKey("u"), valueEndpoint{s: bridgedWithParts(t, "u", "p").Spec()}); err != nil {
+				if err := b.Replace(endpoint.StringKey("u"), mk(bridgedWithParts(t, "u", "p").Spec(), "c")); err != nil {
 					return err
 				}
 				return b.Remove(endpoint.StringKey("o"))
@@ -105,8 +155,8 @@ func TestBatchUncomparableEndpoint(t *testing.T) {
 		// Two endpoints of one uncomparable type: the one replaced is
 		// left out of the collision, the other is not.
 		for _, ep := range []node.Endpoint{
-			valueEndpoint{s: kitLight(t, "u").Spec(), tags: []string{"a"}},
-			valueEndpoint{s: bridgedWithParts(t, "o", "p").Spec(), tags: []string{"b"}},
+			mk(kitLight(t, "u").Spec(), "a"),
+			mk(bridgedWithParts(t, "o", "p").Spec(), "b"),
 		} {
 			if err := agg.Add(ctx, ep); err != nil {
 				t.Fatal(err)
@@ -114,7 +164,7 @@ func TestBatchUncomparableEndpoint(t *testing.T) {
 		}
 		var err error
 		noPanic(t, "Replace colliding with an endpoint of the same type", func() {
-			err = agg.Replace(ctx, endpoint.StringKey("u"), valueEndpoint{s: bridgedWithParts(t, "u", "p").Spec()})
+			err = agg.Replace(ctx, endpoint.StringKey("u"), mk(bridgedWithParts(t, "u", "p").Spec(), "c"))
 		})
 		if !errors.Is(err, node.ErrDuplicateKey) {
 			t.Fatalf("Replace whose part another endpoint of its type serves: %v; want ErrDuplicateKey", err)
