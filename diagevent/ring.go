@@ -252,9 +252,13 @@ func (r *Ring) ForgetFabric(fabricIndex uint8) {
 		if r.events[i].Detail[DetailFabricIndex] != idx {
 			continue
 		}
-		// The ring's own map: Record and Snapshot copy it, so no
-		// caller or observer shares it.
-		delete(r.events[i].Detail, DetailFabricIndex)
+		// Copy on write, never delete in place: Record hands its
+		// observers a clone of the entry outside r.mu, and that clone
+		// reads the very map stored here, so a write to it would race
+		// the clone (a runtime fatal). The entry gets a new map instead.
+		d := maps.Clone(r.events[i].Detail)
+		delete(d, DetailFabricIndex)
+		r.events[i].Detail = d
 	}
 }
 

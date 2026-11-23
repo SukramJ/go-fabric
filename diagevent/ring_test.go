@@ -294,10 +294,14 @@ func TestForgetFabricRemovesOnlyThatIndex(t *testing.T) {
 }
 
 // TestForgetFabricUnderConcurrentRecording runs ForgetFabric beside
-// Record and Snapshot; -race holds it.
+// Record and Snapshot; -race holds it. An observer is registered, so
+// Record hands its event over outside the ring's lock while ForgetFabric
+// strips the key: an in-place delete on the entry's map would be a
+// concurrent map clone and write — a runtime fatal, -race or not.
 func TestForgetFabricUnderConcurrentRecording(t *testing.T) {
 	t.Parallel()
 	r := NewRing(8)
+	r.Observe(func(e Event) { _ = e.Detail[DetailFabricIndex] })
 	var wg sync.WaitGroup
 	for g := range 4 {
 		wg.Go(func() {
