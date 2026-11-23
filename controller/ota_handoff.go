@@ -13,18 +13,19 @@ import (
 
 // otaHandoffs are the update manager's NodeDeleted calls the node hooks
 // handed to goroutines (ota.go otaHooks, decision 219). Close waits for
-// each, within its ctx, until it returns or reaches a host OnUpdateFailed
-// of the same peer. Since C-17 NodeDeleted reports no event for the
-// deleted node — its queued update ends silently (#forgetPeer,
+// each, within its ctx, until its NodeDeleted returned — the only release.
+// Since C-17 NodeDeleted reports no event for the deleted node — its
+// queued update ends silently (#forgetPeer,
 // SoftwareUpdateManager.ts:312-342 at b25ed960) — but its queue run may
 // still report another node's update failed (a stalled update whose
 // consent is gone, reset at that run): that callback runs on the
-// hand-off goroutine and releases the other node's hand-off, if any, not
-// this one. A host that calls Close from it waits for this hand-off until
-// Close's ctx ends (the class of R2-P6-conc-2301 and -err-2317). That
-// bound is kept rather than releasing the hand-off before NodeDeleted:
-// released first, Close could return while the manager still changes its
-// state for the deleted node.
+// hand-off goroutine, and it releases no hand-off — not even the other
+// node's, whose own NodeDeleted may still be running (review II,
+// R2-C2-conc-2301). A host that calls Close from it, or blocks in it,
+// waits for this hand-off until Close's ctx ends (the class of
+// R2-P6-conc-2301 and -err-2317). That bound is kept rather than
+// releasing the hand-off before NodeDeleted: released first, Close could
+// return while the manager still changes its state for the deleted node.
 type otaHandoffs struct {
 	mu      sync.Mutex
 	closed  bool
@@ -111,18 +112,6 @@ func (h *otaHandoffs) done(p softwareupdate.Peer, o *otaHandoff) {
 	h.releaseLocked(p, o)
 }
 
-// reachedHost releases the oldest hand-off of p: the manager is about to
-// call the host's OnUpdateFailed for p (since C-17 never from p's own
-// NodeDeleted, so this releases only a hand-off whose NodeDeleted is still
-// running when another change reports p).
-func (h *otaHandoffs) reachedHost(p softwareupdate.Peer) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if list := h.pending[p]; len(list) > 0 {
-		h.releaseLocked(p, list[0])
-	}
-}
-
 // close refuses further hand-offs and waits, within ctx, until every one
 // was released.
 func (h *otaHandoffs) close(ctx context.Context) {
@@ -140,17 +129,5 @@ func (h *otaHandoffs) close(ctx context.Context) {
 	select {
 	case <-idle:
 	case <-ctx.Done():
-	}
-}
-
-// otaFailed is the host's OnUpdateFailed as the update manager calls it: a
-// pending NodeDeleted hand-off of the peer is released first
-// (otaHandoffs).
-func (c *Controller) otaFailed(host func(softwareupdate.Peer)) func(softwareupdate.Peer) {
-	return func(p softwareupdate.Peer) {
-		c.otaHandoffs.reachedHost(p)
-		if host != nil {
-			host(p)
-		}
 	}
 }

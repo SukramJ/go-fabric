@@ -103,7 +103,7 @@ func (c *Controller) openOTA(ctx context.Context, cfg Config) error {
 		MaxBDXBlockSize: o.MaxBDXBlockSize, BDXAdditionalMrpDelay: o.BDXAdditionalMrpDelay, ApplyDelay: o.ApplyDelay,
 		DelegateConsentToRequestor: o.DelegateConsentToRequestor,
 		RequestConsent:             o.RequestConsent, OnUpdateAvailable: o.OnUpdateAvailable, OnUpdateApplying: o.OnUpdateApplying,
-		OnUpdateDone: o.OnUpdateDone, OnUpdateFailed: c.otaFailed(o.OnUpdateFailed), OnStatus: c.traceOTAStatus(o.OnStatus),
+		OnUpdateDone: o.OnUpdateDone, OnUpdateFailed: o.OnUpdateFailed, OnStatus: c.traceOTAStatus(o.OnStatus),
 		ScriptQueryImage: o.ScriptQueryImage, ScriptApplyUpdate: o.ScriptApplyUpdate, OnProviderExchange: o.OnProviderExchange,
 		Clock: c.clock, Logger: c.log,
 	})
