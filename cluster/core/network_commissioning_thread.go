@@ -179,8 +179,9 @@ var (
 // fail-safe's expiry ([ThreadNetworkCommissioning.OnFailSafeExpired]), the
 // re-attach of the reverted network after an abandoned ConnectNetwork and
 // [ThreadNetworkCommissioning.Refresh] change Networks, InterfaceEnabled
-// and — when the reverted backup was empty — LastNetworkingStatus,
-// LastNetworkID and LastConnectErrorValue outside a command of this
+// and — when no network is left after the revert and one of them held a
+// value — LastNetworkingStatus, LastNetworkID and LastConnectErrorValue
+// outside a command of this
 // cluster (the bridge reports a command's effect on the cluster it
 // invoked), so each tells the listeners once the lock is released, as the
 // Wi-Fi server does ([WiFiNetworkCommissioning.OnAttributeChange];
@@ -791,15 +792,21 @@ func (n *ThreadNetworkCommissioning) OnFailSafeExpired(ctx context.Context) {
 	backup := n.backup
 	n.backup = nil
 	// Networks is reported after every revert, as the staged network may
-	// have moved; the three Last… attributes when an empty backup cleared
-	// them (OnAttributeChange).
+	// have moved (OnAttributeChange).
 	moved := []uint32{netcommAttrNetworks}
 	if backup != nil {
 		n.staging = backup
-		if len(backup) == 0 {
-			n.lastNetworkID, n.lastConnectErr, n.lastStatus = nil, nil, nil
+	}
+	// With no network left after the revert — Networks reads empty — the
+	// three Last… attributes are cleared, whether or not the window changed
+	// the staged network: a window that saw only a ScanNetworks leaves its
+	// LastNetworkingStatus otherwise (R4-par-4002; the Wi-Fi server's rule).
+	// They are reported when one of them held a value.
+	if _, ok := extPANIDOf(n.staging); !ok {
+		if len(n.lastNetworkID) > 0 || n.lastConnectErr != nil || n.lastStatus != nil {
 			moved = append(moved, netcommAttrLastNetworkingStatus, netcommAttrLastNetworkID, netcommAttrLastConnectErrorValue)
 		}
+		n.lastNetworkID, n.lastConnectErr, n.lastStatus = nil, nil, nil
 	}
 	staging := slices.Clone(n.staging)
 	n.mu.Unlock()

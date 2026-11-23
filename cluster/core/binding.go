@@ -43,8 +43,9 @@ type Binding struct {
 	save     func([]TargetStruct) error
 	// saveOwed marks a list in memory the store does not hold: a removed
 	// fabric's drop whose save failed. The next drop (of any index, also
-	// one that finds nothing) and the next write store the list, so a
-	// restart does not restore the removed fabric's entries (R3-store-3052).
+	// one that finds nothing) and the next write (also one that changes
+	// nothing, R4-store-4001) store the list, so a restart does not restore
+	// the removed fabric's entries (R3-store-3052).
 	// Guarded by writeMu.
 	saveOwed bool
 	// fabrics is BindingConfig.Fabrics or SetFabricSource's source, set
@@ -445,6 +446,10 @@ func (b *Binding) MatterWriteChanged(ctx context.Context, attrID uint32, value a
 		held = slices.DeleteFunc(held, func(t TargetStruct) bool { return t.FabricIndex != fabric })
 	}
 	if slices.Equal(held, list) {
+		// Nothing to commit, but a save a drop owes is made now, as in
+		// replace's own equal branch: the saveOwed promise holds for every
+		// write, the controller's unchanged one included (R4-store-4001).
+		b.settleOwed()
 		return false, nil
 	}
 	// The veto sees the written entries as they would be stored, the
@@ -652,6 +657,18 @@ func (b *Binding) MatterDropFabric(_ context.Context, fabricIndex uint8) error {
 	b.writeMu.Unlock()
 	b.notify(contract.OriginUnknown, before, after)
 	return err
+}
+
+// settleOwed is settleOwedLocked for a caller that does not hold writeMu,
+// against the list held now. Its failure keeps the save owed and is not the
+// caller's: the write it runs for changed nothing.
+func (b *Binding) settleOwed() {
+	b.writeMu.Lock()
+	defer b.writeMu.Unlock()
+	b.mu.RLock()
+	list := b.bindings
+	b.mu.RUnlock()
+	_ = b.settleOwedLocked(list)
 }
 
 // settleOwedLocked stores list, the list in memory, when a drop owes its
