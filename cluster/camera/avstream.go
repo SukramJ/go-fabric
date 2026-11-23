@@ -185,6 +185,10 @@ type AvStream struct {
 	audios     []AudioStream
 	snapshots  []SnapshotStream
 	priorities []StreamUsage
+	// refuseForTests, nil in production, stands for a table the schema
+	// refuses: a non-nil error from it fails [AvStream.change] before the
+	// store, as a refused value does.
+	refuseForTests func() error
 }
 
 // Compile-time assertions.
@@ -489,6 +493,11 @@ func (a *AvStream) change(origin contract.Origin, edit func() []uint32) error {
 	for _, id := range ids {
 		values[id] = all[id]
 	}
+	if a.refuseForTests != nil {
+		if err := a.refuseForTests(); err != nil {
+			return fmt.Errorf("camera: CameraAvStreamManagement: %w", err)
+		}
+	}
 	if err := a.srv.SetAttributesFrom(origin, a.served(values)); err != nil {
 		return fmt.Errorf("camera: CameraAvStreamManagement: %w", err)
 	}
@@ -496,6 +505,19 @@ func (a *AvStream) change(origin contract.Origin, edit func() []uint32) error {
 	a.restoreLocked(after)
 	a.mu.Unlock()
 	return nil
+}
+
+// undoAtPort undoes at the port what it created for a command whose
+// commit was refused (cause, the command's FAILURE) and returns that
+// FAILURE: without it the port's stream or zone would run on with no table
+// entry, and a controller's Deallocate or RemoveZone would answer
+// NOT_FOUND (R2-C2-err-1602). A reused stream is not undone, as the table
+// still holds it. The port's error, if any, joins the FAILURE's message.
+func undoAtPort(cause error, undo func() error) error {
+	if err := undo(); err != nil {
+		return spec.Errorf(im.StatusFailure, "%v (undoing it at the port: %v)", cause, err)
+	}
+	return cause
 }
 
 // commandChange is [AvStream.change] for a command: a refused value
@@ -876,10 +898,11 @@ func (a *AvStream) videoStreamAllocate(ctx context.Context, fields any) (any, er
 	if err != nil {
 		return nil, portError("VideoStreamAllocate", err)
 	}
-	action, stream := StreamNewAllocation, args.Clone()
+	action, stream, fresh := StreamNewAllocation, args.Clone(), false
 	if err := a.commandChange(func() []uint32 {
 		i := slices.IndexFunc(a.videos, func(s VideoStream) bool { return s.VideoStreamId == id })
 		if i < 0 { // :2151-2159
+			fresh = true
 			stream.VideoStreamId = id
 			a.videos = append(a.videos, stream.Clone())
 			return []uint32{csdef.AttrAllocatedVideoStreams}
@@ -892,6 +915,9 @@ func (a *AvStream) videoStreamAllocate(ctx context.Context, fields any) (any, er
 		action = StreamModification
 		return []uint32{csdef.AttrAllocatedVideoStreams}
 	}); err != nil {
+		if fresh {
+			return nil, undoAtPort(err, func() error { return a.video.VideoStreamDeallocate(ctx, id) })
+		}
 		return nil, err
 	}
 	a.video.VideoStreamAllocated(ctx, stream, action)
@@ -1076,7 +1102,8 @@ func (a *AvStream) audioStreamAllocate(ctx context.Context, fields any) (any, er
 		a.audios = append(a.audios, args)
 		return []uint32{csdef.AttrAllocatedAudioStreams}
 	}); err != nil {
-		return nil, err
+		// Only a new stream reaches the commit: a held one changes nothing.
+		return nil, undoAtPort(err, func() error { return a.audio.AudioStreamDeallocate(ctx, id) })
 	}
 	return csdef.AudioStreamAllocateResponse{AudioStreamId: id}, nil
 }
@@ -1172,8 +1199,10 @@ func (a *AvStream) snapshotStreamAllocate(ctx context.Context, fields any) (any,
 	if err != nil {
 		return nil, portError("SnapshotStreamAllocate", err)
 	}
+	fresh := false
 	if err := a.commandChange(func() []uint32 {
 		if i := slices.IndexFunc(a.snapshots, func(s SnapshotStream) bool { return s.SnapshotStreamId == id }); i < 0 { // :2461-2478
+			fresh = true
 			args.SnapshotStreamId = id
 			a.snapshots = append(a.snapshots, args.Clone())
 		} else if !narrowSnapshotStream(&a.snapshots[i], args) { // :2479-2484
@@ -1181,6 +1210,9 @@ func (a *AvStream) snapshotStreamAllocate(ctx context.Context, fields any) (any,
 		}
 		return []uint32{csdef.AttrAllocatedSnapshotStreams}
 	}); err != nil {
+		if fresh {
+			return nil, undoAtPort(err, func() error { return a.snapshot.SnapshotStreamDeallocate(ctx, id) })
+		}
 		return nil, err
 	}
 	return csdef.SnapshotStreamAllocateResponse{SnapshotStreamId: id}, nil
