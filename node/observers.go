@@ -390,8 +390,8 @@ func (n *Node) ObserveAsync(o Observers) (unsubscribe func()) {
 // queuedOn returns o with each hook queued on n's callback goroutine.
 func (o Observers) queuedOn(n *Node) Observers {
 	o.OnFabricAdded = queuedHook(n, "fabric_added", o.OnFabricAdded)
-	o.OnFabricRemoved = queuedHook(n, "fabric_removed", o.OnFabricRemoved)
-	o.OnFabricUpdated = queuedHook(n, "fabric_updated", o.OnFabricUpdated)
+	o.OnFabricRemoved = queuedHook(n, eventFabricRemoved, o.OnFabricRemoved)
+	o.OnFabricUpdated = queuedHook(n, eventFabricUpdated, o.OnFabricUpdated)
 	o.OnCommissioningComplete = queuedHook(n, "commissioning_complete", o.OnCommissioningComplete)
 	o.OnWindowTransition = queuedHook(n, "window_transition", o.OnWindowTransition)
 	o.OnSurfaceChanged = queuedHook(n, "surface_changed", o.OnSurfaceChanged)
@@ -402,6 +402,12 @@ func (o Observers) queuedOn(n *Node) Observers {
 	o.OnEvent = queuedHook(n, "event", o.OnEvent)
 	return o
 }
+
+// The events of the fabric hooks an owed fabric event runs (queued).
+const (
+	eventFabricRemoved = "fabric_removed"
+	eventFabricUpdated = "fabric_updated"
+)
 
 // queuedHook wraps one hook to run on n's callback goroutine; nil stays nil.
 func queuedHook[T any](n *Node, event string, fn func(T)) func(T) {
