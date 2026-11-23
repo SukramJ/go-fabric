@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -156,6 +157,15 @@ type peripheral struct {
 	// bluezOwner is the unique bus name that owns org.bluez as last read:
 	// the one caller the exported methods serve (fromBluez).
 	bluezOwner string
+	// adapterGen counts the adapter's InterfacesAdded and
+	// InterfacesRemoved: the work each starts (followAdapter) stops when
+	// a later one superseded it (R3-fsm-3301).
+	adapterGen uint64
+	// appLost is set when the adapter, or its GattManager1, left or came
+	// back while a service was registered: the application is registered
+	// again by followAdapter, and no advertisement is registered before it
+	// (appMissing).
+	appLost bool
 }
 
 var (
@@ -246,7 +256,8 @@ func (p *peripheral) Close() error {
 
 // dispatch follows the devices: a central that disconnects ends its
 // connection (chip UpdateConnectionTable on Connected=false,
-// BluezEndpoint.cpp:296-323).
+// BluezEndpoint.cpp:296-323). It also follows the adapter object, whose
+// leaving and return take BlueZ's registrations (adapterChanged).
 func (p *peripheral) dispatch() {
 	defer close(p.dispatched)
 	for {
@@ -266,6 +277,16 @@ func (p *peripheral) dispatch() {
 
 func (p *peripheral) handle(sig *dbus.Signal) {
 	switch sig.Name {
+	case sigIfacesAdded:
+		var path dbus.ObjectPath
+		var ifaces map[string]map[string]dbus.Variant
+		if dbus.Store(sig.Body, &path, &ifaces) != nil || path != p.adapter {
+			return
+		}
+		_, adapter := ifaces[ifaceAdapter]
+		_, gatt := ifaces[ifaceGattManager]
+		_, advertising := ifaces[ifaceAdvertising]
+		p.adapterChanged(true, adapter || gatt, adapter || advertising)
 	case sigIfacesRemoved:
 		var path dbus.ObjectPath
 		var ifaces []string
@@ -276,6 +297,10 @@ func (p *peripheral) handle(sig *dbus.Signal) {
 			if i == ifaceDevice {
 				p.gone(path)
 			}
+		}
+		if path == p.adapter {
+			adapter := slices.Contains(ifaces, ifaceAdapter)
+			p.adapterChanged(false, adapter || slices.Contains(ifaces, ifaceGattManager), adapter || slices.Contains(ifaces, ifaceAdvertising))
 		}
 	case sigPropsChanged:
 		if len(sig.Body) < 2 {
@@ -548,7 +573,9 @@ func (p *peripheral) readvertise(gen uint64) {
 			}
 			p.mu.Lock()
 		}
-		stop := p.closed || p.registered || p.advOwed || p.adv == nil
+		// While the application is lost with the adapter, followAdapter
+		// registers the advertisement after it.
+		stop := p.closed || p.registered || p.advOwed || p.adv == nil || p.appMissing()
 		p.mu.Unlock()
 		if stop {
 			p.advMu.Unlock()
@@ -570,6 +597,187 @@ func (p *peripheral) readvertise(gen uint64) {
 		}
 		pause = min(2*pause, readvertiseMax)
 	}
+}
+
+// adapterChanged starts followAdapter for an InterfacesAdded (added) or
+// InterfacesRemoved of the adapter's object: app when the adapter or its
+// GattManager1 is among the interfaces, adv when the adapter or its
+// LEAdvertisingManager1 is. It runs on the signal loop, so the work —
+// which waits for advMu and calls BlueZ — runs on a goroutine of its own.
+func (p *peripheral) adapterChanged(added, app, adv bool) {
+	if !app && !adv {
+		return
+	}
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return
+	}
+	p.adapterGen++
+	gen := p.adapterGen
+	if app && p.serviceLive() {
+		p.appLost = true
+	}
+	p.readvertising.Add(1)
+	p.mu.Unlock()
+	go p.followAdapter(gen, added, app, adv)
+}
+
+// serviceLive reports whether a service is registered or served; the
+// caller holds mu.
+func (p *peripheral) serviceLive() bool {
+	return p.svc != nil && (p.svc.state == svcRegistered || p.svc.state == svcServing)
+}
+
+// appMissing reports whether the application of a live service is lost
+// with the adapter and not registered again yet; the caller holds mu.
+func (p *peripheral) appMissing() bool {
+	return p.appLost && p.serviceLive()
+}
+
+// followAdapter follows the adapter object of generation gen (R3-fsm-3301).
+// BlueZ's registrations belong to the adapter object: when it leaves —
+// a re-plugged controller, bluetoothd stopping — the advertisement and the
+// GATT application go with it, and the port has no way to tell the host,
+// which believes it advertises and serves.
+//
+// Removed (no bus call: the adapter is gone): the advertisement is marked
+// unregistered and unexported, its properties kept, and an unregister owed
+// by StopAdvertising is settled; the application of a live service is
+// marked lost (adapterChanged).
+//
+// Added: an advertisement the peripheral believes registered is
+// unregistered, the application of a live service unregistered and
+// registered again, then the advertisement the host last asked for
+// registered — the application first, so no advertisement leads a
+// commissioner to a node without the Matter service. The unregisters'
+// errors are ignored: a bluetoothd that ended without InterfacesRemoved
+// holds nothing, while a registration made on the returned adapter before
+// this signal was handled is held. A failed registration is retried with
+// the pause of readvertise, until it holds, a later adapter signal
+// supersedes this one, or the peripheral closes.
+func (p *peripheral) followAdapter(gen uint64, added, app, adv bool) {
+	defer p.readvertising.Done()
+	pause := readvertiseFirst
+	appReset, advReset := app, adv
+	for {
+		p.advMu.Lock()
+		p.mu.Lock()
+		if p.closed || p.adapterGen != gen {
+			p.mu.Unlock()
+			p.advMu.Unlock()
+			return
+		}
+		if !added {
+			drop := adv && p.registered
+			if drop {
+				p.registered = false
+				if p.advOwed {
+					p.advOwed, p.adv = false, nil
+				}
+			}
+			p.mu.Unlock()
+			if drop {
+				p.unexportAdvertisement()
+			}
+			p.advMu.Unlock()
+			return
+		}
+		s, live := p.svc, p.serviceLive()
+		if !live {
+			p.appLost = false
+		}
+		p.mu.Unlock()
+		if advReset {
+			p.dropAdvertisement()
+			advReset = false
+		}
+		err := p.restoreApplication(appReset && live, s)
+		if err == nil {
+			appReset = false
+			err = p.restoreAdvertisement()
+			if err == nil {
+				p.advMu.Unlock()
+				return
+			}
+		}
+		p.advMu.Unlock()
+		wait := time.NewTimer(pause)
+		select {
+		case <-wait.C:
+		case <-p.done:
+			wait.Stop()
+			return
+		}
+		pause = min(2*pause, readvertiseMax)
+	}
+}
+
+// restoreApplication registers the application of the live service s again
+// when register is set (followAdapter); the caller holds advMu. A service
+// that ended while BlueZ registered it is unregistered again: its own
+// unregister may have run before this registration.
+func (p *peripheral) restoreApplication(register bool, s *gattService) error {
+	if !register {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	_, _ = call(ctx, p.bus, p.adapter, ifaceGattManager+".UnregisterApplication", p.root)
+	if _, err := call(ctx, p.bus, p.adapter, ifaceGattManager+".RegisterApplication", p.root, map[string]dbus.Variant{}); err != nil {
+		p.releaseUnanswered(ctx, err, ifaceGattManager+".UnregisterApplication", p.root)
+		return err
+	}
+	p.mu.Lock()
+	still := !p.closed && p.svc == s && p.serviceLive()
+	if still {
+		p.appLost = false
+	}
+	p.mu.Unlock()
+	if !still {
+		uctx, ucancel := context.WithTimeout(context.Background(), peripheralTimeout)
+		defer ucancel()
+		_, _ = call(uctx, p.bus, p.adapter, ifaceGattManager+".UnregisterApplication", p.root)
+	}
+	return nil
+}
+
+// dropAdvertisement ends a registration of the advertisement the
+// peripheral believes held, before the application is registered again
+// (followAdapter); the caller holds advMu. Its properties are kept.
+func (p *peripheral) dropAdvertisement() {
+	p.mu.Lock()
+	registered := p.registered
+	p.registered = false
+	if p.advOwed {
+		// StopAdvertising's unregister went unanswered: the unregister
+		// below settles it, and the radio stays silent.
+		p.advOwed, p.adv = false, nil
+	}
+	p.mu.Unlock()
+	if !registered {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	_, _ = call(ctx, p.bus, p.adapter, ifaceAdvertising+".UnregisterAdvertisement", p.advPath())
+	p.unexportAdvertisement()
+}
+
+// restoreAdvertisement registers the advertisement the host last asked
+// for, unless it is registered (followAdapter); the caller holds advMu.
+// Nothing is registered after StopAdvertising (adv nil, or an unregister
+// owed).
+func (p *peripheral) restoreAdvertisement() error {
+	p.mu.Lock()
+	register := p.adv != nil && !p.advOwed && !p.registered
+	p.mu.Unlock()
+	if !register {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	return p.registerAdvertisement(ctx)
 }
 
 // fromBluez admits a call on an exported method only from the owner of
@@ -686,6 +894,7 @@ func (p *peripheral) RegisterService(ctx context.Context, c3 []byte) (contract.G
 	closed := p.closed
 	if !closed {
 		s.state = svcRegistered
+		p.appLost = false
 	}
 	p.mu.Unlock()
 	if closed {

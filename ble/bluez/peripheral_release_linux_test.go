@@ -178,3 +178,50 @@ func TestPeripheralReleaseAfterOwedUnregisterStaysSilent(t *testing.T) {
 		t.Fatalf("a later Advertise: registrations %d (want %d), advertised %v", registrations(b), n+1, advertised(p, b))
 	}
 }
+
+// TestPeripheralStaleReleaseLeavesTheNewRegistration holds the generation
+// check of R2-C2-fsm-2001's re-registration (R3-test-3304): a Release of
+// an earlier registration that reaches readvertise only after a
+// StopAdvertising and an Advertise registered the advertisement again
+// leaves that registration alone — no unexport, no third
+// RegisterAdvertisement.
+func TestPeripheralStaleReleaseLeavesTheNewRegistration(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	ctx := context.Background()
+	data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+	if err := p.Advertise(ctx, contract.BLEAdvertisement{Data: data}); err != nil {
+		t.Fatal(err)
+	}
+	p.mu.Lock()
+	props := p.adv
+	p.mu.Unlock()
+
+	// The Release of the first registration arrives; its readvertise
+	// waits for advMu, which StopAdvertising and Advertise hold — their
+	// steps are run here under the held lock, in their order.
+	p.advMu.Lock()
+	if derr := p.release(b.ownerSender()); derr != nil {
+		p.advMu.Unlock()
+		t.Fatalf("Release: %v", derr)
+	}
+	if err := p.unregisterAdvertisement(ctx); err != nil { // StopAdvertising
+		p.advMu.Unlock()
+		t.Fatal(err)
+	}
+	p.mu.Lock()
+	p.adv = props // Advertise
+	p.mu.Unlock()
+	if err := p.registerAdvertisement(ctx); err != nil {
+		p.advMu.Unlock()
+		t.Fatal(err)
+	}
+	p.advMu.Unlock()
+	p.readvertising.Wait()
+
+	if n := registrations(b); n != 2 {
+		t.Fatalf("RegisterAdvertisement calls = %d, want 2: the stale Release registered again", n)
+	}
+	if !advertised(p, b) {
+		t.Fatal("the stale Release ended the live registration")
+	}
+}
