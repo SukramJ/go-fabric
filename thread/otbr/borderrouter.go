@@ -59,7 +59,7 @@ type BorderRouter struct {
 	c   *Client
 	cfg BorderRouterConfig
 
-	// mu guards configured.
+	// mu guards configured and activations.
 	mu sync.Mutex
 	// configured is chip's ActiveDatasetConfigured, narrowed to this
 	// delegate's own activations (review II, R3-fsm-3350; decision 545):
@@ -73,6 +73,11 @@ type BorderRouter struct {
 	// the fail-safe's revert against a dataset no activation of this node
 	// set.
 	configured bool
+	// activations counts the activations that set configured false. A
+	// clear returns the flag to true only when no activation started
+	// while it ran, and a refused activation only when no later one
+	// started (review II, R4-fsm-4303).
+	activations uint64
 }
 
 var _ threadbr.BorderRouter = (*BorderRouter)(nil)
@@ -149,7 +154,11 @@ func (b *BorderRouter) Dataset(ctx context.Context, pending bool) ([]byte, error
 // then PUT /node/dataset/active, PUT /node/state "enable", and /node/state
 // is read every PollInterval until the role is attached — or ctx ends,
 // which the fail-safe's expiry does. The empty dataset clears the active
-// one, as chip attaches an empty dataset to clear it (:202-210).
+// one, as chip attaches an empty dataset to clear it (:202-210). A PUT
+// the border router refuses with a 4xx wrote nothing and returns the flag
+// to what it was before this activation, ahead of chip (review II,
+// R4-fsm-4302; decision 545); a transport failure or a 5xx leaves the
+// revert owed, as chip leaves the flag on every error (:136-140).
 func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) error {
 	current, err := b.c.ActiveDataset(ctx)
 	if err != nil {
@@ -158,9 +167,14 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 	if len(dataset) == 0 {
 		return b.clear(ctx)
 	}
+	var activation uint64
+	var prev bool
 	if current == nil {
 		b.mu.Lock()
+		prev = b.configured
 		b.configured = false
+		b.activations++
+		activation = b.activations
 		b.mu.Unlock()
 	} else if bytes.Equal(current, dataset) {
 		if role, err := b.c.State(ctx); err == nil && role.Attached() {
@@ -173,12 +187,41 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 		}
 	}
 	if err := b.c.setDataset(ctx, false, dataset); err != nil {
+		if current == nil && refused(err) {
+			// The border router refused the PUT: nothing of this
+			// activation was written, so the flag returns to what it was
+			// before it — an earlier activation still uncommitted keeps
+			// its revert (review II, R4-fsm-4302).
+			if prev {
+				b.settle(activation)
+			}
+		}
 		return b.reenable(ctx, current != nil, err)
 	}
 	if err := b.c.setState(ctx, true); err != nil {
 		return b.reenable(ctx, current != nil, err)
 	}
 	return b.awaitAttached(ctx)
+}
+
+// refused reports whether err is a 4xx answer of the border router: the
+// request was refused and nothing it carried was written. A transport
+// failure, a timeout or a 5xx (which something in front of the border
+// router may answer) does not prove that, and leaves the revert owed.
+func refused(err error) bool {
+	var oe *Error
+	return errors.As(err, &oe) && oe.HTTPStatus >= 400 && oe.HTTPStatus < 500
+}
+
+// settle returns the flag to configured unless an activation started
+// after the counter read since: that activation's dataset is still
+// uncommitted (review II, R4-fsm-4303).
+func (b *BorderRouter) settle(since uint64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.activations == since {
+		b.configured = true
+	}
 }
 
 // reenable is the step back of an activation that disabled the Thread
@@ -217,8 +260,14 @@ func (b *BorderRouter) awaitAttached(ctx context.Context) error {
 }
 
 // clear disables the Thread interface and deletes the active dataset; on
-// success nothing of this delegate's is left for a revert.
+// success nothing is left armed: the dataset is deleted or, at a 405,
+// left in place with the interface disabled. An activation that started
+// while the clear ran keeps its flag (review II, R4-doc-4304,
+// R4-fsm-4303).
 func (b *BorderRouter) clear(ctx context.Context) error {
+	b.mu.Lock()
+	since := b.activations
+	b.mu.Unlock()
 	if err := b.c.setState(ctx, false); err != nil {
 		return err
 	}
@@ -236,10 +285,9 @@ func (b *BorderRouter) clear(ctx context.Context) error {
 			return err
 		}
 	}
-	// Nothing of this delegate's is left to revert.
-	b.mu.Lock()
-	b.configured = true
-	b.mu.Unlock()
+	// Nothing is left armed: the dataset is deleted or, at a 405, left
+	// in place with the interface disabled.
+	b.settle(since)
 	return nil
 }
 
@@ -266,7 +314,7 @@ func (b *BorderRouter) CommitActiveDataset(ctx context.Context) error {
 // activation of this delegate set onto a border router that had none, and
 // that no CommissioningComplete committed, is cleared (RevertActiveDataset,
 // :191-212); otherwise nothing changes. A clear that succeeded leaves
-// nothing armed.
+// nothing armed, unless an activation started while it ran.
 func (b *BorderRouter) RevertActiveDataset(ctx context.Context) error {
 	b.mu.Lock()
 	configured := b.configured

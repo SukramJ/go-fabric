@@ -480,5 +480,27 @@ func TestRevertTouchesOnlyAnUncommittedActivation(t *testing.T) {
 		if srv.State() != "leader" || !bytes.Equal(srv.Active(), ds) {
 			t.Errorf("noDelete %v, second revert: %s, %x, want leader with the dataset", noDelete, srv.State(), srv.Active())
 		}
+
+		// (d) an activation the border router refused with a 4xx wrote
+		// nothing, so it leaves nothing armed: a commissioner that
+		// completes all the same while the border router is not attached,
+		// and a network another writer forms afterwards, survive the next
+		// expiry (review II, R4-fsm-4302).
+		br, srv = newBR(t, otbrtest.Options{NoDelete: noDelete})
+		srv.Fail(http.MethodPut, "/node/dataset/active", http.StatusBadRequest)
+		if err := br.SetActiveDataset(ctx, ds); err == nil || srv.Active() != nil {
+			t.Fatalf("noDelete %v, the refused activation: %v, %x, want an error and nothing written", noDelete, err, srv.Active())
+		}
+		srv.Fail(http.MethodPut, "/node/dataset/active", 0)
+		if err := br.CommitActiveDataset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		formOutOfBand(t, br, srv, ds)
+		if err := br.RevertActiveDataset(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if srv.State() != "leader" || !bytes.Equal(srv.Active(), ds) {
+			t.Errorf("noDelete %v, refused activation + revert: %s, %x, want leader with the dataset", noDelete, srv.State(), srv.Active())
+		}
 	}
 }
