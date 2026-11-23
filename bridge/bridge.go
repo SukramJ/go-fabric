@@ -906,6 +906,10 @@ type Bridge struct {
 	// failure mode self-diagnosing.
 	sessionMissTracker sessionMissBurst
 
+	// rxWarns bounds the per-datagram Warn lines of unauthenticated
+	// senders ([Bridge.warnPerDatagram]).
+	rxWarns rxWarnLimiter
+
 	// sessionRegistry is the optional seam to the operational session
 	// manager, wired via [Bridge.AttachSessionRegistry]. The
 	// Secure-Channel path uses it to close a session on an inbound
