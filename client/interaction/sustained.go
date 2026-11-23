@@ -226,12 +226,19 @@ func (st *sustainedState) delivering(consumer func(*Report) error) func(*Report)
 // the request's filters kept until then. Mirrors matter.js
 // SustainedSubscription.#requestNewEvents
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:379-384)
-// at b25ed960.
+// at b25ed960. After an event numbered 2^64-1 the bound is held at
+// 2^64-1 rather than wrapping to 0, which would ask the peer for every
+// event it still holds again: this module's own choice, as the
+// controller's nextEventMin (review II, R2-C2-wire-2351).
 func (st *sustainedState) requestNewEvents(req SubscribeRequest) SubscribeRequest {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if st.hasEvent {
-		req.EventFilters = []im.EventMinimumNumber{{EventMin: st.maxEvent + 1}}
+		next := st.maxEvent
+		if next != math.MaxUint64 {
+			next++
+		}
+		req.EventFilters = []im.EventMinimumNumber{{EventMin: next}}
 	}
 	return req
 }
