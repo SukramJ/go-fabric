@@ -130,7 +130,7 @@ const plainClusterID uint32 = 0x0201
 // a cluster with no elevated-privilege requirements at all.
 func privilegeTestTopology(t *testing.T) *Topology {
 	t.Helper()
-	acl, err := mattercore.NewAccessControl(stubACLStore{})
+	acl, err := mattercore.NewAccessControlWith(context.Background(), mattercore.AccessControlConfig{Store: stubACLStore{}})
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
@@ -437,7 +437,7 @@ func TestHandleWriteRequest_OperateAttributeNotBlockedByPrivilegeGate(t *testing
 func TestHandleWriteRequest_RejectsWildcardAttributePath(t *testing.T) {
 	t.Parallel()
 	aclStore := &recordingACLStore{}
-	acl, err := mattercore.NewAccessControl(aclStore)
+	acl, err := mattercore.NewAccessControlWith(context.Background(), mattercore.AccessControlConfig{Store: aclStore})
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}

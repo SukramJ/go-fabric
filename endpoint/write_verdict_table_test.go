@@ -85,12 +85,12 @@ func verdictCases() []verdictCase {
 	return []verdictCase{
 		{"core.AccessControl", true, func(t *testing.T) contract.ClusterServer {
 			t.Helper()
-			s, err := mattercore.NewAccessControl(&memACL{})
+			s, err := mattercore.NewAccessControlWith(context.Background(), mattercore.AccessControlConfig{Store: &memACL{}})
 			return must(t, s, err)
 		}, acldef.AttrAcl, []mattercore.AccessControlEntryStruct{{Privilege: 5, AuthMode: 2, Subjects: []uint64{0x112233}}}},
 		{"core.AccessControl", true, func(t *testing.T) contract.ClusterServer {
 			t.Helper()
-			s, err := mattercore.NewAccessControl(&memACL{})
+			s, err := mattercore.NewAccessControlWith(context.Background(), mattercore.AccessControlConfig{Store: &memACL{}})
 			return must(t, s, err)
 		}, acldef.AttrExtension, []mattercore.AccessControlExtensionEntry{{Data: []byte{0x17, 0x18}}}},
 		{"core.GroupKeyManagement", true, func(t *testing.T) contract.ClusterServer {
