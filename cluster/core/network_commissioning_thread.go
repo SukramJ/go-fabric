@@ -679,7 +679,11 @@ func (n *ThreadNetworkCommissioning) reorder(req netcommdef.ReorderNetworkReques
 // through the port's SetActiveDataset). The result is the
 // ConnectNetworkResponse, the last networking status and network id, the
 // connect error (null on success); success writes the breadcrumb. A
-// failed attach is UnknownError (GTD :240-244).
+// failed attach is UnknownError (GTD :240-244), reported with no debug
+// text and the interface status 0 (:246-249); the driver keeps the staged
+// network and its backup, and the revert waits for the fail-safe's
+// expiry. ErrorValue and LastConnectErrorValue carry that 0 (owner
+// decision 673).
 func (n *ThreadNetworkCommissioning) connect(ctx context.Context, req netcommdef.ConnectNetworkRequest) (any, error) {
 	if len(req.NetworkId) > maxNetworkIDLength {
 		return nil, netcommStatus(im.StatusConstraintError, "core: ConnectNetwork network id of %d bytes", len(req.NetworkId))
@@ -706,7 +710,9 @@ func (n *ThreadNetworkCommissioning) connect(ctx context.Context, req netcommdef
 	var enabled, connected bool
 	if statusOK(status) {
 		if err := n.br.SetActiveDataset(attach, staged); err != nil {
-			status, errValue = netcommdef.NetworkCommissioningStatusUnknownError, -1
+			// errValue stays 0: chip's interface status of a failed
+			// attach (owner decision 673).
+			status = netcommdef.NetworkCommissioningStatusUnknownError
 		} else {
 			enabled, connected = n.probe(context.WithoutCancel(ctx), staged)
 		}

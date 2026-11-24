@@ -319,11 +319,15 @@ func TestThreadNetworkCommissioningCommands(t *testing.T) {
 	invoke(netcommdef.CmdAddOrUpdateThreadNetwork, add)
 	br.failSet = errors.New("attach failed")
 	resp, _ = invoke(netcommdef.CmdConnectNetwork, netcommdef.ConnectNetworkRequest{NetworkId: threadExtPANID})
-	if r := resp.(netcommdef.ConnectNetworkResponse); r.NetworkingStatus != netcommdef.NetworkCommissioningStatusUnknownError || r.ErrorValue.Null {
-		t.Errorf("a failed attach = %+v", r)
+	// ErrorValue and LastConnectErrorValue are 0, non-null, as chip's
+	// driver reports the failed attach with interface status 0 (owner
+	// decision 673; GTD :246-249 → NetworkCommissioningCluster.cpp
+	// :871-875 at 6170af84).
+	if r := resp.(netcommdef.ConnectNetworkResponse); r.NetworkingStatus != netcommdef.NetworkCommissioningStatusUnknownError || r.ErrorValue.Null || r.ErrorValue.Value != 0 {
+		t.Errorf("a failed attach = %+v, want UnknownError with ErrorValue 0", r)
 	}
-	if v, _ := n.MatterRead(netcommAttrLastConnectErrorValue); v == nil {
-		t.Error("LastConnectErrorValue is null after a failed attach")
+	if v, _ := n.MatterRead(netcommAttrLastConnectErrorValue); v != int32(0) {
+		t.Errorf("LastConnectErrorValue = %v after a failed attach, want 0", v)
 	}
 	if v, _ := n.MatterRead(netcommAttrLastNetworkID); !bytes.Equal(v.([]byte), threadExtPANID) {
 		t.Errorf("LastNetworkID = %v", v)
