@@ -610,8 +610,8 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 // resumptionId + initiatorResumeMic triggers a one-round-trip resume
 // instead of Full Sigma.
 type CaseAdapter struct {
-	// mu guards established, establishedSessionID, lastSigma2 and
-	// responder.
+	// mu guards established, establishedSessionID, lastSigma2, stepPeer
+	// and responder.
 	mu            sync.RWMutex
 	responder     *sigma.Responder
 	onEstablished CaseSessionEstablished
@@ -643,8 +643,14 @@ type CaseAdapter struct {
 	// stepPeer is the initiator's SessionParameters as the Sigma1 that
 	// began the current handshake stated them (nil for none), set under mu
 	// in the same step that records the handshake, so a Sigma3 takes the
-	// ones of the handshake it completes ([CaseAdapter.processSigma3]) —
-	// never another Sigma1's that ran on the responder since (R4-sec-4401).
+	// ones of the handshake it completes ([CaseAdapter.processSigma3])
+	// (R4-sec-4401). The responder's step runs before, without mu: of two
+	// Sigma1s that race on one adapter the one recorded last wins, though
+	// the responder may have taken the other last, and a resume that rolls
+	// back restores the value it saw. A Sigma3 may then take the other
+	// Sigma1's parameters; what that moves is the pacing of one reply,
+	// clamped to the unauthenticated bounds ([handshakePeerTimingOf];
+	// R5-conc-5104).
 	stepPeer *sessionparams.Parameters
 	// onUnfinished and releasedStaked: see [CaseAdapter.SetOnUnfinished].
 	onUnfinished   func(sessionID uint16)
@@ -656,6 +662,9 @@ type CaseAdapter struct {
 	// adapter, is told that a Sigma1 began a handshake on it
 	// ([CaseAdapter.sigma1BeganHandshake]).
 	onBegun func()
+	// droppedForTest, when set, is handed a step's session value as the
+	// adapter drops it ([CaseAdapter.dropEstablished]).
+	droppedForTest func(*sigma.Established)
 	// onCompletion, set by the host that installs its sessions
 	// establishing (node, through internal/bridgeseam), is told when the
 	// handshake of a session onEstablished installed completed or failed
@@ -1046,9 +1055,27 @@ func (a *CaseAdapter) establishedCallbackLocked() func(sigma.Established) error 
 		return a.onSession
 	}
 	if old := a.onEstablished; old != nil {
-		return func(est sigma.Established) error { return old(est.Keys, est.PeerSessionID) }
+		// The deprecated callback is handed the keys and the peer's id
+		// alone; the value's secret is the adapter's own copy, dropped
+		// with it ([CaseAdapter.dropEstablished]). est shares its slice
+		// with the step's value.
+		return func(est sigma.Established) error {
+			err := old(est.Keys, est.PeerSessionID)
+			a.dropEstablished(&est)
+			return err
+		}
 	}
 	return nil
+}
+
+// dropEstablished drops a step's session value that nobody holds: its
+// copy of the shared secret is cleared, as an installed one is handed to
+// the record (BD-chip-HandshakeSecretsOverwritten; decision 658, G641-1).
+func (a *CaseAdapter) dropEstablished(est *sigma.Established) {
+	clear(est.SharedSecret)
+	if hook := a.droppedForTest; hook != nil {
+		hook(est)
+	}
 }
 
 // ProcessSigma1 hands the wire payload to [sigma.Responder.ProcessSigma1WithResume].
@@ -1146,8 +1173,12 @@ func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload [
 		if !install || onEstablished == nil {
 			// No session is installed for this resume, so nobody replaces
 			// the record it presented: the claim goes back (review II,
-			// R2-P6-sec-3320, decision 243).
+			// R2-P6-sec-3320, decision 243). Nobody takes the step's session
+			// value either: its copy of the shared secret is cleared here,
+			// as an installed one is handed to the record
+			// (BD-chip-HandshakeSecretsOverwritten; decision 658, G641-1).
 			result.Claim.Release()
+			a.dropEstablished(result.Established)
 		}
 		if install && onEstablished != nil {
 			// The session is the one this resume established, as the
@@ -1168,7 +1199,9 @@ func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload [
 				// what it was, and an adapter whose handshake had not
 				// begun ends as a failed Sigma1 ends it — it leaves its
 				// provider and returns its staked id — rather than wait
-				// for the reaper (review II, R2-P6-sec-0301).
+				// for the reaper (review II, R2-P6-sec-0301). The value no
+				// host installed is dropped with its secret cleared.
+				a.dropEstablished(result.Established)
 				a.mu.Lock()
 				a.established, a.establishedSessionID, a.stepPeer = prevEstablished, prevSessionID, prevPeer
 				begun := a.established || a.lastSigma2 != nil
@@ -1340,7 +1373,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	if est == nil {
 		a.mu.Unlock()
 		a.handshakeFailed()
-		return 0, nil, sigma3Failed, taken, errors.New("bridge: Sigma3 step established no session (retransmission of a Sigma3 whose session was not installed)")
+		return 0, nil, sigma3Failed, taken, errors.New("bridge: Sigma3 step established no session (the accepted retransmission of the finishing Sigma3)")
 	}
 	a.established = true
 	sessionID := est.SessionID
@@ -1357,11 +1390,15 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	// responder's lock, never read back off the responder once a.mu is
 	// released: a resume Sigma1 accepted on the same responder in between
 	// replaces its keys and identity (R5-sec-5101).
-	if onEstablished != nil {
-		if err := onEstablished(*est); err != nil {
-			a.sigma3PickupFailed()
-			return 0, nil, sigma3Failed, taken, fmt.Errorf("bridge: CASE session pickup: %w", err)
-		}
+	//
+	// A value no host installed — the callback refused it, or there is
+	// none — is dropped with its secret cleared ([CaseAdapter.dropEstablished]).
+	if onEstablished == nil {
+		a.dropEstablished(est)
+	} else if err := onEstablished(*est); err != nil {
+		a.dropEstablished(est)
+		a.sigma3PickupFailed()
+		return 0, nil, sigma3Failed, taken, fmt.Errorf("bridge: CASE session pickup: %w", err)
 	}
 	taken.sessionID, taken.named = sessionID, true
 	return mrp.SCOpcodeStatusReport, caseEstablishedReport(), sigma3Established, taken, nil

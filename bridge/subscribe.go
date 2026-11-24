@@ -3080,13 +3080,25 @@ func quietIntervalOf(clusterID, attrID uint32) time.Duration {
 // parks it ([Bridge.parkQuietPath]) and the next wiring takes it up with
 // its last value, its throttle's last report and a report the throttle
 // holds back, so a re-wiring neither drops a held change nor restarts the
-// interval. A re-wiring keeps the endpoint's cluster version, and the
-// throttle is kept with it: matter.js's QuietEvent observer lives as long
-// as its behavior's backing — registered in the backing's constructor and
-// closed only with it
-// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:35-38,
-// :214-216, #configureEventSuppression :224-262 at db021da0). Parked, it
-// reads nothing and reports nothing: a notification that still reaches it
+// interval. A re-wiring of the same instance keeps the endpoint's cluster
+// version, and the throttle is kept with it. A new instance behind the
+// path (not [endpointpkg.Endpoint.SameInstance] with the endpoint the
+// path was parked from) does not take it up: the parked one is stopped,
+// with a change it held back, and the path starts a new throttle
+// (R5-par-5109).
+//
+// Mirrors matter.js: the quieter throttle belongs to the Endpoint object.
+// QuietEvent owns its QuietObservable (packages/node/src/behavior/Events.ts:274-306),
+// whose last-emit time and deferred payload are its fields
+// (packages/general/src/util/Observable.ts:1061-1063); a new Endpoint builds
+// new Behaviors, backings and event emitters
+// (packages/node/src/endpoint/Endpoint.ts:631,
+// packages/node/src/endpoint/properties/Behaviors.ts:56-57, :781-803), so its
+// first quieter change is emitted at once (Observable.ts:1238-1246) and a
+// change the old instance held back is dropped with it (Observable.ts:1276-1280,
+// Behaviors.ts:471-474) — at b25ed9604f.
+//
+// Parked, it reads nothing and reports nothing: a notification that still reaches it
 // is left to the next wiring, which compares the value with the last one
 // when it takes the path up ([listenerSet.quietPathFor]), and a report
 // its throttle sends is owed to that wiring (review II, R2-P4-dr-sub-01,
@@ -3096,10 +3108,12 @@ type quietPath struct {
 	q    *clusterpkg.Quieter
 	// mu guards ep, last and had and orders the readings and the
 	// throttle's calls.
-	mu   sync.Mutex
-	ep   *endpointpkg.Endpoint // nil while parked
-	last attributeReading
-	had  bool // last holds a reading
+	mu sync.Mutex
+	ep *endpointpkg.Endpoint // nil while parked
+	// parkedFrom is the endpoint the path served when it was parked.
+	parkedFrom *endpointpkg.Endpoint
+	last       attributeReading
+	had        bool // last holds a reading
 	// sinkMu guards mgr and owed; taken under mu, or alone by the
 	// throttle's report.
 	sinkMu sync.Mutex
@@ -3117,6 +3131,12 @@ func (l *listenerSet) quietPathFor(b *Bridge, mgr *subscription.Manager, ep *end
 		return qp
 	}
 	qp := b.reclaimQuietPath(p)
+	if qp != nil && !qp.servesInstanceOf(ep) {
+		// A new instance behind the path: the old one's throttle goes,
+		// with what it held back.
+		qp.q.Stop()
+		qp = nil
+	}
 	fresh := qp == nil
 	if fresh {
 		qp = &quietPath{path: p}
@@ -3167,9 +3187,20 @@ func (qp *quietPath) attach(ep *endpointpkg.Endpoint, mgr *subscription.Manager,
 	}
 }
 
+// servesInstanceOf reports whether the parked qp was parked from the
+// instance ep serves ([endpointpkg.Endpoint.SameInstance]).
+func (qp *quietPath) servesInstanceOf(ep *endpointpkg.Endpoint) bool {
+	qp.mu.Lock()
+	defer qp.mu.Unlock()
+	return ep.SameInstance(qp.parkedFrom)
+}
+
 // park unbinds qp from its wiring; its throttle runs on.
 func (qp *quietPath) park() {
 	qp.mu.Lock()
+	if qp.ep != nil {
+		qp.parkedFrom = qp.ep
+	}
 	qp.ep = nil
 	qp.sinkMu.Lock()
 	qp.mgr = nil
