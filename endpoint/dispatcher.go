@@ -734,11 +734,14 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// verdict is the server's ([writeOne], res.Commit); a server
 				// without one changed the written attribute. A root or
 				// Aggregator server with a tracker of its own advances it
-				// inside the same write, on the same verdict.
+				// inside the same write, on the same verdict. A write of
+				// key-held state through an instance the key no longer
+				// serves advances the served instance's version as well
+				// ([endpointState.bumpWritten], R5-conc-5107).
 				if res.Status == im.StatusSuccess {
 					changed := res.Commit == nil || len(res.Commit.Changed) > 0
 					if _, own := ownDataVersion(ep, srv); changed && !own {
-						ep.BumpClusterDataVersion(cPath.Cluster)
+						ep.endpointState().bumpWritten(cPath.Cluster)
 					}
 					writeChangesFrom(ctx).record(aPath, changed)
 				}
