@@ -246,7 +246,7 @@ const testparityPlannedRatchet = 3
 // responder (P6-D): 179 ported, 1009 missing.
 const (
 	testparityPortedRatchet  = 179
-	testparityMissingRatchet = 1009
+	testparityMissingRatchet = 1005
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
