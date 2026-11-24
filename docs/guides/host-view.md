@@ -268,7 +268,16 @@ call after `fn` returned is `ErrBatchDone`. A `Replace` by a
 declaration the specification level withholds takes the device off the
 wire as `Remove` does — the key keeps its number — and records it as
 withheld in `Node.Surface`; a replacement that fails validation changes
-nothing. An `Add` or `Replace` of a device whose own key or a part key
+nothing. A `Replace` by another device than the one served, or a
+`Remove` and an `Add` of its key in one batch, keeps the endpoint number
+and announces the new device, as matter.js announces a re-added
+endpoint: every cluster gets a new DataVersion and every readable
+attribute but the changes-omitted ones is reported to running
+subscriptions. What a controller wrote
+under the key — a label, scenes, a binding, a running Identify — and the
+ConfigurationVersion stay with the key; an invoke the old device is
+handling completes on it. A `Replace` by the device already served
+announces nothing. An `Add` or `Replace` of a device whose own key or a part key
 another endpoint already serves is refused with `ErrDuplicateKey` and
 changes nothing. The Aggregator's own
 methods are the default partition's, so a host with one source writes
