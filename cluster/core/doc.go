@@ -14,7 +14,8 @@
 //   - Commissioning and security: [NewGeneralCommissioning],
 //     [NewNetworkCommissioning], [NewWiFiNetworkCommissioning],
 //     [NewThreadNetworkCommissioning], [NewOperationalCredentials],
-//     [NewAccessControl], [NewGroupKeyManagement], [NewGroups],
+//     [NewAccessControlWith] (the deprecated [NewAccessControl]),
+//     [NewGroupKeyManagement], [NewGroups],
 //     [NewGroupcast], [NewBinding], [NewCommissionerControl],
 //     [NewICDManagement].
 //   - The node and its endpoints: [NewDescriptor], [NewBasicInformation],
