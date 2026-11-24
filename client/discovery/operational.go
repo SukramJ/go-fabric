@@ -85,7 +85,7 @@ func hasAddress(nm *Name) bool {
 
 // startResolution runs IpServiceResolution on the loop; found is closed
 // when a new address appears. The returned function stops it (idempotent).
-func (s *Service) startResolution(found chan struct{}) func() {
+func (s *Service) startResolution(found chan struct{}) func() { //nolint:funlen // one resolution's closures share its state; split, they would pass it around
 	hosts := newOmap[*Name, struct{}]()
 	resolvers := make(map[*Name]func())
 	waiting := newOmap[*Name, struct{}]() // beyond maxHostDiscoveries, oldest first
@@ -175,8 +175,7 @@ func (s *Service) startResolution(found chan struct{}) func() {
 				return
 			}
 		}
-		// Keyed by *Name: the cache folds case and keeps the first-seen
-		// spelling, so an SRV target's string need not equal nm.qname.
+		// By *Name: the cache folds case, so a target need not equal nm.qname.
 		targets := make(map[*Name]bool)
 		for _, r := range s.name.records.values() {
 			if r.Type == TypeSRV {

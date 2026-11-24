@@ -167,7 +167,7 @@ func (s *Service) maybeStartResolving() {
 	go func() {
 		defer close(done)
 		_, err := s.Resolve(ctx)
-		s.names.loop.post(func() {
+		s.names.loop.post(func() { //nolint:contextcheck // a restarted resolution runs on the cache's context (s.names.ctx), never the ended one's
 			if err == nil {
 				s.names.logger.Debug("matter.discovery.status.resolved", slog.String("service", s.name.qname), slog.Int("addresses", s.addresses.len()), slog.String("targets", s.targets()))
 			}
