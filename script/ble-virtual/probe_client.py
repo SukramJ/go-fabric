@@ -107,22 +107,29 @@ def peripheral(adapter_file):
             adapter = f.read().strip()
         log("register", why, "adapter", adapter)
         obj = bus.get_object(BLUEZ, adapter)
+        # Asynchronous: bluetoothd calls GetManagedObjects / GetAll back on
+        # this client before it replies, so a blocking call deadlocks until
+        # the timeout (run 45458721719: NoReply after 10 s).
         for iface, method, path in (
             ("org.bluez.GattManager1", "RegisterApplication", APP),
             ("org.bluez.LEAdvertisingManager1", "RegisterAdvertisement", ADV),
         ):
-            try:
-                obj.get_dbus_method(method, iface)(dbus.ObjectPath(path), dbus.Dictionary({}, signature="sv"), timeout=10)
+            def ok(method=method):
                 log("reply", method, adapter, "ok")
-            except dbus.exceptions.DBusException as e:
+
+            def err(e, method=method):
                 log("reply", method, adapter, "error", e.get_dbus_name(), repr(e.get_dbus_message()))
+
+            obj.get_dbus_method(method, iface)(
+                dbus.ObjectPath(path), dbus.Dictionary({}, signature="sv"),
+                reply_handler=ok, error_handler=err, timeout=20)
         return True
 
     loop = GLib.MainLoop()
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, lambda: register("SIGUSR1"))
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: loop.quit() or False)
     register("start")
-    log("ready")
+    log("ready (replies follow asynchronously)")
     loop.run()
     log("exit")
 

@@ -235,14 +235,15 @@ snapshot "0 before"
 echo "$(now) \$ sudo $PY -u $CLIENT peripheral $ADAPTER_FILE > client-peripheral.log &" >>"$STEPS"
 sudo "$PY" -u "$CLIENT" peripheral "$ADAPTER_FILE" >"$LOG_DIR/client-peripheral.log" 2>&1 &
 periph_pid=$!
-for _ in $(seq 1 50); do
-	grep -q 'probe-client: ready' "$LOG_DIR/client-peripheral.log" && break
+for _ in $(seq 1 150); do
+	[ "$(grep -c 'probe-client: reply' "$LOG_DIR/client-peripheral.log")" -ge 2 ] && break
 	sleep 0.2
 done
 sleep 2
 snapshot "0 after"
 end 0
-grep -q 'probe-client: ready' "$LOG_DIR/client-peripheral.log" || env_fail "the peripheral client did not register (see client-peripheral.log)"
+[ "$(grep -c 'probe-client: reply .* ok$' "$LOG_DIR/client-peripheral.log")" -ge 2 ] ||
+	env_fail "the peripheral client did not register both objects (see client-peripheral.log)"
 
 # --- 1: Powered ---------------------------------------------------------------
 
