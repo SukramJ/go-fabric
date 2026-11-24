@@ -171,7 +171,10 @@ import (
 // at b25ed960, confirmed by fable-diff-h11 (statement 4), is drift only
 // because the collector finds addCluster nearest at :261 (measured by make
 // cite-report).
-const citecheckDriftRatchet = 411
+// 410 after phase 8 wave 1's REG: client/peer/probe.go's InteractionMessenger
+// cite re-read at b25ed960 (fable-read-a6-a8 A6 (b), :1019-1054) leaves the
+// drift rows.
+const citecheckDriftRatchet = 410
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
