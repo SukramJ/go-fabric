@@ -271,11 +271,104 @@ func waitGoroutineLocksIn(t *testing.T, header, fn string) {
 	for range 1_000_000 {
 		stacks := string(buf[:runtime.Stack(buf, true)])
 		for _, g := range strings.Split(stacks, "\n\n") {
-			if strings.HasPrefix(g, header+"[") && strings.Contains(g, "sync.(*Mutex).Lock") && strings.Contains(g, fn) {
+			if strings.HasPrefix(g, header+"[") && (strings.Contains(g, "sync.(*Mutex).Lock") || strings.Contains(g, "camera.(*opLock).")) && strings.Contains(g, fn) {
 				return
 			}
 		}
 		runtime.Gosched()
 	}
 	t.Fatalf("%sdoes not wait for a lock in %s", header, fn)
+}
+
+// TestProviderPeerGoneWaitEndsWithItsContext (R5-conc-5301): PeerGone
+// waits for a command in flight only as long as its ctx lasts — a node's
+// Stop ends the wait of its peer-gone keeper — and a ctx ended before the
+// call ends nothing either: ran false, no error, no port call, every
+// session stays.
+func TestProviderPeerGoneWaitEndsWithItsContext(t *testing.T) {
+	t.Parallel()
+	ended, cancel := context.WithCancel(context.Background())
+	cancel()
+	p, m := newProvider(t, nil)
+	goneSessions(t, p)
+	if ran, err := p.PeerGone(ended, 1, 7, unknownReason, nil); err != nil || ran {
+		t.Fatalf("PeerGone with an ended ctx = %v, %v; want not ran, no error", ran, err)
+	}
+	m.mu.Lock()
+	n := len(m.ended)
+	m.mu.Unlock()
+	if n != 0 {
+		t.Errorf("port ended %d sessions, want 0", n)
+	}
+	if got := sessionIDs(p); !slices.Equal(got, []uint16{1, 2, 3, 4}) {
+		t.Errorf("sessions %v, want [1 2 3 4]", got)
+	}
+
+	port := &blockingAnswerPort{mockProvider: &mockProvider{}, entered: make(chan struct{}), release: make(chan struct{})}
+	p, err := camera.NewProvider(camera.ProviderConfig{Port: port, Streams: cameraStreams()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := peer(1, 0x55)
+	resp, err := p.MatterInvoke(ctx, wpdef.CmdSolicitOffer, solicit(wpdef.StreamUsageLiveView))
+	if statusOf(err) != im.StatusSuccess {
+		t.Fatalf("solicit: %v", err)
+	}
+	id := resp.(wpdef.SolicitOfferResponse).WebRtcSessionId
+	answered := make(chan error, 1)
+	go func() {
+		_, err := p.MatterInvoke(ctx, wpdef.CmdProvideAnswer, wpdef.ProvideAnswerRequest{WebRtcSessionId: id, Sdp: "a"})
+		answered <- err
+	}()
+	<-port.entered
+	released := false
+	defer func() {
+		if !released {
+			close(port.release)
+		}
+	}()
+	life, stop := context.WithCancel(context.Background())
+	type result struct {
+		ran bool
+		err error
+	}
+	gone := make(chan result, 1)
+	header := make(chan string, 1)
+	go func() {
+		header <- goroutineHeader()
+		ran, err := p.PeerGone(life, 1, 0x55, unknownReason, nil)
+		gone <- result{ran, err}
+	}()
+	waitGoroutineLocksIn(t, <-header, "camera.(*Provider).PeerGone")
+	stop()
+	var r result
+	got := false
+	for range 1_000_000 {
+		select {
+		case r = <-gone:
+			got = true
+		default:
+		}
+		if got {
+			break
+		}
+		runtime.Gosched()
+	}
+	if !got {
+		t.Fatal("PeerGone kept waiting for the command after its ctx ended")
+	}
+	if r.err != nil || r.ran {
+		t.Fatalf("PeerGone = %v, %v; want not ran, no error", r.ran, r.err)
+	}
+	released = true
+	close(port.release)
+	if err := <-answered; statusOf(err) != im.StatusSuccess {
+		t.Fatalf("answer: %v", err)
+	}
+	if port.overlap.Load() {
+		t.Error("EndSession ran while the port's ProvideAnswer was in flight")
+	}
+	if got := sessionIDs(p); !slices.Equal(got, []uint16{id}) {
+		t.Errorf("sessions %v, want [%d]", got, id)
+	}
 }
