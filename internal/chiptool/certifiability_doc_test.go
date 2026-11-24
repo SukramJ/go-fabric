@@ -377,6 +377,22 @@ func renderCertifiability(g docGolden, ts matterJSCertCases) string {
 		fmt.Fprintf(&b, "| %s | %s | %s |\n", id, gp.class, mdCell(gp.reason))
 	}
 	renderMatterJSNotRun(&b, g, ts)
+	b.WriteString("\n### Cases the family run never reaches\n\n")
+	b.WriteString("Python cases of a family at the harness commit that the harness image's test descriptor does not\n")
+	b.WriteString("file, with the measured cause (the family table's absent rows, held to chip's tree by\n")
+	b.WriteString("TestChipPythonCasesCovered, `make chipcases-check`). They are counted in no column above.\n\n")
+	b.WriteString("| Case | Class | Reason |\n| --- | --- | --- |\n")
+	var absent []string
+	for i := range chipFamilies {
+		fam := &chipFamilies[i]
+		for n, gp := range fam.absent {
+			absent = append(absent, fmt.Sprintf("| %s/%s | %s | %s |", fam.name, n, gp.class, mdCell(gp.reason)))
+		}
+	}
+	slices.Sort(absent)
+	for _, l := range absent {
+		b.WriteString(l + "\n")
+	}
 	b.WriteString("\n### Cases that pass with a recorded gap\n\n")
 	b.WriteString("The CHIP checker reports exactly the recorded problems and nothing else; the case fails as soon as\n")
 	b.WriteString("another problem appears or a recorded one disappears.\n\n")

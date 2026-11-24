@@ -800,6 +800,19 @@ lists carry the same row under "Cases not run"; this table lists the others.
 | DGSW/3.2 | (b) not supported | matter.js automates it at the snapshot's pin (TC-DGSW-3.2.test.ts:19); the Go-TH leg does not run it, so the module is unmeasured here — needs ResetWatermarks: the module serves the Watermarks feature to a host that supplies a WatermarkReporter (`WatermarkReporter` in `cluster/core/software_diagnostics.go`), the reference daemon supplies none (DGSW.S.F00=0, DGSW.S.C00.Rsp=0) |
 | DGTHREAD/3.4 | (c) harness | matter.js automates it at the snapshot's pin (TC-DGTHREAD-3.4.test.ts:27); the Go-TH leg does not run it, so the module is unmeasured here — needs the daemon's Thread variant (`--otbr` against a live OTBR REST API, the DGTHREAD family's composition, run by otbr-virtual.yml), which the Go-TH leg does not start |
 
+### Cases the family run never reaches
+
+Python cases of a family at the harness commit that the harness image's test descriptor does not
+file, with the measured cause (the family table's absent rows, held to chip's tree by
+TestChipPythonCasesCovered, `make chipcases-check`). They are counted in no column above.
+
+| Case | Class | Reason |
+| --- | --- | --- |
+| DD/1.5 | (c) harness | not in the harness image's test descriptor, so the family run never reaches it: the case file imports matter.testing.nfc, which imports ndef, which the image's Python lacks (generate-test-descriptor re-run in the image: No module named 'ndef'), and generate-test-descriptor skips a file whose import raises (:290-296) |
+| DD/3.23 | (c) harness | not in the harness image's test descriptor, so the family run never reaches it: the case file imports matter.testing.nfc, which imports ndef, which the image's Python lacks (generate-test-descriptor re-run in the image: No module named 'ndef'), and generate-test-descriptor skips a file whose import raises (:290-296) |
+| DD/3.24 | (c) harness | not in the harness image's test descriptor, so the family run never reaches it: the case file imports matter.testing.nfc, which imports ndef, which the image's Python lacks (generate-test-descriptor re-run in the image: No module named 'ndef'), and generate-test-descriptor skips a file whose import raises (:290-296) |
+| IDM/10.7 | (c) harness | not in the harness image's test descriptor, so the family run never reaches it: the case file imports matter.testing.nfc, which imports ndef, which the image's Python lacks (generate-test-descriptor re-run in the image: No module named 'ndef'), and generate-test-descriptor skips a file whose import raises (:290-296) |
+
 ### Cases that pass with a recorded gap
 
 The CHIP checker reports exactly the recorded problems and nothing else; the case fails as soon as
