@@ -202,9 +202,12 @@ func (p *Provider) signalTarget(sessionID uint16) (PeerConnector, ProviderSessio
 // with the session, fabric, node, command and duration, so a send that
 // never returns is told apart from one that failed: the line before a
 // step says it began, the line after says how it ended (issue #596 B).
-// The lines go to slog.Default() as it stands at the call.
+// The lines go to [ProviderConfig.Logger], slog.Default when nil.
 func (p *Provider) send(ctx context.Context, peers PeerConnector, session ProviderSession, commandID uint32, fields spec.Encodable) error {
-	log := slog.Default()
+	log := p.cfg.Logger
+	if log == nil {
+		log = slog.Default()
+	}
 	attrs := []any{
 		slog.Uint64("session", uint64(session.Id)), slog.Int("fabric_index", int(session.FabricIndex)),
 		slog.Uint64("node_id", session.PeerNodeId), slog.Uint64("command", uint64(commandID)),
