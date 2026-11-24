@@ -171,7 +171,7 @@ type Config struct {
 
 // New returns the interaction over session s of mgr — matter.js
 // DedicatedChannelExchangeProvider (ExchangeProvider.ts:122-164). A nil
-// logger discards.
+// logger is slog.Default().
 func New(mgr *exchange.Manager, s *exchange.Session, log *slog.Logger) *Interaction {
 	return Bind(SessionProvider(mgr, s), Config{Logger: log})
 }
