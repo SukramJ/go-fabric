@@ -581,6 +581,9 @@ func (s *Server) suppressAlarm(ctx context.Context, fields any) (any, error) {
 		return nil, statusErr(im.StatusInvalidCommand, "SuppressAlarm payload %T", fields)
 	}
 	alarms := req.AlarmsToSuppress
+	if alarms&^s.alarmsSup != 0 { // .cpp:410
+		return nil, statusErr(im.StatusConstraintError, "SuppressAlarm 0x%02X outside AlarmsSupported 0x%02X", alarms, s.alarmsSup)
+	}
 	if err := s.lockCommand(ctx, "SuppressAlarm"); err != nil {
 		return nil, err
 	}
@@ -643,16 +646,14 @@ func (s *Server) notifyUnlock(notify func()) {
 	notify()
 }
 
-// suppressLocked is SuppressAlarm's check, Delegate call and store; the
-// caller holds cmd. It returns the stored AlarmsSuppressed, nil when the
+// suppressLocked is SuppressAlarm's state check, Delegate call and store;
+// the caller holds cmd and has checked the modes against AlarmsSupported. It returns the stored AlarmsSuppressed, nil when the
 // command changes nothing.
 func (s *Server) suppressLocked(ctx context.Context, alarms AlarmMode) (*AlarmMode, error) {
 	s.mu.Lock()
 	active, suppressed := s.active, s.suppressed
 	s.mu.Unlock()
 	switch {
-	case alarms&^s.alarmsSup != 0: // .cpp:410
-		return nil, statusErr(im.StatusConstraintError, "SuppressAlarm 0x%02X outside AlarmsSupported 0x%02X", alarms, s.alarmsSup)
 	case alarms&^active != 0: // .cpp:411
 		return nil, statusErr(im.StatusInvalidInState, "SuppressAlarm 0x%02X is not active (0x%02X)", alarms, active)
 	case suppressed&alarms == alarms: // .cpp:414

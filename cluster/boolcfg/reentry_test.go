@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"thingfabric.dev/go-fabric/cluster/boolcfg"
+	"thingfabric.dev/go-fabric/cluster/spec"
 	def "thingfabric.dev/go-fabric/cluster/spec/booleanstateconfiguration"
 	"thingfabric.dev/go-fabric/contract"
+	"thingfabric.dev/go-fabric/im"
 )
 
 // setterDelegate calls a device-side setter from AlarmsEnabledChanged, as
@@ -120,4 +122,37 @@ func TestDelegateSetterListenerCommandCompletes(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestSuppressAlarmOutsideSupportedAnswersWhileACommandRuns (R5-err-5507):
+// a SuppressAlarm naming a mode outside AlarmsSupported answers
+// CONSTRAINT_ERROR at once, as EnableDisableAlarm does, also while another
+// command holds cmd; before the fix it waited for cmd and answered with its
+// context's end.
+func TestSuppressAlarmOutsideSupportedAnswersWhileACommandRuns(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		d := &setterDelegate{entered: make(chan struct{}), release: make(chan struct{})}
+		srv := newSetterServer(t, d)
+		if err := srv.SetAlarmsActive(boolcfg.AlarmVisual); err != nil {
+			t.Fatal(err)
+		}
+		doneA := make(chan error, 1)
+		go func() {
+			_, err := srv.MatterInvoke(context.Background(), def.CmdSuppressAlarm,
+				def.SuppressAlarmRequest{AlarmsToSuppress: boolcfg.AlarmVisual})
+			doneA <- err
+		}()
+		<-d.entered
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		_, err := srv.MatterInvoke(ctx, def.CmdSuppressAlarm, def.SuppressAlarmRequest{AlarmsToSuppress: 0x04})
+		if spec.StatusOf(err) != im.StatusConstraintError {
+			t.Errorf("SuppressAlarm(0x04) while a command runs: %v, want CONSTRAINT_ERROR", err)
+		}
+		close(d.release)
+		if err := <-doneA; err != nil {
+			t.Fatal(err)
+		}
+	})
 }
