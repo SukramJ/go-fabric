@@ -24,10 +24,12 @@
 // fails is retried before the next join and at Close while wpa_supplicant
 // still lists the network. An AddNetwork that ends without
 // wpa_supplicant's answer (the join's bound or context ended in the call,
-// or the bus daemon gave up) may still have been carried out: the network
-// that appeared in the interface's Networks meanwhile is removed the same
-// way — at once when wpa_supplicant answers the read that follows the
-// call, else before the next join or at Close. A join whose read of the
+// or the bus daemon gave up) may still have been carried out: every
+// network that appeared in the interface's Networks meanwhile — another
+// client's included — is removed the same way, at once when
+// wpa_supplicant answers the read that follows the call, else before the
+// next join or at Close; until then the window stays open, and a Close
+// whose read fails leaves the network behind. A join whose read of the
 // interface's Networks before AddNetwork fails ends there: the credential
 // is not sent, as nothing could tell the network it added apart.
 //
