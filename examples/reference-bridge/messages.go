@@ -52,6 +52,9 @@ func newTVMessages(logger *slog.Logger) (*core.Messages, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The host builds Messages, so the host hands it its logger (decision
+	// 635): the take-down after a fabric's removal logs a refusal there.
+	srv.SetLogger(logger)
 	p.presented = srv.Presented
 	p.complete = func(id []byte) { srv.Complete(id, core.MessageOutcome{}) }
 	return srv, nil

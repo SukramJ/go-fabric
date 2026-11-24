@@ -133,6 +133,11 @@ type Manager struct {
 	// network/ServerNetworkRuntime.ts:450-453 at b25ed960).
 	onReannounce func(fabricIndex uint8)
 
+	// onPeerGone, when non-nil, fires once per distinct (fabric, peer)
+	// pair of the same sweeps that has no remaining live session, with the
+	// pair and the close's cause ([Manager.SetOnPeerGone]).
+	onPeerGone func(fabricIndex uint8, peerNodeID uint64, cause PeerGoneCause)
+
 	// reapExempt, when non-nil, is asked by the idle reaper for every
 	// session it found idle; true spares the session
 	// ([Manager.SetReapExemption]).
@@ -161,6 +166,52 @@ func (m *Manager) SetGracefulCloseNotifier(fn func(sessionID uint16, sess *chann
 func (m *Manager) SetReannounceTrigger(fn func(fabricIndex uint8)) {
 	m.mu.Lock()
 	m.onReannounce = fn
+	m.mu.Unlock()
+}
+
+// PeerGoneCause is why a close sweep left a (fabric, peer) pair without a
+// live session ([Manager.SetOnPeerGone]).
+type PeerGoneCause uint8
+
+const (
+	// PeerGoneClosed is every close that is not proven peer loss: the
+	// peer's CloseSession and a closed TCP connection ([Manager.Close]),
+	// the idle reaper, [Manager.ClosePeer] and the eviction of
+	// [Manager.AllocateID]. The peer may well be reachable.
+	PeerGoneClosed PeerGoneCause = iota
+	// PeerGoneLost is the peer-loss sweep ([Manager.ClosePeerLostBefore]
+	// and its time forms): an exchange this node opened went unanswered.
+	PeerGoneLost
+)
+
+// String names the cause for logs.
+func (c PeerGoneCause) String() string {
+	switch c {
+	case PeerGoneClosed:
+		return "closed"
+	case PeerGoneLost:
+		return "lost"
+	default:
+		return fmt.Sprintf("PeerGoneCause(%d)", uint8(c))
+	}
+}
+
+// SetOnPeerGone registers the callback fired once per distinct (fabric,
+// peer) pair a close sweep leaves without a live session — the pairs the
+// re-announce trigger computes ([Manager.SetReannounceTrigger]), with the
+// peer's node id and the sweep's cause. Only the peer-loss sweep reports
+// [PeerGoneLost]; every other sweep that computes the pairs reports
+// [PeerGoneClosed]. A fabric's removal, [Manager.CloseAllGraceful] and the
+// per-peer cap's eviction of a peer's oldest session fire nothing; a
+// session superseded by a newer one leaves the newer, so its pair is not
+// gone; a session without a fabric or a peer node id (PASE) is never
+// reported. The node
+// ends a camera's WebRTC sessions of a lost peer on it (#590 item 2,
+// owner decisions 611, 612). The callback runs outside the manager's
+// lock and may call back into the manager; passing nil clears it.
+func (m *Manager) SetOnPeerGone(fn func(fabricIndex uint8, peerNodeID uint64, cause PeerGoneCause)) {
+	m.mu.Lock()
+	m.onPeerGone = fn
 	m.mu.Unlock()
 }
 
@@ -237,9 +288,13 @@ func (m *Manager) hasSessionForPeer(fabricIndex uint8, peerNodeID uint64) bool {
 // at b25ed960, which runs the check per session deleted from the
 // established set (`sessions.sessions.deleted`, :132): a victim that was
 // still establishing never joined it and triggers nothing.
-func (m *Manager) fireReannounceIfPeerGone(victims []*Entry) {
+//
+// The same pairs, without a PASE one, go to the peer-gone hook
+// ([Manager.SetOnPeerGone]) with cause, after the re-announce.
+func (m *Manager) fireReannounceIfPeerGone(victims []*Entry, cause PeerGoneCause) {
 	m.mu.RLock()
 	hook := m.onReannounce
+	gone := m.onPeerGone
 	established := make([]*Entry, 0, len(victims))
 	for _, e := range victims {
 		if e != nil && e.Session != nil && !e.establishing {
@@ -247,25 +302,35 @@ func (m *Manager) fireReannounceIfPeerGone(victims []*Entry) {
 		}
 	}
 	m.mu.RUnlock()
-	if hook == nil {
+	if hook == nil && gone == nil {
 		return
 	}
 	type fabricPeer struct {
 		fabricIndex uint8
 		peerNodeID  uint64
 	}
-	var gone []fabricPeer
+	var left []fabricPeer
 	for _, e := range established {
 		p := fabricPeer{e.FabricIndex(), e.Session.PeerNodeID()}
-		if slices.Contains(gone, p) {
+		if slices.Contains(left, p) {
 			continue
 		}
 		if !m.hasSessionForPeer(p.fabricIndex, p.peerNodeID) {
-			gone = append(gone, p)
+			left = append(left, p)
 		}
 	}
-	for _, p := range gone {
-		hook(p.fabricIndex)
+	for _, p := range left {
+		if hook != nil {
+			hook(p.fabricIndex)
+		}
+	}
+	if gone == nil {
+		return
+	}
+	for _, p := range left {
+		if p.fabricIndex != 0 && p.peerNodeID != 0 {
+			gone(p.fabricIndex, p.peerNodeID, cause)
+		}
 	}
 }
 
@@ -1143,7 +1208,7 @@ func (m *Manager) closeEvicted(e *Entry) {
 	m.notifyGracefulClose(victims, time.Time{})
 	closeStaleEntries(victims)
 	m.fireOnSessionClose(victims)
-	m.fireReannounceIfPeerGone(victims)
+	m.fireReannounceIfPeerGone(victims, PeerGoneClosed)
 }
 
 // placeholderRef is one id [Manager.AllocateID] staked and the entry it
@@ -1771,7 +1836,7 @@ func (m *Manager) finishClose(entry *Entry) {
 		entry.Session.Close()
 	}
 	m.fireOnSessionClose([]*Entry{entry})
-	m.fireReannounceIfPeerGone([]*Entry{entry})
+	m.fireReannounceIfPeerGone([]*Entry{entry}, PeerGoneClosed)
 }
 
 // CloseAllGraceful tears down every live session, notifying each peer
@@ -1931,7 +1996,7 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	m.notifyGracefulClose(victims, time.Time{})
 	closeStaleEntries(victims)
 	m.fireOnSessionClose(victims)
-	m.fireReannounceIfPeerGone(victims)
+	m.fireReannounceIfPeerGone(victims, PeerGoneClosed)
 	return len(victims)
 }
 
@@ -2017,7 +2082,7 @@ func (m *Manager) closePeerLost(fabricIndex uint8, peerNodeID uint64, keep func(
 	m.mu.Unlock()
 	closeStaleEntries(victims)
 	m.fireOnSessionClose(victims)
-	m.fireReannounceIfPeerGone(victims)
+	m.fireReannounceIfPeerGone(victims, PeerGoneLost)
 	return len(victims)
 }
 
@@ -2245,7 +2310,7 @@ func (m *Manager) reapIdle(idleTimeout time.Duration) {
 	m.notifyGracefulClose(victims, time.Time{})
 	closeStaleEntries(victims)
 	m.fireOnSessionClose(victims)
-	m.fireReannounceIfPeerGone(victims)
+	m.fireReannounceIfPeerGone(victims, PeerGoneClosed)
 }
 
 // idleSince reports whether e's last activity — its creation when it

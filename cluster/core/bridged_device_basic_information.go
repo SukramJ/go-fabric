@@ -180,9 +180,13 @@ type BridgedConfig struct {
 	NodeLabelStated bool
 	Reachable       bool
 	// ConfigurationVersion is the bridged device's ConfigurationVersion;
-	// zero serves 1, matter.js's initial value
-	// (BridgedDeviceBasicInformationServer.ts / BasicInformationServer.ts
-	// setDefault("configurationVersion", 1)).
+	// zero serves 1, the seed matter.js gives the root's
+	// (BasicInformationServer.ts:75 at b25ed960,
+	// setDefault("configurationVersion", 1)). matter.js gives a bridged
+	// device none and serves the attribute only with a configured value
+	// (BridgedDeviceBasicInformationServer.ts:22-23, :58-59); serving it
+	// always is the divergence notes/parity/by_design.md
+	// BD-Matter-BridgedDevice-ConfigurationVersionAlwaysServed records.
 	ConfigurationVersion uint32
 	// OnNodeLabelWrite, when set, receives a NodeLabel a controller
 	// writes, after validation, when it differs from the one the server
@@ -589,8 +593,9 @@ func (b *BridgedDeviceBasicInformation) MatterAttributes() []uint32 {
 // value changed. Emits the Matter §9.13.6 ReachableChanged event (id
 // 0x0003, priority Critical) on the bridge's [contract.EventEmitter]
 // when it has been wired via [SetMatterEventEmitter] — mirrors
-// matter.js HEAD bridged-device-basic-information/Behavior.ts where
-// the reachable setter triggers events.reachableChanged.emit. Without
+// matter.js BridgedDeviceBasicInformationServer.ts:37, :100-102 at
+// b25ed960, where a change of reachable emits events.reachableChanged
+// (reactTo(reachable$Changed, #emitReachableChange)). Without
 // the event, Apple Home's HAP-service mapper never learns about
 // availability flips and silently caches the boot-time value, so
 // ongoing device drop-outs never surface to the user.

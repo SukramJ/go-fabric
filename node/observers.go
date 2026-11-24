@@ -57,7 +57,11 @@ type Observers struct {
 	// ran (store.OwedFabricEvent), so it reaches the host at least once:
 	// after a crash between the rollback and this hook — or in the
 	// moment after the hook — the next Start runs it, and a host may hear
-	// the same removal twice. One residual: a store upgraded from a release
+	// the same removal twice. A hook registered with [Node.ObserveAsync]
+	// counts as run once its queued call ran: the event is acknowledged
+	// behind it on the callback queue, and one whose call the queue may
+	// have dropped at its bound stays owed for the next Start (decision
+	// 600, review II R4-err-4751). One residual: a store upgraded from a release
 	// before schema v8 that went down inside a fail-safe window owes the
 	// removal of that window's AddNOC in memory only — it reaches the host
 	// only if the first process on the upgraded store starts.
@@ -386,8 +390,8 @@ func (n *Node) ObserveAsync(o Observers) (unsubscribe func()) {
 // queuedOn returns o with each hook queued on n's callback goroutine.
 func (o Observers) queuedOn(n *Node) Observers {
 	o.OnFabricAdded = queuedHook(n, "fabric_added", o.OnFabricAdded)
-	o.OnFabricRemoved = queuedHook(n, "fabric_removed", o.OnFabricRemoved)
-	o.OnFabricUpdated = queuedHook(n, "fabric_updated", o.OnFabricUpdated)
+	o.OnFabricRemoved = queuedHook(n, eventFabricRemoved, o.OnFabricRemoved)
+	o.OnFabricUpdated = queuedHook(n, eventFabricUpdated, o.OnFabricUpdated)
 	o.OnCommissioningComplete = queuedHook(n, "commissioning_complete", o.OnCommissioningComplete)
 	o.OnWindowTransition = queuedHook(n, "window_transition", o.OnWindowTransition)
 	o.OnSurfaceChanged = queuedHook(n, "surface_changed", o.OnSurfaceChanged)
@@ -398,6 +402,12 @@ func (o Observers) queuedOn(n *Node) Observers {
 	o.OnEvent = queuedHook(n, "event", o.OnEvent)
 	return o
 }
+
+// The events of the fabric hooks an owed fabric event runs (queued).
+const (
+	eventFabricRemoved = "fabric_removed"
+	eventFabricUpdated = "fabric_updated"
+)
 
 // queuedHook wraps one hook to run on n's callback goroutine; nil stays nil.
 func queuedHook[T any](n *Node, event string, fn func(T)) func(T) {

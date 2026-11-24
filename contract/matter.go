@@ -1086,6 +1086,12 @@ type SelfReportedAttributeLister interface {
 // MatterQuiesce ended stays ended — an activity stops where it is, a
 // value a cancelled timer was to store is not stored — until a later
 // command, or a report of the server's source, moves it again.
+//
+// A server whose value cannot be compared — an uncomparable type, or a
+// comparable one holding a slice in an interface field — is left out:
+// the bridge cannot tell it from another server, so it never calls its
+// MatterQuiesce, and the server's timers end only when it ends them
+// (review II, R4-api-4753).
 type ClusterQuiescer interface {
 	MatterQuiesce()
 }

@@ -41,6 +41,9 @@ type labelSub struct {
 
 // tracks reports whether the store keeps srv's list.
 func (u *userLabelSync) tracks(srv contract.ClusterServer) bool {
+	if !comparableServer(srv) {
+		return false
+	}
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	_, ok := u.persisted[srv]
@@ -73,7 +76,9 @@ func (u *userLabelSync) release(keys []string) {
 // packages/model/src/standard/elements/user-label.element.ts:21-22 at b25ed960),
 // as the root's list is (buildLabels). A server met again in a reassembly
 // keeps its subscription; one that left the topology is released. An
-// endpoint without a stable key keeps its list in memory only. A store
+// endpoint without a stable key, and a server that is a value that cannot
+// be compared,
+// keep the list in memory only. A store
 // that fails a restore read fails the topology (review II,
 // R2-P6-store-2403): the servers restored before it are kept with the
 // ones the node met already, and none is released.
@@ -90,7 +95,9 @@ func (n *Node) persistUserLabels(ctx context.Context, t *endpoint.Topology) erro
 			continue
 		}
 		for _, srv := range endpoint.ClusterServers(ep) {
-			if srv.MatterClusterID() != userlabeldef.ClusterID {
+			// A server that is a value that cannot be compared keeps its list in memory
+			// only (comparableServer).
+			if srv.MatterClusterID() != userlabeldef.ClusterID || !comparableServer(srv) {
 				continue
 			}
 			if sub, met := n.userLabels.persisted[srv]; met {

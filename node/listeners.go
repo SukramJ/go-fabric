@@ -67,6 +67,30 @@ func contain(logger *slog.Logger, event string, fn func()) {
 
 // queued wraps fn to run on the node's callback goroutine, one call after
 // the other, while the node runs; Stop returns once every queued call ran.
+// An OnFabricRemoved or OnFabricUpdated call queued while an owed event's
+// hooks run (owedHookCalls: at start, and at a run-time rollback a
+// fail-safe's end delivers) is exempt from the queue's drop rule
+// (decisions 615, 622), as queuedExempt — a call another goroutine queues
+// in that window included.
 func (n *Node) queued(event string, fn func()) {
+	if n.owedHooks.Load() && (event == eventFabricRemoved || event == eventFabricUpdated) {
+		n.queuedExempt(event, fn)
+		return
+	}
+	n.queuedCalls.Add(1)
 	n.callbacks.Enqueue(func() { contain(n.logger, event, fn) })
+}
+
+// queuedExempt is queued with fn exempt from the callback queue's drop
+// rule (serialqueue.Queue.EnqueueExempt): it runs while the node runs,
+// however full the queue is. It is for an owed fabric event's hooks and
+// its acknowledgement only, at start and at a run-time rollback — one
+// call per owed event and async fabric hook, one acknowledgement per owed
+// event, and a fabric hook another goroutine queues in that window — so
+// what it queues is bounded by the events the store owes and the fabric
+// changes made in that window (review II, R4-err-4751, decisions 615,
+// 622).
+func (n *Node) queuedExempt(event string, fn func()) {
+	n.queuedCalls.Add(1)
+	n.callbacks.EnqueueExempt(func() { contain(n.logger, event, fn) })
 }

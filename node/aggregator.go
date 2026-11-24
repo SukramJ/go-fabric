@@ -39,7 +39,8 @@ var (
 	ErrNoStableKey = errors.New("node: endpoint without a StableKey")
 	// ErrDuplicateKey: an endpoint with the key of one already added, in
 	// any partition, or with a key — its own or a part's — that another
-	// endpoint serves, itself or as a part (decision 580). In a [Batch]
+	// endpoint serves, itself or as a part (decision 580), or whose tree
+	// holds one key twice (decision 617; review II, R4-api-4790). In a [Batch]
 	// such a collision is judged against the batch's end state and the
 	// error arrives from [Partition.Batch], not from the call (decisions
 	// 582, 585).
@@ -131,7 +132,23 @@ type Aggregator struct {
 	// forgetMu serialises the record of the forgets in progress
 	// (markForget).
 	forgetMu sync.Mutex
+
+	// instances is the instance each key of the last assembled snapshot
+	// was served as ([endpoint.Spec.Instance]); touched the keys whose
+	// place in the set an Add or a Replace wrote since, with the sequence
+	// of the latest write (touchSeq). a.mu guards all three. See
+	// [Aggregator.instanceOf].
+	instances map[string]*servedInstance
+	touched   map[string]uint64
+	touchSeq  uint64
 }
+
+// servedInstance is the [endpoint.Spec.Instance] the node hands the
+// assembler for a key: a new one whenever a new instance is put behind
+// the key, so the assembler gives its clusters new DataVersions and the
+// bridge announces it (issue #589, decisions 592, 595). Compared by
+// pointer; ep is the endpoint it was made for.
+type servedInstance struct{ ep Endpoint }
 
 // partition is one snapshot scope of the set: its endpoints in insertion
 // order.
@@ -286,9 +303,20 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // Replace puts ep in the place of the endpoint with key: ep must carry the
 // same StableKey ([ErrKeyMismatch]), so it keeps the endpoint number the
 // endpoint store holds for the key, and the running node reassembles once
-// — the Aggregator's PartsList unchanged, the endpoint's Descriptor
-// (device types, server list) the one change a controller sees. The old
-// endpoint is unbound after the reassembly. It mirrors matter.js replacing
+// — the Aggregator's PartsList unchanged. The old endpoint is unbound
+// after the reassembly. ep is a new instance unless it is the endpoint
+// the key serves (a Replace by that one changes nothing): every cluster of
+// the endpoint starts at a new random DataVersion, and every readable
+// attribute but the changes-omitted ones is reported to the running
+// subscriptions, as matter.js
+// announces a re-added endpoint (Datasource.ts:763, ProtocolService.ts:
+// 290-296 at b25ed960; issue #589, decision 592). What a controller wrote
+// under the key — the NodeLabel, the scene table, the Binding, a running
+// Identify — and the ConfigurationVersion stay with the key, and ep
+// serves them (decision 594); raising the ConfigurationVersion stays the
+// host's call ([Aggregator.IncreaseConfigurationVersions]). An invoke the
+// old endpoint is handling at the swap completes on it and is answered;
+// the announce of ep follows the swap (decision 593). It mirrors matter.js replacing
 // a part: `close()` keeps the endpoint's number reservation
 // (endpoint/Endpoint.ts:998-1007, ServerEndpointInitializer.ts:67-69,
 // where `delete()` would erase it, endpoint/Endpoint.ts:961-966, at
@@ -618,7 +646,7 @@ func (b *Batch) Add(ep Endpoint) error {
 	// A key the set holds is judged at the end like a key another
 	// endpoint serves: a Remove or Forget of it in the batch, before or
 	// after, lets the device in (decision 585).
-	if p, _ := a.findLocked(key); p != nil || b.collidesLocked(entries, nil) {
+	if p, _ := a.findLocked(key); p != nil || b.collidesLocked(entries, nil, -1) {
 		b.pending = append(b.pending, pendingCall{kind: heldAdd, seq: b.nextSeq(), key: key, ep: ep, entries: entries})
 		return nil
 	}
@@ -641,6 +669,7 @@ func (b *Batch) addLocked(seq int, key string, ep Endpoint, entries []surfaceEnt
 	}
 	part := a.partLocked(b.scope)
 	part.eps = append(part.eps, ep)
+	a.touchLocked(key)
 	a.detachSetLocked(key, detach)
 	b.changed = true
 	// A returning key takes its reserved number back; the reservation is
@@ -652,7 +681,11 @@ func (b *Batch) addLocked(seq int, key string, ep Endpoint, entries []surfaceEnt
 
 // Replace replaces the endpoint with key in the batch's partition; see
 // [Aggregator.Replace]. The old endpoint is unbound after the batch's
-// reassembly. A replacement with a part key another endpoint serves is
+// reassembly. A new instance is announced as [Aggregator.Replace] says,
+// judged once per commit against what the batch serves at its end: a
+// Remove and an Add of the key in one batch announce as a Replace does,
+// and a Replace the batch holds and refuses, or one by the endpoint the
+// key serves, announces nothing (issue #589, decisions 593, 595). A replacement with a part key another endpoint serves is
 // held and judged against the batch's end state: refused
 // ([ErrDuplicateKey], from [Partition.Batch]) and changing nothing when
 // another endpoint still serves the key once fn returned (decisions 580,
@@ -702,10 +735,10 @@ func (b *Batch) Replace(key device.SourceKey, ep Endpoint) error {
 	if !inSet {
 		return fmt.Errorf("%w: %s", ErrUnknownKey, key)
 	}
-	if part.eps[i] == ep {
+	if sameInstance(part.eps[i], ep) {
 		return nil
 	}
-	if b.collidesLocked(entries, part.eps[i]) {
+	if b.collidesLocked(entries, part, i) {
 		b.pending = append(b.pending, pendingCall{kind: heldReplace, seq: b.nextSeq(), key: newKey, ep: ep, entries: entries})
 		return nil
 	}
@@ -730,6 +763,7 @@ func (b *Batch) replaceLocked(seq int, part *partition, i int, newKey string, ep
 	}
 	t := takenCall{seq: seq, key: newKey, ep: ep, old: part.eps[i], oldDetach: old, oldAt: -1}
 	part.eps[i] = ep
+	a.touchLocked(newKey)
 	a.detachSetLocked(newKey, detach)
 	if old != nil {
 		t.oldAt = len(b.detach)
@@ -752,7 +786,7 @@ func (b *Batch) replaceLocked(seq int, part *partition, i int, newKey string, ep
 func (b *Batch) replaceWithheldLocked(part *partition, i int, key string, entries []surfaceEntry) error {
 	a := b.a
 	old := part.eps[i]
-	err := a.n.recordWithheld(b.ctx, entries, func(k string) bool { return a.servesExceptLocked(k, old) })
+	err := a.n.recordWithheld(b.ctx, entries, func(k string) bool { return a.servesExceptAtLocked(k, part, i) })
 	b.dropLocked(part, i, key)
 	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key, tree: reservationTree(old.Spec())})
 	return err
@@ -870,11 +904,12 @@ func (b *Batch) isDone() bool {
 }
 
 // collidesLocked reports whether a key of entries — an endpoint and its
-// parts — is served by an endpoint of the set other than except (and its
-// parts), or declared by a take the batch holds: such a take is held to
-// the end of the batch (decision 582). a.mu is held.
-func (b *Batch) collidesLocked(entries []surfaceEntry, except Endpoint) bool {
-	if _, ok := b.a.servedOfLocked(entries, except); ok {
+// parts — is served by an endpoint of the set other than the one at i of
+// part (and its parts; part nil: none), or declared by a take the batch
+// holds: such a take is held to the end of the batch (decision 582). a.mu
+// is held.
+func (b *Batch) collidesLocked(entries []surfaceEntry, part *partition, i int) bool {
+	if _, ok := b.a.servedOfLocked(entries, part, i); ok {
 		return true
 	}
 	for _, t := range b.pending {
@@ -919,9 +954,14 @@ func (b *Batch) commitPending() error {
 	// later one moved its collision away. The held calls stay in
 	// b.pending while they are judged, so an applied Forget drops a held
 	// Add of its key made before it, as at its call. What still collides
-	// when none applies is refused.
+	// when none applies is refused — with the refusal its last judgement
+	// returned: judged once more, a call could apply against a surface
+	// that moved since (a host Endpoint's live Spec) and drop a held call
+	// from under the judgement (review II, R4-fsm-4701).
+	var refused map[int]error
 	for {
 		applied := false
+		refused = map[int]error{}
 		for _, forgets := range []bool{true, false} {
 			for j := 0; j < len(b.pending) && !applied; j++ {
 				t := b.pending[j]
@@ -932,6 +972,7 @@ func (b *Batch) commitPending() error {
 				blocked, err := b.judgeLocked(t)
 				if blocked {
 					b.pending = slices.Insert(b.pending, j, t)
+					refused[t.seq] = err
 					continue
 				}
 				errs = append(errs, err)
@@ -945,9 +986,10 @@ func (b *Batch) commitPending() error {
 			break
 		}
 	}
+	// The last round applied nothing: each held call was judged in it
+	// once, against the set as it is now, and blocked.
 	for _, t := range b.pending {
-		_, err := b.judgeLocked(t)
-		errs = append(errs, err)
+		errs = append(errs, refused[t.seq])
 	}
 	b.pending = nil
 	errs = append(errs, b.refuseLateCollisionsLocked()...)
@@ -972,7 +1014,7 @@ func (b *Batch) judgeLocked(t pendingCall) (blocked bool, err error) {
 		if p, _ := a.findLocked(t.key); p != nil {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, t.key)
 		}
-		if k, ok := a.servedOfLocked(entries, nil); ok {
+		if k, ok := a.servedOfLocked(entries, nil, -1); ok {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
 		return false, b.addLocked(t.seq, t.key, t.ep, entries)
@@ -981,14 +1023,14 @@ func (b *Batch) judgeLocked(t pendingCall) (blocked bool, err error) {
 		if part == nil || part.scope != b.scope {
 			return false, fmt.Errorf("%w: %s", ErrUnknownKey, t.key)
 		}
-		if part.eps[i] == t.ep {
+		if sameInstance(part.eps[i], t.ep) {
 			return false, nil
 		}
 		entries, err := b.recheckLocked(t.ep)
 		if err != nil {
 			return false, err
 		}
-		if k, ok := a.servedOfLocked(entries, part.eps[i]); ok {
+		if k, ok := a.servedOfLocked(entries, part, i); ok {
 			return true, fmt.Errorf("%w: %s", ErrDuplicateKey, k)
 		}
 		return false, b.replaceLocked(t.seq, part, i, t.key, t.ep, entries)
@@ -1012,10 +1054,11 @@ func (b *Batch) addedLocked(key string, ep Endpoint) (int, bool) {
 // applied once more, its device as it is at the end of fn: a part added
 // to it during fn whose key — or its own key — another endpoint serves
 // would make the batch's reassembly, and every later one, assemble two
-// Specs under one key (decision 580). Such a take is refused with
-// [ErrDuplicateKey] and undone: an Add leaves the set and keeps the key's
-// reservation, a Replace puts the endpoint it replaced back (decision 585:
-// no path wedges; fable-diff-g5g N1). The takes are judged from the last
+// Specs under one key (decision 580), and so would a tree that came to
+// hold one key twice itself (R4-api-4790, decision 617). Such a take is
+// refused with [ErrDuplicateKey] and undone: an Add leaves the set and
+// keeps the key's reservation, a Replace puts the endpoint it replaced
+// back (decision 585: no path wedges; fable-diff-g5g N1). The takes are judged from the last
 // to the first, so of two that collide the later one goes; after a
 // Replace is undone, all are judged again against the endpoint put back.
 // A take the batch removed or replaced again is not the set's and not
@@ -1029,7 +1072,11 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 		if part == nil || !sameEndpoint(part.eps[i], t.ep) {
 			continue
 		}
-		k, ok := a.servedOfExceptAtLocked(surfaceEntries(t.ep), part, i)
+		entries := surfaceEntries(t.ep)
+		k, ok := duplicateKey(entries)
+		if !ok {
+			k, ok = a.servedOfLocked(entries, part, i)
+		}
 		if !ok {
 			continue
 		}
@@ -1047,9 +1094,19 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 					break
 				}
 			}
+			// A reassembly that ran during fn may have served the take
+			// and stored numbers for its tree: the tree is reserved as a
+			// Remove reserves it, so a later Forget of the key erases its
+			// parts' numbers too — without the keys another endpoint
+			// serves (the collision's, not the take's) and joined with
+			// the reservation the key held before (review II,
+			// R4-store-4702).
+			tree := slices.DeleteFunc(reservationTree(t.ep.Spec()), a.servesLocked)
+			b.ops = append(b.ops, reservationOp{kind: opReserve, key: t.key, tree: tree, join: true})
 			continue
 		}
 		part.eps[i] = t.old
+		a.touchLocked(t.key)
 		a.detachSetLocked(t.key, t.oldDetach)
 		if t.oldAt >= 0 {
 			// The replaced device stays bound: it is served again.
@@ -1081,11 +1138,38 @@ func (b *Batch) recheckLocked(ep Endpoint) ([]surfaceEntry, error) {
 // servesLocked reports whether the set holds an endpoint, or a part of
 // one, under key; a.mu is held.
 func (a *Aggregator) servesLocked(key string) bool {
+	return a.servesExceptAtLocked(key, nil, -1)
+}
+
+// servedOfLocked returns the first key of entries — an endpoint and its
+// parts — that an endpoint of the set serves, itself or as a part, with
+// the endpoint at i of part and its parts left out (part nil: none). A
+// set that took such an endpoint would assemble two Specs under one key,
+// and that assembly and every later one would fail until the endpoint
+// went (decision 580). a.mu is held.
+func (a *Aggregator) servedOfLocked(entries []surfaceEntry, part *partition, i int) (string, bool) {
+	for e := range entries {
+		if a.servesExceptAtLocked(entries[e].key, part, i) {
+			return entries[e].key, true
+		}
+	}
+	return "", false
+}
+
+// servesExceptAtLocked is servesLocked with the endpoint at i of part
+// (and its parts) left out, part nil: none. The endpoint left out is named
+// by its place, never compared, so an endpoint that cannot be compared is
+// judged as any other, and another endpoint of its type is not left out
+// with it (review II, R4-api-4703); a.mu is held.
+func (a *Aggregator) servesExceptAtLocked(key string, part *partition, i int) bool {
 	for _, p := range a.parts {
-		for _, ep := range p.eps {
-			entries := surfaceEntries(ep)
-			for i := range entries {
-				if entries[i].key == key {
+		for j, ep := range p.eps {
+			if p == part && j == i {
+				continue
+			}
+			served := surfaceEntries(ep)
+			for s := range served {
+				if served[s].key == key {
 					return true
 				}
 			}
@@ -1094,75 +1178,76 @@ func (a *Aggregator) servesLocked(key string) bool {
 	return false
 }
 
-// servedOfLocked returns the first key of entries — an endpoint and its
-// parts — that an endpoint of the set serves, itself or as a part, with
-// except and its parts left out (nil: none). A set that took such an
-// endpoint would assemble two Specs under one key, and that assembly and
-// every later one would fail until the endpoint went (decision 580).
-// a.mu is held.
-func (a *Aggregator) servedOfLocked(entries []surfaceEntry, except Endpoint) (string, bool) {
-	for i := range entries {
-		if a.servesExceptLocked(entries[i].key, except) {
-			return entries[i].key, true
-		}
-	}
-	return "", false
+// comparableValue reports whether x can be compared with == and used as a
+// map key without a panic. It judges the value, not its type: a struct of
+// a comparable type whose interface field holds a slice panics on ==
+// though its type is comparable (review II, R4-api-4703, R4-api-4753,
+// the Fable diff read's B1). A nil x is not comparable.
+func comparableValue(x any) bool {
+	v := reflect.ValueOf(x)
+	return v.IsValid() && v.Comparable()
 }
 
-// servedOfExceptAtLocked is servedOfLocked with the endpoint at i of part
-// (and its parts) left out, named by its place rather than compared, so
-// an endpoint of an uncomparable type is judged as any other; a.mu is
-// held.
-func (a *Aggregator) servedOfExceptAtLocked(entries []surfaceEntry, part *partition, i int) (string, bool) {
-	for e := range entries {
-		for _, p := range a.parts {
-			for j, ep := range p.eps {
-				if p == part && j == i {
-					continue
-				}
-				served := surfaceEntries(ep)
-				for s := range served {
-					if served[s].key == entries[e].key {
-						return entries[e].key, true
-					}
-				}
-			}
-		}
-	}
-	return "", false
-}
-
-// sameEndpoint reports whether x and y are the same endpoint. An
-// endpoint of an uncomparable type cannot be told from another of its
-// type and counts as the same: the caller has matched it by its key.
+// sameEndpoint reports whether x and y are the same endpoint, for a
+// caller that matched both by one key. An endpoint that is a value that
+// cannot be compared cannot be told from another of its type and counts
+// as the same: the key matched it.
 func sameEndpoint(x, y Endpoint) bool {
 	tx := reflect.TypeOf(x)
 	if tx != reflect.TypeOf(y) {
 		return false
 	}
-	if tx == nil || !tx.Comparable() {
+	if tx == nil || !comparableValue(x) || !comparableValue(y) {
 		return true
 	}
 	return x == y
 }
 
-// servesExceptLocked is servesLocked with the endpoint except (and its
-// parts) left out; a.mu is held.
-func (a *Aggregator) servesExceptLocked(key string, except Endpoint) bool {
-	for _, p := range a.parts {
-		for _, ep := range p.eps {
-			if ep == except {
-				continue
-			}
-			entries := surfaceEntries(ep)
-			for i := range entries {
-				if entries[i].key == key {
-					return true
-				}
-			}
-		}
+// sameInstance reports whether y is the very endpoint x — the one
+// instance, so a Replace by it changes nothing the set serves. An
+// endpoint that is a value that cannot be compared cannot be shown to be
+// the instance it replaces and never is: a Replace by one is applied, as
+// a Replace by a new pointer is (review II, R4-api-4703). [Batch.Replace]'s
+// no-op and a held Replace's are judged by it.
+func sameInstance(x, y Endpoint) bool {
+	if reflect.TypeOf(x) != reflect.TypeOf(y) || !comparableValue(x) || !comparableValue(y) {
+		return false
 	}
-	return false
+	return x == y
+}
+
+// touchLocked records that an Add or a Replace wrote key's place in the
+// set; a.mu is held.
+func (a *Aggregator) touchLocked(key string) {
+	if a.touched == nil {
+		a.touched = map[string]uint64{}
+	}
+	a.touchSeq++
+	a.touched[key] = a.touchSeq
+}
+
+// instanceOf returns the [servedInstance] the snapshot hands the
+// assembler for ep under key, given the one of the last assembled
+// snapshot (prev, nil for none) and whether an Add or a Replace wrote the
+// key's place since: prev while ep is the instance prev was made for, a
+// new one otherwise. "The instance" is [sameInstance], H9's strict
+// predicate: an endpoint whose value cannot be compared is a new instance
+// once an Add or a Replace put it in place, and stays the one served while
+// nothing wrote its place (issue #589, decisions 595, 618). A same-pointer
+// Replace, and a Remove and an Add of the same pointer in one batch, keep
+// it.
+func instanceOf(prev *servedInstance, ep Endpoint, touched bool) *servedInstance {
+	switch {
+	case prev == nil:
+		return &servedInstance{ep: ep}
+	case sameInstance(prev.ep, ep):
+		return prev
+	case !touched && (!comparableValue(prev.ep) || !comparableValue(ep)):
+		// Nothing wrote the place: the value served is the one served.
+		return prev
+	default:
+		return &servedInstance{ep: ep}
+	}
 }
 
 // attach binds ep to the node when it is a device; the returned detach is
@@ -1292,7 +1377,10 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		parts = append(parts, part{p.scope, slices.Clone(p.eps)})
 	}
 	retired := slices.Clone(a.retired)
+	prevInstances := a.instances
+	touched := maps.Clone(a.touched)
 	a.mu.Unlock()
+	instances := make(map[string]*servedInstance, len(prevInstances))
 	for _, scope := range retired {
 		// Retired for good: the scope's numbers and reservations go.
 		if err := a.eraseScope(ctx, scope); err != nil {
@@ -1304,6 +1392,14 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		specs := make([]endpoint.Spec, 0, len(p.eps)+1)
 		for _, ep := range p.eps {
 			spec := ep.Spec()
+			// The instance behind the key: a new one gets new
+			// DataVersions and is announced (issue #589).
+			if key, err := keyOf(spec); err == nil {
+				_, wrote := touched[key]
+				inst := instanceOf(prevInstances[key], ep, wrote)
+				instances[key] = inst
+				spec.Instance = inst
+			}
 			// A store that fails a read fails the assembly: the default
 			// served in the stored value's place would be stored over it at
 			// the next write, a version read as 0 would go down (review II,
@@ -1333,6 +1429,17 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The assembler holds these instances now: the next snapshot judges
+	// against them. A write of a key's place since this snapshot read
+	// the set stays recorded for the next one.
+	a.mu.Lock()
+	a.instances = instances
+	for key, seq := range touched {
+		if a.touched[key] == seq {
+			delete(a.touched, key)
+		}
+	}
+	a.mu.Unlock()
 	if len(retired) > 0 {
 		// Erased: the names are forgotten.
 		a.mu.Lock()

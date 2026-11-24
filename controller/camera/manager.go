@@ -37,9 +37,9 @@ const deviceCleanupBudget = 10 * time.Second
 // packages/ws-controller/src/camera/CameraStreamManager.ts:234-235 at
 // 0bd06f2.
 const (
-	endReasonUserHangup     uint8 = 2
-	endReasonOutOfResources uint8 = 8
-	endReasonUnknown        uint8 = 12
+	endReasonUserHangup     = uint8(wpdef.WebRTCEndReasonUserHangup)
+	endReasonOutOfResources = uint8(wpdef.WebRTCEndReasonOutOfResources)
+	endReasonUnknown        = uint8(wpdef.WebRTCEndReasonUnknownReason)
 )
 
 // Provenance says how a stream came to serve a request.

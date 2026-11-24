@@ -22,7 +22,20 @@
 // that fails removes the network it added and selects the one it was on
 // again, a join that succeeds removes the one it was on. A removal that
 // fails is retried before the next join and at Close while wpa_supplicant
-// still lists the network.
+// still lists the network. An AddNetwork that ends without
+// wpa_supplicant's answer (the join's bound or context ended in the call,
+// or the bus daemon gave up) may still have been carried out: every
+// network that appeared in the interface's Networks meanwhile — another
+// client's included — is removed the same way, at once when
+// wpa_supplicant answers the read that follows the call, else before the
+// next join or at Close; until then the window stays open, and a Close
+// whose read fails leaves the network behind. A join whose read of the
+// interface's Networks before AddNetwork stalls or fails ends there: the
+// credential is not sent, as nothing could tell the network it added
+// apart. A wpa_supplicant that serves no Networks property (it answers
+// org.freedesktop.DBus.Error.UnknownProperty, as connectedhomeip's test
+// mock does) is joined all the same, and there an AddNetwork that goes
+// unanswered cannot be settled: the network it may have added stays.
 //
 // What it does not do, on purpose: it saves nothing into wpa_supplicant's
 // configuration (the node's store holds the committed network and the

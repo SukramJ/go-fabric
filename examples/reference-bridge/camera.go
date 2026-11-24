@@ -169,9 +169,6 @@ type demoCamera struct {
 	ticks    int
 	// transports are the push transports and their CMAF session numbers.
 	transports map[uint16]*camTransport
-	// sessions are the WebRTC sessions the provider manager holds
-	// (webrtc-provider-manager.cpp mWebrtcTransportMap).
-	sessions map[uint16]bool
 	// pushEvents carries the push transports' Begin and End to the
 	// server in the order the transitions happened (R2-P6-conc-2608).
 	pushEvents orderedQueue
@@ -251,7 +248,7 @@ var (
 func newDemoCamera(policies surface.Policies, opts cameraOptions, logger *slog.Logger) *demoCamera {
 	c := &demoCamera{
 		logger: logger, surface: policies, opts: opts, clk: clock.System{},
-		snapshots: map[uint16]bool{}, transports: map[uint16]*camTransport{}, sessions: map[uint16]bool{},
+		snapshots: map[uint16]bool{}, transports: map[uint16]*camTransport{},
 	}
 	c.videos = []camAvailableVideo{
 		{params: camVideo(1, camMinVideoFrameRate, cam60fps, camMinWidth, camMinHeight, cam720Width, cam720Height)},
@@ -522,7 +519,12 @@ func (c *demoCamera) build() error {
 			Features: avsFeatures, Initial: avs,
 			VideoStreamPort: camVideoPort{c}, AudioStreamPort: camAudioPort{c}, SnapshotStreamPort: camSnapshotPort{c}, SnapshotCapturePort: camCapturePort{c},
 		},
-		wpdef.Declare{ProviderPort: camProviderPort{c}},
+		// The camera app's session bound, kMaxConcurrentWebRTCSessions
+		// (connectedhomeip examples/camera-app/linux/src/clusters/
+		// webrtc-provider/webrtc-provider-manager.cpp:39 at 6170af84),
+		// counted and refused by the kit's server (issue #590, decision
+		// 619).
+		wpdef.Declare{ProviderPort: camProviderPort{c}, MaxSessions: camMaxWebRTCSessions},
 		// camera-app.matter's PushAvStreamTransport, featureMap 3:
 		// PERZONESENS and METADATA.
 		padef.Declare{Features: padef.FeaturePerZoneSensitivity | padef.FeatureMetadata, Initial: push, PushTransportPort: camPushPort{c}},
@@ -806,27 +808,19 @@ func camFirst(ids *[]uint16) *spec.Nullable[uint16] {
 }
 
 // camMaxWebRTCSessions is the provider manager's capacity
-// (webrtc-provider-manager.cpp:39 kMaxConcurrentWebRTCSessions).
+// (webrtc-provider-manager.cpp:39 kMaxConcurrentWebRTCSessions), the
+// declaration's MaxSessions: the kit's server refuses a session over it
+// before it asks the port.
 const camMaxWebRTCSessions = 5
 
-// camEndOutOfResources is WebRTCEndReasonEnum OutOfResources (matter.js
-// web-rtc-transport-definitions.element.ts:26 at db021da0).
-const camEndOutOfResources = 8
-
 // SolicitOffer answers DeferredOffer as --camera-deferred-offer says
-// (HandleSolicitOffer: LinuxDeviceOptions cameraDeferredOffer). Over the
-// capacity the session is still made and then ended OutOfResources
-// (:279-292).
+// (HandleSolicitOffer: LinuxDeviceOptions cameraDeferredOffer).
 func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, bool, error) {
-	if p.c.addSession(args.SessionID) > camMaxWebRTCSessions {
-		go p.c.endSession(args.SessionID, camEndOutOfResources) //nolint:gosec,contextcheck // the End outlives the SolicitOffer request; the camera-app schedules it (ScheduleEndSend)
-	}
 	return camSession(args), p.c.opts.deferredOffer, nil
 }
 
-// ProvideOffer keeps the session, RESOURCE_EXHAUSTED over the capacity
-// (:470-477); the answer would come from a media stack this simulation
-// does not have. A re-offer — its id already in CurrentSessions — starts
+// ProvideOffer returns the session; the answer would come from a media
+// stack this simulation does not have. A re-offer — its id already in CurrentSessions — starts
 // from that session (chip WebRTCTransportProviderCluster.cpp:926 at
 // 6170af84, outSession = *existingSession) and sets what
 // HandleProvideOffer sets (webrtc-provider-manager.cpp:407-445): the
@@ -835,10 +829,6 @@ func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (
 // carries no deprecated id still names its streams ("O.a+", which the
 // server holds CurrentSessions to; TC-WEBRTCP-2.30 step 7).
 func (p camProviderPort) ProvideOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
-	if p.c.addSession(args.SessionID) > camMaxWebRTCSessions {
-		p.c.dropSession(args.SessionID)
-		return wpdef.WebRTCSessionStruct{}, statusErr(im.StatusResourceExhausted, "%d WebRTC sessions", camMaxWebRTCSessions)
-	}
 	s, reoffer := p.c.currentSession(args.SessionID)
 	if !reoffer {
 		return camSession(args), nil
@@ -870,35 +860,7 @@ func (camProviderPort) ProvideIceCandidates(context.Context, uint16, []wpdef.ICE
 	return nil
 }
 
-func (p camProviderPort) EndSession(_ context.Context, id uint16, _ uint8) error {
-	p.c.dropSession(id)
-	return nil
-}
-
-// addSession records a session and returns how many the manager holds.
-func (c *demoCamera) addSession(id uint16) int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.sessions[id] = true
-	return len(c.sessions)
-}
-
-func (c *demoCamera) dropSession(id uint16) {
-	c.mu.Lock()
-	delete(c.sessions, id)
-	c.mu.Unlock()
-}
-
-// endSession ends a session from the camera's side (the provider's End to
-// the requestor).
-func (c *demoCamera) endSession(id uint16, reason uint8) {
-	c.dropSession(id)
-	if p, ok := c.camera.WebRtcTransportProvider().Underlying().(*camera.Provider); ok {
-		if err := p.End(context.Background(), id, reason); err != nil {
-			c.logger.Info("camerasim.end", slog.Uint64("session", uint64(id)), slog.Any("err", err))
-		}
-	}
-}
+func (camProviderPort) EndSession(context.Context, uint16, uint8) error { return nil }
 
 // --- PushAvStreamTransport (push-av-stream-manager.cpp) --------------------
 

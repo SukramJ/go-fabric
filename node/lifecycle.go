@@ -5,6 +5,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"slices"
 
 	"thingfabric.dev/go-fabric/clock"
@@ -53,6 +54,33 @@ func (n *Node) markDevicesLive(live bool) {
 		return
 	}
 	deviceseam.Composing(flip)
+}
+
+// AdmitParts implements [deviceseam.Host]: move runs under the
+// Aggregator's lock, so no Add or Batch call takes a key between the
+// check and the move; a key the set serves is [ErrDuplicateKey], as an Add
+// of it is (decisions 580, 599), and so is a key checked twice in one
+// move — the parts tree it adds holds the key twice, as an Add of such a
+// tree is refused (review II, R4-api-4790, decision 617).
+func (h nodeHost) AdmitParts(move func(check func(key endpoint.SourceKey) error) error) error {
+	a := h.n.agg
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	checked := map[string]bool{}
+	return move(func(key endpoint.SourceKey) error {
+		k, ok := keyString(key)
+		if !ok {
+			return nil
+		}
+		if a.servesLocked(k) {
+			return fmt.Errorf("%w: %s", ErrDuplicateKey, k)
+		}
+		if checked[k] {
+			return fmt.Errorf("%w: %s twice in the parts added", ErrDuplicateKey, k)
+		}
+		checked[k] = true
+		return nil
+	})
 }
 
 // EndpointNumber implements [deviceseam.Host].

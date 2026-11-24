@@ -165,7 +165,13 @@ import (
 // fable-diff-g1 (statement 2), is drift only because its sentence names
 // ConstraintError and the collector finds that name nearest at :453
 // (measured by make cite-report).
-const citecheckDriftRatchet = 413
+// 411 after the run-4 fix PR's REG: thermostat_server.go's two cites
+// re-read at b25ed960 (R4-doc-4280, verify-r4-pass3.md) leave the drift
+// rows; bridge/bridge.go's #589 announce cite of ProtocolService.ts:290-296
+// at b25ed960, confirmed by fable-diff-h11 (statement 4), is drift only
+// because the collector finds addCluster nearest at :261 (measured by make
+// cite-report).
+const citecheckDriftRatchet = 411
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -231,7 +237,9 @@ const citecheckDriftRatchet = 413
 // Wave P6-C relabelled bridge cites at b25ed960 (2658).
 // Review II run-3 fix close: node's Add/Replace/Forget Endpoint.ts cites
 // re-pinned at b25ed960 per fable-diff-g5c/g5d/g5e (2655).
-const citecheckOffPinRatchet = 2655
+// Review II run-4 fix PR's REG: the cites re-read at b25ed960 by
+// verify-r4-pass3.md and fable-diff-h11 note 6 (2653).
+const citecheckOffPinRatchet = 2653
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

@@ -160,7 +160,7 @@ var _ endpoint.WritePersister = (*nonVolatile)(nil)
 // the persister does not keep.
 func (v *nonVolatile) key(ep *endpoint.Endpoint, srv contract.ClusterServer, attrID uint32) (string, bool) {
 	clusterID := srv.MatterClusterID()
-	if !nonVolatileWritable(clusterID, attrID) {
+	if !nonVolatileWritable(clusterID, attrID) || !comparableServer(srv) {
 		return "", false
 	}
 	// Nothing could restore a value the server takes no setter for.
@@ -184,6 +184,15 @@ func (v *nonVolatile) key(ep *endpoint.Endpoint, srv contract.ClusterServer, att
 		}
 	}
 	return nonVolatileKey(ep, clusterID, attrID), true
+}
+
+// comparableServer reports whether srv is a value that can be compared:
+// the persister keeps a server by its value (a map key, a Contains),
+// which a host server that is a value that cannot be compared cannot be —
+// such a server keeps its state in memory only, as one without a setter
+// does, rather than panic on the assembly (review II, R4-api-4753).
+func comparableServer(srv contract.ClusterServer) bool {
+	return comparableValue(srv)
 }
 
 // nonVolatileWritable reports an attribute of the generated definition

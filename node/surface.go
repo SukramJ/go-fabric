@@ -293,16 +293,38 @@ func surfaceEntries(ep Endpoint) []surfaceEntry {
 	return out
 }
 
+// duplicateKey returns the first key entries — an endpoint and its parts
+// — hold twice (R4-api-4790).
+func duplicateKey(entries []surfaceEntry) (string, bool) {
+	seen := make(map[string]bool, len(entries))
+	for i := range entries {
+		if seen[entries[i].key] {
+			return entries[i].key, true
+		}
+		seen[entries[i].key] = true
+	}
+	return "", false
+}
+
 // checkSurface refuses ep when it, or one of its parts, has a reserved
 // key ([ErrReservedKey]): [AggregatorSurfaceKey], or the stable key of the
 // node's own OTA provider endpoint, which the default snapshot would hold
 // twice (review II, R2-P6-api-2415); or when it reports a surface
 // composed under policies other than the node's ([ErrPolicyMismatch]). An
 // endpoint without a reporter — a host's own Spec type — passes the
-// second check. It returns ep's surface entries, which the caller hands
-// [Node.recordWithheld] once its set accepted ep's key.
+// second check. A tree that holds one key twice — ep and a part, or two
+// parts — is refused with [ErrDuplicateKey]: its assembly, and every
+// later one, would fail on two Specs under one key, as matter.js refuses
+// an inserted tree whose endpoints claim one number
+// (packages/node/src/endpoint/properties/Parts.ts:195-203 at b25ed960,
+// #validateInsertion; on a ready owner, :54-57) (review II,
+// R4-api-4790, decision 617). It returns ep's surface entries, which the
+// caller hands [Node.recordWithheld] once its set accepted ep's key.
 func (n *Node) checkSurface(ep Endpoint) ([]surfaceEntry, error) {
 	entries := surfaceEntries(ep)
+	if k, ok := duplicateKey(entries); ok {
+		return nil, fmt.Errorf("%w: %s twice in one endpoint's tree", ErrDuplicateKey, k)
+	}
 	for i := range entries {
 		e := &entries[i]
 		if e.key == AggregatorSurfaceKey {

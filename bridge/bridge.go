@@ -271,7 +271,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"reflect"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -1641,9 +1640,9 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// A removed endpoint ends no subscription: the paths that name it
 	// select nothing from then on, and the subscription's other paths go
 	// on being reported. Mirrors matter.js
-	// packages/node/src/node/integration/ProtocolService.ts:216-220 at
-	// db021da0 (deleteEndpoint drops the endpoint from the protocol
-	// collections and nothing else; called at :314).
+	// packages/node/src/node/integration/ProtocolService.ts:225-229 at
+	// b25ed960 (deleteEndpoint drops the endpoint from the protocol
+	// collections and nothing else; called at :323).
 
 	// Notify active subscribers that Descriptor.PartsList has changed
 	// on the endpoints that list the parts that moved. Mirrors
@@ -1683,13 +1682,18 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 
 	// An endpoint the new topology adds announces every attribute of its
 	// clusters as changed, so a subscription that covers it reports the
-	// endpoint's data, not only the PartsList that names it. Mirrors
-	// matter.js packages/node/src/node/integration/ProtocolService.ts:252-287
-	// (addCluster: "Cluster added, emit all attributes as changed", the
-	// readable attributes without changes-omitted ones — OnAttributeChanged
-	// drops those).
+	// endpoint's data, not only the PartsList that names it — and so does
+	// an endpoint whose number stays but whose instance is new (a same-key
+	// Replace, a Remove and an Add of the key in one batch: its clusters
+	// are at new DataVersions, endpoint.Endpoint.SameInstance; issue #589,
+	// decisions 592, 595). Judged once per reassembly, against the topology
+	// this one replaces. Mirrors matter.js
+	// packages/node/src/node/integration/ProtocolService.ts:290-296 at
+	// b25ed960 (addCluster: "Cluster added, emit all attributes as
+	// changed", the readable attributes without changes-omitted ones —
+	// OnAttributeChanged drops those).
 	if prevTopology != nil {
-		b.announceAddedEndpoints(ctx, prevTopology, topology, dispatcher)
+		b.announceNewEndpoints(ctx, prevTopology, topology, dispatcher)
 	}
 
 	// Topology.Bridged() is the authoritative bridged set: the assembler
@@ -1772,22 +1776,26 @@ func partsListOwnersChanged(prev, next *endpoint.Topology) []uint16 {
 	return out
 }
 
-// announceAddedEndpoints marks every attribute of each endpoint in next
-// but not in prev changed on the subscription manager — see the call in
-// reassembleLocked.
-func (b *Bridge) announceAddedEndpoints(ctx context.Context, prev, next *endpoint.Topology, dispatcher im.Dispatcher) {
+// announceNewEndpoints marks every attribute of each endpoint in next
+// that prev does not hold — by number, or by instance
+// ([endpoint.Endpoint.SameInstance]) — changed on the subscription
+// manager; see the call in reassembleLocked.
+func (b *Bridge) announceNewEndpoints(ctx context.Context, prev, next *endpoint.Topology, dispatcher im.Dispatcher) {
 	m := b.subscriptionManagerLocked()
 	if m == nil || dispatcher == nil {
 		return
 	}
-	known := make(map[uint16]bool, len(prev.Endpoints))
+	known := make(map[uint16]*endpoint.Endpoint, len(prev.Endpoints))
 	for _, ep := range prev.Endpoints {
 		if ep != nil {
-			known[ep.ID] = true
+			known[ep.ID] = ep
 		}
 	}
 	for _, ep := range next.Endpoints {
-		if ep == nil || known[ep.ID] {
+		if ep == nil {
+			continue
+		}
+		if old, ok := known[ep.ID]; ok && ep.SameInstance(old) {
 			continue
 		}
 		for _, rr := range dispatcher.Read(ctx, im.ConcreteAttributePath{Endpoint: ep.ID, HasEndpoint: true}) {
@@ -2797,7 +2805,10 @@ type reconciledServer struct {
 
 // reconciled lists the servers of topo that implement
 // [contract.ClusterQuiescer] or [contract.EventReceiver] and can be told
-// apart (a comparable dynamic type — every pointer server).
+// apart: a value that can be compared — every pointer server. It judges
+// the value, not its type: a server of a comparable type whose interface
+// field holds a slice panics as a map key (review II, R4-api-4753,
+// decision 618).
 func reconciled(topo *endpoint.Topology) []reconciledServer {
 	if topo == nil {
 		return nil
@@ -2810,7 +2821,7 @@ func reconciled(topo *endpoint.Topology) []reconciledServer {
 		for _, srv := range endpoint.ClusterServers(ep) {
 			_, quiesces := srv.(contract.ClusterQuiescer)
 			_, receives := srv.(contract.EventReceiver)
-			if (quiesces || receives) && srv != nil && reflect.TypeOf(srv).Comparable() {
+			if (quiesces || receives) && comparableValue(srv) {
 				out = append(out, reconciledServer{srv, ep.ID})
 			}
 		}
@@ -2819,8 +2830,7 @@ func reconciled(topo *endpoint.Topology) []reconciledServer {
 }
 
 // quiescers lists the servers of topo that implement
-// [contract.ClusterQuiescer] and can be told apart (a comparable dynamic
-// type — every pointer server).
+// [contract.ClusterQuiescer] and can be told apart ([reconciled]).
 func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
 	var out []contract.ClusterQuiescer
 	for _, r := range reconciled(topo) {

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"runtime"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	chimedef "thingfabric.dev/go-fabric/cluster/spec/chime"
 	padef "thingfabric.dev/go-fabric/cluster/spec/pushavstreamtransport"
 	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
 	zmdef "thingfabric.dev/go-fabric/cluster/spec/zonemanagement"
 	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/im"
@@ -282,15 +284,7 @@ func TestCameraSimRestoresItsAllocations(t *testing.T) {
 	}
 }
 
-// simSessions is how many WebRTC sessions the provider manager holds.
-func simSessions(c *demoCamera) int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return len(c.sessions)
-}
-
-// TestCameraSimWebRTCProvider: the provider manager's sessions and their
-// capacity.
+// TestCameraSimWebRTCProvider: the provider manager's sessions.
 func TestCameraSimWebRTCProvider(t *testing.T) {
 	t.Parallel()
 	c, _, _ := simCamera(t, cameraOptions{deferredOffer: true})
@@ -320,36 +314,99 @@ func TestCameraSimWebRTCProvider(t *testing.T) {
 	if err != nil || bare.VideoStreamId == nil || !bare.VideoStreamId.Null || bare.VideoStreams != nil {
 		t.Fatalf("a session without streams = %+v, %v; want null stream ids", bare, err)
 	}
-	for id := uint16(3); id <= camMaxWebRTCSessions; id++ {
-		if _, err := port.ProvideOffer(ctx, args(id)); err != nil {
-			t.Fatalf("ProvideOffer %d: %v", id, err)
-		}
-	}
-
-	// Mirrors chip examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp:470-477 at 6170af84:
-	// a sixth session through ProvideOffer is RESOURCE_EXHAUSTED.
-	_, err = port.ProvideOffer(ctx, args(6))
-	wantStatus(t, "a sixth ProvideOffer", err, im.StatusResourceExhausted)
-	if n := simSessions(c); n != camMaxWebRTCSessions {
-		t.Fatalf("sessions after the refused offer = %d, want %d", n, camMaxWebRTCSessions)
-	}
-
-	// Mirrors chip examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp:279-292 at 6170af84:
-	// a sixth SolicitOffer still makes its session, then ends it
-	// OutOfResources.
-	if s, _, err := port.SolicitOffer(ctx, args(7)); err != nil || s.Id != 7 {
-		t.Fatalf("a sixth SolicitOffer = %+v, %v; want the session made", s, err)
-	}
-	waitFor(t, "the over-capacity session ended", func() bool { return simSessions(c) == camMaxWebRTCSessions })
-
 	if err := port.ProvideAnswer(ctx, 1, "v=0"); err != nil {
 		t.Fatal(err)
 	}
 	if err := port.ProvideIceCandidates(ctx, 1, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := port.EndSession(ctx, 1, 2); err != nil || simSessions(c) != camMaxWebRTCSessions-1 {
-		t.Fatalf("EndSession = %v, %d sessions left", err, simSessions(c))
+	if err := port.EndSession(ctx, 1, 2); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// simEndOutOfResources is WebRTCEndReasonEnum OutOfResources
+// (parity/schema.json, WebRTCEndReasonEnum id 8).
+const simEndOutOfResources uint8 = 8
+
+// simEnds is a PeerConnector that records the End commands the provider
+// sends a requestor.
+type simEnds struct {
+	mu   sync.Mutex
+	ends []wrdef.EndRequest
+}
+
+func (e *simEnds) ConnectPeer(context.Context, uint8, uint64) (camera.PeerSession, error) {
+	return e, nil
+}
+
+func (e *simEnds) Invoke(_ context.Context, _ uint16, _, command uint32, fields spec.Encodable) (*spec.Node, error) {
+	if req, ok := fields.(wrdef.EndRequest); ok && command == wrdef.CmdEnd {
+		e.mu.Lock()
+		e.ends = append(e.ends, req)
+		e.mu.Unlock()
+	}
+	return nil, nil
+}
+
+func (e *simEnds) sent() []wrdef.EndRequest {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.ends)
+}
+
+// TestCameraSimWebRTCSessionBound: the daemon declares the camera app's
+// capacity as the provider's MaxSessions (issue #590, decision 619) and
+// the kit's server holds it, before the port is asked — a sixth
+// ProvideOffer is RESOURCE_EXHAUSTED; a sixth SolicitOffer is answered
+// with a session id and DeferredOffer false (decision 621), the session
+// is not entered, and the requestor is sent End with OutOfResources.
+func TestCameraSimWebRTCSessionBound(t *testing.T) {
+	t.Parallel()
+	c, _, _ := simCamera(t, cameraOptions{deferredOffer: true})
+	avsm := c.camera.CameraAvStreamManagement().Underlying()
+	provider, ok := c.camera.WebRtcTransportProvider().Underlying().(*camera.Provider)
+	if !ok {
+		t.Fatalf("WebRtcTransportProvider is %T", c.camera.WebRtcTransportProvider().Underlying())
+	}
+	ends := &simEnds{}
+	provider.AttachPeerConnector(ends)
+	resp, status := simInvoke(avsm, csdef.CmdVideoStreamAllocate, simVideoRequest())
+	if status != im.StatusSuccess {
+		t.Fatalf("VideoStreamAllocate: %v", status)
+	}
+	video := resp.(csdef.VideoStreamAllocateResponse).VideoStreamId
+	usage, origin := wpdef.StreamUsageLiveView, uint16(2)
+	offer := wpdef.ProvideOfferRequest{
+		WebRtcSessionId: spec.NullOf[uint16](), Sdp: "v=0", StreamUsage: &usage, OriginatingEndpointId: &origin, VideoStreams: &[]uint16{video},
+	}
+	for i := range camMaxWebRTCSessions {
+		if _, status := simInvoke(provider, wpdef.CmdProvideOffer, offer); status != im.StatusSuccess {
+			t.Fatalf("ProvideOffer %d: %v", i+1, status)
+		}
+	}
+	if _, status := simInvoke(provider, wpdef.CmdProvideOffer, offer); status != im.StatusResourceExhausted {
+		t.Fatalf("a sixth ProvideOffer: %v, want RESOURCE_EXHAUSTED", status)
+	}
+	if n := len(provider.Sessions()); n != camMaxWebRTCSessions {
+		t.Fatalf("sessions after the refused offer = %d, want %d", n, camMaxWebRTCSessions)
+	}
+	resp, status = simInvoke(provider, wpdef.CmdSolicitOffer, wpdef.SolicitOfferRequest{
+		StreamUsage: usage, OriginatingEndpointId: origin, VideoStreams: &[]uint16{video},
+	})
+	if status != im.StatusSuccess {
+		t.Fatalf("a sixth SolicitOffer: %v, want a session id", status)
+	}
+	refused := resp.(wpdef.SolicitOfferResponse)
+	if refused.DeferredOffer {
+		t.Fatal("the refused SolicitOffer answered a deferred offer")
+	}
+	if n := len(provider.Sessions()); n != camMaxWebRTCSessions {
+		t.Fatalf("sessions after the refused SolicitOffer = %d, want %d", n, camMaxWebRTCSessions)
+	}
+	waitFor(t, "the End of the refused session", func() bool { return len(ends.sent()) == 1 })
+	if got := ends.sent()[0]; got.WebRtcSessionId != refused.WebRtcSessionId || got.Reason != simEndOutOfResources {
+		t.Fatalf("End = %+v, want session %d with OutOfResources", got, refused.WebRtcSessionId)
 	}
 }
 

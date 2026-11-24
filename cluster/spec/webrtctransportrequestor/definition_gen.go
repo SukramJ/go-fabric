@@ -278,6 +278,43 @@ var ICECandidateStructDef = &spec.Struct{Name: "ICECandidateStruct", Fields: []s
 	{ID: 2, Name: "SdpmLineIndex", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Nullable: true}},
 }}
 
+// WebRTCEndReasonEnum is the WebRTCEndReasonEnum enum8.
+type WebRTCEndReasonEnum uint8
+
+// WebRTCEndReasonEnum values.
+const (
+	WebRTCEndReasonIceFailed         WebRTCEndReasonEnum = 0  // M
+	WebRTCEndReasonIceTimeout        WebRTCEndReasonEnum = 1  // M
+	WebRTCEndReasonUserHangup        WebRTCEndReasonEnum = 2  // M
+	WebRTCEndReasonUserBusy          WebRTCEndReasonEnum = 3  // M
+	WebRTCEndReasonReplaced          WebRTCEndReasonEnum = 4  // M
+	WebRTCEndReasonNoUserMedia       WebRTCEndReasonEnum = 5  // M
+	WebRTCEndReasonInviteTimeout     WebRTCEndReasonEnum = 6  // M
+	WebRTCEndReasonAnsweredElsewhere WebRTCEndReasonEnum = 7  // M
+	WebRTCEndReasonOutOfResources    WebRTCEndReasonEnum = 8  // M
+	WebRTCEndReasonMediaTimeout      WebRTCEndReasonEnum = 9  // M
+	WebRTCEndReasonLowPower          WebRTCEndReasonEnum = 10 // M
+	WebRTCEndReasonPrivacyMode       WebRTCEndReasonEnum = 11 // M
+	WebRTCEndReasonUnknownReason     WebRTCEndReasonEnum = 12 // M
+)
+
+// WebRTCEndReasonEnumDef describes WebRTCEndReasonEnum.
+var WebRTCEndReasonEnumDef = &spec.Enum{Name: "WebRTCEndReasonEnum", Bits: 8, Values: []spec.EnumValue{
+	{Value: 0, Name: "IceFailed", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 1, Name: "IceTimeout", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 2, Name: "UserHangup", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 3, Name: "UserBusy", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 4, Name: "Replaced", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 5, Name: "NoUserMedia", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 6, Name: "InviteTimeout", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 7, Name: "AnsweredElsewhere", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 8, Name: "OutOfResources", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 9, Name: "MediaTimeout", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 10, Name: "LowPower", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 11, Name: "PrivacyMode", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+	{Value: 12, Name: "UnknownReason", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+}}
+
 // OfferRequest is the Offer command payload.
 type OfferRequest struct {
 	WebRtcSessionId    uint16             // 0: WebRtcTransportDefinitions.WebRTCSessionID, M

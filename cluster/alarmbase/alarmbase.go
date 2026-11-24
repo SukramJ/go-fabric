@@ -83,6 +83,12 @@ const (
 // FAILURE for any other, and changes nothing. A nil Delegate accepts every
 // command, as
 // chip's default implementation does (Delegate.h:63, :82).
+//
+// The server asks it one command at a time: a second Reset or
+// ModifyEnabledAlarms waits until the first one's call returned and its
+// change is stored, so Mask and State end at what the Delegate heard last.
+// The Delegate may call the host setters (SetMask, SetState,
+// ResetLatchedAlarms); they do not wait for the command.
 type Delegate interface {
 	// ModifyEnabledAlarms is asked before Mask becomes mask.
 	ModifyEnabledAlarms(ctx context.Context, mask uint32) error
@@ -213,6 +219,12 @@ type Server struct {
 	latch     uint32
 	delegate  Delegate
 
+	// cmd serialises Reset and ModifyEnabledAlarms from the Delegate's
+	// call to the store, so Mask and State end at what the Delegate heard
+	// last (R4-conc-4252); a one-slot channel, so a waiter can leave with
+	// its request context. The host setters do not take it: a Delegate may
+	// call them.
+	cmd chan struct{}
 	// op serialises the read-modify-write of Mask and State and the Notify
 	// that reports it.
 	op sync.Mutex
@@ -281,7 +293,7 @@ func newServer(v variant, cfg Config) (*Server, error) {
 	if cfg.Features&FeatureReset != 0 {
 		initial[AttrLatch] = cfg.Latch
 	}
-	s := &Server{v: v, supported: cfg.Supported, latch: cfg.Latch, delegate: cfg.Delegate}
+	s := &Server{v: v, supported: cfg.Supported, latch: cfg.Latch, delegate: cfg.Delegate, cmd: make(chan struct{}, 1)}
 	handlers := map[uint32]spec.CommandHandler{
 		CmdReset:               s.handleReset,
 		CmdModifyEnabledAlarms: s.handleModifyEnabledAlarms,
@@ -460,14 +472,16 @@ func (s *Server) handleReset(ctx context.Context, fields any) (any, error) {
 	if alarms&^s.supported != 0 {
 		return nil, statusError{im.StatusInvalidCommand, fmt.Sprintf("alarmbase: Reset 0x%X outside Supported 0x%X", alarms, s.supported)}
 	}
-	if s.delegate != nil {
-		if err := s.delegate.ResetAlarms(ctx, alarms); err != nil {
-			return nil, delegateError("Reset", err)
+	return nil, s.command(ctx, "Reset", func() error {
+		if s.delegate != nil {
+			if err := s.delegate.ResetAlarms(ctx, alarms); err != nil {
+				return delegateError("Reset", err)
+			}
 		}
-	}
-	s.op.Lock()
-	defer s.op.Unlock()
-	return nil, s.resetLatched(alarms)
+		s.op.Lock()
+		defer s.op.Unlock()
+		return s.resetLatched(alarms)
+	})
 }
 
 // handleModifyEnabledAlarms is chip's HandleModifyEnabledAlarms
@@ -480,14 +494,29 @@ func (s *Server) handleModifyEnabledAlarms(ctx context.Context, fields any) (any
 	if mask&^s.supported != 0 {
 		return nil, statusError{im.StatusInvalidCommand, fmt.Sprintf("alarmbase: ModifyEnabledAlarms 0x%X outside Supported 0x%X", mask, s.supported)}
 	}
-	if s.delegate != nil {
-		if err := s.delegate.ModifyEnabledAlarms(ctx, mask); err != nil {
-			return nil, delegateError("ModifyEnabledAlarms", err)
+	return nil, s.command(ctx, "ModifyEnabledAlarms", func() error {
+		if s.delegate != nil {
+			if err := s.delegate.ModifyEnabledAlarms(ctx, mask); err != nil {
+				return delegateError("ModifyEnabledAlarms", err)
+			}
 		}
+		s.op.Lock()
+		defer s.op.Unlock()
+		return s.setMask(contract.OriginCommand, mask)
+	})
+}
+
+// command runs fn — a command's Delegate call and its store — holding cmd,
+// so two controllers' commands store in the order the Delegate heard them
+// (R4-conc-4252). A command waiting for cmd leaves when ctx ends.
+func (s *Server) command(ctx context.Context, what string, fn func() error) error {
+	select {
+	case s.cmd <- struct{}{}:
+	case <-ctx.Done():
+		return fmt.Errorf("alarmbase: %s: %w", what, ctx.Err())
 	}
-	s.op.Lock()
-	defer s.op.Unlock()
-	return nil, s.setMask(contract.OriginCommand, mask)
+	defer func() { <-s.cmd }()
+	return fn()
 }
 
 // Thresholds returns the served TemperatureAlarm thresholds by attribute

@@ -3306,17 +3306,24 @@ func (qp *quietPath) refresh() {
 }
 
 // sameNotifier reports whether a and b are the same notifier — the
-// source that is also one of its endpoint's cluster servers. Notifiers of
-// a type that cannot be compared are never the same.
+// source that is also one of its endpoint's cluster servers. A notifier
+// that is a value that cannot be compared is never the same; the value is
+// judged, not its type (review II, R4-api-4753, decision 618).
 func sameNotifier(a, b contract.ChangeNotifier) bool {
-	if a == nil || b == nil {
-		return false
-	}
-	ta := reflect.TypeOf(a)
-	if ta != reflect.TypeOf(b) || !ta.Comparable() {
+	if reflect.TypeOf(a) != reflect.TypeOf(b) || !comparableValue(a) || !comparableValue(b) {
 		return false
 	}
 	return a == b
+}
+
+// comparableValue reports whether x can be compared with == and used as a
+// map key without a panic: the value is judged, not its type — a struct of
+// a comparable type whose interface field holds a slice panics on ==
+// (review II, R4-api-4753, decision 618; node's predicate of the same
+// name). A nil x is not comparable.
+func comparableValue(x any) bool {
+	v := reflect.ValueOf(x)
+	return v.IsValid() && v.Comparable()
 }
 
 // filterPathsByNotifierCluster narrows reportable paths to only those

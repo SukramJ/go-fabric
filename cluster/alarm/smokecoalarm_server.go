@@ -123,7 +123,7 @@ const (
 
 // alarming reports whether the state is Warning or Critical — the two
 // values every "changes to either Warning or Critical state" event rule
-// is written against (resource :124, :136, :142).
+// is written against (resource :124, :133, :142-143 at b25ed960).
 func alarming(a AlarmState) bool { return a == AlarmWarning || a == AlarmCritical }
 
 // Sensitivity is the SensitivityEnum (element :82-87).
@@ -879,13 +879,18 @@ type pendingEvent struct {
 // SmokeCOState must not call Refresh itself.
 //
 // Each rule is the specification's, as matter.js carries it in
-// smoke-co-alarm-cluster.resource.ts: SmokeAlarm / CoAlarm / LowBattery /
-// the Interconnect events "when [the attribute] changes to either Warning
-// or Critical" (:124, :136, :142, :175, :185); HardwareFault when
+// smoke-co-alarm-cluster.resource.ts (at b25ed960): SmokeAlarm / CoAlarm /
+// LowBattery when the attribute "changes to either Warning or Critical
+// state" (:124, :133, :142-143); the Interconnect events are "generated
+// when the device hosting the server receives a smoke [CO] alarm from an
+// interconnected sensor" (:174-176, :184-186), which connectedhomeip maps
+// onto the Interconnect attribute's change to Warning or Critical
+// (SmokeCoAlarmCluster.cpp:187-192, :210-214 at 6170af84), as here;
+// HardwareFault when
 // HardwareFaultAlert becomes true (:152); EndOfService when
 // EndOfServiceAlert is set to Expired (:157); SelfTestComplete when
 // TestInProgress changes to false (:161); AlarmMuted / MuteEnded on the
-// DeviceMuted flips (:166, :171); AllClear when ExpressedState returns to
+// DeviceMuted flips (:166, :169-170); AllClear when ExpressedState returns to
 // Normal (:195). Priorities are the element's, read from the definition.
 //
 // Without an emitter the baseline still advances: a change nobody could

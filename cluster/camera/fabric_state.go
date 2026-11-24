@@ -9,14 +9,10 @@ import (
 	"fmt"
 	"slices"
 
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
+	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
 	"thingfabric.dev/go-fabric/contract"
 )
-
-// endReasonUnknown is WebRTCEndReasonEnum UnknownReason, the reason a
-// session of a removed fabric ends with: no other value of the enum names
-// the fabric's removal (parity/schema.json, WebRTCEndReasonEnum 12; the
-// highest value, [maxEndReason]).
-const endReasonUnknown uint8 = maxEndReason
 
 // Compile-time assertions: the three servers whose lists are
 // fabric-sensitive ("S") implement the removal contract.
@@ -58,7 +54,9 @@ func (p *Provider) MatterDropFabric(ctx context.Context, fabricIndex uint8) erro
 	p.mu.Unlock()
 	var errs []error
 	for _, id := range ids {
-		if err := p.port.EndSession(ctx, id, endReasonUnknown); err != nil {
+		// UnknownReason: no other value of the enum names the fabric's
+		// removal.
+		if err := p.port.EndSession(ctx, id, uint8(wpdef.WebRTCEndReasonUnknownReason)); err != nil {
 			errs = append(errs, fmt.Errorf("camera: EndSession %d of removed fabric %d: %w", id, fabricIndex, err))
 		}
 		if err := p.removeSession(contract.OriginUnknown, id); err != nil {
@@ -99,7 +97,7 @@ func (r *Requestor) MatterDropFabric(ctx context.Context, fabricIndex uint8) err
 	}
 	if r.port != nil {
 		for _, s := range gone {
-			r.port.End(ctx, s, endReasonUnknown)
+			r.port.End(ctx, s, uint8(wrdef.WebRTCEndReasonUnknownReason))
 		}
 	}
 	return nil
