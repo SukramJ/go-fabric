@@ -12,7 +12,9 @@ package node
 import (
 	"context"
 	"net"
+	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -377,6 +379,75 @@ func TestCameraPeerLossWaitsForACommandInFlight(t *testing.T) {
 	if got := g.port.endedIDs(); !slices.Equal(got, []uint16{1, 3}) {
 		t.Errorf("port ended %v, want [1 3]", got)
 	}
+}
+
+// TestCameraNewSessionWhilePeerGoneWaitsCancels (fable-diff-h13 N1, owner
+// decision 632): a command holds the provider when A is lost; the queue
+// passes the provider's turn and waits on the provider's serialisation;
+// A establishes a new CASE session during that wait. The check of "no
+// session in either stack" runs under the serialisation, after the
+// command, so it sees A's new session and A's WebRTC sessions stay.
+func TestCameraNewSessionWhilePeerGoneWaitsCancels(t *testing.T) {
+	t.Parallel()
+	g := newPGNode(t)
+	g.port.hold, g.port.entered, g.port.release = true, make(chan struct{}), make(chan struct{})
+	answered := make(chan error, 1)
+	go func() {
+		ctx := im.WithSubject(im.WithFabricFilter(context.Background(), false, pgFabric), pgPeerB, nil)
+		_, err := g.prov.MatterInvoke(ctx, wpdef.CmdProvideAnswer, wpdef.ProvideAnswerRequest{WebRtcSessionId: 2, Sdp: "a"})
+		answered <- err
+	}()
+	<-g.port.entered
+	queue := make(chan string, 1)
+	g.n.sec.peerGone.testBeforeEnd = func(addr exchange.PeerAddress) {
+		if addr == pgAddrA {
+			queue <- goroutineHeader()
+		}
+	}
+	g.openBridge(t, pgPeerA)
+	g.lose(pgPeerA)
+	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).PeerGone")
+	g.openBridge(t, pgPeerA)
+	close(g.port.release)
+	if err := <-answered; err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	if got := g.drain(t); !slices.Equal(got, []pgDone{{pgAddrA, 0, true}}) {
+		t.Fatalf("worked off %+v, want A cancelled by the session opened during the wait", got)
+	}
+	if got := g.port.endedIDs(); len(got) != 0 {
+		t.Errorf("port ended %v, want none", got)
+	}
+	if got := g.sessions(); !slices.Equal(got, []uint16{1, 2, 3}) {
+		t.Errorf("sessions %v, want [1 2 3]", got)
+	}
+}
+
+// goroutineHeader is the calling goroutine's stack header, "goroutine N ".
+func goroutineHeader() string {
+	buf := make([]byte, 64)
+	buf = buf[:runtime.Stack(buf, false)]
+	head, _, _ := strings.Cut(string(buf), "[")
+	return head
+}
+
+// waitGoroutineBlockedIn yields until the goroutine named by header
+// (from [goroutineHeader]) waits for a mutex inside fn, read from the
+// goroutines' stacks as [waitBlockedIn] does, but for that one goroutine:
+// a parallel test's goroutine parked in the same function does not count.
+func waitGoroutineBlockedIn(t *testing.T, header, fn string) {
+	t.Helper()
+	buf := make([]byte, 1<<20)
+	for range 1_000_000 {
+		stacks := string(buf[:runtime.Stack(buf, true)])
+		for _, g := range strings.Split(stacks, "\n\n") {
+			if strings.HasPrefix(g, header+"[") && strings.Contains(g, "sync.(*Mutex).Lock") && strings.Contains(g, fn) {
+				return
+			}
+		}
+		runtime.Gosched()
+	}
+	t.Fatalf("%sdoes not wait for a lock in %s", header, fn)
 }
 
 // TestCameraFabricRemovalEndsOnce: the sessions of a removed fabric end

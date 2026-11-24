@@ -148,10 +148,13 @@ func (n *Node) drainCameraPeerGone() {
 // endLostPeer ends addr's WebRTC sessions on every camera provider of the
 // topology (the walk of [Node.attachCameraPeers]) — [camera.Provider.PeerGone]
 // with UnknownReason — while the node holds no session with the peer in
-// either stack. The check runs again immediately before each provider:
-// a session the peer opened since the loss — a new CASE session — cancels
-// the end for that provider and every later one; a provider already
-// called keeps its result, its end is final.
+// either stack. The check is PeerGone's gone predicate, so it runs again
+// for each provider under that provider's command serialisation, after a
+// command in flight and before any port call (owner decision 632): a
+// session the peer opened since the loss — a new CASE session, also one
+// opened while PeerGone waited for the command — cancels the end for that
+// provider and every later one; a provider already called keeps its
+// result, its end is final.
 func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 	q := &n.sec.peerGone
 	ended, cancelled := 0, false
@@ -164,6 +167,7 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 	if topo == nil {
 		return
 	}
+	gone := func() bool { return !n.holdsPeerSession(addr) }
 	for _, ep := range topo.Endpoints {
 		for _, srv := range endpoint.ClusterServers(ep) {
 			p, ok := srv.(*camera.Provider)
@@ -173,16 +177,17 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 			if q.testBeforeEnd != nil {
 				q.testBeforeEnd(addr)
 			}
-			if n.holdsPeerSession(addr) {
+			ran, err := p.PeerGone(n.life, addr.FabricIndex, addr.NodeID, camera.EndReasonUnknown, gone)
+			if err != nil {
+				n.logger.Warn("matter.camera.peer_gone.end_failed",
+					slog.Int("fabric_index", int(addr.FabricIndex)), slog.Uint64("node_id", addr.NodeID), slog.Any("err", err))
+			}
+			if !ran {
 				cancelled = true
 				n.logger.Debug("matter.camera.peer_gone.cancelled",
 					slog.Int("fabric_index", int(addr.FabricIndex)), slog.Uint64("node_id", addr.NodeID),
 					slog.String("hint", "a session with the peer is live again; its WebRTC sessions stay"))
 				return
-			}
-			if err := p.PeerGone(n.life, addr.FabricIndex, addr.NodeID, camera.EndReasonUnknown); err != nil {
-				n.logger.Warn("matter.camera.peer_gone.end_failed",
-					slog.Int("fabric_index", int(addr.FabricIndex)), slog.Uint64("node_id", addr.NodeID), slog.Any("err", err))
 			}
 			ended++
 		}
