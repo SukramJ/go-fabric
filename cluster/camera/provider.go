@@ -670,8 +670,9 @@ func (p *Provider) abandonSession(ctx context.Context, id uint16, cause error) e
 	return spec.Errorf(im.StatusFailure, "%v", cause)
 }
 
-// maxEndReason is the highest WebRTCEndReasonEnum value (UnknownReason).
-const maxEndReason = 12
+// maxEndReason is the highest WebRTCEndReasonEnum value (UnknownReason),
+// the generated value (decision 633).
+const maxEndReason = uint8(wpdef.WebRTCEndReasonUnknownReason)
 
 // endSession carries out EndSession. Mirrors chip HandleEndSession
 // (:1194-1213): an unknown reason is CONSTRAINT_ERROR; the session leaves

@@ -26,9 +26,9 @@ import (
 // host's rows count and are never refused (decision 608); nothing is
 // evicted (decision 609).
 
-// endReasonOutOfResources is WebRTCEndReasonEnum OutOfResources
-// (parity/schema.json, WebRTCEndReasonEnum id 8).
-const endReasonOutOfResources uint8 = 8
+// endReasonOutOfResources is WebRTCEndReasonEnum OutOfResources, the
+// generated value (decision 633).
+const endReasonOutOfResources = uint8(wrdef.WebRTCEndReasonOutOfResources)
 
 // atSessionBound reports whether a new session of the accessing fabric
 // would pass a bound: the provider's over every CurrentSessions entry, the
