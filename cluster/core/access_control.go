@@ -81,7 +81,8 @@ type AccessControl struct {
 	extOwedClear map[uint8]bool
 	// aclHeld names each fabric whose Acl rows the server last saw
 	// non-empty in the store: at construction, at a read or a write of the
-	// fabric's list and at a new fabric's default admin entry. The store's
+	// fabric's list, at a new fabric's default admin entry and at an entry
+	// the node appended (NotifyLocalEntryInstalledOn). The store's
 	// fabric cascade removes a fabric's rows before the drop runs, so the
 	// drop asks the store only for a fabric named here, and an empty answer
 	// is the Acl shrinking (review II, R4-par-4051).
@@ -807,18 +808,30 @@ func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []u
 	}
 	out := []AccessControlEntryStruct{}
 	for _, fabric := range fabrics {
-		entries, err := a.store.ListACL(ctx, fabric)
+		entries, err := a.listACLMarking(ctx, fabric)
 		if err != nil {
 			return nil, false
-		}
-		if len(entries) > 0 {
-			a.markACLHeld(fabric, true)
 		}
 		for _, e := range entries {
 			out = append(out, aclEntryStruct(e))
 		}
 	}
 	return out, true
+}
+
+// listACLMarking is a read's list of fabric's Acl rows, which marks the
+// fabric held when they are not empty (aclHeld). The read and the mark are
+// one step under writeMu, as a drop's read and clear of the mark are: a
+// read that saw the rows of a fabric removed meanwhile does not mark it
+// again after its drop cleared the mark (review II, R5-conc-5004).
+func (a *AccessControl) listACLMarking(ctx context.Context, fabric uint8) ([]store.ACLEntry, error) {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	entries, err := a.store.ListACL(ctx, fabric)
+	if err == nil && len(entries) > 0 {
+		a.markACLHeld(fabric, true)
+	}
+	return entries, err
 }
 
 // unfilteredFabrics lists the fabrics a non-fabric-filtered read of Acl or
@@ -1576,7 +1589,28 @@ func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 // (packages/node/src/behaviors/access-control/AccessControlServer.ts:
 // 286-302, #handleAccessControlListChange returns when the context has no
 // session's fabric).
+//
+// It names no fabric, so the fabric is not marked as holding Acl rows and
+// its removal may go unreported; [AccessControl.NotifyLocalEntryInstalledOn]
+// names it.
 func (a *AccessControl) NotifyLocalEntryInstalled() { a.dataVersion.Bump() }
+
+// NotifyLocalEntryInstalledOn is [AccessControl.NotifyLocalEntryInstalled]
+// for an entry the node appended to fabricIndex's ACL: the DataVersion
+// moves, no AccessControlEntryChanged event is emitted, and the fabric is
+// marked as holding Acl rows when the store holds them, so the fabric's
+// removal is reported as the Acl shrinking ([AccessControl.MatterDropFabric];
+// review II, R5-par-5003). The store is asked under the server's write
+// lock, as a drop asks it; a list that fails marks the fabric, so its
+// removal is asked about rather than missed. Call it after the entry is
+// stored and the write lock the entry was written under is released.
+func (a *AccessControl) NotifyLocalEntryInstalledOn(ctx context.Context, fabricIndex uint8) {
+	a.writeMu.Lock()
+	rows, err := a.store.ListACL(ctx, fabricIndex)
+	a.markACLHeld(fabricIndex, err != nil || len(rows) > 0)
+	a.writeMu.Unlock()
+	a.dataVersion.Bump()
+}
 
 // aclEntriesEqual reports whether two stored ACL lists hold the same
 // entries in the same order (positions and fabric stamps ignored).
