@@ -19,7 +19,8 @@ import (
 // reported CurrentState Position is off it — the server takes an off-grid
 // current Position. Resolution 100, StepValue 1000, current 1234: the
 // target 2234 is off the grid, the handler runs, and the command answers
-// FAILURE with TargetState unchanged.
+// FAILURE with TargetState unchanged. A Step the clamp puts on a bound on
+// the grid (0 here) succeeds.
 func TestStepFromAnOffGridCurrentPositionAnswersFailureAfterTheHandler(t *testing.T) {
 	t.Parallel()
 	p := &panel{}
@@ -40,5 +41,14 @@ func TestStepFromAnOffGridCurrentPositionAnswersFailureAfterTheHandler(t *testin
 	}
 	if after := srv.TargetState(); after.Position == nil || before.Position == nil || after.Position.Null != before.Position.Null || after.Position.Value != before.Position.Value {
 		t.Errorf("TargetState moved from %+v to %+v", before, after)
+	}
+
+	// The clamp catches it: 1234 down by 2000 is clamped to the bound 0,
+	// which is on the grid, and the Step succeeds.
+	if _, err := srv.MatterInvoke(context.Background(), cd.CmdStep, cd.StepRequest{Direction: cd.StepDirectionDecrease, NumberOfSteps: 2}); err != nil {
+		t.Fatalf("Step from 1234 down by 2000, clamped to 0: %v, want success", err)
+	}
+	if after := srv.TargetState(); after.Position == nil || after.Position.Null || after.Position.Value != 0 {
+		t.Errorf("TargetState %+v after the clamped Step, want Position 0", after)
 	}
 }
