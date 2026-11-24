@@ -80,7 +80,7 @@ type BorderRouter struct {
 	// is true exactly when pending is empty (review II, R4-fsm-4303,
 	// R5-fsm-5401).
 	activations uint64
-	pending     map[uint64]struct{}
+	pending     *activationSet
 }
 
 var _ threadbr.BorderRouter = (*BorderRouter)(nil)
@@ -100,7 +100,7 @@ func NewBorderRouter(c *Client, cfg BorderRouterConfig) (*BorderRouter, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	return &BorderRouter{c: c, cfg: cfg, configured: true, pending: map[uint64]struct{}{}}, nil
+	return &BorderRouter{c: c, cfg: cfg, configured: true, pending: &activationSet{m: map[uint64]struct{}{}}}, nil
 }
 
 // Client is the border router's REST client.
@@ -176,7 +176,7 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 		b.mu.Lock()
 		b.activations++
 		activation = b.activations
-		b.pending[activation] = struct{}{}
+		b.pending.m[activation] = struct{}{}
 		b.configured = false
 		b.mu.Unlock()
 	} else if bytes.Equal(current, dataset) {
@@ -197,8 +197,8 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 			// overlapping refused ones each take themselves off (review
 			// II, R4-fsm-4302, R5-fsm-5401).
 			b.mu.Lock()
-			delete(b.pending, activation)
-			b.configured = len(b.pending) == 0
+			delete(b.pending.m, activation)
+			b.configured = len(b.pending.m) == 0
 			b.mu.Unlock()
 		}
 		return b.reenable(ctx, current != nil, err)
@@ -225,12 +225,12 @@ func refused(err error) bool {
 func (b *BorderRouter) settle(since uint64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	for n := range b.pending {
+	for n := range b.pending.m {
 		if n <= since {
-			delete(b.pending, n)
+			delete(b.pending.m, n)
 		}
 	}
-	b.configured = len(b.pending) == 0
+	b.configured = len(b.pending.m) == 0
 }
 
 // reenable is the step back of an activation that disabled the Thread
@@ -377,3 +377,9 @@ func (b *BorderRouter) Diagnostics(ctx context.Context) (thread.NodeDiagnostics,
 	}
 	return out, nil
 }
+
+// activationSet holds the activations not proven unwritten. It sits
+// behind a pointer so BorderRouter stays comparable, as it was at
+// v0.25.0 (a map field would make it not comparable, an API break the
+// fix of R5-fsm-5401 does not need).
+type activationSet struct{ m map[uint64]struct{} }
