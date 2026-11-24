@@ -318,7 +318,7 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // old endpoint is handling at the swap completes on it and is answered;
 // the announce of ep follows the swap (decision 593). It mirrors matter.js replacing
 // a part: `close()` keeps the endpoint's number reservation
-// (endpoint/Endpoint.ts:998-1007, ServerEndpointInitializer.ts:67-69,
+// (endpoint/Endpoint.ts:998-1008, ServerEndpointInitializer.ts:67-69,
 // where `delete()` would erase it, endpoint/Endpoint.ts:961-966, at
 // b25ed960) and the new endpoint with the same id is assigned it
 // (ServerEndpointInitializer.ts:34-42).

@@ -54,7 +54,8 @@ const ClusterRevision = closuredef.Revision
 // a ventilation stop advertises: Positioning plus Ventilation.
 //
 // Ventilation carries conformance "[PS]" (matter.js
-// closure-control.element.ts:31), so it is never advertised alone.
+// closure-control.element.ts:29 at b25ed960), so it is never advertised
+// alone.
 const PositioningVentilationFeatureMap = wire.ClosureControlFeaturePositioning |
 	wire.ClosureControlFeatureVentilation
 
@@ -266,7 +267,8 @@ func New(cfg Config) (*ControlServer, error) {
 		mover: cfg.Mover,
 		// SetupRequired, not Stopped: the drive has reported nothing yet,
 		// and Stopped is a claim about a device we have not heard from.
-		// Mirrors matter.js closure-control.element.ts:113 MainStateEnum.
+		// Mirrors matter.js closure-control.element.ts:114 at b25ed960
+		// MainStateEnum.
 		mainState: wire.ClosureMainStateSetupRequired,
 		errorList: wire.ClosureErrorList{},
 	}
@@ -956,8 +958,10 @@ func (s *ControlServer) targetStateLocked() *wire.ClosureOverallTargetState {
 	}
 }
 
-// secureLocked derives SecureState, "the closure is in a position that
-// secures the opening" (matter.js closure-control.element.ts:134-137):
+// secureLocked derives SecureState (matter.js closure-control.element.ts:135-138
+// at b25ed960) by the rules of closure-control.resource.ts:483-501 (Position
+// FullyClosed with Positioning, :488-489; Latch true with MotionLatching,
+// :491; true, false and null, :495-501):
 // unknown while the position is, false away from FullyClosed, and at
 // FullyClosed true — where the closure advertises MotionLatching, only
 // latched, unknown with an unknown latch. connectedhomeip refuses a true

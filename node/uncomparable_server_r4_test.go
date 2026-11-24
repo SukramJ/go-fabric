@@ -31,8 +31,8 @@ type ifaceServer struct {
 }
 
 // TestUncomparableRootServerIsServed (review II, R4-api-4753): a server
-// the host mounts on the root through Config.RootServers whose dynamic
-// type is uncomparable — with a writable nonvolatile attribute and a
+// the host mounts on the root through Config.RootServers that is a value
+// that cannot be compared — with a writable nonvolatile attribute and a
 // setter — is served and written without a panic; it is the host's, so
 // nothing is stored for it.
 func TestUncomparableRootServerIsServed(t *testing.T) {

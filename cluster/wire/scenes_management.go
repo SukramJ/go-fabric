@@ -84,9 +84,13 @@ func (s ScenesManagement) MatterWriteChanged(ctx context.Context, attrID uint32,
 
 // MatterInvoke rejects every command with a typed UnsupportedCommand
 // (0x81); errScenesStub alone would answer StatusFailure (0x01).
-// matter.js `packages/node/src/behaviors/scenes-management/` + chip
-// `src/app/clusters/scenes-server/ScenesServer.cpp` both require a valid
-// status-code response for unsupported commands.
+// connectedhomeip answers a command it does not handle UnsupportedCommand
+// (`src/app/clusters/scenes-server/ScenesManagementCluster.cpp:406-407` at
+// 6170af84, the default of InvokeCommand), and matter.js so answers a
+// command the cluster does not carry, in its protocol layer
+// (`packages/protocol/src/action/server/CommandInvokeResponse.ts:269-271`
+// at b25ed960); matter.js's ScenesManagementServer is an implemented
+// server, not a stub that refuses commands.
 func (ScenesManagement) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
 	return nil, spec.Errorf(im.StatusUnsupportedCommand, "%w: no commands supported, cmdID 0x%02X", errScenesStub, cmdID)
 }

@@ -964,8 +964,8 @@ func (a *CaseAdapter) SnapshotResponder() *sigma.Responder { return a.snapshotRe
 // PeerSessionParams returns the initiator's SessionParameters from the
 // Sigma1 the adapter's responder processed, or nil when it stated none or
 // no Sigma1 was processed yet. The bridge paces the Sigma2 /
-// Sigma2_Resume retransmissions by them (matter.js CaseServer.ts:120-123
-// `session.timingParameters = sigma1.initiatorSessionParams`).
+// Sigma2_Resume retransmissions by them (matter.js CaseServer.ts:122-125
+// at b25ed960 `session.timingParameters = sigma1.initiatorSessionParams`).
 func (a *CaseAdapter) PeerSessionParams() *sessionparams.Parameters {
 	r := a.snapshotResponder()
 	if r == nil {
@@ -1099,7 +1099,7 @@ func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload [
 			// The callback's second argument is the PEER's session id
 			// (Sigma1.initiatorSessionID) — the id the initiator expects
 			// stamped into Header.SessionID of every outbound packet.
-			// matter.js CaseServer.ts:179 `peerSessionId: cx.peerSessionId`.
+			// matter.js CaseServer.ts:182 at b25ed960 `peerSessionId: cx.peerSessionId`.
 			// Passing our own ResponderSessionID here registered the
 			// resumed session under a peer id the initiator never
 			// allocated, so it dropped every reply.

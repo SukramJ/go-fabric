@@ -20,8 +20,9 @@ import (
 )
 
 // clientSessionKeyMaxLength bounds an owner's key for a session. Mirrors
-// matterjs-server packages/ws-controller/src/camera/cameraCommands.ts:308
-// at 0bd06f2.
+// matterjs-server packages/ws-controller/src/camera/cameraCommands.ts:304
+// at 0bd06f2 (CLIENT_SESSION_KEY_MAX_LENGTH; the check, toClientSessionKey,
+// :309-311).
 const clientSessionKeyMaxLength = 128
 
 // StartRequest is one session start. A zero numeric bound and a nil

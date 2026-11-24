@@ -1640,9 +1640,10 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// A removed endpoint ends no subscription: the paths that name it
 	// select nothing from then on, and the subscription's other paths go
 	// on being reported. Mirrors matter.js
-	// packages/node/src/node/integration/ProtocolService.ts:216-220 at
-	// db021da0 (deleteEndpoint drops the endpoint from the protocol
-	// collections and nothing else; called at :314).
+	// packages/node/src/node/integration/ProtocolService.ts:225-229 at
+	// b25ed960 (deleteEndpoint drops the endpoint from the protocol
+	// collections and nothing else; its caller, :314 at db021da0, was not
+	// re-read at b25ed960).
 
 	// Notify active subscribers that Descriptor.PartsList has changed
 	// on the endpoints that list the parts that moved. Mirrors

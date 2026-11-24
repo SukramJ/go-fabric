@@ -169,14 +169,15 @@ type ThermostatConfig struct {
 	// MinHeatSetpointLimit, MaxHeatSetpointLimit, MinCoolSetpointLimit and
 	// MaxCoolSetpointLimit are the initial user setpoint limits; nil takes
 	// the absolute limit (matter.js #userLimit: an unset user limit is its
-	// absolute bound, ThermostatServer.ts:927-931). [New] reconciles them
+	// absolute bound, ThermostatServer.ts:1379-1383 at b25ed960). [New] reconciles them
 	// with the rest.
 	MinHeatSetpointLimit, MaxHeatSetpointLimit *int16
 	MinCoolSetpointLimit, MaxCoolSetpointLimit *int16
 	// MinSetpointDeadBand is the AUTO deadband in 0.1 °C (0 to 127); nil is
-	// the default, 20 (2.0 °C). A value above 127 is reset to 20 and a
-	// negative one refused, as matter.js's initialize does
-	// (ThermostatServer.ts:154-160).
+	// the default, 20 (2.0 °C). A negative one is refused, as matter.js's
+	// initialize refuses one below 0 (ThermostatServer.ts:285-287 at
+	// b25ed960); matter.js also resets one above 127 to 20 (:282-284),
+	// which an int8 cannot hold.
 	MinSetpointDeadBand *int8
 	// InitialUnoccupiedHeatingSetpoint and InitialUnoccupiedCoolingSetpoint
 	// are the unoccupied setpoints (conformance HEAT & OCC, COOL & OCC); nil
@@ -184,7 +185,8 @@ type ThermostatConfig struct {
 	// default celsius 20 and 26).
 	InitialUnoccupiedHeatingSetpoint, InitialUnoccupiedCoolingSetpoint *int16
 	// Occupied is the initial occupancy with OCC — matter.js's
-	// externallyMeasuredOccupancy (ThermostatServer.ts:560-570); nil is
+	// externallyMeasuredOccupancy (ThermostatServer.ts:1023-1060 at
+	// b25ed960, the default :1027, the warning :1050-1053); nil is
 	// occupied, with the warning matter.js logs. The host reports changes
 	// through [ThermostatServer.SetOccupied].
 	Occupied *bool
@@ -194,7 +196,8 @@ type ThermostatConfig struct {
 	// the active preset's handle (nil for none). The configured presets are
 	// the stored ones on the first start — a preset without a handle gets
 	// one, a null BuiltIn is false — and a [PresetStore] that holds presets
-	// replaces them (ThermostatServer.ts:134-152).
+	// replaces them (ThermostatServer.ts:294-305, the normalisation
+	// #normalizePresets :2001-2025, at b25ed960).
 	NumberOfPresets    uint8
 	PresetTypes        []PresetType
 	Presets            []Preset
@@ -330,7 +333,7 @@ type Sink interface {
 	// wrote — and the companions are what the reconcile moves besides it. A SetpointRaiseLower makes one call: in Both
 	// mode on a HEAT+COOL thermostat the cooling setpoint is the primary
 	// and the heating setpoint its companion (matter.js assigns cooling
-	// first, ThermostatServer.ts:219-220); when only one of them moves it
+	// first, ThermostatServer.ts:448-449 at b25ed960); when only one of them moves it
 	// travels alone, and a single-mode command moves one with no
 	// companions.
 	//

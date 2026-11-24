@@ -196,8 +196,9 @@ type AdministratorCommissioning struct {
 	// GeneralCommissioning.FailSafeArmed. When non-nil it is called
 	// before OpenCommissioningWindow to enforce the "FailSafe must be
 	// fully disarmed" pre-condition per chip
-	// AdministratorCommissioningCluster.cpp OpenCommissioningWindow
-	// VerifyOrExit(IsFailSafeFullyDisarmed, ...).
+	// AdministratorCommissioningLogic.cpp:53 (OpenCommissioningWindow) and
+	// :94 (OpenBasicCommissioningWindow) at 6170af84:
+	// VerifyOrReturnError(IsFailSafeFullyDisarmed(), Busy).
 	isFailSafeArmed func() bool
 
 	// versionMu guards lastSnapshot.
@@ -650,8 +651,10 @@ func (admCommBusyErr) Error() string {
 }
 
 // MatterStatusCode / MatterClusterStatus: FAILURE with the cluster-specific
-// Busy (0x02), as matter.js AdministratorCommissioningServer.ts:196,214
-// throws AdministratorCommissioning.BusyError — not the IM-level BUSY.
+// Busy (0x02), as matter.js throws AdministratorCommissioning.BusyError in
+// #assertNoCommissioningInProgress (AdministratorCommissioningServer.ts:216-224
+// at b25ed960: :218 with a fail-safe armed, :222 with an administrator
+// window open) — not the IM-level BUSY.
 // TC-CADMIN-1.5 step 14 reads the cluster status from the error.
 func (admCommBusyErr) MatterStatusCode() im.StatusCode { return im.StatusFailure }
 func (admCommBusyErr) MatterClusterStatus() uint8      { return 0x02 } // Busy
@@ -674,7 +677,8 @@ func (admCommPakeErr) MatterClusterStatus() uint8      { return 0x03 } // PAKEPa
 // [ErrAdmCommWindowNotOpen]. Matter §11.19.8.3 Step 2 mandates returning
 // a cluster-specific failure when RevokeCommissioning is called while no
 // window is open. Both matter.js
-// AdministratorCommissioningServer.ts:143-147 (throws WindowNotOpenError)
+// AdministratorCommissioningServer.ts:157-160 at b25ed960 (throws
+// WindowNotOpenError)
 // and chip AdministratorCommissioningLogic.cpp:115-119
 // (ClusterStatusCode::kWindowNotOpen = 0x04) require ClusterStatus=0x04.
 type admCommWindowNotOpenErr struct{}
