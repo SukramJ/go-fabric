@@ -765,7 +765,7 @@ func (r *endpointStateRegistry) retain(keep map[SourceKey]struct{}) {
 
 // ClusterDataVersion returns the stable per-(endpoint, cluster)
 // DataVersion for a bridged endpoint. First access installs the
-// random non-zero initial value (see [contract.DataVersionTracker]).
+// random initial value, 0 included (see [contract.DataVersionTracker]).
 func (e *Endpoint) ClusterDataVersion(clusterID uint32) uint32 {
 	return e.clusterTracker(clusterID).Current()
 }
@@ -775,7 +775,7 @@ func (e *Endpoint) ClusterDataVersion(clusterID uint32) uint32 {
 // subscribers receive the fresh value. Mirrors matter.js
 // Datasource.ts:690-699 at db021da0 (advanceVersion), which a commit that
 // changed a property calls once (:1456-1457); past 0xFFFF_FFFF it wraps to
-// 0 there (:696-698), where the tracker skips 0
+// 0 there (:696-698), and so does the tracker
 // ([contract.DataVersionTracker.Bump]).
 func (e *Endpoint) BumpClusterDataVersion(clusterID uint32) {
 	e.clusterTracker(clusterID).Bump()

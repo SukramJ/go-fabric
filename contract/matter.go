@@ -235,7 +235,7 @@ type ClusterDataVersion interface {
 	// MatterDataVersion returns the current per-cluster monotonic counter.
 	// Every value is a version, 0 included: a DataVersionFilter and a
 	// write's DataVersion are compared with it whatever it is (review II,
-	// decision 46). [DataVersionTracker] skips 0 when it wraps.
+	// decision 46). [DataVersionTracker] wraps past 0xFFFFFFFF to 0.
 	MatterDataVersion() uint32
 }
 
