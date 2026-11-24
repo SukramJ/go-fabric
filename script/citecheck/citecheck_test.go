@@ -242,8 +242,9 @@ const citecheckDriftRatchet = 410
 // re-pinned at b25ed960 per fable-diff-g5c/g5d/g5e (2655).
 // Review II run-4 fix PR's REG: the cites re-read at b25ed960 by
 // verify-r4-pass3.md and fable-diff-h11 note 6 (2653).
-// Review II phase 8 wave 1's REG: the cites the wave re-read at b25ed960
-// (fact note F2, fable-diff-a4 note 7, fable-diff-a7 §4) (2650).
+// Review II phase 8 wave 1's REG: the wave re-cited lines at b25ed960
+// (measured by make cite-report: 2653 → 2650; which cites moved is not
+// itemised) (2650).
 const citecheckOffPinRatchet = 2650
 
 // offPinRowRE reads the off-pin row of summary.md.
