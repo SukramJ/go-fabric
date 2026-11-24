@@ -21,6 +21,17 @@ import (
 // at b25ed960).
 const probeMaxRetransmissions = 2
 
+// probeMaxReportChunks is how many reports the probe's read takes before
+// it fails: a peer that keeps answering with more to come would otherwise
+// hold the probe, and its network slot, for as long as it streams. A read
+// without paths has nothing to report, so one report answers it; the
+// bound is this module's own (review II, R2-C2-bound-2159).
+const probeMaxReportChunks = 4
+
+// errProbeChunks is a probe read that reached probeMaxReportChunks reports
+// with more still to come.
+var errProbeChunks = errors.New("peer: probe read sent too many report chunks")
+
 // Tags of ReportDataMessage the probe reads (Matter §10.7.3).
 const (
 	tagReportMoreChunked      = 3
@@ -38,7 +49,7 @@ const (
 // reads them (interaction/InteractionMessenger.ts:938-972) — a
 // StatusResponse Success after a chunk with more to come, and after the
 // last one unless it suppresses the response, the last one not awaited.
-// It reports true on the final report and false on any error or the end of
+// It reads at most probeMaxReportChunks reports. It reports true on the final report and false on any error or the end of
 // ctx (:345-355); the exchange is closed either way (:356-359).
 //
 // With a network profile the probe takes a slot of it, released when the
@@ -100,7 +111,7 @@ func readEmpty(ctx context.Context, x *exchange.Exchange) error {
 		return err
 	}
 	success := statusSuccess()
-	for {
+	for chunks := 1; ; chunks++ {
 		msg, err := x.Next(ctx, exchange.ReceiveOptions{})
 		if err != nil {
 			return err
@@ -113,6 +124,9 @@ func readEmpty(ctx context.Context, x *exchange.Exchange) error {
 			return err
 		}
 		if more {
+			if chunks >= probeMaxReportChunks {
+				return errProbeChunks
+			}
 			if err := x.Send(ctx, im.OpcodeStatusResponse, success, exchange.SendOptions{}); err != nil {
 				return err
 			}
