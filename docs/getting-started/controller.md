@@ -1063,7 +1063,8 @@ failure before an Ok deletes it.
 ### The fabric label
 
 `Registry.SetFabricLabel(ctx, label)` renames our fabric at run time:
-the label (at most 32 characters, else `commissioner.ErrLabel`) is saved
+the label (at most 32 bytes of its UTF-8 encoding, else
+`commissioner.ErrLabel`; a stored longer label is cut at load) is saved
 with the fabric record (`commissioner.Fabric.SetLabel`), and every
 connected node gets `UpdateFabricLabel` at once; a node that is not
 connected gets it at its next start. A node that refuses the name because
