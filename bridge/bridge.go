@@ -1642,8 +1642,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context, run *uint64) error { //no
 	// on being reported. Mirrors matter.js
 	// packages/node/src/node/integration/ProtocolService.ts:225-229 at
 	// b25ed960 (deleteEndpoint drops the endpoint from the protocol
-	// collections and nothing else; its caller, :314 at db021da0, was not
-	// re-read at b25ed960).
+	// collections and nothing else; called at :323).
 
 	// Notify active subscribers that Descriptor.PartsList has changed
 	// on the endpoints that list the parts that moved. Mirrors

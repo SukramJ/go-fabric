@@ -393,7 +393,7 @@ and `RemoveSession`. A removed fabric's sessions end through the port's
 
 `ProviderConfig.MaxSessions` bounds the sessions, the host's included,
 and `ProviderConfig.MaxSessionsPerFabric` those of one fabric; through
-the device facade they are the fields of `wpdef.Declare`. Zero, the
+the device facade they are the fields of `webrtctransportproviderdef.Declare`. Zero, the
 default, bounds neither beyond the session ids. Past a bound the port is
 not asked: `ProvideOffer` answers `RESOURCE_EXHAUSTED`, and `SolicitOffer`
 is answered with a session id and DeferredOffer false, the session is not
@@ -555,7 +555,7 @@ turns a client's `ice_candidates` list into the structs
 `Session.ProvideICECandidates` takes, through the converter `Provider.Send`
 runs, so a refusal reads as there. `client.ValueOf` turns what
 `Provider.Send` returns (a generated response such as
-`wpdef.ProvideOfferResponse`) into a value `client.DecodeJSON` renders. In
+`webrtctransportproviderdef.ProvideOfferResponse`) into a value `client.DecodeJSON` renders. In
 `VideoBounds` and `AudioBounds` a nil field is unstated and a stated one is
 held to its field's range, so a stated 0 is refused where the model's floor
 is 1, as matterjs-server refuses it.

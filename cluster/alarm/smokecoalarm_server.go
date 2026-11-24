@@ -885,7 +885,7 @@ type pendingEvent struct {
 // when the device hosting the server receives a smoke [CO] alarm from an
 // interconnected sensor" (:174-176, :184-186), which connectedhomeip maps
 // onto the Interconnect attribute's change to Warning or Critical
-// (SmokeCoAlarmCluster.cpp:187-192, :211-213 at 6170af84), as here;
+// (SmokeCoAlarmCluster.cpp:187-192, :210-214 at 6170af84), as here;
 // HardwareFault when
 // HardwareFaultAlert becomes true (:152); EndOfService when
 // EndOfServiceAlert is set to Expired (:157); SelfTestComplete when

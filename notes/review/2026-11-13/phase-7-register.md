@@ -551,16 +551,18 @@ issue #590 item 1, H13 issue #590 item 2, and the follow-ups the decisions
 opened (H2b, H2c, H6b, H9b, H12b, H13b). An Opus refutation read every row
 at the head first (the Fable-confirmed rows re-located only; none
 refuted); each fixed row has a test that failed before its fix; Fable read
-the diffs of H1, H2, H2b, H5, H6, H6b, H7, H8, H9, H9b, H11, H12 and H13
-and wrote the fact notes of H1 and H11. Merges onto the branch:
+the diffs of H1, H2, H2b, H5, H6, H6b, H7, H8, H9, H9b, H11, H12, H13
+and H13b and wrote the fact notes of H1 and H11. Merges onto the branch:
 `4a4b28771` H1, `328d39818` H7, `21ba99974` H9, `337883cd7` H9 repair
 (R4F-A); `d50fc4d60` H9b (R4F-A2); `c967694c7` H12, `a401cd3c6` H12b;
 `c8c57c52c` H2, `f314fd783` H3, `30336f21c` H4, `bdfdf3b7c` H5 (R4F-B);
 `48af40214` H6, `45204a080` H8, `999ccffb9` H10, `aebbf42fc` H11,
 `cfc992aaf` H2b (R4F-C); `ef6b5979e` H13, `097072287` H6b, `23c90b73b` H2c
 (R4F-D); `3efb507b3` the reference bridge's `Messages.SetLogger` (decision
-635). H13b (decisions 632, 633) runs beside this REG and merges on its
-own. Severities are the verify's. Not reopened: the R2-C2-bound-2153 →
+635); `e795f4a84` H13b (decisions 632, 633; commits `911115086`,
+`45ab3f354`, `549376080`, `7b7d92b4d`). Coordinator commits: `71dcb4300`
+the remaining `WebRTCEndReasonEnum` hand constants take the generated
+values (decision 636), `a695f5249` the guards after the units. Severities are the verify's. Not reopened: the R2-C2-bound-2153 →
 R3-bound-3501 line (holds), the R2-C2-store-1004 residual, R2-P6-sup-1009,
 R2-P6-fsm-1018, R4-api-4706 (decision 551's shape). The notes of the run
 are not fixed (decision 602).
@@ -605,13 +607,13 @@ are not fixed (decision 602).
 | R4-doc-4803 | — | struck (the citation holds) |
 | #589 | — | fixed `91c9bacc8`, `d5f18171b`, `e363a9adc`, `fa56a305e` (decisions 591-595, 604, 626, 627): a same-key Replace (or Remove and Add in one batch) renews every cluster's DataVersion and reports every readable attribute but the changes-omitted ones; key-scoped state stays with the key → `BD-Matter-Bridge-ReplaceKeepsKeyScopedState`; new `endpoint.Spec.Instance`, `(*Endpoint).SameInstance`; tests `TestReplaceAnnouncesTheNewInstance`, `TestRemoveAndAddOfOneKeyInOneBatchAnnounces`, `TestInvokeInFlightAtTheSwapCompletesOnTheOldInstance`, `TestReplaceKeepsTheControllerWrittenLabel`, `TestNewInstanceRenewsTheTrackers`, the negative controls `TestSameInstanceReplaceAnnouncesNothing`, `TestUnrelatedReassemblyKeepsDataVersions`, `TestRefusedReplaceAnnouncesNothing` |
 | #590 item 1 | — | fixed `3a1746f04` (decisions 606-609), `3f4868212`, `6c01dfed6`, `349e8ab8a` (619-621, 610): `ProviderConfig.MaxSessions` / `MaxSessionsPerFabric`, also as `wpdef.Declare` fields; the reference daemon declares 5 and keeps no count → paragraph in `BD-chip-WebRtcTransportProvider-RulesInServer`, the *Ahead* row's source cell; tests `cluster/camera/provider_cap_test.go`, `TestProviderSessionBoundsThroughTheFacade`, `TestCameraSimWebRTCSessionBound` |
-| #590 item 2 | — | fixed `8da0a37be`, `8a3e46a7a`, `634537416`, `004f19936` (decisions 605, 611-613, 630, 631, 634); the predicate under the provider's serialisation and the generated end reason are H13b's (decisions 632, 633) → *Ahead* row and `BD-Matter-Camera-LostRequestorEndsSessions`, camera guide; tests `secure/operational/peer_gone_test.go`, `cluster/camera/provider_gone_test.go`, `node/camera_peergone_internal_test.go` |
+| #590 item 2 | — | fixed `8da0a37be`, `8a3e46a7a`, `634537416`, `004f19936` (decisions 605, 611-613, 630, 631, 634); the predicate under the provider's serialisation and the generated end reason are H13b's (`e795f4a84`, decisions 632, 633; `71dcb4300`, decision 636) → *Ahead* row and `BD-Matter-Camera-LostRequestorEndsSessions`, camera guide; tests `secure/operational/peer_gone_test.go`, `cluster/camera/provider_gone_test.go`, `node/camera_peergone_internal_test.go` |
 
 ### Carried to run 5
 
 | ID | where | what |
 | --- | --- | --- |
-| the run's notes (decision 602) | C5 | R4-doc-4003, R4-conc-4053, -4054, R4-err-4055, R4-conc-4056, R4-err-4104, R4-store-4154, R4-conc-4155, -4156, R4-api-4157, R4-test-4158, R4-store-4201, R4-doc-4202, R4-fsm-4253, R4-fsm-4305, R4-conc-4306, R4-conc-4352, R4-bound-4353, R4-fsm-4354, R4-err-4355, R4-doc-4404, R4-doc-4502, R4-test-4503, R4-fsm-4551, R4-conc-4552, R4-doc-4553, R4-doc-4705, R4-api-4706, R4-api-4752, R4-doc-4754, the pass-3 notes R4-doc-4185 to 4189 and 4284 to 4288, and the known notes `rows-r4.tsv` lists again (R2-C2-, R3- rows, R3-store-3703 among them): each closed as accepted or one follow-up issue per package |
+| the run's notes (decision 602) | C5 | R4-doc-4003, R4-conc-4053, -4054, R4-err-4055, R4-conc-4056, R4-err-4104, R4-store-4154, R4-conc-4155, -4156, R4-api-4157, R4-test-4158, R4-store-4201, R4-doc-4202, R4-fsm-4253, R4-fsm-4305, R4-conc-4306, R4-conc-4352, R4-bound-4353, R4-fsm-4354, R4-err-4355, R4-doc-4404, R4-doc-4502, R4-test-4503, R4-fsm-4551, R4-conc-4552, R4-doc-4553, R4-doc-4705, R4-api-4752, R4-doc-4754, the pass-3 notes R4-doc-4185 to 4189 and 4284 to 4288, and the known notes `rows-r4.tsv` lists again (R2-C2-, R3- rows, R3-store-3703 among them): each closed as accepted or one follow-up issue per package |
 | R3-sec-3403 residue (above, run 3) | C5 | a note; not fixed in run 4 |
 | R3-fsm-3301, R3-err-3305, R3-conc-3306, R4-fsm-4301's trigger | the bluetoothd probe (decision 574) | as above |
 | notes R3-doc-3255 and the eight others (above, run 3) | C5 | the scripted re-cite of the answered notes is still not done |
