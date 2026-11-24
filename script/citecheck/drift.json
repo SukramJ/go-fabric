@@ -2687,7 +2687,7 @@
   },
   {
     "file": "endpoint/dispatcher.go",
-    "line": 1178,
+    "line": 1181,
     "citation": "packages/protocol/src/interaction/InteractionMessenger.ts:425-459",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -3137,7 +3137,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1854,
+    "line": 1859,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",
@@ -3621,7 +3621,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 328,
+    "line": 376,
     "citation": "NodeSession.ts:437",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "logNew",
@@ -3630,7 +3630,7 @@
   },
   {
     "file": "secure/sigma/protocol.go",
-    "line": 363,
+    "line": 411,
     "citation": "MRP.ts:129",
     "resolved": "packages/protocol/src/protocol/MRP.ts",
     "identifier": "retransmissionIntervalOf",
