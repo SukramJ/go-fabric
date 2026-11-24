@@ -551,6 +551,14 @@ type OpcredsConfig struct {
 	// mDNS record with the just-installed CompressedFabricID + NodeID
 	// so commissioners' `FindOperationalForStayActive` step resolves.
 	// May be nil — the cluster works regardless.
+	//
+	// It runs under the server's NOC lock, which orders a fabric's
+	// installation before a rollback's removal of it (review II,
+	// R4-conc-4054, decision 660): it must not call
+	// [OperationalCredentials.RemoveFabric],
+	// [OperationalCredentials.PrepareFreshFailSafe] or
+	// [OperationalCredentials.OnFailSafeExpiry], which take that lock and
+	// would wait for it forever.
 	OnFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
 	// OnFabricRemoved fires after a successful RemoveFabric has dropped
 	// a fabric from persistent storage, and after an expired fail-safe
@@ -615,10 +623,24 @@ type OpcredsConfig struct {
 	// new NOC. Mirrors matter.js FabricManager.ts `replacing` event →
 	// SessionManager and chip operational-credentials-server.cpp
 	// FabricTable::AbortAllOtherCommunicationOnFabric. May be nil.
+	//
+	// From UpdateNOC it runs under the server's NOC lock, as
+	// OnFabricInstalled does (review II, R4-conc-4054, decision 660): it
+	// must not call [OperationalCredentials.RemoveFabric],
+	// [OperationalCredentials.PrepareFreshFailSafe] or
+	// [OperationalCredentials.OnFailSafeExpiry]. Its run for a rolled-back
+	// UpdateNOC comes after the lock is released.
 	OnFabricUpdated func(ctx context.Context, fabricIndex uint8)
 	// OnFabricWithdraw, when non-nil, receives the (compressedID,
 	// nodeID) of an operational mDNS instance that must be withdrawn —
 	// see the field doc on [OperationalCredentials]. May be nil.
+	//
+	// From UpdateNOC it runs under the server's NOC lock, as
+	// OnFabricInstalled does (review II, R4-conc-4054, decision 660): it
+	// must not call [OperationalCredentials.RemoveFabric],
+	// [OperationalCredentials.PrepareFreshFailSafe] or
+	// [OperationalCredentials.OnFailSafeExpiry]. Its run for a rolled-back
+	// UpdateNOC comes after the lock is released.
 	OnFabricWithdraw func(ctx context.Context, compressedID [8]byte, nodeID uint64)
 	// Logger receives the server's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
