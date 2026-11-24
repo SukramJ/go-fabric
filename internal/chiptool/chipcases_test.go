@@ -92,16 +92,21 @@ type descriptorNode struct {
 }
 
 // loadChipCases reads the descriptor out of the image and flattens it to
-// family → cases. A Python suite with several runs (one per CHIP app) keeps
-// run1: the runs differ in which CHIP app they drive, and there is one DUT
-// here.
+// family → cases. A Python suite with several runs keeps one: the runs
+// differ in which CHIP app or endpoint they drive, and there is one DUT
+// here (see firstRun).
 func loadChipCases(ctx context.Context, h *harness) (map[string][]chipCase, error) {
 	raw, err := h.exec(ctx, "cat", "/lib/test-descriptor.json")
 	if err != nil {
 		return nil, fmt.Errorf("read the test descriptor: %w\n%s", err, raw)
 	}
+	return parseChipCases([]byte(raw))
+}
+
+// parseChipCases flattens a test descriptor to family → cases.
+func parseChipCases(raw []byte) (map[string][]chipCase, error) {
 	var root descriptorNode
-	if err := json.Unmarshal([]byte(raw), &root); err != nil {
+	if err := json.Unmarshal(raw, &root); err != nil {
 		return nil, fmt.Errorf("decode the test descriptor: %w", err)
 	}
 	out := map[string][]chipCase{}
@@ -111,15 +116,13 @@ func loadChipCases(ctx context.Context, h *harness) (map[string][]chipCase, erro
 			switch m.Kind {
 			case "suite":
 				if m.Path != "" && len(trail) == 1 {
-					// A multi-run Python case: take run1.
-					for _, run := range m.Members {
-						if run.Name == "run1" {
-							run.Name = m.Name
-							if run.PICS == "" {
-								run.PICS = m.PICS
-							}
-							addCase(out, trail[0], run)
+					// A multi-run Python case: take one run.
+					if run, ok := firstRun(m.Members); ok {
+						run.Name = m.Name
+						if run.PICS == "" {
+							run.PICS = m.PICS
 						}
+						addCase(out, trail[0], run)
 					}
 					continue
 				}
@@ -133,6 +136,31 @@ func loadChipCases(ctx context.Context, h *harness) (map[string][]chipCase, erro
 	}
 	walk(root, nil)
 	return out, nil
+}
+
+// firstRun picks the run a multi-run Python case keeps: the one with the
+// lowest number of the descriptor's run<N> names, which is run1 where the
+// case has one. A case CHIP's CI runs only in later runs keeps the first of
+// those (decision 648 of review II: TC_SWTCH.py at chip 6170af84 names
+// test_TC_SWTCH_2_3 and _2_4 in run2 and run3 only, :40-63, and keeping
+// run1 alone dropped both). The numbers are read from the names, not from
+// the members' order in the descriptor.
+func firstRun(members []descriptorNode) (descriptorNode, bool) {
+	best, bestN := descriptorNode{}, -1
+	for _, run := range members {
+		num, ok := strings.CutPrefix(run.Name, "run")
+		if !ok {
+			continue
+		}
+		n, err := strconv.Atoi(num)
+		if err != nil || n < 1 {
+			continue
+		}
+		if bestN < 0 || n < bestN {
+			best, bestN = run, n
+		}
+	}
+	return best, bestN > 0
 }
 
 func addCase(out map[string][]chipCase, fam string, n descriptorNode) {
