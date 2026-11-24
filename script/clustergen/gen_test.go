@@ -404,3 +404,40 @@ func TestDefinitionOnlyHostRefused(t *testing.T) {
 		t.Errorf("%s: %v, want the Host refused", name, err)
 	}
 }
+
+// TestDefinitionEnumsAreDeclared: every package whose definition
+// references an enum or bitmap of a snapshot definition
+// (WebRtcTransportDefinitions.WebRTCEndReasonEnum) declares its type, its
+// named values and its descriptor, so a server names a value by its
+// generated constant rather than a hand-written one (owner decision 633).
+func TestDefinitionEnumsAreDeclared(t *testing.T) {
+	t.Parallel()
+	snap := testSnapshot(t)
+	refs := 0
+	for _, name := range sortedClusterNames(snap) {
+		o, err := generate(snap, name)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		for _, def := range snap.Definitions {
+			for _, d := range def.Datatypes {
+				if d.Metatype != "enum" && d.Metatype != "bitmap" {
+					continue
+				}
+				if !bytes.Contains(o.Source, []byte(def.Name+"."+d.Name)) {
+					continue
+				}
+				refs++
+				goName := exportName(d.Name)
+				for _, want := range []string{"type " + goName + " ", "var " + goName + "Def = "} {
+					if !bytes.Contains(o.Source, []byte(want)) {
+						t.Errorf("%s references %s.%s but does not declare %q", name, def.Name, d.Name, want)
+					}
+				}
+			}
+		}
+	}
+	if refs == 0 {
+		t.Error("no package references an enum or bitmap of a definition: the check reached nothing")
+	}
+}

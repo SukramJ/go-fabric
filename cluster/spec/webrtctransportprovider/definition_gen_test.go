@@ -29,6 +29,7 @@ func TestConstantsMatchTheDefinition(t *testing.T) {
 	t.Parallel()
 	spectest.CheckFeatures[Feature](t, Definition, FeatureMetadata)
 	spectest.CheckEnum[StreamUsageEnum](t, StreamUsageEnumDef, StreamUsageInternal, StreamUsageRecording, StreamUsageAnalysis, StreamUsageLiveView)
+	spectest.CheckEnum[WebRTCEndReasonEnum](t, WebRTCEndReasonEnumDef, WebRTCEndReasonIceFailed, WebRTCEndReasonIceTimeout, WebRTCEndReasonUserHangup, WebRTCEndReasonUserBusy, WebRTCEndReasonReplaced, WebRTCEndReasonNoUserMedia, WebRTCEndReasonInviteTimeout, WebRTCEndReasonAnsweredElsewhere, WebRTCEndReasonOutOfResources, WebRTCEndReasonMediaTimeout, WebRTCEndReasonLowPower, WebRTCEndReasonPrivacyMode, WebRTCEndReasonUnknownReason)
 }
 
 // TestCodecsRoundTrip encodes a populated value of every generated
