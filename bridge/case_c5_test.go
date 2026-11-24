@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"testing"
 
 	"thingfabric.dev/go-fabric/secure/sessionparams"
@@ -90,7 +91,7 @@ func TestUninstalledResumeClearsItsSecret(t *testing.T) {
 				a.SetOnEstablished(func(sigma.Established) error { return nil })
 			}
 			var dropped []sigma.Established
-			a.resumeDroppedForTest = func(est *sigma.Established) { dropped = append(dropped, *est) }
+			a.droppedForTest = func(est *sigma.Established) { dropped = append(dropped, *est) }
 			for call := 1; call <= tc.dropped; call++ {
 				if op, _, err := a.ProcessSigma1(s1); err != nil || op != mrp.SCOpcodeSigma2Resume {
 					t.Fatalf("resume %d: opcode %#x, err %v; want a Sigma2_Resume", call, op, err)
@@ -113,4 +114,99 @@ func TestUninstalledResumeClearsItsSecret(t *testing.T) {
 			}
 		})
 	}
+}
+
+// zeroedA7 fails unless every dropped value carries a shared secret, all
+// of it zero.
+func zeroedA7(t *testing.T, dropped []sigma.Established) {
+	t.Helper()
+	if len(dropped) == 0 {
+		t.Fatal("no session value dropped")
+	}
+	for i := range dropped {
+		est := &dropped[i]
+		if len(est.SharedSecret) == 0 {
+			t.Fatalf("dropped value %d carries no shared secret", i)
+		}
+		for _, b := range est.SharedSecret {
+			if b != 0 {
+				t.Fatalf("dropped value %d's shared secret is %x; want it zeroed", i, est.SharedSecret)
+			}
+		}
+	}
+}
+
+// sigma3AdapterA7 runs a full handshake up to its Sigma3 on a fresh
+// adapter and returns the adapter, the Sigma3 and the values it drops.
+func sigma3AdapterA7(t *testing.T) (*CaseAdapter, []byte, *[]sigma.Established) {
+	t.Helper()
+	ipk := newCaseTestIPK(t)
+	initiator := sigma.NewInitiator(newCaseTestIdentity(t, 0xAAAA, 1, ipk), caseTestVerifier{}, 0x1001, [32]byte{0xDE, 0xAD, 0xBE, 0xEF})
+	a := NewCaseAdapter(sigma.NewResponder(newCaseTestIdentity(t, 0xBBBB, 1, ipk), caseTestVerifier{}, 0x2001))
+	dropped := &[]sigma.Established{}
+	a.droppedForTest = func(est *sigma.Established) { *dropped = append(*dropped, *est) }
+	s1, err := initiator.GenerateSigma1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, s2, err := a.ProcessSigma1(s1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s3, err := initiator.ProcessSigma2Bytes(s2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a, s3, dropped
+}
+
+// TestDroppedSessionValuesClearTheirSecret (N1 of the Fable diff read of
+// C5-h1-n3): every step's session value this module drops — a resume or a
+// Sigma3 whose callback refused it, a Sigma3 without a callback, a session
+// installed through the deprecated callback, which is handed the keys
+// alone — is dropped with its shared secret zeroed.
+func TestDroppedSessionValuesClearTheirSecret(t *testing.T) {
+	t.Parallel()
+	refuse := func(sigma.Established) error { return errors.New("refused") }
+	t.Run("resume refused by the callback", func(t *testing.T) {
+		t.Parallel()
+		ipk := newCaseTestIPK(t)
+		responder := sigma.NewResponder(newCaseTestIdentity(t, 0xBBBB, 1, ipk), caseTestVerifier{}, 0x2001)
+		s1, secret, rid := buildResumeSigma1(t)
+		responder.SetResumptionStore(resumeRecords{string(rid): secret})
+		a := NewCaseAdapter(responder)
+		a.SetOnEstablished(refuse)
+		var dropped []sigma.Established
+		a.droppedForTest = func(est *sigma.Established) { dropped = append(dropped, *est) }
+		if _, _, err := a.ProcessSigma1(s1); err == nil {
+			t.Fatal("a resume the callback refused: want an error")
+		}
+		zeroedA7(t, dropped)
+	})
+	t.Run("Sigma3 refused by the callback", func(t *testing.T) {
+		t.Parallel()
+		a, s3, dropped := sigma3AdapterA7(t)
+		a.SetOnEstablished(refuse)
+		if _, _, err := a.ProcessSigma3(s3); err == nil {
+			t.Fatal("a Sigma3 the callback refused: want an error")
+		}
+		zeroedA7(t, *dropped)
+	})
+	t.Run("Sigma3 without a callback", func(t *testing.T) {
+		t.Parallel()
+		a, s3, dropped := sigma3AdapterA7(t)
+		if _, _, err := a.ProcessSigma3(s3); err != nil {
+			t.Fatal(err)
+		}
+		zeroedA7(t, *dropped)
+	})
+	t.Run("Sigma3 through the deprecated callback", func(t *testing.T) {
+		t.Parallel()
+		a, s3, dropped := sigma3AdapterA7(t)
+		a.SetOnSessionEstablished(func(sigma.SessionKeys, uint16) error { return nil })
+		if _, _, err := a.ProcessSigma3(s3); err != nil {
+			t.Fatal(err)
+		}
+		zeroedA7(t, *dropped)
+	})
 }
