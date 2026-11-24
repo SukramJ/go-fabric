@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
+	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/cluster/spec"
 	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
@@ -212,17 +212,17 @@ func (p *Provider) send(ctx context.Context, peers PeerConnector, session Provid
 		slog.Uint64("session", uint64(session.Id)), slog.Int("fabric_index", int(session.FabricIndex)),
 		slog.Uint64("node_id", session.PeerNodeId), slog.Uint64("command", uint64(commandID)),
 	}
-	started := time.Now()
+	started := p.clock.Now()
 	log.Debug("camera.provider.signal.connecting", attrs...)
 	sess, err := peers.ConnectPeer(ctx, session.FabricIndex, session.PeerNodeId)
-	log.Debug("camera.provider.signal.connected", append(attrs, slog.Duration("took", time.Since(started)), slog.Any("err", err))...)
+	log.Debug("camera.provider.signal.connected", append(attrs, slog.Duration("took", clock.Since(p.clock, started)), slog.Any("err", err))...)
 	if err != nil {
 		return fmt.Errorf("camera: WebRTC session %d: reach the requestor: %w", session.Id, err)
 	}
-	started = time.Now()
+	started = p.clock.Now()
 	log.Debug("camera.provider.signal.invoking", attrs...)
 	_, err = sess.Invoke(ctx, session.PeerEndpointId, wrdef.ClusterID, commandID, fields)
-	log.Debug("camera.provider.signal.invoked", append(attrs, slog.Duration("took", time.Since(started)), slog.Any("err", err))...)
+	log.Debug("camera.provider.signal.invoked", append(attrs, slog.Duration("took", clock.Since(p.clock, started)), slog.Any("err", err))...)
 	if err != nil {
 		return fmt.Errorf("camera: WebRTC session %d: %w", session.Id, err)
 	}

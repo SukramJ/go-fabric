@@ -14,6 +14,7 @@ import (
 
 	"thingfabric.dev/go-fabric/internal/deepcopy"
 
+	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/cluster"
 	"thingfabric.dev/go-fabric/cluster/spec"
 	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
@@ -114,6 +115,8 @@ type Provider struct {
 	port ProviderPort
 	cfg  ProviderConfig
 	view streamView
+	// clock times the Debug lines of the signals to the requestor (send).
+	clock clock.Clock
 
 	// op serialises the commands and the fabric removal: each holds it
 	// from its checks through the port to its commit, as chip's handlers
@@ -160,7 +163,7 @@ func NewProvider(cfg ProviderConfig) (*Provider, error) {
 	if cfg.MaxSessions < 0 || cfg.MaxSessionsPerFabric < 0 {
 		return nil, fmt.Errorf("%w: MaxSessions %d, MaxSessionsPerFabric %d", ErrNegativeMaxSessions, cfg.MaxSessions, cfg.MaxSessionsPerFabric)
 	}
-	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}}
+	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clock.System{}}
 	handlers := map[uint32]spec.CommandHandler{
 		wpdef.CmdSolicitOffer:         serial(&p.op, p.solicitOffer),
 		wpdef.CmdProvideOffer:         serial(&p.op, p.provideOffer),
