@@ -127,6 +127,11 @@ type family struct {
 	ownEndpoints map[string]bool
 	// exclude maps a case ("2.9", "10.*") to the gap it is.
 	exclude map[string]gap
+	// absent maps a Python case of the family at the harness commit that
+	// the family run never reaches — the image's descriptor does not file
+	// it, or the loader drops it — to the gap it is, with the measured
+	// cause (TestChipPythonCasesCovered, chipcoverage_test.go).
+	absent map[string]gap
 	// args are extra script arguments per case ("*" for every case).
 	args map[string][]string
 	// edits patch a case file before it runs.
@@ -291,6 +296,22 @@ type recordedFailure struct {
 // startUpOnBridged classifies the cases that power-cycle the bridge and
 // expect a bridged light's start-up attribute applied.
 const startUpOnBridged = "the case reboots the DUT and expects the light's StartUpOnOff / StartUpColorTemperatureMireds applied; matter.js applies the start-up attributes only on an endpoint no Aggregator owns (OnOffServer.ts and ColorControlServer.ts initialize: !endpoint.ownerOfType(AggregatorEndpoint)) — a bridge restart is not the bridged device's power cycle — and every light here is bridged"
+
+// The causes of the absent entries (family.absent), measured in the harness
+// image (CHIP_TEST_IMAGE, /etc/chip-version 6170af84) on 2026-11-24: the
+// image's /bin/generate-test-descriptor, byte-identical to matter.js
+// 862ad75f's support/chip/support/generate-test-descriptor, imports every
+// src/python_testing/*.py and skips a file whose import raises (:290-296);
+// re-run in the image it writes the shipped /lib/test-descriptor.json and
+// names each skipped file with its error on stderr.
+const (
+	// absentNoWebRTC: the case file imports matter.webrtc.
+	absentNoWebRTC = "not in the harness image's test descriptor, so the family run never reaches it: the case file imports matter.webrtc, which the image's Python controller lacks (python3 -c 'import matter.webrtc' → ModuleNotFoundError; the controller is built without chip_support_webrtc_python_bindings, chip src/controller/flags.gni:25), and generate-test-descriptor skips a file whose import raises (:290-296); a TH with the WebRTC bindings is decision 644"
+	// absentNoNDEF: the case file imports ndef (NFC).
+	absentNoNDEF = "not in the harness image's test descriptor, so the family run never reaches it: the case file imports ndef, which the image's Python lacks (generate-test-descriptor re-run in the image: No module named 'ndef'), and generate-test-descriptor skips a file whose import raises (:290-296)"
+	// absentNoRun1: loadChipCases keeps run1 of a multi-run case only.
+	absentNoRun1 = "in the harness image's test descriptor as a multi-run suite of run2 and run3 only (TC_SWTCH.py CI arguments at chip 6170af84: run2 :40, run3 :58, both --test-case test_TC_SWTCH_2_3 and _2_4; run1 :24 is TC-SWTCH-2.2's), and loadChipCases keeps run1 of a multi-run case (chipcases_test.go:114-116), so the family run drops it — this harness's loader, not the case"
+)
 
 // Device types of the reference daemon's bridged endpoints
 // (examples/reference-bridge/fleet*.go), named for the family table.
@@ -566,6 +587,11 @@ var chipFamilies = []family{
 	},
 	{
 		name: "DD",
+		absent: map[string]gap{
+			"1.5":  {classHarness, absentNoNDEF, false},
+			"3.23": {classHarness, absentNoNDEF, false},
+			"3.24": {classHarness, absentNoNDEF, false},
+		},
 		// TC_DD_1_16_17.py is a MatterTestUncommissionedDevice case: it
 		// parses the onboarding payload and checks the commissionable
 		// advertisement of a factory-new device, without commissioning
@@ -618,6 +644,9 @@ var chipFamilies = []family{
 	{name: "GRPKEY"},
 	{
 		name: "IDM",
+		absent: map[string]gap{
+			"10.7": {classHarness, absentNoNDEF, false},
+		},
 		args: map[string][]string{
 			// The bridge mounts Identify on every bridged endpoint, including
 			// device types that do not list it; matter.js passes the same flag
@@ -1011,6 +1040,10 @@ var chipFamilies = []family{
 	{name: "SMOKECO", deviceType: dtSmokeCOAlarm},
 	{
 		name: "SWTCH", deviceType: dtGenericSwitch,
+		absent: map[string]gap{
+			"2.3": {classHarness, absentNoRun1, false},
+			"2.4": {classHarness, absentNoRun1, false},
+		},
 		exclude: map[string]gap{
 			"2.2": {classNotSupported, "TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary)", true},
 			"2.6": {classNotSupported, "TC-SWTCH-2.6 runs only with ActionSwitch (PICS SWTCH.S.F05=0): the daemon's button serves MomentarySwitchRelease, which ActionSwitch excludes (MSR conformance \"[MS & !AS]\", switch.element.ts)", true},
@@ -1109,6 +1142,22 @@ var chipFamilies = []family{
 	// with the same switch (daemonAppArgs).
 	{
 		name: "WEBRTCP", deviceType: dtCamera, variant: variantCamera,
+		// The twelve cases of decision 642; step 3 of decision 644 files
+		// them with a WebRTC-capable TH and removes these entries.
+		absent: map[string]gap{
+			"2.11": {classHarness, absentNoWebRTC, false},
+			"2.12": {classHarness, absentNoWebRTC, false},
+			"2.17": {classHarness, absentNoWebRTC, false},
+			"2.18": {classHarness, absentNoWebRTC, false},
+			"2.19": {classHarness, absentNoWebRTC, false},
+			"2.20": {classHarness, absentNoWebRTC, false},
+			"2.21": {classHarness, absentNoWebRTC, false},
+			"2.22": {classHarness, absentNoWebRTC, false},
+			"2.23": {classHarness, absentNoWebRTC, false},
+			"2.24": {classHarness, absentNoWebRTC, false},
+			"2.25": {classHarness, absentNoWebRTC, false},
+			"2.33": {classHarness, absentNoWebRTC, false},
+		},
 		edits: map[string][]edit{
 			// Step 2 sends its ProvideOffers to endpoint 1, step 3 to the
 			// case's endpoint (TC_WEBRTCP_2_16.py:159, :173).
@@ -1118,6 +1167,10 @@ var chipFamilies = []family{
 	{name: "WebRTCP", deviceType: dtCamera, variant: variantCamera},
 	{
 		name: "AVSM", deviceType: dtCamera, variant: variantCamera,
+		absent: map[string]gap{
+			"2.16": {classHarness, absentNoWebRTC, false},
+			"2.17": {classHarness, absentNoWebRTC, false},
+		},
 		// TC_AVSM_2_18 to 2_21 gate on AVSM.S.F_VDO, F_ADO and F_SNP
 		// (TC_AVSM_2_18.py:82-83, 2_19:78-79, 2_20:78-79, 2_21:73-74),
 		// codes no PICS defines: a feature's code is AVSM.S.Fnn (CHIP's
