@@ -26,6 +26,12 @@ on:
   schedule:
     - cron: "41 4 * * 1"
   workflow_dispatch:
+    inputs:
+      probe:
+        description: "Run only the bluetoothd probe (script/ble-virtual/bluetoothd-probe.sh, issue #610 row 1) instead of the pairing run; its record is uploaded as an artifact"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -40,6 +46,9 @@ jobs:
     # built with "# CONFIG_BT is not set" (no Bluetooth stack, no hci_vhci;
     # run 39099608818), the arm64 one with CONFIG_BT=m and
     # CONFIG_BT_HCIVHCI=m (probe run 39099728809, 2026-10-18).
+    # A dispatch with probe=true runs the probe job instead; the schedule
+    # and a plain dispatch run this job as before.
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.probe }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
@@ -93,4 +102,42 @@ jobs:
         with:
           name: ble-virtual-logs
           path: ${{ runner.temp }}/ble-virtual
+          if-no-files-found: ignore
+
+  # The bluetoothd probe (issue #610 row 1, decision 574): what bluetoothd
+  # sends on the system bus, and whether a registered GATT application and
+  # LE advertisement survive, around Powered false/true, a bluetoothd
+  # restart, controller remove/add and a client's bus name leaving. Only on
+  # a dispatch with probe=true; the runner image, the BlueZ install and the
+  # vhci module as in the job above.
+  bluetoothd-probe:
+    name: bluetoothd probe (D-Bus record)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.probe }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: install BlueZ, its test tools and python3-dbus
+        run: |
+          sudo apt-get update
+          # Whether the image already carries the client's modules, before the install.
+          /usr/bin/python3 -c 'import dbus, gi' 2>&1 || true
+          sudo apt-get install -y --no-install-recommends bluez bluez-test-tools python3-dbus python3-gi
+          if ! find "/lib/modules/$(uname -r)" -name 'hci_vhci.ko*' | grep -q .; then
+            sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)" || true
+          fi
+          bluetoothctl --version
+          command -v btvirt dbus-monitor dbus-send busctl
+      - name: probe bluetoothd
+        env:
+          BLE_LOG_DIR: ${{ runner.temp }}/bluetoothd-probe
+        run: script/ble-virtual/bluetoothd-probe.sh
+      - name: upload the probe record
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bluetoothd-probe
+          path: ${{ runner.temp }}/bluetoothd-probe
           if-no-files-found: ignore
