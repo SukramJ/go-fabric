@@ -219,7 +219,7 @@ func TestThreadNetworkCommissioningScan(t *testing.T) {
 	}
 }
 
-// AddOrUpdate, Remove, Reorder, Connect and the fail-safe (GTD :97-268;
+// AddOrUpdate, Remove, Reorder, Connect and the fail-safe (GTD :101-250;
 // NetworkCommissioningCluster.cpp :561-730, :843-902, :984-1014).
 func TestThreadNetworkCommissioningCommands(t *testing.T) {
 	t.Parallel()

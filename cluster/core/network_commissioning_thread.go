@@ -61,7 +61,7 @@ type ThreadNetworkCommissioning struct {
 
 	// staging is mStagingNetwork (GTD :38-44): the network the commands
 	// edit, attached by ConnectNetwork. backup is the fail-safe's copy
-	// (FailSafeNetworkConfig, BackupConfiguration GTD :300-314), nil for
+	// (FailSafeNetworkConfig, BackupConfiguration GTD :301-315), nil for
 	// none.
 	staging []byte
 	backup  []byte
@@ -135,7 +135,7 @@ var threadNetcommInst = mustInstance(netcommdef.Definition, spec.Options{Feature
 
 // threadCapabilities is SupportedThreadFeatures of a border router: a
 // border-router-capable full Thread device that can route
-// (GetSupportedThreadFeatures, GTD :383-394, with
+// (GetSupportedThreadFeatures, GTD :387-398, with
 // CHIP_DEVICE_CONFIG_THREAD_BORDER_ROUTER and _FTD set).
 const threadCapabilities = netcommdef.ThreadCapabilitiesIsBorderRouterCapable |
 	netcommdef.ThreadCapabilitiesIsRouterCapable | netcommdef.ThreadCapabilitiesIsFullThreadDevice
@@ -241,7 +241,7 @@ func (n *ThreadNetworkCommissioning) setLinkLocked(enabled, connected bool) []ui
 }
 
 // probe reads the border router's interface and, as
-// ThreadNetworkIterator::Next's connected (GTD :345-373), whether the
+// ThreadNetworkIterator::Next's connected (GTD :359-385), whether the
 // staged network is connected: the border router is attached and its
 // active dataset names the same Extended PAN ID. A border router that
 // does not answer is neither enabled nor connected. It runs without the
@@ -373,7 +373,7 @@ func (n *ThreadNetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 // errThreadInterfaceEnabled refuses an InterfaceEnabled write: the
 // border router's Thread interface is switched by the border router's
 // own management, not through this cluster — chip's driver switches its
-// in-process stack (SetEnabled, GTD :270-282), and the module wraps no
+// in-process stack (SetEnabled, GTD :252-266), and the module wraps no
 // mutating border-router operation outside the fail-safe-guarded dataset
 // path (ADR 0027 decision 4).
 var errThreadInterfaceEnabled = errors.New("core: the border router's Thread interface is not switched through NetworkCommissioning")
@@ -523,7 +523,7 @@ func (n *ThreadNetworkCommissioning) setStatusLocked(s netcommdef.NetworkCommiss
 	n.lastStatus = &v
 }
 
-// backupLocked is BackupConfiguration (GTD :300-314): the staged network
+// backupLocked is BackupConfiguration (GTD :301-315): the staged network
 // as it was when the fail-safe's first change came, once.
 func (n *ThreadNetworkCommissioning) backupLocked() {
 	if n.backup == nil {
@@ -531,7 +531,7 @@ func (n *ThreadNetworkCommissioning) backupLocked() {
 	}
 }
 
-// matchLocked is MatchesNetworkId (GTD :396-409): NetworkIDNotFound for
+// matchLocked is MatchesNetworkId (GTD :284-299): NetworkIDNotFound for
 // an uncommissioned staged network or another Extended PAN ID.
 func (n *ThreadNetworkCommissioning) matchLocked(id []byte) netcommdef.NetworkCommissioningStatusEnum {
 	xp, ok := extPANIDOf(n.staging)
@@ -671,14 +671,14 @@ func (n *ThreadNetworkCommissioning) reorder(req netcommdef.ReorderNetworkReques
 }
 
 // connect is HandleConnectNetwork (:634-683) and OnResult (:843-902)
-// over the driver's ConnectNetwork (GTD :205-268): a network id over 32
+// over the driver's ConnectNetwork (GTD :205-250): a network id over 32
 // bytes is a ConstraintError; a failsafe is required; an unknown network
 // is NetworkIDNotFound; otherwise the configuration is backed up and the
 // border router attaches the staged network (AttachToThreadNetwork,
 // through the port's SetActiveDataset). The result is the
 // ConnectNetworkResponse, the last networking status and network id, the
 // connect error (null on success); success writes the breadcrumb. A
-// failed attach is UnknownError (GTD :258-262).
+// failed attach is UnknownError (GTD :240-244).
 func (n *ThreadNetworkCommissioning) connect(ctx context.Context, req netcommdef.ConnectNetworkRequest) (any, error) {
 	if len(req.NetworkId) > maxNetworkIDLength {
 		return nil, netcommStatus(im.StatusConstraintError, "core: ConnectNetwork network id of %d bytes", len(req.NetworkId))
@@ -779,7 +779,7 @@ func (n *ThreadNetworkCommissioning) reattachReverted(ctx context.Context, windo
 
 // OnCommissioningComplete drops the fail-safe's backup
 // (CommitConfiguration, NetworkCommissioningCluster.cpp:984-990; GTD
-// :97-106).
+// :101-110).
 func (n *ThreadNetworkCommissioning) OnCommissioningComplete(context.Context) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -787,7 +787,7 @@ func (n *ThreadNetworkCommissioning) OnCommissioningComplete(context.Context) {
 }
 
 // OnFailSafeExpired restores the backed-up network (RevertConfiguration,
-// :992-1014; GTD :108-156): without a backup nothing changed since the
+// :992-1014; GTD :112-154): without a backup nothing changed since the
 // fail-safe was armed; with one the staged network is the backup and the
 // border router attaches it — the empty dataset of a border router that
 // had none clears its active dataset, as chip attaches an empty one. The
