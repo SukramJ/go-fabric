@@ -326,7 +326,7 @@ func (n *ThreadNetworkCommissioning) MinInvokePrivilege(cmdID uint32) uint8 {
 // NetworkCommissioningCluster.cpp:1067-1113): MaxNetworks 1 (GTD
 // GetMaxNetworks, GenericNetworkCommissioningThreadDriver.h:103), the
 // staged network with its Extended PAN ID as the network id (GTD
-// :340-373), SupportedThreadFeatures and ThreadVersion (:1102-1108).
+// :354-385), SupportedThreadFeatures and ThreadVersion (:1102-1108).
 func (n *ThreadNetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -491,7 +491,8 @@ func (n *ThreadNetworkCommissioning) expiryWindow() uint64 {
 }
 
 // errWindowExpired is the FAILSAFE_REQUIRED of a command whose window
-// expired after its gate passed ([ThreadNetworkCommissioning.expiryWindow]).
+// expired after its gate passed ([ThreadNetworkCommissioning.expiryWindow],
+// [WiFiNetworkCommissioning.expiryWindow]).
 func errWindowExpired(cmd string) error {
 	return netcommStatus(im.StatusFailsafeRequired, "core: %s: the failsafe expired while the command ran", cmd)
 }
@@ -594,7 +595,7 @@ func scanResult(ds []byte) (netcommdef.ThreadInterfaceScanResultStruct, bool) {
 }
 
 // addOrUpdate is HandleAddOrUpdateThreadNetwork (:561-587) over the
-// driver's AddOrUpdateNetwork (GTD :158-176): a failsafe is required
+// driver's AddOrUpdateNetwork (GTD :156-176): a failsafe is required
 // (:570); a dataset that does not frame or is not commissioned is
 // OutOfRange; a staged commissioned network of another Extended PAN ID is
 // BoundsExceeded (one network); otherwise the staged network is backed up
