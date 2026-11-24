@@ -102,8 +102,6 @@ var skipInRangeLeft = map[string]int{
 	// No connectedhomeip checkout: the environment, with its reason in a
 	// variable the scan does not read.
 	"internal/chipdm/levels_test.go:TestChipDataModelLevels": 1,
-	// No connectedhomeip checkout (noConnectedhomeip): the environment.
-	"internal/chiptool/chipcoverage_test.go:TestChipPythonCasesCovered": 1,
 	// TestTestparityRegisterCoversSnapshot reports the mismatch.
 	"script/testparity/register_test.go:TestTestparityPageIsCurrent": 1,
 }
@@ -163,6 +161,7 @@ var environmentSkips = map[string]int{
 	"conformance/chiptool_smoke_test.go:TestChipToolPairingOnNetworkLong":      1,
 	"internal/chipdm/crosscheck_test.go:chipModel":                             1,
 	"internal/chipdm/levels_test.go:TestChipDataModelLevels":                   1,
+	"internal/chiptool/chipcoverage_test.go:TestChipPythonCasesCovered":        1,
 	"internal/chiptool/controller_test.go:resolveChipTool":                     1,
 	"internal/chiptool/matterjs_test.go:startMatterJSController":               2,
 	"schema/staleness_test.go:TestMatterJSSchemaStalenessAgainstLiveCheckout":  2,
