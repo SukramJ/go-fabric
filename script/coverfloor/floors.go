@@ -62,7 +62,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/cluster/alarmbase", min: 94},
 	{pkg: "thingfabric.dev/go-fabric/cluster/appliance", min: 98},
 	{pkg: "thingfabric.dev/go-fabric/cluster/closure", min: 95}, // pin lift b25ed960 P1-B: the model gate refuses an undefined enum before the servers' own checks
-	{pkg: "thingfabric.dev/go-fabric/cluster/core", min: 90},
+	{pkg: "thingfabric.dev/go-fabric/cluster/core", min: 93},    // review II phase 8 wave 1 (#595): measured 93.2%
 	{pkg: "thingfabric.dev/go-fabric/cluster/cover", min: 98},
 	{pkg: "thingfabric.dev/go-fabric/cluster/energy", min: 93},
 	{pkg: "thingfabric.dev/go-fabric/cluster/fan", min: 98},
