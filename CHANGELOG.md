@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-11-24
+
+The fixes of review II's close-out, runs 2 to 5 (decisions 514–655): security and correctness fixes across the CASE responder, the fabric-removal paths of the core servers, the camera and WebRTC servers, `node`'s key and batch rules, Thread and Wi-Fi commissioning, and the certification harness. No source change required: the 42 incompatible changes `make apidiff` reports against `v0.25.0` are the move of the ledger client from `controller/dcl` to `dcl`, and every old name stays a type alias or forwarding function (`controller/dcl/moved.go`), deprecated and removable in `v0.28.0`. Several servers now refuse input they accepted before — see *Changed*. The nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in a release of their own that requires `v0.26.0`.
+
 ### Security
 
 - `node`, `bridge`: the DiagnosticLogs log a controller retrieves (RetrieveLogsRequest) carries peer addresses and session ids only for the accessing fabric's own sessions; other fabrics' session events, PASE events and a request without an accessing fabric carry neither. The session events of the diagnostic trace (`Node.DiagnosticEvents`) carry the detail `fabric_index` (review II, R2-C2-sec-2451, decision 524).
@@ -7024,7 +7028,10 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/thingfabric/go-fabric/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/thingfabric/go-fabric/compare/v0.25.0...v0.26.0
+[0.25.0]: https://github.com/thingfabric/go-fabric/compare/v0.24.1...v0.25.0
+[0.24.1]: https://github.com/thingfabric/go-fabric/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/SukramJ/go-fabric/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/SukramJ/go-fabric/compare/v0.22.2...v0.23.0
 [0.22.2]: https://github.com/SukramJ/go-fabric/compare/v0.22.1...v0.22.2
