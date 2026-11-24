@@ -43,9 +43,10 @@ type Binding struct {
 	save     func([]TargetStruct) error
 	// saveOwed marks a list in memory the store does not hold: a removed
 	// fabric's drop whose save failed. The next drop (of any index, also
-	// one that finds nothing) and the next write (also one that changes
-	// nothing, R4-store-4001) store the list, so a restart does not restore
-	// the removed fabric's entries (R3-store-3052).
+	// one that finds nothing) and the next write that is not refused (also
+	// one that changes nothing, R4-store-4001; R5-store-5008) store the
+	// list, so a restart does not restore the removed fabric's entries
+	// (R3-store-3052).
 	// Guarded by writeMu.
 	saveOwed bool
 	// fabrics is BindingConfig.Fabrics or SetFabricSource's source, set

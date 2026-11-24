@@ -41,8 +41,8 @@ var NetworkCommissioningAhead = surface.AheadSet{
 // (notes/parity/by_design.md): the TermsAndConditions feature
 // (general_commissioning_tc.go), row
 // BD-chip-GeneralCommissioning-TermsAndConditions. The register's matter.js
-// marker: "`GeneralCommissioningServer.ts:31` is the class line (absence:
-// no terms-and-conditions text in the 285-line file)".
+// marker: "`GeneralCommissioningServer.ts:32` is the class line (absence:
+// no terms-and-conditions text in the 289-line file)".
 var GeneralCommissioningAhead = surface.AheadSet{
 	"BD-chip-GeneralCommissioning-TermsAndConditions": {Features: gencommFeatureTC},
 }

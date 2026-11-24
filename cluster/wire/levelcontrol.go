@@ -172,7 +172,7 @@ func DecodeStop(payload []byte) (StopRequest, error) {
 // reads into one — is skipped whole, so its members are never taken for
 // the command's fields (review II, R2-P6-wire-1208). A payload without
 // one of the mandatory tags is refused INVALID_COMMAND, as the generated
-// decoders refuse it (cluster/spec/codec.go, decodeFields; review II,
+// decoders refuse it (cluster/spec/codec.go, DecodeFields; review II,
 // R2-P6-wire-1209).
 func walkContext(payload []byte, sentinel error, mandatory []uint32, visit func(tag uint32, el tlv.Element) error) error {
 	d := tlv.NewDecoder(payload)

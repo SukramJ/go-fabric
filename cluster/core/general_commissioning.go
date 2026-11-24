@@ -1703,8 +1703,9 @@ const PaseSessionAutoArmSeconds uint16 = 60
 // The daemon wires it from the PaseAdapter's onEstablished callback so the
 // arm fires exactly once per successful Pake3 completion.
 //
-// Deprecated: use [GeneralCommissioning.ArmOnPaseEstablished], which
-// returns the refusal: a session whose arm was refused must be closed.
+// Deprecated: use [GeneralCommissioning.ArmOnPaseSession], which returns
+// the refusal of the arm — a session whose arm was refused must be closed
+// — and takes the session's id; removable in v0.25.0.
 func (g *GeneralCommissioning) AutoArmOnPaseEstablished(ctx context.Context) {
 	_ = g.ArmOnPaseEstablished(ctx)
 }
