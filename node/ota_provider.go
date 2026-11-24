@@ -33,14 +33,14 @@ type OTAProviderConfig struct {
 	// (mattercore.OTAProviderConfig.Manager); nil is the provider's
 	// default manager, which queues no update. [Node.OnOTAProviderStatus]
 	// learns the statuses with either; with a Manager, RebootQuery,
-	// TransferBlockSize and DelegateConsentToRequestor are refused at Start.
+	// TransferBlockSize and DelegateConsentToRequestor fail [New].
 	Manager OTAUpdateManager
 	// DelegateConsentToRequestor lets the default manager offer a
 	// requestor that says it can consent an image that needs a consent
 	// without asking Consent, with UserConsentNeeded
 	// (mattercore.OTAProviderConfig.DelegateConsentToRequestor); off, as
-	// matter.js's default, Consent is asked. With a Manager it is refused
-	// at Start: the manager decides the delegation.
+	// matter.js's default, Consent is asked. With a Manager it fails
+	// [New]: the manager decides the delegation.
 	DelegateConsentToRequestor bool
 	// ApplyDelay is how long a requestor allowed to apply an update waits
 	// before it applies, in whole seconds rounded up and at most a day

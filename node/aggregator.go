@@ -43,7 +43,8 @@ var (
 	// holds one key twice (decision 617; review II, R4-api-4790). In a [Batch]
 	// such a collision is judged against the batch's end state and the
 	// error arrives from [Partition.Batch], not from the call (decisions
-	// 582, 585).
+	// 582, 585) — but a [Batch.Add] of a key the batch already holds an
+	// Add of is refused at the call (review II, R4-doc-4705).
 	ErrDuplicateKey = errors.New("node: an endpoint with this StableKey is already added")
 	// ErrUnknownKey: no endpoint with this key is added (to the partition
 	// asked), or a Forget of a part key another endpoint serves (decision
@@ -618,7 +619,9 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 
 // Add adds ep to the batch's partition; see [Aggregator.Add]. An Add of
 // a key the set holds, or of a device another endpoint serves a key of,
-// is held and judged once fn returned ([Batch], decisions 582, 585).
+// is held and judged once fn returned ([Batch], decisions 582, 585). A
+// second Add of a key whose Add the batch holds is refused at the call
+// with [ErrDuplicateKey] (review II, R4-doc-4705).
 func (b *Batch) Add(ep Endpoint) error {
 	if b.isDone() {
 		return ErrBatchDone
