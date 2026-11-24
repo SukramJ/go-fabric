@@ -12270,7 +12270,7 @@
       "identifier": "ICEServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "cluster/camera",
@@ -12305,7 +12305,7 @@
       "identifier": "OfferArgs",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 36
+      "line": 37
     },
     {
       "package": "cluster/camera",
@@ -12326,14 +12326,14 @@
       "identifier": "ProviderPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 34
+      "line": 35
     },
     {
       "package": "cluster/camera",
       "identifier": "ProviderSession",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "cluster/camera",
