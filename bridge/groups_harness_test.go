@@ -150,7 +150,7 @@ func newGroupsHarnessWith(t *testing.T, n int, withGroupcast bool) *groupsHarnes
 		if !withGroupcast {
 			return snap, []contract.ClusterServer{gkm}
 		}
-		acl, err := mattercore.NewAccessControl(st)
+		acl, err := mattercore.NewAccessControlWith(context.Background(), mattercore.AccessControlConfig{Store: st})
 		if err != nil {
 			t.Fatalf("NewAccessControl: %v", err)
 		}

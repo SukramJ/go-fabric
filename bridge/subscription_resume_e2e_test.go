@@ -578,7 +578,7 @@ func startResumeDeviceWith(t *testing.T, st SubscriptionStore, entries []store.A
 		t.Fatal(err)
 	}
 	acl := &aclStoreFake{entries: entries}
-	ac, err := core.NewAccessControl(acl)
+	ac, err := core.NewAccessControlWith(context.Background(), core.AccessControlConfig{Store: acl})
 	if err != nil {
 		t.Fatal(err)
 	}

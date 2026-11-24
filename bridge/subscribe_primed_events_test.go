@@ -90,7 +90,7 @@ func TestReestablishedSubscriptionEventInThePrimingReportIsNotReportedAgain(t *t
 	// after the restore and before the report reads the event log.
 	srv.onChange = func() { b.EmitEvent(0, 0x0006, 0x00, nil, contract.EventPriorityCritical) }
 	acl := &aclStoreFake{entries: []store.ACLEntry{{FabricIndex: fabric, Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE}}}
-	ac, err := core.NewAccessControl(acl)
+	ac, err := core.NewAccessControlWith(context.Background(), core.AccessControlConfig{Store: acl})
 	if err != nil {
 		t.Fatal(err)
 	}

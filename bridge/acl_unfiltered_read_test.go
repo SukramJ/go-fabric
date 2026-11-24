@@ -30,7 +30,7 @@ func TestAccessControlUnfilteredReadsRedactOtherFabrics(t *testing.T) {
 	var acl *mattercore.AccessControl
 	h := newSecureHarness(t, nil, func(st *store.Store, _ uint8) []contract.ClusterServer {
 		var err error
-		if acl, err = mattercore.NewAccessControl(st); err != nil {
+		if acl, err = mattercore.NewAccessControlWith(context.Background(), mattercore.AccessControlConfig{Store: st}); err != nil {
 			t.Fatal(err)
 		}
 		return []contract.ClusterServer{acl}
