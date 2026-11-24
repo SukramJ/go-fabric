@@ -174,3 +174,20 @@ func TestPeerGoneHookRunsOutsideTheLock(t *testing.T) {
 		t.Fatalf("causes %v, want [lost closed]", reentered)
 	}
 }
+
+// TestPeerGoneCauseNamesItself pins the log names of the two causes and
+// the fallback of a value outside them.
+func TestPeerGoneCauseNamesItself(t *testing.T) {
+	for _, tc := range []struct {
+		cause PeerGoneCause
+		want  string
+	}{
+		{PeerGoneClosed, "closed"},
+		{PeerGoneLost, "lost"},
+		{PeerGoneCause(7), "PeerGoneCause(7)"},
+	} {
+		if got := tc.cause.String(); got != tc.want {
+			t.Errorf("PeerGoneCause(%d).String() = %q, want %q", uint8(tc.cause), got, tc.want)
+		}
+	}
+}
