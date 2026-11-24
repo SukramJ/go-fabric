@@ -1042,3 +1042,24 @@ section.
 | 653 | Owner (wizard, recommended) | open the run-5 fix PR directly once make ci / ci-net are green; the owner merges |
 | 654 | Owner (wizard, recommended) | `Provider.End` removal order (session leaves CurrentSessions only after the requestor's response, `cluster/camera/provider_peer.go:140-144`; chip removes independently, `webrtc-provider-manager.cpp:1041`, `:1170-1185`): C5 issue with a Fable read of chip's order, not #592 |
 | 655 | Owner (wizard, recommended) | the release after gate 641 is v0.26.0 (minor; all fixes of runs 3–5 per 558; the deprecations' "Removable in v0.28.0" stands) |
+
+## 2026-11-24, review II close-out C5 (decision 602)
+
+C5 put the 148 carried notes (`c5/inventory.tsv`) to three Fable verdicts
+(`c5/verdict-cluster.md`, `verdict-stack.md`, `verdict-radio.md`, at
+`d1d1212b9`); the owner settled their questions. Outcomes and the issue per
+package in `phase-7-register.md` § C5 (decision 602).
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 656 | Owner (wizard, recommended) | R4-doc-4754: `Config.TLS` under a surface level without the TLS clusters is refused at `Validate` / `New` → node issue |
+| 657 | Owner (wizard, recommended) | R4-api-4706: `type Sealer = store.Sealer` in `node/facade.go` (ADR 0025 principle 3) → node issue |
+| 658 | Owner (wizard, recommended) | fable-diff-h1 N3 = G641-1: clear the shared-secret copy in the bridge's no-install branch (`bridge/handlers.go:1146-1151`); `BD-chip-HandshakeSecretsOverwritten` without exception → bridge issue |
+| 659 | Owner (wizard, recommended) | R4-conc-4352: a second ESPHome `Connect` for one address is refused, the address reserved under the lock, as BlueZ (`ble/bluez/central_linux.go:476-493`) → ble/esphome issue |
+| 660 | Owner (wizard, recommended) | R4-conc-4054: the host fabric hooks stay under the NOC lock (ordering); the constraint is documented on `OnFabricInstalled` / `OnFabricUpdated` / `OnFabricWithdraw` → cluster/core issue |
+| 661 | Owner (wizard, recommended) | R4-api-4157: an error-returning limits form (`SetLimitsChecked` or constructor config), `SetLimits` deprecated → cluster/core issue |
+| 662 | Owner (wizard, recommended) | R2-C2-doc-1503: closed as accepted; the removal of the fields "Removable in v0.25.0" is a release-plan item, not a review issue |
+| 663 | Owner (wizard, recommended) | decision 654 follow-up: `Provider.End` removes the session from CurrentSessions also when the requestor is unreachable; recorded as a divergence from chip's camera-app (`OnDeviceConnectionFailure` :1014-1019) → cluster/camera issue |
+| 664 | Owner (wizard, recommended) | C4 compare: finish the run, repeat at the release head, a bridge-own test or a recorded reason for every bridge-blind mutant (decisions 403 / 512) → bridge issue (tests section) |
+| 665 | Owner (wizard, recommended) | the camera sim rows (`examples/reference-bridge`: SolicitOffer counts) and the TC-AVSM-2.17 flake ride in the cluster/camera issue (one causal chain; first step: log lines on the Answer path) |
+| 666 | Coordinator | every other C5 row as the Fable verdicts `c5/verdict-{cluster,stack,radio}.md` state (accept / issue:<package> / closed); decision 602 is thereby executed |

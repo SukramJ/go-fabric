@@ -690,18 +690,111 @@ the run are not fixed except where a unit carried them (decision 640 and
 
 | ID | where | what |
 | --- | --- | --- |
-| H9 follow-up (fable-diff-h9 (5)) | `cluster/camera/provider_peer.go:140-144` | `Provider.End` takes the session out of CurrentSessions only after the requestor's response; chip removes it independently of the response (`webrtc-provider-manager.cpp:1041`, `:1170-1185` at 6170af84, Fable, one link inferred) — a race for TC-AVSM-2.17 step 13 (passed in run 45371120681); the End doc's chip lines are off too |
-| H9 follow-up | `examples/reference-bridge` camera sim | SolicitOffer sessions' stream counting (chip `:301`) not mirrored |
-| R5-store-5205, R5-api-5206 | one follow-up issue (decision 645) | `refuseLateCollisionsLocked` (`node/aggregator.go:1069-1079`, `:1108-1122`, `:1195-1204` at M5); host-observable only; no run 6 reads a change to it |
-| BlueZ `svcRegistering` window (fix-h2b "Adjacent window") | one follow-up issue (decision 651) | an adapter removal and re-addition both handled between a successful `RegisterApplication` reply and `RegisterService`'s state change (`ble/bluez/peripheral_linux.go:923-927` at `7b32ea7c4`) leave the service registered on no adapter: `adapterChanged` owes the application only for a live service (`:629`, `:643`). Read only; reachability unverified. Closing it touches the gate and the clear at `:927` |
-| fable-diff-h1 N3 | C5 (secret hygiene) | every accepted resume copies the record's shared secret into `Sigma1ProcessResult.Established` (`secure/sigma/protocol.go:1210`), also when the adapter installs nothing; the copy is not zeroed and does not pass `dropSharedLocked`'s hook (see `BD-chip-HandshakeSecretsOverwritten`) |
-| R5-conc-5104 | C5 | `stepPeer` is written in the adapter's order, not the responder's, and the resume rollback restores a `stepPeer` another Sigma1 may have written since; effect: the retransmission timing of one reply, clamped. Shape: correct `stepPeer`'s and `mu`'s docs, or take a Sigma3's pacing from `Established.PeerSessionParams` (fix-h1) |
-| fable-diff-h1b A, B | C5 | the Sigma3 no-value branch's `handshakeFailed()` is not under test (no detach hook in the test); the error's parenthesis names one of its two causes |
-| fable-diff-h1 §2, stale cites in `tryResume` | the scripted re-cite | `CaseServer.ts` line 182-183 → `:193-194`, line 184 → `:195`, line 165 → `:176`, `:186-191` → `:196-201`, `:171-186` / `:212` → `:177-190` / `:214`, `:217` (at `b25ed960`, Fable's lines) |
-| `node/metrics/expvar` `TestRoundTrip` under `-count>1` (fix-h4c) | C5 (test) | fails under `go test -count=3` (process-global expvar registration), independent of this pull request — measured there; a `-count=3` race guard over `./node/...` fails on that package |
-| R5-fsm-5401 residue (fable-diff-h5 notes 1-3) | C5 | decision 2 of fix-h5 (an activation numbered after a commit began stays pending) has no test; `CommitActiveDataset`'s doc says "after the commit read the border router's state" where `since` is read before the GET ("after the commit began"); an activation landing in that window and attaching keeps `configured` false until the next fail-safe expiry reverts it (inferred, not run) |
-| fix-h6 left out, fable-diff-h6 N2, N3 | C5 (probe first) | host-side bump sites on an `*Endpoint` kept from a superseded topology (`bridge/receive.go:1037`, `:1064`, `Endpoint.IncreaseConfigurationVersion`): unverified; the invoke path advances the served topology's endpoint (measured by lines, not probed); fix-h6's "`SetNodeLabel`'s bump (`types.go:832`)" is `IncreaseConfigurationVersion`, `SetNodeLabel` is `:909` and advances nothing itself |
-| fable-diff-h4c note 4 | C5 (note) | a Stop that fails at the bridge leaves the stop flag set and the node not stopped: no lost requestor's sessions end until the next Stop finishes (fail closed; as before with `stopping`) |
-| chip Python cases without `ndef` (fix-h7 §1.6, step 2) | the `absent` map (class (c) harness) | DD 1.5, 3.23, 3.24 and IDM 10.7: the generator re-run fails with `No module named 'ndef'`, so the image descriptor does not file them; they stay `absent` until the image carries the module |
-| the run's notes and the confirmed carried rows | C5 | R5-conc-5002, R5-bound-5006, R5-store-5007, R5-store-5008, R5-par-5109, R5-fsm-5208, R5-conc-5209, R5-doc-5304, R5-test-5305, R5-test-5505; the rows verify-r5 §3-4 found open: R5-par-5003, R5-conc-5004, R5-par-5005, R5-doc-5009, R5-doc-5010, R5-par-5011, R5-test-5105, R5-par-5106, R5-fsm-5108, R5-doc-5151, R5-err-5201, R5-test-5202, R5-err-5203, R5-bound-5204, R5-fsm-5306, R5-bound-5307, R5-fsm-5308, R5-test-5309, R5-doc-5504 (releaseNotStated) |
-| run 4's carried rows | C5 | the list of § Run 4 "Carried to run 5" not closed above stands: decision 602's notes, the R3-sec-3403 residue, the bluetoothd probe (decision 574: R3-fsm-3301, R3-err-3305, R3-conc-3306, R4-fsm-4301's and R5-fsm-5502's trigger), the nine run-3 re-cites, the stale `Datasource.ts` cites |
+| H9 follow-up (fable-diff-h9 (5)) | `cluster/camera/provider_peer.go:140-144` → § C5: #596 | `Provider.End` takes the session out of CurrentSessions only after the requestor's response; chip removes it independently of the response (`webrtc-provider-manager.cpp:1041`, `:1170-1185` at 6170af84, Fable, one link inferred) — a race for TC-AVSM-2.17 step 13 (passed in run 45371120681); the End doc's chip lines are off too |
+| H9 follow-up | `examples/reference-bridge` camera sim → § C5: #596 | SolicitOffer sessions' stream counting (chip `:301`) not mirrored |
+| R5-store-5205, R5-api-5206 | one follow-up issue (decision 645) → § C5: #601 | `refuseLateCollisionsLocked` (`node/aggregator.go:1069-1079`, `:1108-1122`, `:1195-1204` at M5); host-observable only; no run 6 reads a change to it |
+| BlueZ `svcRegistering` window (fix-h2b "Adjacent window") | one follow-up issue (decision 651) → § C5: #610 | an adapter removal and re-addition both handled between a successful `RegisterApplication` reply and `RegisterService`'s state change (`ble/bluez/peripheral_linux.go:923-927` at `7b32ea7c4`) leave the service registered on no adapter: `adapterChanged` owes the application only for a live service (`:629`, `:643`). Read only; reachability unverified. Closing it touches the gate and the clear at `:927` |
+| fable-diff-h1 N3 | C5 (secret hygiene) → § C5: #602 (decision 658) | every accepted resume copies the record's shared secret into `Sigma1ProcessResult.Established` (`secure/sigma/protocol.go:1210`), also when the adapter installs nothing; the copy is not zeroed and does not pass `dropSharedLocked`'s hook (see `BD-chip-HandshakeSecretsOverwritten`) |
+| R5-conc-5104 | C5 → § C5: #602 | `stepPeer` is written in the adapter's order, not the responder's, and the resume rollback restores a `stepPeer` another Sigma1 may have written since; effect: the retransmission timing of one reply, clamped. Shape: correct `stepPeer`'s and `mu`'s docs, or take a Sigma3's pacing from `Established.PeerSessionParams` (fix-h1) |
+| fable-diff-h1b A, B | C5 → § C5: #602 | the Sigma3 no-value branch's `handshakeFailed()` is not under test (no detach hook in the test); the error's parenthesis names one of its two causes |
+| fable-diff-h1 §2, stale cites in `tryResume` | the scripted re-cite → § C5: accepted, the scripted re-cite | `CaseServer.ts` line 182-183 → `:193-194`, line 184 → `:195`, line 165 → `:176`, `:186-191` → `:196-201`, `:171-186` / `:212` → `:177-190` / `:214`, `:217` (at `b25ed960`, Fable's lines) |
+| `node/metrics/expvar` `TestRoundTrip` under `-count>1` (fix-h4c) | C5 (test) → § C5: #609 | fails under `go test -count=3` (process-global expvar registration), independent of this pull request — measured there; a `-count=3` race guard over `./node/...` fails on that package |
+| R5-fsm-5401 residue (fable-diff-h5 notes 1-3) | C5 → § C5: #612 (notes 1, 2), note 3 accepted | decision 2 of fix-h5 (an activation numbered after a commit began stays pending) has no test; `CommitActiveDataset`'s doc says "after the commit read the border router's state" where `since` is read before the GET ("after the commit began"); an activation landing in that window and attaching keeps `configured` false until the next fail-safe expiry reverts it (inferred, not run) |
+| fix-h6 left out, fable-diff-h6 N2, N3 | C5 (probe first) → § C5: N2 accepted, N3 closed | host-side bump sites on an `*Endpoint` kept from a superseded topology (`bridge/receive.go:1037`, `:1064`, `Endpoint.IncreaseConfigurationVersion`): unverified; the invoke path advances the served topology's endpoint (measured by lines, not probed); fix-h6's "`SetNodeLabel`'s bump (`types.go:832`)" is `IncreaseConfigurationVersion`, `SetNodeLabel` is `:909` and advances nothing itself |
+| fable-diff-h4c note 4 | C5 (note) → § C5: accepted | a Stop that fails at the bridge leaves the stop flag set and the node not stopped: no lost requestor's sessions end until the next Stop finishes (fail closed; as before with `stopping`) |
+| chip Python cases without `ndef` (fix-h7 §1.6, step 2) | the `absent` map (class (c) harness) → § C5: accepted (the `absent` map) | DD 1.5, 3.23, 3.24 and IDM 10.7: the generator re-run fails with `No module named 'ndef'`, so the image descriptor does not file them; they stay `absent` until the image carries the module |
+| the run's notes and the confirmed carried rows | C5 → § C5, per row | R5-conc-5002, R5-bound-5006, R5-store-5007, R5-store-5008, R5-par-5109, R5-fsm-5208, R5-conc-5209, R5-doc-5304, R5-test-5305, R5-test-5505; the rows verify-r5 §3-4 found open: R5-par-5003, R5-conc-5004, R5-par-5005, R5-doc-5009, R5-doc-5010, R5-par-5011, R5-test-5105, R5-par-5106, R5-fsm-5108, R5-doc-5151, R5-err-5201, R5-test-5202, R5-err-5203, R5-bound-5204, R5-fsm-5306, R5-bound-5307, R5-fsm-5308, R5-test-5309, R5-doc-5504 (releaseNotStated) |
+| run 4's carried rows | C5 → § C5, per row | the list of § Run 4 "Carried to run 5" not closed above stands: decision 602's notes, the R3-sec-3403 residue, the bluetoothd probe (decision 574: R3-fsm-3301, R3-err-3305, R3-conc-3306, R4-fsm-4301's and R5-fsm-5502's trigger), the nine run-3 re-cites, the stale `Datasource.ts` cites |
+
+### C5 (decision 602)
+
+The 148 notes carried to C5 (`c5/inventory.tsv`: the rows of § Run 4
+"Carried to run 5", § Run 5 "Carried to C5", the gate-641 items G641-1 to
+G641-5, the TC-AVSM-2.17 flake and the C4 compare) were judged at
+`d1d1212b9` by three Fable verdicts (`c5/verdict-cluster.md`,
+`verdict-stack.md`, `verdict-radio.md`); the owner's decisions 656 to 665
+settled their questions, decision 666 takes every other row as the verdicts
+state it. Outcome per row in `c5/outcome.tsv`: **97 into 19 issues, 45
+accepted, 5 closed, 1 fixed in this pull request** (R4-doc-4404). Line
+numbers below are at `d1d1212b9`.
+
+**Issues, one per package**
+
+- `cluster/core` #595 (34): R4-doc-4003, R4-conc-4053, R4-conc-4054 (decision 660), R4-err-4055, R4-conc-4056, R4-err-4104, R4-store-4154, R4-conc-4155, R4-conc-4156, R4-api-4157 (decision 661), R4-test-4158, R4-doc-4185, R4-doc-4186, R4-doc-4187, R4-doc-4188, R4-doc-4189 (`cluster/wire`), R3-store-3001, R3-sup-3002, R3-fsm-3055, R3-conc-3056, R3-doc-3054, R5-conc-5002, R5-store-5007, R5-store-5008, R5-par-5003 = R4-par-4051-residue-1, R5-conc-5004, R5-par-5005, R5-doc-5009, R5-doc-5010, R5-err-5201 = R4-err-4751b-residue, R5-doc-5504 = releaseNotStated
+- `cluster/camera` #596 (3): C5-h9-provider-end-order (decisions 654, 663), C5-h9-solicitoffer and the TC-AVSM-2.17 flake (`examples/reference-bridge`, decision 665)
+- `cluster/thermo` #597 (3): R4-fsm-4253, R3-doc-3255, R3-doc-3282
+- `cluster/lock` #598 (2): R4-store-4201, R4-doc-4202
+- `cluster/closure` #599 (2): R3-doc-3280, R4-doc-4284
+- `device` #600 (1): R5-err-5302 = R5-api-5503
+- `node` #601 (14): R5-store-5205, R5-api-5206, R5-test-5202, R5-err-5203, R3-store-3703, R4-api-4752, R4-doc-4754 (decision 656), R4-api-4706 (decision 657), R5-doc-5304, R5-test-5309 = C5-590-closeLostPeer-test, R4-doc-4705, R3-doc-3782, R3-doc-3783
+- `bridge` #602 (9): R5-par-5106 = C5-589-n3, R5-par-5109, fable-diff-h1 N3 = G641-1 (decision 658), R5-test-5105, fable-diff-h1b A, B, R5-conc-5104, the C4 compare (decision 664: the run at `28255e842` finished, repeated at the release head, a `bridge` test or a recorded reason for every bridge-blind mutant)
+- `client/discovery` #603 (4): R4-fsm-4551, R4-conc-4552, R4-test-4503, R4-doc-4502
+- `client/peer` #604 (4): R2-C2-api-2157, R2-C2-bound-2159, R4-doc-4553, R2-C2-doc-2156
+- `endpoint` #605 (3): R5-fsm-5108 = C5-589-n1, R3-doc-3452
+- `client/interaction` #606 (2): R3-doc-3556, R3-doc-3581
+- `contract` #607 (1): R3-doc-3781
+- `controller/ble/bletest` #608 (1): R2-C2-test-2050
+- `node/metrics/expvar` #609 (1): `TestRoundTrip` under `-count>1`
+- `ble/bluez` #610 (7): the bluetoothd probe (decision 574) first, then R3-err-3305, R3-conc-3306, the `svcRegistering` window (decision 651), R4-conc-4306, R4-err-4355, R5-test-5505
+- `ble/esphome` #611 (3): R4-conc-4352 (decision 659), R4-fsm-4305, R3-wire-3352
+- `thread/otbr` #612 (2): R5-fsm-5401 residue notes 1, 2
+- `wifi/wpasupplicant` #613 (1): R4-fsm-4354
+
+**Accepted** (decision 666; R2-C2-doc-1503 decision 662)
+
+| ID | reason | where recorded |
+| --- | --- | --- |
+| R2-C2-sup-1008 | two spellings of one rule (`cluster/core/commissioner_control.go:259-268`, `internal/caseauth/caseauth.go:23-33`) with no behaviour difference shown since run 2 | this row |
+| R2-C2-doc-1009 | a lint annotation; the bulk-replace sentence is what the code does (`cluster/core/access_control.go:1293-1296`) | this row |
+| R2-C2-fsm-1007 | a pure state reset on a host-called disarm costs one DataVersion step without a change | `cluster/core/general_commissioning.go:1429-1455` |
+| R5-bound-5006 | bounded at 65 535 small closures per fabric, needs a store that refuses the load, and a fabric removal collapses the keys | this row |
+| R2-C2-store-1004 residual | decided and not reopened; the start-up reconcile is the retry | § C3 |
+| R2-P6-sup-1009 | the one slot is stated on both fields with chip's line (decision 150) | `cluster/core/commissioner_control.go:116-131` |
+| R2-P6-fsm-1018 | one FabricUnderTest for the node, not cleared by the fabric's removal, as matter.js (`GroupcastServer.ts:404-430`, `:522-525` at `b25ed960`, Fable) | `cluster/core/groupcast.go:906-915` |
+| R2-C2-doc-1503 | "Removable in v0.25.0" is true; removing the 235 fields is a release-plan item, not a review issue (decision 662) | `README.md:168-169` |
+| R4-doc-4285 | the effective range is the one stated; the quoted constraint text goes into the scripted re-cite | the scripted re-cite |
+| R4-doc-4286 | an incomplete list in a package doc | the scripted re-cite |
+| R4-doc-4287 | wrong line only | the scripted re-cite |
+| R4-doc-4288 | a field doc naming `alarmsOf` for `resetOf` / `maskOf` | the scripted re-cite |
+| R3-doc-3285 | the three statements hold, the ranges are off by at most two lines | the scripted re-cite |
+| R5-fsm-5208 | fails closed: the doubled key makes `Start` fail until the host removes one | this row |
+| R5-bound-5307 = C5-590-S4 | decided (620): only a refusal's form changes, no accepted session | `cluster/camera/provider.go:71-76` |
+| R5-fsm-5308 = C5-590-S6 | chip's `ScheduleEndSend` outlives its command too (Fable); after Stop the send fails fast; at most the queue bound | this row |
+| R2-C2-par-2155 | mirrors matter.js `ServerAddressSet.ts:179-181` at `b25ed960` (Fable) | this row |
+| R2-C2-bound-2102 | the module's own bound; a sender that can squat four SRV targets can also announce addresses | `BD-Matter-Controller-HostDiscoveriesBounded` |
+| R2-C2-par-2154 | mirrors matter.js `Peer.ts:150-158` at `b25ed960` (Fable; the iteration order is unverified) | this row |
+| R5-conc-5209 | correct; cost only and unmeasured | this row |
+| R5-test-5305 | the two non-blocking selects are weak, not wrong; the property is pinned elsewhere per the source row | this row |
+| R5-bound-5204 | decided (615, 622), bounded by administered fabric changes | `node/listeners.go:70-74`, `:86-92` |
+| C5-h4c-n4 | fail closed; the next `Stop` finishes | this row |
+| C5-589-r2-4 | a test-harness ordering question; the wire behaviour is correct once awaited | this row |
+| G641-2 | deprecated (removable in v0.28.0) and the hazard is in the doc; no use in the four consumers at their local heads | `bridge/handlers.go:974-985` |
+| R5-par-5011 | the list of root servers is open by its own wording | `docs/guides/ports.md:255-257` |
+| R5-doc-5151 | the stated behaviour holds; the cite has no pin | the scripted re-cite |
+| C5-h6-n2 | no bridge path keeps an endpoint across a swap; the rest is a host calling a method on an object it kept | this row |
+| G641-3 | touches the replay-quiet comparison only; the adapter is made per handshake under the node (`node/security.go:1222`) | the R5-conc-5104 doc correction (#602) |
+| G641-4 | fail closed, cosmetic | this row |
+| R3-sec-3403-residue | documented in the method's doc; the residue needs an index to be reused | `bridge/bridge.go:2094-2103` |
+| C5-stale-datasource-cites | line numbers only | the scripted re-cite |
+| R5-fsm-5306 | decided (634); mirrors matter.js `Fabric.ts:422-429` at `b25ed960` (Fable) | `notes/parity/by_design.md:9800` |
+| C5-5401-residue-n3 | fail closed: the worst case is a revert at the next fail-safe expiry | `thread/otbr/borderrouter.go:307-309` |
+| G641-5 | a zero-value `BorderRouter` has a nil client and fails at its first call before `pending` is touched | this row |
+| R2-C2-bound-2005 | bounded by count × frame from a proxy the host configured; the overrun ends the connection | this row |
+| R2-C2-conc-2051 | test kit: two racing connects can exceed `Slots` by one in a fake; no product path | this row |
+| R2-C2-conc-2052 | test kit: a window between `Accept` and the registration in `serve` | this row |
+| R4-bound-4353 | mirrors matter.js `BorderRouterRegistry.ts:460-463`, `:470-472`, `:565-581` at `b25ed960` (Fable) | `thread/brdiscovery/registry.go:479-482` |
+| R3-fsm-3351 | same structure in matter.js (`BorderRouterRegistry.ts:591-599`, `:470-472` at `b25ed960`, Fable); only at the 256 cap | this row |
+| R2-C2-bound-2008 | bounded by existing caps (the observer's blocking, the 1 MiB body) | this row |
+| C5-ndef-absent | classed harness in the table with its reason; lifts when the image carries the module | `internal/chiptool/families_table_test.go:308-309` |
+| C5-tryresume-cites | line numbers only, no behaviour misstated | the scripted re-cite (mapping in § Run 5 "Carried to C5") |
+
+**Closed**
+
+| ID | by |
+| --- | --- |
+| R3-fsm-3301 | `17bb663f7`: `handle` follows the adapter object (`ble/bluez/peripheral_linux.go:287-314`); the trigger and `Powered` are #610's first step |
+| C5-589-n2-quiescer | said in `contract/matter.go:1090-1094` |
+| C5-589-n7 | the report path gates every result per subscriber: `bridge/subscribe.go:646-660`, `:668-696`, called at `:1100` |
+| C5-h6-n3 | the wrong cite was in a local fix note; this register's row corrects it (§ Run 5 "Carried to C5", fix-h6 row) |
+| C5-590-tc-webrtcp-2.12-2.16 | WEBRTCP runs in the `app-camera` group (`.github/workflows/chiptool.yml:255`); both cases are in the golden with 0 skipped steps |
+| R4-doc-4404 | fixed in this pull request: `docs/getting-started/controller.md` says 32 bytes of UTF-8 and the cut at load (`controller/commissioner/fabric.go:114-133`) |
