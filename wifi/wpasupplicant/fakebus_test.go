@@ -85,6 +85,11 @@ type fakeBus struct {
 	// failReads is the number of the next Gets that fail with the bus
 	// daemon's NoReply — a wpa_supplicant that does not answer in time.
 	failReads int
+	// unknownProperty, when set, answers a Get of a property the fake does
+	// not serve, in place of InvalidArgs — chip's wpa_supplicant mock
+	// answers with org.freedesktop.DBus.Error.UnknownProperty (decision
+	// 637).
+	unknownProperty *dbus.Error
 }
 
 // Watch implements bus: the subscription is recorded, with the calls.
@@ -217,6 +222,9 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 			return nil, dbus.NewError("org.freedesktop.DBus.Error.UnknownObject", nil)
 		}
 		v, ok := b.props[args[1].(string)]
+		if !ok && b.unknownProperty != nil {
+			return nil, *b.unknownProperty
+		}
 		if !ok {
 			return nil, dbus.NewError("org.freedesktop.DBus.Error.InvalidArgs", []any{"No such property"})
 		}

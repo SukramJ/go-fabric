@@ -1617,9 +1617,15 @@ func TestAJoinWithTheNetworksUnreadableSendsNoCredential(t *testing.T) {
 		name  string
 		setup func(b *fakeBus)
 	}{
-		{"wpa_supplicant does not serve it", func(b *fakeBus) { delete(b.props, "Networks") }},
+		{"wpa_supplicant answers another error", func(b *fakeBus) { delete(b.props, "Networks") }},
 		{"the bus daemon gave up", func(b *fakeBus) {
 			b.fail[methodGet] = dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"}
+		}},
+		{"the read timed out", func(b *fakeBus) { b.fail[methodGet] = context.DeadlineExceeded }},
+		{"the bus is gone", func(b *fakeBus) { b.fail[methodGet] = dbus.ErrClosed }},
+		{"a name that only starts like the unknown-property one", func(b *fakeBus) {
+			delete(b.props, "Networks")
+			b.unknownProperty = &dbus.Error{Name: "org.freedesktop.DBus.Error.UnknownPropertyX"}
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1645,4 +1651,60 @@ func TestAJoinWithTheNetworksUnreadableSendsNoCredential(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAJoinWithoutANetworksPropertyAddsTheNetwork: a wpa_supplicant that
+// answers the read of the interface's Networks with
+// org.freedesktop.DBus.Error.UnknownProperty — chip's mock, measured in
+// the CHIP harness image (decision 637) — serves no such property, so the
+// join goes on without the list as before decision 625 and says so once at
+// debug; only a stalled or erroring read refuses the join
+// (TestAJoinWithTheNetworksUnreadableSendsNoCredential). Without the list
+// an unanswered AddNetwork cannot be settled: nothing is owed.
+func TestAJoinWithoutANetworksPropertyAddsTheNetwork(t *testing.T) {
+	t.Parallel()
+	noNetworks := func(b *fakeBus) {
+		delete(b.props, "Networks")
+		b.unknownProperty = &dbus.Error{Name: "org.freedesktop.DBus.Error.UnknownProperty", Body: []any{"Unknown interface fi.w1.wpa_supplicant1.Interface or property Networks."}}
+	}
+
+	t.Run("the join succeeds", func(t *testing.T) {
+		t.Parallel()
+		b := newFakeBus()
+		noNetworks(b)
+		d, logs := startDriver(t, b, Options{})
+		status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential))
+		if status != statusSuccess || debug != "" {
+			t.Fatalf("ConnectNetwork = %d %q, want Success", status, debug)
+		}
+		if !slices.Contains(b.called(), ifaceInterface+".AddNetwork") {
+			t.Error("AddNetwork not called")
+		}
+		if n := strings.Count(logs.String(), "level=DEBUG msg=\"wpasupplicant: wpa_supplicant serves no Networks"); n != 1 {
+			t.Errorf("%d debug lines on the missing Networks property, want 1:\n%s", n, logs)
+		}
+		if strings.Contains(logs.String(), testCredential) {
+			t.Error("the log carries the credential")
+		}
+	})
+
+	t.Run("an unanswered AddNetwork owes nothing", func(t *testing.T) {
+		t.Parallel()
+		b := newFakeBus()
+		noNetworks(b)
+		b.fail[ifaceInterface+".AddNetwork"] = dbus.Error{Name: errNoReply}
+		d, _ := startDriver(t, b, Options{})
+		if status, _, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusUnknown {
+			t.Fatalf("ConnectNetwork = %d, want UnknownError", status)
+		}
+		d.mu.Lock()
+		owed, unsettled := len(d.owed), d.unsettled
+		d.mu.Unlock()
+		if owed != 0 {
+			t.Errorf("%d networks owed without a Networks property", owed)
+		}
+		if unsettled != nil {
+			t.Errorf("unsettled = %v without a Networks property, want nil", unsettled)
+		}
+	})
 }
