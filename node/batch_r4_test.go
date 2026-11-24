@@ -146,6 +146,59 @@ func testUncomparableEndpoint(t *testing.T, mk func(endpoint.Spec, string) node.
 			t.Fatal("after the batch: p not served; want the held replacement applied")
 		}
 	})
+	// review II, R5-api-5206: an Add and a Replace of one key in one
+	// batch — the Add's value, superseded, gains during fn a part another
+	// endpoint serves; only the last take of the key is the set's and
+	// judged, so the clean replacement stays served.
+	t.Run("Add then Replace of one key", func(t *testing.T) {
+		for _, started := range []bool{false, true} {
+			t.Run(fmt.Sprint("started=", started), func(t *testing.T) {
+				ctx := t.Context()
+				cfg := minimalConfig(nil)
+				cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+				n := newNode(t, cfg)
+				agg := n.Aggregator()
+				if err := agg.Add(ctx, bridgedWithParts(t, "o", "p")); err != nil {
+					t.Fatal(err)
+				}
+				if started {
+					if err := n.Start(ctx); err != nil {
+						t.Fatal(err)
+					}
+				}
+				// The two values share s1's part array: renaming its part
+				// changes the first value's live Spec.
+				s1 := bridgedWithParts(t, "u", "ua").Spec()
+				v1, v2 := mk(s1, "a"), mk(bridgedWithParts(t, "u", "up").Spec(), "b")
+				var err error
+				noPanic(t, "Batch", func() {
+					err = agg.Batch(ctx, func(b *node.Batch) error {
+						if err := b.Add(v1); err != nil {
+							return err
+						}
+						if err := b.Replace(endpoint.StringKey("u"), v2); err != nil {
+							return err
+						}
+						s1.Parts[0].StableKey = endpoint.StringKey("p")
+						return nil
+					})
+				})
+				if err != nil {
+					t.Fatalf("Batch: %v; want nil, the replacement collides with nothing", err)
+				}
+				if !started {
+					if err := n.Start(ctx); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for _, k := range []string{"u", "up"} {
+					if _, ok := servedNumberOf(n, k); !ok {
+						t.Errorf("%s not served; want the replacement", k)
+					}
+				}
+			})
+		}
+	})
 	t.Run("held Replace refused", func(t *testing.T) {
 		ctx := t.Context()
 		cfg := minimalConfig(nil)

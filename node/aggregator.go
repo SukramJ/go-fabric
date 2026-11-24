@@ -580,7 +580,7 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	// with a fresh one.
 	pre, erase := splitErasures(b.ops)
 	resErr := p.a.applyReservations(ctx, pre, nil)
-	served, cancel, keep, findErr := p.a.servedInErasure(ctx, erase)
+	erase, served, cancel, keep, findErr := p.a.servedInErasure(ctx, erase)
 	resErr = errors.Join(resErr, findErr)
 	p.a.mu.Lock()
 	started := p.a.started
@@ -788,7 +788,7 @@ func (b *Batch) replaceWithheldLocked(part *partition, i int, key string, entrie
 	old := part.eps[i]
 	err := a.n.recordWithheld(b.ctx, entries, func(k string) bool { return a.servesExceptAtLocked(k, part, i) })
 	b.dropLocked(part, i, key)
-	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key, tree: reservationTree(old.Spec())})
+	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key, tree: reservationTree(old.Spec()), join: true})
 	return err
 }
 
@@ -846,7 +846,11 @@ func (b *Batch) Remove(key device.SourceKey) error {
 	b.dropLocked(part, i, key.String())
 	// Appended under a.mu, as Add and Forget do: a.mu guards b.ops
 	// against a call racing the end of fn (fable-diff-g5g N4).
-	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key.String(), tree: reservationTree(removed.Spec())})
+	// Joined with the reservation the key holds while served — the
+	// parts of an undone Replace (refuseLateCollisionsLocked) — so its
+	// Forget still reaches them; a key served holds none otherwise (its
+	// Add released it).
+	b.ops = append(b.ops, reservationOp{kind: opReserve, key: key.String(), tree: reservationTree(removed.Spec()), join: true})
 	a.mu.Unlock()
 	return nil
 }
@@ -1066,12 +1070,21 @@ func (b *Batch) addedLocked(key string, ep Endpoint) (int, bool) {
 func (b *Batch) refuseLateCollisionsLocked() []error {
 	a := b.a
 	var errs []error
+	// judged are the keys whose take was judged as the set's: an earlier
+	// take of one is superseded and never the set's, also when an
+	// endpoint that cannot be compared makes sameEndpoint match it
+	// (review II, R5-api-5206).
+	judged := map[string]bool{}
 	for j := len(b.taken) - 1; j >= 0; j-- {
 		t := b.taken[j]
+		if judged[t.key] {
+			continue
+		}
 		part, i := a.findLocked(t.key)
 		if part == nil || !sameEndpoint(part.eps[i], t.ep) {
 			continue
 		}
+		judged[t.key] = true
 		entries := surfaceEntries(t.ep)
 		k, ok := duplicateKey(entries)
 		if !ok {
@@ -1112,12 +1125,23 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 			// The replaced device stays bound: it is served again.
 			b.detach[t.oldAt] = func() {}
 		}
+		// A reassembly that ran during fn may have served the replacement
+		// and stored numbers for its parts: the parts no endpoint serves
+		// once the replaced one is back are reserved under the key alone,
+		// so a later Forget of the key — or of its Remove's reservation,
+		// which joins this one — erases their numbers too, while a Forget
+		// of such a part by name does not reach the served key's values
+		// (review II, R5-store-5205).
+		if extra := slices.DeleteFunc(reservationTree(t.ep.Spec()), a.servesLocked); len(extra) > 0 {
+			b.ops = append(b.ops, reservationOp{kind: opReserve, key: t.key, tree: append([]string{t.key}, extra...), join: true, keyOnly: true})
+		}
 		// The endpoint put back serves its keys again: the takes judged
 		// while it was out are judged once more against it
 		// (fable-read-close B1). Each restart removes a take, so the loop
 		// ends.
 		b.taken = slices.Delete(b.taken, j, j+1)
 		j = len(b.taken)
+		clear(judged)
 	}
 	return errs
 }

@@ -134,4 +134,47 @@ func TestBatchTakeGrowingOneKeyTwiceIsUndone(t *testing.T) {
 			}
 		})
 	}
+	// A Replace whose replacement came to hold one key twice is undone
+	// the same way: the endpoint it replaced is served again (review II,
+	// R5-test-5202, the duplicateKey arm of the late judgement).
+	t.Run("Replace", func(t *testing.T) {
+		ctx := t.Context()
+		cfg := minimalConfig(nil)
+		cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()}
+		n := newNode(t, cfg)
+		agg := n.Aggregator()
+		if err := agg.Add(ctx, bridgedWithParts(t, "x", "xp")); err != nil {
+			t.Fatal(err)
+		}
+		if err := n.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		spec := bridgedWithParts(t, "x", "q").Spec()
+		h := ifaceEndpoint{s: &spec}
+		var err error
+		noPanic(t, "Batch", func() {
+			err = agg.Batch(ctx, func(b *node.Batch) error {
+				if err := b.Replace(endpoint.StringKey("x"), h); err != nil {
+					return err
+				}
+				spec.Parts = append(spec.Parts, spec.Parts[0]) // q twice
+				return nil
+			})
+		})
+		if !errors.Is(err, node.ErrDuplicateKey) {
+			t.Fatalf("Batch whose Replace came to hold q twice: %v; want ErrDuplicateKey", err)
+		}
+		if _, ok := servedNumberOf(n, "xp"); !ok {
+			t.Fatal("xp not served: the replaced endpoint was not put back")
+		}
+		if _, ok := servedNumberOf(n, "q"); ok {
+			t.Fatal("q served: the refused Replace was not undone")
+		}
+		if err := agg.Add(ctx, kitLight(t, "u1")); err != nil {
+			t.Fatalf("unrelated Add after the refusal: %v", err)
+		}
+		if _, ok := servedNumberOf(n, "u1"); !ok {
+			t.Fatal("u1 not served")
+		}
+	})
 }
