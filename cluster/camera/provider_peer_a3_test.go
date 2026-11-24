@@ -4,8 +4,11 @@
 package camera_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"thingfabric.dev/go-fabric/cluster/camera"
@@ -85,5 +88,45 @@ func TestProviderEndRemovesBeforeTheSendA3(t *testing.T) {
 				t.Fatalf("%d sessions after End", n)
 			}
 		})
+	}
+}
+
+// TestProviderSignalLogsThroughTheConfigLoggerA3: a signal logs, at Debug
+// and to ProviderConfig.Logger, the step to the requestor and the invoke —
+// begun and ended, with session, fabric, node, duration and error — in
+// that order; a failed invoke's line carries its error (issue #596 B
+// step 1, decision 676).
+func TestProviderSignalLogsThroughTheConfigLoggerA3(t *testing.T) {
+	var logs bytes.Buffer
+	p, _ := newProvider(t, nil, func(cfg *camera.ProviderConfig) {
+		cfg.Logger = slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	})
+	peers := &fakePeers{invokeErr: statusErr{im.StatusNotFound}}
+	p.AttachPeerConnector(peers)
+	if err := p.UpsertSession(camera.ProviderSession{
+		Id: 5, PeerNodeId: sigPeerNode, PeerEndpointId: sigPeerEndpoint, FabricIndex: sigPeerFabric, StreamUsage: wpdef.StreamUsageLiveView,
+		VideoStreams: &[]uint16{1},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Answer(context.Background(), 5, "v=0"); err == nil {
+		t.Fatal("Answer: no error from a refused invoke")
+	}
+	out := logs.String()
+	at := -1
+	for _, msg := range []string{"camera.provider.signal.connecting", "camera.provider.signal.connected", "camera.provider.signal.invoking", "camera.provider.signal.invoked"} {
+		i := strings.Index(out, "msg="+msg)
+		if i <= at {
+			t.Fatalf("%s missing or out of order in\n%s", msg, out)
+		}
+		at = i
+	}
+	for _, want := range []string{"session=5", "fabric_index=2", "node_id=1234605616436508552", "took=", "msg=camera.provider.signal.invoked session=5"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("log has no %s:\n%s", want, out)
+		}
+	}
+	if _, invoked, _ := strings.Cut(out, "msg=camera.provider.signal.invoked"); !strings.Contains(invoked, "err=") || strings.Contains(invoked, "err=<nil>") {
+		t.Errorf("the invoked line carries no error:\n%s", out)
 	}
 }

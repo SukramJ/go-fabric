@@ -148,7 +148,7 @@ func newProviderServer(b defaultBuild) (contract.ClusterServer, error) {
 	if d.ProviderPort == nil {
 		return nil, notServed(fmt.Errorf("webrtc transport provider: %w", errNoPort))
 	}
-	cfg := camera.ProviderConfig{Port: d.ProviderPort, MaxSessions: d.MaxSessions, MaxSessionsPerFabric: d.MaxSessionsPerFabric}
+	cfg := camera.ProviderConfig{Port: d.ProviderPort, MaxSessions: d.MaxSessions, MaxSessionsPerFabric: d.MaxSessionsPerFabric, Logger: b.logger}
 	if av, ok := b.sibling(csdef.ClusterID).(*camera.AvStream); ok {
 		cfg.Streams = av
 	}

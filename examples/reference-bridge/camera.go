@@ -580,6 +580,7 @@ func (c *demoCamera) build() error {
 func (c *demoCamera) options(key, name string) device.Options {
 	o := bridged(key, name)
 	o.Surface = c.surface
+	o.Logger = c.logger // the daemon's logger; the provider's signal lines among them (#596 B, decision 676)
 	return o
 }
 

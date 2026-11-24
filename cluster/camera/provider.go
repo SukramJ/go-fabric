@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -88,6 +89,10 @@ type ProviderConfig struct {
 	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
 	// v0.25.0.
 	DataVersion *cluster.DataVersionTracker
+	// Logger receives the Debug lines of the camera's signals to the
+	// requestor (provider_peer.go: reaching the requestor and invoking
+	// the command, with their duration and error); slog.Default when nil.
+	Logger *slog.Logger
 }
 
 // Provider implements [contract.ClusterServer] for WebRtcTransportProvider:
