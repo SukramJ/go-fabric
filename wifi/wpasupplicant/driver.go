@@ -831,8 +831,10 @@ func (d *Driver) removePrevious(ctx context.Context, prev dbus.ObjectPath) {
 // non-empty debugText is the failure; then the driver holds no network of
 // this join: an AddNetwork that ended without wpa_supplicant's answer is
 // settled by [Driver.settleUnanswered], and one whose settlement could
-// not tell its network apart — the interface's Networks unreadable before
-// it — is not sent.
+// not tell its network apart — the read of the interface's Networks before
+// it stalled or failed — is not sent. A wpa_supplicant that answers it
+// serves no Networks property (errUnknownProperty) gets the AddNetwork
+// all the same, unsettled when it goes unanswered (decision 637).
 func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidAttr slog.Attr) (network, prev dbus.ObjectPath, debugText string) {
 	args, refusal := networkArgs(ssid, credentials)
 	if refusal != "" {
@@ -851,17 +853,25 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 		}
 	}
 	// The networks listed before the call, to tell the one an unanswered
-	// AddNetwork may have added. Without them such a network could not be
-	// told apart, so the join fails here and the credential is not sent
-	// (review II, R4-err-4351, decision 625).
+	// AddNetwork may have added. When the read stalls or fails such a
+	// network could not be told apart, so the join fails here and the
+	// credential is not sent (review II, R4-err-4351, decision 625). A
+	// wpa_supplicant that answers it has no such property — chip's mock —
+	// is joined without the list, as before decision 625: before stays nil
+	// and an unanswered AddNetwork cannot be settled (decision 637).
+	var before []dbus.ObjectPath
 	v, err := d.property(ctx, "Networks")
-	if err != nil {
+	switch {
+	case unknownProperty(err):
+		d.log.Debug("wpasupplicant: wpa_supplicant serves no Networks property; an unanswered AddNetwork cannot be settled", ssidAttr)
+	case err != nil:
 		d.log.Warn("wpasupplicant: failed to read the networks before adding one; the network is not added", ssidAttr, slog.String("reason", errName(err)))
 		return "", "", "add network: the networks are unreadable: " + errName(err)
-	}
-	before, _ := v.Value().([]dbus.ObjectPath)
-	if before == nil {
-		before = []dbus.ObjectPath{}
+	default:
+		before, _ = v.Value().([]dbus.ObjectPath)
+		if before == nil {
+			before = []dbus.ObjectPath{}
+		}
 	}
 	// The one call that carries the credential: neither its arguments nor
 	// its error's text (which a service may build from them) is logged or
@@ -910,6 +920,28 @@ func refused(err error) bool {
 // answered: the request may still be carried out.
 const errNoReply = "org.freedesktop.DBus.Error.NoReply"
 
+// errUnknownProperty is the error a service built on sd-bus answers a Get
+// of a property its object does not serve with: chip's wpa_supplicant
+// mock (matter/testing/linux/wifi.py at connectedhomeip 6170af84, on
+// python-sdbus 0.14.3 in the CHIP harness image) answers the interface's
+// Networks with it, measured over dbus-send in that image (decision 637).
+const errUnknownProperty = "org.freedesktop.DBus.Error.UnknownProperty"
+
+// unknownProperty reports whether err is the service's answer that it
+// serves no such property — errUnknownProperty exactly; any other error,
+// a timeout or a closed bus included, is not.
+func unknownProperty(err error) bool {
+	var de dbus.Error
+	var dep *dbus.Error
+	switch {
+	case errors.As(err, &de):
+		return de.Name == errUnknownProperty
+	case errors.As(err, &dep):
+		return dep.Name == errUnknownProperty
+	}
+	return false
+}
+
 // settleUnanswered handles an AddNetwork that ended without
 // wpa_supplicant's answer (review II, R4-err-4351): wpa_supplicant may
 // have carried it out, and the network it added — with the credential —
@@ -920,9 +952,14 @@ const errNoReply = "org.freedesktop.DBus.Error.NoReply"
 // context of its own bounded by removeTimeout, as the join's may have
 // ended. When it fails (wpa_supplicant stalled), before is kept as
 // unsettled and sweep diffs against it before the next join and at Close
-// — an earlier unsettled list is kept, being the older. before is never
-// nil: addNetwork does not send the AddNetwork without it.
+// — an earlier unsettled list is kept, being the older. before is nil
+// only when wpa_supplicant serves no Networks property (decision 637):
+// then nothing can be told apart and nothing is owed, which is logged.
 func (d *Driver) settleUnanswered(ctx context.Context, before []dbus.ObjectPath) {
+	if before == nil {
+		d.log.Warn("wpasupplicant: cannot tell whether the unanswered network was added", slog.String("reason", "wpa_supplicant serves no Networks property"))
+		return
+	}
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
 	defer cancel()
 	v, err := d.property(rctx, "Networks")

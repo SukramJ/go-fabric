@@ -746,6 +746,30 @@ func TestRefused(t *testing.T) {
 	}
 }
 
+// TestUnknownProperty: only the unknown-property error name, as a value or
+// a pointer, is the answer that wpa_supplicant serves no such property;
+// another name, NoReply, a context error and a closed connection are not
+// (decision 637).
+func TestUnknownProperty(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		err  error
+		want bool
+	}{
+		{dbus.Error{Name: "org.freedesktop.DBus.Error.UnknownProperty"}, true},
+		{&dbus.Error{Name: "org.freedesktop.DBus.Error.UnknownProperty"}, true},
+		{dbus.Error{Name: "org.freedesktop.DBus.Error.InvalidArgs"}, false},
+		{&dbus.Error{Name: errNoReply}, false},
+		{context.DeadlineExceeded, false},
+		{dbus.ErrClosed, false},
+		{nil, false},
+	} {
+		if got := unknownProperty(tc.err); got != tc.want {
+			t.Errorf("unknownProperty(%v) = %v, want %v", tc.err, got, tc.want)
+		}
+	}
+}
+
 // TestScanReadsAfterTheBound: the scan's bound covers the wait for
 // ScanDone, not the reads after it — a ScanDone close to the bound still
 // yields every BSS (run 43137917486: a scan while associated ended at
