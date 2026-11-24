@@ -201,6 +201,13 @@ func deref(ids *[]uint16) []uint16 {
 // of a session carries the session's ICE credentials (sessionSignal). An
 // offer the answer cannot be built from — no media section — is logged
 // and not answered.
+//
+// Each step logs a Debug line — the wait for the session, the session
+// seen, every attempt and its outcome, and each exit that sends nothing
+// (no provider, the session ended, the daemon stopping) — so a run in
+// which no Answer reached the requestor says where the goroutine stopped;
+// [camera.Provider.Answer]'s own lines say whether the send to the
+// requestor returned (issue #596 B).
 func (c *demoCamera) answerOffer(ctx context.Context, id uint16, offer string) {
 	fingerprint, err := c.dtlsFingerprint()
 	if err != nil {
@@ -215,6 +222,7 @@ func (c *demoCamera) answerOffer(ctx context.Context, id uint16, offer string) {
 	}
 	provider, ok := c.provider()
 	if !ok {
+		c.logger.Debug("camerasim.answer.stopped", slog.Uint64("session", uint64(id)), slog.String("reason", "no WebRtcTransportProvider kit server"))
 		return
 	}
 	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
@@ -230,36 +238,50 @@ func (c *demoCamera) answerOffer(ctx context.Context, id uint16, offer string) {
 		defer cancel()
 		defer stop()
 		defer unsubscribe()
+		session := slog.Uint64("session", uint64(id))
+		seen := false
 		for attempt := 1; ; {
 			if _, ok := c.currentSession(id); !ok {
 				// Not yet in CurrentSessions: the server stores it when the
 				// port has returned.
+				c.logger.Debug("camerasim.answer.waiting", session)
 				select {
 				case <-changed:
 					continue
 				case <-sig.ended:
+					c.logger.Debug("camerasim.answer.stopped", session, slog.String("reason", "session ended while waiting for it"))
 					return
 				case <-ctx.Done():
+					c.logger.Debug("camerasim.answer.stopped", session, slog.String("reason", "daemon stopping while waiting for the session"))
 					return
 				}
 			}
+			if !seen {
+				seen = true
+				c.logger.Debug("camerasim.answer.session_seen", session)
+			}
+			c.logger.Debug("camerasim.answer.attempt", session, slog.Int("attempt", attempt))
 			err := provider.Answer(ctx, id, answer)
 			if err == nil {
+				c.logger.Debug("camerasim.answer.sent", session, slog.Int("attempt", attempt))
 				return
 			}
 			if spec.StatusOf(err) != im.StatusNotFound || attempt >= camAnswerAttempts {
-				c.logger.Info("camerasim.answer", slog.Uint64("session", uint64(id)), slog.Int("attempt", attempt), slog.Any("err", err))
+				c.logger.Info("camerasim.answer", session, slog.Int("attempt", attempt), slog.Any("err", err))
 				return
 			}
+			c.logger.Debug("camerasim.answer.retry", session, slog.Int("attempt", attempt), slog.Any("err", err))
 			attempt++
 			t := c.clk.NewTimer(camAnswerRetry)
 			select {
 			case <-t.C():
 			case <-sig.ended:
 				t.Stop()
+				c.logger.Debug("camerasim.answer.stopped", session, slog.String("reason", "session ended before the retry"))
 				return
 			case <-ctx.Done():
 				t.Stop()
+				c.logger.Debug("camerasim.answer.stopped", session, slog.String("reason", "daemon stopping before the retry"))
 				return
 			}
 		}
