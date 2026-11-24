@@ -141,7 +141,8 @@ type Spec struct {
 	// of a part are not served.
 	Parts []Spec
 	// Instance names the host's object behind StableKey — compared with
-	// == against the Instance of the key's previous assembly. When it
+	// == against the last Instance that was set for the key by an
+	// assembly that succeeded (a failed one sets none). When it
 	// differs, the endpoint is a new instance under the key, as matter.js
 	// closes an endpoint and adds another under the same id: every one of
 	// its clusters starts at a new random DataVersion (matter.js

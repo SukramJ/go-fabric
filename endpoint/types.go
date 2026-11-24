@@ -683,10 +683,12 @@ func newEndpointStateRegistry(clk clock.Clock) *endpointStateRegistry {
 // stateFor returns the state for key, creating it on first use, and the
 // instance the host put behind it ([Spec.Instance]). The returned pointer
 // is stable for key across the registry's lifetime while the instance
-// stays. For a new instance it returns a renewed state ([endpointState.renewed])
-// and install, which makes it the key's state: the caller runs it once the
-// assembly succeeded, so a failed one leaves the registry as it was. install
-// is nil when nothing is to be installed.
+// stays. For a new instance it returns a renewed state ([endpointState.renewed]).
+// What the call would change in the registry — the first use's state, an
+// instance adopted by a state served without one, a new instance's state —
+// is install: the caller runs it once the assembly succeeded, so a failed
+// one leaves the registry as it was (issue #605). install is nil when
+// nothing is to be installed.
 func (r *endpointStateRegistry) stateFor(key SourceKey, instance any) (st *endpointState, install func()) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -694,14 +696,25 @@ func (r *endpointStateRegistry) stateFor(key SourceKey, instance any) (st *endpo
 	if s == nil {
 		s = newEndpointState(r.clock)
 		s.instance, s.assembled = instance, true
-		r.states[key] = s
-		return s, nil
+		return s, func() {
+			r.mu.Lock()
+			if r.states[key] == nil {
+				r.states[key] = s
+			}
+			r.mu.Unlock()
+		}
 	}
 	if !newInstance(s.instance, instance) {
-		if s.instance == nil {
-			s.instance = instance
+		if s.instance != nil || instance == nil {
+			return s, nil
 		}
-		return s, nil
+		return s, func() {
+			r.mu.Lock()
+			if r.states[key] == s && s.instance == nil {
+				s.instance = instance
+			}
+			r.mu.Unlock()
+		}
 	}
 	fresh := s.renewed(instance)
 	return fresh, func() {
