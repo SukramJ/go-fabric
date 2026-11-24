@@ -121,10 +121,13 @@ type SessionOptions struct {
 	// "not discovered" outcome (:404-430). The discovery ends only after
 	// every preparation finished (:303-331). At most 16 devices are
 	// prepared at once; while 16 are, the transport that found the next
-	// one waits until a preparation has finished. No device is dropped
-	// while the search runs; one still waiting when the search stops is
-	// not prepared, so the discovery ends at most one Prepare time after
-	// its search.
+	// one waits until a preparation has finished. This bound drops no
+	// device; the delivery queue of [IPTransport]'s search, which holds
+	// what it finds while it waits, drops its oldest device past
+	// maxQueuedDeliveries (logged as matter.discovery.deliveries_dropped),
+	// and that device is delivered again on its next announcement. One
+	// still waiting when the search stops is not prepared, so the
+	// discovery ends at most one Prepare time after its search.
 	Prepare func(ctx context.Context, c Candidate) error
 	// Clock times Timeout and the race's stagger; nil is the system clock.
 	Clock fabricclock.Clock
