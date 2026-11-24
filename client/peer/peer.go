@@ -22,10 +22,10 @@ import (
 // Peer is a node on one of our fabrics: its descriptor, its sessions, its
 // operational DNS-SD service and the work that keeps a session to it. It
 // is matter.js Peer (packages/protocol/src/peer/Peer.ts:64-675 at
-// db021da0) without the transport preference, the BasicInformation input
-// and the client interaction (stages 3 and 4); of its physical
-// properties it takes the medium ([Peer.SetMedium]) its network profile
-// is selected by. It is safe for concurrent use.
+// db021da0) without the BasicInformation input and the client
+// interaction (stages 3 and 4); of its physical properties it takes the
+// medium ([Peer.SetMedium]) its network profile is selected by. It is
+// safe for concurrent use.
 type Peer struct {
 	set     *Set
 	address handshake.PeerAddress
