@@ -14,11 +14,11 @@
 // (packages/nodejs-ble/src/BlenoBleServer.ts at 0ceb202d): the handshake
 // request arrives on C1, and the session — with its handshake response —
 // starts when the central subscribes to C2. A C2 subscribe before the
-// handshake request starts nothing, as that server refuses it
+// handshake request starts nothing, as that server throws on it
 // (BlenoBleServer.ts:288-291 at b25ed960: "Subscription request received
-// before handshake Request"); the request written after such a subscribe
-// is stored and not answered. A peripheral can also play the stalled
-// peer matter.js's channel tests model
+// before handshake Request"); this peripheral then stores the request
+// written after such a subscribe and does not answer it. A peripheral can
+// also play the stalled peer matter.js's channel tests model
 // (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-346 at b25ed960,
 // handshakeOnlyMatterService): it completes the handshake at the offered
 // segment size and then answers no BTP packet — see [Peripheral.Stall]
