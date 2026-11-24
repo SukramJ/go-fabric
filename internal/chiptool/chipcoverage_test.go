@@ -159,21 +159,21 @@ func chipPythonCases(root, commit string) (map[string]map[string][]string, error
 func TestChipPythonCasesCovered(t *testing.T) {
 	commit := harnessChipCommit(t)
 	root := chipCoverageRoot()
-	skip := ""
+	noConnectedhomeip := ""
 	var chip map[string]map[string][]string
 	if _, err := exec.LookPath("git"); err != nil {
-		skip = "git is not installed"
+		noConnectedhomeip = "git is not installed"
 	} else if err := exec.Command("git", "-C", root, "cat-file", "-e", commit+"^{commit}").Run(); err != nil { //nolint:gosec // a fixed git invocation
-		skip = "no connectedhomeip checkout with the harness commit " + commit + " at " + root +
+		noConnectedhomeip = "no connectedhomeip checkout with the harness commit " + commit + " at " + root +
 			" (set GOFABRIC_CHIP_ROOT, or run make chiptool-setup)"
 	} else if chip, err = chipPythonCases(root, commit); err != nil {
 		t.Fatal(err)
 	}
-	if skip != "" {
+	if noConnectedhomeip != "" {
 		if os.Getenv("GOFABRIC_CHIP_REQUIRED") != "" {
-			t.Fatalf("GOFABRIC_CHIP_REQUIRED is set, but %s", skip)
+			t.Fatalf("GOFABRIC_CHIP_REQUIRED is set, but %s", noConnectedhomeip)
 		}
-		t.Skip(skip)
+		t.Skip(noConnectedhomeip)
 	}
 
 	data, err := os.ReadFile(filepath.Join("testdata", chipCasesGoldenFile))

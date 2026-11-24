@@ -425,6 +425,10 @@ chiptool-setup: ## sparse connectedhomeip checkout at the harness image's CHIP c
 chipdm-check: ## run the CHIP data model cross-check against CHIP_ROOT; fails instead of skipping without the checkout
 	GOFABRIC_CHIP_ROOT="$(abspath $(CHIP_ROOT))" GOFABRIC_CHIP_REQUIRED=1 $(GO) test -count=1 -run 'TestChipDataModel|TestCompareSeededDifferences' -v ./internal/chipdm/
 
+.PHONY: chipcases-check
+chipcases-check: ## hold the certification family table to chip's Python cases at CHIP_TEST_IMAGE_COMMIT (CHIP_ROOT); fails instead of skipping without the checkout
+	GOFABRIC_CHIP_ROOT="$(abspath $(CHIP_ROOT))" GOFABRIC_CHIP_REQUIRED=1 $(GO) test -count=1 -run 'TestChipPythonCasesCovered|TestChipPythonCoverageSeeded|TestChipPyCaseID' -v ./internal/chiptool/
+
 .PHONY: chipdm-report
 chipdm-report: ## rewrite the generated block of docs/chip-datamodel-crosscheck.md from CHIP_ROOT
 	GOFABRIC_CHIP_ROOT="$(abspath $(CHIP_ROOT))" GOFABRIC_CHIP_REQUIRED=1 $(GO) test -count=1 -run 'TestChipDataModelCrosscheck' ./internal/chipdm/ -args -update-chipdm-doc
@@ -784,4 +788,4 @@ workflow-lint: ## actionlint and zizmor over .github/workflows (pinned: ACTIONLI
 ci: build build-32bit vet archcheck apidiff-check race lint cover-check bench-smoke reachability-check surface-check testparity-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs offline (ci-net: the guards that read a pinned clone)
 
 .PHONY: ci-net
-ci-net: cite-check testparity-snapshot-check chipdm-check ## the pipeline's guards that read a clone at a pinned commit (matter.js and matterjs-server, connectedhomeip's data model)
+ci-net: cite-check testparity-snapshot-check chipdm-check chipcases-check ## the pipeline's guards that read a clone at a pinned commit (matter.js and matterjs-server, connectedhomeip's data model and Python cases)

@@ -319,7 +319,11 @@ jobs:
       # deriving works from them. Every other job sees no checkout and the
       # cross-check skips there; this one provides it and runs the check with
       # GOFABRIC_CHIP_REQUIRED=1 (make chipdm-check), so a skip is a failure
-      # and the comparison cannot rot unnoticed.
+      # and the comparison cannot rot unnoticed. The same checkout carries
+      # src/python_testing for the Python-case coverage guard (make
+      # chipcases-check, internal/chiptool/chipcoverage_test.go): every
+      # Python case of a certification family at the pin is in the golden
+      # families list or in the family's absent map with its cause.
       - name: read the CHIP pins
         id: pins
         run: |
@@ -333,10 +337,11 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/connectedhomeip
-          key: chipdm-${{ steps.pins.outputs.commit }}-${{ steps.pins.outputs.version }}-${{ steps.pins.outputs.levels }}
+          key: chipdm-py-${{ steps.pins.outputs.commit }}-${{ steps.pins.outputs.version }}-${{ steps.pins.outputs.levels }}
       # A blob-filtered, depth-1 partial clone of the pinned commit with only
       # data_model/<version> and the specification levels' directories
-      # (CHIP_LEVEL_DATA_MODELS, the level cross-check) checked out: a few MB,
+      # (CHIP_LEVEL_DATA_MODELS, the level cross-check) and src/python_testing
+      # (the coverage guard reads its blobs at the pin) checked out: a few MB,
       # no authentication. The same fetch script/chiptool-setup.sh makes,
       # with a narrower sparse set.
       - name: fetch connectedhomeip data_model at the pin
@@ -347,7 +352,7 @@ jobs:
           DM: data_model/${{ steps.pins.outputs.version }}
           LEVELS: ${{ steps.pins.outputs.levels }}
         run: |
-          dirs="$DM"
+          dirs="$DM src/python_testing"
           for l in $LEVELS; do dirs="$dirs data_model/$l"; done
           git init -q "$CHIP_DIR"
           git -C "$CHIP_DIR" remote add origin https://github.com/project-chip/connectedhomeip.git
@@ -358,6 +363,8 @@ jobs:
           du -sh "$CHIP_DIR"
       - name: cross-check
         run: make chipdm-check CHIP_ROOT="$RUNNER_TEMP/connectedhomeip"
+      - name: Python-case coverage
+        run: make chipcases-check CHIP_ROOT="$RUNNER_TEMP/connectedhomeip"
 
   lint:
     name: lint
