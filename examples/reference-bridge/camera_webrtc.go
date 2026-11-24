@@ -266,7 +266,7 @@ type camOfferSection struct {
 //     fingerprint chip's ValidateSdpFields looks for (WebRTCClient.cpp:
 //     72-82; without one the answer is dropped, nothing set);
 //   - a fingerprint of a known algorithm with exactly its size in hex
-//     bytes (libdatachannel description.cpp:108-143, :1378-1395), the
+//     bytes (libdatachannel description.cpp:108-143, :1363-1380), the
 //     ufrag and pwd, at least one active media section
 //     (impl/peerconnection.cpp:924-953 validateRemoteDescription);
 //   - a=setup:active, never actpass in an answer
@@ -279,7 +279,7 @@ type camOfferSection struct {
 //     payload type: the camera-app answers H264 video and opus audio
 //     (webrtc-provider-manager.cpp:502-517 GetPayloadType), else the
 //     first offered;
-//   - each rtpmap as "<pt> <format>/<clock>" (description.cpp:1146-1160):
+//   - each rtpmap as "<pt> <format>/<clock>" (description.cpp:1150-1160):
 //     copied from the offer, with its fmtp lines.
 //
 // The session lines follow libdatachannel's generateSdp

@@ -90,7 +90,7 @@ func simCheckAnswer(t *testing.T, offer, answer string) {
 			line = strings.TrimRight(line, "\r")
 			switch {
 			case strings.HasPrefix(line, "m="):
-				// description.cpp:557-561: type and protocol, else
+				// description.cpp:549-561: type and protocol, else
 				// "Invalid media description line".
 				f := strings.Fields(line[2:])
 				if len(f) < 3 {
@@ -117,7 +117,7 @@ func simCheckAnswer(t *testing.T, offer, answer string) {
 				case slices.Contains([]string{"sendonly", "recvonly", "sendrecv", "inactive"}, key) && cur != nil:
 					cur.dir = key
 				case key == "rtpmap":
-					// description.cpp:1146-1160: "<pt> <format>/<clock>".
+					// description.cpp:1150-1160: "<pt> <format>/<clock>".
 					pt, desc, ok := strings.Cut(value, " ")
 					if _, err := strconv.Atoi(pt); err != nil || !ok || !strings.Contains(desc, "/") {
 						t.Errorf("rtpmap %q is not \"<pt> <format>/<clock>\"", value)
@@ -136,7 +136,7 @@ func simCheckAnswer(t *testing.T, offer, answer string) {
 		t.Errorf("answer ice-ufrag %q, ice-pwd %q", ufrag, pwd)
 	}
 	// Description::Description :108-143 and CertificateFingerprint::isValid
-	// :1378-1395: a known algorithm and exactly its size in colon-separated
+	// :1363-1380: a known algorithm and exactly its size in colon-separated
 	// hex bytes, else setFingerprint throws.
 	sizes := map[string]int{"sha-1": 20, "sha-224": 28, "sha-256": 32, "sha-384": 48, "sha-512": 64}
 	alg, value, _ := strings.Cut(fingerprint, " ")
