@@ -132,6 +132,11 @@ var notRequired = []decision{
 			"the required gate job needs it and fails a release pull request unless it passed.",
 	},
 	{
+		"chiptool.yml", "certification families (long) on the base commit", advisory,
+		"runs on a release pull request that changes documentation only (the comment over the job long-on-base in chiptool.yml); " +
+			"the required gate job needs it and fails such a pull request unless it passed.",
+	},
+	{
 		"pages.yml", "build", sharesName,
 		"no entry of its own in the branch protection: the job (mkdocs build --strict, path-filtered to the " +
 			"documentation) shares the name `build` with ci.yml's job. What GitHub does with two check " +

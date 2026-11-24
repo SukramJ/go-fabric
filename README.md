@@ -324,7 +324,9 @@ the changelog, it does not ship.
 
 A release pull request (head branch `release/*`) is also the gate of the
 certification run: it runs every chip-tool job and certification family the
-nightly run does, checks that the nested modules build against the versions
+nightly run does — the `long` group, whose one case waits 3 h 10 min, by its
+result on the base commit when the pull request changes documentation only —
+checks that the nested modules build against the versions
 they require, and cannot merge with one of them red
 ([Certifiability](https://github.com/thingfabric/go-fabric/blob/main/docs/certifiability.md#how-the-status-is-produced)).
 
