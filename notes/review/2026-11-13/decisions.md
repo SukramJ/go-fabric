@@ -1010,3 +1010,31 @@ Fable reads named in that section.
 | 635 | Coordinator | Coordinator (fact correction of 628): the node never builds `core.Messages` — the host does (`examples/reference-bridge/messages.go:51`); the reference bridge wires `SetLogger`, H2c's option 1 |
 | 636 | Coordinator | fix-h13b Q1 — the remaining WebRTCEndReasonEnum hand constants (cluster/camera provider_cap.go, provider.go maxEndReason, controller/camera/manager.go) take the generated values (`71dcb4300`); Q2 no (a field referring to a shared enum stays an integer, the generated convention); Q3 reachability regenerated at integration |
 | 637 | Owner (wizard) | Owner (wizard after the red BLE-Wi-Fi legs of #591): chip's wpa_supplicant mock serves no `Networks` property (connectedhomeip 6170af84 `src/python_testing/matter_testing_infrastructure/matter/testing/linux/wifi.py:665-695`), so 625's fail-closed refused every join against it. 625 narrowed: the join fails before AddNetwork only on a stalled / erroring bus (timeout, NoReply, other errors); a supplicant that answers that it has no such property (the D-Bus error name measured from the mock, not assumed) joins without settlement, as before 625, the residual documented — follow-up H6c |
+
+## 2026-11-24, review II close-out, run 5 and its fix PR
+
+Run 5, the delta run over the run-4 fix PR (`25a78a453`), did not converge:
+one medium confirmed (R5-sec-5101), no high, the low fix-regressions
+R5-fsm-5502 (the second of the R3-fsm-3301 line), R5-conc-5501,
+R5-conc-5107, R5-conc-5301 and R5-fsm-5401, and the note-level R5-doc-5207.
+Its fix pull request ran as units H1 to H8 on branch `review2/p7-r5fix`;
+dispositions in `phase-7-register.md` § Run 5 and its fix pull request.
+Reference statements in a decision come from the Fable reads named in that
+section.
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 638 | Owner (wizard, recommended) | R5-sec-5101 (medium; Sigma3 keys under another handshake's identity, `bridge/handlers.go:1288-1300`, `node/security.go:1234-1250`): fix now — the handshake result (keys, peer session id, identity) is handed to the callback as a value, no read-back off the shared responder; closes the carried read-backs R5-sec-5102/-5103 with it |
+| 639 | Owner (wizard, recommended) | R5-fsm-5502 (second regression of R3-fsm-3301 → R4-fsm-4301): `appLost` cleared only when the generation is unchanged since the work started; the run-5 Linux probe (`probes/rest/overlay_bluez_*`) becomes a fake-bus regression test that is red at M5 |
+| 640 | Owner (wizard, recommended) | the low fix-regressions R5-conc-5501, R5-conc-5107, R5-conc-5301, R5-fsm-5401 and the doc note R5-doc-5207 go into the same fix PR (as 587/544) |
+| 641 | Owner (wizard, recommended) | gate for the release (558) after the run-5 fix PR merges: no run 6 — Fable diff read of the fix diff (sec paths) + make ci / ci-net + chiptool.yml; 0 blocking → release |
+| 642 | Owner (wizard, recommended) | TC-WEBRTCP-2.12 (decision 610): own unit in the fix PR — measure why the image descriptor files only 20 of 32 WEBRTCP cases (missing 2.11, 2.12, 2.17–2.25, 2.33; present at chip pin 6170af84), complete the family (golden + excludes with reasons), run 2.12 before the release. Measured so far: dispatch run 45339831663 at M5 green, 19 PASS incl. WEBRTCP/2.16, WebRTCP/2.1 SKIP (PICS) |
+| 643 | Owner (wizard, recommended) | 638 shape: value hand-over only (new value callback; old `CaseSessionEstablished` setter and `SnapshotResponder` deprecated, kept working) — no per-adapter step lock (a lock held across the host callback can deadlock a host). Mirrors matter.js CaseServer.ts:175-190, :310-327 (fix-plan §3) |
+| 644 | Owner (wizard, recommended) | 642 option A: coverage guard now + WebRTC-capable TH image in this PR (wave C; measured cause: the 12 missing cases import `matter.webrtc`, descriptor generator skips files whose import raises, image lacks `chip_support_webrtc_python_bindings`); h7 step 1 measures /etc/chip-version and the import in CHIP_TEST_IMAGE first; 2.12 runs before the release |
+| 645 | Owner (wizard, recommended) | R5-5205 / R5-5206 (`refuseLateCollisionsLocked`): C5 follow-up issue, not in this PR (no run 6 would read the change) |
+| 646 | Owner (wizard, recommended) | 5101 in the CHANGELOG: a Security-marked line naming the measured reach (reference daemon defaults `--tcp true`, main.go:125), no advisory |
+| 647 | Owner (wizard, recommended) | AVSM 2.16 / 2.17 (same cause as 642: no `matter.webrtc` in the image, measured r5/fix-h7.md) go into wave C's WebRTC-capable image and run before the release with the 12 WEBRTCP cases |
+| 648 | Owner (wizard, not the recommendation) | SWTCH 2.3 / 2.4 (descriptor lists them only as run2/run3 suites; `loadChipCases` keeps run1 only, `internal/chiptool/chipcases_test.go:114-116`): fixed in wave C (loader takes the first run when a case has no run1), proven by a SWTCH family run on the same chiptool.yml dispatch. Recommendation was a C5 issue (no run 6 reads the loader change); the Fable diff read of H7's wave-C diff covers it instead |
+| 649 | Owner (wizard, recommended) | the `absent` cases appear in `docs/certifiability.md` (REG), held to the `absent` maps by the doc test |
+| 650 | Owner (wizard, recommended) | H4 / R5-conc-5301: the op → keeperMu edge (gone calls stopBegan under a camera provider's op; reopenUnlessStopping holds keeperMu across the host's synchronous OnWindowTransition) is removed by a lock-free atomic stop flag in node/node.go, set before Stop closes the first session — no new observer rule. Together with Fable's re-read correction: gone reads holdsPeerSession first, then the stop flag and life (fable-diff-h4*.md) |
+| 651 | Owner (wizard, recommended) | H2b side window (adapter removed and re-added between RegisterApplication's reply and the state change, ble/bluez/peripheral_linux.go:923-927; gate :629; reach unverified): C5 follow-up issue, not this PR |
