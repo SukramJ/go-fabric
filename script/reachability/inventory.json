@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10788,
+  "entry_points": 10794,
   "initializers": 372,
   "entry_packages": [
     ".",
@@ -296,9 +296,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28597,
+    "total_exported": 28603,
     "reachable": 22325,
-    "whitelisted": 6250,
+    "whitelisted": 6256,
     "unreachable": 22
   },
   "by_package": [
@@ -31300,6 +31300,41 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerRetryIsBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 451
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerReusesICECredentials",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 415
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerSDP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 344
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerStopsAtEnd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 478
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswersOfferAndEndsOnPrivacy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 274
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestCameraSimAppPipeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
@@ -31325,6 +31360,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
       "line": 761
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimEndSessionReleasesStreams",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 314
     },
     {
       "package": "examples/reference-bridge",
