@@ -33,14 +33,14 @@ type OTAProviderConfig struct {
 	// (mattercore.OTAProviderConfig.Manager); nil is the provider's
 	// default manager, which queues no update. [Node.OnOTAProviderStatus]
 	// learns the statuses with either; with a Manager, RebootQuery,
-	// TransferBlockSize and DelegateConsentToRequestor are refused at Start.
+	// TransferBlockSize and DelegateConsentToRequestor fail [New].
 	Manager OTAUpdateManager
 	// DelegateConsentToRequestor lets the default manager offer a
 	// requestor that says it can consent an image that needs a consent
 	// without asking Consent, with UserConsentNeeded
 	// (mattercore.OTAProviderConfig.DelegateConsentToRequestor); off, as
-	// matter.js's default, Consent is asked. With a Manager it is refused
-	// at Start: the manager decides the delegation.
+	// matter.js's default, Consent is asked. With a Manager it fails
+	// [New]: the manager decides the delegation.
 	DelegateConsentToRequestor bool
 	// ApplyDelay is how long a requestor allowed to apply an update waits
 	// before it applies, in whole seconds rounded up and at most a day
@@ -297,8 +297,10 @@ func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, ep
 	// AccessControlEntryChanged is emitted, because matter.js's
 	// setStateOf(AccessControlServer) runs without a remote actor and
 	// #handleAccessControlListChange returns before its events
-	// (AccessControlServer.ts:284-302 at b25ed960).
-	n.root.AccessControl.NotifyLocalEntryInstalled()
+	// (AccessControlServer.ts:284-302 at b25ed960). Called after
+	// addLocalOperateEntry released the write lock, as
+	// NotifyLocalEntryInstalledOn requires (review II, R5-par-5003).
+	n.root.AccessControl.NotifyLocalEntryInstalledOn(ctx, fabricIndex)
 	n.logger.Info("ota.provider.acl_added", slog.Int("fabric_index", int(fabricIndex)), slog.Int("endpoint", int(epID)),
 		slog.String("hint", "anyone in the fabric may access the OTA Software Update Provider cluster"))
 }

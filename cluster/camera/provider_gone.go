@@ -37,14 +37,25 @@ import (
 // call it on its own evidence. It is not the media plane's verdict: a
 // viewer idle on Matter keeps its sessions, and the host ends a session
 // whose peer connection failed with [Provider.RemoveSession] or
-// [Provider.End].
+// [Provider.End]. [Provider.EndLostPeer] is the same call that also
+// reports how many sessions it ended.
 func (p *Provider) PeerGone(ctx context.Context, fabricIndex uint8, peerNodeID uint64, reason uint8, gone func() bool) (ran bool, err error) {
+	_, ran, err = p.EndLostPeer(ctx, fabricIndex, peerNodeID, reason, gone)
+	return ran, err
+}
+
+// EndLostPeer is [Provider.PeerGone] reporting ended, the number of the
+// pair's sessions it ended — each left CurrentSessions, whatever the port
+// answered; 0 when ran is false or the pair held none. A caller that
+// reports the end, as the node's log does, reports it only for ended > 0
+// (review II, R5-doc-5304).
+func (p *Provider) EndLostPeer(ctx context.Context, fabricIndex uint8, peerNodeID uint64, reason uint8, gone func() bool) (ended int, ran bool, err error) {
 	if p.op.LockContext(ctx) != nil {
-		return false, nil
+		return 0, false, nil
 	}
 	defer p.op.Unlock()
 	if gone != nil && !gone() {
-		return false, nil
+		return 0, false, nil
 	}
 	p.mu.Lock()
 	var ids []uint16
@@ -63,5 +74,5 @@ func (p *Provider) PeerGone(ctx context.Context, fabricIndex uint8, peerNodeID u
 			errs = append(errs, err)
 		}
 	}
-	return true, errors.Join(errs...)
+	return len(ids), true, errors.Join(errs...)
 }
