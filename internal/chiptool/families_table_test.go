@@ -305,8 +305,8 @@ const startUpOnBridged = "the case reboots the DUT and expects the light's Start
 // re-run in the image it writes the shipped /lib/test-descriptor.json and
 // names each skipped file with its error on stderr.
 const (
-	// absentNoNDEF: the case file imports ndef (NFC).
-	absentNoNDEF = "not in the harness image's test descriptor, so the family run never reaches it: the case file imports ndef, which the image's Python lacks (generate-test-descriptor re-run in the image: No module named 'ndef'), and generate-test-descriptor skips a file whose import raises (:290-296)"
+	// absentNoNDEF: the case file imports matter.testing.nfc, which imports ndef (NFC).
+	absentNoNDEF = "not in the harness image's test descriptor, so the family run never reaches it: the case file imports matter.testing.nfc, which imports ndef, which the image's Python lacks (generate-test-descriptor re-run in the image: No module named 'ndef'), and generate-test-descriptor skips a file whose import raises (:290-296)"
 )
 
 // Device types of the reference daemon's bridged endpoints
