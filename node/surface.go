@@ -318,10 +318,23 @@ func duplicateKey(entries []surfaceEntry) (string, bool) {
 // an inserted tree whose endpoints claim one number
 // (packages/node/src/endpoint/properties/Parts.ts:195-203 at b25ed960,
 // #validateInsertion; on a ready owner, :54-57) (review II,
-// R4-api-4790, decision 617). It returns ep's surface entries, which the
+// R4-api-4790, decision 617). An entry whose key renders empty — a nil
+// part key, or a key whose String is "" — is refused first with
+// [ErrNoStableKey]: the assembly refuses a Spec without a StableKey, so
+// such a tree would fail the node's start or every later reassembly
+// (review II, R5-err-5203). It returns ep's surface entries, which the
 // caller hands [Node.recordWithheld] once its set accepted ep's key.
 func (n *Node) checkSurface(ep Endpoint) ([]surfaceEntry, error) {
 	entries := surfaceEntries(ep)
+	for i := range entries {
+		if entries[i].key != "" {
+			continue
+		}
+		if i == 0 {
+			return nil, fmt.Errorf("%w: its key renders empty", ErrNoStableKey)
+		}
+		return nil, fmt.Errorf("%w: part %d of %q (depth first)", ErrNoStableKey, i, entries[0].key)
+	}
 	if k, ok := duplicateKey(entries); ok {
 		return nil, fmt.Errorf("%w: %s twice in one endpoint's tree", ErrDuplicateKey, k)
 	}
