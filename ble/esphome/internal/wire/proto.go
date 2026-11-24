@@ -175,6 +175,9 @@ type field struct {
 	data  []byte
 }
 
+// maxFieldNumber is the largest protobuf field number, 2^29-1.
+const maxFieldNumber = 1<<29 - 1
+
 // fields decodes b, calling f for each field in order.
 func fields(b []byte, f func(field) error) error {
 	for len(b) > 0 {
@@ -183,7 +186,13 @@ func fields(b []byte, f func(field) error) error {
 			return ErrMalformed
 		}
 		b = b[n:]
-		fl := field{num: int(tag >> 3), wt: int(tag & 7)} //nolint:gosec // a field number fits an int
+		// protobuf's field numbers end at 2^29-1: one above is malformed,
+		// refused before the conversion, so the decode is the same on 32
+		// and 64 bit (review II, R3-wire-3352).
+		if tag>>3 > maxFieldNumber {
+			return ErrMalformed
+		}
+		fl := field{num: int(tag >> 3), wt: int(tag & 7)} //nolint:gosec // bounded by maxFieldNumber above
 		if fl.num == 0 {
 			return ErrMalformed
 		}
