@@ -1015,18 +1015,40 @@ func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, up
 // once. A failed read or acknowledgement is logged and leaves the event
 // owed.
 func (o *OperationalCredentials) ackOwedFabricEvents(ctx context.Context, kind store.FabricPending, fabricIndex uint8) {
-	ctx = context.WithoutCancel(ctx)
-	owed, err := o.store.OwedFabricEvents(ctx)
+	o.ackOwedFabricEventIDs(ctx, fabricIndex, o.owedFabricEventIDs(ctx, kind, fabricIndex))
+}
+
+// owedFabricEventIDs lists the IDs of the owed events of kind the store
+// holds for fabricIndex. A delivery lists them before its hooks run and
+// acknowledges those only ([OperationalCredentials.ackOwedFabricEventIDs]):
+// a later rollback of the same fabric records its own event while the
+// first delivery's hooks still wait in the node's queue, and that event
+// stays owed until its own delivery's hooks ran (review II,
+// R5-err-5201). A failed read is logged and lists none, which leaves the
+// events owed.
+func (o *OperationalCredentials) owedFabricEventIDs(ctx context.Context, kind store.FabricPending, fabricIndex uint8) []uint64 {
+	owed, err := o.store.OwedFabricEvents(context.WithoutCancel(ctx))
 	if err != nil {
 		o.logger().Warn("matter.opcreds.owed_fabric_event.list_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
-		return
+		return nil
 	}
+	var ids []uint64
 	for i := range owed {
 		ev := &owed[i]
-		if ev.Kind != kind || ev.Fabric.FabricIndex != fabricIndex {
-			continue
+		if ev.Kind == kind && ev.Fabric.FabricIndex == fabricIndex {
+			ids = append(ids, ev.ID)
 		}
-		if err := o.store.AckOwedFabricEvent(ctx, ev.ID); err != nil {
+	}
+	return ids
+}
+
+// ackOwedFabricEventIDs acknowledges the owed events ids of fabricIndex
+// ([store.Fabrics.AckOwedFabricEvent]). A failed acknowledgement is logged
+// and leaves that event owed.
+func (o *OperationalCredentials) ackOwedFabricEventIDs(ctx context.Context, fabricIndex uint8, ids []uint64) {
+	ctx = context.WithoutCancel(ctx)
+	for _, id := range ids {
+		if err := o.store.AckOwedFabricEvent(ctx, id); err != nil {
 			o.logger().Warn("matter.opcreds.owed_fabric_event.ack_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 		}
 	}
