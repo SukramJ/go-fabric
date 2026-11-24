@@ -114,7 +114,8 @@ type Provider struct {
 	// from its checks through the port to its commit, as chip's handlers
 	// run one at a time on its single-threaded stack. The host's methods
 	// never take it, so a port may call them (review II, R2-P6-conc-1609).
-	op sync.Mutex
+	// PeerGone takes it with its context (R5-conc-5301).
+	op opLock
 	// pub serialises each change of the session table with its
 	// publication, so no change is lost to a concurrent one and the table
 	// and CurrentSessions agree (R2-P6-conc-1601); mu guards the state

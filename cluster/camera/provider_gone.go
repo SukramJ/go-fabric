@@ -17,7 +17,9 @@ import (
 // No End command is sent: the peer is not reachable. It is
 // [Provider.MatterDropFabric] narrowed to the pair, and like it runs
 // under the provider's command serialisation, so it waits for a command
-// in flight and its port call. A pair without a session ends nothing.
+// in flight and its port call — unless ctx ends first: then, as when ctx
+// ended before the call, it ends nothing and reports ran false with no
+// error. A pair without a session ends nothing.
 //
 // gone is the caller's evidence that the requestor is still lost, asked
 // once after the serialisation is held and before any port call: false
@@ -37,7 +39,9 @@ import (
 // whose peer connection failed with [Provider.RemoveSession] or
 // [Provider.End].
 func (p *Provider) PeerGone(ctx context.Context, fabricIndex uint8, peerNodeID uint64, reason uint8, gone func() bool) (ran bool, err error) {
-	p.op.Lock()
+	if p.op.LockContext(ctx) != nil {
+		return false, nil
+	}
 	defer p.op.Unlock()
 	if gone != nil && !gone() {
 		return false, nil
