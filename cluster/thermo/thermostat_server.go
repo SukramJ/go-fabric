@@ -93,8 +93,8 @@ const (
 // events emitted at :2094-2164 and :2246 at b25ed960; schedules.go,
 // events.go; the Ahead rows, ahead.go), and ThermostatSuggestions as
 // matter.js serves it (#setupSuggestions, :2261, called at :375;
-// suggestions.go). ScheduleConfiguration and Setback (deprecated,
-// refused, :120-125) are not.
+// suggestions.go). ScheduleConfiguration (removed from the specification,
+// refused, :259-263) and Setback (deprecated, refused, :264-266) are not.
 const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE |
 	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH | ThermostatFeatureTEVT | ThermostatFeatureTSUGGEST
 
@@ -1511,7 +1511,7 @@ func (s *ThermostatServer) OnAttributeChange(cb func(change contract.Change)) (u
 // SetActiveScheduleRequest, with TSUGGEST AddThermostatSuggestion and
 // RemoveThermostatSuggestion. Without PRES and without
 // MatterScheduleConfiguration AtomicRequest is unsupported (matter.js
-// ThermostatServer.ts:130-132 at db021da0).
+// ThermostatServer.ts:277-279 at b25ed960).
 func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
 		return resp, err
