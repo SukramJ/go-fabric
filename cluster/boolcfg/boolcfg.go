@@ -100,7 +100,7 @@ const (
 // second command waits until the first one's calls returned and its change
 // is stored, so the alarm attributes end at what the Delegate heard last.
 // The Delegate may call the device-side setters; they do not wait for the
-// command.
+// command, and what they change is published once the command ends.
 type Delegate = def.Delegate
 
 // Config carries the construction parameters.
@@ -172,6 +172,15 @@ type Server struct {
 	// The changes are published after cmd is released, and the host
 	// setters do not take it.
 	cmd chan struct{}
+
+	// held is true while a command holds cmd; later collects, in the order
+	// they were stored, the publishes of that command and those of the
+	// device-side setters that ran meanwhile, with their events, and the
+	// command runs them once cmd is released — so a change listener that
+	// invokes a command on the goroutine that tells it does not wait for
+	// cmd (R5-conc-5501). Both are guarded by mu.
+	held  bool
+	later []func()
 
 	// mu guards active, current, enabled, endpoint, fault and suppressed.
 	mu         sync.Mutex
@@ -467,10 +476,12 @@ func (s *Server) SetCurrentSensitivityLevel(level uint8) error {
 	if level >= s.supported {
 		return fmt.Errorf("%w: CurrentSensitivityLevel %d ≥ %d", ErrInvalidConfig, level, s.supported)
 	}
+	notify := func() {
+		s.publish(contract.OriginHostSet, map[uint32]any{def.AttrCurrentSensitivityLevel: level})
+	}
 	s.mu.Lock()
 	s.current = level
-	s.mu.Unlock()
-	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrCurrentSensitivityLevel: level})
+	s.notifyUnlock(notify)
 	return nil
 }
 
@@ -496,17 +507,15 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 	// that invokes a command on this goroutine does not wait for this one.
 	// AlarmsStateChanged follows only a command that ran to its end
 	// (.cpp:213-216).
-	var stored []map[uint32]any
 	event, finished := false, false
 	defer func() {
-		for _, values := range stored {
-			s.publish(contract.OriginCommand, values)
+		for _, f := range s.unlockCommand() {
+			f()
 		}
 		if event && finished {
 			s.alarmsStateChanged()
 		}
 	}()
-	defer s.unlockCommand()
 
 	s.mu.Lock()
 	enabled, active, suppressed := s.enabled, s.active, s.suppressed
@@ -520,8 +529,8 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 		}
 		s.mu.Lock()
 		s.enabled = alarms
+		s.storeLocked(map[uint32]any{def.AttrAlarmsEnabled: alarms})
 		s.mu.Unlock()
-		stored = append(stored, map[uint32]any{def.AttrAlarmsEnabled: alarms})
 	}
 
 	disable := ^alarms & allKnownAlarmModes // .cpp:182-185
@@ -539,8 +548,8 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 		s.mu.Lock()
 		next = s.active &^ disable
 		s.active = next
+		s.storeLocked(map[uint32]any{def.AttrAlarmsActive: next})
 		s.mu.Unlock()
-		stored = append(stored, map[uint32]any{def.AttrAlarmsActive: next})
 		event = true
 	}
 	if suppressed&disable != 0 { // .cpp:200-211
@@ -553,8 +562,8 @@ func (s *Server) enableDisableAlarm(ctx context.Context, fields any) (any, error
 		s.mu.Lock()
 		next = s.suppressed &^ disable // re-read, as AlarmsActive
 		s.suppressed = next
+		s.storeLocked(map[uint32]any{def.AttrAlarmsSuppressed: next})
 		s.mu.Unlock()
-		stored = append(stored, map[uint32]any{def.AttrAlarmsSuppressed: next})
 		event = true
 	}
 	finished = true
@@ -576,7 +585,11 @@ func (s *Server) suppressAlarm(ctx context.Context, fields any) (any, error) {
 		return nil, err
 	}
 	next, err := s.suppressLocked(ctx, alarms)
-	s.unlockCommand()
+	// What the device-side setters changed meanwhile, before this
+	// command's store.
+	for _, f := range s.unlockCommand() {
+		f()
+	}
 	if err != nil || next == nil {
 		return nil, err
 	}
@@ -590,14 +603,45 @@ func (s *Server) suppressAlarm(ctx context.Context, fields any) (any, error) {
 func (s *Server) lockCommand(ctx context.Context, what string) error {
 	select {
 	case s.cmd <- struct{}{}:
+		s.mu.Lock()
+		s.held = true
+		s.mu.Unlock()
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("boolcfg: %s: %w", what, ctx.Err())
 	}
 }
 
-// unlockCommand releases cmd.
-func (s *Server) unlockCommand() { <-s.cmd }
+// unlockCommand releases cmd and returns what was handed to later while
+// the command held it, for the caller to run in order (R5-conc-5501).
+func (s *Server) unlockCommand() []func() {
+	s.mu.Lock()
+	later := s.later
+	s.held, s.later = false, nil
+	s.mu.Unlock()
+	<-s.cmd
+	return later
+}
+
+// storeLocked hands the publish of what the command holding cmd stored
+// to later; the caller holds s.mu.
+func (s *Server) storeLocked(values map[uint32]any) {
+	s.later = append(s.later, func() { s.publish(contract.OriginCommand, values) })
+}
+
+// notifyUnlock releases s.mu, which the caller holds after storing a
+// device-side change, and runs notify — the change's publish and events —
+// now, or, while a command holds cmd, hands it to that command, which runs
+// it once cmd is released (R5-conc-5501).
+func (s *Server) notifyUnlock(notify func()) {
+	if s.held {
+		s.later = append(s.later, notify)
+		s.mu.Unlock()
+		return
+	}
+	s.mu.Unlock()
+	notify()
+}
 
 // suppressLocked is SuppressAlarm's check, Delegate call and store; the
 // caller holds cmd. It returns the stored AlarmsSuppressed, nil when the
@@ -654,14 +698,15 @@ func (s *Server) SetAlarmsActive(alarms AlarmMode) error {
 		s.mu.Unlock()
 		return fmt.Errorf("%w: 0x%02X (enabled 0x%02X)", ErrNotEnabled, alarms, s.enabled)
 	}
-	same := s.active == alarms
-	s.active = alarms
-	s.mu.Unlock()
-	if same { // .cpp:345
+	if s.active == alarms { // .cpp:345
+		s.mu.Unlock()
 		return nil
 	}
-	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrAlarmsActive: alarms})
-	s.alarmsStateChanged()
+	s.active = alarms
+	s.notifyUnlock(func() {
+		s.publish(contract.OriginHostSet, map[uint32]any{def.AttrAlarmsActive: alarms})
+		s.alarmsStateChanged()
+	})
 	return nil
 }
 
@@ -684,9 +729,10 @@ func (s *Server) ClearAllAlarms() {
 		return
 	}
 	s.active, s.suppressed = 0, 0
-	s.mu.Unlock()
-	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrAlarmsActive: AlarmMode(0), def.AttrAlarmsSuppressed: AlarmMode(0)})
-	s.alarmsStateChanged()
+	s.notifyUnlock(func() {
+		s.publish(contract.OriginHostSet, map[uint32]any{def.AttrAlarmsActive: AlarmMode(0), def.AttrAlarmsSuppressed: AlarmMode(0)})
+		s.alarmsStateChanged()
+	})
 }
 
 // SetSensorFault records a sensor fault (chip GenerateSensorFault,
@@ -696,11 +742,12 @@ func (s *Server) ClearAllAlarms() {
 func (s *Server) SetSensorFault(fault SensorFault) {
 	s.mu.Lock()
 	s.fault = fault
-	s.mu.Unlock()
-	if s.Emits(def.EventSensorFault) {
-		_ = s.srv.EmitEvent(def.EventSensorFault, def.SensorFaultEvent{SensorFault: fault})
-	}
-	s.publish(contract.OriginHostSet, map[uint32]any{def.AttrSensorFault: fault})
+	s.notifyUnlock(func() {
+		if s.Emits(def.EventSensorFault) {
+			_ = s.srv.EmitEvent(def.EventSensorFault, def.SensorFaultEvent{SensorFault: fault})
+		}
+		s.publish(contract.OriginHostSet, map[uint32]any{def.AttrSensorFault: fault})
+	})
 }
 
 // alarmsStateChanged emits AlarmsStateChanged with the current state
