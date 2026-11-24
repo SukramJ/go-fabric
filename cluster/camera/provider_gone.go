@@ -11,13 +11,6 @@ import (
 	"thingfabric.dev/go-fabric/contract"
 )
 
-// EndReasonUnknown is WebRTCEndReasonEnum UnknownReason, the reason a
-// node passes to [Provider.PeerGone] and the one a removed fabric's
-// sessions end with ([Provider.MatterDropFabric]): no other value of the
-// enum names the requestor's loss (parity/schema.json, WebRTCEndReasonEnum
-// 12).
-const EndReasonUnknown = endReasonUnknown
-
 // PeerGone ends every session of the requestor (fabricIndex, peerNodeID):
 // the port's EndSession with reason for each, and the session leaves
 // CurrentSessions whatever the port answers; the error is the port's.

@@ -19,7 +19,7 @@ import (
 
 // unknownReason is WebRTCEndReasonEnum UnknownReason, the reason the node
 // ends a lost peer's sessions with.
-const unknownReason uint8 = 12
+const unknownReason = uint8(wpdef.WebRTCEndReasonUnknownReason)
 
 // goneSessions is the table of the PeerGone tests: peer A (7) holds two
 // sessions on fabric 1 and one on fabric 2, peer B (8) one on fabric 1.

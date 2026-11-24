@@ -12,6 +12,7 @@ import (
 
 	"thingfabric.dev/go-fabric/client/exchange"
 	"thingfabric.dev/go-fabric/cluster/camera"
+	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 	"thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/secure/operational"
 )
@@ -177,7 +178,7 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 			if q.testBeforeEnd != nil {
 				q.testBeforeEnd(addr)
 			}
-			ran, err := p.PeerGone(n.life, addr.FabricIndex, addr.NodeID, camera.EndReasonUnknown, gone)
+			ran, err := p.PeerGone(n.life, addr.FabricIndex, addr.NodeID, uint8(wpdef.WebRTCEndReasonUnknownReason), gone)
 			if err != nil {
 				n.logger.Warn("matter.camera.peer_gone.end_failed",
 					slog.Int("fabric_index", int(addr.FabricIndex)), slog.Uint64("node_id", addr.NodeID), slog.Any("err", err))
