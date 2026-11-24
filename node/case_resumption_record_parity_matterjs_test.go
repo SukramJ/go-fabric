@@ -108,7 +108,7 @@ func (r *recordRig) full(t *testing.T) (uint16, *caseEstablishment) {
 	if _, _, err := a.ProcessSigma3(sigma3); err != nil {
 		t.Fatalf("ProcessSigma3: %v", err)
 	}
-	return a.SnapshotResponder().SessionID(), est
+	return a.SnapshotResponder().SessionID(), est //nolint:staticcheck // SA1019: the test reads the responder the handshake ran on, held until SnapshotResponder's removal
 }
 
 // resume presents rec in a Sigma1 on a new adapter. It returns the reply's
@@ -138,7 +138,7 @@ func (r *recordRig) resume(t *testing.T, rec store.ResumptionRecord) (op uint8, 
 	if op != mrp.SCOpcodeSigma2Resume {
 		return op, 0, est
 	}
-	return op, a.SnapshotResponder().SessionID(), est
+	return op, a.SnapshotResponder().SessionID(), est //nolint:staticcheck // SA1019: the test reads the responder the handshake ran on, held until SnapshotResponder's removal
 }
 
 // record is the peer's stored resumption record; ok false without one.

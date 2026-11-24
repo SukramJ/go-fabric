@@ -254,32 +254,6 @@ type Established struct {
 	SharedSecret []byte
 }
 
-// establishedLocked builds the [Established] value of the session the
-// responder holds. Caller holds r.mu, in the step that established it.
-func (r *Responder) establishedLocked() *Established {
-	e := &Established{
-		Keys:          r.keys,
-		SessionID:     r.sessionID,
-		PeerSessionID: r.peerSessionID,
-		PeerNodeID:    r.peerNodeID,
-		ResumptionID:  append([]byte(nil), r.resumptionID...),
-		SharedSecret:  append([]byte(nil), r.shared...),
-	}
-	if len(r.peerCATs) > 0 {
-		e.PeerCATs = append([]uint32(nil), r.peerCATs...)
-	}
-	if r.identity != nil {
-		e.FabricIndex, e.LocalNodeID, e.IdentityOK = r.identity.FabricIndex, r.identity.NodeID, true
-	}
-	if r.peerSessionParams != nil {
-		e.PeerSessionParams, e.PeerSessionParamsOK = *r.peerSessionParams, true
-	}
-	e.Resume = r.resume
-	e.Resume.PresentedResumptionID = append([]byte(nil), r.resume.PresentedResumptionID...)
-	e.Resume.IssuedResumptionID = append([]byte(nil), r.resume.IssuedResumptionID...)
-	return e
-}
-
 // ResumeClaim is the responder's claim of a resumption id
 // ([Sigma1ProcessResult.Claim]).
 type ResumeClaim struct{ release func() }
@@ -1222,6 +1196,32 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 func (r *Responder) ProcessSigma3(sigma3Bytes []byte) error {
 	_, err := r.ProcessSigma3Established(sigma3Bytes)
 	return err
+}
+
+// establishedLocked builds the [Established] value of the session the
+// responder holds. Caller holds r.mu, in the step that established it.
+func (r *Responder) establishedLocked() *Established {
+	e := &Established{
+		Keys:          r.keys,
+		SessionID:     r.sessionID,
+		PeerSessionID: r.peerSessionID,
+		PeerNodeID:    r.peerNodeID,
+		ResumptionID:  append([]byte(nil), r.resumptionID...),
+		SharedSecret:  append([]byte(nil), r.shared...),
+	}
+	if len(r.peerCATs) > 0 {
+		e.PeerCATs = append([]uint32(nil), r.peerCATs...)
+	}
+	if r.identity != nil {
+		e.FabricIndex, e.LocalNodeID, e.IdentityOK = r.identity.FabricIndex, r.identity.NodeID, true
+	}
+	if r.peerSessionParams != nil {
+		e.PeerSessionParams, e.PeerSessionParamsOK = *r.peerSessionParams, true
+	}
+	e.Resume = r.resume
+	e.Resume.PresentedResumptionID = append([]byte(nil), r.resume.PresentedResumptionID...)
+	e.Resume.IssuedResumptionID = append([]byte(nil), r.resume.IssuedResumptionID...)
+	return e
 }
 
 // ProcessSigma3Established is [Responder.ProcessSigma3] that also returns,

@@ -81,7 +81,7 @@ func TestNoResumptionRecordOutlivesAnUpdateAfterTheAdmit(t *testing.T) {
 			t.Fatalf("ProcessSigma2: %v", err)
 		}
 		_, _, _ = adapter.ProcessSigma3(sigma3)
-		if snap := adapter.SnapshotResponder(); snap != nil {
+		if snap := adapter.SnapshotResponder(); snap != nil { //nolint:staticcheck // SA1019: the test reads the responder the handshake ran on, held until SnapshotResponder's removal
 			est.complete(snap.SessionID(), true)
 		}
 		if rec, err := st.GetResumptionByPeer(context.Background(), 1, fx.peer.NodeID); err == nil {
