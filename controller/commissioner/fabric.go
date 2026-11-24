@@ -329,7 +329,7 @@ func newFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 }
 
 // loadFabric rebuilds a fabric from its stored record — the load half of
-// matter.js FabricManager's construction (FabricManager.ts:66-69,
+// matter.js FabricManager's construction (FabricManager.ts:85-89 at b25ed960,
 // Fabric.create over each stored Fabric.Config), for the one fabric a
 // controller owns. A stored label over [MaxLabelLength] bytes is cut
 // (storedLabel), warned through cfg.Logger, and the record saved once

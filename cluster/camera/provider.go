@@ -67,7 +67,13 @@ type ProviderConfig struct {
 	// camera app's delegate, kMaxConcurrentWebRTCSessions (5; connectedhomeip
 	// examples/camera-app/linux/src/clusters/webrtc-provider/
 	// webrtc-provider-manager.cpp:39 at 6170af84). 0 is no bound beyond the
-	// session ids; negative is [ErrNegativeMaxSessions].
+	// session ids; negative is [ErrNegativeMaxSessions]. The refused
+	// SolicitOffer answers DeferredOffer false (decision 621). Its End has
+	// no deadline of its own: the PeerConnector's response timeouts bound
+	// it, and the Ends wait behind one sender in a queue of at most the
+	// bound; at worst a send that never returns holds that sender, and every
+	// later over-bound SolicitOffer answers RESOURCE_EXHAUSTED (decision
+	// 620).
 	MaxSessions int
 	// MaxSessionsPerFabric bounds the sessions of one fabric, counted over
 	// the entries of the accessing fabric, the host's included, and refused

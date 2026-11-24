@@ -35,6 +35,8 @@ type ProviderICECandidate = wpdef.ICECandidateStruct
 // :914, :941). The node attaches its peer path to every [Provider] it
 // assembles: a live TCP session with the requestor, whichever side opened
 // it, else a new one; [ErrNoLargeMessageTransport] when there is neither.
+// The provider sets no deadline on a send; the connector's own response
+// timeouts are its bound (decision 620).
 type PeerConnector interface {
 	ConnectPeer(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (PeerSession, error)
 }

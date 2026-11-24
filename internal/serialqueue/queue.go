@@ -94,10 +94,11 @@ func (q *Queue) Enqueue(fn func()) { q.enqueue(fn, false) }
 // it runs in its place in the order while the queue runs (a no-op for nil
 // or while the queue does not run). The queue does not bound the exempt
 // callbacks; the caller does. The node queues its owed fabric events'
-// ObserveAsync hooks and their acknowledgements with it at start — at most
-// one call per owed event and async fabric hook plus one acknowledgement
-// per owed event, the few rollbacks the store owes (review II,
-// R4-err-4751, decision 615).
+// ObserveAsync hooks and their acknowledgements with it at start and at a
+// run-time rollback — at most one call per owed event and async fabric
+// hook plus one acknowledgement per owed event, the few rollbacks the
+// store owes, and the fabric hooks queued while those run (review II,
+// R4-err-4751, decisions 615, 622).
 func (q *Queue) EnqueueExempt(fn func()) { q.enqueue(fn, true) }
 
 func (q *Queue) enqueue(fn func(), exempt bool) {

@@ -385,10 +385,11 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 	// The initial state conforms to the schema or the server is not built:
 	// a TypeEnum or EndProductTypeEnum member whose conformance the features
 	// disallow is refused (window-covering-cluster.element.ts:150-192).
-	// Mirrors matter.js packages/node/src/behavior/internal/ServerBehaviorBacking.ts:60-63
-	// (invokeInitializer validates the behavior's state) and
-	// packages/node/src/behavior/state/validation/conformance-compiler.ts:735-747
-	// (disallowEnumValue throws EnumValueConformanceError).
+	// Mirrors matter.js packages/node/src/behavior/internal/ServerBehaviorBacking.ts:50-77
+	// at b25ed960 (invokeInitializer validates the behavior's state, :65-68,
+	// once the behavior's initializer ran, :71-76) and
+	// packages/node/src/behavior/state/validation/conformance-compiler.ts:734-746
+	// (disallowEnumValue :734 throws EnumValueConformanceError, :740).
 	for _, v := range []struct {
 		attr  uint32
 		value uint8

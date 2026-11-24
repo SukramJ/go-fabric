@@ -106,7 +106,11 @@ cfg.Store = node.Store{Credentials: memstore.New(), Endpoints: epmem.New()} // e
   `OwedFabricEvents` lists them by ID and `AckOwedFabricEvent` removes one.
   The node runs the owed hooks at its start and acknowledges each after
   them, so a crash between a rollback and its hooks delivers them at the
-  next start: at least once.
+  next start: at least once. This holds for hooks registered with
+  `ObserveAsync` too, and for a rollback a fail-safe's end makes while
+  the node runs: the event is acknowledged once the queued hooks ran, and
+  the callback queue never drops an owed event's hook or its
+  acknowledgement.
   While an update is pending, `UpdateFabricVendorID`, `UpdateFabricNodeID`
   and `UpdateFabricVIDVerification` change the live values only. Each of
   these is one atomic write, and the state is on disk with the row, so a

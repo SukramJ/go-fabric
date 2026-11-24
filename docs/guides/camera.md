@@ -391,6 +391,39 @@ answers. The host changes a session itself with `Provider.UpsertSession`
 and `RemoveSession`. A removed fabric's sessions end through the port's
 `EndSession` with UnknownReason and leave CurrentSessions.
 
+`ProviderConfig.MaxSessions` bounds the sessions, the host's included,
+and `ProviderConfig.MaxSessionsPerFabric` those of one fabric; through
+the device facade they are the fields of `wpdef.Declare`. Zero, the
+default, bounds neither beyond the session ids. Past a bound the port is
+not asked: `ProvideOffer` answers `RESOURCE_EXHAUSTED`, and `SolicitOffer`
+is answered with a session id and DeferredOffer false, the session is not
+entered in CurrentSessions, and the requestor is sent `End` with
+OutOfResources — the pair connectedhomeip's camera app answers at its
+bound of 5 ([Limits](limits.md#camera)). The Ends wait behind one sender
+in a queue of at most the bound and have no deadline of their own: the
+`PeerConnector`'s response timeouts bound them. A full queue, or no
+`PeerConnector`, makes `SolicitOffer` answer `RESOURCE_EXHAUSTED`.
+Sessions the host sets are never refused, and nothing is evicted.
+
+**Which evidence is whose.** WebRTC media does not travel over the
+Matter session, so a viewer idle on Matter — no subscription, signalling
+finished — is still watching. The host's stack owns the peer connection
+and is the evidence that a viewer is gone: when the connection fails, the
+host ends the session with `Provider.RemoveSession` or `Provider.End`.
+The node adds one rule on the Matter plane: when an exchange it opened to
+the requestor goes unanswered — a signal of the camera's, say — and no
+session with the requestor is left in either of its stacks, it ends that
+requestor's sessions through the port's `EndSession` with UnknownReason
+(`Provider.PeerGone`), as for a removed fabric. That no session is left
+is checked once the provider is free of other commands, so a session the
+requestor opens meanwhile keeps its streams; a loss that a session in the
+other stack cancelled is not remembered. A session closed by the idle
+reaper, a closed TCP connection or the controller's CloseSession ends
+nothing, and a requestor the camera sends nothing to — a silent
+subscriber included — is never detected this way. A host that runs
+`camera.Provider` outside a node can call `PeerGone` on its own
+evidence.
+
 **Push transports.** `AllocatePushTransport` checks, in chip's order: the
 fabric's room (4 transports, `PushTransportConfig.MaxPerFabric`), the
 transport options (the stream names and counts, the URL length, the

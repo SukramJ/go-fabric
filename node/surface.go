@@ -315,7 +315,9 @@ func duplicateKey(entries []surfaceEntry) (string, bool) {
 // second check. A tree that holds one key twice — ep and a part, or two
 // parts — is refused with [ErrDuplicateKey]: its assembly, and every
 // later one, would fail on two Specs under one key, as matter.js refuses
-// an inserted tree whose endpoints claim one number (review II,
+// an inserted tree whose endpoints claim one number
+// (packages/node/src/endpoint/properties/Parts.ts:195-203 at b25ed960,
+// #validateInsertion; on a ready owner, :54-57) (review II,
 // R4-api-4790, decision 617). It returns ep's surface entries, which the
 // caller hands [Node.recordWithheld] once its set accepted ep's key.
 func (n *Node) checkSurface(ep Endpoint) ([]surfaceEntry, error) {

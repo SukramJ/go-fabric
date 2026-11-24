@@ -6,18 +6,18 @@ Second tree: a sentence naming matterjs-server is checked against `MATTERJS_SERV
 
 | Metric | Count |
 |---|---|
-| Citations | 11796 |
-| Go files citing | 1877 |
-| Resolved: exact path from a tree root (packages/, support/, examples/) | 3393 |
+| Citations | 11810 |
+| Go files citing | 1879 |
+| Resolved: exact path from a tree root (packages/, support/, examples/) | 3399 |
 | Resolved: unique suffix | 248 |
-| Resolved: unique basename | 8155 |
-| Checked at their own `at <sha>`, the pin | 2585 |
-| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 2655 |
+| Resolved: unique basename | 8163 |
+| Checked at their own `at <sha>`, the pin | 2617 |
+| **Checked at another matter.js commit** (their own `at <sha>`, not the pin) | 2653 |
 | Checked against matterjs-server (`MATTERJS_SERVER_DIR`) at their `at <sha>` | 678 |
-| Drift-checked (the sentence names a name the file contains) | 5320 |
-| Hard-checked only | 6476 |
+| Drift-checked (the sentence names a name the file contains) | 5322 |
+| Hard-checked only | 6488 |
 | **Hard errors** | 0 |
-| **Drift** | 413 |
+| **Drift** | 411 |
 
 ## Off the pin, by commit
 
@@ -29,21 +29,21 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 | `862ad75f` | 3 | 121 |
 | `9892fa39` | 2 | 0 |
 | `d87d1de4` | 2 | 0 |
-| `db021da0` | 2533 | 181 |
+| `db021da0` | 2531 | 181 |
 | `e812bd07` | 1 | 0 |
 
 ## Counted, not ratcheted
 
 | Reference | Count |
 |---|---|
-| A .ts file named without a line part | 2760 |
+| A .ts file named without a line part | 2758 |
 | … whose sentence names another matter.js commit | 595 |
-| A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 585 |
+| A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 579 |
 | … checked at another matter.js commit | 309 |
 | … with a hard error at the commit it was checked at | 3 |
-| A bare line part after a .ts citation or after no file (not checked) | 3019 |
-| A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 1779 |
-| … naming a commit that is no matter.js commit | 851 |
+| A bare line part after a .ts citation or after no file (not checked) | 3036 |
+| A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 1784 |
+| … naming a commit that is no matter.js commit | 858 |
 | … at a commit other than the harness commit `6170af84` (Makefile CHIP_TEST_IMAGE_COMMIT) | 4 |
 
 | chip commit | chip citations |
