@@ -121,7 +121,7 @@ func TestProviderSignalLogsThroughTheConfigLoggerA3(t *testing.T) {
 		}
 		at = i
 	}
-	for _, want := range []string{"session=5", "fabric_index=2", "node_id=1234605616436508552", "took=", "msg=camera.provider.signal.invoked session=5"} {
+	for _, want := range []string{"webrtc_session_id=5", "fabric_index=2", "node_id=1234605616436508552", "took=", "msg=camera.provider.signal.invoked webrtc_session_id=5"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("log has no %s:\n%s", want, out)
 		}

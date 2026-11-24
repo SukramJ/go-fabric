@@ -209,7 +209,7 @@ func (p *Provider) send(ctx context.Context, peers PeerConnector, session Provid
 		log = slog.Default()
 	}
 	attrs := []any{
-		slog.Uint64("session", uint64(session.Id)), slog.Int("fabric_index", int(session.FabricIndex)),
+		slog.Int("webrtc_session_id", int(session.Id)), slog.Int("fabric_index", int(session.FabricIndex)),
 		slog.Uint64("node_id", session.PeerNodeId), slog.Uint64("command", uint64(commandID)),
 	}
 	started := p.clock.Now()
