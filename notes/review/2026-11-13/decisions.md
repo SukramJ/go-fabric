@@ -1063,3 +1063,26 @@ package in `phase-7-register.md` § C5 (decision 602).
 | 664 | Owner (wizard, recommended) | C4 compare: finish the run, repeat at the release head, a bridge-own test or a recorded reason for every bridge-blind mutant (decisions 403 / 512) → bridge issue (tests section) |
 | 665 | Owner (wizard, recommended) | the camera sim rows (`examples/reference-bridge`: SolicitOffer counts) and the TC-AVSM-2.17 flake ride in the cluster/camera issue (one causal chain; first step: log lines on the Answer path) |
 | 666 | Coordinator | every other C5 row as the Fable verdicts `c5/verdict-{cluster,stack,radio}.md` state (accept / issue:<package> / closed); decision 602 is thereby executed |
+
+## 2026-11-24, review II phase 8 (the C5 issues #595–#613), wave 1
+
+Phase 8 fixes the 19 C5 issues in two waves (plan `phase-8/plan.md`, local);
+wave 1 is pull request 1. Rows and their outcome in `phase-7-register.md`
+§ Phase 8, wave 1.
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 667 | Owner (wizard, recommended) | #610 probe venue: a `ble-virtual.yml` dispatch with a bluetoothd probe step on a branch, alongside wave 1 |
+| 668 | Owner (wizard, recommended) | C4 (decision 664): finish the current run; fix `pase_close.go:189` and the 10 both-surviving mutants; one full repeat on pull request 1's merge head; a targeted re-run at the release head |
+| 669 | Owner (wizard, recommended) | #595 limits form (decision 661): an `AccessControlConfig{Store, Limits}` constructor; `SetLimits` and the store-only constructor deprecated |
+| 670 | Owner (wizard, recommended) | release: `v0.27.0` after pull request 2; #596-B may stay open on its 20-run count |
+| 671 | Owner (wizard, recommended) | #610 rows 2–7: all in wave 2, behind the probe (decision 574) |
+| 672 | Owner (recommended) | Fable limit until 2026-11-28 19:00: Opus finishes all other work (A9, the A2 repair, integration, REG, `make ci` / `ci-net`, the AVSM dispatch, pull request 1 as a draft); the pending Fable reads (A1 diff read, A7 re-read of its repair, A9 diff read, the REG text read) run from 2026-11-28 19:00, and their repairs go into pull request 1 before it merges |
+| 673 | Owner (wizard, recommended) | #595 R4-doc-4003: a failed Thread attach reports ErrorValue / LastConnectErrorValue 0, as connectedhomeip (`GenericNetworkCommissioningThreadDriver.cpp:246-249` → `NetworkCommissioningCluster.cpp:871-875` at 6170af84); matter.js is silent (`NetworkCommissioningServer.ts:18`, an empty class) |
+| 674 | Owner (wizard, recommended) | #603 R4-test-4503: accepted and closed — the race is the fake clock's relative arm only; no clock API for a test problem; matter.js has no equivalent (`ParallelPaseDiscovery.ts:102-110` at b25ed960) |
+| 675 | Owner (wizard, recommended) | #611: a second `Connect` for one address through a different proxy is refused at the Central level (matter.js refuses per address for the whole central, `NobleBleChannel.ts:166-179` at b25ed960) → wave 2 follow-up |
+| 676 | Owner (wizard, recommended) | #596: `camera.ProviderConfig` gets an additive `Logger *slog.Logger` (the form of `cluster/netinfra/threaddir.go:177-179`) |
+| 677 | Owner (wizard, recommended) | #602 R5-par-5106: keep the read under a context without the caller's request values; a `by_design` entry records the remaining difference (a server read here, the type's attribute list in matter.js, `ProtocolService.ts:290-296` at b25ed960) |
+| 678 | Owner (wizard, recommended) | #610 B1: the peripheral does not set `Powered=true` (host policy); log and status only; a `by_design` entry against connectedhomeip (`BluezObjectManager.cpp:133-136`, `BLEManagerImpl.cpp:745` at 6170af84) → wave 2 |
+| 679 | Owner (wizard, recommended) | #601 R5-doc-5304: `(*camera.Provider).PeerGone` deprecated in favour of `EndLostPeer`, removable in `v0.29.0` (one shape) |
+| 680 | Owner (wizard, recommended) | #601 R4-doc-4754: the TLS refusal follows level membership (`Config.TLS` refused below 1.5.1, where the level set of 0x0801 / 0x0802 is {1.5.1, 1.6.0, 1.6.1}, and when a policy removes the clusters); the issue's premise ("removed from the mount only") corrected |

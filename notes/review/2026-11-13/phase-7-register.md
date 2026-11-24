@@ -798,3 +798,107 @@ numbers below are at `d1d1212b9`.
 | C5-h6-n3 | the wrong cite was in a local fix note; this register's row corrects it (§ Run 5 "Carried to C5", fix-h6 row) |
 | C5-590-tc-webrtcp-2.12-2.16 | WEBRTCP runs in the `app-camera` group (`.github/workflows/chiptool.yml:255`); both cases are in the golden with 0 skipped steps |
 | R4-doc-4404 | fixed in this pull request: `docs/getting-started/controller.md` says 32 bytes of UTF-8 and the cut at load (`controller/commissioner/fabric.go:114-133`) |
+
+## Phase 8, wave 1: the C5 issues' first fix pull request (2026-11-24)
+
+Phase 8 fixes the 19 issues of § C5 in two waves (decisions 667–680, in
+`decisions.md`). Wave 1 ran on branch `phase8/wave1` from `5774823ec` in
+nine units on disjoint paths (A1 `cluster/core` security, A2 `cluster/core`
+rest, A3 camera, A4 thermo / lock / closure, A5 device / endpoint /
+interaction / contract, A6 client discovery and peer, A7 bridge without the
+C4 compare, A8 the radios and `bletest`, A9 node), integrated one by one and
+closed by the REG step. Every fixed row has a test that failed before its
+fix, except where the row says doc, test only or otherwise. Fable read the
+diffs of A2, A3, A4, A7 and the reference statements of A6 and A8; the reads
+of A1, of A7's repair, of A9 and of the REG text are pending (decision 672).
+Severities are those of `c5/inventory.tsv`. Wave 2 (pull request 2) takes
+#610, the C4 compare of #602 and #596's AVSM count.
+
+### The rows
+
+| ID | sev | disposition |
+| --- | --- | --- |
+| R4-conc-4053 | note | fixed `dcf094eba`: UpdateFabricLabel checks and writes under `nocMu`; test `TestUpdateFabricLabelCheckAndWriteAreOneStepA1` |
+| R3-conc-3056 | note | fixed `dcf094eba`: SetVIDVerificationStatement reads and writes under `nocMu`; test `TestSetVIDVerificationStatementReadAndWriteAreOneStepA1` (`-race`) |
+| R4-doc-4003 | note | fixed: `vid_verification.go` cite `dcf094eba`; Thread driver ranges per fact note F1 `fa4f47565`, `7d7286817` (fable-diff-a2 N7); the failed attach reports 0 `fb29d20be` (decision 673), test `TestThreadNetworkCommissioningCommands` asserts the value |
+| R5-err-5201 | low | fixed `c593b63da`: an owed fabric event's ack is bound to the IDs listed before the hooks ran; test `TestOwedFabricEventAckIsBoundToItsDeliveryA1`. Residual window (A1 report, assumption 2) → follow-up below |
+| R5-conc-5004 | note | fixed `e34debac5`: the Acl read marks under `writeMu`; test `TestAccessControlReadMarkDoesNotOutliveADropA1` |
+| R5-par-5003 | low | fixed `e34debac5`, call sites `5cb0eeb09`: `NotifyLocalEntryInstalledOn(ctx, fabricIndex)`; test `TestAccessControlLocalEntryMarksItsFabricA1` |
+| R3-store-3001 | note | fixed `9edfd026f`; test `TestAdminEntryClearsAnExtensionThatFailedToLoadA1` |
+| R4-err-4055 | note | fixed `54f520224`; test `TestAuxiliarySyncOwedByAFailedReadRunsAtTheNextReadA1` |
+| R5-conc-5002 | note | fixed `249c67860`; test `TestGroupTableMarkFollowsTheLastChangeA1` |
+| R5-par-5005 | note | fixed `d08621b31`; test `TestGroupKeyMappingRemovalClearsTheMarkA1` |
+| R4-api-4157 | note | fixed `25a8c2985`, `768b7a659`, `30c52b741`, `5cb0eeb09` (decision 669): `NewAccessControlWith(ctx, AccessControlConfig{Store, Limits})`; `NewAccessControl` and `SetLimits` deprecated, removable in `v0.29.0`; tests `TestNewAccessControlWithJudgesTheLimitsA1`, `TestAccessControlLimitsJudgedOnce` |
+| R3-doc-3054 | note | fixed `357dd3640` (package doc, `ARLClusterID` deprecated) and REG (`BD-Matter-ARL-NotMounted`, § C-L1-ARL) |
+| R4-conc-4054 | note | fixed `e929200cf` (doc, decision 660) |
+| R4-conc-4056 | note | fixed `d276e91d1`; test `TestICDStartDoesNotUndoARegistration` |
+| R3-fsm-3055 | note | fixed `6cb33248d` (Thread), `35b3d941c` (the Wi-Fi sibling, fable-diff-a2 §(3)); tests `TestThreadNetworkCommandAfterTheWindowExpired`, `TestWiFiNetworkCommandAfterTheWindowExpired`. The CommissioningComplete sibling → follow-up below |
+| R3-sup-3002 | note | fixed `93891e877`: `ThreadNetworkCommissioningConfig.Logger`; test `TestThreadNetworkCommissioningBlindFailSafePortLogsOnce` |
+| R4-conc-4155 | note | fixed `18068d3df`; test `TestDiagLogsBDX_QuiesceCancelsTheStartingCollection` |
+| R4-conc-4156 | note | fixed `619da5438`; test `TestBridgedReachableLastEventIsTheFinalValue` |
+| R4-store-4154 | note | fixed `231f10594`; test `TestScenesForgetFabricOnAnUnloadedTable` |
+| R5-store-5007 | note | fixed `a20514391`; test `TestOTARequestorRefusedSaveThenDropStoresTheDrop`. Residual (fable-diff-a2 N5) → follow-up below |
+| R4-test-4158 | note | fixed `fe7126735` (test only; a mutant sink fails it) |
+| R4-doc-4185 | note | fixed `80d9ce0cf` (`ahead.go`) and REG (`by_design.md` row `BD-chip-GeneralCommissioning-TermsAndConditions`: `:32`, 289 lines) |
+| R4-doc-4186, R4-doc-4187, R4-doc-4188, R4-doc-4189, R4-err-4104, R5-store-5008, R5-doc-5009, R5-doc-5010 | note | fixed `80d9ce0cf` (doc) |
+| R5-doc-5504 | low | fixed `80d9ce0cf` (the three paragraphs name `v0.25.0`) and REG (`releaseNotStated` emptied; `TestReadmeDeprecatedTable`) |
+| C5-h9-provider-end-order | low | fixed `80c4dc344`, `faad6c119` (decisions 654, 663): `Provider.End` removes before it sends; test `TestProviderEndRemovesBeforeTheSendA3`; REG: `BD-chip-Camera-EndRemovesSessionWhenUnreachable` |
+| C5-h9-solicitoffer | note | fixed `82f5fef5f`: the sim's SolicitOffer counts the session's streams; test `TestCameraSimSolicitOfferCountsStreamsA3`. The 30 s timer difference (fable-diff-a3 Part C) → `matter_behaviour_findings.md` § Certification harness |
+| C5-avsm217-flake | low | step 1 done (decision 665): Debug lines on the Answer path `80c4dc344`, `82f5fef5f`, and through `ProviderConfig.Logger` `4c1bbc5f1` (decision 676); test `TestProviderSignalLogsThroughTheConfigLoggerA3`. Open: the AVSM dispatch count and a fix if it recurs → wave 2 (B3) |
+| R4-fsm-4253 | note | fixed `aba8abbac`; test `TestCommitClearsAHandleTheHostSetMeanwhile` |
+| R3-doc-3255 | note | fixed `aba8abbac`, `560c73521` (fable-diff-a4 B1, note 7) |
+| R3-doc-3282 | note | fixed `aba8abbac` (doc) |
+| R4-store-4201 | note | fixed `f0a76faaf`, `28aaae2c4`, `5cd97fe89`; tests `TestRefusedStartStoresNoCredentialKey`, `TestStartFailsClosedWhenTheKeyCannotBeStored`; REG: the decision-569 entry names it |
+| R4-doc-4202 | note | fixed `f0a76faaf` (doc) |
+| R3-doc-3280 | note | fixed `eeb406e6c`, `a6a1ba689` and REG (`by_design.md` § decision 150's closure paragraph); regression lock `TestStepFromAnOffGridCurrentPositionAnswersFailureAfterTheHandler`. The 100.00 % off-grid bound has no test → follow-up below |
+| R4-doc-4284 | note | fixed `eeb406e6c` (doc) |
+| R5-err-5302 (= R5-api-5503) | low | fixed `88cae01d1`; test `TestKitSettingsBesideHostServerOrWithoutPortRefused`; REG: the generated HostServer doc names the kit settings |
+| R5-fsm-5108 | note | fixed `ca486d40c`; tests `TestFailedAssemblyAdoptsNoInstance`, `TestFailedFirstAssemblyLeavesNoState` |
+| R3-doc-3452 | note | fixed `ca486d40c` (the orphan block deleted) |
+| R3-doc-3556, R3-doc-3581 | note | fixed `7ab2189fb` (doc) |
+| R3-doc-3781 | note | fixed `898fe4f51` (doc), and REG `cluster/dataversion.go` |
+| R4-fsm-4551 | note | fixed `13165d964`; test `TestOperational_ResolveKeepsAHostWhoseSRVTargetDiffersInCase` |
+| R4-conc-4552 | note | fixed `3bb3daaac`, `3833132d8`; test `TestStatus_ResolutionRestartsWhenNeededAgainBeforeItsCleanup`; REG: `BD-Matter-IpServiceStatus-RestartInCleanup` |
+| R4-test-4503 | note | accepted (decision 674): the issue's fix shape leaves the probe red (12/12 runs with and without it, `phase-8/a6-4503/`); the window is `clocktest.Fake`'s relative arm; matter.js has no equivalent (`ParallelPaseDiscovery.ts:102-110` at b25ed960) |
+| R4-doc-4502 | note | fixed `06aab68ce` (doc) and REG (`docs/guides/limits.md`, preparations row) |
+| R2-C2-api-2157 | note | fixed `ad5a48f69`; test `descriptor_c5_a6_test.go` (every TXTData field copied) |
+| R2-C2-bound-2159 | note | fixed `2a3e503b7`, `b6379a6f3`: `probeMaxReportChunks = 4`; test `TestProbeEndsAPeerThatKeepsChunking`; REG: `BD-Matter-PeerProbe-ChunkBound`, limits row |
+| R4-doc-4553 | note | fixed `44db567c6` (doc) |
+| R2-C2-doc-2156 | note | fixed `44db567c6`, `45037a4ea`, `b6379a6f3`: the four sleeping-LIT-ICD cases ported, `TestPeerAddressMonitorSleepingLITICD`; REG: `script/testparity/register.json`, missing ratchet 1009 → 1005 |
+| R5-par-5106 (= C5-589-n3) | low | fixed `9d4e36db1`, `6aaf814b3` (decision 677); tests `TestReplaceUnderARefusingRequestAnnounces`, `TestAnnounceIgnoresTheReassemblyCallersRequest`; REG: `BD-Matter-Bridge-AnnounceListsByRead` |
+| R5-par-5109 | note | fixed `f151e8a3e`, re-cite `88bb62bd2` (fact note F2, fable-diff-a7 §4); test `TestNewInstanceStartsAFreshQuietThrottle` |
+| C5-h1-n3-secret-copy (= G641-1) | note | fixed `17712e456`, `5024ccfb2` (decision 658, and the three further drop sites of fable-diff-a7 N1); tests `TestUninstalledResumeClearsItsSecret`, `TestDroppedSessionValuesClearTheirSecret`; REG: `BD-chip-HandshakeSecretsOverwritten` names them |
+| R5-test-5105 | low | fixed `17712e456` (test only); `TestCaseStepTakesTheStatedSessionParams`, mutation-checked |
+| C5-h1b-A | note | fixed `17712e456` (test extended, mutation-checked) |
+| C5-h1b-B | note | fixed `17712e456` (wording) |
+| R5-conc-5104 | note | fixed `17712e456` (doc) |
+| R2-C2-test-2050 | note | fixed `209afa3e2`, `c8aebc449`; test `TestSubscribeBeforeTheHandshakeRequestStartsNothing`; REG: `BD-Matter-BLETest-NoHandshakeTimeout` |
+| C5-expvar-roundtrip | low | fixed `a13cf5abe`; `TestRoundTrip` under `-count=3` |
+| R3-wire-3352 | note | fixed `12a8cf594`; test `TestFieldNumberBound` |
+| R4-conc-4352 | note | fixed `b5307eae2` (decision 659, per proxy); test `TestSecondConnectForOneAddressIsRefused`. Across proxies → follow-up below (decision 675) |
+| R4-fsm-4305 | note | fixed `50a4a409b`; test `TestAliasIsDialledWhenItsDeviceLeaves` |
+| C5-5401-residue-n1 | low | fixed `f4d0c7f6f` (test); `TestCommitKeepsAnActivationThatOverlapsIt`, mutation-checked |
+| C5-5401-residue-n2 | note | fixed `f4d0c7f6f` (doc) |
+| R4-fsm-4354 | note | fixed `da84137e3`; test `TestAFailedJoinRestoresTheJoinedNetworkWhenTheCurrentOneIsUnreadable` |
+| R5-store-5205, R5-api-5206, R3-store-3703 | low, low, note | fixed `0ded3f61d`; tests `TestBatchReplaceUndoKeepsItsPartsReserved`, `TestBatchUncomparableEndpoint` (subtest "Add then Replace of one key"), `TestForgetReadErrorErasesNothing` |
+| R5-test-5202 | note | fixed `0ded3f61d` (test only; green at the base, as probe P3 measured) |
+| R5-err-5203 | note | fixed `bebc752ad`; test `TestKeylessPartRefusedAtAdd`. The device layer's path → follow-up below |
+| R4-api-4752 | note | fixed `c69fe1d19`; test `TestOpenOwnWindowRefusesNegativeTimeout` |
+| R4-doc-4754 | note | fixed `c69fe1d19` (decisions 656, 680): premise corrected — below 1.5.1 the root keeps 0x0801 / 0x0802 "kept: mandatory at pin" (`surface.Evaluate`); the refusal follows level membership in `Config.Validate`; test `TestTLSRefusedBelowItsLevel` |
+| R4-api-4706 | note | fixed `c69fe1d19` (decision 657): `node.Sealer`; compile-time test in `facade_c5a9_test.go` |
+| R3-doc-3782 | note | fixed `4e09b67e9`; test `TestJointWindowIsCommissioningMode3` (green at the base) |
+| R3-doc-3783, R4-doc-4705 | note | fixed `4e09b67e9` (doc) |
+| R5-doc-5304 | note | fixed `6c2e1bdd9`, `34f44c4ac` (decision 679): `Provider.EndLostPeer`, `PeerGone` deprecated, removable in `v0.29.0`; tests `TestProviderEndLostPeerCountsTheEndedSessions`, `TestCameraPeerLossWithoutSessionsLogsNothing`, `TestProviderPeerGoneKeepsItsBehaviour` |
+| R5-test-5309 (= C5-590-closeLostPeer-test) | note | fixed `da1052ea4`, `0e66f52f0` (test only); `TestCameraSignalToASilentRequestorEndsItsSessions` |
+
+### Raised in wave 1, open
+
+| ID | where | what |
+| --- | --- | --- |
+| P8-thread-3055-commissioning-complete (fable-diff-a2 N1) | `cluster/core/network_commissioning_thread.go` `OnCommissioningComplete` (`:790` at the REG head) | a command that passed the gate, then a CommissioningComplete, then the command's hold takes a backup and changes the staged network with no fail-safe armed; shape: a window generation that expiry and completion both advance (a second counter: `connect` / `reattachReverted` rely on `expiries == window+1`). Pre-existing; the Wi-Fi server may have the same completion sibling (not checked) |
+| P8-ota-5007-residual (fable-diff-a2 N5) | `cluster/core/ota_software_update_requestor.go:934` | `fabricRemoved` reads `saveOwed` under `mu` before `persistOwing` takes `persistSem`; a save in flight refused after that read sets the flag too late. Shape: decide "owed" inside the `persistSem` section. Read, not reproduced |
+| P8-esphome-cross-proxy (decision 675) | `ble/esphome` | a second `Connect` for one address through a different proxy is not refused; decision 675: a Central-level reservation → wave 2 |
+| P8-acl-admin-entry-mark (A1 report, Left out) | `cluster/core/access_control.go` `NotifyAdminEntryInstalled` (`:1602`; the mark at `:1616` after `writeMu` is released) | marks outside `writeMu`, the class of R5-conc-5004; not changed |
+| P8-5201-window (A1 report, assumption 2; Fable read pending, decision 672) | `cluster/core/operational_credentials.go` `deliverOwedFabricEvent` | between a rollback landing under `nocMu` and the ID listing after release, a second rollback of the same fabric and kind can be listed and acknowledged by the first delivery; closing it needs the IDs captured inside `rollbackPendingLocked` (five call sites). As reported, unverified by a reference read |
+| P8-admitparts-nil-key (A9 report, Left out) | `node/lifecycle.go:65` `nodeHost.AdmitParts` | a part with a nil key is skipped (`keyString` → `return nil`), so a `device.AddPart` of a key-less part is not judged by R5-err-5203's rule |
+| P8-closure-offgrid-ceiling (fable-diff-a4, re-read) | `cluster/closure` `step` | the 100.00 % bound off the grid (Resolution not dividing 10000, no LM) has no test here; the added step covers the floor only |
