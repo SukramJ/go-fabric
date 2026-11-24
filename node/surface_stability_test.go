@@ -278,8 +278,11 @@ func TestSurfaceChangeInProcess(t *testing.T) {
 	if ep.ClusterDataVersion(0x001D) == desc || ep.ClusterDataVersion(thermostatdef.ClusterID) == therm {
 		t.Error("the Descriptor's or the Thermostat's DataVersion did not move")
 	}
-	if ep.ClusterDataVersion(identify) != ident {
-		t.Error("Identify's DataVersion moved without a change")
+	// The replacement is a new instance behind the key: every one of its
+	// clusters starts at a new DataVersion, Identify's too (issue #589,
+	// decision 592).
+	if ep.ClusterDataVersion(identify) == ident {
+		t.Error("Identify's DataVersion did not move for the new instance")
 	}
 	if ep.ConfigurationVersion() != 2 || rootVersion(t, run.n) != 2 || len(run.n.Surface().Changed) != 1 {
 		t.Errorf("versions %d, %d; changed %v", ep.ConfigurationVersion(), rootVersion(t, run.n), run.n.Surface().Changed)

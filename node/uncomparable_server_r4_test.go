@@ -49,14 +49,6 @@ func TestUncomparableRootServerIsServed(t *testing.T) {
 
 func testUncomparableRootServer(t *testing.T, mk func(*spec.Server) contract.ClusterServer) {
 	t.Helper()
-	if _, ok := mk(nil).(ifaceServer); ok {
-		// node's predicates judge the value (TestComparableValueJudgesTheValue);
-		// past them bridge.reconciled (bridge/bridge.go:2813) still judges
-		// the type and Start panics in reconcileQuiescers
-		// (bridge/bridge.go:2748) — outside this unit's paths, handed to
-		// the coordinator (review II, R4-api-4753, fix-h9 repair).
-		t.Skip("bridge.reconciled judges the server's type, not its value: open finding outside node/")
-	}
 	mem := memstore.New()
 	cfg := minimalConfig(nil)
 	cfg.Store = node.Store{Credentials: mem, Endpoints: epmem.New()}

@@ -38,8 +38,8 @@ type keptServer struct {
 // two dispatches that materialise at once hand out the same instance.
 func (e *Endpoint) keepStateful(slot keptSlot, src any, built []contract.ClusterServer) []contract.ClusterServer {
 	st := e.endpointState()
-	st.mu.Lock()
-	defer st.mu.Unlock()
+	st.instMu.Lock()
+	defer st.instMu.Unlock()
 	seen := map[uint32]struct{}{}
 	for i, s := range built {
 		if _, ok := s.(contract.StatefulServer); !ok {

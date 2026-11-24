@@ -6,6 +6,7 @@ package endpoint
 import (
 	"context"
 	"log/slog"
+	"reflect"
 	"sync"
 	"sync/atomic"
 
@@ -258,14 +259,17 @@ type Endpoint struct {
 	// The state is owned by the assembler's [endpointStateRegistry] and
 	// keyed there by the endpoint's stable [Endpoint.SourceKey], so the
 	// SAME (device, channel, dp) keeps ONE state across every reassembly
-	// for as long as it stays in the topology: an already-paired
+	// for as long as it stays in the topology and the host puts no new
+	// instance behind the key ([Spec.Instance]): an already-paired
 	// endpoint's DataVersion survives an UNRELATED topology change (a
 	// sibling endpoint added / removed), and only a state change on the
-	// endpoint itself bumps it. Mirrors matter.js
-	// packages/node/src/behavior/state/managed/Datasource.ts:597 (version
-	// sampled once per behavior lifetime, bound to the endpoint's own
-	// lifecycle) / :1456-1457 (increment per committed change,
-	// advanceVersion :690-699). The root and
+	// endpoint itself bumps it. A new instance behind the key gets new
+	// DataVersion trackers and keeps the key's controller-written state
+	// ([keyState]). Mirrors matter.js
+	// packages/node/src/behavior/state/managed/Datasource.ts:763 at
+	// b25ed960 (version sampled once per Datasource, bound to the
+	// behavior's lifetime) / :1672-1673 (increment per committed change,
+	// advanceVersion :856-865). The root and
 	// the Aggregator an [Assembler] builds carry its own root and
 	// Aggregator state, for the clusters whose reattached instance-hosted
 	// servers keep no tracker of their own. nil for bare
@@ -360,6 +364,32 @@ func (e *Endpoint) endpointState() *endpointState {
 	return e.state
 }
 
+// SameInstance reports whether e serves the instance prev served: false
+// when the assembler bound both to a key and the host put a new instance
+// behind the key in between ([Spec.Instance]), or when they serve
+// different keys. An endpoint the assembler did not bind to a key — the
+// root, the Aggregator, a bare one — is never a new instance. The bridge
+// announces an endpoint whose instance changed as it announces an added
+// one (issue #589, decision 595).
+func (e *Endpoint) SameInstance(prev *Endpoint) bool {
+	if e == nil || prev == nil {
+		return true
+	}
+	a, b := e.boundState(), prev.boundState()
+	if a == nil || b == nil || !a.assembled || !b.assembled {
+		return true
+	}
+	return a == b
+}
+
+// boundState returns the state the endpoint holds, without installing a
+// private one.
+func (e *Endpoint) boundState() *endpointState {
+	e.stateMu.Lock()
+	defer e.stateMu.Unlock()
+	return e.state
+}
+
 // clusterTracker returns (lazily creating) the DataVersion tracker for
 // clusterID. Assembler-built bridged endpoints share the state the
 // [endpointStateRegistry] keyed by [Endpoint.SourceKey], so the version
@@ -389,15 +419,42 @@ func (e *Endpoint) identifyServer() *mattercore.Identify {
 }
 
 // endpointState is the concurrency-safe state bound to one stable
-// endpoint identity for as long as that identity is part of the
-// topology. The same state is handed to every *Endpoint the assembler
-// rebuilds for that identity. Two *Endpoint instances — the outgoing
-// topology still serving in-flight reads and the incoming one — may
-// reference it concurrently, hence the internal mutex.
+// endpoint identity and the host's instance behind it
+// ([Spec.Instance]) for as long as both are part of the topology. The
+// same state is handed to every *Endpoint the assembler rebuilds for that
+// identity. Two *Endpoint instances — the outgoing topology still serving
+// in-flight reads and the incoming one — may reference it concurrently,
+// hence the internal mutexes.
+//
+// It holds what belongs to the instance — the DataVersion trackers and the
+// kept stateful servers its sources built — and shares the key's
+// [keyState] with every other instance the key had: a new instance behind
+// the key starts with new trackers and serves the state a controller
+// wrote under the key (issue #589, decisions 592, 594).
 type endpointState struct {
-	// mu guards configVersion, identify, kept, nodeLabel and trackers.
-	mu       sync.Mutex
+	*keyState
+	// instance is the [Spec.Instance] the state was bound for; assembled
+	// is set on a state the registry bound (never on a bare endpoint's
+	// private one). The registry's mu guards instance.
+	instance  any
+	assembled bool
+	// instMu guards trackers and kept.
+	instMu   sync.Mutex
 	trackers map[uint32]*contract.DataVersionTracker
+	// kept holds the [contract.StatefulServer] instances the endpoint's
+	// materialisers built, kept across materialisations
+	// ([Endpoint.keepStateful]); it goes with the instance.
+	kept map[keptKey]keptServer
+}
+
+// keyState is the part of an endpoint's state that stays with its stable
+// key across the instances the host puts behind it: what a controller
+// wrote (NodeLabel, the scene table, the Binding, a running Identify), the
+// host's name and the ConfigurationVersion (decision 594).
+type keyState struct {
+	// mu guards configVersion, identify, nodeLabel, hostName, scenes and
+	// binding.
+	mu       sync.Mutex
 	identify *mattercore.Identify
 	// clock is the Identify countdown's time source; nil is the system
 	// clock.
@@ -419,10 +476,6 @@ type endpointState struct {
 	// binding is the Binding server [mountBinding] mounts, created on first
 	// use.
 	binding *mattercore.Binding
-	// kept holds the [contract.StatefulServer] instances the endpoint's
-	// materialisers built, kept across materialisations
-	// ([Endpoint.keepStateful]); it goes with the state.
-	kept map[keptKey]keptServer
 	// nilServerLogged is set once [Endpoint.dropNilServers] logged a
 	// dropped nil server for this endpoint.
 	nilServerLogged atomic.Bool
@@ -518,13 +571,21 @@ func (s *endpointState) restoreLabel(l string) {
 }
 
 func newEndpointState(clk clock.Clock) *endpointState {
-	return &endpointState{trackers: make(map[uint32]*contract.DataVersionTracker), clock: clk}
+	return &endpointState{keyState: &keyState{clock: clk}, trackers: make(map[uint32]*contract.DataVersionTracker)}
+}
+
+// renewed returns a state for a new instance behind s's key: new
+// DataVersion trackers, first read at a new random value (as matter.js
+// samples a new version per Datasource, Datasource.ts:763 at b25ed960),
+// no kept servers, and s's key state.
+func (s *endpointState) renewed(instance any) *endpointState {
+	return &endpointState{keyState: s.keyState, instance: instance, assembled: true, trackers: make(map[uint32]*contract.DataVersionTracker)}
 }
 
 // tracker returns (lazily creating) the tracker for clusterID.
 func (s *endpointState) tracker(clusterID uint32) *contract.DataVersionTracker {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.instMu.Lock()
+	defer s.instMu.Unlock()
 	t := s.trackers[clusterID]
 	if t == nil {
 		t = &contract.DataVersionTracker{}
@@ -544,11 +605,11 @@ func (s *endpointState) identifyServer() *mattercore.Identify {
 	return s.identify
 }
 
-// close releases the state's stateful cluster servers. Called when the
+// close releases the key state's stateful cluster servers. Called when the
 // endpoint identity leaves the topology so a running Identify countdown
 // does not keep ticking on an endpoint nobody can address any more
 // (IdentifyTime tops out at 65535 s).
-func (s *endpointState) close() {
+func (s *keyState) close() {
 	s.mu.Lock()
 	identify := s.identify
 	s.mu.Unlock()
@@ -581,17 +642,51 @@ func newEndpointStateRegistry(clk clock.Clock) *endpointStateRegistry {
 	return &endpointStateRegistry{states: make(map[SourceKey]*endpointState), clock: clk}
 }
 
-// stateFor returns the state for key, creating it on first use. The
-// returned pointer is stable for key across the registry's lifetime.
-func (r *endpointStateRegistry) stateFor(key SourceKey) *endpointState {
+// stateFor returns the state for key, creating it on first use, and the
+// instance the host put behind it ([Spec.Instance]). The returned pointer
+// is stable for key across the registry's lifetime while the instance
+// stays. For a new instance it returns a renewed state ([endpointState.renewed])
+// and install, which makes it the key's state: the caller runs it once the
+// assembly succeeded, so a failed one leaves the registry as it was. install
+// is nil when nothing is to be installed.
+func (r *endpointStateRegistry) stateFor(key SourceKey, instance any) (st *endpointState, install func()) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	s := r.states[key]
 	if s == nil {
 		s = newEndpointState(r.clock)
+		s.instance, s.assembled = instance, true
 		r.states[key] = s
+		return s, nil
 	}
-	return s
+	if !newInstance(s.instance, instance) {
+		if s.instance == nil {
+			s.instance = instance
+		}
+		return s, nil
+	}
+	fresh := s.renewed(instance)
+	return fresh, func() {
+		r.mu.Lock()
+		if r.states[key] == s {
+			r.states[key] = fresh
+		}
+		r.mu.Unlock()
+	}
+}
+
+// newInstance reports whether next names another instance than prev
+// ([Spec.Instance]): both set, comparable, and not equal. An instance that
+// is not set, or a value that cannot be compared, names no new one.
+func newInstance(prev, next any) bool {
+	if prev == nil || next == nil {
+		return false
+	}
+	vp, vn := reflect.ValueOf(prev), reflect.ValueOf(next)
+	if !vp.Comparable() || !vn.Comparable() {
+		return false
+	}
+	return vp.Type() != vn.Type() || prev != next
 }
 
 // retain drops every state whose key is absent from keep, closing it.

@@ -140,6 +140,24 @@ type Spec struct {
 	// parts; FriendlyName, VendorName, NodeLabel and ConfigurationVersion
 	// of a part are not served.
 	Parts []Spec
+	// Instance names the host's object behind StableKey — compared with
+	// == against the Instance of the key's previous assembly. When it
+	// differs, the endpoint is a new instance under the key, as matter.js
+	// closes an endpoint and adds another under the same id: every one of
+	// its clusters starts at a new random DataVersion (matter.js
+	// packages/node/src/behavior/state/managed/Datasource.ts:763 at
+	// b25ed960) and the bridge reports every readable attribute but the
+	// changes-omitted ones to the running subscriptions
+	// (packages/node/src/node/integration/
+	// ProtocolService.ts:290-296). What a controller wrote under the key
+	// — the NodeLabel, the scene table, the Binding, a running Identify —
+	// and the ConfigurationVersion stay with the key and the new instance
+	// serves them (issue #589, decisions 592, 594). A part without an
+	// Instance of its own takes its parent's. nil — or a value that
+	// cannot be compared — names no instance: the endpoint keeps its
+	// DataVersions across every assembly, as before. node's Aggregator
+	// sets it for every endpoint it holds.
+	Instance any
 }
 
 // ComposeNodeLabel appends the parameter suffix to the base label and

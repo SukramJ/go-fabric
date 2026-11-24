@@ -132,7 +132,23 @@ type Aggregator struct {
 	// forgetMu serialises the record of the forgets in progress
 	// (markForget).
 	forgetMu sync.Mutex
+
+	// instances is the instance each key of the last assembled snapshot
+	// was served as ([endpoint.Spec.Instance]); touched the keys whose
+	// place in the set an Add or a Replace wrote since, with the sequence
+	// of the latest write (touchSeq). a.mu guards all three. See
+	// [Aggregator.instanceOf].
+	instances map[string]*servedInstance
+	touched   map[string]uint64
+	touchSeq  uint64
 }
+
+// servedInstance is the [endpoint.Spec.Instance] the node hands the
+// assembler for a key: a new one whenever a new instance is put behind
+// the key, so the assembler gives its clusters new DataVersions and the
+// bridge announces it (issue #589, decisions 592, 595). Compared by
+// pointer; ep is the endpoint it was made for.
+type servedInstance struct{ ep Endpoint }
 
 // partition is one snapshot scope of the set: its endpoints in insertion
 // order.
@@ -287,9 +303,20 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 // Replace puts ep in the place of the endpoint with key: ep must carry the
 // same StableKey ([ErrKeyMismatch]), so it keeps the endpoint number the
 // endpoint store holds for the key, and the running node reassembles once
-// — the Aggregator's PartsList unchanged, the endpoint's Descriptor
-// (device types, server list) the one change a controller sees. The old
-// endpoint is unbound after the reassembly. It mirrors matter.js replacing
+// — the Aggregator's PartsList unchanged. The old endpoint is unbound
+// after the reassembly. ep is a new instance unless it is the endpoint
+// the key serves (a Replace by that one changes nothing): every cluster of
+// the endpoint starts at a new random DataVersion, and every readable
+// attribute but the changes-omitted ones is reported to the running
+// subscriptions, as matter.js
+// announces a re-added endpoint (Datasource.ts:763, ProtocolService.ts:
+// 290-296 at b25ed960; issue #589, decision 592). What a controller wrote
+// under the key — the NodeLabel, the scene table, the Binding, a running
+// Identify — and the ConfigurationVersion stay with the key, and ep
+// serves them (decision 594); raising the ConfigurationVersion stays the
+// host's call ([Aggregator.IncreaseConfigurationVersions]). An invoke the
+// old endpoint is handling at the swap completes on it and is answered;
+// the announce of ep follows the swap (decision 593). It mirrors matter.js replacing
 // a part: `close()` keeps the endpoint's number reservation
 // (endpoint/Endpoint.ts:998-1007, ServerEndpointInitializer.ts:67-69,
 // where `delete()` would erase it, endpoint/Endpoint.ts:961-966, at
@@ -642,6 +669,7 @@ func (b *Batch) addLocked(seq int, key string, ep Endpoint, entries []surfaceEnt
 	}
 	part := a.partLocked(b.scope)
 	part.eps = append(part.eps, ep)
+	a.touchLocked(key)
 	a.detachSetLocked(key, detach)
 	b.changed = true
 	// A returning key takes its reserved number back; the reservation is
@@ -653,7 +681,11 @@ func (b *Batch) addLocked(seq int, key string, ep Endpoint, entries []surfaceEnt
 
 // Replace replaces the endpoint with key in the batch's partition; see
 // [Aggregator.Replace]. The old endpoint is unbound after the batch's
-// reassembly. A replacement with a part key another endpoint serves is
+// reassembly. A new instance is announced as [Aggregator.Replace] says,
+// judged once per commit against what the batch serves at its end: a
+// Remove and an Add of the key in one batch announce as a Replace does,
+// and a Replace the batch holds and refuses, or one by the endpoint the
+// key serves, announces nothing (issue #589, decisions 593, 595). A replacement with a part key another endpoint serves is
 // held and judged against the batch's end state: refused
 // ([ErrDuplicateKey], from [Partition.Batch]) and changing nothing when
 // another endpoint still serves the key once fn returned (decisions 580,
@@ -731,6 +763,7 @@ func (b *Batch) replaceLocked(seq int, part *partition, i int, newKey string, ep
 	}
 	t := takenCall{seq: seq, key: newKey, ep: ep, old: part.eps[i], oldDetach: old, oldAt: -1}
 	part.eps[i] = ep
+	a.touchLocked(newKey)
 	a.detachSetLocked(newKey, detach)
 	if old != nil {
 		t.oldAt = len(b.detach)
@@ -1073,6 +1106,7 @@ func (b *Batch) refuseLateCollisionsLocked() []error {
 			continue
 		}
 		part.eps[i] = t.old
+		a.touchLocked(t.key)
 		a.detachSetLocked(t.key, t.oldDetach)
 		if t.oldAt >= 0 {
 			// The replaced device stays bound: it is served again.
@@ -1180,6 +1214,40 @@ func sameInstance(x, y Endpoint) bool {
 		return false
 	}
 	return x == y
+}
+
+// touchLocked records that an Add or a Replace wrote key's place in the
+// set; a.mu is held.
+func (a *Aggregator) touchLocked(key string) {
+	if a.touched == nil {
+		a.touched = map[string]uint64{}
+	}
+	a.touchSeq++
+	a.touched[key] = a.touchSeq
+}
+
+// instanceOf returns the [servedInstance] the snapshot hands the
+// assembler for ep under key, given the one of the last assembled
+// snapshot (prev, nil for none) and whether an Add or a Replace wrote the
+// key's place since: prev while ep is the instance prev was made for, a
+// new one otherwise. "The instance" is [sameInstance], H9's strict
+// predicate: an endpoint whose value cannot be compared is a new instance
+// once an Add or a Replace put it in place, and stays the one served while
+// nothing wrote its place (issue #589, decisions 595, 618). A same-pointer
+// Replace, and a Remove and an Add of the same pointer in one batch, keep
+// it.
+func instanceOf(prev *servedInstance, ep Endpoint, touched bool) *servedInstance {
+	switch {
+	case prev == nil:
+		return &servedInstance{ep: ep}
+	case sameInstance(prev.ep, ep):
+		return prev
+	case !touched && (!comparableValue(prev.ep) || !comparableValue(ep)):
+		// Nothing wrote the place: the value served is the one served.
+		return prev
+	default:
+		return &servedInstance{ep: ep}
+	}
 }
 
 // attach binds ep to the node when it is a device; the returned detach is
@@ -1309,7 +1377,10 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		parts = append(parts, part{p.scope, slices.Clone(p.eps)})
 	}
 	retired := slices.Clone(a.retired)
+	prevInstances := a.instances
+	touched := maps.Clone(a.touched)
 	a.mu.Unlock()
+	instances := make(map[string]*servedInstance, len(prevInstances))
 	for _, scope := range retired {
 		// Retired for good: the scope's numbers and reservations go.
 		if err := a.eraseScope(ctx, scope); err != nil {
@@ -1321,6 +1392,14 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		specs := make([]endpoint.Spec, 0, len(p.eps)+1)
 		for _, ep := range p.eps {
 			spec := ep.Spec()
+			// The instance behind the key: a new one gets new
+			// DataVersions and is announced (issue #589).
+			if key, err := keyOf(spec); err == nil {
+				_, wrote := touched[key]
+				inst := instanceOf(prevInstances[key], ep, wrote)
+				instances[key] = inst
+				spec.Instance = inst
+			}
 			// A store that fails a read fails the assembly: the default
 			// served in the stored value's place would be stored over it at
 			// the next write, a version read as 0 would go down (review II,
@@ -1350,6 +1429,17 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The assembler holds these instances now: the next snapshot judges
+	// against them. A write of a key's place since this snapshot read
+	// the set stays recorded for the next one.
+	a.mu.Lock()
+	a.instances = instances
+	for key, seq := range touched {
+		if a.touched[key] == seq {
+			delete(a.touched, key)
+		}
+	}
+	a.mu.Unlock()
 	if len(retired) > 0 {
 		// Erased: the names are forgotten.
 		a.mu.Lock()
