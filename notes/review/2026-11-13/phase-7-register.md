@@ -727,7 +727,7 @@ numbers below are at `d1d1212b9`.
 - `cluster/closure` #599 (2): R3-doc-3280, R4-doc-4284
 - `device` #600 (1): R5-err-5302 = R5-api-5503
 - `node` #601 (14): R5-store-5205, R5-api-5206, R5-test-5202, R5-err-5203, R3-store-3703, R4-api-4752, R4-doc-4754 (decision 656), R4-api-4706 (decision 657), R5-doc-5304, R5-test-5309 = C5-590-closeLostPeer-test, R4-doc-4705, R3-doc-3782, R3-doc-3783
-- `bridge` #602 (9): R5-par-5106 = C5-589-n3, R5-par-5109, fable-diff-h1 N3 = G641-1 (decision 658), R5-test-5105, fable-diff-h1b A, B, R5-conc-5104, the C4 compare (decision 664: the run at `28255e842` finished, repeated at the release head, a `bridge` test or a recorded reason for every bridge-blind mutant)
+- `bridge` #602 (9): R5-par-5106 = C5-589-n3, R5-par-5109, fable-diff-h1 N3 = G641-1 (decision 658), R5-test-5105, fable-diff-h1b A, B, R5-conc-5104, the C4 compare (decision 664: finish the run at `28255e842` (still running at C5), repeat it at the release head, a `bridge` test or a recorded reason for every bridge-blind mutant)
 - `client/discovery` #603 (4): R4-fsm-4551, R4-conc-4552, R4-test-4503, R4-doc-4502
 - `client/peer` #604 (4): R2-C2-api-2157, R2-C2-bound-2159, R4-doc-4553, R2-C2-doc-2156
 - `endpoint` #605 (3): R5-fsm-5108 = C5-589-n1, R3-doc-3452
@@ -747,7 +747,7 @@ numbers below are at `d1d1212b9`.
 | R2-C2-sup-1008 | two spellings of one rule (`cluster/core/commissioner_control.go:259-268`, `internal/caseauth/caseauth.go:23-33`) with no behaviour difference shown since run 2 | this row |
 | R2-C2-doc-1009 | a lint annotation; the bulk-replace sentence is what the code does (`cluster/core/access_control.go:1293-1296`) | this row |
 | R2-C2-fsm-1007 | a pure state reset on a host-called disarm costs one DataVersion step without a change | `cluster/core/general_commissioning.go:1429-1455` |
-| R5-bound-5006 | bounded at 65 535 small closures per fabric, needs a store that refuses the load, and a fabric removal collapses the keys | this row |
+| R5-bound-5006 | bounded at 65 535 small closures per fabric, needs a store that refuses the load and Manage, and a fabric removal collapses the keys | this row |
 | R2-C2-store-1004 residual | decided and not reopened; the start-up reconcile is the retry | § C3 |
 | R2-P6-sup-1009 | the one slot is stated on both fields with chip's line (decision 150) | `cluster/core/commissioner_control.go:116-131` |
 | R2-P6-fsm-1018 | one FabricUnderTest for the node, not cleared by the fabric's removal, as matter.js (`GroupcastServer.ts:404-430`, `:522-525` at `b25ed960`, Fable) | `cluster/core/groupcast.go:906-915` |
@@ -759,7 +759,7 @@ numbers below are at `d1d1212b9`.
 | R3-doc-3285 | the three statements hold, the ranges are off by at most two lines | the scripted re-cite |
 | R5-fsm-5208 | fails closed: the doubled key makes `Start` fail until the host removes one | this row |
 | R5-bound-5307 = C5-590-S4 | decided (620): only a refusal's form changes, no accepted session | `cluster/camera/provider.go:71-76` |
-| R5-fsm-5308 = C5-590-S6 | chip's `ScheduleEndSend` outlives its command too (Fable); after Stop the send fails fast; at most the queue bound | this row |
+| R5-fsm-5308 = C5-590-S6 | chip's `ScheduleEndSend` outlives its command too (`webrtc-provider-manager.cpp:892-917` at 6170af84, Fable); after Stop the send fails fast per the source row (`errNodeStopped`, `node/client.go:257`; the send path not re-read); at most the queue bound | this row |
 | R2-C2-par-2155 | mirrors matter.js `ServerAddressSet.ts:179-181` at `b25ed960` (Fable) | this row |
 | R2-C2-bound-2102 | the module's own bound; a sender that can squat four SRV targets can also announce addresses | `BD-Matter-Controller-HostDiscoveriesBounded` |
 | R2-C2-par-2154 | mirrors matter.js `Peer.ts:150-158` at `b25ed960` (Fable; the iteration order is unverified) | this row |
@@ -767,7 +767,7 @@ numbers below are at `d1d1212b9`.
 | R5-test-5305 | the two non-blocking selects are weak, not wrong; the property is pinned elsewhere per the source row | this row |
 | R5-bound-5204 | decided (615, 622), bounded by administered fabric changes | `node/listeners.go:70-74`, `:86-92` |
 | C5-h4c-n4 | fail closed; the next `Stop` finishes | this row |
-| C5-589-r2-4 | a test-harness ordering question; the wire behaviour is correct once awaited | this row |
+| C5-589-r2-4 | a test-harness ordering question; the wire behaviour is correct once awaited per the source row (unverified here: needs a traced `fabrictest` run of `Node.RemoveFabric`) | this row |
 | G641-2 | deprecated (removable in v0.28.0) and the hazard is in the doc; no use in the four consumers at their local heads | `bridge/handlers.go:974-985` |
 | R5-par-5011 | the list of root servers is open by its own wording | `docs/guides/ports.md:255-257` |
 | R5-doc-5151 | the stated behaviour holds; the cite has no pin | the scripted re-cite |
@@ -792,7 +792,7 @@ numbers below are at `d1d1212b9`.
 
 | ID | by |
 | --- | --- |
-| R3-fsm-3301 | `17bb663f7`: `handle` follows the adapter object (`ble/bluez/peripheral_linux.go:287-314`); the trigger and `Powered` are #610's first step |
+| R3-fsm-3301 | `17bb663f7`: `handle` follows the adapter object (`ble/bluez/peripheral_linux.go:287-314`); the trigger is #610's first step (the probe), `Powered` follows its result |
 | C5-589-n2-quiescer | said in `contract/matter.go:1090-1094` |
 | C5-589-n7 | the report path gates every result per subscriber: `bridge/subscribe.go:646-660`, `:668-696`, called at `:1100` |
 | C5-h6-n3 | the wrong cite was in a local fix note; this register's row corrects it (§ Run 5 "Carried to C5", fix-h6 row) |

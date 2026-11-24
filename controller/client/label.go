@@ -121,7 +121,7 @@ func (r *Registry) pushLabel(ctx context.Context, n *Node) error {
 // validateAndUpdateFabricLabel for each connected node (:953-992), an
 // offline node updated on its next connection. matter.js returns after
 // the first connected node it updated (:1008-1010); every connected node
-// gets the label here. A label longer than 32 characters is
+// gets the label here. A label longer than 32 bytes (UTF-8) is
 // commissioner.ErrLabel; the error of each node it could not update is
 // joined into the returned error, a refusal of the name
 // commissioner.ErrFabricLabelConflict.
