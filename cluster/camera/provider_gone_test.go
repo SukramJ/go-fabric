@@ -49,7 +49,7 @@ func TestProviderPeerGoneEndsThePeersSessions(t *testing.T) {
 	peers := &fakePeers{}
 	p.AttachPeerConnector(peers)
 	goneSessions(t, p)
-	if ran, err := p.PeerGone(context.Background(), 1, 7, unknownReason, nil); err != nil || !ran {
+	if _, ran, err := p.EndLostPeer(context.Background(), 1, 7, unknownReason, nil); err != nil || !ran {
 		t.Fatalf("PeerGone = %v, %v; want ran", ran, err)
 	}
 	if got := sessionIDs(p); !slices.Equal(got, []uint16{2, 4}) {
@@ -68,7 +68,7 @@ func TestProviderPeerGoneEndsThePeersSessions(t *testing.T) {
 		t.Errorf("the requestor was sent %d commands, want 0: no End to a lost peer", calls)
 	}
 	// A second report of the same loss ends nothing more.
-	if ran, err := p.PeerGone(context.Background(), 1, 7, unknownReason, nil); err != nil || !ran {
+	if _, ran, err := p.EndLostPeer(context.Background(), 1, 7, unknownReason, nil); err != nil || !ran {
 		t.Fatalf("PeerGone = %v, %v; want ran", ran, err)
 	}
 	m.mu.Lock()
@@ -89,7 +89,7 @@ func TestProviderPeerGoneRemovesWhateverThePortAnswers(t *testing.T) {
 	m.mu.Lock()
 	m.err = errors.New("stack gone")
 	m.mu.Unlock()
-	_, err := p.PeerGone(context.Background(), 1, 7, unknownReason, nil)
+	_, _, err := p.EndLostPeer(context.Background(), 1, 7, unknownReason, nil)
 	if err == nil || !errors.Is(err, m.err) {
 		t.Fatalf("PeerGone = %v, want the port's error", err)
 	}
@@ -148,7 +148,7 @@ func TestProviderPeerGoneWaitsForACommandInFlight(t *testing.T) {
 	<-port.entered
 	gone := make(chan error, 1)
 	go func() {
-		_, err := p.PeerGone(context.Background(), 1, 0x55, unknownReason, nil)
+		_, _, err := p.EndLostPeer(context.Background(), 1, 0x55, unknownReason, nil)
 		gone <- err
 	}()
 	for range 1000 {
@@ -182,7 +182,7 @@ func TestProviderPeerGoneCheckFalseEndsNothing(t *testing.T) {
 	p, m := newProvider(t, nil)
 	goneSessions(t, p)
 	asked := 0
-	ran, err := p.PeerGone(context.Background(), 1, 7, unknownReason, func() bool { asked++; return false })
+	_, ran, err := p.EndLostPeer(context.Background(), 1, 7, unknownReason, func() bool { asked++; return false })
 	if err != nil || ran {
 		t.Fatalf("PeerGone = %v, %v; want not ran, no error", ran, err)
 	}
@@ -232,13 +232,13 @@ func TestProviderPeerGoneChecksUnderTheSerialisation(t *testing.T) {
 	header := make(chan string, 1)
 	go func() {
 		header <- goroutineHeader()
-		ran, err := p.PeerGone(context.Background(), 1, 0x55, unknownReason, func() bool {
+		_, ran, err := p.EndLostPeer(context.Background(), 1, 0x55, unknownReason, func() bool {
 			duringAnswer.Store(port.answering.Load())
 			return false
 		})
 		gone <- result{ran, err}
 	}()
-	waitGoroutineLocksIn(t, <-header, "camera.(*Provider).PeerGone")
+	waitGoroutineLocksIn(t, <-header, "camera.(*Provider).EndLostPeer")
 	close(port.release)
 	if err := <-answered; statusOf(err) != im.StatusSuccess {
 		t.Fatalf("answer: %v", err)
@@ -291,7 +291,7 @@ func TestProviderPeerGoneWaitEndsWithItsContext(t *testing.T) {
 	cancel()
 	p, m := newProvider(t, nil)
 	goneSessions(t, p)
-	if ran, err := p.PeerGone(ended, 1, 7, unknownReason, nil); err != nil || ran {
+	if _, ran, err := p.EndLostPeer(ended, 1, 7, unknownReason, nil); err != nil || ran {
 		t.Fatalf("PeerGone with an ended ctx = %v, %v; want not ran, no error", ran, err)
 	}
 	m.mu.Lock()
@@ -336,10 +336,10 @@ func TestProviderPeerGoneWaitEndsWithItsContext(t *testing.T) {
 	header := make(chan string, 1)
 	go func() {
 		header <- goroutineHeader()
-		ran, err := p.PeerGone(life, 1, 0x55, unknownReason, nil)
+		_, ran, err := p.EndLostPeer(life, 1, 0x55, unknownReason, nil)
 		gone <- result{ran, err}
 	}()
-	waitGoroutineLocksIn(t, <-header, "camera.(*Provider).PeerGone")
+	waitGoroutineLocksIn(t, <-header, "camera.(*Provider).EndLostPeer")
 	stop()
 	var r result
 	got := false
@@ -393,5 +393,20 @@ func TestProviderEndLostPeerCountsTheEndedSessions(t *testing.T) {
 	}
 	if got := sessionIDs(p); !slices.Equal(got, []uint16{2, 4}) {
 		t.Errorf("sessions %v, want [2 4]", got)
+	}
+}
+
+// TestProviderPeerGoneKeepsItsBehaviour: the deprecated PeerGone is
+// EndLostPeer without the count, for its window (decision 679).
+func TestProviderPeerGoneKeepsItsBehaviour(t *testing.T) {
+	t.Parallel()
+	p, _ := newProvider(t, nil)
+	p.AttachPeerConnector(&fakePeers{})
+	goneSessions(t, p)
+	if ran, err := p.PeerGone(context.Background(), 1, 7, unknownReason, nil); err != nil || !ran { //nolint:staticcheck // the deprecated method's own test
+		t.Fatalf("PeerGone = %v, %v; want ran", ran, err)
+	}
+	if got := sessionIDs(p); !slices.Equal(got, []uint16{2, 4}) {
+		t.Errorf("sessions after PeerGone %v, want [2 4]", got)
 	}
 }
