@@ -596,7 +596,7 @@ func (p *proxy) connect(ctx context.Context, addr uint64, addrType uint32) (*con
 	}
 	if p.conns[addr] != nil {
 		p.mu.Unlock()
-		return nil, fmt.Errorf("proxy %s: %s: a connection is already open", p.name, macString(addr))
+		return nil, fmt.Errorf("esphome: proxy %s: %s: a connection is already open", p.name, macString(addr))
 	}
 	k := newConnection(p, addr)
 	p.conns[addr] = k
