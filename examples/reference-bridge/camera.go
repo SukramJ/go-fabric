@@ -839,7 +839,7 @@ const camMaxWebRTCSessions = 5
 // SolicitOffer counts the session's streams and answers DeferredOffer as
 // --camera-deferred-offer says (HandleSolicitOffer,
 // webrtc-provider-manager.cpp:176 at 6170af84: LinuxDeviceOptions
-// cameraDeferredOffer; AcquireAudioVideoStreams at :301), so a stream a
+// cameraDeferredOffer at :220; AcquireAudioVideoStreams at :301), so a stream a
 // solicited session names cannot be deallocated while the session lives.
 // EndSession releases them, as for a ProvideOffer's session (issue #596 C).
 func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, bool, error) {

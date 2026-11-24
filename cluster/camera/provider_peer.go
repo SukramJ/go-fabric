@@ -144,8 +144,9 @@ func (p *Provider) IceCandidates(ctx context.Context, sessionID uint16, candidat
 // (SendEndCommand :1301-1329, InvokeCommandRequest with logging
 // callbacks) and cleans the session up at once, whatever the send
 // returned (:999-1000); its CurrentSessions entry goes when the peer
-// connection reports Failed or Closed (OnConnectionStateChanged
-// :1157-1187, RemoveSession :1183), not through the End's response. That
+// connection reports Failed or Closed (webrtc-libdatachannel.cpp:342-348
+// at 6170af84 → OnConnectionStateChanged :1157-1187, RemoveSession
+// :1183), not through the End's response. That
 // libdatachannel's close() raises the Closed callback is inferred, not
 // read. Where the requestor cannot be reached, chip's
 // OnDeviceConnectionFailure (:1014-1019) only logs and keeps the session;
