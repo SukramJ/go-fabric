@@ -10,6 +10,11 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.26.0` (was `v0.25.0`) and are tagged `ble/bluez/v0.26.0`, `ble/esphome/v0.26.0` and `wifi/wpasupplicant/v0.26.0` at this commit; `examples/ble-wifi-light` requires the three at `v0.26.0`. The root `go.mod` and `go.sum` did not change between `v0.25.0` and `v0.26.0`.
+- CI (`chiptool.yml`): the certification-family groups are cut by measured duration — `commissioning-cadmin` (CADMIN) out of `commissioning`, `app-lights-cc` (CC) out of `app-lights`, `app-appliances` in two — so no group outlasts the longest single case (TC-SU-2.2, about 19 min): by the case durations of the nightly run 45186566898, no group takes more than about 24 min, where `app-lights` took 42 and `commissioning` 40. Both commissioning groups run on every pull request that changes code. A release pull request that changes documentation only no longer runs `long` (TC-DGGEN-2.1's 3 h 10 min of waits) itself: the new job `certification families (long) on the base commit` requires a passed `long` from a nightly or dispatched run on the pull request's base commit, and the gate is red without one.
+
 ## [0.26.0] — 2026-11-24
 
 The fixes of review II's close-out, runs 2 to 5 (decisions 514–655): security and correctness fixes across the CASE responder, the fabric-removal paths of the core servers, the camera and WebRTC servers, `node`'s key and batch rules, Thread and Wi-Fi commissioning, and the certification harness. No source change required: the 42 incompatible changes `make apidiff` reports against `v0.25.0` are the move of the ledger client from `controller/dcl` to `dcl`, and every old name stays a type alias or forwarding function (`controller/dcl/moved.go`), deprecated and removable in `v0.28.0`. Several servers now refuse input they accepted before — see *Changed*. The nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in a release of their own that requires `v0.26.0`.

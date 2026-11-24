@@ -24,7 +24,10 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
 
 In CI (`.github/workflows/chiptool.yml`) the nightly run covers every family.
 A release pull request (head branch `release/*`) runs that same full set —
-every family group, the chip-tool suite, the Go-TH groups (`gocert-cadmin`,
+every family group (`long`, whose one case TC-DGGEN-2.1 waits 3 h 10 min by
+design, by its result on the pull request's base commit from a nightly or
+dispatched run, when the pull request changes documentation only), the
+chip-tool suite, the Go-TH groups (`gocert-cadmin`,
 `gocert-dd`, `gocert-rest`), the control leg, the BLE-Wi-Fi leg and the BLE
 cases leg — and, beyond it, the nested modules' release shape (`make
 nested-release-check`: each nested module built against the go-fabric version
