@@ -718,7 +718,7 @@ func (p *peripheral) followAdapter(gen uint64, added, adv bool) {
 		if advReset {
 			p.dropAdvertisement()
 		}
-		err := p.restoreApplication(appReset, s)
+		err := p.restoreApplication(gen, appReset, s)
 		if err == nil {
 			err = p.restoreAdvertisement()
 			if err == nil {
@@ -739,10 +739,13 @@ func (p *peripheral) followAdapter(gen uint64, added, adv bool) {
 }
 
 // restoreApplication registers the application of the live service s again
-// when register is set (followAdapter); the caller holds advMu. A service
-// that ended while BlueZ registered it is unregistered again: its own
-// unregister may have run before this registration.
-func (p *peripheral) restoreApplication(register bool, s *gattService) error {
+// when register is set (followAdapter of generation gen); the caller holds
+// advMu. A service that ended while BlueZ registered it is unregistered
+// again: its own unregister may have run before this registration. appLost
+// is settled only while gen is current: a signal handled while
+// RegisterApplication was in flight owes the application anew, and the work
+// that superseded this one reads it (R5-fsm-5502).
+func (p *peripheral) restoreApplication(gen uint64, register bool, s *gattService) error {
 	if !register {
 		return nil
 	}
@@ -755,7 +758,7 @@ func (p *peripheral) restoreApplication(register bool, s *gattService) error {
 	}
 	p.mu.Lock()
 	still := !p.closed && p.svc == s && p.serviceLive()
-	if still {
+	if still && p.adapterGen == gen {
 		p.appLost = false
 	}
 	p.mu.Unlock()

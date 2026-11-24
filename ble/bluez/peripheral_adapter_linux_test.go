@@ -371,3 +371,36 @@ func TestPeripheralAdvertisingOnlySignalDuringTheRetry(t *testing.T) {
 		t.Fatalf("the advertisement was registered before the application: %q", b.called())
 	}
 }
+
+// TestPeripheralGattSignalDuringRegisterApplication holds R5-fsm-5502: a
+// signal naming GattManager1 alone arrives while the first addition's
+// RegisterApplication is in flight. The registration that answers after
+// the signal belongs to the superseded work, so the application stays
+// owed: the superseding work registers it again, and the advertisement
+// follows the last registration of the application.
+func TestPeripheralGattSignalDuringRegisterApplication(t *testing.T) {
+	p, b := newTestPeripheral(t)
+	advertiseAndServe(t, p, b)
+	lostWithTheAdapter(b)
+	before := callsOf(b, regApp)
+
+	release := b.hold(regApp)
+	p.handle(addedSignal(testAdapter))
+	waitUntil(t, "the first RegisterApplication in flight", func() bool { return callsOf(b, regApp) > before })
+	p.handle(partialAdded(testAdapter, ifaceGattManager))
+	release()
+	p.readvertising.Wait()
+
+	p.mu.Lock()
+	lost := p.appLost
+	p.mu.Unlock()
+	if n := callsOf(b, regApp) - before; n != 2 || lost {
+		t.Fatalf("RegisterApplication calls after the first addition %d, want 2; appLost %v; calls %q", n, lost, b.called())
+	}
+	if app, adv := heldByBluetoothd(b); !app || !adv || !advertised(p, b) {
+		t.Fatalf("application %v, advertisement %v; calls %q", app, adv, b.called())
+	}
+	if lastCall(b, regApp) > lastCall(b, regAdv) {
+		t.Fatalf("the advertisement was registered before the application: %q", b.called())
+	}
+}
