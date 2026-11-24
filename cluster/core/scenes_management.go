@@ -563,17 +563,24 @@ func (st *ScenesState) removeScenesForFabric(ctx context.Context, fabric uint8) 
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	st.changeKeyed(ctx, false, fabric, scenesFabricKey(fabric), func() (im.StatusCode, bool) {
-		before := len(st.table)
-		st.table = slices.DeleteFunc(st.table, func(e SceneEntry) bool { return e.FabricIndex == fabric })
-		if st.monitor == fabric {
-			if inf := st.info[fabric]; inf != nil {
-				inf.SceneValid = false
-			}
-			st.monitor = 0
-		}
+		changed := st.dropFabricScenesLocked(fabric)
 		st.infoFor(fabric)
-		return im.StatusSuccess, len(st.table) != before
+		return im.StatusSuccess, changed
 	})
+}
+
+// dropFabricScenesLocked removes fabric's scenes and ends its current
+// scene, and reports whether the table changed. Caller holds mu.
+func (st *ScenesState) dropFabricScenesLocked(fabric uint8) bool {
+	before := len(st.table)
+	st.table = slices.DeleteFunc(st.table, func(e SceneEntry) bool { return e.FabricIndex == fabric })
+	if st.monitor == fabric {
+		if inf := st.info[fabric]; inf != nil {
+			inf.SceneValid = false
+		}
+		st.monitor = 0
+	}
+	return len(st.table) != before
 }
 
 // ForgetFabric drops everything the table holds for a removed fabric: its
@@ -583,12 +590,21 @@ func (st *ScenesState) ForgetFabric(fabric uint8) {
 	st.forgetFabric(context.Background(), fabric)
 }
 
-// forgetFabric is ForgetFabric with ctx for the store.
+// forgetFabric is ForgetFabric with ctx for the store: one keyed
+// consequence removes the scenes and then the info entry, so on a table
+// not loaded yet the removal applied at the load does not create the
+// entry again (review II, R4-store-4154). The entry goes at once as well:
+// while the table does not load, Fabrics lists the info entries.
 func (st *ScenesState) forgetFabric(ctx context.Context, fabric uint8) {
-	st.removeScenesForFabric(ctx, fabric)
+	defer st.reportIfChanged(st.snapshot())
 	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.changeKeyed(ctx, false, fabric, scenesFabricKey(fabric), func() (im.StatusCode, bool) {
+		changed := st.dropFabricScenesLocked(fabric)
+		delete(st.info, fabric)
+		return im.StatusSuccess, changed
+	})
 	delete(st.info, fabric)
-	st.mu.Unlock()
 }
 
 // Fabrics lists the fabrics the table holds scenes or a scene info entry
