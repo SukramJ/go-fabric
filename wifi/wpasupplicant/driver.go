@@ -901,9 +901,11 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 }
 
 // refused reports whether err is wpa_supplicant's own answer to a call —
-// a D-Bus error reply other than the bus daemon's NoReply — so the call
-// was not carried out. A context error, NoReply, a closed connection or an
-// answer the driver cannot read leaves open whether it was.
+// a D-Bus error reply other than the bus daemon's NoReply — taken to mean
+// the call was not carried out. That premise is unverified: hostap is not
+// pinned and was not read (review II, R5-err-5403; BD-chip-WpaSupplicantDriver).
+// A context error, NoReply, a closed connection or an answer the driver
+// cannot read leaves open whether it was.
 func refused(err error) bool {
 	var de dbus.Error
 	var dep *dbus.Error
