@@ -176,7 +176,9 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 	// (R5-conc-5301). The session table is read first and the stop flag
 	// after it: Stop sets the flag before it closes a session and never
 	// clears it, so a flag still clear means the absence read before it
-	// was not Stop's doing (fable-diff-h4-r2 §2).
+	// was not Stop's doing (fable-diff-h4-r2 §2). stopBegan is lock-free,
+	// so the predicate takes no lock under the provider's command
+	// serialisation (decision 650).
 	gone := func() bool {
 		if n.holdsPeerSession(addr) {
 			return false

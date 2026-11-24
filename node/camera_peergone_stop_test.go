@@ -282,3 +282,50 @@ func TestCameraPeerLossStopBetweenTheReadsEndsNothing(t *testing.T) {
 		t.Errorf("sessions %v, want [1 2 3]", got)
 	}
 }
+
+// TestCameraPeerGoneTakesNoKeeperLock (decision 650): the gone predicate
+// runs under a camera provider's command serialisation, and a reopen holds
+// keeperMu across the host's synchronous window hooks. The predicate and
+// the stop flag it reads take no keeperMu: a lost requestor's end runs to
+// completion while keeperMu is held.
+func TestCameraPeerGoneTakesNoKeeperLock(t *testing.T) {
+	t.Parallel()
+	g := newPGNode(t)
+	g.n.keeperMu.Lock()
+	locked := true
+	unlock := func() {
+		if locked {
+			locked = false
+			g.n.keeperMu.Unlock()
+		}
+	}
+	defer unlock()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		g.n.endLostPeer(pgAddrA)
+	}()
+	finished := false
+	for range 1_000_000 {
+		select {
+		case <-done:
+			finished = true
+		default:
+		}
+		if finished {
+			break
+		}
+		runtime.Gosched()
+	}
+	unlock()
+	if !finished {
+		<-done
+		t.Fatal("a lost requestor's end waited for keeperMu")
+	}
+	if d := <-g.done; d != (pgDone{pgAddrA, 1, false}) {
+		t.Errorf("worked off %+v, want A ended on one provider", d)
+	}
+	if got := g.port.endedIDs(); !slices.Equal(got, []uint16{1, 3}) {
+		t.Errorf("port ended %v, want [1 3]", got)
+	}
+}
