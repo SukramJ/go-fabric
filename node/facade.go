@@ -62,6 +62,11 @@ type SemanticTag = mattercore.SemanticTag
 // Snapshot lists it, a copy ([subscription.Info]).
 type SubscriptionInfo = subscription.Info
 
+// Sealer seals the node's secrets at rest: the type of [Store].Sealer and
+// of [Reseal]'s keys ([store.Sealer]); [NewAESGCMSealer] returns the
+// module's own (review II, R4-api-4706, decision 657).
+type Sealer = store.Sealer
+
 // DiagnosticEvent is one entry of the node's diagnostic trace
 // ([diagevent.Event]): the moments that explain a failed pairing.
 type DiagnosticEvent = diagevent.Event
@@ -135,7 +140,7 @@ func NewAESGCMSealer(key []byte) (*store.AESGCMSealer, error) {
 // next [New] under next runs the scrub again. A start without a sealer on
 // the resealed database reads a secret as [ErrNoSealer]; New under old
 // fails with ErrUnseal. old and next are [NewAESGCMSealer]'s or the host's
-// own store.Sealer; neither may be nil.
+// own [Sealer]; neither may be nil.
 //
 // db is the node's SQLite file — [Store].DB, or [Store].Path opened with
 // database/sql under the "sqlite" driver the node registers — and no node
@@ -143,7 +148,7 @@ func NewAESGCMSealer(key []byte) (*store.AESGCMSealer, error) {
 // It carries the schema a New applied.
 // A controller's database moves with controller.Reseal, which also
 // reseals its node registry.
-func Reseal(ctx context.Context, db *sql.DB, old, next store.Sealer) error {
+func Reseal(ctx context.Context, db *sql.DB, old, next Sealer) error {
 	return store.Reseal(ctx, db, old, next)
 }
 

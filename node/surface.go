@@ -169,6 +169,23 @@ func composeRoot(cfg *Config) ([]surface.Decision, []surface.Element, error) {
 // rootNodeType is the Matter RootNode device type (0x0016).
 const rootNodeType schema.DeviceTypeID = 0x0016
 
+// rootClusterElement is the candidate of the root cluster id that
+// [Node.levelRootClusters] judges: mandatory when the RootNode device type
+// may mandate it at the pin, host-declared when the configuration adds
+// it (configured), a kit default otherwise.
+func rootClusterElement(id uint32, configured bool) surface.Element {
+	el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Provenance: surface.ProvenanceKitDefault}
+	switch {
+	case rootMandatory(id):
+		el.Provenance, el.Mandatory = surface.ProvenanceDeviceType, true
+	case configured:
+		el.Provenance = surface.ProvenanceHostDeclared
+	default:
+	}
+	el.Levels = surface.ElementLevels(el)
+	return el
+}
+
 // rootMandatory reports whether the RootNode device type may mandate the
 // server cluster id at the pin: its requirement's conformance
 // (schema.DeviceTypeClusterRequirement) is "M", or mandatory under a
@@ -228,16 +245,7 @@ func (n *Node) levelRootClusters() error {
 	cands := make([]surface.Element, 0, len(n.root.servers))
 	for _, s := range n.root.servers {
 		id := s.MatterClusterID()
-		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Provenance: surface.ProvenanceKitDefault}
-		switch {
-		case rootMandatory(id):
-			el.Provenance, el.Mandatory = surface.ProvenanceDeviceType, true
-		case configured[id]:
-			el.Provenance = surface.ProvenanceHostDeclared
-		default:
-		}
-		el.Levels = surface.ElementLevels(el)
-		cands = append(cands, el)
+		cands = append(cands, rootClusterElement(id, configured[id]))
 	}
 	kept, decisions, err := surface.Evaluate(cands, n.cfg.Surface)
 	if err != nil {

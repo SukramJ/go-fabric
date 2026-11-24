@@ -12,6 +12,7 @@ import (
 	"thingfabric.dev/go-fabric/cluster/tls"
 	"thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/store"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 // TLSConfig mounts TlsCertificateManagement and TlsClientManagement on
@@ -108,6 +109,40 @@ func buildTLS(ctx context.Context, cfg *TLSConfig, st store.Port) (*tls.Certific
 		return nil, nil, fmt.Errorf("tls client management: %w", err)
 	}
 	return certs, client, nil
+}
+
+// tlsLevelErrors refuses [Config].TLS under surface policies whose level
+// does not have both TLS clusters, or that remove them (review II,
+// R4-doc-4754, owner decision 656). Each cluster is judged as the root
+// judges it once built ([rootClusterElement], host-declared). Below
+// 1.5.1 the level policy does not remove them — the RootNode device type
+// may mandate them at the pin, so the root keeps them "mandatory at pin
+// (absent at level …)" — but a node that composes at such a level would
+// serve two clusters its level does not know; the TLS configuration is
+// refused instead, before anything is built. Policies whose level is
+// invalid are left to their own check.
+func (c *Config) tlsLevelErrors() []error {
+	if c.TLS == nil || c.Surface.Validate() != nil {
+		return nil
+	}
+	level := c.Surface.EffectiveLevel()
+	ids := []uint32{tls.CertificateManagementClusterID, tls.ClientManagementClusterID}
+	cands := make([]surface.Element, 0, len(ids))
+	for _, id := range ids {
+		el := rootClusterElement(id, true)
+		if el.Levels != 0 && !el.Levels.Has(level) {
+			return []error{fmt.Errorf("node: Config.TLS needs TlsCertificateManagement and TlsClientManagement, which surface level %s does not have", level)}
+		}
+		cands = append(cands, el)
+	}
+	kept, _, err := surface.Evaluate(cands, c.Surface)
+	if err != nil {
+		return []error{fmt.Errorf("node: Config.TLS: %w", err)}
+	}
+	if len(kept) != len(ids) {
+		return []error{fmt.Errorf("node: Config.TLS needs TlsCertificateManagement and TlsClientManagement on the root, which the surface policies remove (level %s)", level)}
+	}
+	return nil
 }
 
 // tlsAttacher is a cluster server that takes the node's TLS lookups: the
