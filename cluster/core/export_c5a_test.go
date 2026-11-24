@@ -20,8 +20,8 @@ import (
 // happened, not on a timeout. The goroutine dump's header names a parked
 // waiter "[sync.Mutex.Lock"; a sync.RWMutex waiter is named
 // differently and does not count.
-func WaitParkedOnMutexA1(t testing.TB, done <-chan struct{}, fn string) bool {
-	t.Helper()
+func WaitParkedOnMutexA1(tb testing.TB, done <-chan struct{}, fn string) bool {
+	tb.Helper()
 	buf := make([]byte, 1<<20)
 	for {
 		select {
