@@ -12,7 +12,7 @@ import (
 
 // TestADroppedConnectionStartsNoSession: a connection dropped after
 // SubscribeC2 passed its check but before the session started — the
-// handshake request reaching maybeStart on the pipe's goroutine — starts
+// subscribe reaching maybeStart on the pipe's goroutine — starts
 // no session: Serve is not called, so no session is left without its
 // closed hook (review II, R2-P6-conc-2053).
 func TestADroppedConnectionStartsNoSession(t *testing.T) {
@@ -29,7 +29,7 @@ func TestADroppedConnectionStartsNoSession(t *testing.T) {
 	c.onC2 = func([]byte) {} // SubscribeC2 passed its gone check
 	c.mu.Unlock()
 	c.drop()
-	c.maybeStart() // the request's maybeStart, after the drop
+	c.maybeStart() // the subscribe's maybeStart, after the drop
 	c.mu.Lock()
 	session, messages := c.session, c.messages
 	c.mu.Unlock()

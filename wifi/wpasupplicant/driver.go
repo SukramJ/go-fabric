@@ -181,7 +181,6 @@ type attempt struct {
 	more chan struct{}
 	// ready is closed once the run loop installed the attempt.
 	ready chan struct{}
-	done  chan struct{}
 	// abandoned (d.mu) is set when listen gave up on the hand-over: the
 	// run loop does not install the attempt.
 	abandoned bool
@@ -646,7 +645,6 @@ func (d *Driver) ConnectNetwork(ctx context.Context, ssid, credentials []byte) (
 		d.restore(ctx, prev)
 		return statusUnknown, debugText, 0
 	}
-	defer close(a.done)
 	if err := d.selectNetwork(ctx, network); err != nil {
 		d.removeAdded(ctx, network)
 		d.restore(ctx, prev)
@@ -742,7 +740,7 @@ func (d *Driver) sweep(ctx context.Context) {
 // is marked abandoned, so the loop does not install it
 // ([Driver.installAttempt]).
 func (d *Driver) listen(ctx context.Context) (a *attempt, debugText string) {
-	a = &attempt{more: make(chan struct{}, 1), ready: make(chan struct{}), done: make(chan struct{})}
+	a = &attempt{more: make(chan struct{}, 1), ready: make(chan struct{})}
 	select {
 	case d.register <- a:
 		select {
@@ -758,7 +756,6 @@ func (d *Driver) listen(ctx context.Context) (a *attempt, debugText string) {
 		d.mu.Lock()
 		a.abandoned = true
 		d.mu.Unlock()
-		close(a.done)
 		return nil, debugText
 	case <-ctx.Done():
 		return nil, "the connect did not complete in time"
@@ -827,7 +824,10 @@ func (d *Driver) removePrevious(ctx context.Context, prev dbus.ObjectPath) {
 
 // addNetwork hands the network to wpa_supplicant: the part of
 // ConnectNetwork before the State walk. prev is the interface's
-// CurrentNetwork, kept until the join has ended ("" when none). A
+// CurrentNetwork, kept until the join has ended ("" when none); when
+// that read fails, the network the driver joined last while wpa_supplicant
+// still lists it, so a failed join selects it again (review II,
+// R4-fsm-4354). A
 // non-empty debugText is the failure; then the driver holds no network of
 // this join: an AddNetwork that ended without wpa_supplicant's answer is
 // settled by [Driver.settleUnanswered], and one whose settlement could
@@ -847,7 +847,8 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 			return "", "", "the Wi-Fi interface is disabled"
 		}
 	}
-	if v, err := d.property(ctx, "CurrentNetwork"); err == nil {
+	v, curErr := d.property(ctx, "CurrentNetwork")
+	if curErr == nil {
 		if cur, _ := v.Value().(dbus.ObjectPath); cur != "" && cur != "/" {
 			prev = cur
 		}
@@ -871,6 +872,16 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 		before, _ = v.Value().([]dbus.ObjectPath)
 		if before == nil {
 			before = []dbus.ObjectPath{}
+		}
+	}
+	if curErr != nil {
+		// The CurrentNetwork is unreadable: the network joined last is
+		// the one to go back to, while wpa_supplicant lists it.
+		d.mu.Lock()
+		joined := d.joined
+		d.mu.Unlock()
+		if joined != "" && slices.Contains(before, joined) {
+			prev = joined
 		}
 	}
 	// The one call that carries the credential: neither its arguments nor
