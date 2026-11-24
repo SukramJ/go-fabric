@@ -1806,7 +1806,7 @@ func (b *Bridge) announceNewEndpoints(ctx context.Context, prev, next *endpoint.
 		if old, ok := known[ep.ID]; ok && ep.SameInstance(old) {
 			continue
 		}
-		for _, rr := range dispatcher.Read(ctx, im.ConcreteAttributePath{Endpoint: ep.ID, HasEndpoint: true}) {
+		for _, rr := range dispatcher.Read(ctx, im.ConcreteAttributePath{Endpoint: ep.ID, HasEndpoint: true}) { //nolint:contextcheck // ctx is the caller's without its values (withoutValues): its deadline and cancellation are inherited, its request is not (R5-par-5106)
 			if rr.Status == im.StatusSuccess {
 				m.OnAttributeChanged(rr.Path)
 			}
