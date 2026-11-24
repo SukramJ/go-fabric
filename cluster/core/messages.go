@@ -40,7 +40,10 @@ type MessagePresenter interface {
 	// goroutine of the server's, so the fabric's teardown and the
 	// command's answer do not wait for them; until a call returned, no
 	// other fabric can present a message with that id. A refusal there
-	// is logged.
+	// is logged. Such a call must return: while it blocks, the ids of every
+	// later removal stay held too. It can reach the host after the node's
+	// Stop returned, under the removing command's context without its
+	// cancellation (decision 624).
 	CancelMessage(ctx context.Context, messageID []byte) error
 }
 
