@@ -203,3 +203,82 @@ func TestCameraPeerLossInStopsWindowEndsNothing(t *testing.T) {
 		t.Errorf("sessions %v, want [1 2 3]", got)
 	}
 }
+
+// TestCameraPeerLossStopBetweenTheReadsEndsNothing (fable-diff-h4-r2 §2,
+// decision 650): Stop begins between the gone predicate's reads and closes
+// the session A opened since its loss. "No session" read after Stop began
+// is Stop's doing; the predicate reads the session table first, so A,
+// live again when the predicate began, keeps its WebRTC sessions.
+func TestCameraPeerLossStopBetweenTheReadsEndsNothing(t *testing.T) {
+	t.Parallel()
+	g := newPGNode(t)
+	g.port.hold, g.port.entered, g.port.release = true, make(chan struct{}), make(chan struct{})
+	var release sync.Once
+	releasePort := func() { release.Do(func() { close(g.port.release) }) }
+	t.Cleanup(releasePort)
+	answered := make(chan error, 1)
+	go func() {
+		ctx := im.WithSubject(im.WithFabricFilter(context.Background(), false, pgFabric), pgPeerB, nil)
+		_, err := g.prov.MatterInvoke(ctx, wpdef.CmdProvideAnswer, wpdef.ProvideAnswerRequest{WebRtcSessionId: 2, Sdp: "a"})
+		answered <- err
+	}()
+	<-g.port.entered
+	queue := make(chan string, 1)
+	g.n.sec.peerGone.testBeforeEnd = func(addr exchange.PeerAddress) {
+		if addr == pgAddrA {
+			queue <- goroutineHeader()
+		}
+	}
+	g.openBridge(t, pgPeerA)
+	g.lose(pgPeerA)
+	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).PeerGone")
+	// A is live again: a new session before the predicate runs.
+	g.openBridge(t, pgPeerA)
+	if !g.n.holdsPeerSession(pgAddrA) {
+		t.Fatal("the node holds no session with A after A's new one")
+	}
+	// Between the predicate's reads Stop begins and closes A's session;
+	// Stop then waits for the node's callbacks, before the node's life ends.
+	hold := make(chan struct{})
+	var releaseHold sync.Once
+	releaseCallbacks := func() { releaseHold.Do(func() { close(hold) }) }
+	t.Cleanup(releaseCallbacks)
+	g.n.callbacks.Enqueue(func() { <-hold })
+	stopped := make(chan error, 1)
+	var stopOnce sync.Once
+	startStop := func() {
+		stopOnce.Do(func() { go func() { stopped <- g.n.Stop(context.Background()) }() })
+	}
+	g.n.sec.peerGone.testBetweenReads = func(addr exchange.PeerAddress) {
+		if addr != pgAddrA {
+			return
+		}
+		startStop()
+		for i := 0; g.n.holdsPeerSession(pgAddrA); i++ {
+			if i == 1_000_000 {
+				t.Error("Stop did not close A's session")
+				return
+			}
+			runtime.Gosched()
+		}
+	}
+	releasePort()
+	if err := <-answered; err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	d := <-g.done
+	startStop() // the predicate may have answered before its second read
+	releaseCallbacks()
+	if err := <-stopped; err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	if d.addr != pgAddrA || d.ended != 0 {
+		t.Errorf("worked off %+v, want A not ended", d)
+	}
+	if got := g.port.endedIDs(); len(got) != 0 {
+		t.Errorf("port ended %v, want none", got)
+	}
+	if got := g.sessions(); !slices.Equal(got, []uint16{1, 2, 3}) {
+		t.Errorf("sessions %v, want [1 2 3]", got)
+	}
+}

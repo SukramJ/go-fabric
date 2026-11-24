@@ -67,6 +67,9 @@ type cameraPeerGone struct {
 	// pair was worked off: ended is the number of providers it ended
 	// sessions on, cancelled whether a live session stopped it.
 	testDone func(addr exchange.PeerAddress, ended int, cancelled bool)
+	// testBetweenReads, set by tests only, runs inside the gone predicate
+	// between its first read and the next (R5-conc-5301).
+	testBetweenReads func(addr exchange.PeerAddress)
 }
 
 // wireCameraPeerGone has the session table report a lost peer to the
@@ -168,12 +171,21 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 	if topo == nil {
 		return
 	}
-	// Once Stop began nothing ends: Stop closes every session before the
-	// node's life ends, so "no session left" is no evidence any more
-	// (R5-conc-5301). stopBegan takes keeperMu under the provider's
-	// command serialisation: nothing that holds keeperMu (goKeeper,
-	// stopParts, reopenUnlessStopping) takes a camera provider's.
-	gone := func() bool { return !n.stopBegan() && n.life.Err() == nil && !n.holdsPeerSession(addr) }
+	// "No session left" is evidence only when Stop's own closing is not
+	// its cause: Stop closes every session before the node's life ends
+	// (R5-conc-5301). The session table is read first and the stop flag
+	// after it: Stop sets the flag before it closes a session and never
+	// clears it, so a flag still clear means the absence read before it
+	// was not Stop's doing (fable-diff-h4-r2 §2).
+	gone := func() bool {
+		if n.holdsPeerSession(addr) {
+			return false
+		}
+		if q.testBetweenReads != nil {
+			q.testBetweenReads(addr)
+		}
+		return !n.stopBegan() && n.life.Err() == nil
+	}
 	for _, ep := range topo.Endpoints {
 		for _, srv := range endpoint.ClusterServers(ep) {
 			p, ok := srv.(*camera.Provider)
