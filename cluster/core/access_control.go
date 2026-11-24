@@ -130,7 +130,8 @@ type AccessControl struct {
 	// It is taken before mu, never under it.
 	auxSyncMu sync.Mutex
 
-	// limits is what [AccessControl.SetLimits] set; a zero field is the constant.
+	// limits is what [AccessControlConfig.Limits] or
+	// [AccessControl.SetLimits] set; a zero field is the constant.
 	limits AccessControlLimits
 }
 
@@ -337,6 +338,11 @@ type ACLTargetStruct struct {
 }
 
 // NewAccessControl constructs the cluster.
+//
+// Deprecated: use [NewAccessControlWith], which takes the store and the
+// capacity limits together and refuses a limit outside its range at
+// construction; this constructor keeps its behaviour until it goes and is
+// removable in v0.29.0 (review II, R4-api-4157, decision 669).
 func NewAccessControl(s ACLStoreFacade) (*AccessControl, error) {
 	if s == nil {
 		return nil, errors.New("core: AccessControl store is required")
@@ -344,6 +350,35 @@ func NewAccessControl(s ACLStoreFacade) (*AccessControl, error) {
 	a := &AccessControl{store: s}
 	a.loadExtensions(context.Background())
 	a.loadACLHeld(context.Background())
+	return a, nil
+}
+
+// AccessControlConfig drives [NewAccessControlWith].
+type AccessControlConfig struct {
+	// Store is the ACL store; required.
+	Store ACLStoreFacade
+	// Limits are the capacity attributes and the limits an ACL write is
+	// held to; a zero field is its default. A field outside its range
+	// ([AccessControlLimits]) is refused at construction: the attributes
+	// are fixed, and a node does not advertise a capacity its own
+	// constraint forbids.
+	Limits AccessControlLimits
+}
+
+// NewAccessControlWith returns the AccessControl server on cfg.Store with
+// cfg.Limits: the stored Extension entries are loaded and the fabrics
+// holding Acl rows marked, under ctx. A config without a store, or with a
+// limit outside its range, is refused with an error naming it.
+func NewAccessControlWith(ctx context.Context, cfg AccessControlConfig) (*AccessControl, error) {
+	if cfg.Store == nil {
+		return nil, errors.New("core: AccessControl needs a store")
+	}
+	if err := cfg.Limits.check(); err != nil {
+		return nil, err
+	}
+	a := &AccessControl{store: cfg.Store, limits: cfg.Limits}
+	a.loadExtensions(ctx)
+	a.loadACLHeld(ctx)
 	return a, nil
 }
 
