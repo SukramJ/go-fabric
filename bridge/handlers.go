@@ -1330,11 +1330,20 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	// above and does not re-register the operational session — that
 	// double-registers the same session-id in opMgr and confuses Apple's
 	// session table.
-	a.established = true
-	var sessionID uint16
-	if est != nil {
-		sessionID = est.SessionID
+	//
+	// The responder's acceptance of the finishing Sigma3's retransmission
+	// builds no session value — a handshake whose session was not
+	// installed ([CaseAdapter.sigma3PickupFailed]), or a responder handed
+	// over already finished ([CaseAdapter.SetResponder]): the step
+	// establishes nothing, with or without a callback, and the adapter is
+	// not marked established (R5-sec-5101, follow-up N1 of its Fable diff read).
+	if est == nil {
+		a.mu.Unlock()
+		a.handshakeFailed()
+		return 0, nil, sigma3Failed, taken, errors.New("bridge: Sigma3 step established no session (retransmission of a Sigma3 whose session was not installed)")
 	}
+	a.established = true
+	sessionID := est.SessionID
 	a.establishedSessionID = sessionID
 	onEstablished := a.establishedCallbackLocked()
 	a.mu.Unlock()
@@ -1347,15 +1356,8 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	// The session is the value this Sigma3's step built under the
 	// responder's lock, never read back off the responder once a.mu is
 	// released: a resume Sigma1 accepted on the same responder in between
-	// replaces its keys and identity (R5-sec-5101). The responder's
-	// acceptance of the finishing Sigma3's retransmission builds none — a
-	// handshake whose session was not installed ([sigma3PickupFailed])
-	// installs nothing on it.
+	// replaces its keys and identity (R5-sec-5101).
 	if onEstablished != nil {
-		if est == nil {
-			a.sigma3PickupFailed()
-			return 0, nil, sigma3Failed, taken, errors.New("bridge: CASE keys missing after Sigma3 success")
-		}
 		if err := onEstablished(*est); err != nil {
 			a.sigma3PickupFailed()
 			return 0, nil, sigma3Failed, taken, fmt.Errorf("bridge: CASE session pickup: %w", err)
