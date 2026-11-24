@@ -50,8 +50,8 @@ type ThreadNetworkCommissioning struct {
 	failSafe      func() (fabricIndex uint8, armed bool)
 	failSafeArmed func() bool
 	// blindWarned logs, once, that only the deprecated fabric-blind port
-	// answers the gate (armedFor); logger is where, nil slog.Default()
-	// (no config field: the warning is the only thing it logs).
+	// answers the gate (armedFor); logger is where
+	// ([ThreadNetworkCommissioningConfig.Logger]), nil slog.Default().
 	blindWarned   sync.Once
 	logger        *slog.Logger
 	setBreadcrumb func(uint64)
@@ -123,6 +123,11 @@ type ThreadNetworkCommissioningConfig struct {
 	// ScanMaxTimeSeconds and ConnectMaxTimeSeconds; 0 are the Thread
 	// driver's 10 and 20 (GenericNetworkCommissioningThreadDriver.h:87-90).
 	ScanMaxTimeSeconds, ConnectMaxTimeSeconds uint8
+	// Logger receives the server's lines — the one warning that only the
+	// deprecated IsFailSafeArmed port answers the gate; nil is
+	// slog.Default(), as the Wi-Fi server's
+	// ([WiFiNetworkCommissioningConfig.Logger]).
+	Logger *slog.Logger
 }
 
 // threadNetcommInst is the definition bound to the Thread feature.
@@ -145,6 +150,7 @@ func NewThreadNetworkCommissioning(ctx context.Context, cfg ThreadNetworkCommiss
 	}
 	n := &ThreadNetworkCommissioning{
 		br: cfg.BorderRouter, failSafe: cfg.FailSafe, failSafeArmed: cfg.IsFailSafeArmed, setBreadcrumb: cfg.SetBreadcrumb,
+		logger:  cfg.Logger,
 		scanMax: cfg.ScanMaxTimeSeconds, connectMax: cfg.ConnectMaxTimeSeconds,
 	}
 	if n.scanMax == 0 {
@@ -788,8 +794,7 @@ func (n *ThreadNetworkCommissioning) OnCommissioningComplete(context.Context) {
 // backup goes either way.
 //
 // The revert is attempted once. When the border router refuses it or
-// cannot be reached, nothing retries or reports it (the server has no
-// logger): the
+// cannot be reached, nothing retries, logs or reports it: the
 // border router stays on the dataset of the commissioning the fail-safe
 // rolled back, the server holds the backup as its staged network, and
 // Networks reports it not connected (review II, R2-P6-err-1002; chip
