@@ -1022,6 +1022,11 @@ func (r *OTASoftwareUpdateRequestor) enableOrDisableUpdates(v bool) {
 //
 // A Start whose load fails returns its error and leaves the requestor not
 // started, so the host or the node may call Start again (R3-err-3152).
+//
+// Start is not for concurrent use: a second call while the first loads
+// answers "already started" even when the first's load then fails and
+// leaves the requestor not started. The node calls it from its own Start
+// (review II, R4-err-4104).
 func (r *OTASoftwareUpdateRequestor) Start(ctx context.Context) error {
 	r.mu.Lock()
 	if r.started {

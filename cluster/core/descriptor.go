@@ -22,9 +22,11 @@ import (
 // it advertises the device-type list, the server cluster list, the
 // client cluster list, and the parts list (sub-endpoints).
 //
-// The bridge wires one Descriptor per endpoint — the Root endpoint's
-// PartsList enumerates every bridged endpoint; bridged endpoints
-// have an empty PartsList (no sub-endpoints).
+// The bridge wires one Descriptor per endpoint. The Root endpoint's and
+// the Aggregator's PartsList are the bridge's live topology (its default
+// providers, unless the host attaches its own); a bridged endpoint lists
+// its own parts — empty for a device of one endpoint, its sub-endpoints
+// for a composed one.
 type Descriptor struct {
 	deviceTypes []DeviceTypeStruct
 	clientList  []uint32
@@ -167,8 +169,8 @@ func NewDescriptor(deviceTypes []DeviceTypeStruct, serverList, clientList []uint
 // (existingDeviceType.deviceType === newDeviceType.deviceType) continue
 // nextInput` at :104-108 — "A device type that is already listed keeps its
 // listed revision", :86-87). It catches a bridged endpoint whose host
-// device type is BridgedNode itself, which endpoint.Materialize lists
-// next to the BridgedNode entry it adds.
+// device type is BridgedNode itself, which endpoint.ClusterServers lists
+// next to the BridgedNode entry it adds (descriptorDeviceTypes).
 func dedupeDeviceTypes(deviceTypes []DeviceTypeStruct) []DeviceTypeStruct {
 	out := make([]DeviceTypeStruct, 0, len(deviceTypes))
 next:
@@ -415,7 +417,7 @@ func (d *Descriptor) SetPartsListProvider(p func() []uint16) {
 // SetServerListProvider installs a closure consulted on every
 // ServerList read; it overrides the static list set by [NewDescriptor].
 // The Root endpoint's Descriptor uses this so the actual mounted
-// MatterClusterServer set (assembled in daemon.go after the full
+// MatterClusterServer set (assembled by the host after the full
 // endpoint composition completes) is the single source of truth and
 // the advertised ServerList cannot drift from it.
 //

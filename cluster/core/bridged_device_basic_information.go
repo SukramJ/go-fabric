@@ -241,7 +241,7 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 	serialNumber := cfg.SerialNumber
 	// Reachable is taken from cfg so the bridge can advertise the
 	// underlying host device's live availability at construction time
-	// (materialize.go reads dev.Available() per dispatch). A dead device
+	// (endpoint/materialize.go reads ep.Availability()). A dead device
 	// must surface Reachable=false immediately, not after a deferred
 	// SetReachable(false) call that — because cluster servers are
 	// reconstructed per dispatch — would never persist. Mirrors matter.js
@@ -595,7 +595,7 @@ func (b *BridgedDeviceBasicInformation) MatterAttributes() []uint32 {
 
 // SetReachable updates the reachable flag. Returns true when the
 // value changed. Emits the Matter §9.13.6 ReachableChanged event (id
-// 0x0003, priority Critical) on the bridge's [contract.EventEmitter]
+// 0x0003, priority Info) on the bridge's [contract.EventEmitter]
 // when it has been wired via [SetMatterEventEmitter] — mirrors
 // matter.js BridgedDeviceBasicInformationServer.ts:37, :100-102 at
 // b25ed960, where a change of reachable emits events.reachableChanged
