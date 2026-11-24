@@ -124,7 +124,10 @@ type OperationalCredentials struct {
 
 	// nocMu serialises AddNOC, UpdateNOC, CSRRequest's draw and record of
 	// the fail-safe's key pair, AddTrustedRootCertificate from its
-	// fail-safe check to its store of the root, RemoveFabric's store removal, the
+	// fail-safe check to its store of the root, RemoveFabric's store removal,
+	// UpdateFabricLabel from its LabelConflict check to its write
+	// (R4-conc-4053), SetVIDVerificationStatement from its read of the
+	// fabric to its write (R3-conc-3056), the
 	// fail-safe's commit ([OperationalCredentials.CommitFailSafe]) and
 	// its rollback ([OperationalCredentials.OnFailSafeExpiry]): a fail-safe
 	// that ends while a NOC command is between its fail-safe check and its
@@ -2838,6 +2841,26 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	if idx == 0 {
 		return nil, opcredsUnsupportedAccessErr{"core: UpdateFabricLabel needs an accessing fabric"}
 	}
+	resp, relabelled, err := o.relabel(ctx, idx, req.Label)
+	// The fabric changed: matter.js Fabric.setLabel persists it and the
+	// node reports an "updated" fabric (Fabric.ts:193-201,
+	// FabricManager.ts:236-246, OperationalCredentialsServer.ts:404). The
+	// hook runs after nocMu is released.
+	if relabelled {
+		o.fabricChanged(ctx, idx)
+	}
+	return resp, err
+}
+
+// relabel is UpdateFabricLabel's LabelConflict check and its write, as one
+// step under nocMu: of two fabrics relabelled to one label at once, the
+// second sees the first one's label and is answered LabelConflict (review
+// II, R4-conc-4053). matter.js does the find and setLabel in one handler
+// (OperationalCredentialsServer.ts:396-405 at b25ed960). relabelled
+// reports a label that changed.
+func (o *OperationalCredentials) relabel(ctx context.Context, idx uint8, label string) (resp any, relabelled bool, err error) {
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	// A label another fabric on this node already carries — the empty
 	// label every fabric starts with included — is answered LabelConflict.
 	// Mirrors matter.js db021da0 packages/node/src/behaviors/
@@ -2850,33 +2873,28 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	// R2-C2-err-1003).
 	fabrics, err := o.store.ListFabrics(ctx)
 	if err != nil {
-		return nil, spec.Errorf(im.StatusFailure, "core: UpdateFabricLabel: the fabric list: %v", err)
+		return nil, false, spec.Errorf(im.StatusFailure, "core: UpdateFabricLabel: the fabric list: %v", err)
 	}
 	for i := range fabrics {
 		f := &fabrics[i]
-		if f.FabricIndex != idx && f.Label == req.Label {
+		if f.FabricIndex != idx && f.Label == label {
 			return NOCResponse{
 				StatusCode: NOCStatusLabelConflict,
-				DebugText:  fmt.Sprintf("label %q already used by fabric %d", req.Label, f.FabricIndex),
-			}, nil
+				DebugText:  fmt.Sprintf("label %q already used by fabric %d", label, f.FabricIndex),
+			}, false, nil
 		}
 	}
 	// matter.js Fabric.setLabel persists, and so reports, only a label
 	// that changed (Fabric.ts:197-199).
 	prev, prevErr := o.store.GetFabric(ctx, idx)
-	relabelled := prevErr != nil || prev.Label != req.Label
-	if err := o.store.UpdateFabricLabel(ctx, idx, req.Label); err != nil {
-		return opcredsFabricReadFailure("UpdateFabricLabel", idx, err, store.ErrFabricNotFound)
+	relabelled = prevErr != nil || prev.Label != label
+	if err := o.store.UpdateFabricLabel(ctx, idx, label); err != nil {
+		resp, err := opcredsFabricReadFailure("UpdateFabricLabel", idx, err, store.ErrFabricNotFound)
+		return resp, false, err
 	}
 	// Bump DataVersion after successful label update — fabric list changed.
 	o.dataVersion.Bump()
-	// The fabric changed: matter.js Fabric.setLabel persists it and the
-	// node reports an "updated" fabric (Fabric.ts:193-201,
-	// FabricManager.ts:236-246, OperationalCredentialsServer.ts:404).
-	if relabelled {
-		o.fabricChanged(ctx, idx)
-	}
-	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: idx}, nil
+	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: idx}, relabelled, nil
 }
 
 // opcredsFabricReadFailure answers a store error on the accessing fabric:
