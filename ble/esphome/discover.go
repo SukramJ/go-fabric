@@ -573,7 +573,9 @@ func (c *Central) refuse(cd candidate, err error) {
 // it is down. A refused name no longer advertised is forgotten
 // (R2-P6-bound-2009): it is refused again, at its config_hash, should it
 // come back. An alias is forgotten when its name is no longer advertised
-// or the device it named left the set (R3-bound-3302).
+// or the device it named left the set (R3-bound-3302); one still
+// advertised whose device left is dialled at once: leave asks for the next
+// browse rather than leaving it to the Rescan (review II, R4-fsm-4305).
 func (c *Central) leave(advertised map[string]bool) {
 	c.setMu.Lock()
 	for name := range c.skipped {
@@ -596,12 +598,20 @@ func (c *Central) leave(advertised map[string]bool) {
 		keep = append(keep, p)
 	}
 	c.proxies = keep
+	redial := false
 	for name, al := range c.aliases {
-		if !advertised[name] || !c.holdsDeviceLocked(al.mac, al.keyed) {
+		switch {
+		case !advertised[name]:
 			delete(c.aliases, name)
+		case !c.holdsDeviceLocked(al.mac, al.keyed):
+			delete(c.aliases, name)
+			redial = true
 		}
 	}
 	c.setMu.Unlock()
+	if redial {
+		c.triggerRescan()
+	}
 	for _, p := range gone {
 		p.stop()
 		c.forgetProxy(p)
