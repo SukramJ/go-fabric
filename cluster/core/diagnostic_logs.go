@@ -49,10 +49,14 @@ type DiagnosticLogs struct {
 	// busy is set while a BDX transfer runs: chip has one
 	// BDXDiagnosticLogsProvider (DLC:62-64, :146-150).
 	busy bool
-	// stopTransfer cancels the running transfer's context; idle, on mu,
-	// signals busy fell, which MatterQuiesce waits for.
+	// stopTransfer cancels the running transfer's context, set in the
+	// hold that sets busy; idle, on mu, signals busy fell, which
+	// MatterQuiesce waits for. quiescing answers a request Busy while
+	// MatterQuiesce waits, so no new transfer starts behind its cancel
+	// (review II, R4-conc-4155).
 	stopTransfer context.CancelFunc
 	idle         sync.Cond
+	quiescing    bool
 }
 
 // LogProvider supplies the log of an intent as one byte slice — the
@@ -520,14 +524,21 @@ func (d *DiagnosticLogs) logRequestForBdx(ctx context.Context, intent uint8, des
 		return d.responsePayload(ctx, intent, LogStatusExhausted), nil
 	}
 	d.mu.Lock()
-	if d.busy {
+	if d.busy || d.quiescing {
 		d.mu.Unlock()
 		return failure(LogStatusBusy), nil // :146-150
 	}
 	d.busy = true
+	// The transfer outlives the command; it is bounded by its own idle
+	// timeout (kBdxTimeout, :36-37) and ended early by MatterQuiesce
+	// (done cancels it). Its cancel is in place from the claim on, so a
+	// quiesce at any point after it reaches the collector's start
+	// (review II, R4-conc-4155).
+	tctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	d.stopTransfer = cancel
 	logger := d.logger
 	d.mu.Unlock()
-	resp, ok := d.initializeTransfer(ctx, c, opener, intent, *designator, logger)
+	resp, ok := d.initializeTransfer(ctx, tctx, c, opener, intent, *designator, logger)
 	if !ok {
 		d.done()
 		return failure(LogStatusDenied), nil // :152-157
@@ -563,9 +574,11 @@ func (d *DiagnosticLogs) MatterQuiesce() {
 	if d.idle.L == nil {
 		d.idle.L = &d.mu
 	}
+	d.quiescing = true
 	for d.busy {
 		d.idle.Wait() // releases mu: the transfer's end takes it in done
 	}
+	d.quiescing = false
 }
 
 // initializeTransfer is BDXDiagnosticLogsProvider::InitializeTransfer
@@ -575,25 +588,20 @@ func (d *DiagnosticLogs) MatterQuiesce() {
 // command is answered Success with the collection's timestamps once the
 // receiver accepted; the blocks follow once that answer is out. Any
 // failure before the SendAccept — the receiver's StatusReport, a timeout —
-// is reported false, answered Denied (:219-241).
-func (d *DiagnosticLogs) initializeTransfer(ctx context.Context, c LogCollector, opener BDXExchangeOpener, intent uint8, designator string, logger *slog.Logger) (RetrieveLogsResponse, bool) {
+// is reported false, answered Denied (:219-241). The collector's start and
+// the exchange run on tctx, the transfer's context, which MatterQuiesce
+// cancels.
+func (d *DiagnosticLogs) initializeTransfer(ctx, tctx context.Context, c LogCollector, opener BDXExchangeOpener, intent uint8, designator string, logger *slog.Logger) (RetrieveLogsResponse, bool) {
 	sessionID := InvokeSessionIDFromContext(ctx)
 	if sessionID == 0 {
 		return RetrieveLogsResponse{}, false // :51-59: a secure session with a peer
 	}
-	// The transfer outlives the command; it is bounded by its own idle
-	// timeout (kBdxTimeout, :36-37) and ended early by MatterQuiesce
-	// (done cancels it).
-	tctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	d.mu.Lock()
-	d.stopTransfer = cancel
-	d.mu.Unlock()
-	session, ts, err := c.StartLogCollection(ctx, intent) // :65
+	session, ts, err := c.StartLogCollection(tctx, intent) // :65
 	if err != nil {
 		logger.Info("diaglogs.bdx.start_failed", slog.Any("err", err))
 		return RetrieveLogsResponse{}, false
 	}
-	ex, err := opener.OpenSessionExchange(ctx, sessionID) // :67-70
+	ex, err := opener.OpenSessionExchange(tctx, sessionID) // :67-70
 	if err != nil {
 		session.EndLogCollection(err)
 		logger.Info("diaglogs.bdx.exchange_failed", slog.Any("err", err))

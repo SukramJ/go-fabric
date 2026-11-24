@@ -23,6 +23,13 @@ func goroutineHeaderA2() string {
 // waiting).
 func waitLockedOrDoneA2(t *testing.T, header, fn string, done <-chan struct{}) {
 	t.Helper()
+	waitParkedOrDoneA2(t, header, fn, "sync.(*Mutex).Lock", done)
+}
+
+// waitParkedOrDoneA2 yields until the goroutine named by header waits in
+// frame inside fn, or until done is closed.
+func waitParkedOrDoneA2(t *testing.T, header, fn, frame string, done <-chan struct{}) {
+	t.Helper()
 	buf := make([]byte, 1<<20)
 	for range 1_000_000 {
 		select {
@@ -32,11 +39,11 @@ func waitLockedOrDoneA2(t *testing.T, header, fn string, done <-chan struct{}) {
 		}
 		stacks := string(buf[:runtime.Stack(buf, true)])
 		for _, g := range strings.Split(stacks, "\n\n") {
-			if strings.HasPrefix(g, header+"[") && strings.Contains(g, "sync.(*Mutex).Lock") && strings.Contains(g, fn) {
+			if strings.HasPrefix(g, header+"[") && strings.Contains(g, frame) && strings.Contains(g, fn) {
 				return
 			}
 		}
 		runtime.Gosched()
 	}
-	t.Fatalf("%sneither waits for a lock in %s nor finished", header, fn)
+	t.Fatalf("%sneither waits in %s inside %s nor finished", header, frame, fn)
 }
