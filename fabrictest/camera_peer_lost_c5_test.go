@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"thingfabric.dev/go-fabric/client/exchange"
 	"thingfabric.dev/go-fabric/client/handshake"
@@ -173,12 +174,17 @@ func TestCameraSignalToASilentRequestorEndsItsSessions(t *testing.T) {
 
 	// The Answer goes unanswered: the camera's wait ends at the bridge's
 	// receive deadline, which the site's clock reaches while nothing else
-	// runs.
-	if err := site.Run(ctx, func(ctx context.Context) error { return prov.Answer(ctx, 1, "v=0 answer") }); err == nil {
+	// runs. The requestor's blocked handler is work the site counts, so
+	// each step waits it out first: the waits get a deadline of their own
+	// rather than the site's default, which a slow run (-race) exceeds.
+	wctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	answerErr := site.Run(wctx, func(ctx context.Context) error { return prov.Answer(ctx, 1, "v=0 answer") })
+	if answerErr == nil {
 		t.Fatal("Answer to a requestor that does not answer returned nil")
 	}
-	if err := site.Eventually(ctx, "the lost requestor's WebRTC session ended", func() bool { return len(prov.Sessions()) == 0 }); err != nil {
-		t.Fatal(err)
+	if err := site.Eventually(wctx, "the lost requestor's WebRTC session ended", func() bool { return len(prov.Sessions()) == 0 }); err != nil {
+		t.Fatalf("%v (the Answer returned %v)", err, answerErr)
 	}
 	if got := camPort.endedIDs(); !slices.Equal(got, []uint16{1}) {
 		t.Errorf("the camera's port ended %v, want [1]", got)
