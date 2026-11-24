@@ -46,3 +46,33 @@ func TestRefusedStartStoresNoCredentialKey(t *testing.T) {
 		t.Fatalf("credential key after the refused start: stored %v, %v; want none", ok, err)
 	}
 }
+
+// keyWriteFailingStoreA4 refuses every write of the credential key.
+type keyWriteFailingStoreA4 struct{ lock.AuthStore }
+
+var errKeyWriteA4 = errors.New("key write refused")
+
+func (f keyWriteFailingStoreA4) SetSetting(ctx context.Context, key, value string) error {
+	if key == store.SettingDoorLockCredentialKey {
+		return errKeyWriteA4
+	}
+	return f.AuthStore.SetSetting(ctx, key, value)
+}
+
+// TestStartFailsClosedWhenTheKeyCannotBeStored (R4-store-4201): a
+// generated key the AuthStore refuses to store fails New with the store's
+// error — no server runs on a key no restart loads — and the store holds
+// no key afterwards.
+func TestStartFailsClosedWhenTheKeyCannotBeStored(t *testing.T) {
+	t.Parallel()
+	st, _ := openStore(t)
+	cfg := scheduledLockState(scheduledUser(lockdef.UserTypeUnrestrictedUser, nil))
+	cfg.Auth, cfg.AuthKey = keyWriteFailingStoreA4{AuthStore: st}, "lock:front"
+	srv, err := lock.New(cfg)
+	if !errors.Is(err, errKeyWriteA4) || srv != nil {
+		t.Fatalf("New with a store refusing the key: %v, %v; want the store's error and no server", srv, err)
+	}
+	if _, ok, err := st.GetSetting(context.Background(), store.SettingDoorLockCredentialKey); err != nil || ok {
+		t.Fatalf("credential key after the failed start: stored %v, %v; want none", ok, err)
+	}
+}
