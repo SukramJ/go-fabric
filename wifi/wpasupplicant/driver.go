@@ -920,11 +920,11 @@ func refused(err error) bool {
 // answered: the request may still be carried out.
 const errNoReply = "org.freedesktop.DBus.Error.NoReply"
 
-// errUnknownProperty is the error a service built on sd-bus answers a Get
-// of a property its object does not serve with: chip's wpa_supplicant
-// mock (matter/testing/linux/wifi.py at connectedhomeip 6170af84, on
-// python-sdbus 0.14.3 in the CHIP harness image) answers the interface's
-// Networks with it, measured over dbus-send in that image (decision 637).
+// errUnknownProperty is the error chip's wpa_supplicant mock
+// (matter/testing/linux/wifi.py at connectedhomeip 6170af84, on
+// python-sdbus 0.14.3 in the CHIP harness image) answers a Get of the
+// interface's Networks with — it declares no such property —, measured
+// over dbus-send in that image (decision 637).
 const errUnknownProperty = "org.freedesktop.DBus.Error.UnknownProperty"
 
 // unknownProperty reports whether err is the service's answer that it
