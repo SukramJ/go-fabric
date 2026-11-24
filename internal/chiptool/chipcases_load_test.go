@@ -54,3 +54,44 @@ func TestParseChipCasesMultiRun(t *testing.T) {
 		t.Fatalf("X = %+v, want run1's case although run2 is listed first", got)
 	}
 }
+
+// TestMergeWebRTCCases holds decisions 644 and 647 of review II: a case
+// only the WebRTC descriptor files joins its family, in the generator's
+// order, and runs with the WebRTC controller; a case the base descriptor
+// files keeps its entry and the base image's python3.
+func TestMergeWebRTCCases(t *testing.T) {
+	py := func(fam, name string) chipCase {
+		return chipCase{ID: fam + "/" + name, Family: fam, Name: name, Kind: "py"}
+	}
+	base := map[string][]chipCase{
+		"WEBRTCP": {py("WEBRTCP", "2.8"), py("WEBRTCP", "2.13")},
+		"ACE":     {py("ACE", "1.1")},
+	}
+	base["WEBRTCP"][0].Args = []string{"--base"}
+	webrtc := map[string][]chipCase{
+		"WEBRTCP": {py("WEBRTCP", "2.8"), py("WEBRTCP", "2.11"), py("WEBRTCP", "2.12"), py("WEBRTCP", "2.13")},
+		"ACE":     {py("ACE", "1.1")},
+		"WEBRTC":  {py("WEBRTC", "1.1")},
+	}
+	got := mergeWebRTCCases(base, webrtc)
+	var names, pythons []string
+	for _, c := range got["WEBRTCP"] {
+		names = append(names, c.Name)
+		pythons = append(pythons, c.Python)
+	}
+	if want := []string{"2.8", "2.11", "2.12", "2.13"}; !slices.Equal(names, want) {
+		t.Fatalf("WEBRTCP %v, want %v", names, want)
+	}
+	if want := []string{"", webrtcPython, webrtcPython, ""}; !slices.Equal(pythons, want) {
+		t.Fatalf("WEBRTCP interpreters %q, want %q", pythons, want)
+	}
+	if !slices.Equal(got["WEBRTCP"][0].Args, []string{"--base"}) {
+		t.Fatalf("WEBRTCP/2.8 lost its base entry: %+v", got["WEBRTCP"][0])
+	}
+	if len(got["ACE"]) != 1 || got["ACE"][0].Python != "" {
+		t.Fatalf("ACE = %+v, want the base entry unchanged", got["ACE"])
+	}
+	if len(got["WEBRTC"]) != 1 || got["WEBRTC"][0].Python != webrtcPython {
+		t.Fatalf("WEBRTC = %+v, want its one case on the WebRTC controller", got["WEBRTC"])
+	}
+}

@@ -76,7 +76,21 @@ type chipCase struct {
 	Steps   []string
 	// PICS is the descriptor's applicability expression ("" for none).
 	PICS string
+	// Python is the interpreter a Python case runs with: "" for the image's
+	// python3, webrtcPython for a case only the WebRTC descriptor files.
+	Python string
 }
+
+// The harness image's Python controller with chip's WebRTC bindings, and
+// the test descriptor the image's generate-test-descriptor writes when it
+// runs with it (internal/chiptool/image/Dockerfile, stage pywebrtc and the
+// last RUN; review II, decisions 644 and 647). The base image's descriptor
+// skips every case file that imports matter.webrtc, because its
+// controller has none.
+const (
+	webrtcPython     = "/opt/matter-webrtc/bin/python3"
+	webrtcDescriptor = "/lib/test-descriptor-webrtc.json"
+)
 
 // descriptorNode mirrors /lib/test-descriptor.json (format 2), which the
 // image generates from the CHIP tree (support/chip/support/
@@ -100,7 +114,59 @@ func loadChipCases(ctx context.Context, h *harness) (map[string][]chipCase, erro
 	if err != nil {
 		return nil, fmt.Errorf("read the test descriptor: %w\n%s", err, raw)
 	}
-	return parseChipCases([]byte(raw))
+	cases, err := parseChipCases([]byte(raw))
+	if err != nil {
+		return nil, err
+	}
+	// An image without the WebRTC controller (every image before decision
+	// 644's) has no WebRTC descriptor: its cases stay as they are.
+	webrtc, err := h.exec(ctx, "sh", "-c", "if [ -e "+webrtcDescriptor+" ]; then cat "+webrtcDescriptor+"; fi")
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w\n%s", webrtcDescriptor, err, webrtc)
+	}
+	if strings.TrimSpace(webrtc) == "" {
+		return cases, nil
+	}
+	extra, err := parseChipCases([]byte(webrtc))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", webrtcDescriptor, err)
+	}
+	return mergeWebRTCCases(cases, extra), nil
+}
+
+// mergeWebRTCCases adds to the base descriptor's cases those only the
+// WebRTC descriptor files, each to run with webrtcPython. A case both file
+// keeps the base entry and the base image's python3, so nothing the base
+// descriptor runs changes controller. A family that gains a case takes the
+// WebRTC descriptor's order, which is the generator's semantic order.
+func mergeWebRTCCases(base, webrtc map[string][]chipCase) map[string][]chipCase {
+	for fam, wcases := range webrtc {
+		have := map[string]chipCase{}
+		for _, c := range base[fam] {
+			have[c.Name] = c
+		}
+		if !slices.ContainsFunc(wcases, func(c chipCase) bool { _, ok := have[c.Name]; return !ok }) {
+			continue
+		}
+		merged := make([]chipCase, 0, len(wcases)+len(base[fam]))
+		seen := map[string]bool{}
+		for _, c := range wcases {
+			if b, ok := have[c.Name]; ok {
+				c = b
+			} else {
+				c.Python = webrtcPython
+			}
+			merged = append(merged, c)
+			seen[c.Name] = true
+		}
+		for _, c := range base[fam] {
+			if !seen[c.Name] {
+				merged = append(merged, c)
+			}
+		}
+		base[fam] = merged
+	}
+	return base
 }
 
 // parseChipCases flattens a test descriptor to family → cases.

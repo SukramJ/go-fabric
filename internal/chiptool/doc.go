@@ -31,7 +31,10 @@
 //     by family the way matter.js runs them (`make chiptool-families`,
 //     narrowed with GOFABRIC_CHIP_FAMILIES=IDM,ACL,…, further to single
 //     cases with GOFABRIC_CHIP_CASES=FAN/3.1,… and repeated with
-//     GOFABRIC_CHIP_REPEAT=20 — a narrowed run cannot -update-chip-cases);
+//     GOFABRIC_CHIP_REPEAT=20 — a narrowed run cannot -update-chip-cases;
+//     a case only the image's WebRTC descriptor files, because its file
+//     imports matter.webrtc, runs with the image's third Python controller,
+//     /opt/matter-webrtc, built with chip's WebRTC bindings);
 //   - TestGoCertificationCases — the Go-TH leg below (`make chiptool-gocert`,
 //     part of `make chiptool-test`, narrowed with GOFABRIC_GOCERT=IDM,SC/4.2
 //     and -CADMIN leaving a family out; in CI the gocert job of chiptool.yml
