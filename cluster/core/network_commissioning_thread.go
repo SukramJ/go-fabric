@@ -473,6 +473,23 @@ func (n *ThreadNetworkCommissioning) armedFor(ctx context.Context) bool {
 	return armed()
 }
 
+// expiryWindow is the count of fail-safe expiries, read before the gate
+// (armedFor): a command compares it again in the hold that writes, and an
+// expiry in between fails it with FAILSAFE_REQUIRED — its backup would
+// outlive the window that admitted it, with no expiry left to revert it
+// (review II, R3-fsm-3055).
+func (n *ThreadNetworkCommissioning) expiryWindow() uint64 {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.expiries
+}
+
+// errWindowExpired is the FAILSAFE_REQUIRED of a command whose window
+// expired after its gate passed ([ThreadNetworkCommissioning.expiryWindow]).
+func errWindowExpired(cmd string) error {
+	return netcommStatus(im.StatusFailsafeRequired, "core: %s: the failsafe expired while the command ran", cmd)
+}
+
 // releaseBusy ends the command's claim gen.
 func (n *ThreadNetworkCommissioning) releaseBusy(gen uint64) {
 	n.mu.Lock()
@@ -577,6 +594,7 @@ func scanResult(ds []byte) (netcommdef.ThreadInterfaceScanResultStruct, bool) {
 // BoundsExceeded (one network); otherwise the staged network is backed up
 // and replaced, the breadcrumb written and the list changed (:578-582).
 func (n *ThreadNetworkCommissioning) addOrUpdate(ctx context.Context, req netcommdef.AddOrUpdateThreadNetworkRequest) (any, error) {
+	window := n.expiryWindow()
 	if !n.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: AddOrUpdateThreadNetwork needs an armed failsafe")
 	}
@@ -585,6 +603,10 @@ func (n *ThreadNetworkCommissioning) addOrUpdate(ctx context.Context, req netcom
 		return configResponse(netcommdef.NetworkCommissioningStatusOutOfRange, 0), nil
 	}
 	n.mu.Lock()
+	if n.expiries != window {
+		n.mu.Unlock()
+		return nil, errWindowExpired("AddOrUpdateThreadNetwork")
+	}
 	if staged, commissioned := extPANIDOf(n.staging); commissioned && !bytes.Equal(staged, xp) {
 		n.mu.Unlock()
 		return configResponse(netcommdef.NetworkCommissioningStatusBoundsExceeded, 0), nil
@@ -603,10 +625,15 @@ func (n *ThreadNetworkCommissioning) addOrUpdate(ctx context.Context, req netcom
 // network is NetworkIDNotFound; the staged network is backed up and
 // cleared, and the last status, network id and connect error with it.
 func (n *ThreadNetworkCommissioning) remove(ctx context.Context, req netcommdef.RemoveNetworkRequest) (any, error) {
+	window := n.expiryWindow()
 	if !n.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: RemoveNetwork needs an armed failsafe")
 	}
 	n.mu.Lock()
+	if n.expiries != window {
+		n.mu.Unlock()
+		return nil, errWindowExpired("RemoveNetwork")
+	}
 	if st := n.matchLocked(req.NetworkId); !statusOK(st) {
 		n.mu.Unlock()
 		return configResponse(st, 0), nil
@@ -650,11 +677,15 @@ func (n *ThreadNetworkCommissioning) connect(ctx context.Context, req netcommdef
 	if len(req.NetworkId) > maxNetworkIDLength {
 		return nil, netcommStatus(im.StatusConstraintError, "core: ConnectNetwork network id of %d bytes", len(req.NetworkId))
 	}
+	window := n.expiryWindow()
 	if !n.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
 	n.mu.Lock()
-	window := n.expiries
+	if n.expiries != window {
+		n.mu.Unlock()
+		return nil, errWindowExpired("ConnectNetwork")
+	}
 	status := n.matchLocked(req.NetworkId)
 	staged := slices.Clone(n.staging)
 	attach, cancel := context.WithCancel(ctx)
