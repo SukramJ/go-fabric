@@ -40,9 +40,9 @@ func TestParseChipCasesMultiRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var names []string
-	for _, c := range cases["SWTCH"] {
-		names = append(names, c.Name)
+	names := make([]string, 0, len(cases["SWTCH"]))
+	for i := range cases["SWTCH"] {
+		names = append(names, cases["SWTCH"][i].Name)
 	}
 	if want := []string{"2.2", "2.3", "2.6"}; !slices.Equal(names, want) {
 		t.Fatalf("SWTCH cases %v, want %v", names, want)
@@ -74,10 +74,11 @@ func TestMergeWebRTCCases(t *testing.T) {
 		"WEBRTC":  {py("WEBRTC", "1.1")},
 	}
 	got := mergeWebRTCCases(base, webrtc)
-	var names, pythons []string
-	for _, c := range got["WEBRTCP"] {
-		names = append(names, c.Name)
-		pythons = append(pythons, c.Python)
+	names := make([]string, 0, len(got["WEBRTCP"]))
+	pythons := make([]string, 0, len(got["WEBRTCP"]))
+	for i := range got["WEBRTCP"] {
+		names = append(names, got["WEBRTCP"][i].Name)
+		pythons = append(pythons, got["WEBRTCP"][i].Python)
 	}
 	if want := []string{"2.8", "2.11", "2.12", "2.13"}; !slices.Equal(names, want) {
 		t.Fatalf("WEBRTCP %v, want %v", names, want)

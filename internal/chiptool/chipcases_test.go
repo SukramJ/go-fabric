@@ -141,27 +141,28 @@ func loadChipCases(ctx context.Context, h *harness) (map[string][]chipCase, erro
 // WebRTC descriptor's order, which is the generator's semantic order.
 func mergeWebRTCCases(base, webrtc map[string][]chipCase) map[string][]chipCase {
 	for fam, wcases := range webrtc {
-		have := map[string]chipCase{}
-		for _, c := range base[fam] {
-			have[c.Name] = c
+		have := map[string]int{}
+		for i := range base[fam] {
+			have[base[fam][i].Name] = i
 		}
 		if !slices.ContainsFunc(wcases, func(c chipCase) bool { _, ok := have[c.Name]; return !ok }) {
 			continue
 		}
 		merged := make([]chipCase, 0, len(wcases)+len(base[fam]))
 		seen := map[string]bool{}
-		for _, c := range wcases {
-			if b, ok := have[c.Name]; ok {
-				c = b
+		for i := range wcases {
+			c := wcases[i]
+			if j, ok := have[c.Name]; ok {
+				c = base[fam][j]
 			} else {
 				c.Python = webrtcPython
 			}
 			merged = append(merged, c)
 			seen[c.Name] = true
 		}
-		for _, c := range base[fam] {
-			if !seen[c.Name] {
-				merged = append(merged, c)
+		for i := range base[fam] {
+			if !seen[base[fam][i].Name] {
+				merged = append(merged, base[fam][i])
 			}
 		}
 		base[fam] = merged
