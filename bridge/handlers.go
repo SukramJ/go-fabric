@@ -646,11 +646,6 @@ type CaseAdapter struct {
 	// ones of the handshake it completes ([CaseAdapter.processSigma3]) —
 	// never another Sigma1's that ran on the responder since (R4-sec-4401).
 	stepPeer *sessionparams.Parameters
-	// resumeInstalled is the session the last Sigma1 installed by
-	// resumption, until the router takes it for the Sigma2_Resume's
-	// retransmission entry ([CaseAdapter.takeResumeInstall]); zero for
-	// none.
-	resumeInstalled uint16
 	// onUnfinished and releasedStaked: see [CaseAdapter.SetOnUnfinished].
 	onUnfinished   func(sessionID uint16)
 	releasedStaked bool
@@ -1183,9 +1178,10 @@ func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload [
 				}
 				return 0, nil, taken, fmt.Errorf("bridge: CASE resume session pickup: %w", err)
 			}
-			a.mu.Lock()
-			a.resumeInstalled = sessionID
-			a.mu.Unlock()
+			// The installed session travels with this step, not in a slot
+			// of the adapter a resume that lands meanwhile overwrites
+			// (R5-sec-5103).
+			taken.resumeInstalled = sessionID
 		}
 		a.sigma1BeganHandshake()
 		taken.sessionID, taken.named = sessionID, true
@@ -1241,17 +1237,6 @@ func (a *CaseAdapter) pendingOnFabric(fabricIndex uint8) bool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return !a.established
-}
-
-// takeResumeInstall returns, once, the session the last Sigma1 installed by
-// resumption: the router ties it to the Sigma2_Resume's retransmission
-// entry ([Bridge.handleCase]).
-func (a *CaseAdapter) takeResumeInstall() (uint16, bool) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	id := a.resumeInstalled
-	a.resumeInstalled = 0
-	return id, id != 0
 }
 
 // caseFailureProtocolCode maps a CASE handshake failure to the

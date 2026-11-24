@@ -160,3 +160,61 @@ func TestCaseSessionEstablishedFedFromTheValue(t *testing.T) {
 		t.Fatalf("deprecated callback ran %d times, the new one %d; want 1 and 1", len(calls), value)
 	}
 }
+
+// TestResumeAwaitsItsOwnInstalledSession (R5-sec-5103): two resumes on one
+// adapter, the second accepted inside the first's established-callback and
+// settled by the router between the first's step and the first's
+// settlement — another goroutine's schedule, reproduced in line. Each
+// awaits the initiator's Success for the session its own step installed;
+// the first, settled last, holds the adapter's one wait with its own id.
+func TestResumeAwaitsItsOwnInstalledSession(t *testing.T) {
+	t.Parallel()
+	r := newUnsecuredRig(t)
+	ipk := newCaseTestIPK(t)
+	responder := sigma.NewResponder(newCaseTestIdentity(t, 0xBBBB, 1, ipk), caseTestVerifier{}, 0x2001)
+	responder.SetSessionIDRenewer(func(prev uint16) (uint16, bool) { return prev + 1, true })
+	first, secret1, rid1 := buildResumeSigma1(t)
+	second, secret2, rid2 := buildResumeSigma1(t)
+	responder.SetResumptionStore(resumeRecords{string(rid1): secret1, string(rid2): secret2})
+	a := NewCaseAdapter(responder)
+
+	hdr2, proto2 := r.request(mrp.SCOpcodeSigma1, 0x7002)
+	step2 := &sigma1Step{handler: a}
+	var op2 uint8
+	var out2 []byte
+	var err2 error
+	calls := 0
+	a.SetOnSessionEstablished(func(sigma.SessionKeys, uint16) error {
+		calls++
+		if calls == 1 {
+			op2, out2, err2 = processSigma1With(a, second, step2)
+		}
+		return nil
+	})
+
+	hdr1, proto1 := r.request(mrp.SCOpcodeSigma1, 0x7001)
+	step1 := &sigma1Step{handler: a}
+	process1 := func(p []byte) (uint8, []byte, error) {
+		op, out, err := processSigma1With(a, p, step1)
+		// The second resume's goroutine settles before this one does.
+		if err := r.b.handleCase(r.peer.LocalAddr(), hdr2, proto2, nil, "sigma1",
+			func([]byte) (uint8, []byte, error) { return op2, out2, err2 }, step2); err != nil {
+			t.Errorf("handleCase (second): %v", err)
+		}
+		return op, out, err
+	}
+	if err := r.b.handleCase(r.peer.LocalAddr(), hdr1, proto1, first, "sigma1", process1, step1); err != nil {
+		t.Fatalf("handleCase (first): %v", err)
+	}
+	if op2 != mrp.SCOpcodeSigma2Resume || err2 != nil {
+		t.Fatalf("the second resume: opcode %#x, err %v", op2, err2)
+	}
+	id1, ok1 := step1.establishedSession()
+	id2, ok2 := step2.establishedSession()
+	if !ok1 || !ok2 || id1 == id2 {
+		t.Fatalf("installed %#x (%v), %#x (%v); want two sessions", id1, ok1, id2, ok2)
+	}
+	if got, ok := a.takeAwaitedResume(handshakeKeyOf(hdr1, proto1.ExchangeID)); !ok || got != id1 {
+		t.Fatalf("the first resume awaits %#x (%v); want its own session %#x (the second's is %#x)", got, ok, id1, id2)
+	}
+}
