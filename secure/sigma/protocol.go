@@ -204,6 +204,80 @@ type Sigma1ProcessResult struct {
 	// own releases it in its callback, or the id stays claimed. nil on a
 	// full handshake and on a store that claims nothing.
 	Claim *ResumeClaim
+	// Established, set on a resume, is the session the resume
+	// established, as the step that accepted it left the responder
+	// ([Established]); nil on a full handshake.
+	Established *Established
+}
+
+// Established is the session a handshake step established, built under
+// the responder's lock in that step: the [Responder.ProcessSigma3Established]
+// call that finished a full handshake, or the
+// [Responder.ProcessSigma1WithResume] call that accepted a resume
+// ([Sigma1ProcessResult.Established]). The slices are the value's own
+// copies. A caller installs the session from this value rather than from
+// the responder's accessors read afterwards: a later Sigma1 on the same
+// responder — a resume is accepted on a responder that finished its
+// handshake — replaces what the accessors return, and the session would
+// be installed with one handshake's keys under another's identity
+// (review II, R5-sec-5101).
+type Established struct {
+	// Keys are the session keys.
+	Keys SessionKeys
+	// SessionID is the local session id the step announced.
+	SessionID uint16
+	// PeerSessionID is the initiator's session id from its Sigma1.
+	PeerSessionID uint16
+	// PeerNodeID and PeerCATs are the peer's operational node id and CASE
+	// Authenticated Tags: from its NOC for a full handshake, from the
+	// resumption record for a resume.
+	PeerNodeID uint64
+	PeerCATs   []uint32
+	// FabricIndex and LocalNodeID are the identity the handshake ran
+	// under ([Responder.SessionIdentity]); IdentityOK is false when the
+	// responder held none.
+	FabricIndex uint8
+	LocalNodeID uint64
+	IdentityOK  bool
+	// PeerSessionParams are the initiator's Sigma1 SessionParameters;
+	// PeerSessionParamsOK is false when it stated none.
+	PeerSessionParams   SessionParameters
+	PeerSessionParamsOK bool
+	// Resume describes the resumption for a resumed session
+	// ([ResumeInfo]); its Resumed is false for a full handshake.
+	Resume ResumeInfo
+	// ResumptionID is the resumption id this handshake issued (Sigma2's,
+	// or the fresh one Sigma2_Resume carries); SharedSecret is the
+	// session's shared secret. Together they make the record the peer
+	// resumes from next.
+	ResumptionID []byte
+	SharedSecret []byte
+}
+
+// establishedLocked builds the [Established] value of the session the
+// responder holds. Caller holds r.mu, in the step that established it.
+func (r *Responder) establishedLocked() *Established {
+	e := &Established{
+		Keys:          r.keys,
+		SessionID:     r.sessionID,
+		PeerSessionID: r.peerSessionID,
+		PeerNodeID:    r.peerNodeID,
+		ResumptionID:  append([]byte(nil), r.resumptionID...),
+		SharedSecret:  append([]byte(nil), r.shared...),
+	}
+	if len(r.peerCATs) > 0 {
+		e.PeerCATs = append([]uint32(nil), r.peerCATs...)
+	}
+	if r.identity != nil {
+		e.FabricIndex, e.LocalNodeID, e.IdentityOK = r.identity.FabricIndex, r.identity.NodeID, true
+	}
+	if r.peerSessionParams != nil {
+		e.PeerSessionParams, e.PeerSessionParamsOK = *r.peerSessionParams, true
+	}
+	e.Resume = r.resume
+	e.Resume.PresentedResumptionID = append([]byte(nil), r.resume.PresentedResumptionID...)
+	e.Resume.IssuedResumptionID = append([]byte(nil), r.resume.IssuedResumptionID...)
+	return e
 }
 
 // ResumeClaim is the responder's claim of a resumption id
@@ -848,6 +922,7 @@ func (r *Responder) tryResume(sigma1 Sigma1) (Sigma1ProcessResult, bool, error) 
 		Sigma2Resume: &s2r,
 		ResumeKeys:   keys,
 		Claim:        claim,
+		Established:  r.establishedLocked(),
 	}, true, nil
 }
 
@@ -1145,18 +1220,28 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (_ Sigma2, err error
 // the responder accepts no further Sigma3 until a new Sigma1 restarts
 // it, and commits nothing out of the rejected message.
 func (r *Responder) ProcessSigma3(sigma3Bytes []byte) error {
+	_, err := r.ProcessSigma3Established(sigma3Bytes)
+	return err
+}
+
+// ProcessSigma3Established is [Responder.ProcessSigma3] that also returns,
+// for the call that finished the handshake, the session it established
+// ([Established]), built under the responder's lock in this step. The
+// accepted retransmission of the finishing Sigma3 returns nil and no
+// error: it establishes nothing.
+func (r *Responder) ProcessSigma3Established(sigma3Bytes []byte) (*Established, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.state == responderStateFinished {
 		// Already verified this exchange — re-ack via cached state, for
 		// the retransmission of the finishing Sigma3 only.
 		if r.sigma3Digest == nil || *r.sigma3Digest != sha256.Sum256(sigma3Bytes) {
-			return fmt.Errorf("%w: a Sigma3 other than the one that finished the handshake", ErrSessionState)
+			return nil, fmt.Errorf("%w: a Sigma3 other than the one that finished the handshake", ErrSessionState)
 		}
-		return nil
+		return nil, nil
 	}
 	if r.state != responderStateSigma2Sent {
-		return fmt.Errorf("%w: ProcessSigma1 must run first", ErrSessionState)
+		return nil, fmt.Errorf("%w: ProcessSigma1 must run first", ErrSessionState)
 	}
 	if err := r.verifySigma3Locked(sigma3Bytes); err != nil {
 		// A Sigma3 that does not authenticate ends the handshake.
@@ -1171,12 +1256,12 @@ func (r *Responder) ProcessSigma3(sigma3Bytes []byte) error {
 		r.dropSharedLocked()
 		r.keys = SessionKeys{}
 		r.state = responderStateFailed
-		return err
+		return nil, err
 	}
 	digest := sha256.Sum256(sigma3Bytes)
 	r.sigma3Digest = &digest
 	r.state = responderStateFinished
-	return nil
+	return r.establishedLocked(), nil
 }
 
 // verifySigma3Locked runs the Sigma3 crypto and, once the transcript

@@ -615,6 +615,8 @@ type CaseAdapter struct {
 	mu            sync.RWMutex
 	responder     *sigma.Responder
 	onEstablished CaseSessionEstablished
+	// onSession: see [CaseAdapter.SetOnEstablished].
+	onSession CaseEstablished
 	// established tracks whether onEstablished has fired for the
 	// current responder. Apple Home's MRP layer retransmits Sigma3
 	// when our Sigma3-Success StatusReport ACK is in-flight; the
@@ -859,7 +861,26 @@ func (a *CaseAdapter) handshakeFailed() {
 // stamps it into outbound Header.SessionID so the peer resolves the
 // session in its own table. Implementations typically hand both to
 // [operational.Manager.OpenFromSigmaWithStake].
+//
+// Both arguments are taken from the [sigma.Established] value of the step
+// that established the session.
+//
+// Deprecated: use [CaseEstablished] with [CaseAdapter.SetOnEstablished],
+// which hands over the whole session the step established. Everything
+// else a session needs — the peer's node id and CATs, the fabric — is
+// only reachable here by reading the responder back
+// ([CaseAdapter.SnapshotResponder]), and another Sigma1 may have renewed
+// it by then (review II, R5-sec-5101). Removable in v0.28.0.
 type CaseSessionEstablished func(keys sigma.SessionKeys, peerSessionID uint16) error
+
+// CaseEstablished fires once for every session a handshake of the adapter
+// establishes — by Sigma3, or by resumption — with that session as the
+// step that established it built it under the responder's lock
+// ([sigma.Established]). A host installs the session from this value
+// alone: the responder's accessors, read afterwards, may already describe
+// another Sigma1's handshake (review II, R5-sec-5101). An error means no
+// session was installed; the handshake then ends without one.
+type CaseEstablished func(est sigma.Established) error
 
 // NewCaseAdapter wraps r.
 //
@@ -956,9 +977,17 @@ func (a *CaseAdapter) snapshotResponder() *sigma.Responder {
 }
 
 // SnapshotResponder is the public read-only accessor for the wrapped
-// responder. Callers use it from inside the OnSessionEstablished
-// callback to lift state (peer node id, peer session id, …) the
-// callback signature does not expose directly.
+// responder.
+//
+// Its accessors describe the responder as it stands when they are read,
+// not the handshake a session-established callback runs for: a Sigma1
+// that arrives meanwhile — a resume is accepted on a responder that
+// finished its handshake — replaces the peer's node id, CATs, session ids
+// and keys, so a session built from them can carry one handshake's keys
+// under another's identity (review II, R5-sec-5101).
+//
+// Deprecated: install a session from the [sigma.Established] value
+// [CaseAdapter.SetOnEstablished]'s callback receives. Removable in v0.28.0.
 func (a *CaseAdapter) SnapshotResponder() *sigma.Responder { return a.snapshotResponder() }
 
 // PeerSessionParams returns the initiator's SessionParameters from the
@@ -990,11 +1019,41 @@ func (a *CaseAdapter) establishedSession() (uint16, bool) {
 // SetOnSessionEstablished installs a callback that fires after a
 // successful Sigma3 verification. Pass nil to clear. It may be called
 // while a handshake runs; the handshake reads the callback once, under the
-// adapter's lock (review II, R2-C2-conc-0402).
+// adapter's lock (review II, R2-C2-conc-0402). A callback
+// [CaseAdapter.SetOnEstablished] installed takes precedence.
+//
+// Deprecated: use [CaseAdapter.SetOnEstablished] (see
+// [CaseSessionEstablished]). Removable in v0.28.0.
 func (a *CaseAdapter) SetOnSessionEstablished(cb CaseSessionEstablished) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.onEstablished = cb
+}
+
+// SetOnEstablished installs the callback that installs every session a
+// handshake of the adapter establishes ([CaseEstablished]). Pass nil to
+// clear. It takes precedence over a callback
+// [CaseAdapter.SetOnSessionEstablished] installed. It may be called while
+// a handshake runs; the handshake reads the callback once, under the
+// adapter's lock.
+func (a *CaseAdapter) SetOnEstablished(cb CaseEstablished) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onSession = cb
+}
+
+// establishedCallbackLocked is the callback a step that established a
+// session runs: the [CaseEstablished] one, else the deprecated
+// [CaseSessionEstablished] one fed from the value; nil for none. Caller
+// holds a.mu.
+func (a *CaseAdapter) establishedCallbackLocked() func(sigma.Established) error {
+	if a.onSession != nil {
+		return a.onSession
+	}
+	if old := a.onEstablished; old != nil {
+		return func(est sigma.Established) error { return old(est.Keys, est.PeerSessionID) }
+	}
+	return nil
 }
 
 // ProcessSigma1 hands the wire payload to [sigma.Responder.ProcessSigma1WithResume].
@@ -1087,7 +1146,7 @@ func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload [
 		a.established = true
 		a.establishedSessionID = sessionID
 		a.stepPeer = taken.peer
-		onEstablished := a.onEstablished
+		onEstablished := a.establishedCallbackLocked()
 		a.mu.Unlock()
 		if !install || onEstablished == nil {
 			// No session is installed for this resume, so nobody replaces
@@ -1096,14 +1155,18 @@ func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload [
 			result.Claim.Release()
 		}
 		if install && onEstablished != nil {
-			// The callback's second argument is the PEER's session id
+			// The session is the one this resume established, as the
+			// responder built it in the step that accepted it
+			// (result.Established), never read back off the responder,
+			// which a Sigma1 landing meanwhile renews (R5-sec-5101,
+			// R5-sec-5102). Its PeerSessionID is the PEER's session id
 			// (Sigma1.initiatorSessionID) — the id the initiator expects
 			// stamped into Header.SessionID of every outbound packet.
 			// matter.js CaseServer.ts:182 at b25ed960 `peerSessionId: cx.peerSessionId`.
 			// Passing our own ResponderSessionID here registered the
 			// resumed session under a peer id the initiator never
 			// allocated, so it dropped every reply.
-			if err := onEstablished(result.ResumeKeys, r.PeerSessionID()); err != nil {
+			if err := onEstablished(*result.Established); err != nil {
 				// No session was installed — the host's stake was lost
 				// (operational.ErrStakeLost) or its table refused it: the
 				// resume began nothing. The adapter's state goes back to
@@ -1267,7 +1330,8 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		a.mu.Unlock()
 		return 0, nil, sigma3OfCompleted, taken, nil
 	}
-	if err := r.ProcessSigma3(payload); err != nil {
+	est, err := r.ProcessSigma3Established(payload)
+	if err != nil {
 		a.mu.Unlock()
 		// Emit StatusReport(FAILURE, InvalidParameter) so the commissioner
 		// terminates the CASE exchange immediately instead of retransmitting
@@ -1282,22 +1346,32 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	// double-registers the same session-id in opMgr and confuses Apple's
 	// session table.
 	a.established = true
-	sessionID := r.SessionID()
+	var sessionID uint16
+	if est != nil {
+		sessionID = est.SessionID
+	}
 	a.establishedSessionID = sessionID
-	onEstablished := a.onEstablished
+	onEstablished := a.establishedCallbackLocked()
 	a.mu.Unlock()
 	// A host that installs establishing (node) installs the session
 	// establishing here, before the Success is sent; it is established at
 	// the Success's first transmission ([Bridge.handleCase],
 	// [CaseAdapter.completeEstablishment]). Mirrors matter.js
 	// packages/protocol/src/session/case/CaseServer.ts:314-331 at b25ed960.
+	//
+	// The session is the value this Sigma3's step built under the
+	// responder's lock, never read back off the responder once a.mu is
+	// released: a resume Sigma1 accepted on the same responder in between
+	// replaces its keys and identity (R5-sec-5101). The responder's
+	// acceptance of the finishing Sigma3's retransmission builds none — a
+	// handshake whose session was not installed ([sigma3PickupFailed])
+	// installs nothing on it.
 	if onEstablished != nil {
-		keys, ok := r.SessionKeys()
-		if !ok {
+		if est == nil {
 			a.sigma3PickupFailed()
 			return 0, nil, sigma3Failed, taken, errors.New("bridge: CASE keys missing after Sigma3 success")
 		}
-		if err := onEstablished(keys, r.PeerSessionID()); err != nil {
+		if err := onEstablished(*est); err != nil {
 			a.sigma3PickupFailed()
 			return 0, nil, sigma3Failed, taken, fmt.Errorf("bridge: CASE session pickup: %w", err)
 		}
