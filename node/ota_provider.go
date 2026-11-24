@@ -297,8 +297,10 @@ func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, ep
 	// AccessControlEntryChanged is emitted, because matter.js's
 	// setStateOf(AccessControlServer) runs without a remote actor and
 	// #handleAccessControlListChange returns before its events
-	// (AccessControlServer.ts:284-302 at b25ed960).
-	n.root.AccessControl.NotifyLocalEntryInstalled()
+	// (AccessControlServer.ts:284-302 at b25ed960). Called after
+	// addLocalOperateEntry released the write lock, as
+	// NotifyLocalEntryInstalledOn requires (review II, R5-par-5003).
+	n.root.AccessControl.NotifyLocalEntryInstalledOn(ctx, fabricIndex)
 	n.logger.Info("ota.provider.acl_added", slog.Int("fabric_index", int(fabricIndex)), slog.Int("endpoint", int(epID)),
 		slog.String("hint", "anyone in the fabric may access the OTA Software Update Provider cluster"))
 }
