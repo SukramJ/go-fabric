@@ -10,10 +10,60 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Security
+
+- `bridge`: the CASE adapter clears its copy of the shared secret of every session value it drops — a resume that installs no session (a replayed resume included), a resume or Sigma3 whose `SetOnEstablished` callback refuses it, a Sigma3 with no callback, and a Sigma3 handed to the deprecated `CaseSessionEstablished` callback, which receives only the keys and the peer session id; a value a host's `SetOnEstablished` callback installs stays the host's (review II, C5-h1-n3, decision 658; #602).
+
+### Added
+
+- `cluster/core`: `AccessControlConfig` and `NewAccessControlWith(ctx, cfg)`, the AccessControl server's store and capacity limits at construction, in the form of `NewThreadNetworkCommissioning`; a limit outside its range (EntriesPerFabric and SubjectsPerEntry 4..65534, TargetsPerEntry 3..65534) is refused with an error naming the field. `node` constructs its server through it (review II, R4-api-4157, decision 669; #595).
+- `cluster/core`: `(*AccessControl).NotifyLocalEntryInstalledOn(ctx, fabricIndex)` — a local entry written under `WithACLWriteLock` marks its fabric from the store's rows, so the fabric's removal reports the Acl that shrank; `node`'s OTA provider and WebRTC requestor call it (review II, R5-par-5003; #595).
+- `cluster/core`: `ThreadNetworkCommissioningConfig.Logger`, the logger of the Thread NetworkCommissioning server's lines, as the Wi-Fi server's; nil is `slog.Default()` (review II, R3-sup-3002; #595).
+- `cluster/camera`: `ProviderConfig.Logger` receives Debug lines around each signal to the requestor (Offer, Answer, IceCandidates, End: reaching it and invoking the command, with the session, fabric, node, duration and error); nil is `slog.Default()`. The device kit passes the device's `Options.Logger` (#596, decision 676).
+- `cluster/camera`: `(*Provider).EndLostPeer`, `PeerGone` that also returns how many of the pair's sessions it ended; the node calls it (review II, R5-doc-5304; #601).
+- `node`: `Sealer`, an alias of `store.Sealer`, the type of `Store.Sealer` and of `Reseal`'s keys (review II, R4-api-4706, decision 657; #601).
+
 ### Changed
 
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.26.0` (was `v0.25.0`) and are tagged `ble/bluez/v0.26.0`, `ble/esphome/v0.26.0` and `wifi/wpasupplicant/v0.26.0` at this commit; `examples/ble-wifi-light` requires the three at `v0.26.0`. The root `go.mod` and `go.sum` did not change between `v0.25.0` and `v0.26.0`.
 - CI (`chiptool.yml`): the certification-family groups are cut by measured duration — `commissioning-cadmin` (CADMIN) out of `commissioning`, `app-lights-cc` (CC) out of `app-lights`, `app-appliances` in two — so no group outlasts the longest single case (TC-SU-2.2, about 19 min): by the case durations of the nightly run 45186566898, no group takes more than about 24 min, where `app-lights` took 42 and `commissioning` 40. Both commissioning groups run on every pull request that changes code. A release pull request that changes documentation only no longer runs `long` (TC-DGGEN-2.1's 3 h 10 min of waits) itself: the new job `certification families (long) on the base commit` requires a passed `long` from a nightly or dispatched run on the pull request's base commit, and the gate is red without one.
+- `cluster/core`: a failed Thread attach in ThreadNetworkCommissioning's ConnectNetwork reports ErrorValue and LastConnectErrorValue 0, the interface status connectedhomeip reports, instead of -1 (decision 673; #595).
+- `cluster/camera`: `Provider.End` removes the session from CurrentSessions before it sends the requestor's End, so the removal no longer waits for the requestor's response, and also when the requestor cannot be reached; the send's error is still returned (`BD-chip-Camera-EndRemovesSessionWhenUnreachable`; decisions 654, 663; #596).
+- `device`: a declaration's kit settings (`webrtctransportproviderdef.Declare`'s `MaxSessions`, `MaxSessionsPerFabric`) beside a `HostServer` are refused with `ErrConfiguration`, and without their `ProviderPort` they are refused at build — a negative bound as `camera.ErrNegativeMaxSessions`, a positive one as a kit setting without its port; before, they were accepted and ignored (review II, R5-err-5302; #600).
+- `node`: `OpenOwnWindow` refuses a negative timeout and opens nothing; before, the bridge read it as the default (review II, R4-api-4752; #601).
+- `node`: an endpoint whose tree holds a part whose key is nil or renders empty is refused at `Add` and `Replace` with `ErrNoStableKey`; before, one such part was admitted and failed `Start` or the next reassembly, and two were refused as `ErrDuplicateKey` with an empty key (review II, R5-err-5203; #601).
+- `node`: `Config.TLS` is a configuration error at `Validate` and `New` when the surface policies' level does not have TlsCertificateManagement and TlsClientManagement (below 1.5.1) or the policies remove them; before, the node served both at a level that does not know them (review II, R4-doc-4754, decisions 656, 680; #601).
+- `node`: the `matter.camera.peer_gone` Info line is logged only when a WebRTC session ended, and names how many (review II, R5-doc-5304; #601).
+- `controller/ble/bletest`: a C2 subscribe before the handshake request starts no session, and the request written after it is not answered, as matter.js's BLE server throws on it (review II, R2-C2-test-2050; #608).
+- `ble/esphome` (nested module): a second `Connect` for an address the proxy holds a connection for, open or connecting, is refused; it no longer ends the open one. The reservation is per proxy (review II, R4-conc-4352, decision 659; #611).
+
+### Deprecated
+
+- `thingfabric.dev/go-fabric/cluster/core.NewAccessControl` and `thingfabric.dev/go-fabric/cluster/core.AccessControl.SetLimits`: use `NewAccessControlWith` with `AccessControlConfig{Store, Limits}`, which refuses a limit outside its range at construction; both keep their behaviour (`SetLimits` assigns any value). Removable in `v0.29.0` (review II, R4-api-4157, decision 669; #595). No use in openccu-loom (81e4a5df), go-ha2fabric (ad41fb8), go-fabric-ui (0fb2ee0) or go-fabric-server (d61a545).
+- `thingfabric.dev/go-fabric/cluster/core.ARLClusterID`: 0x002B is LocalizationConfiguration; ARL is not a cluster but AccessControl's MNGD feature (`cluster/spec/accesscontrol.ClusterID`, 0x001F). The constant keeps its value. Removable in `v0.29.0` (review II, R3-doc-3054; #595). No use in openccu-loom (81e4a5df), go-ha2fabric (ad41fb8), go-fabric-ui (0fb2ee0) or go-fabric-server (d61a545).
+- `thingfabric.dev/go-fabric/cluster/camera.Provider.PeerGone`: use `Provider.EndLostPeer`, the same call, which also returns how many of the pair's sessions it ended; `PeerGone` keeps its behaviour. Removable in `v0.29.0` (review II, R5-doc-5304, decision 679; #601). No use in openccu-loom (81e4a5df), go-ha2fabric (ad41fb8), go-fabric-ui (0fb2ee0) or go-fabric-server (d61a545).
+
+### Fixed
+
+- `cluster/core`: OperationalCredentials — UpdateFabricLabel and SetVIDVerificationStatement check and write as one step, so two concurrent commands get one LabelConflict and no VID field is lost (R4-conc-4053, R3-conc-3056); an owed fabric event is acknowledged for the delivery that listed it only (R5-err-5201) (review II; #595).
+- `cluster/core`: AccessControl and GroupKeyManagement — the held marks of Acl, GroupTable and GroupKeyMap follow the store, so a fabric's removal reports what it took out (R5-conc-5004, R5-conc-5002, R5-par-5005); a new fabric's admin entry clears an Extension that failed to load at its index (R3-store-3001); a failed AccessControlAuxiliary read is synchronised again at the next read or change (R4-err-4055) (review II; #595).
+- `cluster/core`: ICDManagement `Start` no longer overwrites a registration made while it loaded (review II, R4-conc-4056; #595).
+- `cluster/core`: Thread and Wi-Fi NetworkCommissioning — AddOrUpdate…Network, RemoveNetwork and ConnectNetwork whose fail-safe expired after the gate answer FAILSAFE_REQUIRED and change nothing, so the next CommissioningComplete no longer stores a change of the expired window (review II, R3-fsm-3055 and its Wi-Fi sibling; #595).
+- `cluster/core`: DiagnosticLogs `MatterQuiesce` cancels a transfer that is still starting (review II, R4-conc-4155; #595).
+- `cluster/core`: BridgedDeviceBasicInformation — `SetReachable`'s last ReachableChanged event matches the attribute (review II, R4-conc-4156; #595).
+- `cluster/core`: ScenesManagement — `ForgetFabric` on a table not yet loaded removes the fabric's scenes and its FabricSceneInfo entry (review II, R4-store-4154; #595).
+- `cluster/core`: the OTA requestor stores a fabric's drop after any refused save (review II, R5-store-5007; #595).
+- `cluster/thermo`: an atomic Schedules commit clears an ActiveScheduleHandle the host set during the commit to a schedule the committed list drops, and reports it (ActiveScheduleChange), as `SetSchedules` does; before, the handle could name no schedule (review II, R4-fsm-4253; #597).
+- `cluster/lock`: a DoorLock start refused because its saved credentials do not decrypt no longer leaves a freshly generated credential key in the AuthStore; a generated key is stored only once the records passed, and a key the store refuses fails the start (review II, R4-store-4201; #598).
+- `endpoint`: an assembly that fails no longer adopts its `Spec.Instance` or writes a key's first state; the next assembly judges a new instance against the last one served (review II, R5-fsm-5108; #605).
+- `node`: a Batch Replace undone at commit keeps its replacement's parts reserved, so `Forget` of the key erases their numbers; an Add and a Replace of one key in one batch judge only the Replace; a Forget whose reservation read fails erases nothing for that key (review II, R5-store-5205, R5-api-5206, R3-store-3703; #601).
+- `bridge`: a reassembly whose context carries a request — a host replacing a device from a command handler — no longer narrows the announce of new endpoints and instances to that request's view for every subscriber (review II, R5-par-5106, decision 677; #602).
+- `bridge`: a quieter attribute of a new instance behind a kept key starts a fresh report throttle, and a change the old instance held back is dropped, as matter.js does (review II, R5-par-5109; #602).
+- `client/discovery`: a resolution keeps the host discovery of an SRV target whose spelling differs only in case from the cached name; a status resolution stopped and needed again before its cleanup ran restarts (review II, R4-fsm-4551, R4-conc-4552; #603).
+- `client/peer`: `Peer.Descriptor` returns a deep copy of the discovery data; a liveness probe answered by more than four chunked reports fails and releases its network slot (review II, R2-C2-api-2157, R2-C2-bound-2159; #604).
+- `ble/esphome` (nested module): a discovered alias whose device left the set is dialled at once rather than at the next Rescan; a protobuf field number above 2^29−1 is malformed on every architecture (review II, R4-fsm-4305, R3-wire-3352; #611).
+- `wifi/wpasupplicant` (nested module): a failed join selects the network joined before also when the `CurrentNetwork` read failed (review II, R4-fsm-4354; #613).
+- `examples/reference-bridge` `--camera-sim`: a SolicitOffer session counts its streams, so a deallocate of one answers INVALID_IN_STATE until the session ends, as connectedhomeip's camera app; its Answer path logs each step at Debug (#596).
 
 ## [0.26.0] — 2026-11-24
 

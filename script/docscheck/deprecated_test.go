@@ -350,11 +350,7 @@ var deprecatedGroups = map[string]int{
 // list is held to the tree both ways — a new paragraph without a release
 // fails, and an entry whose paragraph now states one (or that is gone)
 // fails as stale.
-var releaseNotStated = map[string]bool{
-	"cluster/core.GeneralCommissioning.AutoArmOnPaseEstablished": true,
-	"groups.NoKeyError":                 true,
-	"im.EventLog.SetCounterPersistence": true,
-}
+var releaseNotStated = map[string]bool{}
 
 // checkDeprecatedTable holds the table to the tree's deprecated
 // identifiers, both directions, and returns one line per difference.
