@@ -84,7 +84,11 @@ type OperationalCredentials struct {
 	// facade's slots of the fabric-removed and fabric-updated hooks
 	// (internal/facadeseam), run before the host's.
 	facadeOnFabricRemoved, facadeOnFabricUpdated func(ctx context.Context, fabricIndex uint8)
-	onAdminEntryInstalled                        func(entry store.ACLEntry)
+	// facadeOwedFabricEvent is the node facade's delivery of an owed
+	// fabric event a run-time rollback landed (deliverOwedFabricEvent,
+	// internal/facadeseam).
+	facadeOwedFabricEvent func(ctx context.Context, hooks, ack func(context.Context))
+	onAdminEntryInstalled func(entry store.ACLEntry)
 
 	// pendingCSRSession is the session that issued the pending
 	// CSRRequest ([invokeSessionBinding]): set in handleCSRRequest,
@@ -970,8 +974,10 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 // (review II, R2-P2-fabric-07). nocMu is not held.
 func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, updated []store.FabricRecord) {
 	for i := range updated {
-		o.reportUpdateRolledBack(ctx, &updated[i])
-		o.ackOwedFabricEvents(ctx, store.FabricPendingUpdate, updated[i].FabricIndex)
+		u := &updated[i]
+		o.deliverOwedFabricEvent(ctx, store.FabricPendingUpdate, u.FabricIndex, func(ctx context.Context) {
+			o.reportUpdateRolledBack(ctx, u)
+		})
 	}
 	for i := range added {
 		f := &added[i]
@@ -991,10 +997,11 @@ func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, up
 		o.mu.RLock()
 		hook := chainFabricHooks(o.facadeOnFabricRemoved, o.onFabricRemoved)
 		o.mu.RUnlock()
-		if hook != nil {
-			hook(ctx, f.FabricIndex)
-		}
-		o.ackOwedFabricEvents(ctx, store.FabricPendingAdd, f.FabricIndex)
+		o.deliverOwedFabricEvent(ctx, store.FabricPendingAdd, f.FabricIndex, func(ctx context.Context) {
+			if hook != nil {
+				hook(ctx, f.FabricIndex)
+			}
+		})
 	}
 }
 

@@ -12,7 +12,9 @@
 // [node.Node.Bridge] adds to the facade's wiring instead of replacing it
 // (review II, R2-P5-apinode-07). It also hands the node the
 // AccessControl server's write lock for the entries the node adds to a
-// fabric's ACL itself ([WithACLWriteLock]).
+// fabric's ACL itself ([WithACLWriteLock]), and lets the node deliver the
+// owed fabric events OperationalCredentials' run-time rollback lands
+// ([SetOwedFabricEvent], a facade slot only).
 //
 // Direction of the edge: cluster/core and bridge install the setters from
 // their init; package node calls them. The seam is module-internal, so the
@@ -35,6 +37,16 @@ var (
 	// SetOnFabricUpdated sets the facade's slot of a
 	// *core.OperationalCredentials' fabric-updated hook.
 	SetOnFabricUpdated func(server any, fn func(ctx context.Context, fabricIndex uint8)) bool
+	// SetOwedFabricEvent sets the facade's slot through which a
+	// *core.OperationalCredentials delivers an owed fabric event at run
+	// time — the rollback a fail-safe's end lands: fn runs hooks (the
+	// event's fabric hooks) and then ack, the event's acknowledgement in
+	// the store, once whatever hooks handed on has run. Without the slot
+	// the server runs hooks, then ack. The node's fn queues ack behind the
+	// ObserveAsync hooks hooks queued, as it does for the events it
+	// delivers at start (review II, R4-err-4751b, decisions 600, 615, 616,
+	// 622).
+	SetOwedFabricEvent func(server any, fn func(ctx context.Context, hooks, ack func(context.Context))) bool
 	// SetTransitionHook sets the facade's slot of a
 	// *bridge.CommissioningWindow's transition hook.
 	SetTransitionHook func(window any, fn func()) bool

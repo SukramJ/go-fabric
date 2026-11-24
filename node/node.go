@@ -115,12 +115,17 @@ type Node struct {
 	// fabric event whose hooks queued one is acknowledged behind them
 	// (deliverOwedFabricEvents).
 	queuedCalls atomic.Uint64
-	// owedHooks is set while deliverOwedFabricEvents runs an owed event's
-	// fabric hooks: an ObserveAsync OnFabricRemoved or OnFabricUpdated
+	// owedHooks is set while an owed fabric event's fabric hooks run
+	// (owedHookCalls) — at start in deliverOwedFabricEvents, at run time in
+	// owedFabricEvent: an ObserveAsync OnFabricRemoved or OnFabricUpdated
 	// queued then is exempt from the callback queue's drop rule (queued;
-	// decision 615).
-	owedHooks  atomic.Bool
-	advertiser mdns.Advertiser
+	// decisions 615, 622). owedRunning counts those fan-outs under
+	// owedMu, so one that ends does not clear the mark of another that
+	// still runs.
+	owedHooks   atomic.Bool
+	owedMu      sync.Mutex
+	owedRunning int
+	advertiser  mdns.Advertiser
 	// ownsAdvertiser is set when New built the advertiser (a nil
 	// Config.Advertiser), so a failed New closes it.
 	ownsAdvertiser bool
@@ -482,6 +487,9 @@ func New(ctx context.Context, cfg Config) (*Node, error) { //nolint:funlen // th
 	// (dropFabricState); the bridge's own drop stands aside.
 	facadeSlot(facadeseam.OwnFabricState(n.br), "bridge fabric state")
 	facadeSlot(facadeseam.SetOnFabricUpdated(n.root.OperationalCredentials, n.observedFabricUpdated), "OperationalCredentials fabric updated")
+	// A run-time rollback's owed event is acknowledged behind the
+	// ObserveAsync hooks it queued, as one delivered at start.
+	facadeSlot(facadeseam.SetOwedFabricEvent(n.root.OperationalCredentials, n.owedFabricEvent), "OperationalCredentials owed fabric event")
 	n.root.OperationalCredentials.SetOnFabricChanged(n.observedFabricChanged)
 
 	n.wireEventsUTC()
@@ -1184,23 +1192,11 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 		default:
 			n.logger.Warn("fabric.owed_event.unknown_kind", slog.Int("fabric_index", int(idx)), slog.String("kind", ev.Kind.String()))
 		}
-		ack := func(ctx context.Context) {
+		n.ackBehindQueued(ctx, queued, func(ctx context.Context) {
 			if err := n.st.AckOwedFabricEvent(ctx, ev.ID); err != nil {
 				n.logger.Warn("fabric.owed_event.ack_failed", slog.Int("fabric_index", int(idx)), slog.Any("err", err))
 			}
-		}
-		if n.queuedCalls.Load() == queued {
-			ack(ctx)
-			continue
-		}
-		// An ObserveAsync hook only queued its call: the event is
-		// acknowledged behind it on the same queue, once it ran (decision
-		// 600, review II R4-err-4751). The hook's call and the
-		// acknowledgement are exempt from the queue's drop rule (decision
-		// 615): a full queue drops other callbacks, never these, so the
-		// hook runs in this process and the acknowledgement after it.
-		ackCtx := context.WithoutCancel(ctx)
-		n.queuedExempt("owed_fabric_event_ack", func() { ack(ackCtx) })
+		})
 	}
 	recs := n.root.OperationalCredentials.RolledBackFabrics()
 	for i := range recs {
@@ -1212,12 +1208,54 @@ func (n *Node) deliverOwedFabricEvents(ctx context.Context) {
 	}
 }
 
+// ackBehindQueued runs ack, an owed fabric event's acknowledgement, once
+// the event's hooks ran: at once when they queued nothing since queued
+// (queuedCalls), else behind them on the callback queue. An ObserveAsync
+// hook only queued its call, so the event is acknowledged behind it on
+// the same queue, once it ran (decision 600, review II R4-err-4751). The
+// hook's call and the acknowledgement are exempt from the queue's drop
+// rule (decision 615): a full queue drops other callbacks, never these,
+// so the hook runs in this process and the acknowledgement after it. A
+// queue that no longer runs takes neither: the event stays owed for the
+// next start.
+func (n *Node) ackBehindQueued(ctx context.Context, queued uint64, ack func(context.Context)) {
+	if n.queuedCalls.Load() == queued {
+		ack(ctx)
+		return
+	}
+	ackCtx := context.WithoutCancel(ctx)
+	n.queuedExempt("owed_fabric_event_ack", func() { ack(ackCtx) })
+}
+
+// owedFabricEvent is the facade's delivery of an owed fabric event that
+// OperationalCredentials' run-time rollback landed
+// (internal/facadeseam.SetOwedFabricEvent): hooks, the rollback's fabric
+// hooks, run with the ObserveAsync hooks they queue exempt from the drop
+// rule, and ack runs once those ran (ackBehindQueued) — the rule
+// deliverOwedFabricEvents applies at start (review II, R4-err-4751b,
+// decisions 616, 622). A call another goroutine queues meanwhile only
+// moves the acknowledgement behind it; a fabric hook it queues meanwhile
+// is exempt too, bounded by the fabrics removed or updated in that time.
+func (n *Node) owedFabricEvent(ctx context.Context, hooks, ack func(context.Context)) {
+	queued := n.queuedCalls.Load()
+	n.owedHookCalls(func() { hooks(ctx) })
+	n.ackBehindQueued(ctx, queued, ack)
+}
+
 // owedHookCalls runs fn, an owed fabric event's hook fan-out, with the
 // ObserveAsync fabric hooks it queues exempt from the callback queue's
-// drop rule (owedHooks, queued; decision 615). The lifecycle slot is held.
+// drop rule (owedHooks, queued; decision 615).
 func (n *Node) owedHookCalls(fn func()) {
+	n.owedMu.Lock()
+	n.owedRunning++
 	n.owedHooks.Store(true)
-	defer n.owedHooks.Store(false)
+	n.owedMu.Unlock()
+	defer func() {
+		n.owedMu.Lock()
+		n.owedRunning--
+		n.owedHooks.Store(n.owedRunning > 0)
+		n.owedMu.Unlock()
+	}()
 	fn()
 }
 

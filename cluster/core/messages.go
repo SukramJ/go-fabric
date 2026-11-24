@@ -6,8 +6,10 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 
@@ -32,7 +34,12 @@ type MessagePresenter interface {
 	PresentMessage(ctx context.Context, msg messagesdef.MessageStruct) error
 	// CancelMessage takes a queued or presented message down: at a
 	// CancelMessagesRequest, and for every queued message of a fabric
-	// when the fabric is removed ([Messages.RemoveFabric]).
+	// after the fabric was removed ([Messages.RemoveFabric]). The
+	// removal's calls run after the removal, one after the other on a
+	// goroutine of the server's, so the fabric's teardown and the
+	// command's answer do not wait for them; until a call returned, no
+	// other fabric can present a message with that id. A refusal there
+	// is logged.
 	CancelMessage(ctx context.Context, messageID []byte) error
 }
 
@@ -123,6 +130,19 @@ type Messages struct {
 	// pending holds what a change under mu reports once mu is released.
 	pendingAttrs  []uint32
 	pendingEvents []messagesEvent
+	// takeDowns are the removals whose cancels wait for the presenter,
+	// in removal order; takingDown is set while takeDownRemoved runs
+	// them (removeFabric, R4-fsm-4103, decision 624).
+	takeDowns  []messagesTakeDown
+	takingDown bool
+}
+
+// messagesTakeDown is one removal's take-down at the presenter: the
+// flights that hold its ids until each cancel returned.
+type messagesTakeDown struct {
+	ctx     context.Context
+	fabric  uint8
+	flights []*messagesInFlight
 }
 
 // messagesInFlight is one present or cancel at the presenter; removed
@@ -706,19 +726,22 @@ func (m *Messages) Complete(id []byte, outcome MessageOutcome) bool {
 // read it is gone.
 //
 // The presenter takes each dropped message down ([MessagePresenter]
-// CancelMessage, once per message, after the lock is released), so the
-// display and the queue agree as they do for a removed fabric's present
-// still at the presenter. Until a cancel returned its id stays held:
-// another fabric's present of it is refused meanwhile, so the cancel never
-// takes that fabric's display down (review II, R4-fsm-4103, decision 598).
+// CancelMessage, once per message), so the display and the queue agree as
+// they do for a removed fabric's present still at the presenter. The
+// cancels run after the drop, off the removal path: RemoveFabric returns
+// once the queue dropped the messages, and a goroutine of the server's
+// runs the removals' cancels one after the other, so a presenter that
+// blocks stalls neither the fabric's teardown nor the command's answer
+// (decision 624). Until a cancel returned its id stays held: another
+// fabric's present of it is refused meanwhile, so the cancel never takes
+// that fabric's display down (review II, R4-fsm-4103, decision 598).
 func (m *Messages) RemoveFabric(fabricIndex uint8) {
-	_ = m.removeFabric(context.Background(), fabricIndex)
+	m.removeFabric(context.Background(), fabricIndex)
 }
 
-// removeFabric is RemoveFabric with ctx for the presenter; it answers the
-// presenter's refusals of the cancels, joined. The queue's drop stands
-// either way.
-func (m *Messages) removeFabric(ctx context.Context, fabricIndex uint8) error {
+// removeFabric is RemoveFabric with ctx, without its cancellation, for
+// the presenter's cancels (takeDownRemoved).
+func (m *Messages) removeFabric(ctx context.Context, fabricIndex uint8) {
 	m.mu.Lock()
 	for _, f := range m.inFlight {
 		if f.fabric == fabricIndex {
@@ -736,40 +759,76 @@ func (m *Messages) removeFabric(ctx context.Context, fabricIndex uint8) error {
 	})
 	if len(m.messages) == before {
 		m.unlock()
-		return nil
+		return
 	}
 	m.active = slices.DeleteFunc(m.active, func(id []byte) bool {
 		return slices.ContainsFunc(gone, func(g []byte) bool { return bytes.Equal(g, id) })
 	})
 	m.changedLocked(messagesdef.AttrMessages, messagesdef.AttrActiveMessageIds)
-	flights := make([]*messagesInFlight, len(gone))
-	done := make(chan struct{})
+	td := messagesTakeDown{ctx: context.WithoutCancel(ctx), fabric: fabricIndex, flights: make([]*messagesInFlight, len(gone))}
 	for i, id := range gone {
-		flights[i] = m.beginFlightLocked(id, fabricIndex)
-		flights[i].takingDown = done
+		td.flights[i] = m.beginFlightLocked(id, fabricIndex)
+		td.flights[i].takingDown = make(chan struct{})
 	}
+	m.takeDowns = append(m.takeDowns, td)
+	start := !m.takingDown
+	m.takingDown = true
 	m.unlock()
-	var errs []error
-	for _, id := range gone {
-		if err := m.presenter.CancelMessage(ctx, slices.Clone(id)); err != nil {
-			errs = append(errs, fmt.Errorf("core: Messages: take down message %x of removed fabric %d: %w", id, fabricIndex, err))
+	if start {
+		go m.takeDownRemoved()
+	}
+}
+
+// takeDownRemoved runs the queued removals' cancels at the presenter, one
+// after the other, and ends each id's flight once its cancel returned; it
+// returns when no removal waits. A refusal or a panic of the presenter is
+// logged and ends the flight all the same: the queue's drop stands and
+// nothing is held for a retry.
+func (m *Messages) takeDownRemoved() {
+	for {
+		m.mu.Lock()
+		if len(m.takeDowns) == 0 {
+			m.takingDown = false
+			m.mu.Unlock()
+			return
+		}
+		td := m.takeDowns[0]
+		m.takeDowns = slices.Delete(m.takeDowns, 0, 1)
+		m.mu.Unlock()
+		for _, f := range td.flights {
+			if err := m.cancelRemoved(td.ctx, f.id); err != nil {
+				m.logger().Warn("matter.messages.take_down_refused",
+					slog.Int("fabric_index", int(td.fabric)), slog.String("message_id", hex.EncodeToString(f.id)), slog.Any("err", err))
+			}
+			m.mu.Lock()
+			m.endFlightLocked(f)
+			close(f.takingDown)
+			m.mu.Unlock()
 		}
 	}
-	m.mu.Lock()
-	for _, f := range flights {
-		m.endFlightLocked(f)
-	}
-	close(done)
-	m.mu.Unlock()
-	return errors.Join(errs...)
+}
+
+// logger is the server's logger: slog.Default(), as Messages takes none
+// from its config.
+func (m *Messages) logger() *slog.Logger { return slog.Default() }
+
+// cancelRemoved is the presenter's CancelMessage of a removed fabric's
+// message, a panic answered as an error.
+func (m *Messages) cancelRemoved(ctx context.Context, id []byte) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("presenter panicked: %v", r)
+		}
+	}()
+	return m.presenter.CancelMessage(ctx, slices.Clone(id))
 }
 
 // MatterDropFabric implements [contract.FabricScopedState]
-// ([Messages.RemoveFabric]): the queue is memory only. An error is the
-// presenter's refusal to take a dropped message down; the queue's drop
-// stands, and nothing is held for a later drop to retry.
+// ([Messages.RemoveFabric]): the queue is memory only, so the drop always
+// lands and answers nil. The presenter's take-down runs after it.
 func (m *Messages) MatterDropFabric(ctx context.Context, fabricIndex uint8) error {
-	return m.removeFabric(ctx, fabricIndex)
+	m.removeFabric(ctx, fabricIndex)
+	return nil
 }
 
 // MatterHeldFabrics implements [contract.FabricScopedState]: the fabrics
