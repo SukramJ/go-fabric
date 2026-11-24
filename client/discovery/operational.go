@@ -175,15 +175,18 @@ func (s *Service) startResolution(found chan struct{}) func() {
 				return
 			}
 		}
-		targets := make(map[string]bool)
+		// Keyed by *Name: the cache folds case and keeps the first-seen
+		// spelling, so an SRV target's string need not equal nm.qname.
+		targets := make(map[*Name]bool)
 		for _, r := range s.name.records.values() {
 			if r.Type == TypeSRV {
-				targets[r.SRV.Target] = true
-				addHost(s.names.get(r.SRV.Target))
+				nm := s.names.get(r.SRV.Target)
+				targets[nm] = true
+				addHost(nm)
 			}
 		}
 		for _, nm := range hosts.snapshotKeys() {
-			if !targets[nm.qname] {
+			if !targets[nm] {
 				deleteHost(nm)
 			}
 		}
