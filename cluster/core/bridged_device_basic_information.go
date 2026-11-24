@@ -39,6 +39,10 @@ type BridgedDeviceBasicInformation struct {
 	configVersion uint32
 	// mu guards emitter, endpoint, nodeLabel and reachable.
 	mu sync.RWMutex
+	// reachMu orders SetReachable calls from the compare through the
+	// event: the last ReachableChanged emitted carries the value
+	// Reachable holds (review II, R4-conc-4156). Taken before mu.
+	reachMu sync.Mutex
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped after every successful state mutation (Reachable
@@ -599,7 +603,13 @@ func (b *BridgedDeviceBasicInformation) MatterAttributes() []uint32 {
 // the event, Apple Home's HAP-service mapper never learns about
 // availability flips and silently caches the boot-time value, so
 // ongoing device drop-outs never surface to the user.
+//
+// Concurrent calls are ordered from the compare through the event, so the
+// last event carries the value the attribute holds; the emitter must not
+// call SetReachable.
 func (b *BridgedDeviceBasicInformation) SetReachable(reachable bool) (changed bool) {
+	b.reachMu.Lock()
+	defer b.reachMu.Unlock()
 	b.mu.Lock()
 	changed = b.reachable != reachable
 	b.reachable = reachable
