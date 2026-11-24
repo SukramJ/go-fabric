@@ -36,7 +36,7 @@ func TestRefusedStartStoresNoCredentialKey(t *testing.T) {
 		t.Fatalf("SetCredential: %+v, %v", res, err)
 	}
 	// The key setting is lost, the records are kept.
-	if err := st.DeleteSetting(context.Background(), store.SettingDoorLockCredentialKey); err != nil {
+	if err := st.DeleteSettings(context.Background(), store.SettingDoorLockCredentialKey); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := newLock(); !errors.Is(err, lock.ErrConfig) {
