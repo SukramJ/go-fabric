@@ -325,9 +325,9 @@ func TestCameraSimWebRTCProvider(t *testing.T) {
 	}
 }
 
-// simEndOutOfResources is WebRTCEndReasonEnum OutOfResources
-// (parity/schema.json, WebRTCEndReasonEnum id 8).
-const simEndOutOfResources uint8 = 8
+// simEndOutOfResources is WebRTCEndReasonEnum OutOfResources, the
+// generated value (R5-test-5506).
+const simEndOutOfResources = uint8(wrdef.WebRTCEndReasonOutOfResources)
 
 // simEnds is a PeerConnector that records the End commands the provider
 // sends a requestor.

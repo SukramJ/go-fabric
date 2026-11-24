@@ -4,6 +4,9 @@
 package commissioner
 
 import (
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"errors"
 	"log/slog"
 	"reflect"
@@ -164,5 +167,46 @@ func TestStoredFabricLabelCutSaveFailureIsWarned(t *testing.T) {
 	if !strings.Contains(log, "level=WARN") || !strings.Contains(log, "matter.controller.fabric.stored_label_save_failed") ||
 		!strings.Contains(log, errSaveRefused.Error()) {
 		t.Errorf("the failed save was not warned with its error; log:\n%s", log)
+	}
+}
+
+// TestStoredFabricLabelCutSignerTakeoverSavesOnce: a record in key form —
+// its private key stored — with a label over the bound, loaded with an
+// OperationalSigner over the same key, is saved once: the signer path's own
+// save carries the cut label, and the cut label's save does not follow it
+// with the stored record, which would write the private key back
+// (R5-test-5402; the `!saved` guard of loadFabric's signer branch,
+// R4-par-4403, decision 597).
+func TestStoredFabricLabelCutSignerTakeoverSavesOnce(t *testing.T) {
+	t.Parallel()
+	stored, want := strings.Repeat("ü", 32), strings.Repeat("ü", 16)
+	c, st := countingStoreWithLabel(t, stored, nil)
+	before, _, _ := st.LoadFabric()
+	if before.KeyPair == nil || len(before.KeyPair.PrivateKey) == 0 {
+		t.Fatalf("the stored record holds no private key: %+v", before)
+	}
+	key, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), before.KeyPair.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := NewFabric(c, FabricConfig{Store: st, OperationalSigner: &opSigner{key: key}, Logger: slog.New(slog.DiscardHandler)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.CurrentLabel(); got != want {
+		t.Errorf("served label %q, want %q", got, want)
+	}
+	if n := st.count(); n != 1 {
+		t.Errorf("the load saved the record %d times, want once", n)
+	}
+	after, _, _ := st.LoadFabric()
+	if after.Label != want {
+		t.Errorf("the record holds label %q after the load, want the cut %q", after.Label, want)
+	}
+	if after.KeyRef != "kms:op" {
+		t.Errorf("the record holds KeyRef %q after the load, want the signer's %q", after.KeyRef, "kms:op")
+	}
+	if after.KeyPair == nil || len(after.KeyPair.PrivateKey) != 0 || !bytes.Equal(after.KeyPair.PublicKey, before.KeyPair.PublicKey) {
+		t.Error("the record after the load does not hold the stored public key alone: the private key was written back or the public key changed")
 	}
 }
