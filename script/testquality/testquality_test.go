@@ -102,6 +102,8 @@ var skipInRangeLeft = map[string]int{
 	// No connectedhomeip checkout: the environment, with its reason in a
 	// variable the scan does not read.
 	"internal/chipdm/levels_test.go:TestChipDataModelLevels": 1,
+	// No connectedhomeip checkout (noConnectedhomeip): the environment.
+	"internal/chiptool/chipcoverage_test.go:TestChipPythonCasesCovered": 1,
 	// TestTestparityRegisterCoversSnapshot reports the mismatch.
 	"script/testparity/register_test.go:TestTestparityPageIsCurrent": 1,
 }
