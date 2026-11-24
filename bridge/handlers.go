@@ -610,8 +610,8 @@ func (a *PaseAdapter) consumePake3(payload []byte) (cb PaseSessionEstablished, s
 // resumptionId + initiatorResumeMic triggers a one-round-trip resume
 // instead of Full Sigma.
 type CaseAdapter struct {
-	// mu guards established, establishedSessionID, lastSigma2 and
-	// responder.
+	// mu guards established, establishedSessionID, lastSigma2, stepPeer
+	// and responder.
 	mu            sync.RWMutex
 	responder     *sigma.Responder
 	onEstablished CaseSessionEstablished
@@ -643,8 +643,14 @@ type CaseAdapter struct {
 	// stepPeer is the initiator's SessionParameters as the Sigma1 that
 	// began the current handshake stated them (nil for none), set under mu
 	// in the same step that records the handshake, so a Sigma3 takes the
-	// ones of the handshake it completes ([CaseAdapter.processSigma3]) —
-	// never another Sigma1's that ran on the responder since (R4-sec-4401).
+	// ones of the handshake it completes ([CaseAdapter.processSigma3])
+	// (R4-sec-4401). The responder's step runs before, without mu: of two
+	// Sigma1s that race on one adapter the one recorded last wins, though
+	// the responder may have taken the other last, and a resume that rolls
+	// back restores the value it saw. A Sigma3 may then take the other
+	// Sigma1's parameters; what that moves is the pacing of one reply,
+	// clamped to the unauthenticated bounds ([handshakePeerTimingOf];
+	// R5-conc-5104).
 	stepPeer *sessionparams.Parameters
 	// onUnfinished and releasedStaked: see [CaseAdapter.SetOnUnfinished].
 	onUnfinished   func(sessionID uint16)
@@ -656,6 +662,9 @@ type CaseAdapter struct {
 	// adapter, is told that a Sigma1 began a handshake on it
 	// ([CaseAdapter.sigma1BeganHandshake]).
 	onBegun func()
+	// resumeDroppedForTest, when set, is handed the session value of a
+	// resume that installed nothing, as it is dropped.
+	resumeDroppedForTest func(*sigma.Established)
 	// onCompletion, set by the host that installs its sessions
 	// establishing (node, through internal/bridgeseam), is told when the
 	// handshake of a session onEstablished installed completed or failed
@@ -1146,8 +1155,15 @@ func (a *CaseAdapter) processSigma1(payload []byte) (opcode uint8, respPayload [
 		if !install || onEstablished == nil {
 			// No session is installed for this resume, so nobody replaces
 			// the record it presented: the claim goes back (review II,
-			// R2-P6-sec-3320, decision 243).
+			// R2-P6-sec-3320, decision 243). Nobody takes the step's session
+			// value either: its copy of the shared secret is cleared here,
+			// as an installed one is handed to the record
+			// (BD-chip-HandshakeSecretsOverwritten; decision 658, G641-1).
 			result.Claim.Release()
+			clear(result.Established.SharedSecret)
+			if hook := a.resumeDroppedForTest; hook != nil {
+				hook(result.Established)
+			}
 		}
 		if install && onEstablished != nil {
 			// The session is the one this resume established, as the
@@ -1340,7 +1356,7 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 	if est == nil {
 		a.mu.Unlock()
 		a.handshakeFailed()
-		return 0, nil, sigma3Failed, taken, errors.New("bridge: Sigma3 step established no session (retransmission of a Sigma3 whose session was not installed)")
+		return 0, nil, sigma3Failed, taken, errors.New("bridge: Sigma3 step established no session (the accepted retransmission of the finishing Sigma3)")
 	}
 	a.established = true
 	sessionID := est.SessionID
