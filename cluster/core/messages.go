@@ -830,7 +830,7 @@ func (m *Messages) logger() *slog.Logger {
 func (m *Messages) cancelRemoved(ctx context.Context, id []byte) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("presenter panicked: %v", r)
+			err = fmt.Errorf("core: Messages: presenter panicked: %v", r)
 		}
 	}()
 	return m.presenter.CancelMessage(ctx, slices.Clone(id))

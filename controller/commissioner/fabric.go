@@ -182,7 +182,7 @@ func saveCutLabel(store ca.FabricStore, rec ca.FabricRecord, label string, log *
 			log = slog.New(slog.DiscardHandler)
 		}
 		log.Warn("matter.controller.fabric.stored_label_save_failed",
-			slog.String("label", label), slog.String("error", err.Error()))
+			slog.String("label", label), slog.Any("err", err))
 	}
 }
 

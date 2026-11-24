@@ -98,7 +98,7 @@ var areaKeys = []string{
 	"key", "key_set", "keys", "kind", "label", "last_counter", "left",
 	"listen", "location", "lockout", "max", "max_attempts", "max_bytes",
 	"max_errors", "max_interval", "measurement_seen", "message",
-	"message_bytes", "min", "min_interval", "missing", "more", "name", "new",
+	"message_bytes", "message_id", "min", "min_interval", "missing", "more", "name", "new",
 	"next_check_in", "next_query", "noc_bytes", "noc_subject_fabric_id",
 	"noc_subject_node_id", "node", "notifier_ok", "offered", "offline",
 	"op", "opcode", "origin", "original_bytes", "ota", "outgoing", "panic", "parent",

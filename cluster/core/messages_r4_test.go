@@ -11,6 +11,7 @@ import (
 	"testing"
 	"testing/synctest"
 
+	"thingfabric.dev/go-fabric/cluster/spec"
 	messagesdef "thingfabric.dev/go-fabric/cluster/spec/messages"
 	"thingfabric.dev/go-fabric/im"
 )
@@ -248,8 +249,8 @@ func TestMessagesRemoveFabricDoesNotWaitForThePresenter(t *testing.T) {
 				if isQueued(m, flightID(1)) {
 					t.Error("the removed fabric's message is still queued after the drop returned")
 				}
-				if _, err := m.MatterInvoke(ctx2, messagesdef.CmdPresentMessagesRequest, flightReq(1)); err == nil {
-					t.Error("another fabric's present of the id answered SUCCESS while the removal's cancel ran")
+				if _, err := m.MatterInvoke(ctx2, messagesdef.CmdPresentMessagesRequest, flightReq(1)); spec.StatusOf(err) != im.StatusAlreadyExists {
+					t.Errorf("another fabric's present of the id while the removal's cancel ran = %v, want ALREADY_EXISTS (messages.go heldByAnotherLocked)", err)
 				}
 				close(p.release)
 				synctest.Wait()
