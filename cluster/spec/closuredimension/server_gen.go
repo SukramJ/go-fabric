@@ -275,7 +275,8 @@ func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struc
 // FAILURE without one (cluster/closure).
 type DimensionHandler interface {
 	// SetTarget takes Position after the LimitRange clamp and the
-	// Resolution rounding, Latch and Speed as sent.
+	// Resolution rounding (which may exceed 10000 when Resolution does
+	// not divide it), Latch and Speed as sent.
 	SetTarget(ctx context.Context, position *uint16, latch *bool, speed *ThreeLevelAutoEnum) error
 	// Step takes the request's fields as sent.
 	Step(ctx context.Context, direction StepDirectionEnum, numberOfSteps uint16, speed *ThreeLevelAutoEnum) error
