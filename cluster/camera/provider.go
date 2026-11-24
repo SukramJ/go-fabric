@@ -664,7 +664,7 @@ func (p *Provider) provideIceCandidates(ctx context.Context, fields any) (any, e
 // reason is UnknownReason, as a removed fabric's sessions end; the port's
 // error, if any, joins the FAILURE's message.
 func (p *Provider) abandonSession(ctx context.Context, id uint16, cause error) error {
-	if err := p.port.EndSession(ctx, id, endReasonUnknown); err != nil {
+	if err := p.port.EndSession(ctx, id, uint8(wpdef.WebRTCEndReasonUnknownReason)); err != nil {
 		return spec.Errorf(im.StatusFailure, "%v (ending the session at the port: %v)", cause, err)
 	}
 	return spec.Errorf(im.StatusFailure, "%v", cause)
