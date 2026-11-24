@@ -1550,10 +1550,18 @@ func aclAdminFromContext(ctx context.Context) (adminNode *uint64, adminPasscodeI
 //
 // A clear of the index's stored Extension that a removed fabric's drop
 // owes is retried first: the new fabric must not load it as its own at
-// the next start (review II, R2-C2-store-1004). A clear that fails again
-// stays owed and is logged.
+// the next start (review II, R2-C2-store-1004). A setting the store could
+// not read at construction (extLoadErr) is owed the same clear: a new
+// fabric at the index owns nothing stored there (review II,
+// R3-store-3001). A clear that fails again stays owed and is logged.
 func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 	a.writeMu.Lock()
+	a.mu.Lock()
+	if a.extLoadErr[entry.FabricIndex] != nil {
+		delete(a.extLoadErr, entry.FabricIndex)
+		a.oweClearLocked(entry.FabricIndex)
+	}
+	a.mu.Unlock()
 	err := a.settleOwedClear(context.Background(), entry.FabricIndex)
 	a.writeMu.Unlock()
 	if err != nil {
