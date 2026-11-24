@@ -255,7 +255,7 @@ type OfferArgs struct {
 // a further bound is the port's (RESOURCE_EXHAUSTED). The server
 // ends sessions on EndSession, on the host's RemoveSession, with
 // their fabric and, in a node, when the node proved the requestor
-// lost (Provider.PeerGone) — not when a CASE session closes; the
+// lost (Provider.EndLostPeer) — not when a CASE session closes; the
 // media plane's evidence stays the port's. The host counts the
 // streams a session uses (the
 // AvStream's reference counts). An error answers its status, FAILURE
@@ -339,8 +339,8 @@ type Declare struct {
 	MaxSessionsPerFabric int
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
-	// list. The hooks above go on it; Initial, Features and the ports are
-	// the kit's server's and are refused beside it.
+	// list. The hooks above go on it; Initial, Features, the ports and the
+	// kit settings are the kit's server's and are refused beside it.
 	HostServer contract.ClusterServer
 }
 

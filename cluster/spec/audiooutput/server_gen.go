@@ -221,8 +221,8 @@ type Declare struct {
 	Outputs Outputs
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
-	// list. The hooks above go on it; Initial, Features and the ports are
-	// the kit's server's and are refused beside it.
+	// list. The hooks above go on it; Initial, Features, the ports and the
+	// kit settings are the kit's server's and are refused beside it.
 	HostServer contract.ClusterServer
 }
 

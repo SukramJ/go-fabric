@@ -538,8 +538,8 @@ func (g *generator) declaration(w *writer, cmds []hullCommand) {
 	}
 	w.p("\t// HostServer is the host's own server for the cluster, mounted in")
 	w.p("\t// place of the kit's — also for a cluster the device type does not")
-	w.p("\t// list. The hooks above go on it; Initial, Features and the ports are")
-	w.p("\t// the kit's server's and are refused beside it.")
+	w.p("\t// list. The hooks above go on it; Initial, Features, the ports and the")
+	w.p("\t// kit settings are the kit's server's and are refused beside it.")
 	w.p("\tHostServer contract.ClusterServer")
 	w.p("}")
 	w.p("")

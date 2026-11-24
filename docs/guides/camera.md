@@ -414,14 +414,14 @@ The node adds one rule on the Matter plane: when an exchange it opened to
 the requestor goes unanswered — a signal of the camera's, say — and no
 session with the requestor is left in either of its stacks, it ends that
 requestor's sessions through the port's `EndSession` with UnknownReason
-(`Provider.PeerGone`), as for a removed fabric. That no session is left
+(`Provider.EndLostPeer`), as for a removed fabric. That no session is left
 is checked once the provider is free of other commands, so a session the
 requestor opens meanwhile keeps its streams; a loss that a session in the
 other stack cancelled is not remembered. A session closed by the idle
 reaper, a closed TCP connection or the controller's CloseSession ends
 nothing, and a requestor the camera sends nothing to — a silent
 subscriber included — is never detected this way. A host that runs
-`camera.Provider` outside a node can call `PeerGone` on its own
+`camera.Provider` outside a node can call `EndLostPeer` on its own
 evidence.
 
 **Push transports.** `AllocatePushTransport` checks, in chip's order: the

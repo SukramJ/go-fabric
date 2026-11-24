@@ -19,7 +19,7 @@ import (
 //
 // Mirrors matter.js packages/protocol/src/interaction/
 // InteractionServer.ts DataVersion tracking on per-cluster state. The
-// initial value is a uniformly random non-zero uint32 chosen at first
+// initial value is a uniformly random uint32, 0 included, chosen at first
 // access — matter.js samples observed in the field carry values like
 // 3408898508 / 3191265986 / 2061169561 (per-cluster initial randoms
 // from a `Crypto.getRandomUint32()` call). Apple Home's MTRDevice
