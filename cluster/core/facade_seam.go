@@ -79,17 +79,18 @@ func chainFabricHooks(facade, host func(context.Context, uint8)) func(context.Co
 }
 
 // deliverOwedFabricEvent runs hooks, the fan-out of a rollback that
-// landed, and then acknowledges the owed events of kind the store holds
-// for fabricIndex (ackOwedFabricEvents) — through the node facade's slot
-// when it is set (internal/facadeseam.SetOwedFabricEvent), which
-// acknowledges only once the ObserveAsync hooks hooks queued ran (review
-// II, R4-err-4751b, decisions 616, 622); directly otherwise. nocMu is not
-// held.
+// landed, and then acknowledges the owed events of kind the store held
+// for fabricIndex before hooks ran (owedFabricEventIDs, R5-err-5201) —
+// through the node facade's slot when it is set
+// (internal/facadeseam.SetOwedFabricEvent), which acknowledges only once
+// the ObserveAsync hooks hooks queued ran (review II, R4-err-4751b,
+// decisions 616, 622); directly otherwise. nocMu is not held.
 func (o *OperationalCredentials) deliverOwedFabricEvent(ctx context.Context, kind store.FabricPending, fabricIndex uint8, hooks func(context.Context)) {
 	o.mu.RLock()
 	deliver := o.facadeOwedFabricEvent
 	o.mu.RUnlock()
-	ack := func(ctx context.Context) { o.ackOwedFabricEvents(ctx, kind, fabricIndex) }
+	ids := o.owedFabricEventIDs(ctx, kind, fabricIndex)
+	ack := func(ctx context.Context) { o.ackOwedFabricEventIDs(ctx, fabricIndex, ids) }
 	if deliver == nil {
 		hooks(ctx)
 		ack(ctx)

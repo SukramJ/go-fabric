@@ -81,7 +81,8 @@ type AccessControl struct {
 	extOwedClear map[uint8]bool
 	// aclHeld names each fabric whose Acl rows the server last saw
 	// non-empty in the store: at construction, at a read or a write of the
-	// fabric's list and at a new fabric's default admin entry. The store's
+	// fabric's list, at a new fabric's default admin entry and at an entry
+	// the node appended (NotifyLocalEntryInstalledOn). The store's
 	// fabric cascade removes a fabric's rows before the drop runs, so the
 	// drop asks the store only for a fabric named here, and an empty answer
 	// is the Acl shrinking (review II, R4-par-4051).
@@ -116,12 +117,21 @@ type AccessControl struct {
 	// change, never the node of the command that closes the batch (review
 	// II, R2-P6-conc-1007).
 	auxDeferred map[uint8]context.Context
+	// auxOwed records a synchronisation a failed read of the source owes:
+	// the next read of the cluster or the next change runs it
+	// (settleOwedAuxiliary). auxOwedEmit is whether it fires events, and
+	// auxOwedCtx the context of each failed change, per fabric, so the
+	// event names the node behind that change (review II, R4-err-4055).
+	auxOwed     bool
+	auxOwedEmit bool
+	auxOwedCtx  map[uint8]context.Context
 	// auxSyncMu makes one synchronisation's read of the source and its
 	// apply one step, so two never apply in the other order than they read.
 	// It is taken before mu, never under it.
 	auxSyncMu sync.Mutex
 
-	// limits is what [AccessControl.SetLimits] set; a zero field is the constant.
+	// limits is what [AccessControlConfig.Limits] or
+	// [AccessControl.SetLimits] set; a zero field is the constant.
 	limits AccessControlLimits
 }
 
@@ -328,6 +338,11 @@ type ACLTargetStruct struct {
 }
 
 // NewAccessControl constructs the cluster.
+//
+// Deprecated: use [NewAccessControlWith], which takes the store and the
+// capacity limits together and refuses a limit outside its range at
+// construction; this constructor keeps its behaviour until it goes and is
+// removable in v0.29.0 (review II, R4-api-4157, decision 669).
 func NewAccessControl(s ACLStoreFacade) (*AccessControl, error) {
 	if s == nil {
 		return nil, errors.New("core: AccessControl store is required")
@@ -335,6 +350,35 @@ func NewAccessControl(s ACLStoreFacade) (*AccessControl, error) {
 	a := &AccessControl{store: s}
 	a.loadExtensions(context.Background())
 	a.loadACLHeld(context.Background())
+	return a, nil
+}
+
+// AccessControlConfig drives [NewAccessControlWith].
+type AccessControlConfig struct {
+	// Store is the ACL store; required.
+	Store ACLStoreFacade
+	// Limits are the capacity attributes and the limits an ACL write is
+	// held to; a zero field is its default. A field outside its range
+	// ([AccessControlLimits]) is refused at construction: the attributes
+	// are fixed, and a node does not advertise a capacity its own
+	// constraint forbids.
+	Limits AccessControlLimits
+}
+
+// NewAccessControlWith returns the AccessControl server on cfg.Store with
+// cfg.Limits: the stored Extension entries are loaded and the fabrics
+// holding Acl rows marked, under ctx. A config without a store, or with a
+// limit outside its range, is refused with an error naming it.
+func NewAccessControlWith(ctx context.Context, cfg AccessControlConfig) (*AccessControl, error) {
+	if cfg.Store == nil {
+		return nil, errors.New("core: AccessControl needs a store")
+	}
+	if err := cfg.Limits.check(); err != nil {
+		return nil, err
+	}
+	a := &AccessControl{store: cfg.Store, limits: cfg.Limits}
+	a.loadExtensions(ctx)
+	a.loadACLHeld(ctx)
 	return a, nil
 }
 
@@ -687,6 +731,7 @@ func (a *AccessControl) MatterHeldFabrics() []uint8 {
 // it: Acl and Extension carry every fabric's entries whole, as
 // [AccessControl.MatterReadFiltered] serves a local read.
 func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
+	a.settleOwedAuxiliary(context.Background())
 	switch attrID {
 	case accessControlAttrACL, accessControlAttrExtension:
 		// A read without an IM request behind it is a local one and
@@ -748,6 +793,7 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // AccessControlEntriesPerFabric, FeatureMap, ClusterRevision) fall
 // through to MatterRead.
 func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
+	a.settleOwedAuxiliary(ctx)
 	if attrID == accessControlAttrAuxiliaryACL {
 		filtered, fabricIndex := im.FabricFilterFromContext(ctx)
 		return a.auxiliaryACLRead(ctx, filtered, fabricIndex, false)
@@ -807,18 +853,30 @@ func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []u
 	}
 	out := []AccessControlEntryStruct{}
 	for _, fabric := range fabrics {
-		entries, err := a.store.ListACL(ctx, fabric)
+		entries, err := a.listACLMarking(ctx, fabric)
 		if err != nil {
 			return nil, false
-		}
-		if len(entries) > 0 {
-			a.markACLHeld(fabric, true)
 		}
 		for _, e := range entries {
 			out = append(out, aclEntryStruct(e))
 		}
 	}
 	return out, true
+}
+
+// listACLMarking is a read's list of fabric's Acl rows, which marks the
+// fabric held when they are not empty (aclHeld). The read and the mark are
+// one step under writeMu, as a drop's read and clear of the mark are: a
+// read that saw the rows of a fabric removed meanwhile does not mark it
+// again after its drop cleared the mark (review II, R5-conc-5004).
+func (a *AccessControl) listACLMarking(ctx context.Context, fabric uint8) ([]store.ACLEntry, error) {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	entries, err := a.store.ListACL(ctx, fabric)
+	if err == nil && len(entries) > 0 {
+		a.markACLHeld(fabric, true)
+	}
+	return entries, err
 }
 
 // unfilteredFabrics lists the fabrics a non-fabric-filtered read of Acl or
@@ -1537,10 +1595,18 @@ func aclAdminFromContext(ctx context.Context) (adminNode *uint64, adminPasscodeI
 //
 // A clear of the index's stored Extension that a removed fabric's drop
 // owes is retried first: the new fabric must not load it as its own at
-// the next start (review II, R2-C2-store-1004). A clear that fails again
-// stays owed and is logged.
+// the next start (review II, R2-C2-store-1004). A setting the store could
+// not read at construction (extLoadErr) is owed the same clear: a new
+// fabric at the index owns nothing stored there (review II,
+// R3-store-3001). A clear that fails again stays owed and is logged.
 func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 	a.writeMu.Lock()
+	a.mu.Lock()
+	if a.extLoadErr[entry.FabricIndex] != nil {
+		delete(a.extLoadErr, entry.FabricIndex)
+		a.oweClearLocked(entry.FabricIndex)
+	}
+	a.mu.Unlock()
 	err := a.settleOwedClear(context.Background(), entry.FabricIndex)
 	a.writeMu.Unlock()
 	if err != nil {
@@ -1576,7 +1642,28 @@ func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 // (packages/node/src/behaviors/access-control/AccessControlServer.ts:
 // 286-302, #handleAccessControlListChange returns when the context has no
 // session's fabric).
+//
+// It names no fabric, so the fabric is not marked as holding Acl rows and
+// its removal may go unreported; [AccessControl.NotifyLocalEntryInstalledOn]
+// names it.
 func (a *AccessControl) NotifyLocalEntryInstalled() { a.dataVersion.Bump() }
+
+// NotifyLocalEntryInstalledOn is [AccessControl.NotifyLocalEntryInstalled]
+// for an entry the node appended to fabricIndex's ACL: the DataVersion
+// moves, no AccessControlEntryChanged event is emitted, and the fabric is
+// marked as holding Acl rows when the store holds them, so the fabric's
+// removal is reported as the Acl shrinking ([AccessControl.MatterDropFabric];
+// review II, R5-par-5003). The store is asked under the server's write
+// lock, as a drop asks it; a list that fails marks the fabric, so its
+// removal is asked about rather than missed. Call it after the entry is
+// stored and the write lock the entry was written under is released.
+func (a *AccessControl) NotifyLocalEntryInstalledOn(ctx context.Context, fabricIndex uint8) {
+	a.writeMu.Lock()
+	rows, err := a.store.ListACL(ctx, fabricIndex)
+	a.markACLHeld(fabricIndex, err != nil || len(rows) > 0)
+	a.writeMu.Unlock()
+	a.dataVersion.Bump()
+}
 
 // aclEntriesEqual reports whether two stored ACL lists hold the same
 // entries in the same order (positions and fabric stamps ignored).
