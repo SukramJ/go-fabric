@@ -1139,10 +1139,25 @@ var chipFamilies = []family{
 			// case's endpoint (TC_WEBRTCP_2_16.py:159, :173).
 			"2.16": {{"cmd=provide_offer_cmd,\n                endpoint=1,", "cmd=provide_offer_cmd,\n                endpoint=endpoint,", "step 2 addresses endpoint 1, the camera-app's camera, where step 3 uses the case's endpoint (TC_WEBRTCP_2_16.py:159, :173); the daemon's camera is a bridged endpoint"}},
 		},
+		// The --camera-sim camera has no media stack: these cases wait for the
+		// DUT's Answer to a ProvideOffer until the 90 s body timeout (run
+		// 45361353348; Fable note r5, decision 644).
+		exclude: map[string]gap{
+			"2.22": {classHarness, "TC-WEBRTCP-2.22 step 2 waits for the DUT's Answer to its ProvideOffer, then its ICE candidates and a connected peer (TC_WEBRTCP_2_22.py:143, :161, :167 at 6170af84); the --camera-sim camera answers ProvideOfferResponse and has no media stack to make an answer from (examples/reference-bridge/camera.go ProvideOffer), where chip's camera-app takes it from libdatachannel (webrtc-provider-manager.cpp:531-532, :1124-1150). The case's PICS (:76-84) omit the Answer code its sibling 2.17 gates on (WEBRTCR.C.C01.Tx, TC_WEBRTCP_2_17.py:82), which this DUT declares false; the body times out after 90 s", false},
+			"2.23": {classHarness, "TC-WEBRTCP-2.23 step 3 waits for the DUT's Answer, its ICE candidates and a connected peer (TC_WEBRTCP_2_23.py:190, :208, :214 at 6170af84); the --camera-sim camera has no media stack to answer from (see 2.22), and the case's PICS (:78-86) omit the Answer code 2.17 gates on", false},
+			"2.33": {classHarness, "TC-WEBRTCP-2.33 step 2 waits for the DUT's Answer, its ICE candidates, a connected peer and RTP video frames and audio packets from the DUT (TC_WEBRTCP_2_33.py:110, :127, :132, :160, :165 at 6170af84); the --camera-sim camera captures, encodes and sends nothing (see 2.22), and the case's PICS (:172-180) omit the Answer code 2.17 gates on", false},
+		},
 	},
 	{name: "WebRTCP", deviceType: dtCamera, variant: variantCamera},
 	{
 		name: "AVSM", deviceType: dtCamera, variant: variantCamera,
+		// The --camera-sim camera has no media stack: these cases wait for the
+		// DUT's Answer to a ProvideOffer until the 90 s body timeout (run
+		// 45361353348; Fable note r5, decision 644).
+		exclude: map[string]gap{
+			"2.16": {classHarness, "TC-AVSM-2.16 step 4 waits for the DUT's Answer to its ProvideOffer (TC_AVSM_2_16.py:249 at 6170af84) under the PICS AVSM.S alone (:61-62); the --camera-sim camera has no media stack to answer from (examples/reference-bridge/camera.go ProvideOffer; chip's camera-app: webrtc-provider-manager.cpp:531-532, :1124-1150). The body times out after 90 s", false},
+			"2.17": {classHarness, "TC-AVSM-2.17 step 7 waits for the DUT's Answer to its ProvideOffer and step 12 for its End (TC_AVSM_2_17.py:289, :323-325 at 6170af84) under the PICS AVSM.S alone (:60-61); the --camera-sim camera has no media stack to answer from (see 2.16)", false},
+		},
 		// TC_AVSM_2_18 to 2_21 gate on AVSM.S.F_VDO, F_ADO and F_SNP
 		// (TC_AVSM_2_18.py:82-83, 2_19:78-79, 2_20:78-79, 2_21:73-74),
 		// codes no PICS defines: a feature's code is AVSM.S.Fnn (CHIP's
