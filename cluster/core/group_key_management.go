@@ -1665,6 +1665,13 @@ func (g *GroupKeyManagement) removeGroupKeyMapping(ctx context.Context, fabric u
 	if err := g.store.RemoveGroupKeyMapping(ctx, fabric, groupID); err != nil {
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
 	}
+	// The removal may have emptied the fabric's GroupKeyMap: the mark
+	// follows the store, so the fabric's drop reports no shrinking the
+	// removal already made (review II, R5-par-5005). A list that fails
+	// keeps the mark, and the drop asks the store again.
+	if rows, err := g.store.ListGroupKeyMappings(ctx, fabric); err == nil {
+		g.markHeld(false, fabric, len(rows) > 0)
+	}
 	g.dataVersion.Bump()
 	g.syncGroups(ctx, fabric)
 	return nil
