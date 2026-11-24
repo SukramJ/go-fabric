@@ -47,14 +47,20 @@
 #     generated from the device, every excluded case carries its class and
 #     reason, and docs/certifiability.md is the status. An unlabelled pull
 #     request runs the core groups (core-su, core-idm, core-ace, core-rest)
-#     and the commissioning group, in parallel; the `needs-chiptool` label
-#     adds the application groups;
-#     the nightly run, a manual dispatch and a release pull request run all
-#     of them, including
-#     `long`, the families whose one case waits for hours by design
+#     and the commissioning groups (commissioning, commissioning-cadmin), in
+#     parallel; the `needs-chiptool` label adds the application groups; the
+#     nightly run, a manual dispatch and a release pull request run all of
+#     them. `long` — the families whose one case waits for hours by design
 #     (TC-DGGEN-2.1 sits through 3 h 10 min of literal waits for
-#     TotalOperationalHours). The split keeps every job under the runner
-#     limit. A group an event does not run gets no job.
+#     TotalOperationalHours) — runs on the nightly run and a dispatch; a
+#     release pull request reads its result on the base commit instead
+#     (long-on-base below), unless the pull request itself changes code.
+#     The groups are cut by measured duration so that no group outlasts the
+#     longest single case (TC-SU-2.2, about 19 min): the job a run waits for
+#     is the slowest group. A group an event does not run gets no job.
+#   - long-on-base: a release pull request that changes documentation only
+#     — `long`'s result on the pull request's base commit, from a nightly or
+#     dispatched run of this workflow; the gate is red without a passed one.
 #   - nested-release: a release pull request only — `make
 #     nested-release-check`, each nested module built against the go-fabric
 #     version its go.mod requires, its replace dropped (R2-P5-sup-01).
@@ -64,8 +70,12 @@
 # automatically whenever a pull request changes anything but documentation.
 #
 # A RELEASE PULL REQUEST (head branch `release/*`, issue 495) runs the full
-# set: every job above, and every family group the nightly run covers,
-# `long` included — the full run is the gate of a release, not of every
+# set: every job above, and every family group the nightly run covers —
+# `long` by its result on the base commit when the release pull request
+# changes documentation only (owner, 2026-11-24: the release diff is the
+# CHANGELOG, and the 3 h 10 min wait need not be paid twice for one tree;
+# a release pull request that changes code runs `long` itself) — the full
+# run is the gate of a release, not of every
 # pull request (owner, 2026-11-10; v0.20.0 was tagged with an app-energy
 # failure only the nightly run showed). The `changes` job computes it once:
 # `full` (a labelled or release pull request) replaces the label test at
@@ -217,6 +227,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           FULL: ${{ steps.scope.outputs.full }}
           RELEASE: ${{ steps.scope.outputs.release }}
+          CODE: ${{ steps.filter.outputs.code }}
           FAMILIES_INPUT: ${{ github.event.inputs.families }}
         run: |
           set -euo pipefail
@@ -232,9 +243,12 @@ jobs:
             "core-idm=IDM"
             "core-ace=ACE,ACL,OPCREDS,CGEN"
             "core-rest=DESC,BINFO,BRBINFO,GRPKEY,DT,RR,SM,TIMESYNC,DLOG,ICDM,BDX,BIND,FLABEL,ULABEL,LCFG,LTIME,LUNIT,DGSW,DGETH,DGWIFI,ACT,PSCFG,ECOINFO,MESS"
-            "commissioning=CADMIN,SC,DA,DD,CNET,CNETWIFI,CGENTC,G,GC"
-            "app-lights=OO,LVL,CC,I,S,SWTCH,BOOL,BOOLCFG,OCC,TMP,RH,FLW,CDOCONC,CMOCONC,FLDCONC,NDOCONC,OZCONC,PMHCONC,RNCONC,TVOCCONC,AIRQUAL,PMICONC,PMKCONC,SOIL"
-            "app-appliances=DRLK,FAN,LWM,WASHERCTRL,DRYERCTRL,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV,HEPAFREMON,ACFREMON,CLCTRL,TCCM,TCTL,EPREF,EWATERHTR,WHM,MTRID,DISHALM,REFALM,OVENOPSTATE,OTCCM,MWOCTRL,MWOM,SEAR,CLDIM,TSUIC"
+            "commissioning=SC,DA,DD,CNET,CNETWIFI,CGENTC,G,GC"
+            "commissioning-cadmin=CADMIN"
+            "app-lights=OO,LVL,I,S,SWTCH,BOOL,BOOLCFG,OCC,TMP,RH,FLW,CDOCONC,CMOCONC,FLDCONC,NDOCONC,OZCONC,PMHCONC,RNCONC,TVOCCONC,AIRQUAL,PMICONC,PMKCONC,SOIL"
+            "app-lights-cc=CC"
+            "app-appliances=DRLK,FAN,OPSTATE,VALCC,WNCV"
+            "app-appliances-rest=LWM,WASHERCTRL,DRYERCTRL,MOD,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,HEPAFREMON,ACFREMON,CLCTRL,TCCM,TCTL,EPREF,EWATERHTR,WHM,MTRID,DISHALM,REFALM,OVENOPSTATE,OTCCM,MWOCTRL,MWOM,SEAR,CLDIM,TSUIC"
             "app-energy=DEM,DEMM,EEVSE,EEVSEM,SETRF,COMMTR,EGC,SEPR,EEM,EPM,PWRTL"
             "app-media=ALOGIN,APBSC,APPLAUNCHER,APPOBSERVER,AUDIOOUTPUT,CHANNEL,CONTENTLAUNCHER,KEYPADINPUT,LOWPOWER,MEDIAINPUT,MEDIAPLAYBACK,TGTNAV,WAKEONLAN"
             "app-tls=TLSCERT,TLSCLIENT"
@@ -243,8 +257,10 @@ jobs:
             "long=DGGEN"
             "thread=TBRM,DGTHREAD,THNETDIR"
           )
-          # core-* and commissioning: every event. long: never a pull
-          # request but a release one. thread: never here — it needs the
+          # core-* and commissioning*: every event. long: never a pull
+          # request but a release one that changes code (a documentation-only
+          # one reads long's result on its base commit, job long-on-base).
+          # thread: never here — it needs the
           # virtual OTBR agent and runs in otbr-virtual.yml (dispatch and
           # weekly), after the agent's own live test. The rest: every event
           # but a pull request that is neither labelled nor a release one.
@@ -254,10 +270,10 @@ jobs:
             runs=false
             if [ "$group" = thread ]; then
               continue
-            elif [[ "$group" == core-* ]] || [ "$group" = commissioning ]; then
+            elif [[ "$group" == core-* ]] || [[ "$group" == commissioning* ]]; then
               runs=true
             elif [ "$group" = long ]; then
-              if [ "$EVENT" != "pull_request" ] || [ "$RELEASE" = "true" ]; then runs=true; fi
+              if [ "$EVENT" != "pull_request" ] || { [ "$RELEASE" = "true" ] && [ "$CODE" = "true" ]; }; then runs=true; fi
             elif [ "$EVENT" != "pull_request" ] || [ "$FULL" = "true" ]; then
               runs=true
             fi
@@ -734,6 +750,42 @@ jobs:
           echo "::error::the nested modules are not in release shape (exit $rc, above)"
           exit 1
 
+  # `long` on the base commit, for a release pull request that changes
+  # documentation only (owner, 2026-11-24). Its tree differs from the base
+  # commit's in documentation alone, so `long`'s result there is its result:
+  # the job looks up a completed nightly or dispatched run of this workflow
+  # on the base commit whose `certification families (long)` job passed.
+  # Without one it is red and says how to get one: dispatch this workflow
+  # on main while main is the base commit (a dispatch shares the nightly
+  # run's concurrency group, so it cancels a nightly run in progress).
+  long-on-base:
+    name: certification families (long) on the base commit
+    needs: changes
+    if: needs.changes.outputs.release == 'true' && needs.changes.outputs.code != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          runs=$(gh api "repos/$REPO/actions/workflows/chiptool.yml/runs?head_sha=$BASE&status=completed&per_page=100" \
+            --jq '.workflow_runs[] | select(.event == "schedule" or .event == "workflow_dispatch") | .id')
+          for id in $runs; do
+            verdict=$(gh api "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
+              --jq '.jobs[] | select(.name == "certification families (long)") | .conclusion')
+            if [ "$verdict" = "success" ]; then
+              echo "long passed on the base commit $BASE in run $id"
+              exit 0
+            fi
+          done
+          echo "::error::no passed 'certification families (long)' on the base commit $BASE (runs looked at: ${runs:-none}); dispatch chiptool.yml on main while main is $BASE, or wait for the nightly run"
+          exit 1
+
   # The required status check for the certification families. Branch
   # protection on main names it, and a matrix job cannot serve: its check
   # names depend on the groups an event runs, and a skipped matrix job
@@ -749,12 +801,13 @@ jobs:
   # closed: every job of the full run — the suite, the control leg, the
   # BLE-Wi-Fi leg, the BLE cases leg, the Go-TH groups, the nested modules'
   # release shape and the family groups — must have run and passed; a
-  # skipped, failed or cancelled one is red. That is why it needs every
-  # leg; on every other event only the families and the Go-TH groups are
-  # read.
+  # skipped, failed or cancelled one is red. A release pull request that
+  # changes documentation only gets `long` from long-on-base, which must
+  # have passed as well. That is why it needs every leg; on every other
+  # event only the families and the Go-TH groups are read.
   chip-families-gate:
     name: chip certification cases against the reference daemon
-    needs: [changes, chiptool, gocert, chiptool-control, chiptool-ble-wifi, chiptool-ble-cases, chip-families, nested-release]
+    needs: [changes, chiptool, gocert, chiptool-control, chiptool-ble-wifi, chiptool-ble-cases, chip-families, nested-release, long-on-base]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -769,12 +822,16 @@ jobs:
           BLE_WIFI: ${{ needs.chiptool-ble-wifi.result }}
           BLE_CASES: ${{ needs.chiptool-ble-cases.result }}
           NESTED: ${{ needs.nested-release.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          LONG_BASE: ${{ needs.long-on-base.result }}
         run: |
           echo "code touched: $CHANGES; certification families: $FAMILIES; Go-TH groups: $GOCERT"
           if [ "$RELEASE" = "true" ]; then
             echo "release pull request: suite $SUITE, control leg $CONTROL, BLE-Wi-Fi leg $BLE_WIFI, BLE cases leg $BLE_CASES, nested modules $NESTED"
             failed=0
-            for leg in "chip-tool suite=$SUITE" "Go-TH groups=$GOCERT" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "BLE cases leg=$BLE_CASES" "nested modules' release shape=$NESTED" "certification families=$FAMILIES"; do
+            legs=("chip-tool suite=$SUITE" "Go-TH groups=$GOCERT" "control leg=$CONTROL" "BLE-Wi-Fi leg=$BLE_WIFI" "BLE cases leg=$BLE_CASES" "nested modules' release shape=$NESTED" "certification families=$FAMILIES")
+            if [ "$CODE" != "true" ]; then legs+=("long on the base commit=$LONG_BASE"); fi
+            for leg in "${legs[@]}"; do
               if [ "${leg#*=}" != "success" ]; then
                 echo "::error::release gate: the ${leg%%=*} did not pass (${leg#*=})"
                 failed=1

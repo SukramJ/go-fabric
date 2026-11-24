@@ -171,6 +171,7 @@ func TestWorkflowGateVerdict(t *testing.T) {
 	allPass := map[string]string{
 		"CHANGES": "success", "FAMILIES": "success", "GOCERT": "success", "RELEASE": "false",
 		"SUITE": "success", "CONTROL": "success", "BLE_WIFI": "success", "BLE_CASES": "success", "NESTED": "success",
+		"CODE": "true", "LONG_BASE": "skipped",
 	}
 	for _, tc := range []struct {
 		name string
@@ -194,6 +195,10 @@ func TestWorkflowGateVerdict(t *testing.T) {
 		{"release, control cancelled", map[string]string{"RELEASE": "true", "CONTROL": "cancelled"}, 1},
 		{"release, BLE-Wi-Fi skipped", map[string]string{"RELEASE": "true", "BLE_WIFI": "skipped"}, 1},
 		{"release, BLE cases failed", map[string]string{"RELEASE": "true", "BLE_CASES": "failure"}, 1},
+		{"release, docs only, long on base passed", map[string]string{"RELEASE": "true", "CODE": "false", "LONG_BASE": "success"}, 0},
+		{"release, docs only, long on base failed", map[string]string{"RELEASE": "true", "CODE": "false", "LONG_BASE": "failure"}, 1},
+		{"release, docs only, long on base skipped", map[string]string{"RELEASE": "true", "CODE": "false", "LONG_BASE": "skipped"}, 1},
+		{"release, code, long on base not read", map[string]string{"RELEASE": "true", "CODE": "true", "LONG_BASE": "failure"}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := make([]string, 0, len(allPass))
@@ -203,6 +208,76 @@ func TestWorkflowGateVerdict(t *testing.T) {
 				}
 				env = append(env, k+"="+v)
 			}
+			if got := runStepScript(t, script, env); got != tc.want {
+				t.Errorf("exit %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestWorkflowGroupsSelection runs the `changes` job's groups step over
+// the events it distinguishes: `long` runs on the nightly run, a dispatch
+// and a release pull request that changes code, never on a release pull
+// request that changes documentation only (long-on-base reads it on the
+// base commit, owner 2026-11-24); both commissioning groups run on every
+// pull request.
+func TestWorkflowGroupsSelection(t *testing.T) {
+	script := runBlockAfter(t, chiptoolWorkflow(t), "- id: groups")
+	for _, tc := range []struct {
+		name                     string
+		event, full, release, co string
+		long, cadmin, lightsCC   bool
+	}{
+		{"schedule", "schedule", "false", "false", "false", true, true, true},
+		{"dispatch", "workflow_dispatch", "false", "false", "false", true, true, true},
+		{"pull request", "pull_request", "false", "false", "true", false, true, false},
+		{"labelled pull request", "pull_request", "true", "false", "true", false, true, true},
+		{"release, code", "pull_request", "true", "true", "true", true, true, true},
+		{"release, docs only", "pull_request", "true", "true", "false", false, true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "out")
+			env := []string{"EVENT=" + tc.event, "FULL=" + tc.full, "RELEASE=" + tc.release, "CODE=" + tc.co, "FAMILIES_INPUT=", "GITHUB_OUTPUT=" + out}
+			if got := runStepScript(t, script, env); got != 0 {
+				t.Fatalf("exit %d", got)
+			}
+			data, err := os.ReadFile(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			m := string(data)
+			for group, want := range map[string]bool{"long": tc.long, "commissioning-cadmin": tc.cadmin, "app-lights-cc": tc.lightsCC} {
+				if got := strings.Contains(m, `"group":"`+group+`"`); got != want {
+					t.Errorf("group %s runs: %v, want %v\n%s", group, got, want, m)
+				}
+			}
+		})
+	}
+}
+
+// TestWorkflowLongOnBaseVerdict runs the long-on-base job's step with a
+// stand-in gh: green only when a nightly or dispatched run on the base
+// commit has a passed `certification families (long)` job.
+func TestWorkflowLongOnBaseVerdict(t *testing.T) {
+	script := runBlockAfter(t, chiptoolWorkflow(t), "  long-on-base:")
+	for _, tc := range []struct {
+		name       string
+		runs, jobs string // what the stand-in prints for the runs and the jobs query
+		want       int
+	}{
+		{"passed", "11", "success", 0},
+		{"failed", "11", "failure", 1},
+		{"no long job", "11", "", 1},
+		{"no run", "", "", 1},
+		{"second run passed", "11\n12", "success", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bin := t.TempDir()
+			stub := "#!/usr/bin/env bash\ncase \"$2\" in\n  */runs\\?*) printf '" + tc.runs + "\\n' ;;\n  *) printf '%s\\n' '" + tc.jobs + "' ;;\nesac\n"
+			if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(stub), 0o700); err != nil { //nolint:gosec // a test stand-in
+				t.Fatal(err)
+			}
+			env := []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "REPO=o/r", "BASE=abc", "GH_TOKEN=x"}
 			if got := runStepScript(t, script, env); got != tc.want {
 				t.Errorf("exit %d, want %d", got, tc.want)
 			}
