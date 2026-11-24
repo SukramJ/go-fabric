@@ -78,7 +78,8 @@ import (
 const ClusterIDClosureDimension = cd.ClusterID
 
 // DeviceTypeClosurePanel is the ClosurePanel device type
-// (closure-panel.element.ts, 0x0231), which mandates ClosureDimension.
+// (closure-panel-device.element.ts:13 at b25ed960, id 0x231), which
+// mandates ClosureDimension.
 const DeviceTypeClosurePanel uint16 = 0x0231
 
 // The ClosureDimension datatypes, from the generated definition.
@@ -129,7 +130,12 @@ const positionQuietInterval = 5 * time.Second
 // device acted, as connectedhomeip's server does
 // (ClosureDimensionCluster.cpp:496-505, :555, :557, :607-659 at 6170af84;
 // R2-P6-fsm-1581, -1582). A Resolution that divides 10000 and a StepValue
-// on its grid avoid both.
+// on its grid avoid both while the reported CurrentState Position stays
+// on the grid: the server takes an off-grid current Position, as chip's
+// SetCurrentState does not check Resolution (ClosureDimensionCluster.cpp
+// :223-324; SetTargetState does, :346-350), and a Step from it lands off
+// the grid unless the clamp to 0, 100.00 % or LimitRange puts it on a
+// bound that is on the grid.
 type DimensionHandler = cd.DimensionHandler
 
 // DimensionConfig carries the construction parameters.
@@ -142,7 +148,11 @@ type DimensionConfig struct {
 	// Resolution and StepValue (PS, fixed) are in 0.01 %, 1 to 10000. A
 	// Resolution that does not divide 10000, or a StepValue that is not a
 	// multiple of it, is admitted, and a command can then move the device
-	// and answer FAILURE ([DimensionHandler]).
+	// and answer FAILURE ([DimensionHandler]); so can a Step from a
+	// CurrentState Position off the Resolution grid, which the server
+	// takes, whatever the Resolution and StepValue, unless the clamp to 0,
+	// 100.00 % or LimitRange puts the target on a bound that is on the
+	// grid.
 	Resolution, StepValue uint16
 	// Unit (UT, fixed) and UnitRange (UT, nullable: nil is null).
 	Unit      cd.ClosureUnitEnum

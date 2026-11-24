@@ -548,8 +548,8 @@ func (s *ThermostatServer) Handle(cmdID uint32, fn spec.CommandHandler) error {
 }
 
 // Emit implements [spec.EventEmitting]: an event of the selection's
-// EventList ([spec.ErrNotEmitted] otherwise — the server serves none of
-// the event feature TEVT's events).
+// EventList ([spec.ErrNotEmitted] otherwise — with the Events feature
+// TEVT the list holds the TEVT events of the selection, events.go).
 func (s *ThermostatServer) Emit(endpoint uint16, eventID uint32, data any) error {
 	return s.events.Emit(s.inst, endpoint, eventID, data)
 }

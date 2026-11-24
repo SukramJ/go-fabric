@@ -575,11 +575,26 @@ func (s *DoorLockServer) initialAttributes(cfg DoorLockConfig, mode lockdef.Oper
 // loadRecords reads the credential key and the records: from the
 // AuthStore when it saved some, else from initial with its credentials
 // encrypted (DoorLockServer.ts:153-164).
+//
+// A key generated here is stored only once the records passed their
+// check, so a refused start leaves the store as it found it
+// (R4-store-4201): stored first, the key of a start refused for saved
+// credentials it does not open would be the key every later start loads.
+// The read, the check and the store are one step per AuthStore
+// (lockKeyCreation), so servers that start together on one store end on
+// one key (R3-store-3254).
 func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLockAuth) error {
+	var fresh []byte // a generated key, stored once the records passed
 	if s.cipher == nil {
-		key, err := s.credentialKey(ctx)
+		if s.auth != nil {
+			defer lockKeyCreation(s.auth)()
+		}
+		key, generated, err := s.credentialKey(ctx)
 		if err != nil {
 			return err
+		}
+		if generated {
+			fresh = key
 		}
 		if s.cipher, err = NewCredentialCipher(key); err != nil {
 			return err
@@ -601,7 +616,7 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 				}
 			}
 			s.data = saved
-			return nil
+			return s.storeCredentialKey(ctx, fresh)
 		}
 	}
 	data := cloneAuth(initial)
@@ -613,41 +628,46 @@ func (s *DoorLockServer) loadRecords(ctx context.Context, initial store.DoorLock
 		data.Credentials[i].Data = enc
 	}
 	s.data = data
-	return nil
+	return s.storeCredentialKey(ctx, fresh)
 }
 
-// credentialKey returns the node's credential key, generating and storing
-// it on first use; without an AuthStore it is a key of this server alone.
-// matter.js DoorLockServer.ts:153-155 generates 16 random bytes once.
-//
-// The read and the creation are one step per AuthStore (lockKeyCreation),
-// so servers that start together on one store end on one key
-// (R3-store-3254).
-func (s *DoorLockServer) credentialKey(ctx context.Context) ([]byte, error) {
+// credentialKey returns the node's credential key: the stored one, or a
+// generated one (generated true) the caller stores once the records
+// passed ([DoorLockServer.storeCredentialKey]); without an AuthStore it is
+// a key of this server alone. matter.js DoorLockServer.ts:153-155
+// generates 16 random bytes once. The caller holds the AuthStore's
+// lockKeyCreation slot.
+func (s *DoorLockServer) credentialKey(ctx context.Context) (key []byte, generated bool, err error) {
 	if s.auth != nil {
-		defer lockKeyCreation(s.auth)()
 		v, ok, err := s.auth.GetSetting(ctx, store.SettingDoorLockCredentialKey)
 		if err != nil {
-			return nil, fmt.Errorf("lock: read the credential key: %w", err)
+			return nil, false, fmt.Errorf("lock: read the credential key: %w", err)
 		}
 		if ok {
 			key, err := hex.DecodeString(v)
 			if err != nil || len(key) != credentialKeySize {
-				return nil, fmt.Errorf("%w: the stored credential key is not %d hex-encoded bytes", ErrConfig, credentialKeySize)
+				return nil, false, fmt.Errorf("%w: the stored credential key is not %d hex-encoded bytes", ErrConfig, credentialKeySize)
 			}
-			return key, nil
+			return key, false, nil
 		}
 	}
-	key := make([]byte, credentialKeySize)
+	key = make([]byte, credentialKeySize)
 	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("lock: generate the credential key: %w", err)
+		return nil, false, fmt.Errorf("lock: generate the credential key: %w", err)
 	}
-	if s.auth != nil {
-		if err := s.auth.SetSetting(ctx, store.SettingDoorLockCredentialKey, hex.EncodeToString(key)); err != nil {
-			return nil, fmt.Errorf("lock: store the credential key: %w", err)
-		}
+	return key, true, nil
+}
+
+// storeCredentialKey stores a key [DoorLockServer.credentialKey]
+// generated; nil (a loaded key) or no AuthStore stores nothing.
+func (s *DoorLockServer) storeCredentialKey(ctx context.Context, key []byte) error {
+	if key == nil || s.auth == nil {
+		return nil
 	}
-	return key, nil
+	if err := s.auth.SetSetting(ctx, store.SettingDoorLockCredentialKey, hex.EncodeToString(key)); err != nil {
+		return fmt.Errorf("lock: store the credential key: %w", err)
+	}
+	return nil
 }
 
 // sourceAdapter answers LockState from a [StateSource]: NotFullyLocked
