@@ -551,6 +551,9 @@ type security struct {
 	casep  *bridge.PerExchangeCaseProvider
 	// responderParams is what every PASE and CASE responder advertises.
 	responderParams *sessionparams.Parameters
+	// peerGone is the queue that ends a lost requestor's WebRTC sessions
+	// on the node's cameras (webrtc_provider_peers.go).
+	peerGone cameraPeerGone
 }
 
 // responderSessionParams is the SessionParameters the node's PASE and

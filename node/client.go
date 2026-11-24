@@ -110,6 +110,10 @@ func (n *Node) newClientStack(cfg ClientConfig) (*clientStack, error) {
 	cs.exchanges, err = exchange.NewManager(l, exchange.Config{
 		Clock: n.cfg.Clock, Logger: n.logger, Retransmitted: n.retransmitted,
 		LocalParameters: responderSessionParams(n.cfg.Network.TCP, n.cfg.MaxPathsPerInvoke, n.cfg.Sessions),
+		// A session given up because an exchange this stack opened went
+		// unanswered may leave a camera's requestor lost
+		// ([Node.clientPeerLost], #590 item 2).
+		PeerLost: n.clientPeerLost,
 	})
 	if err != nil {
 		return fail(fmt.Errorf("node: client exchanges: %w", err))
