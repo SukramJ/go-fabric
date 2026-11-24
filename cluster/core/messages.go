@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"thingfabric.dev/go-fabric/internal/deepcopy"
 
@@ -110,6 +111,8 @@ type Messages struct {
 	presenter MessagePresenter
 	embedded  cluster.DataVersionTracker
 	ext       *cluster.DataVersionTracker
+	// log is the logger [Messages.SetLogger] stored; nil is slog.Default().
+	log atomic.Pointer[slog.Logger]
 
 	// mu guards the fields below; it is released before a presenter call
 	// (present, cancel).
@@ -808,9 +811,19 @@ func (m *Messages) takeDownRemoved() {
 	}
 }
 
-// logger is the server's logger: slog.Default(), as Messages takes none
-// from its config.
-func (m *Messages) logger() *slog.Logger { return slog.Default() }
+// SetLogger routes the server's diagnostics (the presenter's refused
+// take-down of a removed fabric's message) to l; nil restores
+// slog.Default(). Safe at any time (ADR 0026 P9, decision 628).
+func (m *Messages) SetLogger(l *slog.Logger) { m.log.Store(l) }
+
+// logger is the server's logger; a value without SetLogger logs through
+// slog.Default().
+func (m *Messages) logger() *slog.Logger {
+	if l := m.log.Load(); l != nil {
+		return l
+	}
+	return slog.Default()
+}
 
 // cancelRemoved is the presenter's CancelMessage of a removed fabric's
 // message, a panic answered as an error.
