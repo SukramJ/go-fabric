@@ -174,6 +174,15 @@ func (s *Service) maybeStartResolving() {
 			cancel()
 			s.status.resolveCancel = nil
 			s.status.resolving = nil
+			// A resolution stopped (stopResolving) keeps its handle until
+			// this cleanup runs; an attempt on a service unreachable again
+			// meanwhile found it set and started none. Start it now when
+			// the status still asks for one — never once the cache is
+			// closing, whose context would end the new one at once
+			// (review II, R4-conc-4552).
+			if s.names.ctx.Err() == nil {
+				s.maybeStartResolving()
+			}
 		})
 	}()
 }

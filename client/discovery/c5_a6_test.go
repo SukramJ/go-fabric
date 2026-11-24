@@ -47,3 +47,39 @@ func TestOperational_ResolveKeepsAHostWhoseSRVTargetDiffersInCase(t *testing.T) 
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// TestStatus_ResolutionRestartsWhenNeededAgainBeforeItsCleanup: a
+// resolution stopped because the service became reachable with no attempt
+// outstanding clears its handle only in a cleanup posted to the loop. An
+// attempt on a service unreachable again before that cleanup runs found
+// the handle still set and started nothing; the cleanup now restarts the
+// resolution when the status still asks for one (review II, R4-conc-4552).
+func TestStatus_ResolutionRestartsWhenNeededAgainBeforeItsCleanup(t *testing.T) {
+	t.Parallel()
+	n, _, _ := testNames(t)
+	svc := n.Service(opCFID, opNode)
+	defer svc.Close()
+	st := svc.Status()
+	rejected := make(chan bool)
+	st.Connecting(rejected)
+	close(rejected)
+	eventually(t, "the rejected attempt", func() bool { return !st.IsConnecting() })
+	if !st.IsResolving() {
+		t.Fatal("an unreachable service is not resolving")
+	}
+	var stopped chan struct{}
+	onLoop(t, n, func() {
+		stopped = svc.status.resolving
+		svc.setReachable(true) // no attempt outstanding: stops the resolution
+		svc.status.connecting[new(int)] = struct{}{}
+		svc.setReachable(false) // the cleanup has not run yet
+	})
+	eventually(t, "the stopped resolution's cleanup", func() bool {
+		var cur chan struct{}
+		onLoop(t, n, func() { cur = svc.status.resolving })
+		return cur != stopped
+	})
+	if !st.IsResolving() {
+		t.Fatal("an unreachable service with an attempt outstanding is not resolving after the stopped resolution's cleanup")
+	}
+}
