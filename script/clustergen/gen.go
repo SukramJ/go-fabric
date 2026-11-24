@@ -246,6 +246,26 @@ func (g *generator) crossClusterStruct(name string) *datatype {
 	return nil
 }
 
+// declareDefinitionValues declares the enum or bitmap of a
+// definition-only cluster that v references
+// (WebRtcTransportDefinitions.WebRTCEndReasonEnum): it has no package of
+// its own, so every package that references it declares it — its type,
+// its named values and its descriptor — as an enum or bitmap of its own
+// cluster is declared. The field keeps its integer type, as the reference
+// to another cluster's enum does ([generator.crossClusterStruct]); the
+// declaration only names the values (owner decision 633).
+func (g *generator) declareDefinitionValues(v *value) error {
+	if (v.Metatype != "enum" && v.Metatype != "bitmap") || g.lookupDatatype(v.Type) != nil {
+		return nil
+	}
+	if xd := g.definitionDatatype(v.Type); xd != nil {
+		if _, err := g.declare(xd); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // definitionDatatype finds an enum or bitmap named "Definitions.Datatype"
 // in a definition-only cluster of the snapshot, nil when the name is not
 // such a reference. An enum or bitmap of an ordinary cluster does not
@@ -395,6 +415,9 @@ func (g *generator) fields(vs []*value, owner string) ([]*fieldInfo, error) {
 //nolint:funlen // one case per matter.js metatype
 func (g *generator) resolve(v *value, anonName string) (typeInfo, error) {
 	t := typeInfo{name: v.Type}
+	if err := g.declareDefinitionValues(v); err != nil {
+		return t, err
+	}
 	switch v.Metatype {
 	case "":
 		t.kind, t.goType = kindAny, "any"
@@ -480,21 +503,6 @@ func (g *generator) resolve(v *value, anonName string) (typeInfo, error) {
 				if di != nil {
 					t.kind, t.goType, t.dt = di.kind, di.goName, di
 					return t, nil
-				}
-			}
-		}
-		if v.Metatype != "integer" && g.lookupDatatype(v.Type) == nil {
-			// An enum or bitmap of a definition-only cluster
-			// (WebRtcTransportDefinitions.WebRTCEndReasonEnum) has no
-			// package of its own: every package that references it
-			// declares it — its type, its named values and its descriptor
-			// — as an enum or bitmap of its own cluster is declared. The
-			// field keeps its integer type, as the reference to another
-			// cluster's enum does ([generator.crossClusterStruct]); the
-			// declaration only names the values (owner decision 633).
-			if xd := g.definitionDatatype(v.Type); xd != nil {
-				if _, err := g.declare(xd); err != nil {
-					return t, err
 				}
 			}
 		}
