@@ -182,6 +182,16 @@
       "steps": 8,
       "stepsSkipped": 0
     },
+    "AVSM/2.16": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.17": {
+      "tests": 1,
+      "steps": 21,
+      "stepsSkipped": 0
+    },
     "AVSM/2.18": {
       "tests": 1,
       "steps": 20,

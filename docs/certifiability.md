@@ -351,7 +351,7 @@ Harness image: `ghcr.io/thingfabric/go-fabric-chip@sha256:a22ed731e3fa28eb380ca1
 | TLSCLIENT | 6 | 6 | 0 | 0 | 0 | 0 | 0 | 0 |
 | WEBRTCP | 19 | 8 | 0 | 0 | 0 | 8 | 3 | 0 |
 | WebRTCP | 13 | 12 | 0 | 0 | 0 | 1 | 0 | 0 |
-| AVSM | 21 | 19 | 0 | 0 | 0 | 0 | 2 | 0 |
+| AVSM | 21 | 21 | 0 | 0 | 0 | 0 | 0 | 0 |
 | AVSUM | 9 | 9 | 0 | 0 | 0 | 0 | 0 | 0 |
 | ZONEMGMT | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
 | PAVST | 15 | 13 | 0 | 0 | 0 | 1 | 1 | 0 |
@@ -362,7 +362,7 @@ Harness image: `ghcr.io/thingfabric/go-fabric-chip@sha256:a22ed731e3fa28eb380ca1
 | TBRM | 5 | 3 | 0 | 0 | 0 | 1 | 1 | 0 |
 | DGTHREAD | 6 | 4 | 0 | 0 | 0 | 1 | 1 | 0 |
 | THNETDIR | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **855** | **602** | **0** | **0** | **2** | **143** | **108** | **0** |
+| **all** | **855** | **604** | **0** | **0** | **2** | **143** | **106** | **0** |
 
 ### Cases not run
 
@@ -373,8 +373,6 @@ Harness image: `ghcr.io/thingfabric/go-fabric-chip@sha256:a22ed731e3fa28eb380ca1
 | ACT/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ALOGIN/12.3 | (b) not supported | not applicable: the case's PICS `ALOGIN.S & ALOGIN.S.F00` is false for the reference DUT |
 | APPOBSERVER/13.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| AVSM/2.16 | (c) harness | TC-AVSM-2.16 step 4 waits for the DUT's Answer to its ProvideOffer (TC_AVSM_2_16.py:249 at 6170af84) under the PICS AVSM.S alone (:61-62); the --camera-sim camera has no media stack to answer from (examples/reference-bridge/camera.go ProvideOffer; chip's camera-app: webrtc-provider-manager.cpp:531-532, :1124-1150). The body times out after 90 s |
-| AVSM/2.17 | (c) harness | TC-AVSM-2.17 step 7 waits for the DUT's Answer to its ProvideOffer and step 12 for its End (TC_AVSM_2_17.py:289, :323-325 at 6170af84) under the PICS AVSM.S alone (:60-61); the --camera-sim camera has no media stack to answer from (see 2.16) |
 | BDX/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
