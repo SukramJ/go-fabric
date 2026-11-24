@@ -287,10 +287,12 @@ func TestPeerAddressMonitorBackoff(t *testing.T) {
 // neither probes nor closes the session; it adopts a discovered address
 // on trust, in the session's IP family first, and keeps one still
 // discovered (review II, R2-C2-doc-2156). The family case of the source
-// puts an IPv4 candidate first for an IPv6 session; the Go service lists
-// the IPv6 address first (asserted below), so the port inverts the case —
-// an IPv4 session, the IPv6 candidate first — to keep the first candidate
-// in the other family.
+// passes `[10.0.0.5, fd00::2]` for an IPv6 session (:300), but its fixture
+// holds them in a ServerAddressSet (:94), which iterates most desirable
+// first — IPv6 before IPv4 (ServerAddressSet.ts:100-107, :165-170;
+// ServerAddress.ts:170-176) — as the Go service does (asserted below). So
+// the port inverts the case — an IPv4 session, the IPv6 candidate first —
+// the one arrangement in which the first candidate is in the other family.
 func TestPeerAddressMonitorSleepingLITICD(t *testing.T) {
 	t.Parallel()
 	lit := func() bool { return true }
