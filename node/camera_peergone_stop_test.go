@@ -5,8 +5,9 @@ package node
 
 // R5-conc-5301: the peer-gone keeper is a goroutine Stop waits for. Its
 // wait for a camera provider's command serialisation ends with the node,
-// and once the node's life ended no lost requestor's session ends any
-// more — not a pair already dequeued, not one whose wait a port call held.
+// and once Stop began no lost requestor's session ends any more — not a
+// pair already dequeued, not one whose wait a port call held, not one
+// whose last session Stop itself closed before the node's life ended.
 
 import (
 	"context"
@@ -124,6 +125,77 @@ func TestCameraPeerLossAfterStopBeganEndsNothing(t *testing.T) {
 	g := newPGNode(t)
 	g.n.cancel()
 	g.n.endLostPeer(pgAddrA)
+	if got := g.port.endedIDs(); len(got) != 0 {
+		t.Errorf("port ended %v, want none", got)
+	}
+	if got := g.sessions(); !slices.Equal(got, []uint16{1, 2, 3}) {
+		t.Errorf("sessions %v, want [1 2 3]", got)
+	}
+}
+
+// TestCameraPeerLossInStopsWindowEndsNothing (fable-diff-h4): between the
+// moment Stop closed every session (br.Stop) and the end of the node's
+// life (n.cancel) the node holds no session with any peer, so "no session
+// left" is no evidence. A lost requestor whose new session Stop closed in
+// that window keeps its WebRTC sessions: the keeper parked in PeerGone,
+// released while Stop waits for the node's callbacks, ends nothing.
+func TestCameraPeerLossInStopsWindowEndsNothing(t *testing.T) {
+	t.Parallel()
+	g := newPGNode(t)
+	g.port.hold, g.port.entered, g.port.release = true, make(chan struct{}), make(chan struct{})
+	var release sync.Once
+	releasePort := func() { release.Do(func() { close(g.port.release) }) }
+	t.Cleanup(releasePort)
+	answered := make(chan error, 1)
+	go func() {
+		ctx := im.WithSubject(im.WithFabricFilter(context.Background(), false, pgFabric), pgPeerB, nil)
+		_, err := g.prov.MatterInvoke(ctx, wpdef.CmdProvideAnswer, wpdef.ProvideAnswerRequest{WebRtcSessionId: 2, Sdp: "a"})
+		answered <- err
+	}()
+	<-g.port.entered
+	queue := make(chan string, 1)
+	g.n.sec.peerGone.testBeforeEnd = func(addr exchange.PeerAddress) {
+		if addr == pgAddrA {
+			queue <- goroutineHeader()
+		}
+	}
+	g.openBridge(t, pgPeerA)
+	g.lose(pgPeerA)
+	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).PeerGone")
+	// A is live again: a new session before Stop.
+	g.openBridge(t, pgPeerA)
+	if !g.n.holdsPeerSession(pgAddrA) {
+		t.Fatal("the node holds no session with A after A's new one")
+	}
+	// Stop parks at the callbacks' drain, after br.Stop and before the
+	// node's life ends.
+	hold := make(chan struct{})
+	var releaseHold sync.Once
+	releaseCallbacks := func() { releaseHold.Do(func() { close(hold) }) }
+	t.Cleanup(releaseCallbacks)
+	g.n.callbacks.Enqueue(func() { <-hold })
+	stopped := make(chan error, 1)
+	go func() { stopped <- g.n.Stop(context.Background()) }()
+	for i := 0; g.n.holdsPeerSession(pgAddrA); i++ {
+		if i == 1_000_000 {
+			t.Fatal("Stop did not close A's session")
+		}
+		runtime.Gosched()
+	}
+	if !g.n.stopBegan() || g.n.life.Err() != nil {
+		t.Fatalf("not in the window: stopBegan=%v life=%v", g.n.stopBegan(), g.n.life.Err())
+	}
+	releasePort()
+	if err := <-answered; err != nil {
+		t.Fatalf("answer: %v", err)
+	}
+	if d := <-g.done; d != (pgDone{pgAddrA, 0, false}) {
+		t.Errorf("worked off %+v, want A neither ended nor cancelled", d)
+	}
+	releaseCallbacks()
+	if err := <-stopped; err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
 	if got := g.port.endedIDs(); len(got) != 0 {
 		t.Errorf("port ended %v, want none", got)
 	}

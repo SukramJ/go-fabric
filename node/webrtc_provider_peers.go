@@ -134,7 +134,7 @@ func (n *Node) drainCameraPeerGone() {
 	q := &n.sec.peerGone
 	for {
 		q.mu.Lock()
-		if len(q.pending) == 0 || n.life.Err() != nil {
+		if len(q.pending) == 0 || n.life.Err() != nil || n.stopBegan() {
 			q.running, q.pending = false, nil
 			q.mu.Unlock()
 			return
@@ -168,9 +168,12 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 	if topo == nil {
 		return
 	}
-	// Once the node's life ended nothing ends: Stop closed every session,
-	// so "no session left" is no evidence any more (R5-conc-5301).
-	gone := func() bool { return n.life.Err() == nil && !n.holdsPeerSession(addr) }
+	// Once Stop began nothing ends: Stop closes every session before the
+	// node's life ends, so "no session left" is no evidence any more
+	// (R5-conc-5301). stopBegan takes keeperMu under the provider's
+	// command serialisation: nothing that holds keeperMu (goKeeper,
+	// stopParts, reopenUnlessStopping) takes a camera provider's.
+	gone := func() bool { return !n.stopBegan() && n.life.Err() == nil && !n.holdsPeerSession(addr) }
 	for _, ep := range topo.Endpoints {
 		for _, srv := range endpoint.ClusterServers(ep) {
 			p, ok := srv.(*camera.Provider)
@@ -186,7 +189,7 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 					slog.Int("fabric_index", int(addr.FabricIndex)), slog.Uint64("node_id", addr.NodeID), slog.Any("err", err))
 			}
 			if !ran {
-				if n.life.Err() != nil {
+				if n.stopBegan() || n.life.Err() != nil {
 					// Stop began: the end gave way to it, no session is live again.
 					return
 				}
