@@ -5,11 +5,13 @@ package main
 
 import (
 	"context"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"thingfabric.dev/go-fabric/cluster/camera"
 	"thingfabric.dev/go-fabric/cluster/spec"
@@ -265,7 +267,7 @@ func simProvideOffer(t *testing.T, c *demoCamera, video, audio uint16) uint16 {
 // for the session (step 7) whose SDP set_remote_answer accepts, the
 // session counts its streams (steps 9-10), and SoftLivestreamPrivacyMode
 // turned on ends it with End reason PrivacyMode, 11 (steps 11-12,
-// TC_AVSM_2_17.py:318-325), out of CurrentSessions and its streams
+// TC_AVSM_2_17.py:322-332), out of CurrentSessions and its streams
 // released (steps 13-15). Mirrors chip's camera-app
 // (webrtc-provider-manager.cpp:522, :531-532, :1124-1150, :1063-1087,
 // :990-1000 at 6170af84).
@@ -373,5 +375,126 @@ func TestCameraSimAnswerSDP(t *testing.T) {
 
 	if _, err := camAnswerSDP("v=0", fp, "abcd", "abcdefghijklmnopqrstuv"); err == nil {
 		t.Fatal("an offer without a media section was answered")
+	}
+}
+
+// simNotFound is a requestor that answers every Answer NOT_FOUND, as
+// connectedhomeip's requestor does for a session it does not know
+// (WebRTCTransportRequestorCluster.cpp:199-200 at 6170af84), and counts
+// them.
+type simNotFound struct {
+	mu      sync.Mutex
+	answers int
+}
+
+func (s *simNotFound) ConnectPeer(context.Context, uint8, uint64) (camera.PeerSession, error) {
+	return s, nil
+}
+
+func (s *simNotFound) Invoke(_ context.Context, _ uint16, _, command uint32, _ spec.Encodable) (*spec.Node, error) {
+	if command != wrdef.CmdAnswer {
+		return nil, nil
+	}
+	s.mu.Lock()
+	s.answers++
+	s.mu.Unlock()
+	return nil, spec.Errorf(im.StatusNotFound, "no such session")
+}
+
+func (s *simNotFound) sent() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.answers
+}
+
+// TestCameraSimAnswerReusesICECredentials: a re-offer's answer carries
+// the session's first ice-ufrag, ice-pwd and fingerprint — another pair
+// on the same peer connection is an ICE restart, which libjuice refuses
+// and libdatachannel throws for (libjuice agent.c:536-550 at 3c40a354,
+// libdatachannel impl/icetransport.cpp:224-226 at 443f6934).
+func TestCameraSimAnswerReusesICECredentials(t *testing.T) {
+	t.Parallel()
+	c, _, _ := simCamera(t, cameraOptions{})
+	signals := &simSignals{}
+	c.camera.WebRtcTransportProvider().Underlying().(*camera.Provider).AttachPeerConnector(signals)
+	video, audio := simStreams(t, c)
+	id := simProvideOffer(t, c, video, audio)
+	waitFor(t, "the first Answer", func() bool { a, _ := signals.sent(); return len(a) == 1 })
+
+	usage, origin := wpdef.StreamUsageLiveView, uint16(1)
+	nv, na := spec.Nullable[uint16]{Value: video}, spec.Nullable[uint16]{Value: audio}
+	if _, status := simInvoke(c.camera.WebRtcTransportProvider().Underlying(), wpdef.CmdProvideOffer, wpdef.ProvideOfferRequest{
+		WebRtcSessionId: spec.Nullable[uint16]{Value: id}, Sdp: simTHOffer, StreamUsage: &usage, OriginatingEndpointId: &origin,
+		VideoStreamId: &nv, AudioStreamId: &na,
+	}); status != im.StatusSuccess {
+		t.Fatalf("the re-offer: %v", status)
+	}
+	waitFor(t, "the second Answer", func() bool { a, _ := signals.sent(); return len(a) == 2 })
+	answers, _ := signals.sent()
+	attrs := func(sdp string) []string {
+		var out []string
+		for line := range strings.SplitSeq(sdp, "\r\n") {
+			if strings.HasPrefix(line, "a=ice-ufrag:") || strings.HasPrefix(line, "a=ice-pwd:") || strings.HasPrefix(line, "a=fingerprint:") {
+				out = append(out, line)
+			}
+		}
+		return out
+	}
+	if first, second := attrs(answers[0].Sdp), attrs(answers[1].Sdp); !slices.Equal(first, second) {
+		t.Fatalf("the re-offer's answer changed the ICE credentials:\n%v\n%v", first, second)
+	}
+}
+
+// TestCameraSimAnswerRetryIsBounded: a requestor that keeps answering
+// NOT_FOUND gets camAnswerAttempts Answer commands, one per retry interval
+// of the camera's clock, and no more.
+func TestCameraSimAnswerRetryIsBounded(t *testing.T) {
+	t.Parallel()
+	c, fake, _ := simCamera(t, cameraOptions{})
+	rec := &simNotFound{}
+	c.camera.WebRtcTransportProvider().Underlying().(*camera.Provider).AttachPeerConnector(rec)
+	video, audio := simStreams(t, c)
+	base := fake.Pending()
+	simProvideOffer(t, c, video, audio)
+	for n := 1; n <= camAnswerAttempts; n++ {
+		waitFor(t, "Answer "+strconv.Itoa(n), func() bool { return rec.sent() >= n })
+		if n < camAnswerAttempts {
+			waitFor(t, "the retry timer", func() bool { return fake.Pending() > base })
+			fake.Advance(camAnswerRetry)
+		}
+	}
+	waitFor(t, "the retry loop's end", func() bool { return fake.Pending() == base })
+	fake.Advance(time.Hour)
+	for range 64 {
+		runtime.Gosched()
+	}
+	if got := rec.sent(); got != camAnswerAttempts {
+		t.Fatalf("Answer commands %d, want %d", got, camAnswerAttempts)
+	}
+}
+
+// TestCameraSimAnswerStopsAtEnd: the session's end stops the Answer's
+// retries — no Answer for an ended session.
+func TestCameraSimAnswerStopsAtEnd(t *testing.T) {
+	t.Parallel()
+	c, fake, _ := simCamera(t, cameraOptions{})
+	rec := &simNotFound{}
+	c.camera.WebRtcTransportProvider().Underlying().(*camera.Provider).AttachPeerConnector(rec)
+	video, audio := simStreams(t, c)
+	base := fake.Pending()
+	id := simProvideOffer(t, c, video, audio)
+	waitFor(t, "the first Answer", func() bool { return rec.sent() >= 1 })
+	waitFor(t, "the retry timer", func() bool { return fake.Pending() > base })
+	if _, status := simInvoke(c.camera.WebRtcTransportProvider().Underlying(), wpdef.CmdEndSession,
+		wpdef.EndSessionRequest{WebRtcSessionId: id, Reason: uint8(wpdef.WebRTCEndReasonUserHangup)}); status != im.StatusSuccess {
+		t.Fatalf("EndSession: %v", status)
+	}
+	waitFor(t, "the retry loop's end", func() bool { return fake.Pending() == base })
+	fake.Advance(time.Hour)
+	for range 64 {
+		runtime.Gosched()
+	}
+	if got := rec.sent(); got != 1 {
+		t.Fatalf("Answer commands after the session ended: %d, want 1", got)
 	}
 }

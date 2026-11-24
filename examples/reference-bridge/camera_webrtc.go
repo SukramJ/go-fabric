@@ -22,6 +22,7 @@ import (
 	"thingfabric.dev/go-fabric/cluster/camera"
 	"thingfabric.dev/go-fabric/cluster/spec"
 	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
+	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/im"
 )
 
@@ -51,18 +52,74 @@ import (
 type camSessionStreams struct{ videos, audios []uint16 }
 
 // camAnswerAttempts and camAnswerRetry bound the Answer's send. The
-// session enters CurrentSessions when the port has returned, and the
+// session enters CurrentSessions when the port has returned — the send
+// waits for that, on the provider's change notification — and the
 // requestor knows it only once it read ProvideOfferResponse
 // (WebRTCTransportProviderClient::HandleProvideOfferResponse →
 // UpsertSession, src/controller/webrtc/WebRTCTransportProviderClient.cpp:
 // 312-334 at 6170af84); before that its Answer handler answers NOT_FOUND
 // (WebRTCTransportRequestorCluster.cpp:199-202). The camera-app sends the
 // Answer from a lambda scheduled after the command (ScheduleAnswerSend),
-// so the response leaves first; here the send is retried instead.
+// so the response leaves first; here a NOT_FOUND is retried instead, on
+// the camera's clock, a few times: the window is the requestor reading
+// one response. A requestor that never learns the session (a ProvideOffer
+// sent without its provider client) gets camAnswerAttempts Answers, not
+// one per retry for seconds.
 const (
-	camAnswerAttempts = 100
+	camAnswerAttempts = 10
 	camAnswerRetry    = 50 * time.Millisecond
 )
+
+// camSessionSignal is what a WebRTC session's answers share: one ICE
+// ufrag and pwd for every answer of the session — another pair on the
+// requestor's peer connection is an ICE restart, which libjuice refuses
+// and libdatachannel throws for (libjuice agent.c:536-550 at 3c40a354,
+// libdatachannel impl/icetransport.cpp:224-226 at 443f6934) — and ended,
+// closed when the session ends, which stops a pending Answer.
+type camSessionSignal struct {
+	ufrag, pwd string
+	ended      chan struct{}
+}
+
+// sessionSignal is the session's signal, made at its first answer.
+func (c *demoCamera) sessionSignal(id uint16) *camSessionSignal {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if sig, ok := c.signals[id]; ok {
+		return sig
+	}
+	if c.signals == nil {
+		c.signals = map[uint16]*camSessionSignal{}
+	}
+	sig := &camSessionSignal{ufrag: camICEString(8), pwd: camICEString(24), ended: make(chan struct{})}
+	c.signals[id] = sig
+	return sig
+}
+
+// sessionEnded is the camera-app's CleanupSession (:1021-1050) for the
+// simulation: the session's streams are released and its pending Answer
+// stopped.
+func (c *demoCamera) sessionEnded(id uint16) {
+	c.releaseStreams(id)
+	c.mu.Lock()
+	sig, ok := c.signals[id]
+	delete(c.signals, id)
+	c.mu.Unlock()
+	if ok {
+		close(sig.ended)
+	}
+}
+
+// lifeContext is the context the camera's background work ends with: the
+// daemon's, from attach; the background one before attach (tests).
+func (c *demoCamera) lifeContext() context.Context {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.life == nil {
+		return context.Background()
+	}
+	return c.life
+}
 
 // provider is the camera's WebRtcTransportProvider kit server.
 func (c *demoCamera) provider() (*camera.Provider, bool) {
@@ -72,7 +129,7 @@ func (c *demoCamera) provider() (*camera.Provider, bool) {
 
 // acquireStreams is AcquireAudioVideoStreams
 // (webrtc-provider-manager.cpp:1331-1344 →
-// camera-av-stream-manager.cpp:967-1026 OnTransportAcquireAudioVideoStreams):
+// camera-av-stream-manager.cpp:966-1025 OnTransportAcquireAudioVideoStreams):
 // each of the session's streams is counted up; one the stream management
 // refuses is logged and not counted. What was counted is kept for the
 // release.
@@ -106,7 +163,7 @@ func (c *demoCamera) acquireStreams(id uint16, videos, audios *[]uint16) {
 
 // releaseStreams is ReleaseAudioVideoStreams (:1346-1359 →
 // OnTransportReleaseAudioVideoStreams, camera-av-stream-manager.cpp:
-// 1028-1087): the streams the session counted are counted down, once.
+// 1027-1086): the streams the session counted are counted down, once.
 func (c *demoCamera) releaseStreams(id uint16) {
 	c.mu.Lock()
 	got, ok := c.sessionStreams[id]
@@ -137,16 +194,21 @@ func deref(ids *[]uint16) []uint16 {
 
 // answerOffer builds the answer to a ProvideOffer's SDP and sends it to
 // the requestor as the Answer command, from its own goroutine (the
-// camera-app's ScheduleAnswerSend) on ctx without its cancellation: the
-// command that carried the offer has answered by then. An offer the answer cannot be built
-// from — no media section — is logged and not answered.
+// camera-app's ScheduleAnswerSend). The goroutine runs on ctx without its
+// cancellation — the command that carried the offer has answered by then
+// — and ends with the daemon (lifeContext) and with the session
+// (sessionEnded): no Answer goes out for an ended session. Every answer
+// of a session carries the session's ICE credentials (sessionSignal). An
+// offer the answer cannot be built from — no media section — is logged
+// and not answered.
 func (c *demoCamera) answerOffer(ctx context.Context, id uint16, offer string) {
 	fingerprint, err := c.dtlsFingerprint()
 	if err != nil {
 		c.logger.Info("camerasim.answer", slog.Uint64("session", uint64(id)), slog.Any("err", err))
 		return
 	}
-	answer, err := camAnswerSDP(offer, fingerprint, camICEString(8), camICEString(24))
+	sig := c.sessionSignal(id)
+	answer, err := camAnswerSDP(offer, fingerprint, sig.ufrag, sig.pwd)
 	if err != nil {
 		c.logger.Info("camerasim.answer", slog.Uint64("session", uint64(id)), slog.Any("err", err))
 		return
@@ -155,22 +217,52 @@ func (c *demoCamera) answerOffer(ctx context.Context, id uint16, offer string) {
 	if !ok {
 		return
 	}
-	ctx = context.WithoutCancel(ctx)
+	ctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	stop := context.AfterFunc(c.lifeContext(), cancel) //nolint:contextcheck // the daemon's life ends the send, not the request's
+	changed := make(chan struct{}, 1)
+	unsubscribe := provider.OnAttributeChange(func(contract.Change) {
+		select {
+		case changed <- struct{}{}:
+		default:
+		}
+	})
 	go func() {
-		var err error
-		for range camAnswerAttempts {
-			err = provider.Answer(ctx, id, answer)
+		defer cancel()
+		defer stop()
+		defer unsubscribe()
+		for attempt := 1; ; {
+			if _, ok := c.currentSession(id); !ok {
+				// Not yet in CurrentSessions: the server stores it when the
+				// port has returned.
+				select {
+				case <-changed:
+					continue
+				case <-sig.ended:
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+			err := provider.Answer(ctx, id, answer)
 			if err == nil {
 				return
 			}
-			// Not yet in CurrentSessions here, or not yet known to the
-			// requestor: try again.
-			if !errors.Is(err, camera.ErrUnknownSession) && spec.StatusOf(err) != im.StatusNotFound {
-				break
+			if spec.StatusOf(err) != im.StatusNotFound || attempt >= camAnswerAttempts {
+				c.logger.Info("camerasim.answer", slog.Uint64("session", uint64(id)), slog.Int("attempt", attempt), slog.Any("err", err))
+				return
 			}
-			time.Sleep(camAnswerRetry)
+			attempt++
+			t := c.clk.NewTimer(camAnswerRetry)
+			select {
+			case <-t.C():
+			case <-sig.ended:
+				t.Stop()
+				return
+			case <-ctx.Done():
+				t.Stop()
+				return
+			}
 		}
-		c.logger.Info("camerasim.answer", slog.Uint64("session", uint64(id)), slog.Any("err", err))
 	}()
 }
 
@@ -188,8 +280,8 @@ func (c *demoCamera) livestreamPrivacyOn() {
 		return
 	}
 	for _, s := range provider.Sessions() {
-		c.releaseStreams(s.Id)
-		if err := provider.End(context.Background(), s.Id, uint8(wrdef.WebRTCEndReasonPrivacyMode)); err != nil {
+		c.sessionEnded(s.Id)
+		if err := provider.End(c.lifeContext(), s.Id, uint8(wrdef.WebRTCEndReasonPrivacyMode)); err != nil {
 			c.logger.Info("camerasim.privacyend", slog.Uint64("session", uint64(s.Id)), slog.Any("err", err))
 		}
 	}
@@ -271,7 +363,7 @@ type camOfferSection struct {
 //     (impl/peerconnection.cpp:924-953 validateRemoteDescription);
 //   - a=setup:active, never actpass in an answer
 //     (impl/icetransport.cpp:204-217); active is the role libdatachannel's
-//     own answerer takes against an actpass offer (:211-213), as the
+//     own answerer takes against an actpass offer (:216-218), as the
 //     camera-app's does;
 //   - each offered section answered in order, of its kind, protocol and
 //     mid (the requestor's tracks are found by mid,

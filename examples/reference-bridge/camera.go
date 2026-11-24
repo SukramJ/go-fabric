@@ -178,6 +178,11 @@ type demoCamera struct {
 	// certificate fingerprint its answers carry.
 	sessionStreams map[uint16]camSessionStreams
 	fingerprint    string
+	// signals are the WebRTC sessions' shared answer state
+	// (camera_webrtc.go sessionSignal); life is the daemon's context from
+	// attach, which the camera's background signalling ends with.
+	signals map[uint16]*camSessionSignal
+	life    context.Context //nolint:containedctx // the daemon's lifetime, for goroutines a port starts
 }
 
 type camAvailableVideo struct {
@@ -289,6 +294,7 @@ func (c *demoCamera) attach(ctx context.Context, st settings) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.st = st
+	c.life = ctx
 	v, ok, err := st.GetSetting(ctx, cameraStateSetting)
 	if err != nil {
 		c.keepUnreadLocked(fmt.Errorf("read %s: %w", cameraStateSetting, err))
@@ -554,7 +560,7 @@ func (c *demoCamera) build() error {
 	persist := func() { c.persist() }
 	cam.CameraAvStreamManagement().OnChangedAsync(func(csdef.State, contract.Change) { persist() })
 	// Mirrors chip examples/camera-app/linux/src/clusters/camera-avstream-mgmt/
-	// camera-av-stream-manager.cpp:701-705 at 6170af84: a change of
+	// camera-av-stream-manager.cpp:702-706 at 6170af84: a change of
 	// SoftLivestreamPrivacyModeEnabled reaches the WebRTC manager
 	// (camera-device.cpp:1670-1677), which ends the sessions when it turned
 	// on (webrtc-provider-manager.cpp:1063-1087). Its own goroutine: the
@@ -895,7 +901,7 @@ func (camProviderPort) ProvideIceCandidates(context.Context, uint16, []wpdef.ICE
 // the EndSession command, a session CurrentSessions refused, a removed
 // fabric and a gone peer.
 func (p camProviderPort) EndSession(_ context.Context, id uint16, _ uint8) error {
-	p.c.releaseStreams(id)
+	p.c.sessionEnded(id)
 	return nil
 }
 
