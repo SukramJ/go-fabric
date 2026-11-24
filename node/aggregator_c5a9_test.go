@@ -134,7 +134,7 @@ type failingReadA9 struct {
 
 var errReadA9 = errors.New("read refused")
 
-func (s *failingReadA9) GetSetting(ctx context.Context, key string) (string, bool, error) {
+func (s *failingReadA9) GetSetting(ctx context.Context, key string) (value string, found bool, err error) {
 	if key == s.fail && s.armed.Load() {
 		if s.skip.Add(-1) < 0 && s.armed.CompareAndSwap(true, false) {
 			return "", false, errReadA9
