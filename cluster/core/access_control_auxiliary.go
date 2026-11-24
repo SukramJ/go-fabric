@@ -6,6 +6,7 @@ package core
 import (
 	"context"
 	"log/slog"
+	"maps"
 	"reflect"
 	"slices"
 
@@ -114,6 +115,30 @@ func (a *AccessControl) endAuxiliaryBatch(ctx context.Context) {
 // no longer exists gets no event. Mirrors matter.js AccessControlServer
 // #syncAuxAcl.
 func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool, deferred map[uint8]context.Context) {
+	a.syncAuxiliaryAs(ctx, ctx, emit, deferred)
+}
+
+// settleOwedAuxiliary runs the synchronisation a failed read of the source
+// owes (auxOwed), before a read of the cluster serves its attributes and
+// its DataVersion (review II, R4-err-4055). The reader made no change, so
+// the run has no actor: each event names the node of its own failed
+// change (auxOwedCtx) or none, never the reader's.
+func (a *AccessControl) settleOwedAuxiliary(ctx context.Context) {
+	a.mu.RLock()
+	owed, emit := a.auxOwed, a.auxOwedEmit
+	a.mu.RUnlock()
+	if owed {
+		a.syncAuxiliaryAs(ctx, nil, emit, nil)
+	}
+}
+
+// syncAuxiliaryAs is syncAuxiliary whose source reads run under ctx and
+// whose events name the node of actor (nil: no actor). It first takes the
+// synchronisation a failed read owes, with its contexts — a context in
+// deferred is newer and wins — and a read of the source that fails owes
+// the whole synchronisation again, its contexts and actor's own fabric's
+// kept, rather than dropping them (review II, R4-err-4055).
+func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, deferred map[uint8]context.Context) {
 	a.mu.RLock()
 	src := a.auxSource
 	a.mu.RUnlock()
@@ -121,8 +146,22 @@ func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool, deferred m
 		return
 	}
 	a.auxSyncMu.Lock()
+	a.mu.Lock()
+	deferred = mergeAuxContexts(a.auxOwedCtx, deferred)
+	a.auxOwed, a.auxOwedEmit, a.auxOwedCtx = false, false, nil
+	a.mu.Unlock()
 	entries, err := src.AuxiliaryACL(ctx, 0)
 	if err != nil {
+		if actor != nil {
+			if _, f, request := im.LookupFabricFilter(actor); request && f != 0 {
+				deferred = mergeAuxContexts(map[uint8]context.Context{f: actor}, deferred)
+			}
+		}
+		a.mu.Lock()
+		a.auxOwed = true
+		a.auxOwedEmit = a.auxOwedEmit || emit
+		a.auxOwedCtx = mergeAuxContexts(deferred, a.auxOwedCtx)
+		a.mu.Unlock()
 		a.auxSyncMu.Unlock()
 		a.logger().Warn("matter.access_control.auxiliary_sync", slog.Any("err", err))
 		return
@@ -156,7 +195,10 @@ func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool, deferred m
 	if err != nil {
 		return
 	}
-	_, accessing := im.FabricFilterFromContext(ctx)
+	var accessing uint8
+	if actor != nil {
+		_, accessing = im.FabricFilterFromContext(actor)
+	}
 	for _, fabric := range changed {
 		if !slices.Contains(known, fabric) {
 			continue
@@ -166,11 +208,23 @@ func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool, deferred m
 		case ok:
 			admin = adminNodeIDOf(own) //nolint:contextcheck // own is the deferred change's request context, read for its subject only
 		case accessing == fabric:
-			admin = adminNodeIDOf(ctx)
+			admin = adminNodeIDOf(actor)
 		}
 		emitter.MatterEmitEvent(endpoint, accessControlClusterID, accessControlEventAuxiliaryAccessUpd,
 			AuxiliaryAccessUpdatedEvent{AdminNodeID: admin, FabricIndex: fabric}, contract.EventPriorityInfo)
 	}
+}
+
+// mergeAuxContexts is older with newer laid over it: a fabric newer names
+// keeps newer's context. Nil when both are empty.
+func mergeAuxContexts(older, newer map[uint8]context.Context) map[uint8]context.Context {
+	if len(older) == 0 {
+		return newer
+	}
+	out := make(map[uint8]context.Context, len(older)+len(newer))
+	maps.Copy(out, older)
+	maps.Copy(out, newer)
+	return out
 }
 
 func unionKeys(a, b map[uint8][]store.ACLEntry) map[uint8]struct{} {

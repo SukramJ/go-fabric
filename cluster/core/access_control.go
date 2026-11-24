@@ -117,6 +117,14 @@ type AccessControl struct {
 	// change, never the node of the command that closes the batch (review
 	// II, R2-P6-conc-1007).
 	auxDeferred map[uint8]context.Context
+	// auxOwed records a synchronisation a failed read of the source owes:
+	// the next read of the cluster or the next change runs it
+	// (settleOwedAuxiliary). auxOwedEmit is whether it fires events, and
+	// auxOwedCtx the context of each failed change, per fabric, so the
+	// event names the node behind that change (review II, R4-err-4055).
+	auxOwed     bool
+	auxOwedEmit bool
+	auxOwedCtx  map[uint8]context.Context
 	// auxSyncMu makes one synchronisation's read of the source and its
 	// apply one step, so two never apply in the other order than they read.
 	// It is taken before mu, never under it.
@@ -688,6 +696,7 @@ func (a *AccessControl) MatterHeldFabrics() []uint8 {
 // it: Acl and Extension carry every fabric's entries whole, as
 // [AccessControl.MatterReadFiltered] serves a local read.
 func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
+	a.settleOwedAuxiliary(context.Background())
 	switch attrID {
 	case accessControlAttrACL, accessControlAttrExtension:
 		// A read without an IM request behind it is a local one and
@@ -749,6 +758,7 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // AccessControlEntriesPerFabric, FeatureMap, ClusterRevision) fall
 // through to MatterRead.
 func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
+	a.settleOwedAuxiliary(ctx)
 	if attrID == accessControlAttrAuxiliaryACL {
 		filtered, fabricIndex := im.FabricFilterFromContext(ctx)
 		return a.auxiliaryACLRead(ctx, filtered, fabricIndex, false)
