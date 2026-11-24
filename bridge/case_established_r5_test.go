@@ -218,3 +218,45 @@ func TestResumeAwaitsItsOwnInstalledSession(t *testing.T) {
 		t.Fatalf("the first resume awaits %#x (%v); want its own session %#x (the second's is %#x)", got, ok, id1, id2)
 	}
 }
+
+// TestSigma3WithoutStepValueIsNoEstablishment (R5-sec-5101, follow-up N1
+// of its Fable diff read): a responder handed over already finished accepts the
+// finishing Sigma3's retransmission and builds no session value. With no
+// established-callback installed the step must not report an established
+// session (it named session 0 before) — it fails, and the adapter does
+// not read established afterwards.
+func TestSigma3WithoutStepValueIsNoEstablishment(t *testing.T) {
+	t.Parallel()
+	ipk := newCaseTestIPK(t)
+	initiator := sigma.NewInitiator(newCaseTestIdentity(t, 0xAAAA, 1, ipk), caseTestVerifier{}, 0x1001, [32]byte{0xDE, 0xAD, 0xBE, 0xEF})
+	responder := sigma.NewResponder(newCaseTestIdentity(t, 0xBBBB, 1, ipk), caseTestVerifier{}, 0x2001)
+	s1, err := initiator.GenerateSigma1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, s2, err := NewCaseAdapter(responder).ProcessSigma1(s1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s3, err := initiator.ProcessSigma2Bytes(s2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if est, err := responder.ProcessSigma3Established(s3); err != nil || est == nil {
+		t.Fatalf("the finishing Sigma3: est %v, err %v", est, err)
+	}
+
+	a := NewCaseAdapter(nil)
+	a.SetResponder(responder) // already finished; no callback installed
+	op, _, outcome, taken, err := a.processSigma3(s3)
+	if err == nil || outcome != sigma3Failed || op != 0 || taken.named {
+		t.Fatalf("retransmitted Sigma3 without a step value: opcode %#x, outcome %d, named %v (session %#x), err %v; want a failed step",
+			op, outcome, taken.named, taken.sessionID, err)
+	}
+	a.mu.RLock()
+	established, id := a.established, a.establishedSessionID
+	a.mu.RUnlock()
+	if established || id != 0 {
+		t.Fatalf("adapter reads established %v (session %#x) after a step without a value", established, id)
+	}
+}
