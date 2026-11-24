@@ -22,6 +22,12 @@ import (
 // matter_doorlock_users, matter_doorlock_credentials,
 // matter_doorlock_schedules and matter_settings, store/memstore in memory;
 // a host with its own store implements the four methods.
+//
+// The locks of one node pass the same AuthStore value, or start one after
+// another, for one credential key: the read-or-create of the key at a
+// start is serialised per AuthStore value (keylock.go), so two values —
+// one store wrapped differently for each lock — that start together may
+// each create a key, and the later one wins.
 type AuthStore = lockdef.AuthStore
 
 var _ AuthStore = (*store.Store)(nil)
