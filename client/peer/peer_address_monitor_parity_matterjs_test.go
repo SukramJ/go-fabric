@@ -16,10 +16,14 @@ package peer
 
 import (
 	"context"
+	"net"
+	"net/netip"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 // monitorFixture is a peer with a live session at addr1, an hour past its
@@ -274,5 +278,79 @@ func TestPeerAddressMonitorBackoff(t *testing.T) {
 		}
 		h.clock.Advance(2 * time.Second)
 		h.udp.none(t)
+	})
+}
+
+// TestPeerAddressMonitorSleepingLITICD ports the four sleeping-LIT-ICD
+// cases of PeerAddressMonitorTest.ts (:280-344 at b25ed960): the peer
+// awaits an ICD check-in (SetICDAwait), no probe answers, and the monitor
+// neither probes nor closes the session; it adopts a discovered address
+// on trust, in the session's IP family first, and keeps one still
+// discovered (review II, R2-C2-doc-2156). The family case of the source
+// puts an IPv4 candidate first for an IPv6 session; the Go service lists
+// the IPv6 address first (asserted below), so the port inverts the case —
+// an IPv4 session, the IPv6 candidate first — to keep the first candidate
+// in the other family.
+func TestPeerAddressMonitorSleepingLITICD(t *testing.T) {
+	t.Parallel()
+	lit := func() bool { return true }
+	sleeping := func(t *testing.T, at string, rrs ...string) (*harness, *Peer, nodeSide) {
+		t.Helper()
+		h := newHarness(t, func(c *Context) {
+			c.Timing = &Timing{AddressChangeStabilizationDelay: 99 * time.Hour}
+		})
+		s, ch := h.securePair(t, 0x50, udpAddr(at))
+		p := h.set.Adopt(s)
+		n := nodeSide{h: h, s: s, ch: ch}
+		h.clock.Advance(time.Hour)
+		p.SetICDAwait(lit)
+		records := []dns.RR{srvRR(h.qname, h.hostQ, 5540, 120), txtRR(h.qname, 120, "SII=800", "SAI=300")}
+		for _, ip := range rrs {
+			if netip.MustParseAddr(ip).Is4() {
+				records = append(records, &dns.A{Hdr: rrHdr(h.hostQ, dns.TypeA, 120), A: net.ParseIP(ip).To4()})
+			} else {
+				records = append(records, aaaaRR(h.hostQ, ip, 120))
+			}
+		}
+		h.mdns.announce(t, records...)
+		eventually(t, "the discovered addresses", func() bool { return len(p.Service().Addresses()) == len(rrs) })
+		h.udp.drain()
+		return h, p, n
+	}
+	check := func(t *testing.T, h *harness, p *Peer, n nodeSide, reason ReachabilityReason, want string) {
+		t.Helper()
+		if r := waitVerify(t, verifyAsync(context.Background(), p, reason)); !r.ok {
+			t.Fatal("verification failed")
+		}
+		h.udp.none(t) // never probe a sleeping ICD
+		if n.s.IsPeerLost() || !p.HasSession() {
+			t.Fatal("the healthy session was given up")
+		}
+		if got := n.s.Addr().String(); got != want {
+			t.Fatalf("session at %v, want %v", got, want)
+		}
+	}
+	t.Run("sleeping LIT ICD whose address left mDNS: adopts a discovered address on trust, no probe", func(t *testing.T) {
+		t.Parallel()
+		h, p, n := sleeping(t, addr1, "fd00::2")
+		check(t, h, p, n, ReasonAddressChange, addr2)
+	})
+	t.Run("sleeping LIT ICD prefers a discovered address in the session's IP family", func(t *testing.T) {
+		t.Parallel()
+		h, p, n := sleeping(t, "10.0.0.1:5540", "fd00::2", "10.0.0.5")
+		if first := p.Service().Addresses()[0]; !first.IP.Is6() {
+			t.Fatalf("first candidate %v, want the IPv6 one", first)
+		}
+		check(t, h, p, n, ReasonAddressChange, "10.0.0.5:5540")
+	})
+	t.Run("sleeping LIT ICD still in mDNS: keeps its address untouched, no probe", func(t *testing.T) {
+		t.Parallel()
+		h, p, n := sleeping(t, addr1, "fd00::1")
+		check(t, h, p, n, ReasonAddressChange, addr1)
+	})
+	t.Run("session-suspect on a sleeping LIT ICD never probes or closes the session", func(t *testing.T) {
+		t.Parallel()
+		h, p, n := sleeping(t, addr1, "fd00::1")
+		check(t, h, p, n, ReasonSessionSuspect, addr1)
 	})
 }
