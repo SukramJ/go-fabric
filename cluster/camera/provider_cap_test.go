@@ -26,7 +26,7 @@ import (
 
 // endOutOfResources is WebRTCEndReasonEnum OutOfResources
 // (parity/schema.json, WebRTCEndReasonEnum id 8).
-const endOutOfResources uint8 = 8
+const endOutOfResources = uint8(wrdef.WebRTCEndReasonOutOfResources)
 
 // endCall is one End the provider sent a requestor.
 type endCall struct {
