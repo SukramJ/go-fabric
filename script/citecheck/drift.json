@@ -157,7 +157,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1692,
+    "line": 1691,
     "citation": "packages/node/src/node/integration/ProtocolService.ts:290-296",
     "resolved": "packages/node/src/node/integration/ProtocolService.ts",
     "at": "b25ed960",
@@ -167,7 +167,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1943,
+    "line": 1942,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -177,7 +177,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1950,
+    "line": 1949,
     "citation": "NodeSession.ts:379-382",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",
@@ -186,7 +186,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1989,
+    "line": 1988,
     "citation": "NodeSession.ts:367-377",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "at": "db021da0",
@@ -196,7 +196,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 2900,
+    "line": 2899,
     "citation": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:243",
     "resolved": "packages/node/src/behavior/system/network/ServerNetworkRuntime.ts",
     "at": "b25ed960",
