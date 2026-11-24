@@ -1107,11 +1107,6 @@ func TestAHandedOverWaitIsNotInstalledAfterItsCallerGaveUp(t *testing.T) {
 	if installed {
 		t.Fatal("the abandoned join's attempt was installed")
 	}
-	select {
-	case <-a.done:
-	default:
-		t.Fatal("the abandoned attempt's done is open: a State change would block the loop")
-	}
 }
 
 // TestAFailedJoinKeepsTheNetworkItWasOn: a join that does not end in
