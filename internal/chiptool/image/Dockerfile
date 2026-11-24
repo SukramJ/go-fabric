@@ -28,6 +28,13 @@
 #     whose TH commissions over BLE onto Wi-Fi (`make chiptool-ble-cases`)
 #     run with /opt/matter-ble/bin/python3, every other family with the
 #     base image's python3, unchanged.
+#   - /opt/matter-webrtc, a third Python controller, built with chip's
+#     WebRTC bindings (matter.webrtc), and /lib/test-descriptor-webrtc.json,
+#     the base image's generate-test-descriptor run with it: the base
+#     image's controller has no matter.webrtc, so its descriptor skips the
+#     case files that import it (review II, decisions 642, 644, 647). The
+#     family runner runs a case only that descriptor files with
+#     /opt/matter-webrtc/bin/python3, every other case as before.
 #
 # The CHIP source and build stages are matter.js's own (support/chip/
 # Dockerfile at matter.js 862ad75f, stages base, build and source; its
@@ -157,6 +164,41 @@ RUN set -e; \
     find /opt/matter-ble -name '*.so' | xargs strip; \
     rm -rf out
 
+# The Python controller with chip's WebRTC bindings, for the certification
+# cases whose file imports matter.webrtc (TC_WEBRTCP_2_11, 2_12, 2_17 …
+# 2_25, 2_33, TC_AVSM_2_16, 2_17 at the pin). chip declares
+# chip_support_webrtc_python_bindings = false (src/controller/flags.gni:25)
+# and matter.js's install-chip-python (862ad75f, the same at 6e8eff403, the
+# commit the base image was built from) does not set it, so the base
+# image's controller has no matter.webrtc; chip's own scripts/build_python.sh
+# builds it on Linux (enable_webrtc=true, :56, passed as
+# chip_support_webrtc_python_bindings, :306). The switch adds the
+# matter/webrtc sources and the libdatachannel dependency
+# (src/controller/python/BUILD.gn:122-129, :183-192, :286-300), whose
+# submodule clone-chip keeps (862ad75f clone-chip:34-35) and which
+# third_party/libdatachannel/BUILD.gn builds with CMake against OpenSSL —
+# the controller's crypto already, chip_crypto defaulting to openssl on
+# Linux (src/crypto/crypto.gni:51-61), which build_python.sh selects for
+# WebRTC explicitly (:285-289). This one is install-chip-python's gn
+# arguments (:24-39) and BUILD.gn edits (:44-60) unchanged plus that one
+# switch, so it is the base image's controller in everything else (BLE off,
+# platform mDNS); the wheels go into the venv /opt/matter-webrtc as
+# /opt/matter-ble's do. matter.webrtc imports websockets, which the base
+# image carries (17.2, /usr/local/lib/python3.12/dist-packages).
+FROM source AS pywebrtc
+RUN set -e; \
+    gn gen out --fail-on-unused-args \
+      --args='matter_log_json_payload_hex=true matter_log_json_payload_decode_full=true chip_detail_logging=true chip_project_config_include_dirs=["//config/python"] chip_mdns="platform" chip_config_network_layer_ble=false chip_enable_ble=false matter_enable_tracing_support=false matter_trace_config="///src/tracing/none" matter_commandline_enable_perfetto_tracing=false chip_support_webrtc_python_bindings=true'; \
+    gn args out --list --short | grep -qx 'chip_support_webrtc_python_bindings = true' || { echo "the controller build has no WebRTC bindings" >&2; exit 1; }; \
+    sed -i -e /ipython/d -e /ipykernel/d -e /ipdb/d -e /pygobject/d -e s/dbus-python==1.2.18/dbus-python==1.4.0/ src/controller/python/BUILD.gn; \
+    ninja -C out python_wheels; \
+    find out -name '*.whl' | grep -v matter_yamltests-0.0.1 | grep -v matter-controller-wheels > /tmp/wheels; \
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin python3 -m venv --system-site-packages /opt/matter-webrtc; \
+    /opt/matter-webrtc/bin/pip install --no-deps --no-cache-dir $(cat /tmp/wheels); \
+    /opt/matter-webrtc/bin/pip uninstall -q -y pip; \
+    find /opt/matter-webrtc -name '*.so' | xargs strip; \
+    rm -rf out
+
 FROM ${CHIP_TEST_IMAGE} AS chip
 ARG CHIP_COMMIT=6170af8461b10b1766044122ac83332c6d00ab20
 LABEL org.opencontainers.image.title="go-fabric CHIP certification harness"
@@ -164,6 +206,7 @@ LABEL org.opencontainers.image.source=https://github.com/thingfabric/go-fabric/t
 LABEL org.opencontainers.image.revision=${CHIP_COMMIT}
 COPY --from=bins /dist/bin/jfa-app /dist/bin/jfc-app /dist/bin/chip-tool-ble /dist/bin/all-clusters-app-ble /bin/
 COPY --from=pyble /opt/matter-ble /opt/matter-ble
+COPY --from=pywebrtc /opt/matter-webrtc /opt/matter-webrtc
 COPY --from=source /connectedhomeip/src/tools/push_av_server /src/tools/push_av_server
 # The base image installs libcurl4 for chip-camera-app (matter.js
 # support/chip/Dockerfile:28-33 at 862ad75f); its apt state does not survive
@@ -187,4 +230,15 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt \
     lib=/opt/matter-ble/lib/python3.12/site-packages/matter/_ChipDeviceCtrl.so && \
     grep -q org.bluez "$lib" || { echo "/opt/matter-ble's controller has no BlueZ support" >&2; exit 1; }; \
     /opt/matter-ble/bin/python3 -c 'import ctypes, os, matter, matter.testing.linux; d = os.path.dirname(matter.__file__); assert d.startswith("/opt/matter-ble/"), d; ctypes.CDLL(d + "/_ChipDeviceCtrl.so").pychip_ble_adapter_list_new' && \
+    python3 -c 'import matter; assert matter.__file__.startswith("/usr/local/"), matter.__file__'
+# The WebRTC controller loads, is the venv's, and carries the bindings; the
+# base image's generate-test-descriptor, run with it, files the case files
+# the base image's descriptor skips for want of matter.webrtc. The base
+# image's /lib/test-descriptor.json stays as it is.
+RUN set -e; \
+    /opt/matter-webrtc/bin/python3 -c 'import ctypes, os, matter, matter.webrtc; d = os.path.dirname(matter.__file__); assert d.startswith("/opt/matter-webrtc/"), d; ctypes.CDLL(d + "/_ChipDeviceCtrl.so").pychip_webrtc_provider_client_create'; \
+    /opt/matter-webrtc/bin/python3 /bin/generate-test-descriptor > /lib/test-descriptor-webrtc.json 2> /tmp/webrtc-descriptor.err; \
+    if grep "No module named 'matter.webrtc'" /tmp/webrtc-descriptor.err; then echo "the WebRTC descriptor still skips matter.webrtc files" >&2; exit 1; fi; \
+    for f in TC_WEBRTCP_2_12.py TC_AVSM_2_16.py; do grep -q "/src/python_testing/$f" /lib/test-descriptor-webrtc.json || { echo "the WebRTC descriptor files no $f" >&2; exit 1; }; done; \
+    rm /tmp/webrtc-descriptor.err; \
     python3 -c 'import matter; assert matter.__file__.startswith("/usr/local/"), matter.__file__'

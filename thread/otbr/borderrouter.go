@@ -59,7 +59,7 @@ type BorderRouter struct {
 	c   *Client
 	cfg BorderRouterConfig
 
-	// mu guards configured and activations.
+	// mu guards configured, activations and pending.
 	mu sync.Mutex
 	// configured is chip's ActiveDatasetConfigured, narrowed to this
 	// delegate's own activations (review II, R3-fsm-3350; decision 545):
@@ -73,11 +73,14 @@ type BorderRouter struct {
 	// the fail-safe's revert against a dataset no activation of this node
 	// set.
 	configured bool
-	// activations counts the activations that set configured false. A
-	// clear returns the flag to true only when no activation started
-	// while it ran, and a refused activation only when no later one
-	// started (review II, R4-fsm-4303).
+	// activations numbers the activations onto a border router without an
+	// active dataset, and pending holds those not proven unwritten: an
+	// activation adds its number, its own 4xx takes it off, and a commit
+	// or a clear takes off those numbered before it started; configured
+	// is true exactly when pending is empty (review II, R4-fsm-4303,
+	// R5-fsm-5401).
 	activations uint64
+	pending     *activationSet
 }
 
 var _ threadbr.BorderRouter = (*BorderRouter)(nil)
@@ -97,7 +100,7 @@ func NewBorderRouter(c *Client, cfg BorderRouterConfig) (*BorderRouter, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	return &BorderRouter{c: c, cfg: cfg, configured: true}, nil
+	return &BorderRouter{c: c, cfg: cfg, configured: true, pending: &activationSet{m: map[uint64]struct{}{}}}, nil
 }
 
 // Client is the border router's REST client.
@@ -155,10 +158,11 @@ func (b *BorderRouter) Dataset(ctx context.Context, pending bool) ([]byte, error
 // is read every PollInterval until the role is attached — or ctx ends,
 // which the fail-safe's expiry does. The empty dataset clears the active
 // one, as chip attaches an empty dataset to clear it (:202-210). A PUT
-// the border router refuses with a 4xx wrote nothing and returns the flag
-// to what it was before this activation, ahead of chip (review II,
-// R4-fsm-4302; decision 545); a transport failure or a 5xx leaves the
-// revert owed, as chip leaves the flag on every error (:136-140).
+// the border router refuses with a 4xx wrote nothing and takes only this
+// activation off the uncommitted ones, ahead of chip (review II,
+// R4-fsm-4302, R5-fsm-5401; decision 545); a transport failure or a 5xx
+// leaves the revert owed, as chip leaves the flag on every error
+// (:136-140).
 func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) error {
 	current, err := b.c.ActiveDataset(ctx)
 	if err != nil {
@@ -168,13 +172,12 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 		return b.clear(ctx)
 	}
 	var activation uint64
-	var prev bool
 	if current == nil {
 		b.mu.Lock()
-		prev = b.configured
-		b.configured = false
 		b.activations++
 		activation = b.activations
+		b.pending.m[activation] = struct{}{}
+		b.configured = false
 		b.mu.Unlock()
 	} else if bytes.Equal(current, dataset) {
 		if role, err := b.c.State(ctx); err == nil && role.Attached() {
@@ -189,12 +192,14 @@ func (b *BorderRouter) SetActiveDataset(ctx context.Context, dataset []byte) err
 	if err := b.c.setDataset(ctx, false, dataset); err != nil {
 		if current == nil && refused(err) {
 			// The border router refused the PUT: nothing of this
-			// activation was written, so the flag returns to what it was
-			// before it — an earlier activation still uncommitted keeps
-			// its revert (review II, R4-fsm-4302).
-			if prev {
-				b.settle(activation)
-			}
+			// activation was written, so it takes only itself off — an
+			// other activation still uncommitted keeps its revert, and
+			// overlapping refused ones each take themselves off (review
+			// II, R4-fsm-4302, R5-fsm-5401).
+			b.mu.Lock()
+			delete(b.pending.m, activation)
+			b.configured = len(b.pending.m) == 0
+			b.mu.Unlock()
 		}
 		return b.reenable(ctx, current != nil, err)
 	}
@@ -213,15 +218,19 @@ func refused(err error) bool {
 	return errors.As(err, &oe) && oe.HTTPStatus >= 400 && oe.HTTPStatus < 500
 }
 
-// settle returns the flag to configured unless an activation started
-// after the counter read since: that activation's dataset is still
-// uncommitted (review II, R4-fsm-4303).
+// settle takes off the activations numbered up to since, those that
+// started before the commit or the clear that read it; an activation that
+// started after is still uncommitted and keeps the flag false (review II,
+// R4-fsm-4303, R5-fsm-5401).
 func (b *BorderRouter) settle(since uint64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.activations == since {
-		b.configured = true
+	for n := range b.pending.m {
+		if n <= since {
+			delete(b.pending.m, n)
+		}
 	}
+	b.configured = len(b.pending.m) == 0
 }
 
 // reenable is the step back of an activation that disabled the Thread
@@ -295,8 +304,13 @@ func (b *BorderRouter) clear(ctx context.Context) error {
 // activation is committed when the border router is attached
 // (CommitActiveDataset, :186-189). A border router found not attached
 // leaves the flag as it is: only an activation of this delegate leaves
-// the dataset to the fail-safe's revert (review II, R3-fsm-3350).
+// the dataset to the fail-safe's revert (review II, R3-fsm-3350). An
+// activation that started after the commit read the border router's state
+// stays uncommitted (review II, R5-fsm-5401).
 func (b *BorderRouter) CommitActiveDataset(ctx context.Context) error {
+	b.mu.Lock()
+	since := b.activations
+	b.mu.Unlock()
 	role, err := b.c.State(ctx)
 	if err != nil {
 		return err
@@ -304,9 +318,7 @@ func (b *BorderRouter) CommitActiveDataset(ctx context.Context) error {
 	if !role.Attached() {
 		return nil
 	}
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.configured = true
+	b.settle(since)
 	return nil
 }
 
@@ -365,3 +377,9 @@ func (b *BorderRouter) Diagnostics(ctx context.Context) (thread.NodeDiagnostics,
 	}
 	return out, nil
 }
+
+// activationSet holds the activations not proven unwritten. It sits
+// behind a pointer so BorderRouter stays comparable, as it was at
+// v0.25.0 (a map field would make it not comparable, an API break the
+// fix of R5-fsm-5401 does not need).
+type activationSet struct{ m map[uint64]struct{} }

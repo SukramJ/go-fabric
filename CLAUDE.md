@@ -23,7 +23,7 @@ make lint           # gofumpt check + golangci-lint + go mod tidy -diff + go mod
 make fmt            # gofumpt -w .
 make ci             # what ci.yml runs offline: build build-32bit vet archcheck apidiff-check race lint cover-check
                     # bench-smoke reachability-check surface-check testparity-check + the four nested-module checks
-make ci-net         # cite-check + testparity-snapshot-check + chipdm-check: the guards that read a clone at a pinned commit
+make ci-net         # cite-check + testparity-snapshot-check + chipdm-check + chipcases-check: the guards that read a clone at a pinned commit
 make setup          # install the pinned gofumpt / golangci-lint, plus govulncheck
 ```
 

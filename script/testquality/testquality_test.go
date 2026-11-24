@@ -161,6 +161,7 @@ var environmentSkips = map[string]int{
 	"conformance/chiptool_smoke_test.go:TestChipToolPairingOnNetworkLong":      1,
 	"internal/chipdm/crosscheck_test.go:chipModel":                             1,
 	"internal/chipdm/levels_test.go:TestChipDataModelLevels":                   1,
+	"internal/chiptool/chipcoverage_test.go:TestChipPythonCasesCovered":        1,
 	"internal/chiptool/controller_test.go:resolveChipTool":                     1,
 	"internal/chiptool/matterjs_test.go:startMatterJSController":               2,
 	"schema/staleness_test.go:TestMatterJSSchemaStalenessAgainstLiveCheckout":  2,

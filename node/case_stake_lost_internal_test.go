@@ -60,7 +60,7 @@ func TestCASEResponderWhoseStakeWasTakenOverOpensNoSession(t *testing.T) {
 	if err != nil || op != mrp.SCOpcodeSigma2 {
 		t.Fatalf("Sigma1 answered with opcode %#x, %v; want Sigma2", op, err)
 	}
-	staked := adapter.SnapshotResponder().SessionID()
+	staked := adapter.SnapshotResponder().SessionID() //nolint:staticcheck // SA1019: the test reads the responder the handshake ran on, held until SnapshotResponder's removal
 	sigma3, err := initiator.ProcessSigma2Bytes(sigma2)
 	if err != nil {
 		t.Fatalf("ProcessSigma2: %v", err)

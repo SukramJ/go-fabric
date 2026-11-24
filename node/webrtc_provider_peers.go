@@ -67,6 +67,9 @@ type cameraPeerGone struct {
 	// pair was worked off: ended is the number of providers it ended
 	// sessions on, cancelled whether a live session stopped it.
 	testDone func(addr exchange.PeerAddress, ended int, cancelled bool)
+	// testBetweenReads, set by tests only, runs inside the gone predicate
+	// between its first read and the next (R5-conc-5301).
+	testBetweenReads func(addr exchange.PeerAddress)
 }
 
 // wireCameraPeerGone has the session table report a lost peer to the
@@ -134,7 +137,7 @@ func (n *Node) drainCameraPeerGone() {
 	q := &n.sec.peerGone
 	for {
 		q.mu.Lock()
-		if len(q.pending) == 0 || n.life.Err() != nil {
+		if len(q.pending) == 0 || n.life.Err() != nil || n.stopBegan() {
 			q.running, q.pending = false, nil
 			q.mu.Unlock()
 			return
@@ -168,7 +171,23 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 	if topo == nil {
 		return
 	}
-	gone := func() bool { return !n.holdsPeerSession(addr) }
+	// "No session left" is evidence only when Stop's own closing is not
+	// its cause: Stop closes every session before the node's life ends
+	// (R5-conc-5301). The session table is read first and the stop flag
+	// after it: Stop sets the flag before it closes a session and never
+	// clears it, so a flag still clear means the absence read before it
+	// was not Stop's doing (fable-diff-h4-r2 §2). stopBegan is lock-free,
+	// so the predicate takes no lock under the provider's command
+	// serialisation (decision 650).
+	gone := func() bool {
+		if n.holdsPeerSession(addr) {
+			return false
+		}
+		if q.testBetweenReads != nil {
+			q.testBetweenReads(addr)
+		}
+		return !n.stopBegan() && n.life.Err() == nil
+	}
 	for _, ep := range topo.Endpoints {
 		for _, srv := range endpoint.ClusterServers(ep) {
 			p, ok := srv.(*camera.Provider)
@@ -184,6 +203,10 @@ func (n *Node) endLostPeer(addr exchange.PeerAddress) {
 					slog.Int("fabric_index", int(addr.FabricIndex)), slog.Uint64("node_id", addr.NodeID), slog.Any("err", err))
 			}
 			if !ran {
+				if n.stopBegan() || n.life.Err() != nil {
+					// Stop began: the end gave way to it, no session is live again.
+					return
+				}
 				cancelled = true
 				n.logger.Debug("matter.camera.peer_gone.cancelled",
 					slog.Int("fabric_index", int(addr.FabricIndex)), slog.Uint64("node_id", addr.NodeID),

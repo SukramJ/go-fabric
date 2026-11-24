@@ -59,9 +59,10 @@ type Observers struct {
 	// moment after the hook — the next Start runs it, and a host may hear
 	// the same removal twice. A hook registered with [Node.ObserveAsync]
 	// counts as run once its queued call ran: the event is acknowledged
-	// behind it on the callback queue, and one whose call the queue may
-	// have dropped at its bound stays owed for the next Start (decision
-	// 600, review II R4-err-4751). One residual: a store upgraded from a release
+	// behind it on the callback queue, which never drops the hook's call
+	// or the acknowledgement (decisions 600, 615; review II R4-err-4751);
+	// an event delivered to a queue that no longer runs stays owed for the
+	// next Start. One residual: a store upgraded from a release
 	// before schema v8 that went down inside a fail-safe window owes the
 	// removal of that window's AddNOC in memory only — it reaches the host
 	// only if the first process on the upgraded store starts.

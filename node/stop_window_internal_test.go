@@ -120,6 +120,7 @@ func TestTransitionDuringStopAnnouncesNothing(t *testing.T) {
 	n.cancelWindow()
 	n.keeperMu.Lock()
 	n.stopping = true
+	n.stopFlag.Store(true)
 	n.keeperMu.Unlock()
 	before := adv.count()
 	if err := n.br.CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {

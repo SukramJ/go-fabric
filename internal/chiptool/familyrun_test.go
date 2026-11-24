@@ -621,8 +621,12 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 		extraArgs: daemonAppArgs(c.AppArgs, flags),
 	})
 
+	python := "python3"
+	if c.Python != "" {
+		python = c.Python
+	}
 	args := []string{
-		"python3", c.Path, "--PICS", pics,
+		python, c.Path, "--PICS", pics,
 		"--paa-trust-store-path", chipPAATrustStore,
 		"--app-pipe", filepath.Join(work, "app.fifo"),
 		"--restart-flag-file", filepath.Join(work, "restart.flag"),

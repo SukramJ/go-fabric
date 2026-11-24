@@ -372,7 +372,7 @@ CHIPTOOL_BIN_DIR     ?= bin
 # digest is a new commissioner and a new case set — lift CHIP_BASE_IMAGE and
 # the commit, dispatch chip-image.yml, then pin the digest it prints here.
 CHIP_BASE_IMAGE        ?= ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326
-CHIP_TEST_IMAGE        ?= ghcr.io/thingfabric/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a08715a65ebfe0e5c9ae8dc2e322ca8f4e006ff
+CHIP_TEST_IMAGE        ?= ghcr.io/thingfabric/go-fabric-chip@sha256:a22ed731e3fa28eb380ca104289edfec7ec16d29fc61251b4dbd60bd48035392
 CHIP_TEST_IMAGE_COMMIT ?= 6170af8461b10b1766044122ac83332c6d00ab20
 
 # The CHIP data model directory the snapshot is cross-checked against
@@ -424,6 +424,10 @@ chiptool-setup: ## sparse connectedhomeip checkout at the harness image's CHIP c
 .PHONY: chipdm-check
 chipdm-check: ## run the CHIP data model cross-check against CHIP_ROOT; fails instead of skipping without the checkout
 	GOFABRIC_CHIP_ROOT="$(abspath $(CHIP_ROOT))" GOFABRIC_CHIP_REQUIRED=1 $(GO) test -count=1 -run 'TestChipDataModel|TestCompareSeededDifferences' -v ./internal/chipdm/
+
+.PHONY: chipcases-check
+chipcases-check: ## hold the certification family table to chip's Python cases at CHIP_TEST_IMAGE_COMMIT (CHIP_ROOT); fails instead of skipping without the checkout
+	GOFABRIC_CHIP_ROOT="$(abspath $(CHIP_ROOT))" GOFABRIC_CHIP_REQUIRED=1 $(GO) test -count=1 -run 'TestChipPythonCasesCovered|TestChipPythonCoverageSeeded|TestChipPyCaseID' -v ./internal/chiptool/
 
 .PHONY: chipdm-report
 chipdm-report: ## rewrite the generated block of docs/chip-datamodel-crosscheck.md from CHIP_ROOT
@@ -784,4 +788,4 @@ workflow-lint: ## actionlint and zizmor over .github/workflows (pinned: ACTIONLI
 ci: build build-32bit vet archcheck apidiff-check race lint cover-check bench-smoke reachability-check surface-check testparity-check bluez-check esphome-check wpasupplicant-check ble-wifi-light-check ## everything the pipeline runs offline (ci-net: the guards that read a pinned clone)
 
 .PHONY: ci-net
-ci-net: cite-check testparity-snapshot-check chipdm-check ## the pipeline's guards that read a clone at a pinned commit (matter.js and matterjs-server, connectedhomeip's data model)
+ci-net: cite-check testparity-snapshot-check chipdm-check chipcases-check ## the pipeline's guards that read a clone at a pinned commit (matter.js and matterjs-server, connectedhomeip's data model and Python cases)

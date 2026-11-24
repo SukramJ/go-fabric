@@ -39,7 +39,8 @@ import (
 // 6170af8461b10b1766044122ac83332c6d00ab20 (examples/camera-app/), whose
 // camera the cases were written against. Nothing is captured, encoded or
 // sent: every port answers the way the camera-app's managers answer and
-// keeps the state they keep.
+// keeps the state they keep, and a WebRTC offer gets a synthetic answer
+// but no ICE candidate, connection or media (camera_webrtc.go).
 //
 //   - "camera" is a Camera (camera-app endpoint 1, device type ma_camera,
 //     camera-app.matter): CameraAvStreamManagement with every feature the
@@ -172,6 +173,16 @@ type demoCamera struct {
 	// pushEvents carries the push transports' Begin and End to the
 	// server in the order the transitions happened (R2-P6-conc-2608).
 	pushEvents orderedQueue
+	// sessionStreams are the streams each WebRTC session counted
+	// (camera_webrtc.go acquireStreams), fingerprint the camera's DTLS
+	// certificate fingerprint its answers carry.
+	sessionStreams map[uint16]camSessionStreams
+	fingerprint    string
+	// signals are the WebRTC sessions' shared answer state
+	// (camera_webrtc.go sessionSignal); life is the daemon's context from
+	// attach, which the camera's background signalling ends with.
+	signals map[uint16]*camSessionSignal
+	life    context.Context //nolint:containedctx // the daemon's lifetime, for goroutines a port starts
 }
 
 type camAvailableVideo struct {
@@ -283,6 +294,7 @@ func (c *demoCamera) attach(ctx context.Context, st settings) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.st = st
+	c.life = ctx
 	v, ok, err := st.GetSetting(ctx, cameraStateSetting)
 	if err != nil {
 		c.keepUnreadLocked(fmt.Errorf("read %s: %w", cameraStateSetting, err))
@@ -547,6 +559,17 @@ func (c *demoCamera) build() error {
 
 	persist := func() { c.persist() }
 	cam.CameraAvStreamManagement().OnChangedAsync(func(csdef.State, contract.Change) { persist() })
+	// Mirrors chip examples/camera-app/linux/src/clusters/camera-avstream-mgmt/
+	// camera-av-stream-manager.cpp:702-706 at 6170af84: a change of
+	// SoftLivestreamPrivacyModeEnabled reaches the WebRTC manager
+	// (camera-device.cpp:1670-1677), which ends the sessions when it turned
+	// on (webrtc-provider-manager.cpp:1063-1087). Its own goroutine: the
+	// callback runs inside the stream management's change.
+	cam.CameraAvStreamManagement().OnChanged(func(st csdef.State, ch contract.Change) {
+		if st.SoftLivestreamPrivacyModeEnabled && slices.Contains(ch.Attributes, csdef.AttrSoftLivestreamPrivacyModeEnabled) {
+			go c.livestreamPrivacyOn()
+		}
+	})
 	cam.CameraAvSettingsUserLevelManagement().OnChangedAsync(func(avdef.State, contract.Change) { persist() })
 	cam.ZoneManagement().OnChangedAsync(func(zmdef.State, contract.Change) { persist() })
 	cam.PushAvStreamTransport().OnChangedAsync(func(padef.State, contract.Change) { persist() })
@@ -819,8 +842,12 @@ func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (
 	return camSession(args), p.c.opts.deferredOffer, nil
 }
 
-// ProvideOffer returns the session; the answer would come from a media
-// stack this simulation does not have. A re-offer — its id already in CurrentSessions — starts
+// ProvideOffer returns the session and answers the offer (camera_webrtc.go:
+// the camera-app's HandleProvideOffer, webrtc-provider-manager.cpp:
+// 397-534, SetRemoteDescription and CreateAnswer at :531-532 for a new
+// session and a re-offer alike): a new session counts its streams first
+// (AcquireAudioVideoStreams, :522), and the Answer command follows the
+// response. A re-offer — its id already in CurrentSessions — starts
 // from that session (chip WebRTCTransportProviderCluster.cpp:926 at
 // 6170af84, outSession = *existingSession) and sets what
 // HandleProvideOffer sets (webrtc-provider-manager.cpp:407-445): the
@@ -828,13 +855,21 @@ func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (
 // without one. The session's stream lists stay, so a re-offer that
 // carries no deprecated id still names its streams ("O.a+", which the
 // server holds CurrentSessions to; TC-WEBRTCP-2.30 step 7).
-func (p camProviderPort) ProvideOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
+//
+// A re-offer counts no streams again: the camera-app's acquires the
+// re-offer's streams a second time and releases them once
+// (AcquireAudioVideoStreams at :522 on every offer, CleanupSession once),
+// which would leave a count no session holds.
+func (p camProviderPort) ProvideOffer(ctx context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, error) {
 	s, reoffer := p.c.currentSession(args.SessionID)
 	if !reoffer {
-		return camSession(args), nil
+		s = camSession(args)
+		p.c.acquireStreams(s.Id, args.VideoStreams, args.AudioStreams)
+	} else {
+		s.Id, s.PeerNodeId, s.PeerEndpointId, s.StreamUsage, s.FabricIndex = args.SessionID, args.PeerNodeID, args.OriginatingEndpointID, args.StreamUsage, args.FabricIndex
+		s.VideoStreamId, s.AudioStreamId = camFirst(args.VideoStreams), camFirst(args.AudioStreams)
 	}
-	s.Id, s.PeerNodeId, s.PeerEndpointId, s.StreamUsage, s.FabricIndex = args.SessionID, args.PeerNodeID, args.OriginatingEndpointID, args.StreamUsage, args.FabricIndex
-	s.VideoStreamId, s.AudioStreamId = camFirst(args.VideoStreams), camFirst(args.AudioStreams)
+	p.c.answerOffer(ctx, s.Id, args.Sdp)
 	return s, nil
 }
 
@@ -860,7 +895,15 @@ func (camProviderPort) ProvideIceCandidates(context.Context, uint16, []wpdef.ICE
 	return nil
 }
 
-func (camProviderPort) EndSession(context.Context, uint16, uint8) error { return nil }
+// EndSession releases the session's streams: the camera-app's
+// HandleEndSession → CleanupSession → ReleaseAudioVideoStreams
+// (webrtc-provider-manager.cpp:618-629, :1032). The server calls it for
+// the EndSession command, a session CurrentSessions refused, a removed
+// fabric and a gone peer.
+func (p camProviderPort) EndSession(_ context.Context, id uint16, _ uint8) error {
+	p.c.sessionEnded(id)
+	return nil
+}
 
 // --- PushAvStreamTransport (push-av-stream-manager.cpp) --------------------
 

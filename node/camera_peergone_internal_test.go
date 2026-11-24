@@ -441,7 +441,7 @@ func waitGoroutineBlockedIn(t *testing.T, header, fn string) {
 	for range 1_000_000 {
 		stacks := string(buf[:runtime.Stack(buf, true)])
 		for _, g := range strings.Split(stacks, "\n\n") {
-			if strings.HasPrefix(g, header+"[") && strings.Contains(g, "sync.(*Mutex).Lock") && strings.Contains(g, fn) {
+			if strings.HasPrefix(g, header+"[") && (strings.Contains(g, "sync.(*Mutex).Lock") || strings.Contains(g, "camera.(*opLock).")) && strings.Contains(g, fn) {
 				return
 			}
 		}

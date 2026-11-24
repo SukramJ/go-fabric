@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10765,
+  "entry_points": 10794,
   "initializers": 372,
   "entry_packages": [
     ".",
@@ -296,9 +296,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28574,
-    "reachable": 22321,
-    "whitelisted": 6231,
+    "total_exported": 28603,
+    "reachable": 22325,
+    "whitelisted": 6256,
     "unreachable": 22
   },
   "by_package": [
@@ -1872,6 +1872,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCaseEstablishedIsTheStepsOwnSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_established_r5_test.go",
+      "line": 38
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCaseProviderEvictsOnlyForAHandshakeThatBegan",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma1_replay_test.go",
@@ -2009,6 +2016,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_provider_test.go",
       "line": 266
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCaseSessionEstablishedFedFromTheValue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_established_r5_test.go",
+      "line": 109
     },
     {
       "package": "bridge",
@@ -7115,6 +7129,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestResumeAwaitsItsOwnInstalledSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_established_r5_test.go",
+      "line": 170
+    },
+    {
+      "package": "bridge",
       "identifier": "TestResumeBindsTheSessionItsSigma1Established",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
@@ -7805,6 +7826,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma3_abandon_test.go",
       "line": 22
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSigma3WithoutStepValueIsNoEstablishment",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/case_established_r5_test.go",
+      "line": 228
     },
     {
       "package": "bridge",
@@ -12722,6 +12750,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestAccessControlHeldMarkFromReadAndWrite",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/access_control_held_r5_test.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestActionsCommandStatuses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/actions_test.go",
@@ -13062,6 +13097,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_uptime_test.go",
       "line": 16
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestGroupKeyManagementHeldMarkFromReadAndWrite",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/group_key_management_held_r5_test.go",
+      "line": 28
     },
     {
       "package": "cluster/core",
@@ -26060,7 +26102,7 @@
       "identifier": "TestStoredFabricLabelCutIsSavedOnceAtLoad",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_label_save_test.go",
-      "line": 78
+      "line": 81
     },
     {
       "package": "controller/commissioner",
@@ -26081,7 +26123,14 @@
       "identifier": "TestStoredFabricLabelCutSaveFailureIsWarned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/fabric_label_save_test.go",
-      "line": 142
+      "line": 145
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestStoredFabricLabelCutSignerTakeoverSavesOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_label_save_test.go",
+      "line": 180
     },
     {
       "package": "controller/commissioner",
@@ -30068,6 +30117,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestKeyStateFieldsAreClassified",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/key_state_fields_r5_test.go",
+      "line": 18
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestKitWriteVerdictParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/write_verdict_table_test.go",
@@ -31244,6 +31300,41 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerRetryIsBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 451
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerReusesICECredentials",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 415
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerSDP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 344
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerStopsAtEnd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 478
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswersOfferAndEndsOnPrivacy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 274
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestCameraSimAppPipeRefusals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
@@ -31269,6 +31360,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_sim_test.go",
       "line": 761
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimEndSessionReleasesStreams",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_webrtc_test.go",
+      "line": 314
     },
     {
       "package": "examples/reference-bridge",
@@ -35717,6 +35815,27 @@
     },
     {
       "package": "internal/chiptool",
+      "identifier": "TestChipPyCaseID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/chipcoverage_test.go",
+      "line": 278
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestChipPythonCasesCovered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/chipcoverage_test.go",
+      "line": 159
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestChipPythonCoverageSeeded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/chipcoverage_test.go",
+      "line": 247
+    },
+    {
+      "package": "internal/chiptool",
       "identifier": "TestDeviceTypeEvents",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/pics_device_events_test.go",
@@ -35727,7 +35846,7 @@
       "identifier": "TestFamilyDeviceTypesResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 573
+      "line": 589
     },
     {
       "package": "internal/chiptool",
@@ -35832,7 +35951,7 @@
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 485
+      "line": 501
     },
     {
       "package": "internal/paritytest",
@@ -37292,6 +37411,13 @@
     },
     {
       "package": "node",
+      "identifier": "TestCASEResponderInstallsTheSigma3SessionDespiteAResumeMeanwhile",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/security_established_r5_internal_test.go",
+      "line": 27
+    },
+    {
+      "package": "node",
       "identifier": "TestCASEResponderKeepsTheResolutionOfItsAcceptedSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/case_fabric_updated_internal_test.go",
@@ -37397,6 +37523,20 @@
     },
     {
       "package": "node",
+      "identifier": "TestCameraPeerGoneTakesNoKeeperLock",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/camera_peergone_stop_test.go",
+      "line": 291
+    },
+    {
+      "package": "node",
+      "identifier": "TestCameraPeerLossAfterStopBeganEndsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/camera_peergone_stop_test.go",
+      "line": 123
+    },
+    {
+      "package": "node",
       "identifier": "TestCameraPeerLossEndsTheLostPeersSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/camera_peergone_internal_test.go",
@@ -37404,10 +37544,31 @@
     },
     {
       "package": "node",
+      "identifier": "TestCameraPeerLossInStopsWindowEndsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/camera_peergone_stop_test.go",
+      "line": 142
+    },
+    {
+      "package": "node",
+      "identifier": "TestCameraPeerLossStopBetweenTheReadsEndsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/camera_peergone_stop_test.go",
+      "line": 212
+    },
+    {
+      "package": "node",
       "identifier": "TestCameraPeerLossWaitsForACommandInFlight",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/camera_peergone_internal_test.go",
       "line": 349
+    },
+    {
+      "package": "node",
+      "identifier": "TestCameraStopEndsThePeerGoneWait",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/camera_peergone_stop_test.go",
+      "line": 28
     },
     {
       "package": "node",
@@ -39987,6 +40148,13 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestProcessSigma3EstablishedReturnsTheStepsSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/established_r5_test.go",
+      "line": 16
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestProcessSigma3_FabricIDExtractorAbsent_FailsClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/protocol_fabricid_test.go",
@@ -41573,6 +41741,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/translate_parity_matterjs_test.go",
       "line": 79
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestTwoOverlappingRefusedActivationsLeaveNothingArmed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/borderrouter_r5_test.go",
+      "line": 21
     },
     {
       "package": "tlv",

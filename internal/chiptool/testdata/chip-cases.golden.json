@@ -1,5 +1,5 @@
 {
-  "image": "ghcr.io/sukramj/go-fabric-chip@sha256:d683bf5bbca6b0d9a37bcce64a08715a65ebfe0e5c9ae8dc2e322ca8f4e006ff",
+  "image": "ghcr.io/thingfabric/go-fabric-chip@sha256:a22ed731e3fa28eb380ca104289edfec7ec16d29fc61251b4dbd60bd48035392",
   "cases": {
     "ACE/1.1": {
       "steps": 38,
@@ -180,6 +180,16 @@
     "AVSM/2.15": {
       "tests": 1,
       "steps": 8,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.16": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "AVSM/2.17": {
+      "tests": 1,
+      "steps": 21,
       "stepsSkipped": 0
     },
     "AVSM/2.18": {
@@ -2241,6 +2251,16 @@
       "steps": 4,
       "stepsSkipped": 0
     },
+    "SWTCH/2.3": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 4
+    },
+    "SWTCH/2.4": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
     "SWTCH/2.5": {
       "tests": 1,
       "steps": 15,
@@ -2511,6 +2531,11 @@
       "steps": 4,
       "stepsSkipped": 0
     },
+    "WEBRTCP/2.12": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
     "WEBRTCP/2.13": {
       "tests": 1,
       "steps": 7,
@@ -2770,6 +2795,8 @@
       "2.13",
       "2.14",
       "2.15",
+      "2.16",
+      "2.17",
       "2.18",
       "2.19",
       "2.20",
@@ -3639,6 +3666,8 @@
     "SWTCH": [
       "2.1",
       "2.2",
+      "2.3",
+      "2.4",
       "2.5",
       "2.6",
       "3.2"
@@ -3757,10 +3786,22 @@
       "2.8",
       "2.9",
       "2.10",
+      "2.11",
+      "2.12",
       "2.13",
       "2.14",
       "2.15",
-      "2.16"
+      "2.16",
+      "2.17",
+      "2.18",
+      "2.19",
+      "2.20",
+      "2.21",
+      "2.22",
+      "2.23",
+      "2.24",
+      "2.25",
+      "2.33"
     ],
     "WHM": [
       "1.2",
@@ -3926,6 +3967,14 @@
     "TIMESYNC/2.8": "TIMESYNC.S.F00",
     "TIMESYNC/2.9": "TIMESYNC.S.F00",
     "TSTAT/4.4": "TSTAT.S \u0026 TSTAT.S.F0b",
+    "WEBRTCP/2.11": "WEBRTCP.S \u0026 WEBRTCP.S.C00.Rsp \u0026 WEBRTCP.S.C01.Tx \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01 \u0026 PS.S.F01",
+    "WEBRTCP/2.17": "WEBRTCP.S \u0026 WEBRTCP.S.C02.Rsp \u0026 WEBRTCP.S.C03.Tx \u0026 WEBRTCR.C.C01.Tx \u0026 WEBRTCP.S.C06.Rsp \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01",
+    "WEBRTCP/2.18": "WEBRTCP.S \u0026 WEBRTCP.S.C00.Rsp \u0026 WEBRTCP.S.C01.Tx \u0026 WEBRTCR.S.C04.Rsp \u0026 WEBRTCP.S.C06.Rsp \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01",
+    "WEBRTCP/2.19": "WEBRTCP.S \u0026 WEBRTCP.S.C00.Rsp \u0026 WEBRTCP.S.C01.Tx \u0026 WEBRTCR.S.C04.Rsp \u0026 WEBRTCP.S.C06.Rsp \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01",
+    "WEBRTCP/2.20": "WEBRTCP.S \u0026 WEBRTCP.S.C02.Rsp \u0026 WEBRTCP.S.C03.Tx \u0026 WEBRTCR.S.C05.Rsp \u0026 WEBRTCP.S.C06.Rsp \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01",
+    "WEBRTCP/2.21": "WEBRTCP.S \u0026 WEBRTCP.S.C02.Rsp \u0026 WEBRTCP.S.C03.Tx \u0026 WEBRTCR.C.C01.Rsp \u0026 WEBRTCR.S.C05.Rsp \u0026 WEBRTCP.S.C06.Rsp \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01",
+    "WEBRTCP/2.24": "WEBRTCP.S \u0026 WEBRTCP.S.F02 \u0026 WEBRTCP.S.C00.Rsp \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01",
+    "WEBRTCP/2.25": "WEBRTCP.S \u0026 WEBRTCP.S.F02 \u0026 WEBRTCP.S.C00.Rsp \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01",
     "WNCV/6.1.Simulated": "WNCV.C",
     "WNCV/7.1.Simulated": "WNCV.C",
     "WebRTCP/2.1": "WEBRTCP.S \u0026 WEBRTCP.S.A0000 \u0026 WEBRTCP.S.C00.Rsp \u0026 WEBRTCP.S.C01.Tx \u0026 AVSM.S \u0026 AVSM.S.F00 \u0026 AVSM.S.F01 \u0026 PS.S.F01"

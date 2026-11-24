@@ -88,7 +88,7 @@ func TestAFailedCASEHandshakeReleasesOnlyItsOwnStake(t *testing.T) {
 		if op, _, err := h.ProcessSigma1(sigma1); err != nil || op != mrp.SCOpcodeSigma2 {
 			t.Fatalf("Sigma1 answered with opcode %#x, %v; want Sigma2", op, err)
 		}
-		return h.SnapshotResponder().SessionID()
+		return h.SnapshotResponder().SessionID() //nolint:staticcheck // SA1019: the test reads the responder the handshake ran on, held until SnapshotResponder's removal
 	}
 	first := bridge.HandshakeKey{InitiatorNodeID: 0xC0FFEE, ExchangeID: 1}
 	staked := begin(first)

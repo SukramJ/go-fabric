@@ -127,6 +127,11 @@ type family struct {
 	ownEndpoints map[string]bool
 	// exclude maps a case ("2.9", "10.*") to the gap it is.
 	exclude map[string]gap
+	// absent maps a Python case of the family at the harness commit that
+	// the family run never reaches — the image's descriptor does not file
+	// it, or the loader drops it — to the gap it is, with the measured
+	// cause (TestChipPythonCasesCovered, chipcoverage_test.go).
+	absent map[string]gap
 	// args are extra script arguments per case ("*" for every case).
 	args map[string][]string
 	// edits patch a case file before it runs.
@@ -291,6 +296,18 @@ type recordedFailure struct {
 // startUpOnBridged classifies the cases that power-cycle the bridge and
 // expect a bridged light's start-up attribute applied.
 const startUpOnBridged = "the case reboots the DUT and expects the light's StartUpOnOff / StartUpColorTemperatureMireds applied; matter.js applies the start-up attributes only on an endpoint no Aggregator owns (OnOffServer.ts and ColorControlServer.ts initialize: !endpoint.ownerOfType(AggregatorEndpoint)) — a bridge restart is not the bridged device's power cycle — and every light here is bridged"
+
+// The causes of the absent entries (family.absent), measured in the harness
+// image (CHIP_TEST_IMAGE, /etc/chip-version 6170af84) on 2026-11-24: the
+// image's /bin/generate-test-descriptor, byte-identical to matter.js
+// 862ad75f's support/chip/support/generate-test-descriptor, imports every
+// src/python_testing/*.py and skips a file whose import raises (:290-296);
+// re-run in the image it writes the shipped /lib/test-descriptor.json and
+// names each skipped file with its error on stderr.
+const (
+	// absentNoNDEF: the case file imports matter.testing.nfc, which imports ndef (NFC).
+	absentNoNDEF = "not in the harness image's test descriptor, so the family run never reaches it: the case file imports matter.testing.nfc, which imports ndef, which the image's Python lacks (generate-test-descriptor re-run in the image: No module named 'ndef'), and generate-test-descriptor skips a file whose import raises (:290-296)"
+)
 
 // Device types of the reference daemon's bridged endpoints
 // (examples/reference-bridge/fleet*.go), named for the family table.
@@ -566,6 +583,11 @@ var chipFamilies = []family{
 	},
 	{
 		name: "DD",
+		absent: map[string]gap{
+			"1.5":  {classHarness, absentNoNDEF, false},
+			"3.23": {classHarness, absentNoNDEF, false},
+			"3.24": {classHarness, absentNoNDEF, false},
+		},
 		// TC_DD_1_16_17.py is a MatterTestUncommissionedDevice case: it
 		// parses the onboarding payload and checks the commissionable
 		// advertisement of a factory-new device, without commissioning
@@ -618,6 +640,9 @@ var chipFamilies = []family{
 	{name: "GRPKEY"},
 	{
 		name: "IDM",
+		absent: map[string]gap{
+			"10.7": {classHarness, absentNoNDEF, false},
+		},
 		args: map[string][]string{
 			// The bridge mounts Identify on every bridged endpoint, including
 			// device types that do not list it; matter.js passes the same flag
@@ -1113,6 +1138,17 @@ var chipFamilies = []family{
 			// Step 2 sends its ProvideOffers to endpoint 1, step 3 to the
 			// case's endpoint (TC_WEBRTCP_2_16.py:159, :173).
 			"2.16": {{"cmd=provide_offer_cmd,\n                endpoint=1,", "cmd=provide_offer_cmd,\n                endpoint=endpoint,", "step 2 addresses endpoint 1, the camera-app's camera, where step 3 uses the case's endpoint (TC_WEBRTCP_2_16.py:159, :173); the daemon's camera is a bridged endpoint"}},
+		},
+		// The --camera-sim camera has no media stack. Measured in run
+		// 45361353348: these cases waited for the DUT's Answer to a
+		// ProvideOffer until the 90 s body timeout. Since decision 652 the sim
+		// sends a synthetic Answer (AVSM 2.16 and 2.17 pass, run 45371120681);
+		// these three then wait for the DUT's ICE candidates and media, which
+		// the sim cannot produce — inferred from the case lines, not run.
+		exclude: map[string]gap{
+			"2.22": {classHarness, "TC-WEBRTCP-2.22 step 2 waits for the DUT's Answer to its ProvideOffer, then its ICE candidates and a connected peer (TC_WEBRTCP_2_22.py:143, :161, :167 at 6170af84); the --camera-sim camera answers ProvideOfferResponse and has no media stack to make an answer from (examples/reference-bridge/camera.go ProvideOffer), where chip's camera-app takes it from libdatachannel (webrtc-provider-manager.cpp:531-532, :1124-1150). The case's PICS (:76-84) omit the Answer code its sibling 2.17 gates on (WEBRTCR.C.C01.Tx, TC_WEBRTCP_2_17.py:82), which this DUT declares false; the body times out after 90 s", false},
+			"2.23": {classHarness, "TC-WEBRTCP-2.23 step 3 waits for the DUT's Answer, its ICE candidates and a connected peer (TC_WEBRTCP_2_23.py:190, :208, :214 at 6170af84); the --camera-sim camera has no media stack to answer from (see 2.22), and the case's PICS (:78-86) omit the Answer code 2.17 gates on", false},
+			"2.33": {classHarness, "TC-WEBRTCP-2.33 step 2 waits for the DUT's Answer, its ICE candidates, a connected peer and RTP video frames and audio packets from the DUT (TC_WEBRTCP_2_33.py:110, :127, :132, :160, :165 at 6170af84); the --camera-sim camera captures, encodes and sends nothing (see 2.22), and the case's PICS (:172-180) omit the Answer code 2.17 gates on", false},
 		},
 	},
 	{name: "WebRTCP", deviceType: dtCamera, variant: variantCamera},

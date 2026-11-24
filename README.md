@@ -260,6 +260,8 @@ becomes permissible in:
 | `controller/dcl.*` (every name of the package, each forwarding unchanged) | the same name in `dcl`, the role-neutral package the ledger client moved to | `v0.28.0` |
 | `cluster/core.WiFiNetworkCommissioningConfig.IsFailSafeArmed`, `cluster/core.ThreadNetworkCommissioningConfig.IsFailSafeArmed` | `FailSafe`, the fabric-aware port (`GeneralCommissioning.FailSafeFabric`); on Thread also `ThreadNetworkCommissioning.AttachFailSafe` | `v0.28.0` |
 | `cluster/core.ScenesConfig.Fabrics` | `ScenesConfig.ListFabrics`, which reports the error | `v0.28.0` |
+| `bridge.CaseSessionEstablished`, `bridge.CaseAdapter.SetOnSessionEstablished` | `bridge.CaseEstablished`, `CaseAdapter.SetOnEstablished`, whose callback receives the session the handshake step established (`sigma.Established`) | `v0.28.0` |
+| `bridge.CaseAdapter.SnapshotResponder` | the `sigma.Established` value `CaseAdapter.SetOnEstablished`'s callback receives | `v0.28.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

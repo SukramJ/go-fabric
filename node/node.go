@@ -206,6 +206,11 @@ type Node struct {
 	// began, and no window opens after br.Stop stopped the window's timer.
 	keeperMu sync.Mutex
 	stopping bool
+	// stopFlag is stopping for the readers that must take no lock
+	// (stopBegan): stopParts sets it with stopping, under keeperMu, before
+	// Stop closes the first session, and nothing clears it. keeperMu's own
+	// takers keep reading stopping under the lock (decision 650).
+	stopFlag atomic.Bool
 	// windowLife bounds the commissioning window's transitions — the
 	// announce and the BLE advertisement of the transition hook — and a
 	// reopen's (wireCommissioningWindow, reopenUnlessStopping). Stop
@@ -944,13 +949,12 @@ func (n *Node) reopenUnlessStopping() {
 	n.window.reopenIfDecommissioned(n.windowLife, n.st)
 }
 
-// stopBegan reports whether a Stop began: the gate of the keepers
-// (keeperMu, stopping), which the host's window calls share (review II,
-// R2-P2-stop-02).
+// stopBegan reports whether a Stop began: the keepers' gate (stopping),
+// which the host's window calls share (review II, R2-P2-stop-02), read
+// lock-free (stopFlag) — it takes no keeperMu, so a caller under another
+// lock adds no edge to it (decision 650).
 func (n *Node) stopBegan() bool {
-	n.keeperMu.Lock()
-	defer n.keeperMu.Unlock()
-	return n.stopping
+	return n.stopFlag.Load()
 }
 
 // goKeeper runs fn on a goroutine Stop waits for (keeperWG), unless Stop
@@ -1639,6 +1643,7 @@ func (n *Node) stopParts(ctx context.Context, work *countedWork) {
 	n.cancelWindow()
 	n.keeperMu.Lock()
 	n.stopping = true
+	n.stopFlag.Store(true)
 	n.keeperMu.Unlock()
 	// An armed fail-safe expires now, with the rollback its timeout runs:
 	// a fabric an unfinished commissioning added goes, and the host hears

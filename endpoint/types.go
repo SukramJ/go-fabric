@@ -484,6 +484,26 @@ type keyState struct {
 	// label served is the label stored last (R2-P5-apidev-16, decision
 	// 226). It is never taken with mu held.
 	labelMu sync.Mutex
+	// served is the instance state the key is served from: the state the
+	// registry holds for the key, or a bare endpoint's private one. A
+	// write of key-held state through a superseded instance advances its
+	// version too ([endpointState.bumpWritten], R5-conc-5107).
+	served atomic.Pointer[endpointState]
+}
+
+// holdsCluster reports whether the state of clusterID lives in the key
+// state, so a change of it is served by whichever instance serves the
+// key: Identify (identify), BridgedDeviceBasicInformation (nodeLabel,
+// hostName, configVersion), ScenesManagement (scenes) and Binding
+// (binding). TestKeyStateFieldsAreClassified holds this set to the
+// struct's fields.
+func holdsCluster(clusterID uint32) bool {
+	switch clusterID {
+	case identifyClusterID, mattercore.BridgedDeviceBasicInformationClusterID,
+		mattercore.ScenesManagementClusterID, bindingClusterID:
+		return true
+	}
+	return false
 }
 
 // configurationVersion returns the version, 1 when never raised.
@@ -571,7 +591,9 @@ func (s *endpointState) restoreLabel(l string) {
 }
 
 func newEndpointState(clk clock.Clock) *endpointState {
-	return &endpointState{keyState: &keyState{clock: clk}, trackers: make(map[uint32]*contract.DataVersionTracker)}
+	s := &endpointState{keyState: &keyState{clock: clk}, trackers: make(map[uint32]*contract.DataVersionTracker)}
+	s.served.Store(s)
+	return s
 }
 
 // renewed returns a state for a new instance behind s's key: new
@@ -580,6 +602,22 @@ func newEndpointState(clk clock.Clock) *endpointState {
 // no kept servers, and s's key state.
 func (s *endpointState) renewed(instance any) *endpointState {
 	return &endpointState{keyState: s.keyState, instance: instance, assembled: true, trackers: make(map[uint32]*contract.DataVersionTracker)}
+}
+
+// bumpWritten advances s's version of clusterID after a write changed
+// it and, when the cluster's state is the key's ([holdsCluster]) and s no
+// longer serves the key, the version of the instance that does: the new
+// instance serves what the write stored, so its version moves with it
+// (R5-conc-5107, decision 640). The superseded instance's own version
+// advances too; nothing reads it.
+func (s *endpointState) bumpWritten(clusterID uint32) {
+	s.tracker(clusterID).Bump()
+	if !holdsCluster(clusterID) {
+		return
+	}
+	if served := s.served.Load(); served != nil && served != s {
+		served.tracker(clusterID).Bump()
+	}
 }
 
 // tracker returns (lazily creating) the tracker for clusterID.
@@ -670,6 +708,7 @@ func (r *endpointStateRegistry) stateFor(key SourceKey, instance any) (st *endpo
 		r.mu.Lock()
 		if r.states[key] == s {
 			r.states[key] = fresh
+			fresh.served.Store(fresh)
 		}
 		r.mu.Unlock()
 	}
