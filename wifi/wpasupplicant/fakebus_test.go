@@ -99,7 +99,7 @@ func (b *fakeBus) Watch(_ context.Context, iface dbus.ObjectPath) error {
 func newFakeBus() *fakeBus {
 	return &fakeBus{
 		sigs:     make(chan *dbus.Signal, 256),
-		props:    map[string]dbus.Variant{"State": dbus.MakeVariant("disconnected"), "CurrentNetwork": dbus.MakeVariant(dbus.ObjectPath("/"))},
+		props:    map[string]dbus.Variant{"State": dbus.MakeVariant("disconnected"), "CurrentNetwork": dbus.MakeVariant(dbus.ObjectPath("/")), "Networks": dbus.MakeVariant([]dbus.ObjectPath{})},
 		bss:      map[dbus.ObjectPath]map[string]dbus.Variant{},
 		networks: map[dbus.ObjectPath]map[string]dbus.Variant{},
 		fail:     map[string]error{},

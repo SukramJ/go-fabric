@@ -830,7 +830,9 @@ func (d *Driver) removePrevious(ctx context.Context, prev dbus.ObjectPath) {
 // CurrentNetwork, kept until the join has ended ("" when none). A
 // non-empty debugText is the failure; then the driver holds no network of
 // this join: an AddNetwork that ended without wpa_supplicant's answer is
-// settled by [Driver.settleUnanswered].
+// settled by [Driver.settleUnanswered], and one whose settlement could
+// not tell its network apart — the interface's Networks unreadable before
+// it — is not sent.
 func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidAttr slog.Attr) (network, prev dbus.ObjectPath, debugText string) {
 	args, refusal := networkArgs(ssid, credentials)
 	if refusal != "" {
@@ -849,13 +851,17 @@ func (d *Driver) addNetwork(ctx context.Context, ssid, credentials []byte, ssidA
 		}
 	}
 	// The networks listed before the call, to tell the one an unanswered
-	// AddNetwork may have added (nil when the read failed).
-	var before []dbus.ObjectPath
-	if v, err := d.property(ctx, "Networks"); err == nil {
-		before, _ = v.Value().([]dbus.ObjectPath)
-		if before == nil {
-			before = []dbus.ObjectPath{}
-		}
+	// AddNetwork may have added. Without them such a network could not be
+	// told apart, so the join fails here and the credential is not sent
+	// (review II, R4-err-4351, decision 625).
+	v, err := d.property(ctx, "Networks")
+	if err != nil {
+		d.log.Warn("wpasupplicant: failed to read the networks before adding one; the network is not added", ssidAttr, slog.String("reason", errName(err)))
+		return "", "", "add network: the networks are unreadable: " + errName(err)
+	}
+	before, _ := v.Value().([]dbus.ObjectPath)
+	if before == nil {
+		before = []dbus.ObjectPath{}
 	}
 	// The one call that carries the credential: neither its arguments nor
 	// its error's text (which a service may build from them) is logged or
@@ -914,14 +920,9 @@ const errNoReply = "org.freedesktop.DBus.Error.NoReply"
 // context of its own bounded by removeTimeout, as the join's may have
 // ended. When it fails (wpa_supplicant stalled), before is kept as
 // unsettled and sweep diffs against it before the next join and at Close
-// — an earlier unsettled list is kept, being the older. With no before
-// (its read failed) nothing can be told apart and nothing is owed, which
-// is logged.
+// — an earlier unsettled list is kept, being the older. before is never
+// nil: addNetwork does not send the AddNetwork without it.
 func (d *Driver) settleUnanswered(ctx context.Context, before []dbus.ObjectPath) {
-	if before == nil {
-		d.log.Warn("wpasupplicant: cannot tell whether the unanswered network was added", slog.String("reason", "the networks before the call are unknown"))
-		return
-	}
 	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
 	defer cancel()
 	v, err := d.property(rctx, "Networks")

@@ -1373,7 +1373,7 @@ func TestNetworksLeftBehindAreRemoved(t *testing.T) {
 		b.mu.Lock()
 		delete(b.fail, ifaceInterface+".RemoveNetwork")
 		b.props["CurrentNetwork"] = dbus.MakeVariant(dbus.ObjectPath("/"))
-		delete(b.props, "Networks")
+		b.failReads = 1 // the sweep's read, the join's first Get
 		b.onSelect = nil
 		b.mu.Unlock()
 		if status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential)); status != statusSuccess {
@@ -1604,4 +1604,45 @@ func TestAnAddNetworkNobodyAnsweredIsRemoved(t *testing.T) {
 			t.Errorf("wpa_supplicant lists %v, want the other client's network kept", l)
 		}
 	})
+}
+
+// TestAJoinWithTheNetworksUnreadableSendsNoCredential: when the
+// interface's Networks cannot be read before AddNetwork, an AddNetwork
+// that then went unanswered could not be settled, so the join fails before
+// it — the credential is not sent (review II, R4-err-4351, decision 625).
+// Nothing else of the join runs: no Disconnect, no SelectNetwork.
+func TestAJoinWithTheNetworksUnreadableSendsNoCredential(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		setup func(b *fakeBus)
+	}{
+		{"wpa_supplicant does not serve it", func(b *fakeBus) { delete(b.props, "Networks") }},
+		{"the bus daemon gave up", func(b *fakeBus) {
+			b.fail[methodGet] = dbus.Error{Name: "org.freedesktop.DBus.Error.NoReply"}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := newFakeBus()
+			b.props["Networks"] = dbus.MakeVariant([]dbus.ObjectPath{})
+			d, _ := startDriver(t, b, Options{})
+			b.mu.Lock()
+			tc.setup(b)
+			b.mu.Unlock()
+			status, debug, _ := d.ConnectNetwork(t.Context(), []byte("lab"), []byte(testCredential))
+			if status != statusUnknown || !strings.Contains(debug, "add network") {
+				t.Fatalf("ConnectNetwork = %d %q, want UnknownError before AddNetwork", status, debug)
+			}
+			if strings.Contains(debug, testCredential) {
+				t.Errorf("the debug text %q carries the credential", debug)
+			}
+			for _, c := range b.callsCopy() {
+				switch c.method {
+				case ifaceInterface + ".AddNetwork", ifaceInterface + ".Disconnect", ifaceInterface + ".SelectNetwork":
+					t.Errorf("%s called although the Networks before it are unknown", c.method)
+				}
+			}
+		})
+	}
 }
