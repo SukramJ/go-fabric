@@ -223,8 +223,9 @@ func TestResumeAwaitsItsOwnInstalledSession(t *testing.T) {
 // of its Fable diff read): a responder handed over already finished accepts the
 // finishing Sigma3's retransmission and builds no session value. With no
 // established-callback installed the step must not report an established
-// session (it named session 0 before) — it fails, and the adapter does
-// not read established afterwards.
+// session (it named session 0 before) — it fails, the adapter does not
+// read established afterwards, and it ends as a failed handshake ends: it
+// leaves its provider and returns its staked id (C5-h1b-A).
 func TestSigma3WithoutStepValueIsNoEstablishment(t *testing.T) {
 	t.Parallel()
 	ipk := newCaseTestIPK(t)
@@ -248,6 +249,12 @@ func TestSigma3WithoutStepValueIsNoEstablishment(t *testing.T) {
 
 	a := NewCaseAdapter(nil)
 	a.SetResponder(responder) // already finished; no callback installed
+	// As a provider's adapter: the failed step leaves the provider and
+	// returns the responder's id, once each (C5-h1b-A).
+	detached := 0
+	var released []uint16
+	a.setDetach(func() { detached++ })
+	a.SetOnUnfinished(func(id uint16) { released = append(released, id) })
 	op, _, outcome, taken, err := a.processSigma3(s3)
 	if err == nil || outcome != sigma3Failed || op != 0 || taken.named {
 		t.Fatalf("retransmitted Sigma3 without a step value: opcode %#x, outcome %d, named %v (session %#x), err %v; want a failed step",
@@ -258,5 +265,9 @@ func TestSigma3WithoutStepValueIsNoEstablishment(t *testing.T) {
 	a.mu.RUnlock()
 	if established || id != 0 {
 		t.Fatalf("adapter reads established %v (session %#x) after a step without a value", established, id)
+	}
+	if detached != 1 || len(released) != 1 || released[0] != responder.SessionID() {
+		t.Fatalf("the failed step: detached %d times, released %#x; want once each, the responder's id %#x",
+			detached, released, responder.SessionID())
 	}
 }

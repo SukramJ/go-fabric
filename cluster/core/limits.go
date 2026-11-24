@@ -3,6 +3,8 @@
 
 package core
 
+import "fmt"
+
 // The capacity limits a host may set on the root's AccessControl and
 // GroupKeyManagement servers, and the defaults a zero value takes. matter.js
 // keeps each of them as server state the node's configuration may set
@@ -44,9 +46,38 @@ type AccessControlLimits struct {
 	TargetsPerEntry uint16
 }
 
+// accessControlLimitMax is the ceiling of each capacity attribute (the
+// field docs of [AccessControlLimits]).
+const accessControlLimitMax = 65534
+
+// check refuses a field outside its range — EntriesPerFabric and
+// SubjectsPerEntry 4 to 65534, TargetsPerEntry 3 to 65534 — with an error
+// naming it; a zero field is its default and passes.
+func (l AccessControlLimits) check() error {
+	for _, f := range []struct {
+		name         string
+		value, floor uint16
+	}{
+		{"EntriesPerFabric", l.EntriesPerFabric, 4},
+		{"SubjectsPerEntry", l.SubjectsPerEntry, 4},
+		{"TargetsPerEntry", l.TargetsPerEntry, 3},
+	} {
+		if f.value != 0 && (f.value < f.floor || f.value > accessControlLimitMax) {
+			return fmt.Errorf("core: AccessControl: Limits.%s %d is outside %d to %d", f.name, f.value, f.floor, accessControlLimitMax)
+		}
+	}
+	return nil
+}
+
 // SetLimits sets the capacity attributes and the limits an ACL write is held
 // to. Call it before the node serves; the attributes are fixed (quality F)
 // and a later change would advertise one capacity and enforce another.
+//
+// Deprecated: pass the limits in [AccessControlConfig.Limits] to
+// [NewAccessControlWith], which refuses a limit outside its range at
+// construction; SetLimits assigns any value, keeps that behaviour until
+// it goes and is removable in v0.29.0 (review II, R4-api-4157, decision
+// 669).
 func (a *AccessControl) SetLimits(l AccessControlLimits) { a.limits = l }
 
 func (a *AccessControl) entriesPerFabric() uint16 {

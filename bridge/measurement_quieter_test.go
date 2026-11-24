@@ -149,12 +149,20 @@ func TestProjectedQuieterAttributeIsThrottled(t *testing.T) {
 // quieter attribute the throttle holds back is reported when its interval
 // is up though the bridge re-wired its listeners meanwhile: the throttle
 // of a path outlives a wiring that serves the path again, as matter.js's
-// QuietEvent lives with its behavior
-// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:251-262 at
-// db021da0, the backing's quiet observers); that a change of the node's
-// topology elsewhere does not re-create the behavior was not read at the
-// pin (unverified). The re-wiring restarts no interval: the change after it is
-// still held. Review II, R2-P4-dr-sub-01.
+// quieter throttle lives with the Endpoint's event emitter: QuietEvent
+// owns its QuietObservable (packages/node/src/behavior/Events.ts:274-306),
+// whose last-emit time and deferred payload are its fields
+// (packages/general/src/util/Observable.ts:1061-1063), and the backing only
+// registers an observer on it
+// (packages/node/src/behavior/internal/ServerBehaviorBacking.ts:258-266).
+// The emitters are disposed in Behaviors.close alone
+// (packages/node/src/endpoint/properties/Behaviors.ts:471-474), which the
+// endpoint's own reset and destructor call
+// (packages/node/src/endpoint/Endpoint.ts:934, :1013) — at b25ed9604f. The
+// re-wiring restarts no interval: the change after it is still held.
+// Review II, R2-P4-dr-sub-01. "alone" rests on a grep for behaviors.close
+// over packages/node/src at the pin (two hits, Endpoint.ts:934, :1013), not
+// a read of every caller of reset or close.
 func TestHeldQuieterChangeSurvivesReassemble(t *testing.T) {
 	t.Parallel()
 	r := newQuietMeterRig(t, epmActivePower)

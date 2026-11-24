@@ -619,12 +619,6 @@ func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.Cluste
 	return append(kept, srv)
 }
 
-// bridgedVendorName is the BridgedDeviceBasicInformation VendorName of a
-// bridged endpoint: the device's own manufacturer as the host supplied it,
-// else the node's BasicInformation VendorName. Empty when the host gave
-// neither — the attribute is then not served, matter.js's default for a
-// bridged device (vendorName is optional, and its bridge example sets
-// none).
 // applyStatedBridgedInfo copies the attributes the host stated that have
 // no fallback of their own onto cfg (R2-P5-apidev-02).
 func applyStatedBridgedInfo(cfg *mattercore.BridgedConfig, st bdbidef.Patch) {

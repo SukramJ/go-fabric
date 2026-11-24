@@ -22,6 +22,6 @@
 // (transport.go, Peer.ts:352-410).
 //
 // Out of scope here, by ADR 0020's stage split: group peers, the BasicInformation and LIT ICD inputs of the
-// session parameters (stage 4), the ICD branch of the address monitor,
-// and the client interaction (stage 3) beyond the liveness probe.
+// session parameters (stage 4) and the client interaction (stage 3)
+// beyond the liveness probe.
 package peer

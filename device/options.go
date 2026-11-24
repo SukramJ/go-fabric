@@ -257,7 +257,7 @@ func (s *settings) declare(d Declaration) error {
 		decl.Initial = nil
 	}
 	if decl.Server != nil && hasPorts(decl.Ports) {
-		return fmt.Errorf("%w: cluster 0x%04X: a host port and a HostServer, the port is the kit's server's", ErrConfiguration, id)
+		return fmt.Errorf("%w: cluster 0x%04X: a host port or kit setting and a HostServer, they are the kit's server's", ErrConfiguration, id)
 	}
 	if decl.Server != nil {
 		// The host's server serves the declared cluster, and holds to the
@@ -285,8 +285,15 @@ func (s *settings) declare(d Declaration) error {
 	return nil
 }
 
-// hasPorts reports whether a typed declaration carries a host port: a
-// non-nil interface field other than its HostServer.
+// hasPorts reports whether a typed declaration carries something only
+// the kit's server takes: a host port (a non-nil interface field other
+// than its HostServer) or a kit setting (a non-zero plain field the
+// device layer passes into the kit server's configuration, such as
+// wpdef.Declare's MaxSessions). The generated Declare's own plain fields
+// (script/clustergen/declare.go: Initial, Features, NoFeatures, Commands,
+// Events, Transitions) are judged elsewhere and are not settings; its
+// hooks are funcs. Issue #600: a setting beside a HostServer, or without
+// its port, was accepted and ignored.
 func hasPorts(typed any) bool {
 	rv := reflect.ValueOf(typed)
 	if rv.Kind() != reflect.Struct {
@@ -294,11 +301,24 @@ func hasPorts(typed any) bool {
 	}
 	for i := range rv.NumField() {
 		f := rv.Type().Field(i)
-		if f.Type.Kind() == reflect.Interface && f.Name != "HostServer" && !rv.Field(i).IsNil() {
+		switch {
+		case f.Name == "HostServer" || declareField[f.Name]:
+		case f.Type.Kind() == reflect.Interface:
+			if !rv.Field(i).IsNil() {
+				return true
+			}
+		case f.Type.Kind() != reflect.Func && !rv.Field(i).IsZero():
 			return true
 		}
 	}
 	return false
+}
+
+// declareField are the plain fields every generated Declare may carry
+// (script/clustergen/declare.go, Declare's template): not kit settings.
+var declareField = map[string]bool{
+	"Initial": true, "Features": true, "NoFeatures": true,
+	"Commands": true, "Events": true, "Transitions": true,
 }
 
 // merge folds one cluster declaration into the settings.

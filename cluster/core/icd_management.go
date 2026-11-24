@@ -289,8 +289,9 @@ type ICDManagement struct {
 	// Nil in every node the module builds.
 	registrationHook func(register bool) error
 
-	// cmdMu serialises the commands and the fabric removal, each a
-	// read-check-persist sequence over the registrations.
+	// cmdMu serialises the commands, the fabric removal and Start's load
+	// of the registrations, each a read-check-persist (or load-swap)
+	// sequence over the registrations.
 	cmdMu sync.Mutex
 
 	// sending guards one Check-In pass at a time
@@ -435,8 +436,13 @@ func (s *ICDManagement) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// The load and the swap hold the command lock: a registration
+	// command served in between would otherwise be overwritten by the
+	// older list (review II, R4-conc-4056).
+	s.cmdMu.Lock()
 	clients, err := s.loadClients(ctx)
 	if err != nil {
+		s.cmdMu.Unlock()
 		return err
 	}
 
@@ -451,6 +457,7 @@ func (s *ICDManagement) Start(ctx context.Context) error {
 	s.started = true
 	changed := s.updateOperatingModeLocked()
 	s.mu.Unlock()
+	s.cmdMu.Unlock()
 	s.operatingModeChanged(changed)
 
 	s.mode.Start()

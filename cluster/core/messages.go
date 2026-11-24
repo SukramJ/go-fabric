@@ -732,13 +732,13 @@ func (m *Messages) Complete(id []byte, outcome MessageOutcome) bool {
 // read it is gone.
 //
 // The presenter takes each dropped message down ([MessagePresenter]
-// CancelMessage, once per message), so the display and the queue agree as
-// they do for a removed fabric's present still at the presenter. The
-// cancels run after the drop, off the removal path: RemoveFabric returns
-// once the queue dropped the messages, and a goroutine of the server's
-// runs the removals' cancels one after the other, so a presenter that
-// blocks stalls neither the fabric's teardown nor the command's answer
-// (decision 624). Until a cancel returned its id stays held: another
+// CancelMessage, once per message by the removal), so the display and the
+// queue agree as they do for a removed fabric's present still at the
+// presenter. The cancels run after the drop, off the removal path:
+// RemoveFabric returns once the queue dropped the messages, and a
+// goroutine of the server's runs the removals' cancels one after the
+// other, so a presenter that blocks stalls neither the fabric's teardown
+// nor the command's answer (decision 624). Until a cancel returned its id stays held: another
 // fabric's present of it is refused meanwhile, so the cancel never takes
 // that fabric's display down (review II, R4-fsm-4103, decision 598).
 func (m *Messages) RemoveFabric(fabricIndex uint8) {

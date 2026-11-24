@@ -349,7 +349,8 @@ var devicePorts = map[string]portSet{
 		},
 		methods: []string{
 			"// SetTarget takes Position after the LimitRange clamp and the",
-			"// Resolution rounding, Latch and Speed as sent.",
+			"// Resolution rounding (which may exceed 10000 when Resolution does",
+			"// not divide it), Latch and Speed as sent.",
 			"SetTarget(ctx context.Context, position *uint16, latch *bool, speed *ThreeLevelAutoEnum) error",
 			"// Step takes the request's fields as sent.",
 			"Step(ctx context.Context, direction StepDirectionEnum, numberOfSteps uint16, speed *ThreeLevelAutoEnum) error",

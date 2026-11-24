@@ -39,6 +39,10 @@ type BridgedDeviceBasicInformation struct {
 	configVersion uint32
 	// mu guards emitter, endpoint, nodeLabel and reachable.
 	mu sync.RWMutex
+	// reachMu orders SetReachable calls from the compare through the
+	// event: the last ReachableChanged emitted carries the value
+	// Reachable holds (review II, R4-conc-4156). Taken before mu.
+	reachMu sync.Mutex
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped after every successful state mutation (Reachable
@@ -237,7 +241,7 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 	serialNumber := cfg.SerialNumber
 	// Reachable is taken from cfg so the bridge can advertise the
 	// underlying host device's live availability at construction time
-	// (materialize.go reads dev.Available() per dispatch). A dead device
+	// (endpoint/materialize.go reads ep.Availability()). A dead device
 	// must surface Reachable=false immediately, not after a deferred
 	// SetReachable(false) call that — because cluster servers are
 	// reconstructed per dispatch — would never persist. Mirrors matter.js
@@ -591,7 +595,7 @@ func (b *BridgedDeviceBasicInformation) MatterAttributes() []uint32 {
 
 // SetReachable updates the reachable flag. Returns true when the
 // value changed. Emits the Matter §9.13.6 ReachableChanged event (id
-// 0x0003, priority Critical) on the bridge's [contract.EventEmitter]
+// 0x0003, priority Info) on the bridge's [contract.EventEmitter]
 // when it has been wired via [SetMatterEventEmitter] — mirrors
 // matter.js BridgedDeviceBasicInformationServer.ts:37, :100-102 at
 // b25ed960, where a change of reachable emits events.reachableChanged
@@ -599,7 +603,13 @@ func (b *BridgedDeviceBasicInformation) MatterAttributes() []uint32 {
 // the event, Apple Home's HAP-service mapper never learns about
 // availability flips and silently caches the boot-time value, so
 // ongoing device drop-outs never surface to the user.
+//
+// Concurrent calls are ordered from the compare through the event, so the
+// last event carries the value the attribute holds; the emitter must not
+// call SetReachable.
 func (b *BridgedDeviceBasicInformation) SetReachable(reachable bool) (changed bool) {
+	b.reachMu.Lock()
+	defer b.reachMu.Unlock()
 	b.mu.Lock()
 	changed = b.reachable != reachable
 	b.reachable = reachable

@@ -135,7 +135,7 @@ func networksOf(t *testing.T, n *ThreadNetworkCommissioning) spec.List[netcommde
 // The attributes: MaxNetworks 1 (GenericNetworkCommissioningThreadDriver.h
 // :103), the Thread feature, the border router's capabilities and
 // version, the staged network from the active dataset (GTD :46-50,
-// :340-373).
+// :354-385).
 func TestThreadNetworkCommissioningAttributes(t *testing.T) {
 	t.Parallel()
 	br := &simBorderRouter{active: slices.Clone(threadDataset), attached: true, enabled: true}
@@ -219,7 +219,7 @@ func TestThreadNetworkCommissioningScan(t *testing.T) {
 	}
 }
 
-// AddOrUpdate, Remove, Reorder, Connect and the fail-safe (GTD :97-268;
+// AddOrUpdate, Remove, Reorder, Connect and the fail-safe (GTD :101-250;
 // NetworkCommissioningCluster.cpp :561-730, :843-902, :984-1014).
 func TestThreadNetworkCommissioningCommands(t *testing.T) {
 	t.Parallel()

@@ -305,8 +305,8 @@ func (b *BorderRouter) clear(ctx context.Context) error {
 // (CommitActiveDataset, :186-189). A border router found not attached
 // leaves the flag as it is: only an activation of this delegate leaves
 // the dataset to the fail-safe's revert (review II, R3-fsm-3350). An
-// activation that started after the commit read the border router's state
-// stays uncommitted (review II, R5-fsm-5401).
+// activation that started after the commit began stays uncommitted
+// (review II, R5-fsm-5401).
 func (b *BorderRouter) CommitActiveDataset(ctx context.Context) error {
 	b.mu.Lock()
 	since := b.activations

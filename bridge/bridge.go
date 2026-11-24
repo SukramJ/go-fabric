@@ -1780,11 +1780,19 @@ func partsListOwnersChanged(prev, next *endpoint.Topology) []uint16 {
 // that prev does not hold — by number, or by instance
 // ([endpoint.Endpoint.SameInstance]) — changed on the subscription
 // manager; see the call in reassembleLocked.
+//
+// The attributes are listed by a read under ctx without its values
+// ([withoutValues]): ctx is the reassembly caller's, and a caller that
+// reassembles from a command handler hands over the handler's ctx, whose
+// request — its access check, its fabric filter — must not decide what
+// every subscriber is told; each subscription's report is read under its
+// own identity (R5-par-5106).
 func (b *Bridge) announceNewEndpoints(ctx context.Context, prev, next *endpoint.Topology, dispatcher im.Dispatcher) {
 	m := b.subscriptionManagerLocked()
 	if m == nil || dispatcher == nil {
 		return
 	}
+	ctx = withoutValues{ctx}
 	known := make(map[uint16]*endpoint.Endpoint, len(prev.Endpoints))
 	for _, ep := range prev.Endpoints {
 		if ep != nil {
@@ -1798,13 +1806,20 @@ func (b *Bridge) announceNewEndpoints(ctx context.Context, prev, next *endpoint.
 		if old, ok := known[ep.ID]; ok && ep.SameInstance(old) {
 			continue
 		}
-		for _, rr := range dispatcher.Read(ctx, im.ConcreteAttributePath{Endpoint: ep.ID, HasEndpoint: true}) {
+		for _, rr := range dispatcher.Read(ctx, im.ConcreteAttributePath{Endpoint: ep.ID, HasEndpoint: true}) { //nolint:contextcheck // ctx is the caller's without its values (withoutValues): its deadline and cancellation are inherited, its request is not (R5-par-5106)
 			if rr.Status == im.StatusSuccess {
 				m.OnAttributeChanged(rr.Path)
 			}
 		}
 	}
 }
+
+// withoutValues is a context that keeps its parent's deadline and
+// cancellation and carries none of its values.
+type withoutValues struct{ context.Context }
+
+// Value implements [context.Context]: no value.
+func (withoutValues) Value(any) any { return nil }
 
 // SetOnReassembled wires the post-Reassemble hook. The bridge calls
 // the supplied closure with the freshly-assembled bridged-endpoint
