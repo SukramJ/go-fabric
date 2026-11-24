@@ -67,7 +67,7 @@ func newEstablishingRigLogged(t *testing.T, logger *slog.Logger) *establishingRi
 	if _, _, err := adapter.ProcessSigma3(sigma3); err != nil {
 		t.Fatalf("ProcessSigma3: %v", err)
 	}
-	snap := adapter.SnapshotResponder()
+	snap := adapter.SnapshotResponder() //nolint:staticcheck // SA1019: the test reads the responder the handshake ran on, held until SnapshotResponder's removal
 	if snap == nil {
 		t.Fatal("no responder")
 	}

@@ -49,7 +49,7 @@ func TestResponderSessionParamsCarryIntervals(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := ca.SnapshotResponder().SessionParameters(); got == nil || got.SessionIdleInterval != tc.idle || got.SessionActiveThreshold != tc.threshold {
+			if got := ca.SnapshotResponder().SessionParameters(); got == nil || got.SessionIdleInterval != tc.idle || got.SessionActiveThreshold != tc.threshold { //nolint:staticcheck // SA1019: the test reads the responder the handshake ran on, held until SnapshotResponder's removal
 				t.Errorf("CASE responder parameters %+v", got)
 			}
 			vc, err := spake2.NewVerifierContext(20202021, []byte("SPAKE2P Key Salt"), 1000)

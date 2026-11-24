@@ -1231,34 +1231,29 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 	if err != nil {
 		return nil, err
 	}
-	adapter.SetOnSessionEstablished(func(keys sigma.SessionKeys, peerSessionID uint16) error {
-		// Everything is read back off the responder rather than captured at
-		// factory time: the destination resolver may have landed on a
-		// different fabric than the one seeded above, and the session id may
-		// have been renewed.
+	adapter.SetOnEstablished(func(est sigma.Established) error {
+		// Everything is taken from the session the handshake step built
+		// (est) rather than captured at factory time — the destination
+		// resolver may have landed on a different fabric than the one
+		// seeded above, and the session id may have been renewed — and
+		// rather than read back off the responder, which a Sigma1 landing
+		// meanwhile renews: a session would carry one handshake's keys
+		// under another's identity (review II, R5-sec-5101).
 		fabricIndex := identity.FabricIndex
 		localNodeID := identity.NodeID
-		peerNodeID := uint64(0)
-		var effectiveID uint16
-		var peerCATs []uint32
-		if resp := adapter.SnapshotResponder(); resp != nil {
-			peerNodeID = resp.PeerNodeID()
-			peerCATs = resp.PeerCATs()
-			effectiveID = resp.SessionID()
-			if fi, nid, ok := resp.SessionIdentity(); ok {
-				fabricIndex, localNodeID = fi, nid
-			}
+		if est.IdentityOK {
+			fabricIndex, localNodeID = est.FabricIndex, est.LocalNodeID
 		}
+		peerNodeID, peerCATs, effectiveID := est.PeerNodeID, est.PeerCATs, est.SessionID
+		peerSessionID, keys := est.PeerSessionID, est.Keys
 		// A resume holds its record's id from acceptance
 		// ([resumptionLookup.ClaimResumptionID]) until the record is
 		// replaced at its establishment, or gives it back when it installs
 		// nothing or its handshake ends without an established session
 		// ([caseEstablishment.complete]).
 		var presented []byte
-		if resp := adapter.SnapshotResponder(); resp != nil {
-			if info := resp.ResumeInfo(); info.Resumed {
-				presented = info.PresentedResumptionID
-			}
+		if est.Resume.Resumed {
+			presented = est.Resume.PresentedResumptionID
 		}
 		// Admitted under the load the handshake answered under: an update
 		// that lands after the stake was taken refuses the install
@@ -1283,40 +1278,36 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, respon
 		// retransmissions and name its transports (matter.js
 		// CaseServer.ts:352 at b25ed960 `sessionParameters:
 		// secureSession.parameters`).
-		if resp := adapter.SnapshotResponder(); resp != nil {
-			if p, ok := resp.PeerSessionParameters(); ok {
-				entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
-				entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
-			}
+		if est.PeerSessionParamsOK {
+			p := est.PeerSessionParams
+			entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
+			entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 		}
 		// The record the peer resumes from next time: the id this
 		// handshake issued (Sigma2's, or the fresh one Sigma2_Resume
-		// carried) with the session's shared secret. Built here, off the
-		// responder as it answered this handshake — the singleton
-		// adapter's responder may serve another Sigma1 before the
-		// completion — and saved once the session is established
-		// ([caseEstablishment.complete]).
+		// carried) with the session's shared secret. Built here, from the
+		// handshake's own value — the singleton adapter's responder may
+		// serve another Sigma1 before the completion — and saved once the
+		// session is established ([caseEstablishment.complete]).
 		pending := &pendingCASE{entry: entry, gen: gen, presented: presented}
-		if resp := adapter.SnapshotResponder(); resp != nil {
-			if id, secret := resp.ResumptionID(), resp.ECDHSharedSecret(); len(id) == 16 && len(secret) > 0 {
-				// With the initiator's session parameters, as a CASE client
-				// that resumes from the same record keeps them (review II,
-				// Fable P-5). A resumed session keeps the parameters of the
-				// record it resumed from, the id alone renewed — matter.js
-				// re-saves the old record with the new id (CaseServer.ts:214,
-				// :217 at b25ed960; Fable P-5a).
-				params, _ := resp.PeerSessionParameters()
-				if info := resp.ResumeInfo(); info.Resumed {
-					if prev, err := sessions.LookupResumption(context.Background(), info.PresentedResumptionID); err == nil {
-						params = prev.SessionParameters
-					}
+		if id, secret := est.ResumptionID, est.SharedSecret; len(id) == 16 && len(secret) > 0 {
+			// With the initiator's session parameters, as a CASE client
+			// that resumes from the same record keeps them (review II,
+			// Fable P-5). A resumed session keeps the parameters of the
+			// record it resumed from, the id alone renewed — matter.js
+			// re-saves the old record with the new id (CaseServer.ts:214,
+			// :217 at b25ed960; Fable P-5a).
+			params := est.PeerSessionParams
+			if est.Resume.Resumed {
+				if prev, err := sessions.LookupResumption(context.Background(), est.Resume.PresentedResumptionID); err == nil {
+					params = prev.SessionParameters
 				}
-				pending.rec = store.ResumptionRecord{
-					FabricIndex: fabricIndex, PeerNodeID: peerNodeID, ResumptionID: id, SharedSecret: secret,
-					CASEAuthTags: peerCATs, SessionParameters: params,
-				}
-				pending.hasRec = true
 			}
+			pending.rec = store.ResumptionRecord{
+				FabricIndex: fabricIndex, PeerNodeID: peerNodeID, ResumptionID: id, SharedSecret: secret,
+				CASEAuthTags: peerCATs, SessionParameters: params,
+			}
+			pending.hasRec = true
 		}
 		establishing.put(pending)
 		// Installed, not yet established: the bridge's report of the

@@ -61,7 +61,7 @@ func TestResponderSessionParamsCarryTCP(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := ca.SnapshotResponder().SessionParameters(); got == nil || got.SupportedTransports != tc.want {
+			if got := ca.SnapshotResponder().SessionParameters(); got == nil || got.SupportedTransports != tc.want { //nolint:staticcheck // SA1019: the test reads the responder the handshake ran on, held until SnapshotResponder's removal
 				t.Errorf("CASE responder parameters %+v, want transports %#x", got, tc.want)
 			}
 			// PASE: PBKDFParamResponse tag 5 (PaseServer.ts:151).

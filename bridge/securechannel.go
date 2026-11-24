@@ -1652,8 +1652,8 @@ func (b *Bridge) handleCase(
 	key := handshakeKeyOf(requestHdr, proto.ExchangeID)
 	var installed, tracked uint16
 	resumer := caseAdapterOf(handler)
-	if resumer != nil && respOpcode == mrp.SCOpcodeSigma2Resume {
-		if installed, _ = resumer.takeResumeInstall(); installed != 0 {
+	if step, ok := handler.(*sigma1Step); ok && resumer != nil && respOpcode == mrp.SCOpcodeSigma2Resume {
+		if installed = step.resumeInstalled; installed != 0 {
 			if !resumer.completesEstablishment() {
 				tracked = installed
 			}
@@ -2601,6 +2601,11 @@ type caseStepTaken struct {
 	sessionID uint16
 	named     bool
 	peer      *sessionparams.Parameters
+	// resumeInstalled is the session this Sigma1 installed by resumption
+	// (the established-callback took it), zero for none: the router ties
+	// it to the Sigma2_Resume's retransmission entry ([Bridge.handleCase];
+	// R5-sec-5103).
+	resumeInstalled uint16
 }
 
 // establishedSession implements [establishedSessionReporter].
