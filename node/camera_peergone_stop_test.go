@@ -48,7 +48,7 @@ func TestCameraStopEndsThePeerGoneWait(t *testing.T) {
 	g.openBridge(t, pgPeerA)
 	g.lose(pgPeerA)
 	keeper := <-queue
-	waitGoroutineBlockedIn(t, keeper, "camera.(*Provider).PeerGone")
+	waitGoroutineBlockedIn(t, keeper, "camera.(*Provider).EndLostPeer")
 
 	stopHeader := make(chan string, 1)
 	stopped := make(chan error, 1)
@@ -111,7 +111,7 @@ func parkedIn(stacks, stopper, keeper string) bool {
 				}
 			}
 		case strings.HasPrefix(gr, keeper+"["):
-			keep = !strings.HasPrefix(gr, keeper+"[runn") && strings.Contains(gr, "camera.(*Provider).PeerGone")
+			keep = !strings.HasPrefix(gr, keeper+"[runn") && strings.Contains(gr, "camera.(*Provider).EndLostPeer")
 		}
 	}
 	return stop && keep
@@ -161,7 +161,7 @@ func TestCameraPeerLossInStopsWindowEndsNothing(t *testing.T) {
 	}
 	g.openBridge(t, pgPeerA)
 	g.lose(pgPeerA)
-	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).PeerGone")
+	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).EndLostPeer")
 	// A is live again: a new session before Stop.
 	g.openBridge(t, pgPeerA)
 	if !g.n.holdsPeerSession(pgAddrA) {
@@ -231,7 +231,7 @@ func TestCameraPeerLossStopBetweenTheReadsEndsNothing(t *testing.T) {
 	}
 	g.openBridge(t, pgPeerA)
 	g.lose(pgPeerA)
-	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).PeerGone")
+	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).EndLostPeer")
 	// A is live again: a new session before the predicate runs.
 	g.openBridge(t, pgPeerA)
 	if !g.n.holdsPeerSession(pgAddrA) {

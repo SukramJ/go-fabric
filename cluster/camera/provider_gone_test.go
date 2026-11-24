@@ -372,3 +372,26 @@ func TestProviderPeerGoneWaitEndsWithItsContext(t *testing.T) {
 		t.Errorf("sessions %v, want [%d]", got, id)
 	}
 }
+
+// TestProviderEndLostPeerCountsTheEndedSessions (review II, R5-doc-5304):
+// EndLostPeer reports how many of the pair's sessions it ended — two for
+// a peer that held two, none for a pair that holds none, though both ran —
+// so a caller reports an end only when one happened.
+func TestProviderEndLostPeerCountsTheEndedSessions(t *testing.T) {
+	t.Parallel()
+	p, _ := newProvider(t, nil)
+	p.AttachPeerConnector(&fakePeers{})
+	goneSessions(t, p)
+	if ended, ran, err := p.EndLostPeer(context.Background(), 1, 7, unknownReason, nil); err != nil || !ran || ended != 2 {
+		t.Fatalf("EndLostPeer of a peer with two sessions = %d, %v, %v; want 2, ran", ended, ran, err)
+	}
+	if ended, ran, err := p.EndLostPeer(context.Background(), 1, 7, unknownReason, nil); err != nil || !ran || ended != 0 {
+		t.Fatalf("EndLostPeer of a pair without sessions = %d, %v, %v; want 0, ran", ended, ran, err)
+	}
+	if ended, ran, err := p.EndLostPeer(context.Background(), 1, 8, unknownReason, func() bool { return false }); err != nil || ran || ended != 0 {
+		t.Fatalf("EndLostPeer with gone false = %d, %v, %v; want 0, not ran", ended, ran, err)
+	}
+	if got := sessionIDs(p); !slices.Equal(got, []uint16{2, 4}) {
+		t.Errorf("sessions %v, want [2 4]", got)
+	}
+}
