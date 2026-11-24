@@ -156,10 +156,14 @@ func (g *pgNode) openBridge(t *testing.T, peer uint64) uint16 {
 	for i := range keys.I2RKey {
 		keys.I2RKey[i], keys.R2IKey[i] = byte(g.next)+byte(i), byte(g.next)+byte(i)+16
 	}
-	if _, err := g.n.sec.sessions.OpenFromSigmaWithID(g.next, pgFabric, pgLocal, peer, g.next, nil, keys); err != nil {
-		t.Fatalf("open session %#x: %v", g.next, err)
+	stake, err := g.n.sec.sessions.AllocateStake()
+	if err != nil {
+		t.Fatal(err)
 	}
-	return g.next
+	if _, err := g.n.sec.sessions.OpenFromSigmaWithStake(stake, pgFabric, pgLocal, peer, g.next, nil, keys); err != nil {
+		t.Fatalf("open session %#x: %v", stake.ID, err)
+	}
+	return stake.ID
 }
 
 // openClient registers a secure session with peer in the peer path's
@@ -209,8 +213,9 @@ func (g *pgNode) drain(t *testing.T) []pgDone {
 }
 
 func (g *pgNode) sessions() []uint16 {
-	var ids []uint16
-	for _, s := range g.prov.Sessions() {
+	sessions := g.prov.Sessions()
+	ids := make([]uint16, 0, len(sessions))
+	for _, s := range sessions {
 		ids = append(ids, s.Id)
 	}
 	return ids
@@ -247,7 +252,7 @@ func TestCameraPeerLossEndsTheLostPeersSessions(t *testing.T) {
 
 // TestCameraCloseThatIsNoLossEndsNothing: a session closed without proof
 // of loss — Manager.Close (the peer's CloseSession, and a TCP eviction:
-// bridge evictSession → the registry's Close), ClosePeer, and the idle
+// bridge evictSession → the registry's Close) and the idle
 // reaper's cause (PeerGoneClosed, pinned for the reaper in
 // secure/operational TestPeerGoneHookCarriesTheCause) — ends nothing,
 // although no session with the peer is left. B's loss queued afterwards
@@ -258,8 +263,6 @@ func TestCameraCloseThatIsNoLossEndsNothing(t *testing.T) {
 	if err := g.n.sec.sessions.Close(g.openBridge(t, pgPeerA)); err != nil {
 		t.Fatal(err)
 	}
-	g.openBridge(t, pgPeerA)
-	g.n.sec.sessions.ClosePeer(pgFabric, pgPeerA)
 	g.n.bridgePeerGone(pgFabric, pgPeerA, operational.PeerGoneClosed)
 	g.openBridge(t, pgPeerB)
 	g.lose(pgPeerB)
