@@ -12004,7 +12004,7 @@
       "identifier": "DataVersionTracker",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/dataversion.go",
-      "line": 53
+      "line": 55
     },
     {
       "package": "cluster",

@@ -778,7 +778,7 @@
   },
   {
     "file": "client/interaction/interaction.go",
-    "line": 446,
+    "line": 448,
     "citation": "InteractionMessenger.ts:148-161",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
