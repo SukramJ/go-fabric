@@ -31,8 +31,10 @@ import (
 // makes each (endpoint, cluster) carry a distinct DataVersion before
 // the first mutation, which is what Apple looks for.
 //
-// Matter §10.6.5: "A DataVersion of zero is reserved for absent or
-// invalid"; the random generator skips zero accordingly.
+// 0 is a version like any other: neither the generator nor the wrap
+// skips it, as matter.js's entropy.randomUint32
+// (packages/general/src/util/Entropy.ts:26-28) and advanceVersion
+// (Datasource.ts:862-864) do not, at b25ed960 (owner decision 146).
 //
 // See [contract.DataVersionTracker] for the counter itself.
 //
