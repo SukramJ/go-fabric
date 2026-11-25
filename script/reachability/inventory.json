@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10855,
+  "entry_points": 10856,
   "initializers": 372,
   "entry_packages": [
     ".",
@@ -296,9 +296,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28639,
+    "total_exported": 28640,
     "reachable": 22330,
-    "whitelisted": 6287,
+    "whitelisted": 6288,
     "unreachable": 22
   },
   "by_package": [
@@ -41614,7 +41614,7 @@
       "identifier": "LeaderData",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "thread/otbr/client.go",
-      "line": 96
+      "line": 109
     },
     {
       "package": "thread/otbr",
@@ -41678,6 +41678,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "thread/otbr/borderrouter_commit_a8_test.go",
       "line": 20
+    },
+    {
+      "package": "thread/otbr",
+      "identifier": "TestDefaultClientOwnsItsTransport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "thread/otbr/client_transport_test.go",
+      "line": 16
     },
     {
       "package": "thread/otbr",
