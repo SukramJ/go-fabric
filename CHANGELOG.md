@@ -45,6 +45,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `thread/otbr`: the default client (`Config.HTTPClient` nil) runs on its own clone of `http.DefaultTransport`, so a process-wide `http.DefaultTransport.CloseIdleConnections` (every `httptest.Server.Close` calls one) no longer breaks a dataset PUT in flight with "http: CloseIdleConnections called"; a host that replaced `http.DefaultTransport` with another RoundTripper keeps it.
 - `cluster/core`: OperationalCredentials — UpdateFabricLabel and SetVIDVerificationStatement check and write as one step, so two concurrent commands get one LabelConflict and no VID field is lost (R4-conc-4053, R3-conc-3056); an owed fabric event is acknowledged for the delivery that listed it only (R5-err-5201) (review II; #595).
 - `cluster/core`: AccessControl and GroupKeyManagement — the held marks of Acl, GroupTable and GroupKeyMap follow the store, so a fabric's removal reports what it took out (R5-conc-5004, R5-conc-5002, R5-par-5005); a new fabric's admin entry clears an Extension that failed to load at its index (R3-store-3001); a failed AccessControlAuxiliary read is synchronised again at the next read or change (R4-err-4055) (review II; #595).
 - `cluster/core`: ICDManagement `Start` no longer overwrites a registration made while it loaded (review II, R4-conc-4056; #595).

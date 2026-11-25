@@ -38,8 +38,11 @@ type Config struct {
 	Port int
 	// Timeout bounds each request; 0 is [DefaultTimeout].
 	Timeout time.Duration
-	// HTTPClient sends the requests. Nil is a client on
-	// http.DefaultClient's transport that follows no redirect: a 3xx
+	// HTTPClient sends the requests. Nil is a client on its own clone of
+	// http.DefaultTransport — so no process-wide
+	// http.DefaultTransport.CloseIdleConnections (httptest.Server.Close
+	// calls one) can break a dataset PUT in flight on a reused
+	// connection — that follows no redirect: a 3xx
 	// answer is a status error, so neither a GET nor the dataset PUT —
 	// the network key in its body — is sent where the border router's
 	// answer points (review II, R2-P6-sec-2028). A host that needs
@@ -80,9 +83,19 @@ func NewClient(cfg Config) (*Client, error) {
 		c.timeout = DefaultTimeout
 	}
 	if c.http == nil {
-		c.http = &http.Client{CheckRedirect: refuseRedirect}
+		c.http = &http.Client{Transport: ownTransport(), CheckRedirect: refuseRedirect}
 	}
 	return c, nil
+}
+
+// ownTransport is a clone of http.DefaultTransport, so the default
+// client keeps its own connection pool; a host that replaced
+// http.DefaultTransport with another RoundTripper keeps it (nil).
+func ownTransport() http.RoundTripper {
+	if t, ok := http.DefaultTransport.(*http.Transport); ok {
+		return t.Clone()
+	}
+	return nil
 }
 
 // refuseRedirect is the default client's CheckRedirect: the redirect's
