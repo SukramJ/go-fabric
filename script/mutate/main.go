@@ -220,6 +220,7 @@ type config struct {
 	workers, minFree     int
 	timeout, budget      time.Duration
 	files                []string
+	start                time.Time // -budget counts from here
 }
 
 // parseFlags reads the command line; false after a usage error, which it
@@ -255,6 +256,7 @@ func run(args []string, stderr io.Writer) int {
 	if !ok {
 		return 2
 	}
+	c.start = time.Now()
 	if c.tmp == "" {
 		d, err := os.MkdirTemp("", "mutate-")
 		if err != nil {
@@ -329,9 +331,8 @@ func mutateAll(c config, all []mutant, srcs map[string][]byte, stderr io.Writer)
 			}
 		})
 	}
-	start := time.Now()
 	for i := range all {
-		if c.budget > 0 && time.Since(start) > c.budget {
+		if c.budget > 0 && time.Since(c.start) > c.budget {
 			logf(stderr, "budget %s spent: %d of %d mutants not run", c.budget, len(all)-i, len(all))
 			break
 		}

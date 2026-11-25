@@ -62,9 +62,6 @@ func writeFixture(t *testing.T) string {
 // per mutant, sorted by line, the survivor run again under -wide, and the
 // tree unchanged afterwards.
 func TestMutateKilledAndSurvived(t *testing.T) {
-	if testing.Short() {
-		t.Skip("builds and tests a fixture module")
-	}
 	t.Setenv("GOWORK", "off")
 	t.Setenv("GOFLAGS", "")
 	root := writeFixture(t)
@@ -95,21 +92,22 @@ func TestMutateKilledAndSurvived(t *testing.T) {
 	}
 }
 
-// TestMutateBudgetSpent: a budget spent before the first mutant writes
-// every line as NOTRUN and runs no test.
+// TestMutateBudgetSpent: a budget spent before the first mutant leaves
+// every mutant NOTRUN and runs no test.
 func TestMutateBudgetSpent(t *testing.T) {
 	root := writeFixture(t)
-	out := filepath.Join(t.TempDir(), "mutants.tsv")
-	var stderr bytes.Buffer
-	if code := run([]string{"-root", root, "-budget", time.Nanosecond.String(), "-tmp", t.TempDir(), "-o", out, "p/p.go"}, &stderr); code != 0 {
-		t.Fatalf("exit %d: %s", code, stderr.String())
-	}
-	got, err := os.ReadFile(out)
+	ms, src, err := collect(root, "p/p.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(string(got), "NOTRUN\t"); n != 2 {
+	c := config{root: root, tmp: t.TempDir(), workers: 1, timeout: time.Minute, budget: time.Second, start: time.Now().Add(-time.Hour)}
+	var stderr bytes.Buffer
+	got := string(tsv(mutateAll(c, ms, map[string][]byte{"p/p.go": src}, &stderr)))
+	if n := strings.Count(got, "NOTRUN\t"); n != 2 {
 		t.Errorf("TSV:\n%s\nwant two NOTRUN lines", got)
+	}
+	if !strings.Contains(stderr.String(), "2 of 2 mutants not run") {
+		t.Errorf("stderr %q: want the budget line", stderr.String())
 	}
 }
 
