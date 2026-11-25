@@ -53,8 +53,8 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 		return nil, opcredsInvalidCommandErr{"core: SetVIDVerificationStatement: at least one of VendorID, VIDVerificationStatement or VVSC must be provided"}
 	}
 	// The VendorID must be operational — valid and not the Matter Standard
-	// vendor ID 0x0000 — not merely valid. Mirrors matter.js
-	// packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:516-518
+	// vendor ID 0x0000 — not merely valid. Mirrors matter.js b25ed960
+	// packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:518-520
 	// (`if (vendorId !== undefined && !VendorId.isOperational(vendorId))
 	// throw new StatusResponse.ConstraintErrorError(…)`) with
 	// packages/types/src/datatype/VendorId.ts:44 isOperational (`v !== 0 &&
@@ -63,18 +63,42 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 	if req.HasVendorID && !isOperationalAdminVendorID(req.VendorID) {
 		return nil, opcredsConstraintErr{msg: fmt.Sprintf("core: SetVIDVerificationStatement: invalid VendorID 0x%04X", req.VendorID)}
 	}
+	if err := o.storeVIDData(ctx, fabricIndex, &req); err != nil {
+		return nil, err
+	}
+	o.dataVersion.Bump()
+	// The fabric changed: matter.js Fabric.updateVendorVerificationData
+	// persists it and the node reports an "updated" fabric (Fabric.ts:210-246
+	// and OperationalCredentialsServer.ts:523 at b25ed960;
+	// FabricManager.ts:265-275 at b25ed960). The hook runs after nocMu is
+	// released.
+	o.fabricChanged(ctx, fabricIndex)
+	return nil, nil
+}
+
+// storeVIDData is SetVIDVerificationStatement's read of the fabric — its
+// ICAC for a VVSC, its stored VID data — and its write, as one step under
+// nocMu: of two commands of one fabric at once, the second reads what the
+// first one wrote, so a field only one of them sets is not overwritten
+// with the value the other read before it (review II, R3-conc-3056), and
+// an UpdateNOC that replaces the ICAC does not land between the check and
+// the write. matter.js runs the handler on one thread
+// (OperationalCredentialsServer.ts:505-524 at b25ed960).
+func (o *OperationalCredentials) storeVIDData(ctx context.Context, fabricIndex uint8, req *SetVidVerificationStatementRequest) error {
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	if req.HasVvsc {
 		id, err := o.store.GetIdentity(ctx, fabricIndex)
 		if err != nil {
-			return nil, fmt.Errorf("core: SetVIDVerificationStatement: identity: %w", err)
+			return fmt.Errorf("core: SetVIDVerificationStatement: identity: %w", err)
 		}
 		if len(id.ICAC) > 0 {
-			return nil, opcredsInvalidCommandErr{"core: SetVIDVerificationStatement: a VVSC is only allowed without an ICAC"}
+			return opcredsInvalidCommandErr{"core: SetVIDVerificationStatement: a VVSC is only allowed without an ICAC"}
 		}
 	}
 	fab, err := o.store.GetFabric(ctx, fabricIndex)
 	if err != nil {
-		return nil, fmt.Errorf("core: SetVIDVerificationStatement: fabric: %w", err)
+		return fmt.Errorf("core: SetVIDVerificationStatement: fabric: %w", err)
 	}
 	d := vidData{statement: fab.VIDVerificationStatement, vvsc: fab.VVSC}
 	if req.HasVidVerificationStatement {
@@ -84,7 +108,7 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 		case vidVerificationStatementSize:
 			d.statement = append([]byte(nil), req.VidVerificationStatement...)
 		default:
-			return nil, opcredsConstraintErr{msg: "core: SetVIDVerificationStatement: the statement must be 0 or 85 bytes long"}
+			return opcredsConstraintErr{msg: "core: SetVIDVerificationStatement: the statement must be 0 or 85 bytes long"}
 		}
 	}
 	if req.HasVvsc {
@@ -104,15 +128,10 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 	}
 	if u.VendorID != nil || u.SetVIDData {
 		if err := o.store.UpdateFabricVendorVerification(ctx, fabricIndex, u); err != nil {
-			return nil, fmt.Errorf("core: SetVIDVerificationStatement: persist: %w", err)
+			return fmt.Errorf("core: SetVIDVerificationStatement: persist: %w", err)
 		}
 	}
-	o.dataVersion.Bump()
-	// The fabric changed: matter.js Fabric.updateVendorVerificationData
-	// persists it and the node reports an "updated" fabric (Fabric.ts:208-243,
-	// FabricManager.ts:236-246, OperationalCredentialsServer.ts:522).
-	o.fabricChanged(ctx, fabricIndex)
-	return nil, nil
+	return nil
 }
 
 // handleSignVidVerificationRequest is matter.js signVidVerificationRequest:

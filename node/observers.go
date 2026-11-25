@@ -227,7 +227,9 @@ type WindowSnapshot struct {
 	Administrator WindowStatus
 	// CommissioningMode is the CM value of the commissionable record the
 	// node publishes after the transition: 0 none, 1 a basic window, 2
-	// an enhanced window with an administrator's verifier.
+	// an enhanced window with an administrator's verifier, 3 a joint
+	// commissioning window (an enhanced one a Joint Fabric administrator
+	// opened).
 	CommissioningMode uint8
 	// Discriminator is the published record's discriminator; 0 when
 	// CommissioningMode is 0.

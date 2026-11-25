@@ -124,7 +124,10 @@ type OperationalCredentials struct {
 
 	// nocMu serialises AddNOC, UpdateNOC, CSRRequest's draw and record of
 	// the fail-safe's key pair, AddTrustedRootCertificate from its
-	// fail-safe check to its store of the root, RemoveFabric's store removal, the
+	// fail-safe check to its store of the root, RemoveFabric's store removal,
+	// UpdateFabricLabel from its LabelConflict check to its write
+	// (R4-conc-4053), SetVIDVerificationStatement from its read of the
+	// fabric to its write (R3-conc-3056), the
 	// fail-safe's commit ([OperationalCredentials.CommitFailSafe]) and
 	// its rollback ([OperationalCredentials.OnFailSafeExpiry]): a fail-safe
 	// that ends while a NOC command is between its fail-safe check and its
@@ -180,13 +183,13 @@ type OperationalCredentials struct {
 	// onFabricChanged fires after UpdateFabricLabel or
 	// SetVIDVerificationStatement changed a fabric the node keeps under
 	// the same operational identity. Mirrors matter.js Fabric.setLabel and
-	// updateVendorVerificationData persisting the fabric
-	// (packages/protocol/src/fabric/Fabric.ts:193-201, :208-243), whose
+	// updateVendorVerificationData persisting the fabric, at b25ed960
+	// (packages/protocol/src/fabric/Fabric.ts:193-204, :210-246), whose
 	// persist callback emits FabricManager's replaced event
-	// (FabricManager.ts:236-246), which OperationalCredentialsServer
+	// (FabricManager.ts:265-275), which OperationalCredentialsServer
 	// hands to CommissioningServer as an "updated" fabric change
-	// (OperationalCredentialsServer.ts:579-582, :596;
-	// CommissioningServer.ts:118-141).
+	// (OperationalCredentialsServer.ts:580-583, :597;
+	// CommissioningServer.ts:118-142).
 	onFabricChanged func(ctx context.Context, fabricIndex uint8)
 
 	// onFabricWithdraw, when non-nil, receives the operational identity
@@ -548,6 +551,15 @@ type OpcredsConfig struct {
 	// mDNS record with the just-installed CompressedFabricID + NodeID
 	// so commissioners' `FindOperationalForStayActive` step resolves.
 	// May be nil — the cluster works regardless.
+	//
+	// It runs under the server's NOC lock, which orders a fabric's
+	// installation before a rollback's removal of it (review II,
+	// R4-conc-4054, decision 660): it must not call
+	// [OperationalCredentials.RemoveFabric],
+	// [OperationalCredentials.PrepareFreshFailSafe],
+	// [OperationalCredentials.CommitFailSafe] or
+	// [OperationalCredentials.OnFailSafeExpiry], which take that lock and
+	// would wait for it forever.
 	OnFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
 	// OnFabricRemoved fires after a successful RemoveFabric has dropped
 	// a fabric from persistent storage, and after an expired fail-safe
@@ -612,10 +624,26 @@ type OpcredsConfig struct {
 	// new NOC. Mirrors matter.js FabricManager.ts `replacing` event →
 	// SessionManager and chip operational-credentials-server.cpp
 	// FabricTable::AbortAllOtherCommunicationOnFabric. May be nil.
+	//
+	// From UpdateNOC it runs under the server's NOC lock, as
+	// OnFabricInstalled does (review II, R4-conc-4054, decision 660): it
+	// must not call [OperationalCredentials.RemoveFabric],
+	// [OperationalCredentials.PrepareFreshFailSafe],
+	// [OperationalCredentials.CommitFailSafe] or
+	// [OperationalCredentials.OnFailSafeExpiry]. Its run for a rolled-back
+	// UpdateNOC comes after the lock is released.
 	OnFabricUpdated func(ctx context.Context, fabricIndex uint8)
 	// OnFabricWithdraw, when non-nil, receives the (compressedID,
 	// nodeID) of an operational mDNS instance that must be withdrawn —
 	// see the field doc on [OperationalCredentials]. May be nil.
+	//
+	// From UpdateNOC it runs under the server's NOC lock, as
+	// OnFabricInstalled does (review II, R4-conc-4054, decision 660): it
+	// must not call [OperationalCredentials.RemoveFabric],
+	// [OperationalCredentials.PrepareFreshFailSafe],
+	// [OperationalCredentials.CommitFailSafe] or
+	// [OperationalCredentials.OnFailSafeExpiry]. Its run for a rolled-back
+	// UpdateNOC comes after the lock is released.
 	OnFabricWithdraw func(ctx context.Context, compressedID [8]byte, nodeID uint64)
 	// Logger receives the server's diagnostics; nil is slog.Default().
 	Logger *slog.Logger
@@ -1012,18 +1040,40 @@ func (o *OperationalCredentials) reportRolledBack(ctx context.Context, added, up
 // once. A failed read or acknowledgement is logged and leaves the event
 // owed.
 func (o *OperationalCredentials) ackOwedFabricEvents(ctx context.Context, kind store.FabricPending, fabricIndex uint8) {
-	ctx = context.WithoutCancel(ctx)
-	owed, err := o.store.OwedFabricEvents(ctx)
+	o.ackOwedFabricEventIDs(ctx, fabricIndex, o.owedFabricEventIDs(ctx, kind, fabricIndex))
+}
+
+// owedFabricEventIDs lists the IDs of the owed events of kind the store
+// holds for fabricIndex. A delivery lists them before its hooks run and
+// acknowledges those only ([OperationalCredentials.ackOwedFabricEventIDs]):
+// a later rollback of the same fabric records its own event while the
+// first delivery's hooks still wait in the node's queue, and that event
+// stays owed until its own delivery's hooks ran (review II,
+// R5-err-5201). A failed read is logged and lists none, which leaves the
+// events owed.
+func (o *OperationalCredentials) owedFabricEventIDs(ctx context.Context, kind store.FabricPending, fabricIndex uint8) []uint64 {
+	owed, err := o.store.OwedFabricEvents(context.WithoutCancel(ctx))
 	if err != nil {
 		o.logger().Warn("matter.opcreds.owed_fabric_event.list_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
-		return
+		return nil
 	}
+	var ids []uint64
 	for i := range owed {
 		ev := &owed[i]
-		if ev.Kind != kind || ev.Fabric.FabricIndex != fabricIndex {
-			continue
+		if ev.Kind == kind && ev.Fabric.FabricIndex == fabricIndex {
+			ids = append(ids, ev.ID)
 		}
-		if err := o.store.AckOwedFabricEvent(ctx, ev.ID); err != nil {
+	}
+	return ids
+}
+
+// ackOwedFabricEventIDs acknowledges the owed events ids of fabricIndex
+// ([store.Fabrics.AckOwedFabricEvent]). A failed acknowledgement is logged
+// and leaves that event owed.
+func (o *OperationalCredentials) ackOwedFabricEventIDs(ctx context.Context, fabricIndex uint8, ids []uint64) {
+	ctx = context.WithoutCancel(ctx)
+	for _, id := range ids {
+		if err := o.store.AckOwedFabricEvent(ctx, id); err != nil {
 			o.logger().Warn("matter.opcreds.owed_fabric_event.ack_failed", slog.Int("fabric_index", int(fabricIndex)), slog.Any("err", err))
 		}
 	}
@@ -2838,6 +2888,27 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	if idx == 0 {
 		return nil, opcredsUnsupportedAccessErr{"core: UpdateFabricLabel needs an accessing fabric"}
 	}
+	resp, relabelled, err := o.relabel(ctx, idx, req.Label)
+	// The fabric changed: matter.js Fabric.setLabel persists it and the
+	// node reports an "updated" fabric (Fabric.ts:193-204 and
+	// OperationalCredentialsServer.ts:405 at b25ed960;
+	// FabricManager.ts:265-275 at b25ed960). The hook runs after nocMu is
+	// released.
+	if relabelled {
+		o.fabricChanged(ctx, idx)
+	}
+	return resp, err
+}
+
+// relabel is UpdateFabricLabel's LabelConflict check and its write, as one
+// step under nocMu: of two fabrics relabelled to one label at once, the
+// second sees the first one's label and is answered LabelConflict (review
+// II, R4-conc-4053). matter.js does the find and setLabel in one handler
+// (OperationalCredentialsServer.ts:396-405 at b25ed960). relabelled
+// reports a label that changed.
+func (o *OperationalCredentials) relabel(ctx context.Context, idx uint8, label string) (resp any, relabelled bool, err error) {
+	o.nocMu.Lock()
+	defer o.nocMu.Unlock()
 	// A label another fabric on this node already carries — the empty
 	// label every fabric starts with included — is answered LabelConflict.
 	// Mirrors matter.js db021da0 packages/node/src/behaviors/
@@ -2850,33 +2921,28 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	// R2-C2-err-1003).
 	fabrics, err := o.store.ListFabrics(ctx)
 	if err != nil {
-		return nil, spec.Errorf(im.StatusFailure, "core: UpdateFabricLabel: the fabric list: %v", err)
+		return nil, false, spec.Errorf(im.StatusFailure, "core: UpdateFabricLabel: the fabric list: %v", err)
 	}
 	for i := range fabrics {
 		f := &fabrics[i]
-		if f.FabricIndex != idx && f.Label == req.Label {
+		if f.FabricIndex != idx && f.Label == label {
 			return NOCResponse{
 				StatusCode: NOCStatusLabelConflict,
-				DebugText:  fmt.Sprintf("label %q already used by fabric %d", req.Label, f.FabricIndex),
-			}, nil
+				DebugText:  fmt.Sprintf("label %q already used by fabric %d", label, f.FabricIndex),
+			}, false, nil
 		}
 	}
 	// matter.js Fabric.setLabel persists, and so reports, only a label
-	// that changed (Fabric.ts:197-199).
+	// that changed (Fabric.ts:199-201 at b25ed960).
 	prev, prevErr := o.store.GetFabric(ctx, idx)
-	relabelled := prevErr != nil || prev.Label != req.Label
-	if err := o.store.UpdateFabricLabel(ctx, idx, req.Label); err != nil {
-		return opcredsFabricReadFailure("UpdateFabricLabel", idx, err, store.ErrFabricNotFound)
+	relabelled = prevErr != nil || prev.Label != label
+	if err := o.store.UpdateFabricLabel(ctx, idx, label); err != nil {
+		resp, err := opcredsFabricReadFailure("UpdateFabricLabel", idx, err, store.ErrFabricNotFound)
+		return resp, false, err
 	}
 	// Bump DataVersion after successful label update — fabric list changed.
 	o.dataVersion.Bump()
-	// The fabric changed: matter.js Fabric.setLabel persists it and the
-	// node reports an "updated" fabric (Fabric.ts:193-201,
-	// FabricManager.ts:236-246, OperationalCredentialsServer.ts:404).
-	if relabelled {
-		o.fabricChanged(ctx, idx)
-	}
-	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: idx}, nil
+	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: idx}, relabelled, nil
 }
 
 // opcredsFabricReadFailure answers a store error on the accessing fabric:

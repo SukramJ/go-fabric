@@ -108,7 +108,11 @@ type Config struct {
 	// TLS mounts TlsCertificateManagement and TlsClientManagement on the
 	// root and hands them to the topology's PushAvStreamTransport servers
 	// ([TLSConfig], [RootClusters].TLSCertificateManagement); nil mounts
-	// neither.
+	// neither. Under [Config].Surface policies whose level does not have
+	// both clusters (below 1.5.1), or one that refuses them, it is a
+	// configuration error ([Config.Validate], [New]). A policy cannot
+	// remove them: both are judged mandatory on the root, so the policies
+	// keep them against a Remove.
 	TLS *TLSConfig
 	// OTAProvider serves OTA images: the OTA Software Update Provider on an
 	// endpoint of device type OtaProvider beside the Aggregator, its images
@@ -810,7 +814,7 @@ type Store struct {
 	// without one reads a sealed secret as store.ErrNoSealer and writes
 	// none. It excludes
 	// Credentials (an override is sealed by the host that built it).
-	Sealer store.Sealer
+	Sealer Sealer
 }
 
 // validate checks which stores the node opens and builds.
@@ -1017,6 +1021,7 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.BasicInformation.constraintErrors()...)
 	errs = append(errs, c.limitsPairErrors()...)
 	errs = append(errs, c.advertisementErrors()...)
+	errs = append(errs, c.tlsLevelErrors()...)
 	if c.Network.GATT != nil && c.Network.BLE != nil { //nolint:staticcheck // the deprecated port is still honoured
 		errs = append(errs, errors.New("node: Network takes GATT or the deprecated BLE, not both"))
 	}

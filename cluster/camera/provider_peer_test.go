@@ -208,9 +208,10 @@ func TestProviderSignalsReachThePeer(t *testing.T) {
 }
 
 // TestProviderEndRemovesTheSession: End sends the requestor's End with the
-// reason and removes the session whether the peer took it or not (chip
-// :999-1000, CleanupSession after SendEndCommand regardless of its
-// result); the peer's status is the error.
+// reason and removes the session whether the peer took it or not (chip's
+// camera app cleans up after SendEndCommand regardless of its result,
+// :999-1000), the unreachable peer included (decision 663, this module's
+// own); the peer's status is the error.
 func TestProviderEndRemovesTheSession(t *testing.T) {
 	t.Run("delivered", func(t *testing.T) {
 		p, peers := signalProvider(t)

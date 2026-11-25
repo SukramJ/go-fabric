@@ -129,7 +129,7 @@ func TestParityMatterJS_BridgedServer_ReachableIsMandatory(t *testing.T) {
 // information/BridgedDeviceBasicInformationServer.ts (state.reachable
 // setter → events.reachableChanged.emit) and packages/model/src/standard/
 // elements/bridged-device-basic-information.element.ts:55 (ReachableChanged
-// event, priority Critical).
+// event, priority Info).
 func TestParityMatterJS_BridgedServer_ReachableChangedEventFired(t *testing.T) {
 	t.Parallel()
 	cfg := validBridgedConfig()

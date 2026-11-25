@@ -167,13 +167,22 @@ func (s *Service) maybeStartResolving() {
 	go func() {
 		defer close(done)
 		_, err := s.Resolve(ctx)
-		s.names.loop.post(func() {
+		s.names.loop.post(func() { //nolint:contextcheck // a restarted resolution runs on the cache's context (s.names.ctx), never the ended one's
 			if err == nil {
 				s.names.logger.Debug("matter.discovery.status.resolved", slog.String("service", s.name.qname), slog.Int("addresses", s.addresses.len()), slog.String("targets", s.targets()))
 			}
 			cancel()
 			s.status.resolveCancel = nil
 			s.status.resolving = nil
+			// A resolution stopped (stopResolving) keeps its handle until
+			// this cleanup runs; an attempt on a service unreachable again
+			// meanwhile found it set and started none. Start it now when
+			// the status still asks for one — never once the cache is
+			// closing, whose context would end the new one at once
+			// (review II, R4-conc-4552).
+			if s.names.ctx.Err() == nil {
+				s.maybeStartResolving()
+			}
 		})
 	}()
 }

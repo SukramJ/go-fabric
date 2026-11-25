@@ -74,10 +74,15 @@ func TestThreadNetworkCommissioningBlindFailSafePortLogsOnce(t *testing.T) {
 	t.Parallel()
 	ctx := im.WithFabricFilter(context.Background(), false, 1)
 
-	armed, crumbs := true, []uint64{}
-	n := newThreadNC(t, &simBorderRouter{}, &armed, &crumbs)
+	// The logger comes through the config (review II, R3-sup-3002).
 	var buf bytes.Buffer
-	n.logger = slog.New(slog.NewTextHandler(&buf, nil))
+	n, err := NewThreadNetworkCommissioning(context.Background(), ThreadNetworkCommissioningConfig{
+		BorderRouter: &simBorderRouter{}, IsFailSafeArmed: func() bool { return true },
+		Logger: slog.New(slog.NewTextHandler(&buf, nil)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	for range 3 {
 		if !n.armedFor(ctx) {
 			t.Fatal("the fabric-blind port, armed, no longer answers armed")

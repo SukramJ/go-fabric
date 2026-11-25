@@ -4,6 +4,7 @@
 package accesscontrol_test
 
 import (
+	"context"
 	"testing"
 
 	"thingfabric.dev/go-fabric/cluster/core"
@@ -20,7 +21,7 @@ import (
 // view of the same cluster (ADR 0013, amendment of 2026-10-25).
 func TestCoreServerMatchesDefinition(t *testing.T) {
 	t.Parallel()
-	srv, err := core.NewAccessControl(memstore.New())
+	srv, err := core.NewAccessControlWith(context.Background(), core.AccessControlConfig{Store: memstore.New()})
 	if err != nil {
 		t.Fatal(err)
 	}

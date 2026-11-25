@@ -21,7 +21,7 @@ import (
 //
 // The read-only attribute surface mirrors the bridge's current PASE
 // state; commands route to a programmatic [WindowController] hook the
-// daemon plumbs in (typically `bridge.Bridge.OpenCommissioningWindow`).
+// host plumbs in (typically the bridge's `bridge.CommissioningWindow`).
 // When no controller is wired a command answers FAILURE with the cluster
 // status Busy (0x02, [ErrAdmCommBusy]), so a commissioner can retry.
 //
@@ -104,8 +104,9 @@ const (
 )
 
 // WindowController is the bridge-side surface
-// AdministratorCommissioning routes its commands through. The daemon
-// wires this to [bridge.Bridge.OpenCommissioningWindow] — the
+// AdministratorCommissioning routes its commands through. The host
+// wires this to the bridge's commissioning window
+// (bridge.CommissioningWindow, whose OpenWindow opens it) — the
 // cluster server itself owns no PASE / verifier state.
 //
 // CurrentWindow returns the live status the cluster reports back via
@@ -174,9 +175,12 @@ type OpenWindowParams struct {
 	// installed yet (FabricCount == 0). The timeout upper bound extends
 	// from 900 s to 172 800 s (48 h) per Matter §11.19.8.1 — matching
 	// chip CommissioningWindowManager.cpp::MaxCommissioningTimeout().
-	// The daemon sets this field from the fabric store before calling
-	// OpenWindow. Defaults to false (commissioned), which applies the
-	// standard 900-s cap.
+	// The server sets this field itself before calling OpenWindow: true
+	// when its FabricCounter ([AdministratorCommissioning.SetFabricCounter])
+	// answers 0. Both open paths refuse a session without a fabric first,
+	// so it is true only when the counter does not count the session's
+	// fabric. Defaults to false (commissioned), which applies the standard
+	// 900-s cap.
 	IsUncommissioned bool
 	// JointFabric opens the window as a Joint Fabric administrator's
 	// joint commissioning window: an enhanced window advertised CM=3

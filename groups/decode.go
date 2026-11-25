@@ -47,7 +47,7 @@ var (
 // Deprecated: [Manager.Decode] no longer returns it — a key set that
 // GroupKeyMap maps no group to is never tried, as in matter.js
 // (GroupSession.ts:366-376 at db021da0). A message no candidate passes is
-// a [DecodeError].
+// a [DecodeError]. Removable in v0.25.0.
 type NoKeyError struct {
 	// Authenticated reports that an unmapped key set opened the message;
 	// FabricIndex and GroupID are set only then.

@@ -21,6 +21,17 @@ import (
 // at b25ed960).
 const probeMaxRetransmissions = 2
 
+// probeMaxReportChunks is how many reports the probe's read takes before
+// it fails: a peer that keeps answering with more to come would otherwise
+// hold the probe, and its network slot, for as long as it streams. A read
+// without paths has nothing to report, so one report answers it; the
+// bound is this module's own (review II, R2-C2-bound-2159).
+const probeMaxReportChunks = 4
+
+// errProbeChunks is a probe read that reached probeMaxReportChunks reports
+// with more still to come.
+var errProbeChunks = errors.New("peer: probe read sent too many report chunks")
+
 // Tags of ReportDataMessage the probe reads (Matter §10.7.3).
 const (
 	tagReportMoreChunked      = 3
@@ -28,24 +39,31 @@ const (
 )
 
 // probe checks that s still reaches the peer with an empty read — matter.js
-// ClientInteraction.probe (action/client/ClientInteraction.ts:300-360):
-// an IM exchange on the existing session, never a new connection
-// (requireExistingSession, :321), to override instead of the session's
-// address when it is set (:320); a ReadRequest without paths and not
-// fabric-filtered (Read({fabricFilter: false}), :331) sent with
-// suppressed peer loss and at most probeMaxRetransmissions transmissions
-// (:332-335); then the reports as InteractionMessenger.readDataReports
-// reads them (interaction/InteractionMessenger.ts:938-972) — a
-// StatusResponse Success after a chunk with more to come, and after the
-// last one unless it suppresses the response, the last one not awaited.
-// It reports true on the final report and false on any error or the end of
-// ctx (:345-355); the exchange is closed either way (:356-359).
+// ClientInteraction.probe (action/client/ClientInteraction.ts:377-430 at
+// b25ed960): an IM exchange on the existing session, never a new
+// connection (requireExistingSession, :390), to override instead of the
+// session's address when it is set (addressOverride, :389); a
+// ReadRequest without paths and not fabric-filtered
+// (Read({fabricFilter: false}), :400) sent with suppressed peer loss and
+// at most probeMaxRetransmissions transmissions (:401-403); then the
+// reports as InteractionMessenger.readDataReports reads them
+// (interaction/InteractionMessenger.ts:1019-1054) — a StatusResponse
+// Success after a chunk with more to come, and after the last one unless
+// it suppresses the response, the last one not awaited. It reports true
+// on the final report and false on any error or the end of ctx
+// (ClientInteraction.ts:405-424); the exchange is closed either way
+// (:425-428).
+//
+// matter.js's probe drains readDataReports without a count
+// (ClientInteraction.ts:405; InteractionMessenger.ts:1019-1054 at
+// b25ed960: while (true), left only on the last chunk); the probe here
+// fails at the probeMaxReportChunks-th report with more to come.
 //
 // With a network profile the probe takes a slot of it, released when the
 // exchange closes, and pads the exchange with margin — the probe network
-// PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at db021da0)
+// PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at b25ed960)
 // and the medium margin PeerExchangeProvider.initiateExchange applies
-// (PeerExchangeProvider.ts:87-92, :133-138).
+// (PeerExchangeProvider.ts:85-90, :131-136 at b25ed960).
 //
 // Its log record matter.controller.peer.probe names the probed address in
 // target — override, else the session's — beside the caller's address, so
@@ -100,7 +118,7 @@ func readEmpty(ctx context.Context, x *exchange.Exchange) error {
 		return err
 	}
 	success := statusSuccess()
-	for {
+	for chunks := 1; ; chunks++ {
 		msg, err := x.Next(ctx, exchange.ReceiveOptions{})
 		if err != nil {
 			return err
@@ -113,6 +131,9 @@ func readEmpty(ctx context.Context, x *exchange.Exchange) error {
 			return err
 		}
 		if more {
+			if chunks >= probeMaxReportChunks {
+				return errProbeChunks
+			}
 			if err := x.Send(ctx, im.OpcodeStatusResponse, success, exchange.SendOptions{}); err != nil {
 				return err
 			}
@@ -122,7 +143,8 @@ func readEmpty(ctx context.Context, x *exchange.Exchange) error {
 			x.Close()
 			return nil
 		}
-		// The final StatusResponse is tracked, not awaited (:950-966).
+		// The final StatusResponse is tracked, not awaited
+		// (InteractionMessenger.ts:1035-1048 at b25ed960).
 		go func() {
 			_ = x.Send(context.WithoutCancel(ctx), im.OpcodeStatusResponse, success, exchange.SendOptions{})
 			x.Close()

@@ -71,7 +71,7 @@ func accessControlACLPath() im.ConcreteAttributePath {
 func newACLTestBridge(t *testing.T, fake *aclStoreFake) *Bridge {
 	t.Helper()
 	b := newStartedBridge(t)
-	ac, err := core.NewAccessControl(fake)
+	ac, err := core.NewAccessControlWith(context.Background(), core.AccessControlConfig{Store: fake})
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}

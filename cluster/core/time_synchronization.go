@@ -307,7 +307,7 @@ func (t *TimeSynchronization) MatterReportable() []uint32 {
 // MatterAttributes lists every TimeSynchronization (0x0038) attribute
 // the server implements via MatterRead. Apple Home's HAP service
 // rebuild reads the full attribute set; without this the dispatcher
-// falls back to MatterReportable's two-attribute surface.
+// falls back to MatterReportable's smaller set.
 func (t *TimeSynchronization) MatterAttributes() []uint32 {
 	return t.instance().MatterAttributes()
 }

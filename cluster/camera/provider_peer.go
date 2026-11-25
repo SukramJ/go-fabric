@@ -7,7 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
+	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/cluster/spec"
 	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
@@ -132,24 +134,49 @@ func (p *Provider) IceCandidates(ctx context.Context, sessionID uint16, candidat
 }
 
 // End tells the requestor the camera ended the session, with the reason
-// (a WebRTCEndReasonEnum value), as the requestor's End command, and
-// removes the session from CurrentSessions whether or not the command
-// reached the peer (chip SendEndCommand :1301-1328, then CleanupSession
-// :999-1000 regardless of the result). The command's error is returned.
+// (a WebRTCEndReasonEnum value), as the requestor's End command. The
+// session leaves CurrentSessions first, before the command is sent, so
+// the removal waits neither for the requestor's response nor for a
+// session to the requestor, and holds when the requestor cannot be
+// reached at all (decisions 654, 663). The command's error is returned.
+//
+// chip's camera app sends End without waiting for its response
+// (SendEndCommand :1301-1329, InvokeCommandRequest with logging
+// callbacks) and cleans the session up at once, whatever the send
+// returned (:999-1000); its CurrentSessions entry goes when the peer
+// connection reports Failed or Closed (webrtc-libdatachannel.cpp:342-348
+// at 6170af84 → OnConnectionStateChanged :1157-1187, RemoveSession
+// :1183), not through the End's response. That
+// libdatachannel's close() raises the Closed callback is inferred, not
+// read. Where the requestor cannot be reached, chip's
+// OnDeviceConnectionFailure (:1014-1019) only logs and keeps the session;
+// this one removes it — a divergence from chip (decision 663).
 func (p *Provider) End(ctx context.Context, sessionID uint16, reason uint8) error {
-	err := p.signal(ctx, sessionID, wrdef.CmdEnd, wrdef.EndRequest{WebRtcSessionId: sessionID, Reason: reason})
-	if errors.Is(err, ErrNoPeerConnector) || errors.Is(err, ErrUnknownSession) {
+	peers, session, err := p.signalTarget(sessionID)
+	if err != nil {
 		return err
 	}
-	if rerr := p.removeSession(contract.OriginHostSet, sessionID); err == nil {
-		err = rerr
+	rerr := p.removeSession(contract.OriginHostSet, sessionID)
+	if err := p.send(ctx, peers, session, wrdef.CmdEnd, wrdef.EndRequest{WebRtcSessionId: sessionID, Reason: reason}); err != nil {
+		return err
 	}
-	return err
+	return rerr
 }
 
 // signal invokes one requestor command for the session of the id on the
 // session's peer node and fabric at its PeerEndpointId.
 func (p *Provider) signal(ctx context.Context, sessionID uint16, commandID uint32, fields spec.Encodable) error {
+	peers, session, err := p.signalTarget(sessionID)
+	if err != nil {
+		return err
+	}
+	return p.send(ctx, peers, session, commandID, fields)
+}
+
+// signalTarget returns the attached connector and the CurrentSessions
+// entry of the id, both read under one lock: [ErrNoPeerConnector]
+// without a connector, [ErrUnknownSession] without the entry.
+func (p *Provider) signalTarget(sessionID uint16) (PeerConnector, ProviderSession, error) {
 	p.mu.Lock()
 	peers := p.peers
 	var session ProviderSession
@@ -162,17 +189,42 @@ func (p *Provider) signal(ctx context.Context, sessionID uint16, commandID uint3
 	}
 	p.mu.Unlock()
 	if peers == nil {
-		return ErrNoPeerConnector
+		return nil, ProviderSession{}, ErrNoPeerConnector
 	}
 	if !found {
-		return fmt.Errorf("%w: %d", ErrUnknownSession, sessionID)
+		return nil, ProviderSession{}, fmt.Errorf("%w: %d", ErrUnknownSession, sessionID)
 	}
+	return peers, session, nil
+}
+
+// send reaches the session's requestor through peers and invokes the
+// command at the session's PeerEndpointId. Each step logs a Debug line
+// with the session, fabric, node, command and duration, so a send that
+// never returns is told apart from one that failed: the line before a
+// step says it began, the line after says how it ended (issue #596 B).
+// The lines go to [ProviderConfig.Logger], slog.Default when nil.
+func (p *Provider) send(ctx context.Context, peers PeerConnector, session ProviderSession, commandID uint32, fields spec.Encodable) error {
+	log := p.cfg.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+	attrs := []any{
+		slog.Int("webrtc_session_id", int(session.Id)), slog.Int("fabric_index", int(session.FabricIndex)),
+		slog.Uint64("node_id", session.PeerNodeId), slog.Uint64("command", uint64(commandID)),
+	}
+	started := p.clock.Now()
+	log.Debug("camera.provider.signal.connecting", attrs...)
 	sess, err := peers.ConnectPeer(ctx, session.FabricIndex, session.PeerNodeId)
+	log.Debug("camera.provider.signal.connected", append(attrs, slog.Duration("took", clock.Since(p.clock, started)), slog.Any("err", err))...)
 	if err != nil {
-		return fmt.Errorf("camera: WebRTC session %d: reach the requestor: %w", sessionID, err)
+		return fmt.Errorf("camera: WebRTC session %d: reach the requestor: %w", session.Id, err)
 	}
-	if _, err := sess.Invoke(ctx, session.PeerEndpointId, wrdef.ClusterID, commandID, fields); err != nil {
-		return fmt.Errorf("camera: WebRTC session %d: %w", sessionID, err)
+	started = p.clock.Now()
+	log.Debug("camera.provider.signal.invoking", attrs...)
+	_, err = sess.Invoke(ctx, session.PeerEndpointId, wrdef.ClusterID, commandID, fields)
+	log.Debug("camera.provider.signal.invoked", append(attrs, slog.Duration("took", clock.Since(p.clock, started)), slog.Any("err", err))...)
+	if err != nil {
+		return fmt.Errorf("camera: WebRTC session %d: %w", session.Id, err)
 	}
 	return nil
 }

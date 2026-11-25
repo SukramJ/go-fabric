@@ -397,8 +397,10 @@ func (r scheduleRules) validateTransitionsPerDay(sc Schedule) error {
 // (ThermostatServer.ts:3056-3086 at b25ed960): a built-in schedule the new
 // list drops is CONSTRAINT_ERROR, the active schedule it drops
 // INVALID_IN_STATE — only if the active handle names a stored schedule
-// (:3073-3085, the clause :3077-3080): a handle the host left dangling,
-// set between a commit's checks and its store, does not block every later
+// (:3073-3085, the clause :3077-3080). A handle that names no stored
+// schedule is not kept here — the stores clear one their list drops
+// ([ThermostatServer.commitSchedules], [ThermostatServer.SetSchedules],
+// R4-fsm-4253) —, so the clause only keeps such a handle from blocking a
 // commit.
 func validateScheduleCommit(stored, next []Schedule, active []byte) error {
 	for _, sc := range stored {
@@ -503,8 +505,12 @@ func schedulesTLVEqual(a, b []Schedule) bool {
 // #normalizeSchedules at pre-commit (ThermostatServer.ts:3028-3049 at
 // b25ed960) —, the [SchedulePort] stores the list — its error fails the
 // commit — and the list is stored and reported. The port may confirm the
-// list through [ThermostatServer.SetSchedules], the host's replace. The
-// caller holds s.op.
+// list through [ThermostatServer.SetSchedules], the host's replace. An
+// active handle the stored list no longer holds is cleared at the store,
+// as [ThermostatServer.SetSchedules] clears one: the commit's check ran
+// before the port, and a host's [ThermostatServer.SetActiveScheduleHandle]
+// takes no s.op, so it may name a schedule the commit drops
+// (R4-fsm-4253). The caller holds s.op.
 func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedule) error {
 	list := deepcopy.Each(staged)
 	if err := issueScheduleHandles(list); err != nil {
@@ -519,12 +525,22 @@ func (s *ThermostatServer) commitSchedules(ctx context.Context, staged []Schedul
 		}
 	}
 	s.mu.Lock()
-	changed := !schedulesTLVEqual(s.schedules, list)
-	s.schedules = list
-	s.mu.Unlock()
-	if changed {
-		s.changes.NotifyFrom(contract.OriginFrom(ctx), tdef.AttrSchedules)
+	var changed []uint32
+	if !schedulesTLVEqual(s.schedules, list) {
+		changed = append(changed, tdef.AttrSchedules)
 	}
+	s.schedules = list
+	var dropped []byte
+	if s.activeScheduleHandle != nil && !scheduleHandleIn(list, s.activeScheduleHandle) {
+		dropped = s.activeScheduleHandle
+		s.activeScheduleHandle = nil
+		changed = append(changed, tdef.AttrActiveScheduleHandle)
+	}
+	s.mu.Unlock()
+	if len(changed) > 0 {
+		s.changes.NotifyFrom(contract.OriginFrom(ctx), changed...)
+	}
+	s.emitActiveScheduleChange(ctx, dropped, nil)
 	return nil
 }
 

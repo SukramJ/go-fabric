@@ -104,6 +104,8 @@ func (n *Node) ensureRequestorACLOn(ctx context.Context, fabricIndex uint8, epID
 	if !n.addLocalOperateEntry(ctx, fabricIndex, epID, camera.RequestorClusterID, "webrtc.requestor.acl") {
 		return
 	}
-	n.root.AccessControl.NotifyLocalEntryInstalled()
+	// After addLocalOperateEntry returned: the write lock is released, as
+	// NotifyLocalEntryInstalledOn requires (review II, R5-par-5003).
+	n.root.AccessControl.NotifyLocalEntryInstalledOn(ctx, fabricIndex)
 	n.logger.Info("webrtc.requestor.acl_added", slog.Int("fabric_index", int(fabricIndex)), slog.Int("endpoint", int(epID)))
 }

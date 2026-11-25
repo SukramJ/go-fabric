@@ -124,7 +124,7 @@ package, and Go makes all of them unimportable from outside — the one-way
 seams through which the facade, the test-support packages, the reference
 programs and the module's own tests reach package internals (`bridgeseam`,
 `channelseam`, `coreseam`, `dclseam`, `deviceseam`, `exchangeseam`, `facadeseam`, `fabrictestseam`,
-`nodeseam`, `sealseam`, `sessionseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
+`nodeseam`, `sealseam`, `sessionseam`, `specseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
 internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`, `caseauth`, `deepcopy`);
 and test support (`paritytest`, `chipdm`, the chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
 else may be changed as if it were.
@@ -262,6 +262,9 @@ becomes permissible in:
 | `cluster/core.ScenesConfig.Fabrics` | `ScenesConfig.ListFabrics`, which reports the error | `v0.28.0` |
 | `bridge.CaseSessionEstablished`, `bridge.CaseAdapter.SetOnSessionEstablished` | `bridge.CaseEstablished`, `CaseAdapter.SetOnEstablished`, whose callback receives the session the handshake step established (`sigma.Established`) | `v0.28.0` |
 | `bridge.CaseAdapter.SnapshotResponder` | the `sigma.Established` value `CaseAdapter.SetOnEstablished`'s callback receives | `v0.28.0` |
+| `cluster/core.NewAccessControl`, `cluster/core.AccessControl.SetLimits` | `cluster/core.NewAccessControlWith` with `AccessControlConfig{Store, Limits}`, which refuses a limit outside its range at construction | `v0.29.0` |
+| `cluster/core.ARLClusterID` | none: ARL is AccessControl's MNGD feature, `cluster/spec/accesscontrol.ClusterID` (0x001F); 0x002B is LocalizationConfiguration | `v0.29.0` |
+| `cluster/camera.Provider.PeerGone` | `Provider.EndLostPeer`, the same call, which also returns how many of the pair's sessions it ended | `v0.29.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

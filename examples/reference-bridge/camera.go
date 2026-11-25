@@ -580,6 +580,7 @@ func (c *demoCamera) build() error {
 func (c *demoCamera) options(key, name string) device.Options {
 	o := bridged(key, name)
 	o.Surface = c.surface
+	o.Logger = c.logger // the daemon's logger; the provider's signal lines among them (#596 B, decision 676)
 	return o
 }
 
@@ -836,10 +837,16 @@ func camFirst(ids *[]uint16) *spec.Nullable[uint16] {
 // before it asks the port.
 const camMaxWebRTCSessions = 5
 
-// SolicitOffer answers DeferredOffer as --camera-deferred-offer says
-// (HandleSolicitOffer: LinuxDeviceOptions cameraDeferredOffer).
+// SolicitOffer counts the session's streams and answers DeferredOffer as
+// --camera-deferred-offer says (HandleSolicitOffer,
+// webrtc-provider-manager.cpp:176 at 6170af84: LinuxDeviceOptions
+// cameraDeferredOffer at :220; AcquireAudioVideoStreams at :301), so a stream a
+// solicited session names cannot be deallocated while the session lives.
+// EndSession releases them, as for a ProvideOffer's session (issue #596 C).
 func (p camProviderPort) SolicitOffer(_ context.Context, args wpdef.OfferArgs) (wpdef.WebRTCSessionStruct, bool, error) {
-	return camSession(args), p.c.opts.deferredOffer, nil
+	s := camSession(args)
+	p.c.acquireStreams(s.Id, args.VideoStreams, args.AudioStreams)
+	return s, p.c.opts.deferredOffer, nil
 }
 
 // ProvideOffer returns the session and answers the offer (camera_webrtc.go:

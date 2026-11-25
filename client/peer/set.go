@@ -111,8 +111,7 @@ type Context struct {
 
 // Set manages the peers on our fabrics and their operational connections.
 // It is matter.js PeerSet (packages/protocol/src/peer/PeerSet.ts:56-339 at
-// b25ed960), without the transport preference and group lookups. It is
-// safe for concurrent use.
+// b25ed960), without group lookups. It is safe for concurrent use.
 type Set struct {
 	ctx   Context
 	log   *slog.Logger

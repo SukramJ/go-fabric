@@ -17,12 +17,13 @@ import (
 // this package, removing the model→northbound coupling. This alias
 // keeps all cluster-internal callers unchanged.
 //
-// Mirrors matter.js packages/protocol/src/interaction/
-// InteractionServer.ts DataVersion tracking on per-cluster state. The
-// initial value is a uniformly random non-zero uint32 chosen at first
+// Mirrors matter.js's per-cluster datasource version
+// (packages/node/src/behavior/state/managed/Datasource.ts:763,
+// `entropy.randomUint32`, advanced at :856-865, at b25ed960). The
+// initial value is a uniformly random uint32, 0 included, chosen at first
 // access — matter.js samples observed in the field carry values like
-// 3408898508 / 3191265986 / 2061169561 (per-cluster initial randoms
-// from a `Crypto.getRandomUint32()` call). Apple Home's MTRDevice
+// 3408898508 / 3191265986 / 2061169561 (per-cluster initial randoms).
+// Apple Home's MTRDevice
 // cache appears to treat a uniform DataVersion=1 across every cluster
 // as an "uninitialised" signal and refuses to persist those clusters
 // to its on-disk cache (surface symptom: `Storing cluster information
@@ -30,8 +31,10 @@ import (
 // makes each (endpoint, cluster) carry a distinct DataVersion before
 // the first mutation, which is what Apple looks for.
 //
-// Matter §10.6.5: "A DataVersion of zero is reserved for absent or
-// invalid"; the random generator skips zero accordingly.
+// 0 is a version like any other: neither the generator nor the wrap
+// skips it, as matter.js's entropy.randomUint32
+// (packages/general/src/util/Entropy.ts:26-28) and advanceVersion
+// (Datasource.ts:862-864) do not, at b25ed960 (owner decision 146).
 //
 // See [contract.DataVersionTracker] for the counter itself.
 //

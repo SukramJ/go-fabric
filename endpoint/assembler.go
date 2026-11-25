@@ -180,8 +180,11 @@ func (c Config) Validate() error {
 }
 
 // Assembler turns snapshots of [Spec] values into a [Topology].
-// Multi-call-safe; concurrent calls serialise through the underlying
-// store transactions.
+// Concurrent calls serialise the endpoint-id allocation through the
+// underlying store transactions, not the endpoint state of a key: two
+// concurrent calls with a key new to both can each build its first state,
+// and the topology whose install lost holds one the next assembly does
+// not reuse (issue #618) — call Assemble from one goroutine at a time.
 type Assembler struct {
 	store  Store
 	cfg    Config

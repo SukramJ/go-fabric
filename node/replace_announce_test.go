@@ -433,3 +433,19 @@ func TestInvokeInFlightAtTheSwapCompletesOnTheOldInstance(t *testing.T) {
 		t.Errorf("OnOff served after the swap: %+v, %v; want the new instance's false", got.Value, err)
 	}
 }
+
+// TestReplaceUnderARefusingRequestAnnounces (R5-par-5106): a same-key
+// Replace whose ctx carries a request's access check that refuses every
+// path — a host replacing a device from a command handler, with the
+// handler's ctx — still announces the new instance to the subscriber: the
+// caller's request does not decide what the subscriptions are told.
+func TestReplaceUnderARefusingRequestAnnounces(t *testing.T) {
+	ctx := parityCtx(t)
+	r := newAnnounceRig(ctx, t, announcePlug(t, "plug", "1.0", false))
+	b := announcePlug(t, "plug", "2.0", true)
+	refusing := im.WithAuthority(ctx, func(uint16, uint32, uint8) im.StatusCode { return im.StatusUnsupportedAccess })
+	if err := r.n.Aggregator().Replace(refusing, device.StringKey("plug"), b); err != nil {
+		t.Fatal(err)
+	}
+	r.wantAnnounced(ctx, t)
+}

@@ -260,12 +260,13 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	facadeSlot(facadeseam.SetOnCommissioningComplete(generalCom, commissioned), "GeneralCommissioning commissioning complete")
 
-	r.AccessControl, err = mattercore.NewAccessControl(d.st) //nolint:contextcheck // the constructor takes no context; it reads the store once
+	// The limits are given at construction and judged there: one outside
+	// its range fails New (review II, R4-api-4157).
+	r.AccessControl, err = mattercore.NewAccessControlWith(ctx, mattercore.AccessControlConfig{Store: d.st, Limits: cfg.Limits.accessControl()})
 	if err != nil {
 		return nil, fmt.Errorf("access control: %w", err)
 	}
 	r.AccessControl.SetLogger(d.logger)
-	r.AccessControl.SetLimits(cfg.Limits.accessControl())
 	r.GroupKeyManagement, err = mattercore.NewGroupKeyManagement(d.st, mattercore.GroupKeyMgmtConfig{ //nolint:contextcheck // the constructor takes no context; it repairs the store once
 		MaxGroupsPerFabric:    cfg.Limits.MaxGroupsPerFabric,
 		MaxGroupKeysPerFabric: cfg.Limits.MaxGroupKeysPerFabric,

@@ -1255,6 +1255,18 @@ func (w *WiFiNetworkCommissioning) armedFor(ctx context.Context) bool {
 	return w.failSafeArmed()
 }
 
+// expiryWindow is the count of fail-safe expiries, read before the gate
+// (armedFor): a command compares it again in the hold that writes, and an
+// expiry in between fails it with FAILSAFE_REQUIRED — its change would
+// stay staged with no expiry left to revert it, and the next
+// CommissioningComplete would store it (review II,
+// C5-p8-wifi-3055-sibling; the Thread server's R3-fsm-3055).
+func (w *WiFiNetworkCommissioning) expiryWindow() uint64 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.expiries
+}
+
 // warnBlindFailSafePort logs that a NetworkCommissioning server gates its
 // network commands on the deprecated fabric-blind fail-safe port alone
 // (R2-C2-sec-1006, decision 515).
@@ -1273,6 +1285,7 @@ func warnBlindFailSafePort(l *slog.Logger, server string) {
 // a new one appended unless the list is full (BoundsExceeded); success
 // writes the breadcrumb and changes the list.
 func (w *WiFiNetworkCommissioning) addOrUpdate(ctx context.Context, req netcommdef.AddOrUpdateWiFiNetworkRequest) (any, error) {
+	window := w.expiryWindow()
 	if !w.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: AddOrUpdateWiFiNetwork needs an armed failsafe")
 	}
@@ -1283,6 +1296,10 @@ func (w *WiFiNetworkCommissioning) addOrUpdate(ctx context.Context, req netcommd
 		return nil, netcommStatus(im.StatusConstraintError, "core: AddOrUpdateWiFiNetwork credentials of %d bytes", len(req.Credentials))
 	}
 	w.mu.Lock()
+	if w.expiries != window {
+		w.mu.Unlock()
+		return nil, errWindowExpired("AddOrUpdateWiFiNetwork")
+	}
 	status := netcommdef.NetworkCommissioningStatusSuccess
 	i := w.indexLocked(req.Ssid)
 	switch {
@@ -1314,10 +1331,15 @@ func (w *WiFiNetworkCommissioning) addOrUpdate(ctx context.Context, req netcommd
 // is NetworkIDNotFound; with the last network gone the last status,
 // network id and connect error are cleared.
 func (w *WiFiNetworkCommissioning) remove(ctx context.Context, req netcommdef.RemoveNetworkRequest) (any, error) {
+	window := w.expiryWindow()
 	if !w.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: RemoveNetwork needs an armed failsafe")
 	}
 	w.mu.Lock()
+	if w.expiries != window {
+		w.mu.Unlock()
+		return nil, errWindowExpired("RemoveNetwork")
+	}
 	i := w.indexLocked(req.NetworkId)
 	if i < 0 {
 		w.mu.Unlock()
@@ -1366,6 +1388,7 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 	if len(req.NetworkId) > maxNetworkIDLength {
 		return nil, netcommStatus(im.StatusConstraintError, "core: ConnectNetwork network id of %d bytes", len(req.NetworkId))
 	}
+	window := w.expiryWindow()
 	if !w.armedFor(ctx) {
 		return nil, netcommStatus(im.StatusFailsafeRequired, "core: ConnectNetwork needs an armed failsafe")
 	}
@@ -1373,7 +1396,10 @@ func (w *WiFiNetworkCommissioning) connect(ctx context.Context, req netcommdef.C
 		return nil, err
 	}
 	w.mu.Lock()
-	window := w.expiries
+	if w.expiries != window {
+		w.mu.Unlock()
+		return nil, errWindowExpired("ConnectNetwork")
+	}
 	i := w.indexLocked(req.NetworkId)
 	var target wifiNetwork
 	// The driver's join is bounded by the ConnectMaxTimeSeconds the server
