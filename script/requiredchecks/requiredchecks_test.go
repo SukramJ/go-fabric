@@ -158,6 +158,7 @@ var offPullRequest = map[string]string{
 	"chip-image.yml":   "workflow_dispatch",
 	"lock.yml":         "schedule,workflow_dispatch",
 	"matterjs-pin.yml": "schedule,workflow_dispatch",
+	"mutate.yml":       "workflow_dispatch",
 	"nightly.yml":      "schedule,workflow_dispatch",
 	"otbr-virtual.yml": "schedule,workflow_dispatch",
 	"release.yml":      "push",

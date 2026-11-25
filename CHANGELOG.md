@@ -22,6 +22,7 @@ pseudo-version of `main`.
 - `cluster/camera`: `ProviderConfig.Logger` receives Debug lines around each signal to the requestor (Offer, Answer, IceCandidates, End: reaching it and invoking the command, with the session, fabric, node, duration and error); nil is `slog.Default()`. The device kit passes the device's `Options.Logger` (#596, decision 676).
 - `cluster/camera`: `(*Provider).EndLostPeer`, `PeerGone` that also returns how many of the pair's sessions it ended; the node calls it (review II, R5-doc-5304; #601).
 - `node`: `Sealer`, an alias of `store.Sealer`, the type of `Store.Sealer` and of `Reseal`'s keys (review II, R4-api-4706, decision 657; #601).
+- `script/mutate` and `.github/workflows/mutate.yml` (manual dispatch): mutation sampling of one package on CI — operator flips, a dropped `!` and switched-off guards applied one at a time through `go test -overlay`, the package's own tests and a `-wide` package list run against each, the files dealt over a runner matrix (`shards`, at most 20 at once), one merged TSV artifact and the counts per verdict and the survivors in the run's summary. The review's C4 sampler, moved from a local script into the repository (review II, decision 685). Not a guard: nothing fails on a survivor.
 
 ### Changed
 
