@@ -186,7 +186,7 @@ type OperationalCredentials struct {
 	// updateVendorVerificationData persisting the fabric
 	// (packages/protocol/src/fabric/Fabric.ts:193-201, :208-243), whose
 	// persist callback emits FabricManager's replaced event
-	// (FabricManager.ts:236-246), which OperationalCredentialsServer
+	// (FabricManager.ts:265-275), which OperationalCredentialsServer
 	// hands to CommissioningServer as an "updated" fabric change
 	// (OperationalCredentialsServer.ts:579-582, :596;
 	// CommissioningServer.ts:118-141).
@@ -2892,7 +2892,7 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	// The fabric changed: matter.js Fabric.setLabel persists it and the
 	// node reports an "updated" fabric (Fabric.ts:193-204 and
 	// OperationalCredentialsServer.ts:405 at b25ed960;
-	// FabricManager.ts:236-246 at db021da0). The hook runs after nocMu is
+	// FabricManager.ts:265-275 at b25ed960). The hook runs after nocMu is
 	// released.
 	if relabelled {
 		o.fabricChanged(ctx, idx)

@@ -114,3 +114,50 @@ func TestAccessControlLocalEntryMarksItsFabricA1(t *testing.T) {
 		t.Errorf("the removal of a fabric holding only the node's own entry reported %v, want [Acl]", got)
 	}
 }
+
+// TestAccessControlReadMarkDoesNotOutliveAnEmptyWriteP8G (R5-conc-5004,
+// gate re-read N1): an Acl read that saw a fabric's rows, held by the
+// store while a write replaces the fabric's list with an empty one, does
+// not mark the fabric again behind the write — clearing the mark advances
+// the fabric's epoch the read noted. The fabric's later drop then reports
+// no Acl shrink and leaves the DataVersion alone (R4-par-4051).
+func TestAccessControlReadMarkDoesNotOutliveAnEmptyWriteP8G(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	const f uint8 = 3
+	st := &holdACLStoreA1{
+		dropACLStore: &dropACLStore{acl: map[uint8][]store.ACLEntry{f: {dropAdmin(f)}}, fabrics: []uint8{f}},
+		entered:      make(chan struct{}),
+		release:      make(chan struct{}),
+	}
+	a, err := NewAccessControlWith(ctx, AccessControlConfig{Store: st})
+	if err != nil {
+		t.Fatal(err)
+	}
+	heard := threadChangeListener(t, a)
+
+	st.hold.Store(true)
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		a.MatterReadFiltered(im.WithFabricFilter(ctx, true, f), accessControlAttrACL)
+	}()
+	<-st.entered // the read holds the rows it saw
+	if err := a.MatterWrite(im.WithFabricFilter(ctx, true, f), accessControlAttrACL, []AccessControlEntryStruct{}); err != nil {
+		t.Fatalf("empty Acl write: %v", err)
+	}
+	close(st.release)
+	<-readDone
+	heard.take()
+
+	v0 := a.MatterDataVersion()
+	if err := a.MatterDropFabric(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	if got := heard.take(); len(got) != 0 {
+		t.Errorf("the drop after the empty write reported %v: the read marked the fabric again behind the write", got)
+	}
+	if v := a.MatterDataVersion(); v != v0 {
+		t.Errorf("the drop moved the DataVersion %d → %d", v0, v)
+	}
+}

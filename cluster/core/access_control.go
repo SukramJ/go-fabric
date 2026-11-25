@@ -91,8 +91,9 @@ type AccessControl struct {
 	// drop asks the store only for a fabric named here, and an empty answer
 	// is the Acl shrinking (review II, R4-par-4051).
 	aclHeld map[uint8]bool
-	// aclDropEpoch counts each fabric's drops; dropFabric advances it in
-	// the hold of mu that reads the fabric's mark. A read of Acl notes it
+	// aclDropEpoch counts each fabric's drops and cleared marks; dropFabric
+	// and markACLHeld(false) advance it in the hold of mu that reads or
+	// clears the fabric's mark. A read of Acl notes it
 	// before it lists the fabric's rows and marks the fabric held only if
 	// it did not move: a read that listed rows the fabric's removal took
 	// does not mark the fabric again after its drop cleared the mark
@@ -414,12 +415,19 @@ func (a *AccessControl) loadACLHeld(ctx context.Context) {
 	}
 }
 
-// markACLHeld records whether the store holds Acl rows of fabric.
+// markACLHeld records whether the store holds Acl rows of fabric. Clearing
+// the mark advances the fabric's drop epoch as a drop does: a read that
+// listed the rows before they went does not mark the fabric again behind
+// the clear (R5-conc-5004, decision 681).
 func (a *AccessControl) markACLHeld(fabric uint8, held bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if !held {
 		delete(a.aclHeld, fabric)
+		if a.aclDropEpoch == nil {
+			a.aclDropEpoch = map[uint8]uint64{}
+		}
+		a.aclDropEpoch[fabric]++
 		return
 	}
 	if a.aclHeld == nil {
