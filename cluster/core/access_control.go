@@ -49,10 +49,14 @@ type AccessControl struct {
 	// the datasource across a write's change and the commit's comparison,
 	// packages/node/src/behavior/state/managed/Datasource.ts:1345-1350 and
 	// :1446-1457 at db021da0). It is taken before mu, never under it, and
-	// the store is called under it.
+	// the store is called under it. A write emits its events while it
+	// holds writeMu, and an emitter's hook may run synchronously on the
+	// writer's goroutine, so no read path takes it: a read of Acl orders
+	// its mark against a drop by aclDropEpoch instead (decision 681).
 	writeMu sync.Mutex
 	// mu guards the fields below: the request's fabric and the cached
-	// ACL state the handlers read; the store is not called under it.
+	// ACL state the handlers read, the held marks and the drop epochs;
+	// the store is not called under it.
 	mu            sync.RWMutex
 	currentFabric uint8
 
@@ -87,6 +91,14 @@ type AccessControl struct {
 	// drop asks the store only for a fabric named here, and an empty answer
 	// is the Acl shrinking (review II, R4-par-4051).
 	aclHeld map[uint8]bool
+	// aclDropEpoch counts each fabric's drops; dropFabric advances it in
+	// the hold of mu that reads the fabric's mark. A read of Acl notes it
+	// before it lists the fabric's rows and marks the fabric held only if
+	// it did not move: a read that listed rows the fabric's removal took
+	// does not mark the fabric again after its drop cleared the mark
+	// (review II, R5-conc-5004; decision 681). Entries are never deleted,
+	// so an index's count only grows.
+	aclDropEpoch map[uint8]uint64
 	// changes reports what moves outside a write of this cluster: a
 	// fabric drop's removal of Acl rows and of an Extension entry
 	// ([AccessControl.OnAttributeChange]).
@@ -633,6 +645,10 @@ func (a *AccessControl) dropFabric(ctx context.Context, fabricIndex uint8) (move
 	defer a.writeMu.Unlock()
 	a.mu.Lock()
 	aclHad := a.aclHeld[fabricIndex]
+	if a.aclDropEpoch == nil {
+		a.aclDropEpoch = map[uint8]uint64{}
+	}
+	a.aclDropEpoch[fabricIndex]++
 	a.mu.Unlock()
 	if aclHad {
 		// The store is asked under writeMu, as a write asks it; a list that
@@ -865,16 +881,27 @@ func (a *AccessControl) listRead(ctx context.Context, attrID uint32, fabrics []u
 }
 
 // listACLMarking is a read's list of fabric's Acl rows, which marks the
-// fabric held when they are not empty (aclHeld). The read and the mark are
-// one step under writeMu, as a drop's read and clear of the mark are: a
-// read that saw the rows of a fabric removed meanwhile does not mark it
-// again after its drop cleared the mark (review II, R5-conc-5004).
+// fabric held when they are not empty (aclHeld). It takes no writeMu — a
+// write's event hook may read Acl on the goroutine that holds it
+// (decision 681) — so the mark is ordered against a drop by the fabric's
+// drop epoch: noted before the list, the mark is set only if no drop ran
+// meanwhile. A read that saw the rows of a fabric removed meanwhile does
+// not mark it again after its drop cleared the mark (review II,
+// R5-conc-5004).
 func (a *AccessControl) listACLMarking(ctx context.Context, fabric uint8) ([]store.ACLEntry, error) {
-	a.writeMu.Lock()
-	defer a.writeMu.Unlock()
+	a.mu.RLock()
+	epoch := a.aclDropEpoch[fabric]
+	a.mu.RUnlock()
 	entries, err := a.store.ListACL(ctx, fabric)
 	if err == nil && len(entries) > 0 {
-		a.markACLHeld(fabric, true)
+		a.mu.Lock()
+		if a.aclDropEpoch[fabric] == epoch {
+			if a.aclHeld == nil {
+				a.aclHeld = map[uint8]bool{}
+			}
+			a.aclHeld[fabric] = true
+		}
+		a.mu.Unlock()
 	}
 	return entries, err
 }

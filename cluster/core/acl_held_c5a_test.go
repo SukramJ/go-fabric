@@ -30,12 +30,15 @@ func (s *holdACLStoreA1) ListACL(ctx context.Context, f uint8) ([]store.ACLEntry
 	return rows, err
 }
 
-// TestAccessControlReadMarkDoesNotOutliveADropA1 (R5-conc-5004): an Acl
-// read that saw a fabric's rows, held by the store while the fabric is
-// removed and dropped, does not mark the fabric again behind the drop: a
-// second drop of the fabric reports nothing. Not parallel:
-// WaitParkedOnMutexA1 reads every goroutine's stack.
+// TestAccessControlReadMarkDoesNotOutliveADropA1 (R5-conc-5004, decision
+// 681): an Acl read that saw a fabric's rows, held by the store while the
+// fabric is removed and its drop runs to the end, does not mark the
+// fabric again behind the drop — the drop advanced the fabric's drop
+// epoch the read noted before its list: a second drop of the fabric
+// reports nothing. The read does not hold writeMu, so the drop does not
+// wait for it.
 func TestAccessControlReadMarkDoesNotOutliveADropA1(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	const f uint8 = 3
 	st := &holdACLStoreA1{
@@ -62,10 +65,9 @@ func TestAccessControlReadMarkDoesNotOutliveADropA1(t *testing.T) {
 		defer close(dropDone)
 		_ = a.MatterDropFabric(ctx, f)
 	}()
-	WaitParkedOnMutexA1(t, dropDone, "dropFabric")
+	<-dropDone // the drop ran while the read held its rows
 	close(st.release)
 	<-readDone
-	<-dropDone
 	if got := heard.take(); !slices.Equal(got, []uint32{accessControlAttrACL}) {
 		t.Fatalf("the drop reported %v, want [Acl]", got)
 	}
