@@ -533,7 +533,9 @@ b25ed960; connectedhomeip was read only where an entry names it at 6170af84 (oth
   (`examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp:306`,
   `kConnectionTimeoutSeconds = 30` `:40` at 6170af84) whose expiry is
   `CleanupSession` (`:1408-1420`), which releases the streams (`:1032`)
-  while CurrentSessions keeps the entry (no `RemoveSession` there). No
+  and calls no `RemoveSession`; whether the CurrentSessions entry then
+  leaves through the peer connection's Closed callback (`:1041` → `:1183`)
+  is inferred, not read (`BD-chip-Camera-EndRemovesSessionWhenUnreachable`). No
   Python case at the pin waits 30 s and then deallocates without
   EndSession: TC_WEBRTCP_2_18, 2_19 and 2_24 end the session first. Found
   by the Fable diff read of #596 C (phase 8, wave 1). Route: model the timer
