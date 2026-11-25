@@ -1152,7 +1152,7 @@
   },
   {
     "file": "cluster/camera/requestor.go",
-    "line": 246,
+    "line": 258,
     "citation": "packages/node/src/behavior/state/managed/values/ListManager.ts:461-478",
     "resolved": "packages/node/src/behavior/state/managed/values/ListManager.ts",
     "identifier": "createProxy",
@@ -3138,7 +3138,7 @@
   },
   {
     "file": "node/node.go",
-    "line": 1859,
+    "line": 1860,
     "citation": "GeneralDiagnosticsServer.ts:527",
     "resolved": "packages/node/src/behaviors/general-diagnostics/GeneralDiagnosticsServer.ts",
     "at": "db021da0",

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10851,
+  "entry_points": 10855,
   "initializers": 372,
   "entry_packages": [
     ".",
@@ -296,9 +296,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28637,
-    "reachable": 22329,
-    "whitelisted": 6286,
+    "total_exported": 28639,
+    "reachable": 22330,
+    "whitelisted": 6287,
     "unreachable": 22
   },
   "by_package": [
@@ -12004,7 +12004,7 @@
       "identifier": "DataVersionTracker",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/dataversion.go",
-      "line": 52
+      "line": 53
     },
     {
       "package": "cluster",
@@ -12263,14 +12263,14 @@
       "identifier": "ICECandidate",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 30
+      "line": 31
     },
     {
       "package": "cluster/camera",
       "identifier": "ICEServer",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 33
+      "line": 34
     },
     {
       "package": "cluster/camera",
@@ -12305,7 +12305,7 @@
       "identifier": "OfferArgs",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 37
+      "line": 38
     },
     {
       "package": "cluster/camera",
@@ -12326,14 +12326,14 @@
       "identifier": "ProviderPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "cluster/camera",
       "identifier": "ProviderSession",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/provider.go",
-      "line": 31
+      "line": 32
     },
     {
       "package": "cluster/camera",
@@ -12354,14 +12354,14 @@
       "identifier": "RequestorPort",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 32
+      "line": 33
     },
     {
       "package": "cluster/camera",
       "identifier": "RequestorRefusals",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 35
+      "line": 36
     },
     {
       "package": "cluster/camera",
@@ -12382,7 +12382,7 @@
       "identifier": "Signal",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 37
+      "line": 38
     },
     {
       "package": "cluster/camera",
@@ -12494,7 +12494,7 @@
       "identifier": "WebRTCSession",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/camera/requestor.go",
-      "line": 28
+      "line": 29
     },
     {
       "package": "cluster/camera",
@@ -14384,7 +14384,7 @@
       "identifier": "WaitParkedOnMutexA1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/export_c5a_test.go",
-      "line": 23
+      "line": 31
     },
     {
       "package": "cluster/energy",
@@ -31493,6 +31493,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/camera_webrtc_test.go",
       "line": 478
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCameraSimAnswerSurvivesASlowLaterListener",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/camera_answer_wake_p8r_test.go",
+      "line": 27
     },
     {
       "package": "examples/reference-bridge",
