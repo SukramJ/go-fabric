@@ -160,7 +160,7 @@ func twoFabricStore(t *testing.T) *store.Store {
 // root endpoint.
 func scopedReadDispatcher(t *testing.T, st *faultingReadStore) *TopologyDispatcher {
 	t.Helper()
-	acl, err := mattercore.NewAccessControl(st)
+	acl, err := mattercore.NewAccessControlWith(context.Background(), mattercore.AccessControlConfig{Store: st})
 	if err != nil {
 		t.Fatal(err)
 	}

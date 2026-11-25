@@ -524,6 +524,22 @@ b25ed960; connectedhomeip was read only where an entry names it at 6170af84 (oth
   (2026-11-05), which assert only the agreeing cases. Route: align
   `motionTriggered` and the blind-period start with chip in the next
   camera-simulation change; the app-camera family does not reach either.
+- **The reference daemon's camera simulation holds a solicited session's
+  streams until EndSession; chip releases them at a 30 s connection
+  timer.** `examples/reference-bridge/camera.go` `SolicitOffer` acquires the
+  session's streams (#596 C) and keeps them until EndSession or the
+  session's removal. chip's camera app starts a 30 s connection timer for
+  the solicited session
+  (`examples/camera-app/linux/src/clusters/webrtc-provider/webrtc-provider-manager.cpp:306`,
+  `kConnectionTimeoutSeconds = 30` `:40` at 6170af84) whose expiry is
+  `CleanupSession` (`:1408-1420`), which releases the streams (`:1032`)
+  and calls no `RemoveSession`; whether the CurrentSessions entry then
+  leaves through the peer connection's Closed callback (`:1041` → `:1183`)
+  is inferred, not read (`BD-chip-Camera-EndRemovesSessionWhenUnreachable`). No
+  Python case at the pin waits 30 s and then deallocates without
+  EndSession: TC_WEBRTCP_2_18, 2_19 and 2_24 end the session first. Found
+  by the Fable diff read of #596 C (phase 8, wave 1). Route: model the timer
+  in the next camera-simulation change that a case needs.
 
 Class (a) gaps the CHIP certification families
 (`internal/chiptool`, [ADR 0011](../../docs/adr/0011-certifiability-is-a-goal.md),

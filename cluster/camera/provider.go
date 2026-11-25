@@ -7,17 +7,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
 
 	"thingfabric.dev/go-fabric/internal/deepcopy"
 
+	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/cluster"
 	"thingfabric.dev/go-fabric/cluster/spec"
 	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/specseam"
 )
 
 // ProviderClusterID is the WebRtcTransportProvider cluster id.
@@ -88,6 +91,10 @@ type ProviderConfig struct {
 	// serves one (decision 165, F-db021da0-46); leave it nil. Removable in
 	// v0.25.0.
 	DataVersion *cluster.DataVersionTracker
+	// Logger receives the Debug lines of the camera's signals to the
+	// requestor (provider_peer.go: reaching the requestor and invoking
+	// the command, with their duration and error); slog.Default when nil.
+	Logger *slog.Logger
 }
 
 // Provider implements [contract.ClusterServer] for WebRtcTransportProvider:
@@ -109,12 +116,14 @@ type Provider struct {
 	port ProviderPort
 	cfg  ProviderConfig
 	view streamView
+	// clock times the Debug lines of the signals to the requestor (send).
+	clock clock.Clock
 
 	// op serialises the commands and the fabric removal: each holds it
 	// from its checks through the port to its commit, as chip's handlers
 	// run one at a time on its single-threaded stack. The host's methods
 	// never take it, so a port may call them (review II, R2-P6-conc-1609).
-	// PeerGone takes it with its context (R5-conc-5301).
+	// EndLostPeer takes it with its context (R5-conc-5301).
 	op opLock
 	// pub serialises each change of the session table with its
 	// publication, so no change is lost to a concurrent one and the table
@@ -155,7 +164,7 @@ func NewProvider(cfg ProviderConfig) (*Provider, error) {
 	if cfg.MaxSessions < 0 || cfg.MaxSessionsPerFabric < 0 {
 		return nil, fmt.Errorf("%w: MaxSessions %d, MaxSessionsPerFabric %d", ErrNegativeMaxSessions, cfg.MaxSessions, cfg.MaxSessionsPerFabric)
 	}
-	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}}
+	p := &Provider{port: cfg.Port, cfg: cfg, view: streamView{cfg.Streams}, clock: clock.System{}}
 	handlers := map[uint32]spec.CommandHandler{
 		wpdef.CmdSolicitOffer:         serial(&p.op, p.solicitOffer),
 		wpdef.CmdProvideOffer:         serial(&p.op, p.provideOffer),
@@ -219,6 +228,15 @@ func (p *Provider) removeSession(origin contract.Origin, sessionID uint16) error
 // a concurrent change applies to this one's result; a table the schema
 // refuses is neither published nor kept (R2-P6-err-1611). As
 // [Requestor]'s change.
+//
+// The table is kept between the store and the notification
+// (internal/specseam.SetAttributesStored): a change listener, and whatever
+// it wakes, reads through Sessions() the table it is told about (PR 1
+// review M1, decision 682). Mirrors matter.js Datasource.ts at b25ed960:
+// commit2 makes the committed values canonical (:1475-1489, the
+// assignment :1488) before postCommit emits the change events (:1520),
+// and a refused commit's values never become canonical (rollback,
+// :1539-1540).
 func (p *Provider) change(origin contract.Origin, edit func([]ProviderSession) ([]ProviderSession, bool)) error {
 	p.pub.Lock()
 	defer p.pub.Unlock()
@@ -229,12 +247,14 @@ func (p *Provider) change(origin contract.Origin, edit func([]ProviderSession) (
 	if next == nil {
 		next = []ProviderSession{}
 	}
-	if err := p.srv.SetAttributesFrom(origin, map[uint32]any{wpdef.AttrCurrentSessions: spec.List[ProviderSession](next)}); err != nil {
+	keep := func() {
+		p.mu.Lock()
+		p.sessions = next
+		p.mu.Unlock()
+	}
+	if err := specseam.SetAttributesStored(p.srv, origin, map[uint32]any{wpdef.AttrCurrentSessions: spec.List[ProviderSession](next)}, keep); err != nil {
 		return fmt.Errorf("camera: CurrentSessions: %w", err)
 	}
-	p.mu.Lock()
-	p.sessions = next
-	p.mu.Unlock()
 	return nil
 }
 

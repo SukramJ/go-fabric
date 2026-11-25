@@ -13,8 +13,12 @@
 // The peripheral's GATT behaviour follows matter.js's BLE server
 // (packages/nodejs-ble/src/BlenoBleServer.ts at 0ceb202d): the handshake
 // request arrives on C1, and the session — with its handshake response —
-// starts when the central subscribes to C2. A peripheral can also play
-// the stalled peer matter.js's channel tests model
+// starts when the central subscribes to C2. A C2 subscribe before the
+// handshake request starts nothing, as that server throws on it
+// (BlenoBleServer.ts:288-291 at b25ed960: "Subscription request received
+// before handshake Request"); this peripheral then stores the request
+// written after such a subscribe and does not answer it. A peripheral can
+// also play the stalled peer matter.js's channel tests model
 // (packages/nodejs-ble/test/NobleBleChannelTest.ts:208-346 at b25ed960,
 // handshakeOnlyMatterService): it completes the handshake at the offered
 // segment size and then answers no BTP packet — see [Peripheral.Stall]
@@ -279,19 +283,21 @@ func (p *Peripheral) attMTU() int {
 	return p.ATTMTU
 }
 
-// pipe delivers byte slices in order on one goroutine until stopped.
+// pipe delivers byte slices — and, on the peripheral's side, the C2
+// subscribe — in order on one goroutine until stopped.
 type pipe struct {
-	ch   chan []byte
-	stop chan struct{}
+	deliver func([]byte)
+	ch      chan func()
+	stop    chan struct{}
 }
 
 func newPipe(deliver func([]byte)) *pipe {
-	p := &pipe{ch: make(chan []byte, 4096), stop: make(chan struct{})}
+	p := &pipe{deliver: deliver, ch: make(chan func(), 4096), stop: make(chan struct{})}
 	go func() {
 		for {
 			select {
-			case b := <-p.ch:
-				deliver(b)
+			case f := <-p.ch:
+				f()
 			case <-p.stop:
 				return
 			}
@@ -301,13 +307,19 @@ func newPipe(deliver func([]byte)) *pipe {
 }
 
 func (p *pipe) send(b []byte) bool {
+	b = append([]byte(nil), b...)
+	return p.run(func() { p.deliver(b) })
+}
+
+// run queues f behind everything sent before it.
+func (p *pipe) run(f func()) bool {
 	select {
 	case <-p.stop:
 		return false
 	default:
 	}
 	select {
-	case p.ch <- append([]byte(nil), b...):
+	case p.ch <- f:
 		return true
 	case <-p.stop:
 		return false
@@ -366,17 +378,20 @@ func (c *connection) peripheralReceive(b []byte) {
 	}
 	s := c.session
 	if s == nil {
+		// Stored for the subscribe; a request alone starts nothing, and
+		// one that follows a subscribe is not answered.
 		c.request = b
 		c.mu.Unlock()
-		c.maybeStart()
 		return
 	}
 	c.mu.Unlock()
 	_ = s.HandleIncoming(b)
 }
 
-// maybeStart starts the session once the request arrived and C2 is
-// subscribed, whichever comes last.
+// maybeStart starts the session when C2 is subscribed with the request
+// already stored; it runs for the subscribe only, on the peripheral's
+// pipe, so the subscribe is seen in order behind the central's C1 writes.
+// A subscribe without a stored request starts nothing.
 func (c *connection) maybeStart() {
 	c.mu.Lock()
 	if c.started || c.request == nil || c.onC2 == nil {
@@ -557,7 +572,9 @@ func (c *connection) SubscribeC2(_ context.Context, on func([]byte)) error {
 	c.mu.Lock()
 	c.onC2 = on
 	c.mu.Unlock()
-	c.maybeStart()
+	if !c.toPeriph.run(c.maybeStart) {
+		return btp.ErrDisconnected
+	}
 	return nil
 }
 

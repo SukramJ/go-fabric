@@ -80,6 +80,15 @@ func (p persisted) reserve(ctx context.Context, tree []string) error {
 	return errors.Join(errs...)
 }
 
+// reserveUnder records tree's reservation under key alone.
+func (p persisted) reserveUnder(ctx context.Context, key string, tree []string) error {
+	v, err := json.Marshal(tree)
+	if err != nil {
+		return err
+	}
+	return p.st.SetSetting(ctx, endpointReservedKeyRoot+key, string(v))
+}
+
 // release drops the reservation key holds, under every key of its tree.
 func (p persisted) release(ctx context.Context, key string) error {
 	tree, err := p.reservedTree(ctx, key)
@@ -106,8 +115,14 @@ type reservationOp struct {
 	tree []string
 	// join reserves tree joined with the tree the store reserves for key
 	// already, rather than in its place: an undone Add keeps both
-	// (refuseLateCollisionsLocked).
+	// (refuseLateCollisionsLocked). When that tree cannot be read, tree
+	// is reserved alone and the read's error returned.
 	join bool
+	// keyOnly records the reservation under key alone, not under every
+	// key of tree: the parts of an undone Replace reserved under a key
+	// the set serves (refuseLateCollisionsLocked), whose Forget by name
+	// must not reach the served endpoint's tree.
+	keyOnly bool
 }
 
 type reservationKind uint8
@@ -128,16 +143,22 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp,
 		case opReserve:
 			tree := slices.Clone(op.tree)
 			if op.join {
+				// A prior reservation that cannot be read is not joined,
+				// but the op's own tree is still reserved and the error
+				// returned: a failed read must not lose the reservation
+				// the op exists to write, or a later Forget of the key
+				// reaches the key alone (gate c-B1 of R5-store-5205).
 				prior, err := p.reservedTree(ctx, op.key)
-				if err != nil {
-					errs = append(errs, err)
-					continue
-				}
+				errs = append(errs, err)
 				for _, k := range prior {
 					if !slices.Contains(tree, k) {
 						tree = append(tree, k)
 					}
 				}
+			}
+			if op.keyOnly {
+				errs = append(errs, p.reserveUnder(ctx, op.key, tree))
+				continue
 			}
 			errs = append(errs, p.reserve(ctx, tree))
 		case opRelease:
@@ -590,14 +611,25 @@ func splitErasures(ops []reservationOp) (pre, erase []reservationOp) {
 // partition retired meanwhile stays retired (R3-store-3701). Run after the
 // batch's pre ops: a re-added key's release has then dropped the
 // reservation it shared.
-func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp) (held []heldKey, cancel, keep []string, err error) {
+//
+// run is the erasures to apply: an op whose reservation cannot be read is
+// left out and its error returned, since the endpoints its erasure would
+// reach cannot be known — its keys are neither held back nor erased, and
+// the Forget can be made again (review II, R3-store-3703).
+func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp) (run []reservationOp, held []heldKey, cancel, keep []string, err error) {
 	if len(erase) == 0 {
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 	forgotten := map[string]bool{}
 	fresh := map[string]bool{}
 	var errs []error
 	for _, op := range erase {
+		reserved, err := a.n.persisted.reservedTree(ctx, op.key)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("node: the erasure of %q is skipped: %w", op.key, err))
+			continue
+		}
+		run = append(run, op)
 		// No other endpoint serves a forgotten key when its Forget
 		// runs (decisions 567, 575): served again, it is a new device.
 		forgotten[op.key] = true
@@ -605,8 +637,6 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp)
 		for _, k := range op.tree {
 			forgotten[k] = true
 		}
-		reserved, err := a.n.persisted.reservedTree(ctx, op.key)
-		errs = append(errs, err)
 		for _, k := range reserved {
 			forgotten[k] = true
 		}
@@ -649,7 +679,7 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp)
 			keep = append(keep, k)
 		}
 	}
-	return held, cancel, keep, errors.Join(errs...)
+	return run, held, cancel, keep, errors.Join(errs...)
 }
 
 // heldKey names an endpoint to hold back: its partition and its key.

@@ -244,9 +244,11 @@ const testparityPlannedRatchet = 3
 // refused shutdown flush (P6-C) and its flush on a given session (left, P6-B),
 // and ServerSubscriptionSessionTest.ts's four record cases on the node's
 // responder (P6-D): 179 ported, 1009 missing.
+// Review II phase 8 (#604, R2-C2-doc-2156) takes PeerAddressMonitorTest.ts's
+// four sleeping-LIT-ICD cases out of missing: 179 ported, 1005 missing.
 const (
 	testparityPortedRatchet  = 179
-	testparityMissingRatchet = 1009
+	testparityMissingRatchet = 1005
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the

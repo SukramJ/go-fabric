@@ -103,6 +103,11 @@ type OTASoftwareUpdateRequestor struct {
 	// lands — the reconcile's drop, any other persist — settles it
 	// (review II, R4-store-4102).
 	dropOwed map[uint8]bool
+	// saveOwed is set by every save the store refused, a drop's or any
+	// other: the store may hold active providers memory no longer does,
+	// so the next drop saves even when memory does not change; the next
+	// save that lands clears it (review II, R5-store-5007).
+	saveOwed bool
 
 	// Internal state (:1397-1429).
 	timer           *queryTimer
@@ -926,7 +931,7 @@ func (r *OTASoftwareUpdateRequestor) fabricRemoved(ctx context.Context, fabricIn
 		r.selected = nil
 	}
 	r.announcedDuringQuery = slices.DeleteFunc(r.announcedDuringQuery, func(a otaAnnouncement) bool { return a.fabric == fabricIndex })
-	owed := r.dropOwed[fabricIndex]
+	owed := r.dropOwed[fabricIndex] || r.saveOwed
 	r.mu.Unlock()
 	if changed {
 		r.changed(otadef.AttrDefaultOtaProviders)
@@ -1017,6 +1022,11 @@ func (r *OTASoftwareUpdateRequestor) enableOrDisableUpdates(v bool) {
 //
 // A Start whose load fails returns its error and leaves the requestor not
 // started, so the host or the node may call Start again (R3-err-3152).
+//
+// Start is not for concurrent use: a second call while the first loads
+// answers "already started" even when the first's load then fails and
+// leaves the requestor not started. The node calls it from its own Start
+// (review II, R4-err-4104).
 func (r *OTASoftwareUpdateRequestor) Start(ctx context.Context) error {
 	r.mu.Lock()
 	if r.started {
@@ -1221,8 +1231,8 @@ func (r *OTASoftwareUpdateRequestor) persist(ctx context.Context) {
 
 // persistOwing is persist, returning the store's answer. A save that
 // lands stores memory, which holds no dropped fabric's active provider, so
-// it settles every owed drop; a refused one marks dropped as owed when
-// drop is set (dropOwed). Both under persistSem, so a save that landed
+// it settles every owed drop; a refused one marks the save owed
+// (saveOwed) and dropped as owed when drop is set (dropOwed). Both under persistSem, so a save that landed
 // before the refused one never clears the mark it sets.
 func (r *OTASoftwareUpdateRequestor) persistOwing(ctx context.Context, dropped uint8, drop bool) error {
 	if r.cfg.Store == nil {
@@ -1252,11 +1262,15 @@ func (r *OTASoftwareUpdateRequestor) persistOwing(ctx context.Context, dropped u
 	switch {
 	case err == nil:
 		r.dropOwed = nil
+		r.saveOwed = false
 	case drop:
+		r.saveOwed = true
 		if r.dropOwed == nil {
 			r.dropOwed = map[uint8]bool{}
 		}
 		r.dropOwed[dropped] = true
+	default:
+		r.saveOwed = true
 	}
 	r.mu.Unlock()
 	if err != nil {

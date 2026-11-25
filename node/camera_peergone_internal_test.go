@@ -11,6 +11,7 @@ package node
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"runtime"
 	"slices"
@@ -106,8 +107,18 @@ type pgNode struct {
 
 func newPGNode(t *testing.T) *pgNode {
 	t.Helper()
+	return newPGNodeLoggedA9(t, nil)
+}
+
+// newPGNodeLoggedA9 is newPGNode logging to logger; nil keeps the test
+// configuration's.
+func newPGNodeLoggedA9(t *testing.T, logger *slog.Logger) *pgNode {
+	t.Helper()
 	ctx := t.Context()
 	cfg := mdnsTestConfig(t)
+	if logger != nil {
+		cfg.Logger = logger
+	}
 	cfg.Network.MDNS.Off = true
 	cfg.DeviceTypeValidation = endpoint.DeviceTypeValidationOff
 	n := newMDNSTestNode(t, cfg)
@@ -406,7 +417,7 @@ func TestCameraNewSessionWhilePeerGoneWaitsCancels(t *testing.T) {
 	}
 	g.openBridge(t, pgPeerA)
 	g.lose(pgPeerA)
-	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).PeerGone")
+	waitGoroutineBlockedIn(t, <-queue, "camera.(*Provider).EndLostPeer")
 	g.openBridge(t, pgPeerA)
 	close(g.port.release)
 	if err := <-answered; err != nil {
@@ -467,5 +478,46 @@ func TestCameraFabricRemovalEndsOnce(t *testing.T) {
 	}
 	if got := g.port.endedIDs(); len(got) != 3 {
 		t.Errorf("port ended %v after the removal, want nothing more", got)
+	}
+}
+
+// TestCameraPeerLossWithoutSessionsLogsNothing (review II, R5-doc-5304):
+// a lost pair the camera holds no session of ends nothing and logs no
+// matter.camera.peer_gone at Info, though the provider ran; a lost pair
+// with sessions logs it once, naming how many ended.
+func TestCameraPeerLossWithoutSessionsLogsNothing(t *testing.T) {
+	t.Parallel()
+	logs := &recordedLogs{}
+	g := newPGNodeLoggedA9(t, slog.New(logs))
+	if got := g.drain(t); len(got) != 0 {
+		t.Fatalf("worked off %+v before the sentinel", got)
+	}
+	if levels, _ := logs.at("matter.camera.peer_gone"); len(levels) != 0 {
+		t.Fatalf("a lost pair without sessions logged matter.camera.peer_gone at %v", levels)
+	}
+	g.openBridge(t, pgPeerA)
+	g.lose(pgPeerA)
+	if got := g.drain(t); !slices.Equal(got, []pgDone{{pgAddrA, 1, false}}) {
+		t.Fatalf("worked off %+v, want A ended on one provider", got)
+	}
+	levels, _ := logs.at("matter.camera.peer_gone")
+	if !slices.Equal(levels, []slog.Level{slog.LevelInfo}) {
+		t.Fatalf("matter.camera.peer_gone logged at %v, want once at Info", levels)
+	}
+	var sessions int64
+	logs.mu.Lock()
+	for i := range logs.records {
+		if logs.records[i].Message == "matter.camera.peer_gone" {
+			logs.records[i].Attrs(func(a slog.Attr) bool {
+				if a.Key == "sessions" {
+					sessions = a.Value.Int64()
+				}
+				return true
+			})
+		}
+	}
+	logs.mu.Unlock()
+	if sessions != 2 {
+		t.Errorf("the log names %d sessions, want 2", sessions)
 	}
 }

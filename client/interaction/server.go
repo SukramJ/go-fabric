@@ -74,8 +74,8 @@ type server struct {
 // Serve installs cfg: from now on a ReadRequest, WriteRequest,
 // InvokeRequest or TimedRequest that opens an exchange is served by its
 // dispatcher; a SubscribeRequest stays InvalidAction (the served endpoints
-// publish no subscription). A nil Dispatcher uninstalls, back to the
-// report-only handler.
+// publish no subscription). A config with neither Dispatcher nor
+// Dispatch uninstalls, back to the report-only handler.
 func (r *Subscriptions) Serve(cfg ServerConfig) {
 	if cfg.Dispatcher == nil && cfg.Dispatch == nil {
 		r.server.Store(nil)

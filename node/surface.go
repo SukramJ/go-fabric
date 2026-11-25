@@ -169,6 +169,23 @@ func composeRoot(cfg *Config) ([]surface.Decision, []surface.Element, error) {
 // rootNodeType is the Matter RootNode device type (0x0016).
 const rootNodeType schema.DeviceTypeID = 0x0016
 
+// rootClusterElement is the candidate of the root cluster id that
+// [Node.levelRootClusters] judges: mandatory when the RootNode device type
+// may mandate it at the pin, host-declared when the configuration adds
+// it (configured), a kit default otherwise.
+func rootClusterElement(id uint32, configured bool) surface.Element {
+	el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Provenance: surface.ProvenanceKitDefault}
+	switch {
+	case rootMandatory(id):
+		el.Provenance, el.Mandatory = surface.ProvenanceDeviceType, true
+	case configured:
+		el.Provenance = surface.ProvenanceHostDeclared
+	default:
+	}
+	el.Levels = surface.ElementLevels(el)
+	return el
+}
+
 // rootMandatory reports whether the RootNode device type may mandate the
 // server cluster id at the pin: its requirement's conformance
 // (schema.DeviceTypeClusterRequirement) is "M", or mandatory under a
@@ -228,16 +245,7 @@ func (n *Node) levelRootClusters() error {
 	cands := make([]surface.Element, 0, len(n.root.servers))
 	for _, s := range n.root.servers {
 		id := s.MatterClusterID()
-		el := surface.Element{Cluster: id, Kind: surface.KindCluster, ID: id, Provenance: surface.ProvenanceKitDefault}
-		switch {
-		case rootMandatory(id):
-			el.Provenance, el.Mandatory = surface.ProvenanceDeviceType, true
-		case configured[id]:
-			el.Provenance = surface.ProvenanceHostDeclared
-		default:
-		}
-		el.Levels = surface.ElementLevels(el)
-		cands = append(cands, el)
+		cands = append(cands, rootClusterElement(id, configured[id]))
 	}
 	kept, decisions, err := surface.Evaluate(cands, n.cfg.Surface)
 	if err != nil {
@@ -318,10 +326,23 @@ func duplicateKey(entries []surfaceEntry) (string, bool) {
 // an inserted tree whose endpoints claim one number
 // (packages/node/src/endpoint/properties/Parts.ts:195-203 at b25ed960,
 // #validateInsertion; on a ready owner, :54-57) (review II,
-// R4-api-4790, decision 617). It returns ep's surface entries, which the
+// R4-api-4790, decision 617). An entry whose key renders empty — a nil
+// part key, or a key whose String is "" — is refused first with
+// [ErrNoStableKey]: the assembly refuses a Spec without a StableKey, so
+// such a tree would fail the node's start or every later reassembly
+// (review II, R5-err-5203). It returns ep's surface entries, which the
 // caller hands [Node.recordWithheld] once its set accepted ep's key.
 func (n *Node) checkSurface(ep Endpoint) ([]surfaceEntry, error) {
 	entries := surfaceEntries(ep)
+	for i := range entries {
+		if entries[i].key != "" {
+			continue
+		}
+		if i == 0 {
+			return nil, fmt.Errorf("%w: its key renders empty", ErrNoStableKey)
+		}
+		return nil, fmt.Errorf("%w: part %d of %q (depth first)", ErrNoStableKey, i, entries[0].key)
+	}
 	if k, ok := duplicateKey(entries); ok {
 		return nil, fmt.Errorf("%w: %s twice in one endpoint's tree", ErrDuplicateKey, k)
 	}

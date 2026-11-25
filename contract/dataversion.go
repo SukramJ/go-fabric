@@ -23,9 +23,9 @@ import (
 // on the host side, neither of which then depends on the
 // other.
 //
-// Three facts govern its behaviour: the counter is monotonic, it is
-// per-cluster, and it starts at a random non-zero value rather than at
-// 1 or 0. The controller behaviour that forced the random start is
+// Three facts govern its behaviour: the counter is monotonic (wrapping
+// past 0xFFFFFFFF to 0), it is per-cluster, and it starts at a uniformly
+// random uint32, 0 included, rather than at a fixed 1 or 0. The controller behaviour that forced the random start is
 // documented with the cluster-side alias in
 // cluster/dataversion.go.
 //

@@ -151,7 +151,7 @@ func TestAttributeValueReader_Extension_DecodesAndClusterAccepts(t *testing.T) {
 		t.Fatalf("decoded entry mismatch: %+v", list)
 	}
 
-	a, err := mattercore.NewAccessControl(fakeACLStore{})
+	a, err := mattercore.NewAccessControlWith(context.Background(), mattercore.AccessControlConfig{Store: fakeACLStore{}})
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}

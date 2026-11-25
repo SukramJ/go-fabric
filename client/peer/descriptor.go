@@ -64,12 +64,39 @@ func (d Descriptor) clone() Descriptor {
 		d.OperationalAddress = &a
 	}
 	if d.DiscoveryData != nil {
-		dd := *d.DiscoveryData
-		d.DiscoveryData = &dd
+		d.DiscoveryData = cloneTXTData(d.DiscoveryData)
 	}
 	if d.ReportedSessionParameters != nil {
 		p := *d.ReportedSessionParameters
 		d.ReportedSessionParameters = &p
 	}
 	return d
+}
+
+// cloneTXTData deep-copies t: every field is a pointer, and a copy that
+// shares one lets a write through it reach the original (review II,
+// R2-C2-api-2157).
+func cloneTXTData(t *discovery.TXTData) *discovery.TXTData {
+	return &discovery.TXTData{
+		VP:  clonePtr(t.VP),
+		DT:  clonePtr(t.DT),
+		DN:  clonePtr(t.DN),
+		RI:  clonePtr(t.RI),
+		PH:  clonePtr(t.PH),
+		PI:  clonePtr(t.PI),
+		SII: clonePtr(t.SII),
+		SAI: clonePtr(t.SAI),
+		SAT: clonePtr(t.SAT),
+		T:   clonePtr(t.T),
+		ICD: clonePtr(t.ICD),
+	}
+}
+
+// clonePtr returns a pointer to a copy of *p, nil for nil.
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
 }

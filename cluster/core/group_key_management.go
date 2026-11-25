@@ -85,6 +85,13 @@ type GroupKeyManagement struct {
 	// so the drop asks the store only for a fabric named here, and an empty
 	// answer is the attribute shrinking (review II, R4-par-4051a).
 	mapHeld, tableHeld map[uint8]bool
+	// tableMarkMu makes a GroupTable mark's store read and its mark one
+	// step (markTableHeld, and the drop's read and clear): of two group
+	// table changes at once, the mark is the store's answer to the later
+	// read, so a removal's stale empty answer never clears the mark of an
+	// addition after it (review II, R5-conc-5002). It is taken after
+	// writeMu and before mu; the store is called under it.
+	tableMarkMu sync.Mutex
 	// reloadMu serialises reloadGroups: a failed reload's forget never
 	// lands after a concurrent reload that succeeded and found nothing
 	// stale to re-announce (review II, R2-P6-err-1701 R2-a). It is taken
@@ -296,6 +303,8 @@ func (g *GroupKeyManagement) markTableHeld(ctx context.Context, fabric uint8) {
 	if g.groups == nil {
 		return
 	}
+	g.tableMarkMu.Lock()
+	defer g.tableMarkMu.Unlock()
 	n, ok := g.tableRows(ctx, fabric)
 	if ok {
 		g.markHeld(true, fabric, n > 0)
@@ -369,10 +378,12 @@ func (g *GroupKeyManagement) MatterDropFabric(ctx context.Context, fabricIndex u
 		}
 	}
 	if tableHad {
+		g.tableMarkMu.Lock()
 		if n, ok := g.tableRows(ctx, fabricIndex); ok && n == 0 {
 			g.markHeld(true, fabricIndex, false)
 			moved = append(moved, groupKeyMgmtAttrGroupTable)
 		}
+		g.tableMarkMu.Unlock()
 	}
 	if len(moved) > 0 {
 		g.dataVersion.Bump()
@@ -1653,6 +1664,13 @@ func (g *GroupKeyManagement) removeGroupKeyMapping(ctx context.Context, fabric u
 	defer g.writeMu.Unlock()
 	if err := g.store.RemoveGroupKeyMapping(ctx, fabric, groupID); err != nil {
 		return fmt.Errorf("core: GroupKeyManagement: %w", err)
+	}
+	// The removal may have emptied the fabric's GroupKeyMap: the mark
+	// follows the store, so the fabric's drop reports no shrinking the
+	// removal already made (review II, R5-par-5005). A list that fails
+	// keeps the mark, and the drop asks the store again.
+	if rows, err := g.store.ListGroupKeyMappings(ctx, fabric); err == nil {
+		g.markHeld(false, fabric, len(rows) > 0)
 	}
 	g.dataVersion.Bump()
 	g.syncGroups(ctx, fabric)

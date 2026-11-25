@@ -579,7 +579,11 @@ func (p *proxy) hasSlotFor(addr uint64) bool {
 // CONNECT_V3_WITHOUT_CACHE with the advertisement's address type
 // (client.py:1311-1420; the firmware answers a request without the address
 // type with connected=false, bluetooth_proxy.cpp:340-345), the answer with
-// the MTU, then the GATT database.
+// the MTU, then the GATT database. A connect for an address the proxy
+// holds a connection for — open or still connecting — is refused: the
+// address is reserved under p.mu as the connection is inserted, so the
+// first stays up and no second CONNECT is sent, as the BlueZ central
+// refuses it (ble/bluez Connect; review II, R4-conc-4352, decision 659).
 func (p *proxy) connect(ctx context.Context, addr uint64, addrType uint32) (*connection, error) {
 	p.mu.Lock()
 	switch {
@@ -590,10 +594,9 @@ func (p *proxy) connect(ctx context.Context, addr uint64, addrType uint32) (*con
 		p.mu.Unlock()
 		return nil, fmt.Errorf("proxy %s: %w", p.name, ErrProxyUnavailable)
 	}
-	if old := p.conns[addr]; old != nil {
+	if p.conns[addr] != nil {
 		p.mu.Unlock()
-		old.markGone()
-		p.mu.Lock()
+		return nil, fmt.Errorf("esphome: proxy %s: %s: a connection is already open", p.name, macString(addr))
 	}
 	k := newConnection(p, addr)
 	p.conns[addr] = k

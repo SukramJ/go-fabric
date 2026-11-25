@@ -87,13 +87,14 @@ const (
 )
 
 // servedFeatures are the features whose elements the server serves.
-// MatterScheduleConfiguration is served as matter.js implements it behind
-// its forward feature thermostat-msch (ThermostatServer.ts:267-271 at
-// b25ed960; schedules.go), and so are the Events feature's
-// events, which matter.js does not emit (events.go), and
-// ThermostatSuggestions, which ThermostatServer.ts does not implement
-// either (suggestions.go). ScheduleConfiguration and Setback
-// (deprecated, refused, :120-125) are not.
+// MatterScheduleConfiguration and the Events feature's events of the
+// selection are served as matter.js implements them behind its forward
+// gates (ThermostatServer.ts:267-271 gates MSCH, :272-276 Events, the
+// events emitted at :2094-2164 and :2246 at b25ed960; schedules.go,
+// events.go; the Ahead rows, ahead.go), and ThermostatSuggestions as
+// matter.js serves it (#setupSuggestions, :2261, called at :375;
+// suggestions.go). ScheduleConfiguration (removed from the specification,
+// refused, :259-263) and Setback (deprecated, refused, :264-266) are not.
 const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE |
 	ThermostatFeatureOCC | ThermostatFeaturePRES | ThermostatFeatureMSCH | ThermostatFeatureTEVT | ThermostatFeatureTSUGGEST
 
@@ -1508,9 +1509,9 @@ func (s *ThermostatServer) OnAttributeChange(cb func(change contract.Change)) (u
 // MatterInvoke handles SetpointRaiseLower and, with PRES,
 // SetActivePresetRequest and AtomicRequest, with MSCH
 // SetActiveScheduleRequest, with TSUGGEST AddThermostatSuggestion and
-// RemoveThermostatSuggestion. Without PRES (and without
-// MatterScheduleConfiguration, which the server does not serve) AtomicRequest
-// is unsupported (matter.js ThermostatServer.ts:130-132 at db021da0).
+// RemoveThermostatSuggestion. Without PRES and without
+// MatterScheduleConfiguration AtomicRequest is unsupported (matter.js
+// ThermostatServer.ts:277-279 at b25ed960).
 func (s *ThermostatServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	if resp, handled, err := s.host.Invoke(ctx, cmdID, fields); handled {
 		return resp, err

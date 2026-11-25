@@ -435,7 +435,7 @@ func (l *EventLog) SetUTCClock(utc func() (time.Time, bool)) {
 //
 // Deprecated: use [EventLog.SetCeilingPersistence], whose persist function
 // returns the store's error, so a refused ceiling is written again instead
-// of counting as stored.
+// of counting as stored; removable in v0.25.0.
 func (l *EventLog) SetCounterPersistence(persist func(ceiling uint64), epoch uint64) {
 	if persist == nil {
 		l.SetCeilingPersistence(nil, epoch)

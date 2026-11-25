@@ -112,6 +112,11 @@ func TestParityMatterJS_TimeFormatLocalization(t *testing.T) {
 	if err := srv.MatterWrite(ctx, tfldef.AttrHourFormat, uint64(tfldef.HourFormatV12Hr)); err != nil {
 		t.Errorf("HourFormat 12Hr: %v", err)
 	}
+	// 24Hr after 12Hr: 12Hr is the enum's zero, so only a non-zero value
+	// shows the sink reads the stored form (review II, R4-test-4158).
+	if err := srv.MatterWrite(ctx, tfldef.AttrHourFormat, uint64(tfldef.HourFormatV24Hr)); err != nil {
+		t.Errorf("HourFormat 24Hr: %v", err)
+	}
 	if err := srv.MatterWrite(ctx, tfldef.AttrHourFormat, uint64(7)); statusOf(err) != im.StatusConstraintError {
 		t.Errorf("HourFormat 7: %v, want CONSTRAINT_ERROR", err)
 	}
@@ -124,7 +129,7 @@ func TestParityMatterJS_TimeFormatLocalization(t *testing.T) {
 	// Gregorian is the held ActiveCalendarType: its write reaches no Sink
 	// and persists nothing (matter.js observes and stores no equal field,
 	// Datasource.ts:1406-1407, :1447-1451 and :1479 at db021da0).
-	if want := []write{{tfldef.AttrHourFormat, 0}}; !slices.Equal(written, want) {
+	if want := []write{{tfldef.AttrHourFormat, uint8(tfldef.HourFormatV12Hr)}, {tfldef.AttrHourFormat, uint8(tfldef.HourFormatV24Hr)}}; !slices.Equal(written, want) {
 		t.Errorf("persisted %v, want %v", written, want)
 	}
 	if _, err := NewTimeFormatLocalization(TimeFormatLocalizationConfig{
@@ -165,13 +170,18 @@ func TestParityMatterJS_UnitLocalization(t *testing.T) {
 	if err := srv.MatterWrite(ctx, unitdef.AttrTemperatureUnit, uint64(unitdef.TempUnitFahrenheit)); err != nil {
 		t.Errorf("Fahrenheit: %v", err)
 	}
+	// Celsius after Fahrenheit: Celsius is the enum's zero, written over a
+	// non-zero value (review II, R4-test-4158).
+	if err := srv.MatterWrite(ctx, unitdef.AttrTemperatureUnit, uint64(unitdef.TempUnitCelsius)); err != nil {
+		t.Errorf("Celsius: %v", err)
+	}
 	if err := srv.MatterWrite(ctx, unitdef.AttrTemperatureUnit, uint64(unitdef.TempUnitKelvin)); statusOf(err) != im.StatusConstraintError {
 		t.Errorf("Kelvin, not supported: %v, want CONSTRAINT_ERROR", err)
 	}
 	if err := srv.MatterWrite(ctx, unitdef.AttrTemperatureUnit, uint64(3)); statusOf(err) != im.StatusConstraintError {
 		t.Errorf("3: %v, want CONSTRAINT_ERROR", err)
 	}
-	if !slices.Equal(written, []unitdef.TempUnitEnum{unitdef.TempUnitFahrenheit}) {
+	if !slices.Equal(written, []unitdef.TempUnitEnum{unitdef.TempUnitFahrenheit, unitdef.TempUnitCelsius}) {
 		t.Errorf("persisted %v", written)
 	}
 

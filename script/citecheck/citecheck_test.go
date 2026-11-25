@@ -171,7 +171,15 @@ import (
 // at b25ed960, confirmed by fable-diff-h11 (statement 4), is drift only
 // because the collector finds addCluster nearest at :261 (measured by make
 // cite-report).
-const citecheckDriftRatchet = 411
+// 410 after phase 8 wave 1's REG: client/peer/probe.go's InteractionMessenger
+// cite re-read at b25ed960 (fable-read-a6-a8 A6 (b), :1019-1054) leaves the
+// drift rows.
+// 411 after phase 8's gate repair: client/peer/probe.go's "tracked, not
+// awaited" cite re-pinned to InteractionMessenger.ts:1035-1048 at b25ed960
+// (fable-read-reg-w1 stale pin (b)) is drift only because its sentence
+// names StatusResponse and the collector finds that name nearest at :999
+// (measured by make cite-report).
+const citecheckDriftRatchet = 410
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
@@ -239,7 +247,13 @@ const citecheckDriftRatchet = 411
 // re-pinned at b25ed960 per fable-diff-g5c/g5d/g5e (2655).
 // Review II run-4 fix PR's REG: the cites re-read at b25ed960 by
 // verify-r4-pass3.md and fable-diff-h11 note 6 (2653).
-const citecheckOffPinRatchet = 2653
+// Review II phase 8 wave 1's REG: the wave re-cited lines at b25ed960
+// (measured by make cite-report: 2653 → 2650; which cites moved is not
+// itemised) (2650).
+// Phase 8's gate repair: the stale pins of fable-read-reg-w1 and
+// fable-diff-a1 N7 re-cited at b25ed960 (measured by make cite-report:
+// 2650 → 2641) (2641).
+const citecheckOffPinRatchet = 2641
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

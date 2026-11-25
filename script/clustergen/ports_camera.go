@@ -244,7 +244,7 @@ var cameraPorts = map[string]portSet{
 				"a further bound is the port's (RESOURCE_EXHAUSTED). The server",
 				"ends sessions on EndSession, on the host's RemoveSession, with",
 				"their fabric and, in a node, when the node proved the requestor",
-				"lost (Provider.PeerGone) — not when a CASE session closes; the",
+				"lost (Provider.EndLostPeer) — not when a CASE session closes; the",
 				"media plane's evidence stays the port's. The host counts the",
 				"streams a session uses (the",
 				"AvStream's reference counts). An error answers its status, FAILURE",

@@ -3,27 +3,28 @@
 
 package core
 
-// AccessRestrictionList (ARL) is a Matter 1.4 fabric-scoped mechanism
-// that lets a fabric administrator restrict which subjects can access
-// specific clusters or endpoints on a node. Cluster ID 0x002B,
-// introduced alongside the Matter 1.4 Managed Aggregator use-case.
+// The Access Restriction List (ARL) is not a cluster of its own: it is
+// part of AccessControl (0x001F) under its MNGD (ManagedDevice) feature — the
+// attributes CommissioningArl (0x0005) and Arl (0x0006) and the command
+// ReviewFabricRestrictions (0x00) with its response
+// ReviewFabricRestrictionsResponse (0x01) (matter.js b25ed960
+// packages/model/src/standard/elements/access-control.element.ts:20, :26,
+// :53, :60, :121, :131). Cluster ID 0x002B is LocalizationConfiguration
+// (localization-configuration.element.ts:16-17 at b25ed960).
 //
-// go-fabric does not currently implement the Managed Aggregator
-// use-case, so this cluster is NOT mounted on any endpoint. The
-// skeleton is present to document the integration point for a future
-// implementation.
-//
-// When the Managed Aggregator use-case is implemented, mount this
-// cluster on the Root endpoint and wire the CommitRestrictionEntries /
-// ReviewFabricRestrictions commands to the daemon's fabric-store.
+// go-fabric does not implement the Managed Device use-case: the
+// AccessControl server declares no MNGD feature and serves none of these
+// elements.
 //
 // By-design entry: see notes/parity/by_design.md §ARL (C-P2-3).
-//
-// TODO: implement full ARL cluster when Managed Aggregator is in scope.
-// At minimum: Cluster 0x002B, attrs CommissioningARLEntries (0x0000),
-// ARLEntries (0x0001), commands CommitRestrictionEntries (0x01) +
-// ReviewFabricRestrictions (0x02) + RestrictedAccessEvent (event 0x00).
 const (
-	// ARLClusterID is the Matter 1.4 Access Restriction List cluster ID.
+	// ARLClusterID was meant as the cluster ID of the Access Restriction
+	// List; 0x002B is LocalizationConfiguration, and ARL has no cluster of
+	// its own (see above).
+	//
+	// Deprecated: ARL is part of AccessControl, cluster
+	// [thingfabric.dev/go-fabric/cluster/spec/accesscontrol.ClusterID]
+	// (0x001F) with the MNGD feature; this constant keeps its value until
+	// it goes and is removable in v0.29.0 (review II, R3-doc-3054).
 	ARLClusterID uint32 = 0x002B
 )

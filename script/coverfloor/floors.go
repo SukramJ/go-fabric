@@ -62,7 +62,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/cluster/alarmbase", min: 94},
 	{pkg: "thingfabric.dev/go-fabric/cluster/appliance", min: 98},
 	{pkg: "thingfabric.dev/go-fabric/cluster/closure", min: 95}, // pin lift b25ed960 P1-B: the model gate refuses an undefined enum before the servers' own checks
-	{pkg: "thingfabric.dev/go-fabric/cluster/core", min: 90},
+	{pkg: "thingfabric.dev/go-fabric/cluster/core", min: 93},    // review II phase 8 wave 1 (#595): measured 93.2%
 	{pkg: "thingfabric.dev/go-fabric/cluster/cover", min: 98},
 	{pkg: "thingfabric.dev/go-fabric/cluster/energy", min: 93},
 	{pkg: "thingfabric.dev/go-fabric/cluster/fan", min: 98},
@@ -279,6 +279,7 @@ var floors = []packageFloor{
 		why:          "declaration-only seam: an interface and function variables store and controller/client/sqlstore install from their init, so the package holds no statement a test could execute",
 	},
 	{pkg: "thingfabric.dev/go-fabric/internal/sessionseam", min: 0, unmeasurable: true, why: "function variables only: secure/operational installs them, node and the module's test fixtures call them (review II, decisions 159, 160)"},
+	{pkg: "thingfabric.dev/go-fabric/internal/specseam", min: 0, unmeasurable: true, why: "declaration-only seam: a function variable cluster/spec installs from its init, the camera servers call it (PR 1 review M1, decision 682)"},
 	{
 		pkg:          "thingfabric.dev/go-fabric/internal/surfaceseam",
 		min:          0,

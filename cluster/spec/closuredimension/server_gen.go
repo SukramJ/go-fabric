@@ -275,7 +275,8 @@ func (s *Server) HandleStep(fn func(ctx context.Context, req StepRequest) (struc
 // FAILURE without one (cluster/closure).
 type DimensionHandler interface {
 	// SetTarget takes Position after the LimitRange clamp and the
-	// Resolution rounding, Latch and Speed as sent.
+	// Resolution rounding (which may exceed 10000 when Resolution does
+	// not divide it), Latch and Speed as sent.
 	SetTarget(ctx context.Context, position *uint16, latch *bool, speed *ThreeLevelAutoEnum) error
 	// Step takes the request's fields as sent.
 	Step(ctx context.Context, direction StepDirectionEnum, numberOfSteps uint16, speed *ThreeLevelAutoEnum) error
@@ -317,8 +318,8 @@ type Declare struct {
 	DimensionHandler DimensionHandler
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
-	// list. The hooks above go on it; Initial, Features and the ports are
-	// the kit's server's and are refused beside it.
+	// list. The hooks above go on it; Initial, Features, the ports and the
+	// kit settings are the kit's server's and are refused beside it.
 	HostServer contract.ClusterServer
 }
 

@@ -100,8 +100,11 @@ type GeneralDiagnostics struct {
 	persistedSeeded     bool
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
-	// §10.6.5. Bumped at construction and when persisted counters are seeded
-	// via [SetPersistedCounters]. Runtime attributes (UpTime,
+	// §10.6.5. Bumped at construction, when persisted counters are seeded
+	// via [SetPersistedCounters], when [EnableTestEventTriggers] sets or
+	// clears the key (TestEventTriggersEnabled), when a fault list changes
+	// and when the network interfaces change (NetworkInterfaces). Runtime
+	// attributes (UpTime,
 	// TotalOperationalHours) change continuously but DataVersion is not bumped
 	// per-second — controllers that cache UpTime do not need sub-second
 	// invalidation. Satisfies [contract.ClusterDataVersion].
@@ -1062,7 +1065,7 @@ func (g *GeneralDiagnostics) MatterReportable() []uint32 {
 // MatterAttributes lists every GeneralDiagnostics (0x0033) attribute
 // the server implements via MatterRead. Apple Home's HAP service
 // rebuild reads the full attribute set; without this the dispatcher
-// falls back to MatterReportable's two-attribute surface.
+// falls back to MatterReportable's smaller set.
 func (g *GeneralDiagnostics) MatterAttributes() []uint32 {
 	// BootReason is not listed, and the three fault lists are listed
 	// only with a fault port ([GeneralDiagnostics.SetFaultSource]): all
@@ -1601,7 +1604,7 @@ func enums[E ~uint8](in []uint8) []E {
 
 // interfacesChanged reports NetworkInterfaces after the interfaces
 // changed: the root's own DataVersion advances before the listeners mark
-// the attribute dirty (bridge wireAttributeNotifiersLocked), as matter.js
+// the attribute dirty (bridge wireAttributeNotifiers), as matter.js
 // assigns the re-read list to the attribute state (#updateNetworkList,
 // GeneralDiagnosticsServer.ts:469-525 at db021da0).
 func (g *GeneralDiagnostics) interfacesChanged([]string) {

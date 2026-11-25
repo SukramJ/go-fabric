@@ -726,14 +726,15 @@ func stoppedAs(err error) error {
 // configured credentials ([Config].Commissioning) and advertises it with
 // CM=1 under the configured discriminator — the window an uncommissioned
 // node opens at Start. timeout 0 is 48 h while the node has no fabric and
-// 15 min once it has one. Invoked while the node's own or a basic window
+// 15 min once it has one; a negative timeout is refused and opens nothing. Invoked while the node's own or a basic window
 // is open, it restarts the own window; while an administrator's window is
 // open it returns [ErrAdministratorWindowOpen]; while
 // [Node.SetCommissioningBlocked] holds an error it wraps
 // [ErrCommissioningBlocked].
 //
 // Mirrors matter.js DeviceCommissioner.allowBasicCommissioning
-// (packages/protocol/src/protocol/DeviceCommissioner.ts:130-137), which
+// (packages/protocol/src/protocol/DeviceCommissioner.ts:129-136 at
+// b25ed960), which
 // opens the window with the node's configured passcode; ADR 0025 principle
 // 3 (the window's wiring stays behind [Node.Bridge]). Before [Node.Start]
 // completed it returns [ErrNotStarted], and from the first [Node.Stop] on
@@ -745,6 +746,12 @@ func (n *Node) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
 	}
 	if !n.started.Load() {
 		return ErrNotStarted
+	}
+	// The bridge reads a timeout <= 0 as the default; a negative one is
+	// the host's error, refused as [Node.OpenBasicWindow] refuses one, and
+	// opens nothing (review II, R4-api-4752).
+	if timeout < 0 {
+		return fmt.Errorf("node: OpenOwnWindow: timeout %s is negative", timeout)
 	}
 	return stoppedAs(n.br.CommissioningWindow().OpenOwnWindow(ctx, timeout))
 }
