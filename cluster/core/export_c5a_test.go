@@ -4,9 +4,11 @@
 package core
 
 import (
+	"context"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 // WaitParkedOnMutexA1 waits until a goroutine whose stack names fn is
@@ -20,14 +22,29 @@ import (
 // happened, not on a timeout. The goroutine dump's header names a parked
 // waiter "[sync.Mutex.Lock"; a sync.RWMutex waiter is named
 // differently and does not count.
+//
+// The wait is bounded: when neither happened within ten seconds — the
+// goroutine blocks somewhere else, an RWMutex or a channel — the test
+// fails naming fn rather than hanging to the go test timeout. The
+// goroutine dump, which stops the world, is taken every 64th yield, not
+// on each (PR 1 review, Opus L3, decision 684).
 func WaitParkedOnMutexA1(tb testing.TB, done <-chan struct{}, fn string) bool {
 	tb.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	buf := make([]byte, 1<<20)
-	for {
+	for turn := 0; ; turn++ {
 		select {
 		case <-done:
 			return false
 		default:
+		}
+		if ctx.Err() != nil {
+			tb.Fatalf("no goroutine in %s parked on a sync.Mutex, and done not closed, within 10s", fn)
+		}
+		if turn%64 != 0 {
+			runtime.Gosched()
+			continue
 		}
 		n := runtime.Stack(buf, true)
 		if n == len(buf) {

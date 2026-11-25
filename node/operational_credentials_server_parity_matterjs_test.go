@@ -25,9 +25,9 @@
 // the group state legs run here. "treats UpdateFabricLabel as a final
 // fabric change" and "treats SetVIDVerificationStatement as a final fabric
 // change" assert the node's fabricsChanged event "1 updated"
-// (CommissioningServer.ts:118-141 via OperationalCredentialsServer.ts:579-582),
-// which matter.js raises on every persist of a fabric (FabricManager.ts:265-275,
-// persistCallback); the Go node's is Observers.OnFabricUpdated
+// (CommissioningServer.ts:118-142 via OperationalCredentialsServer.ts:580-583,
+// at b25ed960), which matter.js raises on every persist of a fabric
+// (FabricManager.ts:265-275, persistCallback); the Go node's is Observers.OnFabricUpdated
 // (TestOperationalCredentialsFinalFabricChange).
 package node_test
 

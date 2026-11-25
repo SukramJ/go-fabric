@@ -183,13 +183,13 @@ type OperationalCredentials struct {
 	// onFabricChanged fires after UpdateFabricLabel or
 	// SetVIDVerificationStatement changed a fabric the node keeps under
 	// the same operational identity. Mirrors matter.js Fabric.setLabel and
-	// updateVendorVerificationData persisting the fabric
-	// (packages/protocol/src/fabric/Fabric.ts:193-201, :208-243), whose
+	// updateVendorVerificationData persisting the fabric, at b25ed960
+	// (packages/protocol/src/fabric/Fabric.ts:193-204, :210-246), whose
 	// persist callback emits FabricManager's replaced event
 	// (FabricManager.ts:265-275), which OperationalCredentialsServer
 	// hands to CommissioningServer as an "updated" fabric change
-	// (OperationalCredentialsServer.ts:579-582, :596;
-	// CommissioningServer.ts:118-141).
+	// (OperationalCredentialsServer.ts:580-583, :597;
+	// CommissioningServer.ts:118-142).
 	onFabricChanged func(ctx context.Context, fabricIndex uint8)
 
 	// onFabricWithdraw, when non-nil, receives the operational identity
