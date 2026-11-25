@@ -809,8 +809,10 @@ interaction / contract, A6 client discovery and peer, A7 bridge without the
 C4 compare, A8 the radios and `bletest`, A9 node), integrated one by one and
 closed by the REG step. Every fixed row has a test that failed before its
 fix, except where the row says doc, test only or otherwise. Fable read the
-diffs of A2, A3, A4, A7 and the reference statements of A6 and A8; the reads
-of A1, of A7's repair, of A9 and of the REG text are pending (decision 672).
+diffs of A2, A3, A4, A7 and the reference statements of A6 and A8; its gate
+reads (decision 672) of A1, of A7's and A2's repairs, of A9 and of the REG
+text found four blocking items (a-B1, c-B1, e-B1, e-B2), closed by the gate
+repair (decision 681).
 Severities are those of `c5/inventory.tsv`. Wave 2 (pull request 2) takes
 #610, the C4 compare of #602 and #596's AVSM count.
 
@@ -822,7 +824,7 @@ Severities are those of `c5/inventory.tsv`. Wave 2 (pull request 2) takes
 | R3-conc-3056 | note | fixed `dcf094eba`: SetVIDVerificationStatement reads and writes under `nocMu`; test `TestSetVIDVerificationStatementReadAndWriteAreOneStepA1` (`-race`) |
 | R4-doc-4003 | note | fixed: `vid_verification.go` cite `dcf094eba`; Thread driver ranges per fact note F1 `fa4f47565`, `7d7286817` (fable-diff-a2 N7); the failed attach reports 0 `fb29d20be` (decision 673), test `TestThreadNetworkCommissioningCommands` asserts the value |
 | R5-err-5201 | low | fixed `c593b63da`: an owed fabric event's ack is bound to the IDs listed before the hooks ran; test `TestOwedFabricEventAckIsBoundToItsDeliveryA1`. Residual window (A1 report, assumption 2) → follow-up below |
-| R5-conc-5004 | note | fixed `e34debac5`: the Acl read marks under `writeMu`; test `TestAccessControlReadMarkDoesNotOutliveADropA1` |
+| R5-conc-5004 | note | fixed `e34debac5`, repaired `5ce04dd9f` (gate a-B1, decision 681): the Acl read takes no `writeMu` — a write's event hook may read Acl on the goroutine that holds it — and marks only if the fabric's drop epoch (advanced by every drop, under `mu`) did not move since before its list; tests `TestAccessControlReadMarkDoesNotOutliveADropA1`, `TestAccessControlEventHookReadsAclDuringAWriteP8G` |
 | R5-par-5003 | low | fixed `e34debac5`, call sites `5cb0eeb09`: `NotifyLocalEntryInstalledOn(ctx, fabricIndex)`; test `TestAccessControlLocalEntryMarksItsFabricA1` |
 | R3-store-3001 | note | fixed `9edfd026f`; test `TestAdminEntryClearsAnExtensionThatFailedToLoadA1` |
 | R4-err-4055 | note | fixed `54f520224`; test `TestAuxiliarySyncOwedByAFailedReadRunsAtTheNextReadA1` |
@@ -880,7 +882,7 @@ Severities are those of `c5/inventory.tsv`. Wave 2 (pull request 2) takes
 | C5-5401-residue-n1 | low | fixed `f4d0c7f6f` (test); `TestCommitKeepsAnActivationThatOverlapsIt`, mutation-checked |
 | C5-5401-residue-n2 | note | fixed `f4d0c7f6f` (doc) |
 | R4-fsm-4354 | note | fixed `da84137e3`; test `TestAFailedJoinRestoresTheJoinedNetworkWhenTheCurrentOneIsUnreadable` |
-| R5-store-5205, R5-api-5206, R3-store-3703 | low, low, note | fixed `0ded3f61d`; tests `TestBatchReplaceUndoKeepsItsPartsReserved`, `TestBatchUncomparableEndpoint` (subtest "Add then Replace of one key"), `TestForgetReadErrorErasesNothing` |
+| R5-store-5205, R5-api-5206, R3-store-3703 | low, low, note | fixed `0ded3f61d`, repaired `6440337f0` (gate c-B1: a joined reservation whose prior read fails keeps the error and reserves the op's tree un-joined; test `TestRemoveKeepsItsReservationWhenThePriorReadFailsP8G`); tests `TestBatchReplaceUndoKeepsItsPartsReserved`, `TestBatchUncomparableEndpoint` (subtest "Add then Replace of one key"), `TestForgetReadErrorErasesNothing` |
 | R5-test-5202 | note | fixed `0ded3f61d` (test only; green at the base, as probe P3 measured) |
 | R5-err-5203 | note | fixed `bebc752ad`; test `TestKeylessPartRefusedAtAdd`. The device layer's path → follow-up below |
 | R4-api-4752 | note | fixed `c69fe1d19`; test `TestOpenOwnWindowRefusesNegativeTimeout` |
@@ -895,10 +897,22 @@ Severities are those of `c5/inventory.tsv`. Wave 2 (pull request 2) takes
 
 | ID | where | what |
 | --- | --- | --- |
-| P8-thread-3055-commissioning-complete (fable-diff-a2 N1) | `cluster/core/network_commissioning_thread.go` `OnCommissioningComplete` (`:790` at the REG head) | a command that passed the gate, then a CommissioningComplete, then the command's hold takes a backup and changes the staged network with no fail-safe armed; shape: a window generation that expiry and completion both advance (a second counter: `connect` / `reattachReverted` rely on `expiries == window+1`). Pre-existing; the Wi-Fi server may have the same completion sibling (not checked) |
+| P8-thread-3055-commissioning-complete (fable-diff-a2 N1) | `cluster/core/network_commissioning_thread.go` `OnCommissioningComplete` (`:790` at the REG head) | a command that passed the gate, then a CommissioningComplete, then the command's hold takes a backup and changes the staged network with no fail-safe armed; shape: a window generation that expiry and completion both advance (a second counter: `connect` / `reattachReverted` rely on `expiries == window+1`). Pre-existing. The Wi-Fi server has the same sibling (fable-diff-a2-repair N2, by reading, not reproduced: `network_commissioning_wifi.go` `OnCommissioningComplete` `:1483-1492` sets `committed` and does not move `expiries`); one row and one fix shape for both servers |
 | P8-ota-5007-residual (fable-diff-a2 N5) | `cluster/core/ota_software_update_requestor.go:934` | `fabricRemoved` reads `saveOwed` under `mu` before `persistOwing` takes `persistSem`; a save in flight refused after that read sets the flag too late. Shape: decide "owed" inside the `persistSem` section. Read, not reproduced |
 | P8-esphome-cross-proxy (decision 675) | `ble/esphome` | a second `Connect` for one address through a different proxy is not refused; decision 675: a Central-level reservation → wave 2 |
 | P8-acl-admin-entry-mark (A1 report, Left out) | `cluster/core/access_control.go` `NotifyAdminEntryInstalled` (`:1602`; the mark at `:1616` after `writeMu` is released) | marks outside `writeMu`, the class of R5-conc-5004; not changed |
-| P8-5201-window (A1 report, assumption 2; Fable read pending, decision 672) | `cluster/core/operational_credentials.go` `deliverOwedFabricEvent` | between a rollback landing under `nocMu` and the ID listing after release, a second rollback of the same fabric and kind can be listed and acknowledged by the first delivery; closing it needs the IDs captured inside `rollbackPendingLocked` (five call sites). As reported, unverified by a reference read |
+| P8-5201-window (A1 report, assumption 2; fable-diff-a1 §3) | `cluster/core/operational_credentials.go` `deliverOwedFabricEvent` | between a rollback landing under `nocMu` and the ID listing after release, a second rollback of the same fabric and kind can be listed and acknowledged by the first delivery; wider than assumption 2: FIFO orders the queue, not two deliveries, so a second delivery can list and acknowledge the first one's event before the first queued its asynchronous hooks. Both need a second fail-safe cycle with an UpdateNOC on the same fabric in that span and a crash after the acknowledgement; low. Closing shape: the IDs returned by `rollbackPendingLocked` with the records (five call sites) |
 | P8-admitparts-nil-key (A9 report, Left out) | `node/lifecycle.go:65` `nodeHost.AdmitParts` | a part with a nil key is skipped (`keyString` → `return nil`), so a `device.AddPart` of a key-less part is not judged by R5-err-5203's rule |
 | P8-closure-offgrid-ceiling (fable-diff-a4, re-read) | `cluster/closure` `step` | the 100.00 % bound off the grid (Resolution not dividing 10000, no LM) has no test here; the added step covers the floor only |
+| P8-handshake-resume-established (gate b R2) | `client/handshake/server.go:433` (`ProcessSigma1WithResume`) | the other consumer of the step value reads `ResumeKeys` and `Sigma2Resume` and no `Established`, so on a resume that value's secret copy is dropped uncleared; `BD-chip-HandshakeSecretsOverwritten` scopes the clear to the CASE adapter. Grep only, not traced (unverified) |
+| P8-deprecated-callback-subtests (gate b R3) | `bridge/case_c5_test.go` | no subtest drives a resume through the deprecated `CaseSessionEstablished` callback, and none an erroring deprecated callback (the double drop, harmless); covered by reading the wrapper only |
+| P8-wifi-connect-refused-interface-enabled (gate d N1) | `cluster/core/network_commissioning_wifi.go` connect (`enableForConnect` `:1395` before the compare `:1398-1402`) | a ConnectNetwork that raced the fail-safe's expiry and is refused can leave `InterfaceEnabled` switched on and stored; a first compare before `enableForConnect` narrows it to the switch's duration. Low |
+| P8-gkm-read-mark (gate a N8) | `cluster/core/group_key_management.go:776-782` | GroupKeyMap's read marks outside `writeMu`: the stale-mark-after-drop race R5-conc-5004 had, one spurious report at a later drop; if fixed, by the drop-epoch shape of decision 681, not a read under `writeMu` |
+| P8-4055-warn-per-read (gate a N4) | `cluster/core/access_control_auxiliary.go` (`settleOwedAuxiliary`, the Warn of a failed source read) | while the auxiliary source keeps failing, every attribute read of the cluster retries it and logs one Warn — a wildcard read once per attribute; settle once per failure interval or log at the first failure only |
+| P8-reserve-forget-remake (gate c N7, R3-store-3703 residue) | `node/reserve.go` (`servedInErasure`, the doc "the Forget can be made again") | a Forget that dropped a served endpoint carries that endpoint's tree only in the skipped erase op; the repeated `Forget(key)` erases the key alone, the dropped parts' records stay until forgotten by name. Shape: write a skipped op's non-empty tree as the key's reservation, or soften the sentence. Medium-low |
+| P8-reserve-unserialised-ops (gate c N6, pre-existing) | `node/aggregator.go` (`applyReservations` after `a.mu` is released) | two batches' reservation ops are not serialised; a `Forget(key)` that runs wholly in that window erases without the keyOnly extras. Pre-existing class (the undone Add) |
+| P8-reserve-keyonly-release (gate c N9) | `node/reserve.go` `release` | the release of a keyOnly tree blanks a part key's own reservation from an earlier, unrelated Remove; not constructed in a test (unverified), low |
+| P8-ownwindow-sentinel (gate c N1) | `node/commissioning.go` `OpenOwnWindow` | the negative-timeout error has no sentinel (`OpenBasicWindow`'s wraps `ErrInvalidWindowCredentials`); a host cannot `errors.Is` it. Note |
+| P8-tls-policy-judged-twice (gate c N5) | `node/tls.go` `tlsLevelErrors` | a custom policy's `Judge` runs once more per `Validate`; harmless for a pure policy, not checked for a stateful one (unverified) |
+
+#596-B (AVSM count): the `chiptool.yml` dispatch run 45478705992 on `73e3a7cfe`, custom families including AVSM, succeeded; it counts toward #596-B.
