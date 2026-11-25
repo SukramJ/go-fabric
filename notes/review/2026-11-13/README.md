@@ -76,6 +76,19 @@ and guards · supply chain and build · docs against code.
    request per phase. Decisions go to the owner as a wizard. A confirmed
    vulnerability is not committed to the register before its fix merges.
 
+**Mutation sampling (C4).** The sampler is `script/mutate`: it flips a
+comparison or a logical operator, drops a `!` or switches off a guard in a
+package's production files, one mutant at a time through
+`go test -overlay` (the tree is never written), runs the package's own
+tests and, for a survivor, the `-wide` packages, and writes one TSV line
+per mutant (verdict, wide verdict, note, `file:line`, kind, source line).
+It runs on GitHub CI by manual dispatch (`.github/workflows/mutate.yml`:
+inputs `ref`, `package`, `wide`, `shards`, `timeout`), which deals the
+package's files over a runner matrix and leaves the merged TSV as the
+artifact `mutants` and the counts and survivors in the run's summary
+(decision 685). A survivor is a finding to read, not a failed check: it
+gets a test or a recorded reason (decisions 403, 512, 664).
+
 ## Finding IDs
 
 `R2-P<N>-<theme>-<nn>`; themes `sec`, `acl`, `conc`, `bound`, `wire`, `fsm`,

@@ -1,0 +1,275 @@
+# Mutation sampling of one package (review II, C4; decision 685): the
+# program script/mutate applies one small change at a time to the
+# package's production files — a flipped comparison, a dropped `!`, a
+# switched-off guard — through `go test -overlay`, and records whether the
+# package's own tests, and for a survivor the -wide packages, notice it.
+#
+# Manual only, and not a guard: nothing fails on a survivor. A survivor is
+# a finding a person reads.
+#
+#   - plan: builds script/mutate at the commit this workflow runs from (so
+#     a ref older than the tool can be sampled), resolves the ref to a
+#     commit, lists the package's files — every .go file of the directory
+#     but tests, *_gen.go and doc.go — and deals them, largest first, to
+#     the shard with the least source so far.
+#   - shard: one runner per shard, at most 20 at once; the tool runs one
+#     mutant per core and writes one TSV per shard.
+#   - summary: merges the shards' TSVs into one artifact (`mutants`) and
+#     writes the counts per verdict and the survivors into the run's
+#     summary. It runs when shards failed too, and names the missing ones.
+name: mutate
+
+run-name: mutate ${{ inputs.package }} at ${{ inputs.ref }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The branch, tag or commit to sample
+        default: main
+        type: string
+      package:
+        description: The package directory, relative to the module root (bridge, im, secure/channel, …)
+        default: bridge
+        type: string
+      wide:
+        description: Comma-separated packages run for a mutant the own package's tests miss (empty for none)
+        default: ./node/
+        type: string
+      shards:
+        description: Runners to split the files over (1–256; at most one per file)
+        default: "30"
+        type: string
+      timeout:
+        description: The bound of one go test run (a Go duration in s or m)
+        default: 120s
+        type: string
+
+permissions:
+  contents: read
+
+# A second dispatch for the same package and ref waits for the first; a
+# long run is not cancelled by accident.
+concurrency:
+  group: mutate-${{ inputs.package }}-${{ inputs.ref }}
+  cancel-in-progress: false
+
+env:
+  CGO_ENABLED: "0"
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.plan.outputs.sha }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      shards: ${{ steps.plan.outputs.shards }}
+      files: ${{ steps.plan.outputs.files }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: build script/mutate
+        run: go build -o "$RUNNER_TEMP/mutate-bin/mutate" ./script/mutate
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutate-tool
+          path: ${{ runner.temp }}/mutate-bin/mutate
+          if-no-files-found: error
+          retention-days: 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+          path: src
+      - name: list and shard the files
+        id: plan
+        env:
+          PKG: ${{ inputs.package }}
+          WIDE: ${{ inputs.wide }}
+          SHARDS: ${{ inputs.shards }}
+          TIMEOUT: ${{ inputs.timeout }}
+        run: |
+          set -euo pipefail
+          PKG=${PKG%/}
+          if [[ ! "$PKG" =~ ^[A-Za-z0-9_][A-Za-z0-9_./-]*$ || "$PKG" == *..* || ! -d "src/$PKG" ]]; then
+            echo "::error::package '$PKG' is not a directory of the module"
+            exit 1
+          fi
+          if [[ ! "$WIDE" =~ ^[A-Za-z0-9_./,-]*$ ]]; then
+            echo "::error::wide '$WIDE' is not a comma-separated package list"
+            exit 1
+          fi
+          if [[ ! "$SHARDS" =~ ^[0-9]+$ ]] || (( SHARDS < 1 || SHARDS > 256 )); then
+            echo "::error::shards '$SHARDS' is not a number from 1 to 256"
+            exit 1
+          fi
+          if [[ ! "$TIMEOUT" =~ ^[0-9]+[sm]$ ]]; then
+            echo "::error::timeout '$TIMEOUT' is not a duration in s or m"
+            exit 1
+          fi
+          cd src
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          # The files of run-r3.sh's nt(): the package's .go files but
+          # tests, generated *_gen.go and doc.go; size, then path.
+          find "$PKG" -maxdepth 1 -type f -name '*.go' ! -name '*_test.go' ! -name '*_gen.go' ! -name 'doc.go' -printf '%s\t%p\n' |
+            sort -t "$(printf '\t')" -k1,1nr -k2,2 > "$RUNNER_TEMP/files.tsv"
+          files=$(wc -l < "$RUNNER_TEMP/files.tsv")
+          if (( files == 0 )); then
+            echo "::error::package '$PKG' has no production .go file"
+            exit 1
+          fi
+          # Largest first, each to the shard with the least source so far;
+          # shards beyond the file count stay empty and are not started.
+          awk -F '\t' -v n="$SHARDS" '{
+              best = 1
+              for (i = 2; i <= n; i++) if (load[i] < load[best]) best = i
+              load[best] += $1
+              f[best] = f[best] (f[best] == "" ? "" : " ") $2
+            } END { for (i = 1; i <= n; i++) if (f[i] != "") printf "%d\t%s\n", i, f[i] }' \
+            "$RUNNER_TEMP/files.tsv" > "$RUNNER_TEMP/shards.tsv"
+          matrix=$(jq -Rnc '{include: [inputs | split("\t") | {shard: (.[0] | tonumber), files: .[1]}]}' < "$RUNNER_TEMP/shards.tsv")
+          {
+            echo "matrix=$matrix"
+            echo "shards=$(wc -l < "$RUNNER_TEMP/shards.tsv")"
+            echo "files=$files"
+          } >> "$GITHUB_OUTPUT"
+          echo "$files files of $PKG in $(wc -l < "$RUNNER_TEMP/shards.tsv") shards"
+
+  shard:
+    name: shard ${{ matrix.shard }}
+    needs: plan
+    runs-on: ubuntu-latest
+    # Below a hosted runner's 360. The tool stops handing out mutants after
+    # -budget 320m; the mutant in flight then takes at most two test runs of
+    # timeout + 60 s each, and the setup a few minutes. A timeout input far
+    # above 120s needs a smaller budget.
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      # Every mutant compiles its package and the -wide packages afresh,
+      # so the build cache grows with each one: drop the toolchains this
+      # job does not use, and let the tool clean the cache below 6 GiB.
+      - name: free disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mutate-tool
+          path: ${{ runner.temp }}/mutate-bin
+      - name: mutate
+        env:
+          FILES: ${{ matrix.files }}
+          SHARD: ${{ matrix.shard }}
+          WIDE: ${{ inputs.wide }}
+          TIMEOUT: ${{ inputs.timeout }}
+        run: |
+          set -euo pipefail
+          chmod +x "$RUNNER_TEMP/mutate-bin/mutate"
+          mkdir -p "$RUNNER_TEMP/out" "$RUNNER_TEMP/mutate-tmp"
+          echo "shard $SHARD on $(nproc) cores: $FILES"
+          # FILES is a space-separated list of paths without spaces (Go
+          # file names); each is one argument.
+          read -r -a files <<<"$FILES"
+          "$RUNNER_TEMP/mutate-bin/mutate" -root . -p "$(nproc)" -minfree 6 -budget 320m \
+            -wide "$WIDE" -timeout "$TIMEOUT" -tmp "$RUNNER_TEMP/mutate-tmp" \
+            -o "$RUNNER_TEMP/out/shard-$SHARD.tsv" "${files[@]}" 2>&1 | tee "$RUNNER_TEMP/out/shard-$SHARD.log"
+          df -h /
+      - name: upload the shard's TSV
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutate-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/out/
+          if-no-files-found: warn
+          retention-days: 30
+
+  summary:
+    name: summary
+    needs: [plan, shard]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: mutate-shard-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/shards
+      - name: merge and summarise
+        env:
+          PKG: ${{ inputs.package }}
+          WIDE: ${{ inputs.wide }}
+          TIMEOUT: ${{ inputs.timeout }}
+          SHA: ${{ needs.plan.outputs.sha }}
+          SHARDS: ${{ needs.plan.outputs.shards }}
+          FILES: ${{ needs.plan.outputs.files }}
+          SHARD_RESULT: ${{ needs.shard.result }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/shards"
+          mkdir -p "$dir" "$RUNNER_TEMP/merged"
+          out="$RUNNER_TEMP/merged/mutants.tsv"
+          missing=""
+          for i in $(seq 1 "$SHARDS"); do
+            [ -f "$dir/shard-$i.tsv" ] || missing="$missing $i"
+          done
+          # Sorted by file, then line, as the tool sorts one shard.
+          find "$dir" -name 'shard-*.tsv' -exec cat {} + |
+            awk -F '\t' -v OFS='\t' '{ split($4, a, ":"); print a[1], a[2], $0 }' |
+            sort -t "$(printf '\t')" -k1,1 -k2,2n | cut -f3- > "$out"
+          {
+            echo "### mutate \`$PKG\` at \`$SHA\`"
+            echo
+            echo "$FILES files in $SHARDS shards (shard jobs: $SHARD_RESULT); wide \`${WIDE:-none}\`, timeout $TIMEOUT; $(wc -l < "$out") mutants."
+            if [ -n "$missing" ]; then
+              echo
+              echo "**Shards without a TSV:**$missing — their mutants are not in the counts."
+            fi
+            echo
+            echo "| own package | wide | note | mutants |"
+            echo "| --- | --- | --- | ---: |"
+            awk -F '\t' '{ print $1 "\t" $2 "\t" $3 }' "$out" | sort | uniq -c |
+              awk '{ n = $1; sub(/^ *[0-9]+ /, ""); split($0, c, "\t"); printf "| %s | %s | %s | %d |\n", c[1], c[2], c[3], n }'
+            echo
+            echo "#### Survivors (no test run noticed them)"
+            echo
+            echo '```'
+            awk -F '\t' '$1 == "SURVIVED" && ($2 == "SURVIVED" || $2 == "") { print $4 "\t" $5 "\t" $6 }' "$out"
+            echo '```'
+            echo
+            echo "<details><summary>Missed by the own package's tests, caught by wide</summary>"
+            echo
+            echo '```'
+            awk -F '\t' '$1 == "SURVIVED" && $2 == "KILLED" { print $4 "\t" $5 "\t" $6 }' "$out"
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$missing" ]; then
+            echo "::warning::shards without a TSV:$missing"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutants
+          path: ${{ runner.temp }}/merged/mutants.tsv
+          if-no-files-found: error
+          retention-days: 90

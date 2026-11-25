@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `script/mutate` and `.github/workflows/mutate.yml` (manual dispatch): mutation sampling of one package on CI — operator flips, a dropped `!` and switched-off guards applied one at a time through `go test -overlay`, the package's own tests and a `-wide` package list run against each, the files dealt over a runner matrix (`shards`, at most 20 at once), one merged TSV artifact and the counts per verdict and the survivors in the run's summary. The review's C4 sampler, moved from a local script into the repository (review II, decision 685). Not a guard: nothing fails on a survivor.
+
 ### Changed
 
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.26.0` (was `v0.25.0`) and are tagged `ble/bluez/v0.26.0`, `ble/esphome/v0.26.0` and `wifi/wpasupplicant/v0.26.0` at this commit; `examples/ble-wifi-light` requires the three at `v0.26.0`. The root `go.mod` and `go.sum` did not change between `v0.25.0` and `v0.26.0`.

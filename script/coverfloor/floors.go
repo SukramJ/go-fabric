@@ -328,6 +328,7 @@ var floors = []packageFloor{
 	{pkg: "thingfabric.dev/go-fabric/script/sqlitedsn", min: 0, unmeasurable: true, why: "test only, no statements to cover: the guard is the test"},
 	{pkg: "thingfabric.dev/go-fabric/script/levelgen", min: 59, why: "the dump parser, the writer, the table half of run and measureInternal's deadline are tested (measured 59.7); measureInternal builds and runs the reference daemon, which make generate-levels exercises and TestSpecLevelsDocIsCurrent regenerates in memory"},
 	{pkg: "thingfabric.dev/go-fabric/script/levelgen/leveltable", min: 97},
+	{pkg: "thingfabric.dev/go-fabric/script/mutate", min: 84, why: "run against a fixture module with a killed and a surviving mutant, the budget and the refusals (measured 86.2); main and the write-failure paths are exercised by the mutate workflow"},
 	{pkg: "thingfabric.dev/go-fabric/script/profilegen", min: 95},
 	{pkg: "thingfabric.dev/go-fabric/script/surfacecheck", min: 54, why: "the summary and the committed snapshot are tested (measured 50.9); run, which builds and runs the reference daemon, is exercised by make surface-check"},
 	{
