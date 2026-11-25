@@ -918,4 +918,21 @@ Severities are those of `c5/inventory.tsv`. Wave 2 (pull request 2) takes
 | P8-3001-restart-residual (gate a §4) | `cluster/core/access_control.go` `NotifyAdminEntryInstalled` | fail-closed in the process; the only gap is the existing R2-C2-store-1004 residual (decided, not reopened), not new in wave 1. Note |
 | P8-tls-policy-judged-twice (gate c N5) | `node/tls.go` `tlsLevelErrors` | a custom policy's `Judge` runs once more per `Validate`; harmless for a pure policy, not checked for a stateful one (unverified) |
 
+### PR 1 review (decisions 682–684)
+
+Opus's code review (`review-pr1-opus.md`) and Fable's bounded read (`fable-review-pr1.md`) of pull request 1 at `2ede7caab`.
+
+| ID | sev | disposition |
+| --- | --- | --- |
+| P8-PR1-opus-M1 | medium | fixed `c59a3e48b` (decisions 682, 683): the camera session tables are kept between the store and the notification (`internal/specseam.SetAttributesStored`); tests `TestProviderSessionsShowTheChangeBeforeListenersRun`, `TestRequestorSessionsShowTheChangeBeforeListenersRun`, `TestCameraSimAnswerSurvivesASlowLaterListener`, `TestSetAttributesStoredRunsBetweenStoreAndNotification` |
+| P8-PR1-fable-L3, P8-PR1-fable-L4 | low | fixed `deedd0a08` (cites at b25ed960) |
+| P8-PR1-fable-L5 | low | fixed `deedd0a08` (the `Assembler` doc names #618) |
+| P8-PR1-opus-L3 | low | fixed `deedd0a08` (test helper bounded, dump every 64th yield) |
+| P8-PR1-fable-L1 | low | open → #618 (`endpoint/types.go:694-706`, a key's first state not shared by concurrent assemblies) |
+| P8-PR1-fable-L2 | low | open → #619 (`cluster/core/access_control_auxiliary.go:156-169`, a failed sync puts a dropped fabric's owed context back) |
+| P8-PR1-opus-L1 | low | open → #620 (`cluster/camera/provider_peer.go:155-163`, `End` drops the removal's error; no connector removes nothing) |
+| P8-PR1-opus-L2 | low | open → #621 (`cluster/core/access_control.go:762`, `:824`, `:830`; also closes P8-4055-warn-per-read above) |
+| P8-PR1-opus-L4 | low | open → #622 (`cluster/core/access_control.go:1682-1688`, `NotifyLocalEntryInstalled` undeprecated) |
+| P8-PR1-opus-L5 | low | open → #623 (`client/discovery/status.go:176-185`, restart after a successful resolve; beyond `by_design.md:9822-9824`, Fable-confirmed) |
+
 #596-B (AVSM count): the `chiptool.yml` dispatch run 45478705992 on `73e3a7cfe`, custom families including AVSM, succeeded; it counts toward #596-B.
