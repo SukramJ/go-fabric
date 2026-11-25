@@ -10,7 +10,7 @@ package core
 // ReviewFabricRestrictionsResponse (0x01) (matter.js b25ed960
 // packages/model/src/standard/elements/access-control.element.ts:20, :26,
 // :53, :60, :121, :131). Cluster ID 0x002B is LocalizationConfiguration
-// (localization-configuration.element.ts:16 at b25ed960).
+// (localization-configuration.element.ts:16-17 at b25ed960).
 //
 // go-fabric does not implement the Managed Device use-case: the
 // AccessControl server declares no MNGD feature and serves none of these

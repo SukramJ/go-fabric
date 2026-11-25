@@ -61,9 +61,9 @@ const (
 //
 // With a network profile the probe takes a slot of it, released when the
 // exchange closes, and pads the exchange with margin — the probe network
-// PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at db021da0)
+// PeerAddressMonitor passes (PeerAddressMonitor.ts:202-211 at b25ed960)
 // and the medium margin PeerExchangeProvider.initiateExchange applies
-// (PeerExchangeProvider.ts:87-92, :133-138).
+// (PeerExchangeProvider.ts:85-90, :131-136 at b25ed960).
 //
 // Its log record matter.controller.peer.probe names the probed address in
 // target — override, else the session's — beside the caller's address, so
@@ -143,7 +143,8 @@ func readEmpty(ctx context.Context, x *exchange.Exchange) error {
 			x.Close()
 			return nil
 		}
-		// The final StatusResponse is tracked, not awaited (:950-966).
+		// The final StatusResponse is tracked, not awaited
+		// (InteractionMessenger.ts:1035-1048 at b25ed960).
 		go func() {
 			_ = x.Send(context.WithoutCancel(ctx), im.OpcodeStatusResponse, success, exchange.SendOptions{})
 			x.Close()

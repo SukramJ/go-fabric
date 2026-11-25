@@ -733,7 +733,8 @@ func stoppedAs(err error) error {
 // [ErrCommissioningBlocked].
 //
 // Mirrors matter.js DeviceCommissioner.allowBasicCommissioning
-// (packages/protocol/src/protocol/DeviceCommissioner.ts:130-137), which
+// (packages/protocol/src/protocol/DeviceCommissioner.ts:129-136 at
+// b25ed960), which
 // opens the window with the node's configured passcode; ADR 0025 principle
 // 3 (the window's wiring stays behind [Node.Bridge]). Before [Node.Start]
 // completed it returns [ErrNotStarted], and from the first [Node.Stop] on
@@ -747,9 +748,8 @@ func (n *Node) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
 		return ErrNotStarted
 	}
 	// The bridge reads a timeout <= 0 as the default; a negative one is
-	// the host's error, refused as [Config.Validate] and
-	// [Node.OpenBasicWindow] refuse one, and opens nothing (review II,
-	// R4-api-4752).
+	// the host's error, refused as [Node.OpenBasicWindow] refuses one, and
+	// opens nothing (review II, R4-api-4752).
 	if timeout < 0 {
 		return fmt.Errorf("node: OpenOwnWindow: timeout %s is negative", timeout)
 	}

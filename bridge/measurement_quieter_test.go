@@ -160,9 +160,10 @@ func TestProjectedQuieterAttributeIsThrottled(t *testing.T) {
 // endpoint's own reset and destructor call
 // (packages/node/src/endpoint/Endpoint.ts:934, :1013) — at b25ed9604f. The
 // re-wiring restarts no interval: the change after it is still held.
-// Review II, R2-P4-dr-sub-01. "alone" rests on a grep for behaviors.close
-// over packages/node/src at the pin (two hits, the two Endpoint.ts lines
-// above), not a read of every caller of reset or close.
+// Review II, R2-P4-dr-sub-01. "alone" rests on the two callers of
+// Behaviors.close in packages/node/src at the pin
+// (this.behaviors.close() :934, this.#behaviors?.close() :1013, the two
+// Endpoint.ts lines above), not a read of every caller of reset or close.
 func TestHeldQuieterChangeSurvivesReassemble(t *testing.T) {
 	t.Parallel()
 	r := newQuietMeterRig(t, epmActivePower)

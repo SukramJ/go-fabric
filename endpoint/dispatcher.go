@@ -284,7 +284,8 @@ var (
 // them to the host. On the wire [im.AttributeExpansion] hands out a
 // status for a fully concrete path alone, as matter.js
 // packages/protocol/src/action/server/AttributeReadResponse.ts at
-// db021da0 does (addWildcard :88-94 answers no status).
+// b25ed960 does (a wildcard path goes to addWildcard, :88-94, which
+// adds no status, :149-197).
 //
 // ctx carries the FabricFiltered flag + FabricIndex via
 // [im.WithFabricFilter] / [im.FabricFilterFromContext]. Cluster servers
@@ -363,7 +364,7 @@ func (d *TopologyDispatcher) AttributePathStatus(ctx context.Context, path im.Co
 // grant drives no read of the server (R2-P6-bound-0405). matter.js
 // authorises a location before it reads the value
 // (packages/protocol/src/action/server/AttributeReadResponse.ts:250, :272
-// at db021da0). A request without a stamped check — PASE, a local caller,
+// at b25ed960). A request without a stamped check — PASE, a local caller,
 // an im without an ACL checker — is not asked here; im's per-result check
 // stays the gate of what is reported.
 func (d *TopologyDispatcher) readAuthorized(ctx context.Context, path im.ConcreteAttributePath) bool {
@@ -381,8 +382,9 @@ func (d *TopologyDispatcher) readAuthorized(ctx context.Context, path im.Concret
 // declares nothing are allowed. The refusal is answered as the access
 // check's: UNSUPPORTED_ACCESS on a fully concrete path, the attribute
 // skipped under a wildcard — matter.js AttributeReadResponse.ts:272 with
-// :473-475 (concrete path: UNSUPPORTED_ACCESS) and :406-413 (wildcard:
-// the attribute is skipped), and chip src/app/reporting/Engine.cpp:81-88.
+// :474-476 (concrete path: UNSUPPORTED_ACCESS) and :408-415 (wildcard:
+// the attribute is skipped) at b25ed960, and chip
+// src/app/reporting/Engine.cpp:81-88.
 func readAllowed(ctx context.Context, srv contract.ClusterServer, attrID uint32) bool {
 	decl, ok := srv.(contract.ReadAccessDeclarer)
 	if !ok {
@@ -421,8 +423,8 @@ func (d *TopologyDispatcher) ReadAtEndpoint(ctx context.Context, path im.Concret
 // attribute of each matching cluster server. A concrete endpoint lacking
 // the cluster answers UnsupportedCluster; under a wildcard endpoint it is
 // skipped, and so is an attribute whose read does not succeed
-// (AttributeReadResponse.ts:259-261, :341-344, :386-387, :407-414 and
-// :419-424 at db021da0).
+// (AttributeReadResponse.ts:259-261, :342-345, :387-388, :408-415 and
+// :420-425 at b25ed960).
 func (d *TopologyDispatcher) readAt(ctx context.Context, ep *Endpoint, path im.ConcreteAttributePath, wildcardEndpoint bool, results []im.ReadResult) []im.ReadResult {
 	ePath := path
 	ePath.Endpoint = ep.ID
@@ -1544,13 +1546,13 @@ func hostStatusError(err error) (contract.StatusError, bool) {
 // attributes (review II, R2-P3-admin-02). matter.js authorizes every read
 // against the attribute's limits.readLevel
 // (packages/protocol/src/action/server/AttributeReadResponse.ts:272, and
-// :408-411 on the wildcard path, at db021da0).
+// :409-412 on the wildcard path, at b25ed960).
 //
 // A path that does not resolve — no such endpoint, no such cluster on it,
 // an attribute the cluster does not list — takes no floor from the data
 // model: matter.js authorizes a concrete read at View first, answers the
 // existence statuses next and checks limits.readLevel only for an
-// attribute that exists (AttributeReadResponse.ts:250-274 at db021da0), as
+// attribute that exists (AttributeReadResponse.ts:250-274 at b25ed960), as
 // [MinWritePrivilege] does for a write. The attribute list is asked only
 // for an attribute the data model reads above View.
 func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {

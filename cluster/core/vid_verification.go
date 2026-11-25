@@ -68,9 +68,10 @@ func (o *OperationalCredentials) handleSetVidVerificationStatement(ctx context.C
 	}
 	o.dataVersion.Bump()
 	// The fabric changed: matter.js Fabric.updateVendorVerificationData
-	// persists it and the node reports an "updated" fabric (Fabric.ts:208-243,
-	// FabricManager.ts:236-246, OperationalCredentialsServer.ts:522). The
-	// hook runs after nocMu is released.
+	// persists it and the node reports an "updated" fabric (Fabric.ts:210-246
+	// and OperationalCredentialsServer.ts:523 at b25ed960;
+	// FabricManager.ts:236-246 at db021da0). The hook runs after nocMu is
+	// released.
 	o.fabricChanged(ctx, fabricIndex)
 	return nil, nil
 }

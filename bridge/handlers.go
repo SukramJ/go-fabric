@@ -883,7 +883,10 @@ type CaseSessionEstablished func(keys sigma.SessionKeys, peerSessionID uint16) e
 // ([sigma.Established]). A host installs the session from this value
 // alone: the responder's accessors, read afterwards, may already describe
 // another Sigma1's handshake (review II, R5-sec-5101). An error means no
-// session was installed; the handshake then ends without one.
+// session was installed; the handshake then ends without one, and the
+// adapter clears the value's SharedSecret once the callback returned, so
+// a callback that refuses the value must not keep that slice (decision
+// 658).
 type CaseEstablished func(est sigma.Established) error
 
 // NewCaseAdapter wraps r.
@@ -1342,9 +1345,9 @@ func (a *CaseAdapter) processSigma3(payload []byte) (opcode uint8, respPayload [
 		// answered, the bytes that established the session included
 		// (review II, phase 7, decision 286): matter.js's CASE server reads
 		// one Sigma3 per handshake
-		// (packages/protocol/src/session/case/CaseServer.ts:275-279 at
-		// db021da0), and a repeat on its exchange is a duplicate that does
-		// not reach it (packages/protocol/src/protocol/MessageExchange.ts:501-511).
+		// (packages/protocol/src/session/case/CaseServer.ts:273-277 at
+		// b25ed960), and a repeat on its exchange is a duplicate that does
+		// not reach it (packages/protocol/src/protocol/MessageExchange.ts:514-524).
 		a.mu.Unlock()
 		return 0, nil, sigma3OfCompleted, taken, nil
 	}
