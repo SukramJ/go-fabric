@@ -112,7 +112,7 @@ func buildTLS(ctx context.Context, cfg *TLSConfig, st store.Port) (*tls.Certific
 }
 
 // tlsLevelErrors refuses [Config].TLS under surface policies whose level
-// does not have both TLS clusters, or that remove them (review II,
+// does not have both TLS clusters, or that refuse them (review II,
 // R4-doc-4754, owner decision 656). Each cluster is judged as the root
 // judges it once built ([rootClusterElement], host-declared). Below
 // 1.5.1 the level policy does not remove them — the RootNode device type
@@ -120,7 +120,10 @@ func buildTLS(ctx context.Context, cfg *TLSConfig, st store.Port) (*tls.Certific
 // (absent at level …)" — but a node that composes at such a level would
 // serve two clusters its level does not know; the TLS configuration is
 // refused instead, before anything is built. Policies whose level is
-// invalid are left to their own check.
+// invalid are left to their own check. The arm for policies that remove
+// a cluster is a guard only: both are judged mandatory, so
+// [surface.Evaluate] keeps them against a Remove and the arm does not
+// fire at this pin.
 func (c *Config) tlsLevelErrors() []error {
 	if c.TLS == nil || c.Surface.Validate() != nil {
 		return nil

@@ -89,9 +89,10 @@ func TestJointWindowIsCommissioningMode3(t *testing.T) {
 
 // TestTLSRefusedBelowItsLevel (review II, R4-doc-4754, decision 656):
 // Config.TLS under a surface level without the TLS clusters is a
-// configuration error at Validate and New — the level would remove both
-// servers from the root while the node still handed them to its push
-// transports. At a level that has them the configuration is valid.
+// configuration error at Validate and New — the level keeps both servers
+// on the root ("kept: mandatory at pin") though it does not know them,
+// and the node would hand them to its push transports. At a level that
+// has them the configuration is valid.
 func TestTLSRefusedBelowItsLevel(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

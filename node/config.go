@@ -109,8 +109,10 @@ type Config struct {
 	// root and hands them to the topology's PushAvStreamTransport servers
 	// ([TLSConfig], [RootClusters].TLSCertificateManagement); nil mounts
 	// neither. Under [Config].Surface policies whose level does not have
-	// both clusters (below 1.5.1), or that remove them, it is a
-	// configuration error ([Config.Validate], [New]).
+	// both clusters (below 1.5.1), or one that refuses them, it is a
+	// configuration error ([Config.Validate], [New]). A policy cannot
+	// remove them: both are judged mandatory on the root, so the policies
+	// keep them against a Remove.
 	TLS *TLSConfig
 	// OTAProvider serves OTA images: the OTA Software Update Provider on an
 	// endpoint of device type OtaProvider beside the Aggregator, its images
