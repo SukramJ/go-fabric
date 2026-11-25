@@ -348,4 +348,5 @@ were released under MIT and stay so). Upstream notices and the dependency
 licences are recorded in
 [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md). Contributions need
 the contributor licence agreement in [`CLA.md`](./CLA.md), agreed once per
-account in the first pull request.
+account in the first pull request. The use of AI tools when
+contributing is governed by [`AI_POLICY.md`](./AI_POLICY.md).
