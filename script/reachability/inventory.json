@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10847,
+  "entry_points": 10850,
   "initializers": 372,
   "entry_packages": [
     ".",
@@ -296,9 +296,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28634,
+    "total_exported": 28636,
     "reachable": 22329,
-    "whitelisted": 6283,
+    "whitelisted": 6285,
     "unreachable": 22
   },
   "by_package": [
@@ -409,14 +409,14 @@
       "package": "cluster/core",
       "identifier": "AccessControl.NotifyLocalEntryInstalled",
       "file": "cluster/core/access_control.go",
-      "line": 1649,
+      "line": 1680,
       "kind": "method"
     },
     {
       "package": "cluster/core",
       "identifier": "OperationalCredentials.RolledBackUpdates",
       "file": "cluster/core/operational_credentials.go",
-      "line": 765,
+      "line": 768,
       "kind": "method"
     },
     {
@@ -4892,7 +4892,7 @@
       "identifier": "TestHeldQuieterChangeSurvivesReassemble",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/measurement_quieter_test.go",
-      "line": 166
+      "line": 167
     },
     {
       "package": "bridge",
@@ -6257,7 +6257,7 @@
       "identifier": "TestPowerSourceBatteryQuietInterval",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/measurement_quieter_test.go",
-      "line": 279
+      "line": 280
     },
     {
       "package": "bridge",
@@ -6376,14 +6376,14 @@
       "identifier": "TestProjectedChangeAdvancesItsVersionOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/measurement_quieter_test.go",
-      "line": 371
+      "line": 372
     },
     {
       "package": "bridge",
       "identifier": "TestProjectedElectricalReadingsAreReported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/measurement_quieter_test.go",
-      "line": 308
+      "line": 309
     },
     {
       "package": "bridge",
@@ -6460,14 +6460,14 @@
       "identifier": "TestQuieterChangeInTheRewiringGapIsReportedAtAttach",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/measurement_quieter_test.go",
-      "line": 196
+      "line": 197
     },
     {
       "package": "bridge",
       "identifier": "TestQuieterChangesInTheRewiringGapAdvanceTheirClusterOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/measurement_quieter_test.go",
-      "line": 228
+      "line": 229
     },
     {
       "package": "bridge",
@@ -8196,7 +8196,7 @@
       "identifier": "TestStoppedBridgeQuieterPathIsSilent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/measurement_quieter_test.go",
-      "line": 251
+      "line": 252
     },
     {
       "package": "bridge",
@@ -12813,6 +12813,20 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestAccessControlDropForgetsTheOwedContextP8G",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_read_hook_p8g_test.go",
+      "line": 76
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestAccessControlEventHookReadsAclDuringAWriteP8G",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_read_hook_p8g_test.go",
+      "line": 37
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestAccessControlFabricDropReportsWhatShrank",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/access_control_r4_test.go",
@@ -12830,14 +12844,14 @@
       "identifier": "TestAccessControlLocalEntryMarksItsFabricA1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/acl_held_c5a_test.go",
-      "line": 90
+      "line": 92
     },
     {
       "package": "cluster/core",
       "identifier": "TestAccessControlReadMarkDoesNotOutliveADropA1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/acl_held_c5a_test.go",
-      "line": 38
+      "line": 40
     },
     {
       "package": "cluster/core",

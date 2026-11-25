@@ -1,15 +1,15 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)
-Entry points: 10847 across 291 test packages, and 372 package initializers.
+Entry points: 10850 across 291 test packages, and 372 package initializers.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 28634 |
+| Total exported | 28636 |
 | Reached by a test | 22329 |
-| Whitelisted | 6283 |
+| Whitelisted | 6285 |
 | **Unreached** | **22** |
 
 ## Top-20 packages by unreached exported identifiers
@@ -37,8 +37,8 @@ Entry points: 10847 across 291 test packages, and 372 package initializers.
 | bridge | Bridge.ControllerRTT | bridge/bridge.go | 3372 |
 | bridge | Bridge.SubscriptionFlushReporter | bridge/subscribe.go | 407 |
 | client/exchange | Manager.LocalFixedMrpBackoff | client/exchange/manager.go | 254 |
-| cluster/core | AccessControl.NotifyLocalEntryInstalled | cluster/core/access_control.go | 1649 |
-| cluster/core | OperationalCredentials.RolledBackUpdates | cluster/core/operational_credentials.go | 765 |
+| cluster/core | AccessControl.NotifyLocalEntryInstalled | cluster/core/access_control.go | 1680 |
+| cluster/core | OperationalCredentials.RolledBackUpdates | cluster/core/operational_credentials.go | 768 |
 | cluster/jointfabric | Datastore.ForceAddNodeKeySetEntry | cluster/jointfabric/datastore_ops.go | 1041 |
 | cluster/jointfabric | Datastore.FriendlyName | cluster/jointfabric/datastore.go | 680 |
 | cluster/jointfabric | Datastore.SetAnchorVendorID | cluster/jointfabric/datastore.go | 781 |
