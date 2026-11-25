@@ -649,6 +649,10 @@ func (a *AccessControl) dropFabric(ctx context.Context, fabricIndex uint8) (move
 		a.aclDropEpoch = map[uint8]uint64{}
 	}
 	a.aclDropEpoch[fabricIndex]++
+	// The context a failed auxiliary change of the fabric left owed goes
+	// with the fabric: an event of a later fabric at the index must not
+	// name its administrator (R4-err-4055).
+	delete(a.auxOwedCtx, fabricIndex)
 	a.mu.Unlock()
 	if aclHad {
 		// The store is asked under writeMu, as a write asks it; a list that

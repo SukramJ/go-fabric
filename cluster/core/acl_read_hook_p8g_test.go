@@ -68,3 +68,33 @@ func TestAccessControlEventHookReadsAclDuringAWriteP8G(t *testing.T) {
 		t.Error("the hook read nothing: the write emitted no event")
 	}
 }
+
+// TestAccessControlDropForgetsTheOwedContextP8G (R4-err-4055, gate a N1):
+// a fabric's drop forgets the context its failed auxiliary change left
+// owed, so an event of a later fabric at the same index never names the
+// dropped fabric's administrator.
+func TestAccessControlDropForgetsTheOwedContextP8G(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	const f uint8 = 3
+	st := &dropACLStore{acl: map[uint8][]store.ACLEntry{f: {dropAdmin(f)}}, fabrics: []uint8{f}}
+	a, err := NewAccessControlWith(ctx, AccessControlConfig{Store: st})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.mu.Lock()
+	a.auxOwedCtx = map[uint8]context.Context{f: im.WithFabricFilter(ctx, true, f), 1: ctx}
+	a.mu.Unlock()
+	st.removeFabric(f)
+	if err := a.MatterDropFabric(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if _, ok := a.auxOwedCtx[f]; ok {
+		t.Error("the drop kept the dropped fabric's owed context")
+	}
+	if _, ok := a.auxOwedCtx[1]; !ok {
+		t.Error("the drop of fabric 3 forgot fabric 1's owed context")
+	}
+}

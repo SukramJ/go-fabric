@@ -119,10 +119,13 @@ func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool, deferred m
 }
 
 // settleOwedAuxiliary runs the synchronisation a failed read of the source
-// owes (auxOwed), before a read of the cluster serves its attributes and
-// its DataVersion (review II, R4-err-4055). The reader made no change, so
-// the run has no actor: each event names the node of its own failed
-// change (auxOwedCtx) or none, never the reader's.
+// owes (auxOwed), before a read of the cluster serves its attributes
+// (review II, R4-err-4055). The dispatcher takes a read's DataVersion
+// before its value, so the read that settles reports the version from
+// before the run with the value after it; the next read reports the
+// version the run moved to. The reader made no change, so the run has no
+// actor: each event names the node of its own failed change (auxOwedCtx)
+// or none, never the reader's.
 func (a *AccessControl) settleOwedAuxiliary(ctx context.Context) {
 	a.mu.RLock()
 	owed, emit := a.auxOwed, a.auxOwedEmit
@@ -135,7 +138,10 @@ func (a *AccessControl) settleOwedAuxiliary(ctx context.Context) {
 // syncAuxiliaryAs is syncAuxiliary whose source reads run under ctx and
 // whose events name the node of actor (nil: no actor). It first takes the
 // synchronisation a failed read owes, with its contexts — a context in
-// deferred is newer and wins — and a read of the source that fails owes
+// deferred is newer and wins; an owed context wins over actor for its
+// fabric, so a later change by another administrator of that fabric is
+// reported with the earlier failed change's node — and a read of the
+// source that fails owes
 // the whole synchronisation again, its contexts and actor's own fabric's
 // kept, rather than dropping them (review II, R4-err-4055).
 func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, deferred map[uint8]context.Context) {

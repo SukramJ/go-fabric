@@ -556,7 +556,8 @@ type OpcredsConfig struct {
 	// installation before a rollback's removal of it (review II,
 	// R4-conc-4054, decision 660): it must not call
 	// [OperationalCredentials.RemoveFabric],
-	// [OperationalCredentials.PrepareFreshFailSafe] or
+	// [OperationalCredentials.PrepareFreshFailSafe],
+	// [OperationalCredentials.CommitFailSafe] or
 	// [OperationalCredentials.OnFailSafeExpiry], which take that lock and
 	// would wait for it forever.
 	OnFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
@@ -627,7 +628,8 @@ type OpcredsConfig struct {
 	// From UpdateNOC it runs under the server's NOC lock, as
 	// OnFabricInstalled does (review II, R4-conc-4054, decision 660): it
 	// must not call [OperationalCredentials.RemoveFabric],
-	// [OperationalCredentials.PrepareFreshFailSafe] or
+	// [OperationalCredentials.PrepareFreshFailSafe],
+	// [OperationalCredentials.CommitFailSafe] or
 	// [OperationalCredentials.OnFailSafeExpiry]. Its run for a rolled-back
 	// UpdateNOC comes after the lock is released.
 	OnFabricUpdated func(ctx context.Context, fabricIndex uint8)
@@ -638,7 +640,8 @@ type OpcredsConfig struct {
 	// From UpdateNOC it runs under the server's NOC lock, as
 	// OnFabricInstalled does (review II, R4-conc-4054, decision 660): it
 	// must not call [OperationalCredentials.RemoveFabric],
-	// [OperationalCredentials.PrepareFreshFailSafe] or
+	// [OperationalCredentials.PrepareFreshFailSafe],
+	// [OperationalCredentials.CommitFailSafe] or
 	// [OperationalCredentials.OnFailSafeExpiry]. Its run for a rolled-back
 	// UpdateNOC comes after the lock is released.
 	OnFabricWithdraw func(ctx context.Context, compressedID [8]byte, nodeID uint64)
@@ -2887,9 +2890,10 @@ func (o *OperationalCredentials) handleUpdateFabricLabel(ctx context.Context, fi
 	}
 	resp, relabelled, err := o.relabel(ctx, idx, req.Label)
 	// The fabric changed: matter.js Fabric.setLabel persists it and the
-	// node reports an "updated" fabric (Fabric.ts:193-201,
-	// FabricManager.ts:236-246, OperationalCredentialsServer.ts:404). The
-	// hook runs after nocMu is released.
+	// node reports an "updated" fabric (Fabric.ts:193-204 and
+	// OperationalCredentialsServer.ts:405 at b25ed960;
+	// FabricManager.ts:236-246 at db021da0). The hook runs after nocMu is
+	// released.
 	if relabelled {
 		o.fabricChanged(ctx, idx)
 	}
@@ -2929,7 +2933,7 @@ func (o *OperationalCredentials) relabel(ctx context.Context, idx uint8, label s
 		}
 	}
 	// matter.js Fabric.setLabel persists, and so reports, only a label
-	// that changed (Fabric.ts:197-199).
+	// that changed (Fabric.ts:199-201 at b25ed960).
 	prev, prevErr := o.store.GetFabric(ctx, idx)
 	relabelled = prevErr != nil || prev.Label != label
 	if err := o.store.UpdateFabricLabel(ctx, idx, label); err != nil {
