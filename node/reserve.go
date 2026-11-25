@@ -115,7 +115,8 @@ type reservationOp struct {
 	tree []string
 	// join reserves tree joined with the tree the store reserves for key
 	// already, rather than in its place: an undone Add keeps both
-	// (refuseLateCollisionsLocked).
+	// (refuseLateCollisionsLocked). When that tree cannot be read, tree
+	// is reserved alone and the read's error returned.
 	join bool
 	// keyOnly records the reservation under key alone, not under every
 	// key of tree: the parts of an undone Replace reserved under a key
@@ -142,11 +143,13 @@ func (a *Aggregator) applyReservations(ctx context.Context, ops []reservationOp,
 		case opReserve:
 			tree := slices.Clone(op.tree)
 			if op.join {
+				// A prior reservation that cannot be read is not joined,
+				// but the op's own tree is still reserved and the error
+				// returned: a failed read must not lose the reservation
+				// the op exists to write, or a later Forget of the key
+				// reaches the key alone (gate c-B1 of R5-store-5205).
 				prior, err := p.reservedTree(ctx, op.key)
-				if err != nil {
-					errs = append(errs, err)
-					continue
-				}
+				errs = append(errs, err)
 				for _, k := range prior {
 					if !slices.Contains(tree, k) {
 						tree = append(tree, k)
