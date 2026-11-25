@@ -669,6 +669,16 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 // R2-C2-conc-1302). A sibling the [Source] answers is read as the Source
 // answers it; a change of it is the host's and not tracked here.
 func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any) error {
+	return s.setAttributesStored(origin, values, nil)
+}
+
+// setAttributesStored is [Server.SetAttributesFrom] with stored, when not
+// nil, run once the values are stored and before any change listener is
+// told: a server that keeps a copy of a stored attribute makes it follow
+// there, so a listener — and whatever it wakes — reads the state it is
+// told about. A refused Set runs nothing. Reached from outside the
+// package through internal/specseam.SetAttributesStored.
+func (s *Server) setAttributesStored(origin contract.Origin, values map[uint32]any, stored func()) error {
 	checked := make(map[uint32]any, len(values))
 	for _, id := range slices.Sorted(maps.Keys(values)) {
 		v, err := s.check(id, values[id])
@@ -695,7 +705,7 @@ func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any
 		if s.judgedForTests != nil {
 			s.judgedForTests()
 		}
-		if s.storeAt(origin, checked, at) {
+		if s.storeAt(origin, checked, at, stored) {
 			return nil
 		}
 	}
@@ -819,11 +829,15 @@ func defaultOf(t Type, d any) (any, bool) {
 // storeAt keeps values a Set judged against the state of generation at
 // and reports the ones that changed, from origin ([Server.storeWith]
 // without an earlier list); false, with nothing stored, when a change was
-// stored since.
-func (s *Server) storeAt(origin contract.Origin, values map[uint32]any, at uint64) bool {
+// stored since. stored, when not nil, runs between the store and the
+// notification ([Server.setAttributesStored]).
+func (s *Server) storeAt(origin contract.Origin, values map[uint32]any, at uint64, stored func()) bool {
 	_, notify, stale := s.storeWith(origin, values, nil, &at)
 	if stale {
 		return false
+	}
+	if stored != nil {
+		stored()
 	}
 	s.told(notify)
 	return true

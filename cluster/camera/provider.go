@@ -20,6 +20,7 @@ import (
 	wpdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportprovider"
 	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/specseam"
 )
 
 // ProviderClusterID is the WebRtcTransportProvider cluster id.
@@ -227,6 +228,15 @@ func (p *Provider) removeSession(origin contract.Origin, sessionID uint16) error
 // a concurrent change applies to this one's result; a table the schema
 // refuses is neither published nor kept (R2-P6-err-1611). As
 // [Requestor]'s change.
+//
+// The table is kept between the store and the notification
+// (internal/specseam.SetAttributesStored): a change listener, and whatever
+// it wakes, reads through Sessions() the table it is told about (PR 1
+// review M1, decision 682). Mirrors matter.js Datasource.ts at b25ed960:
+// commit2 makes the committed values canonical (:1475-1489, the
+// assignment :1488) before postCommit emits the change events (:1520),
+// and a refused commit's values never become canonical (rollback,
+// :1539-1540).
 func (p *Provider) change(origin contract.Origin, edit func([]ProviderSession) ([]ProviderSession, bool)) error {
 	p.pub.Lock()
 	defer p.pub.Unlock()
@@ -237,12 +247,14 @@ func (p *Provider) change(origin contract.Origin, edit func([]ProviderSession) (
 	if next == nil {
 		next = []ProviderSession{}
 	}
-	if err := p.srv.SetAttributesFrom(origin, map[uint32]any{wpdef.AttrCurrentSessions: spec.List[ProviderSession](next)}); err != nil {
+	keep := func() {
+		p.mu.Lock()
+		p.sessions = next
+		p.mu.Unlock()
+	}
+	if err := specseam.SetAttributesStored(p.srv, origin, map[uint32]any{wpdef.AttrCurrentSessions: spec.List[ProviderSession](next)}, keep); err != nil {
 		return fmt.Errorf("camera: CurrentSessions: %w", err)
 	}
-	p.mu.Lock()
-	p.sessions = next
-	p.mu.Unlock()
 	return nil
 }
 

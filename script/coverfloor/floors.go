@@ -279,6 +279,7 @@ var floors = []packageFloor{
 		why:          "declaration-only seam: an interface and function variables store and controller/client/sqlstore install from their init, so the package holds no statement a test could execute",
 	},
 	{pkg: "thingfabric.dev/go-fabric/internal/sessionseam", min: 0, unmeasurable: true, why: "function variables only: secure/operational installs them, node and the module's test fixtures call them (review II, decisions 159, 160)"},
+	{pkg: "thingfabric.dev/go-fabric/internal/specseam", min: 0, unmeasurable: true, why: "declaration-only seam: a function variable cluster/spec installs from its init, the camera servers call it (PR 1 review M1, decision 682)"},
 	{
 		pkg:          "thingfabric.dev/go-fabric/internal/surfaceseam",
 		min:          0,
