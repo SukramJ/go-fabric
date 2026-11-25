@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10850,
+  "entry_points": 10851,
   "initializers": 372,
   "entry_packages": [
     ".",
@@ -296,9 +296,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28636,
+    "total_exported": 28637,
     "reachable": 22329,
-    "whitelisted": 6285,
+    "whitelisted": 6286,
     "unreachable": 22
   },
   "by_package": [
@@ -409,7 +409,7 @@
       "package": "cluster/core",
       "identifier": "AccessControl.NotifyLocalEntryInstalled",
       "file": "cluster/core/access_control.go",
-      "line": 1680,
+      "line": 1688,
       "kind": "method"
     },
     {
@@ -12852,6 +12852,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/acl_held_c5a_test.go",
       "line": 40
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestAccessControlReadMarkDoesNotOutliveAnEmptyWriteP8G",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_held_c5a_test.go",
+      "line": 124
     },
     {
       "package": "cluster/core",

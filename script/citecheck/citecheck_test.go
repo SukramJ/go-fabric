@@ -179,7 +179,7 @@ import (
 // (fable-read-reg-w1 stale pin (b)) is drift only because its sentence
 // names StatusResponse and the collector finds that name nearest at :999
 // (measured by make cite-report).
-const citecheckDriftRatchet = 411
+const citecheckDriftRatchet = 410
 
 // citecheckOffPinRatchet is the number of line citations checked at a
 // matter.js commit other than the pin: their sentence names that commit
