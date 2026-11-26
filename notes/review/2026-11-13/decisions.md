@@ -1090,3 +1090,21 @@ wave 1 is pull request 1. Rows and their outcome in `phase-7-register.md`
 | 682 | Owner (wizard, recommended) | PR 1 review M1 (`review-pr1-opus.md`): `Provider.change` and `Requestor.change` told the change listeners before `Sessions()` showed the new table — a lost wakeup in the reference daemon's Answer wait (the CI race red). Fixed in the library in Fable's shape (`fable-review-pr1.md` § Opus findings): store → keep the table → notify, as matter.js `Datasource.ts` commit2 makes the values canonical (`:1488`) before `postCommit` emits (`:1520`) at b25ed960, so no refused table is ever visible; the stored step reaches `cluster/spec` through the module-internal seam `internal/specseam.SetAttributesStored`; regression tests from Opus's overlay repro |
 | 683 | Owner (wizard, recommended) | The M1 fix lands in pull request 1 (#615), together with merging `main` (one CI run) |
 | 684 | Owner (wizard, recommended) | PR 1 review lows: Fable L3 / L4 / L5 (cites at b25ed960, the `Assembler` doc) and Opus L3 (bounded `WaitParkedOnMutexA1`) fixed in pull request 1; the behaviour lows go to wave 2 as issues — Fable L1 #618, Fable L2 #619, Opus L1 #620, Opus L2 #621, Opus L4 #622, Opus L5 #623 — with register rows in `phase-7-register.md` § Phase 8 wave 1 |
+| 685 | Owner (wizard, recommended) | C4 mutation runs move to GitHub CI: `script/mutate` (from the review's local sampler) and a `workflow_dispatch` workflow `mutate.yml` that deals a package's files over a runner matrix, with TSV artifacts and a summary job; its own small pull request after #615; then the full repeat of decision 668 by dispatch on #615's merge head |
+
+## 2026-11-26, review II phase 8, wave 2
+
+Wave 2 is pull request 2 (plan `phase-8/plan-wave2.md`, local; its §5
+questions Q-a to Q-e are decisions 686–690). Rows and their outcome in
+`phase-7-register.md` § Phase 8, wave 2.
+
+| # | Subject | Decision |
+| --- | --- | --- |
+| 686 | Owner (wizard, recommended; Q-a) | #620: `Provider.End` removes the session whenever it exists, also without a peer connector, and returns `errors.Join(ErrNoPeerConnector, rerr)`; the `by_design` row of decision 663 extended. As implemented, the error is returned bare when the removal succeeds (fable-diff-b6 Q3) |
+| 687 | Owner (wizard, recommended; Q-b) | #618: fixed in wave 2 — `Assemble` serialises itself (a slot that honours the context), doc "safe for concurrent use, one assembly at a time"; the interim one-goroutine sentence never ships |
+| 688 | Owner (wizard, recommended; Q-c) | Commissioning window precedence everywhere: stopped > blocked > busy, as `adminOpenRefusedLocked` already had; the early checks of `OpenOwnWindow` and `OpenWindow` follow; a CHANGELOG line; B2 owns `bridge/commissioning_window.go` |
+| 689 | Owner (wizard, recommended; Q-d) | N1 (`fable-read-pr1-repair.md`): fixed — the spec seam's `stored` runs under `s.mu` in `storeWith`, doc "runs under the server's lock, must not call the server"; Fable reads the diff |
+| 690 | Owner (wizard, recommended; Q-e) | #622: `AccessControl.NotifyLocalEntryInstalled` deprecated for `NotifyLocalEntryInstalledOn`, removable in `v0.29.0`; README row and CHANGELOG |
+| 691 | Owner (wizard, recommended) | Decision 672's Fable limit does not bind wave 2: Fable's diff reads run right after each unit |
+| 692 | Owner (wizard, recommended) | B2 scope: the 10+1 rows of the C4 CI result (`c4-ci-result.md` §4), a triage of the 74 rows that went from killed to survived (false node kills of run 3, measured in `c4-ci-result.md` §1), and the survivors of `bridge/subscribe_dispatch.go` (shard 10, run locally in Docker because the CI runner died twice); test gaps get tests, equivalents a register reason; two agents split by file |
+| 693 | Owner (wizard, recommended) | `script/mutate` gets an RSS watchdog per mutant run (the `go test` process tree; a flag with a default limit); over the limit the mutant is KILLED with the note "memory". Cause: `subscribe_dispatch.go:229` with its guard off measured 6 GB in 3 s (`w2-b2b.md`), the inferred cause of the shard-10 runner deaths |
