@@ -65,8 +65,12 @@ type ClusterServer interface {
 	// EncodeTLV(*tlv.Encoder, tlv.Tag), as the generated types of
 	// cluster/spec have. A value of another type is encoded as null.
 	//
-	// An EncodeTLV runs once per report, on an encoder of its own: it
-	// writes exactly one element under the tag it is handed. One that
+	// An EncodeTLV runs once for each report that carries the value, on an
+	// encoder of its own (the bridge also runs it, the same way, when it
+	// compares a value for change or logs one), so it may run more than
+	// once for one value: it must be deterministic and free of side
+	// effects. It writes exactly one element under the tag it is handed.
+	// One that
 	// panics, leaves a container open or writes no element or more than
 	// one answers FAILURE (an AttributeStatusIB) for its own path, logged
 	// at ERROR; the rest of the read, the priming report or the
@@ -111,7 +115,8 @@ type ClusterServer interface {
 	//
 	// The response is encoded for the answer once, on an encoder of its
 	// own (a response checked against a hand-written form is written once
-	// more for the check, in the same isolation): one whose encoder panics, leaves a container open or writes other than one
+	// more for the check, in the same isolation), so its encoder must be
+	// deterministic and free of side effects: one whose encoder panics, leaves a container open or writes other than one
 	// element answers FAILURE (a CommandStatusIB on the request's path)
 	// for that command, logged at ERROR, the other commands of the
 	// invoke unaffected. The command has run by then, and nothing undoes
@@ -1134,11 +1139,13 @@ const (
 // out on the subscriptions' own schedule.
 //
 // `data` is the cluster-native event payload (struct, scalar, …). It is
-// encoded once, on the caller's goroutine, before the event is recorded —
-// CPU only, no wait: a payload whose encoder panics, leaves a container
-// open or writes other than one element is not recorded (no event number
-// is consumed, no subscriber hears of it) and is logged at ERROR; the
-// call returns normally.
+// encoded once on the caller's goroutine before the event is recorded —
+// CPU only, no wait; a payload's EncodeTLV must therefore not take a lock
+// the caller holds — and again for each report that carries it, so the
+// encoder must be deterministic and free of side effects. A payload whose
+// encoder panics, leaves a container open or writes other than one
+// element is not recorded (no event number is consumed, no subscriber
+// hears of it) and is logged at ERROR; the call returns normally.
 // `priority` is the priority the event is recorded and reported with. It
 // does not decide when a subscriber is told: an event is reported with
 // the subscription's next report, and it asks for one itself only when
