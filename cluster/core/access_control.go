@@ -97,8 +97,11 @@ type AccessControl struct {
 	// before it lists the fabric's rows and marks the fabric held only if
 	// it did not move: a read that listed rows the fabric's removal took
 	// does not mark the fabric again after its drop cleared the mark
-	// (review II, R5-conc-5004; decision 681). Entries are never deleted,
-	// so an index's count only grows.
+	// (review II, R5-conc-5004; decision 681). An auxiliary
+	// synchronisation notes it the same way for the owed contexts it takes,
+	// and a failed one puts back only those of fabrics whose count did not
+	// move (#619). Entries are never deleted, so an index's count only
+	// grows.
 	aclDropEpoch map[uint8]uint64
 	// changes reports what moves outside a write of this cluster: a
 	// fabric drop's removal of Acl rows and of an Extension entry
@@ -130,6 +133,12 @@ type AccessControl struct {
 	// change, never the node of the command that closes the batch (review
 	// II, R2-P6-conc-1007).
 	auxDeferred map[uint8]context.Context
+	// auxBatchEpochs is the drop epoch (aclDropEpoch) of each fabric whose
+	// request opened a batch, noted at its begin and handed to the
+	// synchronisation that closes the batches, so a fabric dropped while a
+	// batch is open gets no context back from that synchronisation's
+	// failure (#619).
+	auxBatchEpochs map[uint8]uint64
 	// auxOwed records a synchronisation a failed read of the source owes:
 	// the next read of the cluster or the next change runs it
 	// (settleOwedAuxiliary). auxOwedEmit is whether it fires events, and
@@ -659,8 +668,10 @@ func (a *AccessControl) dropFabric(ctx context.Context, fabricIndex uint8) (move
 	a.aclDropEpoch[fabricIndex]++
 	// The context a failed auxiliary change of the fabric left owed goes
 	// with the fabric: an event of a later fabric at the index must not
-	// name its administrator (R4-err-4055).
+	// name its administrator (R4-err-4055). So does the context an open
+	// batch recorded for it (#619).
 	delete(a.auxOwedCtx, fabricIndex)
+	delete(a.auxDeferred, fabricIndex)
 	a.mu.Unlock()
 	if aclHad {
 		// The store is asked under writeMu, as a write asks it; a list that
@@ -760,6 +771,13 @@ func (a *AccessControl) MatterHeldFabrics() []uint8 {
 // [AccessControl.MatterReadFiltered] serves a local read.
 func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 	a.settleOwedAuxiliary(context.Background())
+	return a.readSettled(attrID)
+}
+
+// readSettled is MatterRead after the owed synchronisation was settled:
+// a read settles once, so MatterReadFiltered, which settled already,
+// serves its non-list attributes here (#621).
+func (a *AccessControl) readSettled(attrID uint32) (any, bool) {
 	switch attrID {
 	case accessControlAttrACL, accessControlAttrExtension:
 		// A read without an IM request behind it is a local one and
@@ -820,6 +838,10 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // (SubjectsPerAccessControlEntry, TargetsPerAccessControlEntry,
 // AccessControlEntriesPerFabric, FeatureMap, ClusterRevision) fall
 // through to MatterRead.
+//
+// The read settles an owed auxiliary synchronisation once, before it
+// serves any attribute: the fall-through serves MatterRead's attributes
+// without settling a second time.
 func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	a.settleOwedAuxiliary(ctx)
 	if attrID == accessControlAttrAuxiliaryACL {
@@ -827,7 +849,7 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 		return a.auxiliaryACLRead(ctx, filtered, fabricIndex, false)
 	}
 	if attrID != accessControlAttrACL && attrID != accessControlAttrExtension {
-		return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
+		return a.readSettled(attrID) //nolint:contextcheck // MatterRead's body: the unfiltered cluster-interface read takes no ctx by the Matter cluster-server contract
 	}
 	filtered, fabricIndex, request := im.LookupFabricFilter(ctx)
 	if !request {
@@ -1685,6 +1707,12 @@ func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 // It names no fabric, so the fabric is not marked as holding Acl rows and
 // its removal may go unreported; [AccessControl.NotifyLocalEntryInstalledOn]
 // names it.
+//
+// Deprecated: use [AccessControl.NotifyLocalEntryInstalledOn], which names
+// the fabric the entry was appended to and marks it, so the fabric's
+// removal is reported as the Acl shrinking; NotifyLocalEntryInstalled keeps
+// its behaviour until it goes and is removable in v0.29.0 (review II,
+// P8-PR1-opus-L4, #622, decision 690).
 func (a *AccessControl) NotifyLocalEntryInstalled() { a.dataVersion.Bump() }
 
 // NotifyLocalEntryInstalledOn is [AccessControl.NotifyLocalEntryInstalled]

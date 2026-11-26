@@ -492,7 +492,7 @@ func (g *Groupcast) MatterInvoke(ctx context.Context, cmdID uint32, fields any) 
 	}
 	g.cmdMu.Lock()
 	defer g.cmdMu.Unlock()
-	g.acl.beginAuxiliaryBatch()
+	g.acl.beginAuxiliaryBatch(ctx)
 	defer g.acl.endAuxiliaryBatch(ctx)
 	switch cmdID {
 	case groupcastCmdJoinGroup:
