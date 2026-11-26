@@ -6,6 +6,9 @@
 /reference-controller
 /clustergen
 /devicegen
+# `go build` inside examples/ble-wifi-light drops its binary there; it was
+# committed by mistake in v0.25.0 and v0.26.0.
+/examples/ble-wifi-light/ble-wifi-light
 *.test
 *.out
 

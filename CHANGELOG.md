@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.27.0` (was `v0.26.0`) and are tagged `ble/bluez/v0.27.0`, `ble/esphome/v0.27.0` and `wifi/wpasupplicant/v0.27.0` at this commit; `examples/ble-wifi-light` requires the three at `v0.27.0`. The root `go.mod` and `go.sum` did not change between `v0.26.0` and `v0.27.0`.
+
+### Removed
+
+- `examples/ble-wifi-light/ble-wifi-light`: the example's built binary (57 MB), committed by mistake in `v0.25.0` and updated in `v0.26.0`, is no longer in the tree and is ignored; build it with `go build` in the example's directory.
+
 ## [0.27.0] — 2026-11-26
 
 Review II, phase 8 (decisions 667–694): the C5 follow-up issues #595–#613 (#596's flake count stays open, decision 670) and the pull request 1 review issues #618–#623, in two waves (#615, #626). Correctness and concurrency fixes across the core servers (AccessControl, GroupKeyManagement, OperationalCredentials, NetworkCommissioning), the camera and WebRTC servers, `endpoint`, `node`'s batches, `bridge`, `client/discovery` and `client/peer`, and the nested modules; a panic while a subscription report is built or sent no longer ends the process; mutation sampling on CI (`script/mutate`, `mutate.yml`). No source change required: `make apidiff` reports no incompatible change against `v0.26.0`, here or in the nested modules. Five identifiers are deprecated, each removable in `v0.29.0` — see *Deprecated*. Several calls now refuse input they accepted before — see *Changed*. The nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in a release of their own that requires `v0.27.0`.
