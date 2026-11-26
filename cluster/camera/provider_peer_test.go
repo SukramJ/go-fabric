@@ -99,7 +99,8 @@ func signalProvider(t *testing.T) (*camera.Provider, *fakePeers) {
 }
 
 // TestProviderSignalsNeedAConnector: without a PeerConnector every signal
-// is ErrNoPeerConnector, and End keeps the session.
+// is ErrNoPeerConnector; End removes the session all the same (decision
+// 686, TestProviderEndWithoutConnectorRemovesW2B6).
 func TestProviderSignalsNeedAConnector(t *testing.T) {
 	p, _ := signalProvider(t)
 	p.AttachPeerConnector(nil)
@@ -109,8 +110,8 @@ func TestProviderSignalsNeedAConnector(t *testing.T) {
 	if err := p.End(context.Background(), 5, 0); !errors.Is(err, camera.ErrNoPeerConnector) {
 		t.Fatalf("End: %v", err)
 	}
-	if n := len(p.Sessions()); n != 1 {
-		t.Fatalf("End without a connector removed the session: %d sessions", n)
+	if n := len(p.Sessions()); n != 0 {
+		t.Fatalf("End without a connector kept the session: %d sessions", n)
 	}
 }
 

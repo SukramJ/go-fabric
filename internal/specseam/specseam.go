@@ -21,7 +21,10 @@ import "thingfabric.dev/go-fabric/contract"
 // any because this package must not import cluster/spec)
 // SetAttributesFrom(origin, values) with stored, when not nil, run once
 // the values are stored and before any change listener is told; a Set
-// the server refuses runs nothing. A server that is not a *spec.Server
+// the server refuses runs nothing. stored runs under the server's lock —
+// in the hold that stores the values and queues their notification, so
+// the order holds for a Set that joins an open controller write's commit
+// too — and must not call the server. A server that is not a *spec.Server
 // is an error. Set by cluster/spec's init; nil until that package is
 // linked.
 var SetAttributesStored func(server any, origin contract.Origin, values map[uint32]any, stored func()) error
