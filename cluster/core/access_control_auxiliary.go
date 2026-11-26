@@ -143,7 +143,9 @@ func (a *AccessControl) settleOwedAuxiliary(ctx context.Context) {
 // reported with the earlier failed change's node — and a read of the
 // source that fails owes
 // the whole synchronisation again, its contexts and actor's own fabric's
-// kept, rather than dropping them (review II, R4-err-4055).
+// kept, rather than dropping them (review II, R4-err-4055). The failure is
+// logged at Warn when nothing was owed before the run and at Debug when
+// the run failed to settle a debt already owed (#621).
 func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, deferred map[uint8]context.Context) {
 	a.mu.RLock()
 	src := a.auxSource
@@ -153,19 +155,18 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 	}
 	a.auxSyncMu.Lock()
 	a.mu.Lock()
+	wasOwed := a.auxOwed
 	deferred = mergeAuxContexts(a.auxOwedCtx, deferred)
 	a.auxOwed, a.auxOwedEmit, a.auxOwedCtx = false, false, nil
 	// The drop epoch of each fabric whose context the run holds, noted in
 	// the hold of mu that takes the contexts: a fabric dropped while the
 	// source is read gets no context back from a failure (#619).
-	epochs := a.auxEpochsLocked(deferred, actor)
+	epochs := a.auxEpochsLocked(actor, deferred)
 	a.mu.Unlock()
 	entries, err := src.AuxiliaryACL(ctx, 0)
 	if err != nil {
-		if actor != nil {
-			if _, f, request := im.LookupFabricFilter(actor); request && f != 0 {
-				deferred = mergeAuxContexts(map[uint8]context.Context{f: actor}, deferred)
-			}
+		if f, ok := requestFabricOf(actor); ok {
+			deferred = mergeAuxContexts(map[uint8]context.Context{f: actor}, deferred)
 		}
 		a.mu.Lock()
 		a.auxOwed = true
@@ -173,7 +174,7 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 		a.auxOwedCtx = mergeAuxContexts(a.undroppedLocked(deferred, epochs), a.auxOwedCtx)
 		a.mu.Unlock()
 		a.auxSyncMu.Unlock()
-		a.logger().Warn("matter.access_control.auxiliary_sync", slog.Any("err", err))
+		a.logger().Log(ctx, auxSyncFailLevel(wasOwed), "matter.access_control.auxiliary_sync", slog.Any("err", err))
 		return
 	}
 	next := make(map[uint8][]store.ACLEntry)
@@ -225,17 +226,38 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 	}
 }
 
+// auxSyncFailLevel is the level of a failed synchronisation's log: a debt
+// that starts failing is a Warn; the same debt failing again — at every
+// read of the cluster while the source stays down — is Debug, so a
+// wildcard read or a subscriber's report does not warn per attribute
+// (#621). A run that succeeds settles the debt, and the next failure warns
+// again.
+func auxSyncFailLevel(wasOwed bool) slog.Level {
+	if wasOwed {
+		return slog.LevelDebug
+	}
+	return slog.LevelWarn
+}
+
+// requestFabricOf is the fabric of the request behind actor; false for a
+// nil actor, a context without a request and a session without a fabric.
+func requestFabricOf(actor context.Context) (uint8, bool) {
+	if actor == nil {
+		return 0, false
+	}
+	_, f, request := im.LookupFabricFilter(actor)
+	return f, request && f != 0
+}
+
 // auxEpochsLocked notes the drop epoch (aclDropEpoch) of every fabric
 // deferred names and of actor's own fabric. Called with mu held.
-func (a *AccessControl) auxEpochsLocked(deferred map[uint8]context.Context, actor context.Context) map[uint8]uint64 {
+func (a *AccessControl) auxEpochsLocked(actor context.Context, deferred map[uint8]context.Context) map[uint8]uint64 {
 	out := make(map[uint8]uint64, len(deferred)+1)
 	for f := range deferred {
 		out[f] = a.aclDropEpoch[f]
 	}
-	if actor != nil {
-		if _, f, request := im.LookupFabricFilter(actor); request && f != 0 {
-			out[f] = a.aclDropEpoch[f]
-		}
+	if f, ok := requestFabricOf(actor); ok {
+		out[f] = a.aclDropEpoch[f]
 	}
 	return out
 }

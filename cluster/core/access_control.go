@@ -763,6 +763,13 @@ func (a *AccessControl) MatterHeldFabrics() []uint8 {
 // [AccessControl.MatterReadFiltered] serves a local read.
 func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 	a.settleOwedAuxiliary(context.Background())
+	return a.readSettled(attrID)
+}
+
+// readSettled is MatterRead after the owed synchronisation was settled:
+// a read settles once, so MatterReadFiltered, which settled already,
+// serves its non-list attributes here (#621).
+func (a *AccessControl) readSettled(attrID uint32) (any, bool) {
 	switch attrID {
 	case accessControlAttrACL, accessControlAttrExtension:
 		// A read without an IM request behind it is a local one and
@@ -823,6 +830,10 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // (SubjectsPerAccessControlEntry, TargetsPerAccessControlEntry,
 // AccessControlEntriesPerFabric, FeatureMap, ClusterRevision) fall
 // through to MatterRead.
+//
+// The read settles an owed auxiliary synchronisation once, before it
+// serves any attribute: the fall-through serves MatterRead's attributes
+// without settling a second time.
 func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	a.settleOwedAuxiliary(ctx)
 	if attrID == accessControlAttrAuxiliaryACL {
@@ -830,7 +841,7 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 		return a.auxiliaryACLRead(ctx, filtered, fabricIndex, false)
 	}
 	if attrID != accessControlAttrACL && attrID != accessControlAttrExtension {
-		return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
+		return a.readSettled(attrID) //nolint:contextcheck // MatterRead's body: the unfiltered cluster-interface read takes no ctx by the Matter cluster-server contract
 	}
 	filtered, fabricIndex, request := im.LookupFabricFilter(ctx)
 	if !request {
