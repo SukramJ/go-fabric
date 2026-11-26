@@ -84,7 +84,7 @@ func TestChunkerEncodesEachReportAConstantNumberOfTimes(t *testing.T) {
 	const n = 4000
 	calls := 0
 	c := reportchunk.New(im.ReportData{HasSubscription: true, SubscriptionID: 1}, tcpBudget, tcpBudget, countingWrite(&calls),
-		reportchunk.Slice(smallReports(n)), func() []im.EventReport { return smallEvents(n) })
+		reportchunk.Slice(smallReports(n)), func() []im.EventReport { return smallEvents(n) }, nil)
 	chunks := drain(t, c)
 	if len(chunks) < 2 {
 		t.Fatalf("%d chunks; the test needs several", len(chunks))
@@ -117,7 +117,7 @@ func TestChunkerFillIsTheExactGreedyFill(t *testing.T) {
 			calls := 0
 			write := reportchunk.Writer(countingWrite(&calls))
 			c := reportchunk.New(im.ReportData{HasSubscription: true, SubscriptionID: 7}, budget, 1280, countingWrite(&calls),
-				reportchunk.Slice(reps), func() []im.EventReport { return smallEvents(300) })
+				reportchunk.Slice(reps), func() []im.EventReport { return smallEvents(300) }, nil)
 			chunks := drain(t, c)
 			size := func(rd im.ReportData) int {
 				rd.MoreChunkedMessages, rd.SuppressResponse = false, false
@@ -163,6 +163,6 @@ func BenchmarkChunkerTCPBudget(b *testing.B) {
 	write := countingWrite(&calls)
 	b.ReportAllocs()
 	for b.Loop() {
-		drain(b, reportchunk.New(im.ReportData{HasSubscription: true, SubscriptionID: 1}, tcpBudget, tcpBudget, write, reportchunk.Slice(reps), nil))
+		drain(b, reportchunk.New(im.ReportData{HasSubscription: true, SubscriptionID: 1}, tcpBudget, tcpBudget, write, reportchunk.Slice(reps), nil, nil))
 	}
 }

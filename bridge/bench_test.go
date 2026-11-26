@@ -154,7 +154,7 @@ func BenchmarkChunkInitialReportWildcard(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		c := newReportChunker(im.ReportData{HasSubscription: true, SubscriptionID: 1}, reportChunkPayloadBudget, reportChunkHardCap, sliceAttributeReports(report.Reports), nil)
+		c := newReportChunker(nil, im.ReportData{HasSubscription: true, SubscriptionID: 1}, reportChunkPayloadBudget, reportChunkHardCap, sliceAttributeReports(report.Reports), nil)
 		for {
 			chunk, ok, err := c.Next()
 			if err != nil {

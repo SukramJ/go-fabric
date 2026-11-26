@@ -22,6 +22,7 @@ import (
 	endpointpkg "thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/im"
 	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/internal/reportchunk"
 	"thingfabric.dev/go-fabric/secure/channel"
 	"thingfabric.dev/go-fabric/tlv"
 	"thingfabric.dev/go-fabric/transport/message"
@@ -324,7 +325,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
 	// A plain Read's response suppresses the answer to its last chunk
 	// (see [im.HandleReadRequest]).
-	chunker := newReportChunker(im.ReportData{SuppressResponse: true}, limits.budget, limits.hardCap, attributes, events)
+	chunker := newReportChunker(b.logger, im.ReportData{SuppressResponse: true}, limits.budget, limits.hardCap, attributes, events)
 	chunk, have, err := chunker.Next()
 	if err != nil {
 		debugReplyError(b.logger, "chunk_report", src, err)
@@ -880,7 +881,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 		return nil
 	}
 	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
-	chunks, err := chunkInvokeResponse(resp, limits.budget, limits.hardCap)
+	chunks, err := chunkInvokeResponse(b.logger, req, resp, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "encode_invoke", src, err)
 		return err
@@ -1349,7 +1350,14 @@ func readCluster(_ context.Context, d im.Dispatcher, key invokedCluster) map[uin
 // nothing at all. Found by the CHIP Python harness
 // (TC-IDM-1.4 step 11 batches two commands whose responses exceed one
 // message).
-func chunkInvokeResponse(resp im.InvokeResponse, budget, hardCap int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one
+//
+// Every response is resolved once first, in isolation
+// ([reportchunk.ResolveInvoke]): one whose encoder panics, leaves a
+// container open or writes other than one element is answered FAILURE on
+// req's command path with its CommandRef and logged at ERROR on logger
+// (nil: not logged); the command has run and its effect stays (#625).
+func chunkInvokeResponse(logger *slog.Logger, req im.InvokeRequest, resp im.InvokeResponse, budget, hardCap int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one
+	resp = reportchunk.ResolveInvoke(req, resp, defaultCommandFieldsWriter, invokeEncodeFailureLogger(logger))
 	whole, err := EncodeInvokeResponse(resp)
 	if err != nil {
 		return nil, err

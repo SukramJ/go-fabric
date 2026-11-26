@@ -244,7 +244,7 @@ func (s *server) read(ctx context.Context, x *exchange.Exchange, req im.ReadRequ
 	rctx := s.requestContext(ctx, x, req.FabricFiltered)
 	budget := x.Session().MaxPayloadSize()
 	write := reportchunk.Writer(s.cfg.ValueWriter)
-	chunker := reportchunk.New(im.ReportData{SuppressResponse: true}, budget, budget, write, reportchunk.Reads(im.NewReadReports(rctx, d, req)), nil)
+	chunker := reportchunk.New(im.ReportData{SuppressResponse: true}, budget, budget, write, reportchunk.Reads(im.NewReadReports(rctx, d, req)), nil, s.encodeFailed)
 	for {
 		chunk, ok, err := chunker.Next()
 		if err == nil && !ok {
@@ -365,12 +365,16 @@ func (s *server) invoke(ctx context.Context, x *exchange.Exchange, req im.Invoke
 	if req.SuppressResponse {
 		return im.StatusSuccess
 	}
-	chunks := s.chunkInvokeResponse(resp, x.Session().MaxPayloadSize())
+	// Every response is resolved once, in isolation: one that cannot be
+	// encoded answers FAILURE for its command (#625).
+	resp = reportchunk.ResolveInvoke(req, resp, s.cfg.FieldsWriter, s.invokeEncodeFailed)
+	write := reportchunk.CommandWriter(s.cfg.FieldsWriter)
+	chunks := s.chunkInvokeResponse(resp, x.Session().MaxPayloadSize(), write)
 	for i, chunk := range chunks {
 		last := i == len(chunks)-1
 		chunk.MoreChunkedMessages = !last
 		enc := tlv.NewEncoder()
-		chunk.MarshalTLV(enc, s.cfg.FieldsWriter)
+		chunk.MarshalTLV(enc, write)
 		body, err := enc.Bytes()
 		if err != nil {
 			s.log.Debug("matter.controller.interaction.server.invoke_encode", slog.Any("err", err))
@@ -391,10 +395,10 @@ func (s *server) invoke(ctx context.Context, x *exchange.Exchange, req im.Invoke
 // entry at a time; an entry above the budget on its own becomes a
 // ResourceExhausted status for its path (bridge/receive_dispatch.go
 // chunkInvokeResponse).
-func (s *server) chunkInvokeResponse(resp im.InvokeResponse, budget int) []im.InvokeResponse {
+func (s *server) chunkInvokeResponse(resp im.InvokeResponse, budget int, write im.CommandFieldsWriter) []im.InvokeResponse {
 	size := func(r im.InvokeResponse) int {
 		enc := tlv.NewEncoder()
-		r.MarshalTLV(enc, s.cfg.FieldsWriter)
+		r.MarshalTLV(enc, write)
 		b, _ := enc.Bytes()
 		return len(b)
 	}
@@ -460,4 +464,25 @@ func (s *server) sendStatus(ctx context.Context, x *exchange.Exchange, status im
 	if err := x.Send(ctx, im.OpcodeStatusResponse, body, exchange.SendOptions{ExpectAckOnly: true}); err != nil {
 		s.log.Debug("matter.controller.interaction.server.status_send", slog.Any("err", err))
 	}
+}
+
+// encodeFailed logs a value the chunker could not encode: its path answers
+// FAILURE and the rest of the read goes out ([reportchunk.EncodeFailure];
+// #625).
+func (s *server) encodeFailed(f reportchunk.EncodeFailure) {
+	s.log.Error("matter.controller.interaction.server.encode_failed",
+		slog.Int("endpoint", int(f.AttributePath.Endpoint)),
+		slog.Uint64("cluster", uint64(f.AttributePath.Cluster)),
+		slog.Uint64("attribute", uint64(f.AttributePath.Attribute)),
+		slog.Any("err", f.Err))
+}
+
+// invokeEncodeFailed logs a command response that could not be encoded:
+// the command answers FAILURE ([reportchunk.ResolveInvoke]; #625).
+func (s *server) invokeEncodeFailed(f reportchunk.InvokeFailure) {
+	s.log.Error("matter.controller.interaction.server.invoke_encode_failed",
+		slog.Int("endpoint", int(f.Path.Endpoint)),
+		slog.Uint64("cluster", uint64(f.Path.Cluster)),
+		slog.Uint64("command", uint64(f.Path.Command)),
+		slog.Any("err", f.Err))
 }

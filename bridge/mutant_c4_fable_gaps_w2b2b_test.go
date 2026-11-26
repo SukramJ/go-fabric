@@ -147,8 +147,7 @@ func TestPrimingReportsAStatusWhateverItsVersionW2B2b(t *testing.T) {
 }
 
 // openContainersW2B2b is a host attribute value whose EncodeTLV leaves
-// two structures open: the report it is in cannot be encoded
-// (tlv.Encoder.Bytes refuses an open container).
+// two structures open (tlv.Encoder.Bytes refuses an open container).
 type openContainersW2B2b struct{}
 
 func (openContainersW2B2b) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
@@ -198,9 +197,13 @@ func (c *udpLikeConnW2B2b) sentCount() int {
 
 // TestPrimingReportThatCannotBeEncodedIsNoSubscriptionW2B2b: a priming
 // report one of whose values cannot be encoded — in the first chunk or in
-// a later one — fails the Subscribe; no subscription is established and
-// no SubscribeResponse goes out. Kills subscribe_dispatch.go:683 and
-// :761 (guard off (err)).
+// a later one — failed the Subscribe before #625 (no subscription, no
+// SubscribeResponse; the test killed subscribe_dispatch.go:683 and :761,
+// guard off (err)). Since #625 the chunker encodes each value in
+// isolation and answers the failing one FAILURE for its path: the
+// priming goes out in full, the SubscribeResponse follows and the
+// subscription is established. A value can no longer make the chunker
+// fail, so the two guards are defensive.
 func TestPrimingReportThatCannotBeEncodedIsNoSubscriptionW2B2b(t *testing.T) {
 	t.Parallel()
 	const cluster = uint32(0xFFF6)
@@ -223,24 +226,26 @@ func TestPrimingReportThatCannotBeEncodedIsNoSubscriptionW2B2b(t *testing.T) {
 	}
 	for i, tc := range []struct {
 		paths  []im.ConcreteAttributePath
-		chunks int // priming chunks sent before the failure
+		chunks int // priming chunks: the two large values fit no chunk together
 	}{
-		{[]im.ConcreteAttributePath{attr(2)}, 0},                   // the first chunk fails (:683)
-		{[]im.ConcreteAttributePath{attr(0), attr(1), attr(2)}, 1}, // the first goes out, the next fails (:761)
+		{[]im.ConcreteAttributePath{attr(2)}, 1},                   // the failing value in the first chunk (:683)
+		{[]im.ConcreteAttributePath{attr(0), attr(1), attr(2)}, 2}, // the failing value in a later one (:761)
 	} {
 		exchange := uint16(0x5700 + i)
 		c := &udpLikeConnW2B2b{b: b, exchange: exchange}
 		hdr := &message.Header{SessionID: paseTestSessionID, MessageCounter: uint32(300 + i)}
 		proto := message.ProtocolHeader{ProtocolID: im.InteractionModelProtocolID, Opcode: im.OpcodeSubscribeRequest, ExchangeID: exchange, Initiator: true}
 		err := b.handleSubscribeRequest(context.Background(), &connRoute{conn: c}, hdr, proto, im.SubscribeRequest{AttributeRequests: tc.paths, MaxIntervalCeiling: 60})
-		if err == nil {
-			t.Errorf("case %d: a priming report that cannot be encoded returned no error", i)
+		if err != nil {
+			t.Errorf("case %d: a priming report with a value that cannot be encoded failed: %v", i, err)
 		}
-		if n := mgr.Active(); n != 0 {
-			t.Errorf("case %d: mgr.Active() = %d, want 0", i, n)
+		// A Subscribe without KeepSubscriptions replaces the peer's earlier
+		// one: one subscription after each case.
+		if n := mgr.Active(); n != 1 {
+			t.Errorf("case %d: mgr.Active() = %d, want 1", i, n)
 		}
-		if got := c.sentCount(); got != tc.chunks {
-			t.Errorf("case %d: %d datagrams sent, want %d priming chunk(s) and no SubscribeResponse", i, got, tc.chunks)
+		if got := c.sentCount(); got != tc.chunks+1 {
+			t.Errorf("case %d: %d datagrams sent, want %d priming chunk(s) and the SubscribeResponse", i, got, tc.chunks)
 		}
 	}
 }

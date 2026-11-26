@@ -31,7 +31,11 @@ import (
 // one — which a JavaScript value does not have.
 type attributeReading struct {
 	// wire is the value as [defaultAttributeValueWriter] writes it; nil
-	// when the encoder failed.
+	// when the encoder failed ([encodeValueIsolated]: it panicked, left a
+	// container open or wrote other than one element). Two failing
+	// readings then compare by raw, so a value that always fails is no
+	// change on every tick, and the chunker's FAILURE for its path (with
+	// its log line) is not repeated per tick (#625).
 	wire []byte
 	// raw is the Go value with its outer pointers followed, compared
 	// with [reflect.DeepEqual] when the wire form cannot tell two values
@@ -46,9 +50,7 @@ func readingOf(v im.AttributeValue) attributeReading {
 	if !v.IsNull {
 		r.raw = derefValue(v.Value)
 	}
-	enc := tlv.NewEncoder()
-	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), v)
-	if out, err := enc.Bytes(); err == nil {
+	if out, err := encodeValueIsolated(v); err == nil {
 		r.wire = out
 	}
 	return r

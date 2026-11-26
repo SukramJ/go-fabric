@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/internal/valueenc"
 	"thingfabric.dev/go-fabric/tlv"
 )
 
@@ -88,9 +89,10 @@ func (i *Instance) writtenResponse(req, resp *Command, response any, write im.Co
 	if write == nil || response == nil || resp.Decode == nil {
 		return reflect.Value{}, false, nil
 	}
-	enc := tlv.NewEncoder()
-	write(enc, tlv.AnonymousTag(), response)
-	raw, err := enc.Bytes()
+	// In isolation ([valueenc.Encode]): a writer that panics here is
+	// contained, and the response it cannot write answers FAILURE when the
+	// response is encoded (#625).
+	raw, err := valueenc.Encode(func(enc *tlv.Encoder, tag tlv.Tag) { write(enc, tag, response) })
 	if err != nil || len(raw) == 0 {
 		return reflect.Value{}, false, nil //nolint:nilerr // a response the written bytes do not decode is not judged further; its types and constraints are not the response check's
 	}
