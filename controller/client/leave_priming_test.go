@@ -5,7 +5,6 @@ package client_test
 
 import (
 	"testing"
-	"time"
 
 	"thingfabric.dev/go-fabric/controller/client"
 	"thingfabric.dev/go-fabric/fabrictest"
@@ -21,18 +20,18 @@ import (
 // the node it had just commissioned — the default subscription never
 // came up again (issue #628, the CI failure of TestClientNodeParity's
 // leave-event case). The gate holds the reaction until the subscription
-// is active, the interleaving that run had.
+// is active, the interleaving that run had. It waits under the site's
+// quiet protocol; the held reaction is counted work, so the site logs that
+// it moves on without it after its hold budget (fabrictest site.go).
 func TestLeaveOfPrimingReportReactedLate(t *testing.T) {
 	t.Parallel()
 	site := quietSite(t)
 	p := site.UncommissionedPair(fabrictest.PairOptions{})
 	reg := p.Controller.Registry()
 	held := make(chan bool, 1)
+	ctx := parityCtx(t)
 	client.SetLeaveGate(reg, func(n *client.Node) {
-		deadline := time.Now().Add(30 * time.Second)
-		for !n.SubscriptionActive() && time.Now().Before(deadline) {
-			time.Sleep(time.Millisecond)
-		}
+		_ = site.Eventually(ctx, "the default subscription, the Leave reaction held", n.SubscriptionActive)
 		select {
 		case held <- n.SubscriptionActive():
 		default:
@@ -44,7 +43,7 @@ func TestLeaveOfPrimingReportReactedLate(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	n, err := p.Controller.CommissionNode(parityCtx(t), p.Device, client.CommissionOptions{})
+	n, err := p.Controller.CommissionNode(ctx, p.Device, client.CommissionOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +52,7 @@ func TestLeaveOfPrimingReportReactedLate(t *testing.T) {
 		if !active {
 			t.Fatal("the subscription did not become active while the reaction was held")
 		}
-	case <-time.After(time.Minute):
+	case <-ctx.Done():
 		t.Fatal("no Leave reaction ran")
 	}
 	client.WaitRegistry(reg)
