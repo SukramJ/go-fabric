@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"thingfabric.dev/go-fabric/cluster/camera"
 	"thingfabric.dev/go-fabric/cluster/spec"
@@ -272,5 +273,27 @@ func TestProviderSessionBoundsThroughTheFacade(t *testing.T) {
 		if _, err := newWith(CameraType(), testOptions("negative"), streams(), decl); !errors.Is(err, camera.ErrNegativeMaxSessions) {
 			t.Fatalf("%+v: %v, want ErrNegativeMaxSessions", decl, err)
 		}
+	}
+	// Issue #634 (decisions 702, 711): EvictIdle and EvictAcrossFabrics
+	// reach the kit — with a bound of one and an EvictIdle of a
+	// nanosecond, the second ProvideOffer evicts the first session
+	// instead of being refused — and a negative EvictIdle is refused.
+	d, err := newWith(CameraType(), testOptions("evicting"), streams(), wpdef.Declare{
+		ProviderPort: boundProvider{}, MaxSessions: 1, EvictIdle: time.Nanosecond, EvictAcrossFabrics: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := d.Server(wpdef.ClusterID).(*camera.Provider)
+	for i := range 2 {
+		if err := offer(p); err != nil {
+			t.Fatalf("ProvideOffer %d with EvictIdle: %v", i+1, err)
+		}
+	}
+	if ids := p.Sessions(); len(ids) != 1 || ids[0].Id != 1 {
+		t.Fatalf("CurrentSessions %+v, want session 1 alone", ids)
+	}
+	if _, err := newWith(CameraType(), testOptions("negative-evict"), streams(), wpdef.Declare{ProviderPort: boundProvider{}, EvictIdle: -time.Second}); !errors.Is(err, camera.ErrNegativeEvictIdle) {
+		t.Fatalf("negative EvictIdle: %v, want ErrNegativeEvictIdle", err)
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"thingfabric.dev/go-fabric/cluster/spec"
 	"thingfabric.dev/go-fabric/contract"
+	"time"
 )
 
 // State is the typed state of the WebRtcTransportProvider cluster: one field per attribute
@@ -253,7 +254,8 @@ type OfferArgs struct {
 // The server bounds sessions by the
 // id space and by Declare's MaxSessions and MaxSessionsPerFabric;
 // a further bound is the port's (RESOURCE_EXHAUSTED). The server
-// ends sessions on EndSession, on the host's RemoveSession, with
+// ends sessions on EndSession, on the host's RemoveSession, at a
+// bound with Declare's EvictIdle (EndSession with OutOfResources), with
 // their fabric and, in a node, when the node proved the requestor
 // lost (Provider.EndLostPeer) — not when a CASE session closes; the
 // media plane's evidence stays the port's. The host counts the
@@ -337,6 +339,27 @@ type Declare struct {
 	// bound; a negative bound is refused when the device builds the
 	// kit's server.
 	MaxSessionsPerFabric int
+	// EvictIdle, when positive, lets a new session at a bound take the
+	// place of the accessing fabric's entry whose signalling is oldest,
+	// once that is at least EvictIdle old (cluster/camera
+	// ProviderConfig.EvictIdle): the entry leaves CurrentSessions, the
+	// port's EndSession and the requestor's End both carry
+	// OutOfResources, and the offer goes on. Idle is signalling-idle,
+	// not abandonment: a fabric at its bound loses its oldest
+	// established view to its own next offer once that view is older
+	// than EvictIdle. 0 evicts nothing; a negative value is refused
+	// when the device builds the kit's server; without a bound it is
+	// inert.
+	EvictIdle time.Duration
+	// EvictAcrossFabrics extends EvictIdle to a fair share across
+	// fabrics (cluster/camera ProviderConfig.EvictAcrossFabrics): at
+	// MaxSessions, a fabric holding fewer entries than its share —
+	// MaxSessions divided by the fabrics holding an entry, the
+	// accessing one included, at most MaxSessionsPerFabric — takes the
+	// place of the longest-idle entry of a fabric over its share; an
+	// entry within its fabric's share is never ended by another
+	// fabric. Inert without EvictIdle and MaxSessions.
+	EvictAcrossFabrics bool
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
 	// list. The hooks above go on it; Initial, Features, the ports and the

@@ -141,18 +141,26 @@ func newZonesServer(b defaultBuild) (contract.ClusterServer, error) {
 // newProviderServer is the module's WebRtcTransportProvider server
 // ([camera.NewProvider]) on the declared ProviderPort, against the
 // device's CameraAvStreamManagement server, with the declared session
-// bounds (issue #590, decision 619); a negative bound is the server's
-// [camera.ErrNegativeMaxSessions] and fails the build — judged before
-// the port, so it is refused without one too (issue #600).
+// bounds (issue #590, decision 619) and the eviction at them (issue #634,
+// decisions 702 and 711); a negative bound is the server's
+// [camera.ErrNegativeMaxSessions], a negative EvictIdle its
+// [camera.ErrNegativeEvictIdle], and either fails the build — judged
+// before the port, so it is refused without one too (issue #600).
 func newProviderServer(b defaultBuild) (contract.ClusterServer, error) {
 	d, _ := b.ports.(wpdef.Declare)
 	if d.MaxSessions < 0 || d.MaxSessionsPerFabric < 0 {
 		return nil, fmt.Errorf("webrtc transport provider: %w: MaxSessions %d, MaxSessionsPerFabric %d", camera.ErrNegativeMaxSessions, d.MaxSessions, d.MaxSessionsPerFabric)
 	}
+	if d.EvictIdle < 0 {
+		return nil, fmt.Errorf("webrtc transport provider: %w: %v", camera.ErrNegativeEvictIdle, d.EvictIdle)
+	}
 	if d.ProviderPort == nil {
 		return nil, notServed(fmt.Errorf("webrtc transport provider: %w", errNoPort))
 	}
-	cfg := camera.ProviderConfig{Port: d.ProviderPort, MaxSessions: d.MaxSessions, MaxSessionsPerFabric: d.MaxSessionsPerFabric, Logger: b.logger}
+	cfg := camera.ProviderConfig{
+		Port: d.ProviderPort, MaxSessions: d.MaxSessions, MaxSessionsPerFabric: d.MaxSessionsPerFabric,
+		EvictIdle: d.EvictIdle, EvictAcrossFabrics: d.EvictAcrossFabrics, Logger: b.logger,
+	}
 	if av, ok := b.sibling(csdef.ClusterID).(*camera.AvStream); ok {
 		cfg.Streams = av
 	}
