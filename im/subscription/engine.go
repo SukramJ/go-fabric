@@ -5,6 +5,8 @@ package subscription
 
 import (
 	"context"
+	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -108,10 +110,38 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 			defer started.Done()
 			defer m.inflight.Leave(inflight.SubscriptionPending)
 			defer sub.endReport()
+			defer m.recoverReport(sub)
 			work()
 		}()
 	}
 	return started
+}
+
+// recoverReport is the backstop of a report's goroutine, the tick's and
+// the flush's ([Manager.flush]): a panic while the report is built or
+// sent — host code runs there, a host value's EncodeTLV and the
+// attribute reads behind it — is logged at ERROR with
+// the subscription id, the panic value and a stack, and the report is
+// dropped. The subscription stays open and reports again on its next
+// change or send interval; the deferred bookkeeping of the goroutine
+// (endReport, the inflight count, the wait groups)
+// runs after it as on a normal return. Without it, the panic ended the
+// process (review II, phase 8 decision 694).
+//
+// Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts
+// :530-532 at b25ed9604f: #triggerSendUpdate ends #sendUpdate's promise in
+// `.catch(error => logger.warn("Sending subscription update failed:",
+// error))` — the update is dropped, the subscription is not closed.
+func (m *Manager) recoverReport(sub *Subscription) {
+	r := recover()
+	if r == nil {
+		return
+	}
+	m.logger.Error("im.subscription.report_panic",
+		slog.Uint64("subscription_id", uint64(sub.ID)),
+		slog.Int("fabric_index", int(sub.FabricIndex)),
+		slog.Any("panic", r),
+		slog.String("stack", string(debug.Stack())))
 }
 
 // dueReport drains what sub has due at now and returns the report to send
