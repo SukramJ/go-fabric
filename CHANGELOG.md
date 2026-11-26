@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `cluster/camera`, `device`: eviction at the WebRTC session bounds, opt-in (#634, decisions 702–711). `ProviderConfig.EvictIdle` (`webrtctransportproviderdef.Declare.EvictIdle` through the facade): a new session at a bound — ProvideOffer or SolicitOffer — takes the place of the accessing fabric's entry whose accepted signalling (either direction) is oldest, once that is at least `EvictIdle` old; the entry leaves CurrentSessions, the port's `EndSession` and the requestor's `End` both carry OutOfResources, and the offer goes on. Only one eviction per offer and only when it makes room; without a `PeerConnector` or with the End queue full the entry goes without an End. Idle is signalling-idle: a fabric at its bound loses its oldest established view to its own next offer. `ProviderConfig.EvictAcrossFabrics` (`Declare.EvictAcrossFabrics`) adds a fair share: at `MaxSessions`, a fabric under its share (`MaxSessions` over the fabrics holding an entry, at most `MaxSessionsPerFabric`) takes the longest-idle entry of a fabric over its share first; an entry within its fabric's share is never ended by another fabric. Both default off — 0 and false keep the previous behaviour; a negative `EvictIdle` is `camera.ErrNegativeEvictIdle`. connectedhomeip's camera app and matter.js evict nothing (`notes/parity/by_design.md`).
+
 ### Changed
 
 - CI (`chiptool.yml`, issue 632): a release pull request in release shape — documentation plus, in the nested modules' and the examples' `go.mod`, only `require` lines of `thingfabric.dev/go-fabric…` modules that the same `go.mod` replaces with a local path (no `go.sum`, `replace` or other line) — no longer runs the chip-tool legs, the Go-TH groups or the certification families (`long` included): `certification families (long) on the base commit` requires one nightly or dispatched run on the pull request's base commit in which every one of them passed, and the gate accepts those verdicts for this class only. `nested modules against the versions they require` and `ci.yml` run in full; any other change runs everything.
@@ -18,6 +22,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `cluster/camera`: `Provider.End` for a session another removal takes between its lookup and its own removal — the requestor's EndSession, `RemoveSession`, now an eviction — sends no End and returns `ErrUnknownSession`; before, the requestor could be told twice (#634).
 - `controller/client`: a BasicInformation Leave event the device still held from before commissioning, delivered in the default subscription's priming report, could delete the node right after it was commissioned. The registry's Leave reaction runs after the report's hooks, on a goroutine of its own; when it ran only after the subscription became established it saw an active subscription and took the stale Leave as the peer leaving. Whether the subscription was active is now read when the report arrives, and a Leave counts only when it was active then and still is. The ShutDown and StartUp reactions had the same window — a ShutDown of the priming report handled late gave up every session with the device, the new subscription's included — and take the same check, as does a decommission's watch for the Leave that confirms the removal (#628).
 
 ### Removed

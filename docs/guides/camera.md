@@ -407,7 +407,53 @@ bound of 5 ([Limits](limits.md#camera)). The Ends wait behind one sender
 in a queue of at most the bound and have no deadline of their own: the
 `PeerConnector`'s response timeouts bound them. A full queue, or no
 `PeerConnector`, makes `SolicitOffer` answer `RESOURCE_EXHAUSTED`.
-Sessions the host sets are never refused, and nothing is evicted.
+Sessions the host sets are never refused.
+
+**Eviction at a bound.** By default nothing is evicted. With
+`ProviderConfig.EvictIdle` set (`Declare.EvictIdle` through the facade),
+a new session at a bound takes the place of the accessing fabric's
+entry whose signalling is oldest, once that is at least `EvictIdle`
+old: the entry leaves CurrentSessions, the port's `EndSession` and the
+requestor's `End` both carry OutOfResources, and the offer goes on.
+Signalling is a session's accepted signalling in either direction — its
+commit, an accepted re-offer, `ProvideAnswer` or `ProvideICECandidates`,
+and the camera's `Offer`, `Answer` and `IceCandidates`; a host's row
+counts from its `UpsertSession`. Only a new session evicts (a re-offer
+never does), one entry per offer, and only when that one makes room: a
+table the host's rows hold over the bound is refused as without
+eviction. Without a `PeerConnector`, or with the End queue full, the
+entry goes without an `End`. Another fabric's entry is never taken.
+
+Idle here is signalling-idle, not abandonment: a live view signals
+nothing once it is up. With `EvictIdle` set, a fabric at its bound
+loses its **oldest established view** to its own next offer once that
+view is older than `EvictIdle` — replacement within the fabric, not the
+detection of a dead session. A fabric's live views that each re-offer
+can take turns evicting each other; the value bounds how often. The
+cost of a controller that abandons a view without `EndSession` and
+stays on Matter — it is never proven lost — is what the option exists
+for. Below 30 s, connectedhomeip's timeout for a session that never
+connected, a session still being set up can be taken; a camera run
+against the certification cases keeps 0, or a value longer than the
+run.
+
+`ProviderConfig.EvictAcrossFabrics` (`Declare.EvictAcrossFabrics`)
+adds a fair share across fabrics; it acts only with `EvictIdle` and
+`MaxSessions` set. A fabric's share is `MaxSessions` divided by the
+number of fabrics holding an entry, the accessing one included, at
+least 1 and at most `MaxSessionsPerFabric`. At `MaxSessions`, a fabric
+holding fewer entries than its share takes the place of the
+longest-idle entry, idle for `EvictIdle`, of a fabric holding more than
+its share; without one, the fabric's own rule above applies. An entry
+within its fabric's share is never ended by another fabric. The entries
+beyond a share are borrowed, and one of them may be another
+administrator's view that is being watched. The share moves with the
+fabrics holding entries — commissioned fabrics that hold none do not
+count — so a fabric's protected count shrinks when another fabric first
+offers; a fabric over its share has the own-fabric rule only and cannot
+take a slot back. With 8 sessions and 4 per fabric, two fabrics never
+cross (the share is 4); a third fabric's offers bring the table to
+3, 3 and 2.
 
 **Which evidence is whose.** WebRTC media does not travel over the
 Matter session, so a viewer idle on Matter — no subscription, signalling

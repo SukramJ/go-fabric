@@ -141,7 +141,11 @@ func (p *Provider) IceCandidates(ctx context.Context, sessionID uint16, candidat
 // reached at all (decisions 654, 663) — also on a provider no
 // [PeerConnector] was attached to, which sends nothing and returns
 // [ErrNoPeerConnector] (decision 686). The command's error is returned,
-// joined with the removal's when the table refused the shorter one.
+// joined with the removal's when the table refused the shorter one. A
+// session another removal takes first — the requestor's EndSession,
+// RemoveSession, an eviction at a bound ([ProviderConfig.EvictIdle]) —
+// is that removal's to end: End then sends nothing and returns
+// [ErrUnknownSession], so the requestor is told once.
 //
 // chip's camera app sends End without waiting for its response
 // (SendEndCommand :1301-1329, InvokeCommandRequest with logging
