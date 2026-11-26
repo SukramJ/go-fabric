@@ -92,3 +92,59 @@ func TestReportSenderPanicDropsTheReportNotTheProcessW2B10(t *testing.T) {
 	// The goroutine's wg / reporting flag were released: Stop returns.
 	m.Stop()
 }
+
+// TestFlushSenderPanicDropsTheFlushNotTheProcessW2B10: the flush of a
+// session's subscriptions runs the same sender on a goroutine of its own;
+// a panic there is the same backstop's — logged at ERROR, the flush
+// report dropped, the subscription kept and reporting on its next change,
+// Stop returning. Red before the backstop: the test binary dies.
+func TestFlushSenderPanicDropsTheFlushNotTheProcessW2B10(t *testing.T) {
+	t.Parallel()
+	logs := &lockedBufferW2B10{}
+	logger := slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	m := subscription.NewManager(subscription.Config{}, nil, logger)
+
+	var mu sync.Mutex
+	var flushes, reports int
+	m.SetReportSender(func(_ context.Context, _ *subscription.Subscription, r subscription.Report) subscription.ReportOutcome {
+		mu.Lock()
+		defer mu.Unlock()
+		if r.Flush {
+			flushes++
+			panic("host encoder left a container open")
+		}
+		reports++
+		return subscription.Sent
+	})
+	args := defaultArgs()
+	sub, err := m.Subscribe(args)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	ctx := context.Background()
+
+	m.OnAttributeChanged(mkPath(1, 0x0006, 0x0000))
+	m.FlushSession(ctx, args.SessionID)
+
+	line := logs.String()
+	if !strings.Contains(line, "level=ERROR") ||
+		!strings.Contains(line, "msg=im.subscription.report_panic") ||
+		!strings.Contains(line, "subscription_id="+strconv.FormatUint(uint64(sub.ID), 10)) ||
+		!strings.Contains(line, `panic="host encoder left a container open"`) {
+		t.Fatalf("log after the flush panic = %q, want one ERROR im.subscription.report_panic with subscription_id and panic", line)
+	}
+	if sub.IsClosed() {
+		t.Fatal("the subscription was closed by the flush panic, want it kept")
+	}
+
+	m.OnAttributeChanged(mkPath(1, 0x0006, 0x0000))
+	m.Tick(ctx, time.Now().Add(2*time.Second))
+	mu.Lock()
+	gotFlushes, gotReports := flushes, reports
+	mu.Unlock()
+	if gotFlushes != 1 || gotReports != 1 {
+		t.Fatalf("flushes = %d, reports = %d; want 1 and 1: the subscription reports again after the dropped flush", gotFlushes, gotReports)
+	}
+
+	m.Stop()
+}

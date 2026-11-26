@@ -895,6 +895,7 @@ func (m *Manager) flush(ctx context.Context, match func(*Subscription) bool) {
 			defer wg.Done()
 			defer m.inflight.Leave(inflight.SubscriptionPending)
 			defer sub.endReport()
+			defer m.recoverReport(sub)
 			send(ctx, sub, Report{Events: events, Paths: dirty, Flush: true})
 		}()
 	}
