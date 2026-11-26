@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"runtime/debug"
 
 	"thingfabric.dev/go-fabric/tlv"
@@ -29,14 +30,60 @@ import (
 // tagged element: none, two or more, or one under another tag.
 var ErrNotOneElement = errors.New("valueenc: the encoder did not write exactly one anonymous element")
 
-// ErrPanic reports an encoder that panicked; the error carries the panic
-// value and the stack.
+// ErrPanic reports an encoder that panicked. The error is a
+// [*PanicError]: its message names the panic value's type and, for a
+// runtime error, the runtime's message; any other panic value is withheld
+// ("(redacted)"), because a host encoder's panic may carry the value it
+// was writing. The stack is a field, for a log at DEBUG.
 var ErrPanic = errors.New("valueenc: the encoder panicked")
+
+// PanicError is the [ErrPanic] of one recovered panic.
+type PanicError struct {
+	// Type is the panic value's Go type.
+	Type string
+	// Message is a runtime error's message, at most [maxPanicMessage]
+	// bytes; "(redacted)" for any other panic value.
+	Message string
+	// Stack is the goroutine's stack where the panic was recovered.
+	Stack []byte
+}
+
+// maxPanicMessage bounds [PanicError.Message].
+const maxPanicMessage = 160
+
+// Error names the type and the bounded message, never the stack.
+func (e *PanicError) Error() string {
+	return fmt.Sprintf("%s: %s: %s", ErrPanic, e.Type, e.Message)
+}
+
+// Is makes a PanicError match [ErrPanic].
+func (e *PanicError) Is(target error) bool { return target == ErrPanic }
+
+// PanicStack is err's stack when err is a [*PanicError], else nil.
+func PanicStack(err error) []byte {
+	var pe *PanicError
+	if errors.As(err, &pe) {
+		return pe.Stack
+	}
+	return nil
+}
+
+// newPanicError is the [*PanicError] of the recovered value r.
+func newPanicError(r any) *PanicError {
+	msg := "(redacted)"
+	if re, ok := r.(runtime.Error); ok {
+		msg = re.Error()
+		if len(msg) > maxPanicMessage {
+			msg = msg[:maxPanicMessage]
+		}
+	}
+	return &PanicError{Type: fmt.Sprintf("%T", r), Message: msg, Stack: debug.Stack()}
+}
 
 // Encode runs write on a fresh encoder and returns the one anonymous TLV
 // element it wrote. write must write its value under the tag it is handed
 // ([tlv.AnonymousTag]). It fails when write panics (the panic is
-// recovered; [ErrPanic], with the stack), when it leaves a container open
+// recovered; [ErrPanic], a [*PanicError]), when it leaves a container open
 // ([tlv.ErrUnbalancedContainer]), and when what it wrote is not exactly
 // one complete, anonymously tagged element ([ErrNotOneElement]). A surplus
 // EndContainer writes nothing on an encoder of its own ([tlv.Encoder]
@@ -63,7 +110,9 @@ func Encode(write func(enc *tlv.Encoder, tag tlv.Tag)) (element []byte, err erro
 func run(write func(enc *tlv.Encoder, tag tlv.Tag), enc *tlv.Encoder) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%w: %v\n%s", ErrPanic, r, debug.Stack())
+			pe := newPanicError(r)
+			notePanic(r, pe)
+			err = pe
 		}
 	}()
 	write(enc, tlv.AnonymousTag())

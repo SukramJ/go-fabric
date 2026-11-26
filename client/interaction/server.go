@@ -14,6 +14,7 @@ import (
 	"thingfabric.dev/go-fabric/cluster/wire"
 	"thingfabric.dev/go-fabric/im"
 	"thingfabric.dev/go-fabric/internal/reportchunk"
+	"thingfabric.dev/go-fabric/internal/valueenc"
 	"thingfabric.dev/go-fabric/tlv"
 )
 
@@ -468,21 +469,38 @@ func (s *server) sendStatus(ctx context.Context, x *exchange.Exchange, status im
 
 // encodeFailed logs a value the chunker could not encode: its path answers
 // FAILURE and the rest of the read goes out ([reportchunk.EncodeFailure];
-// #625).
+// #625). The error at ERROR, a panic's stack at DEBUG ([s.logEncodeFailure]).
 func (s *server) encodeFailed(f reportchunk.EncodeFailure) {
-	s.log.Error("matter.controller.interaction.server.encode_failed",
+	if f.IsEvent {
+		s.logEncodeFailure("matter.controller.interaction.server.encode_failed", f.Err,
+			slog.Int("endpoint", int(f.EventPath.Endpoint)),
+			slog.Uint64("cluster", uint64(f.EventPath.Cluster)),
+			slog.Uint64("event", uint64(f.EventPath.Event)))
+		return
+	}
+	s.logEncodeFailure("matter.controller.interaction.server.encode_failed", f.Err,
 		slog.Int("endpoint", int(f.AttributePath.Endpoint)),
 		slog.Uint64("cluster", uint64(f.AttributePath.Cluster)),
-		slog.Uint64("attribute", uint64(f.AttributePath.Attribute)),
-		slog.Any("err", f.Err))
+		slog.Uint64("attribute", uint64(f.AttributePath.Attribute)))
+}
+
+// logEncodeFailure logs the path and the error at ERROR and, for a panic,
+// its stack at DEBUG: a value that fails on every read puts no stack into
+// the log at the default level, and the error names a panic value's type,
+// never the value ([valueenc.PanicError]).
+func (s *server) logEncodeFailure(msg string, err error, path ...slog.Attr) {
+	ctx := context.Background()
+	s.log.LogAttrs(ctx, slog.LevelError, msg, append(path, slog.Any("err", err))...)
+	if stack := valueenc.PanicStack(err); stack != nil {
+		s.log.LogAttrs(ctx, slog.LevelDebug, msg, append(path, slog.String("stack", string(stack)))...)
+	}
 }
 
 // invokeEncodeFailed logs a command response that could not be encoded:
 // the command answers FAILURE ([reportchunk.ResolveInvoke]; #625).
 func (s *server) invokeEncodeFailed(f reportchunk.InvokeFailure) {
-	s.log.Error("matter.controller.interaction.server.invoke_encode_failed",
+	s.logEncodeFailure("matter.controller.interaction.server.invoke_encode_failed", f.Err,
 		slog.Int("endpoint", int(f.Path.Endpoint)),
 		slog.Uint64("cluster", uint64(f.Path.Cluster)),
-		slog.Uint64("command", uint64(f.Path.Command)),
-		slog.Any("err", f.Err))
+		slog.Uint64("command", uint64(f.Path.Command)))
 }

@@ -23,7 +23,9 @@ type badValue string
 func writeOrFail(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
 	if b, ok := v.Value.(badValue); ok && !v.IsNull {
 		if b == "panic" {
-			panic("encoder bug")
+			const p = "encoder bug"
+			valueenc.ExpectPanic(p)
+			panic(p)
 		}
 		enc.StartArray(tag)
 		enc.PutUint(tlv.AnonymousTag(), 1)

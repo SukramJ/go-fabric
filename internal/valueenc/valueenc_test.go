@@ -18,6 +18,8 @@ import (
 // produces; every other outcome is an error and nothing else.
 func TestEncode(t *testing.T) {
 	t.Parallel()
+	valueenc.ExpectPanic("host bug")
+	valueenc.ExpectPanic("tlv: context tag inside Array container (tag=0); use AnonymousTag()")
 	good := func(enc *tlv.Encoder, tag tlv.Tag) {
 		enc.StartStruct(tag)
 		enc.PutUint(tlv.ContextTag(0), 7)
@@ -78,7 +80,41 @@ func TestEncode(t *testing.T) {
 		})
 	}
 	_, err = valueenc.Encode(func(*tlv.Encoder, tlv.Tag) { panic("host bug") })
-	if msg := err.Error(); !strings.Contains(msg, "host bug") || !strings.Contains(msg, "goroutine") {
-		t.Fatalf("panic error without its value and stack: %q", msg)
+	if msg := err.Error(); strings.Contains(msg, "host bug") || !strings.Contains(msg, "string: (redacted)") || strings.Contains(msg, "goroutine") {
+		t.Fatalf("panic error %q, want the type, the value withheld and no stack", msg)
 	}
+	if st := valueenc.PanicStack(err); !strings.Contains(string(st), "goroutine") {
+		t.Fatalf("panic error without its stack: %q", st)
+	}
+	// A runtime error keeps the runtime's own message.
+	_, err = valueenc.Encode(func(*tlv.Encoder, tlv.Tag) {
+		var m map[string]int
+		m["x"] = 1
+	})
+	valueenc.ForgetUnexpectedPanics(1) // provoked on purpose; a runtime error cannot be declared by value
+	if msg := err.Error(); !errors.Is(err, valueenc.ErrPanic) || !strings.Contains(msg, "assignment to entry in nil map") {
+		t.Fatalf("runtime panic error %q, want the runtime's message", msg)
+	}
+	if valueenc.PanicStack(errors.New("x")) != nil {
+		t.Fatal("a stack for an error that is no panic")
+	}
+}
+
+// TestTripwireCountsUndeclaredPanics: a contained panic no test declared
+// is counted, a declared one is not ([valueenc.UnexpectedPanics]).
+func TestTripwireCountsUndeclaredPanics(t *testing.T) {
+	valueenc.ExpectPanic("host bug")
+	before, _ := valueenc.UnexpectedPanics()
+	_, _ = valueenc.Encode(func(*tlv.Encoder, tlv.Tag) { panic("host bug") })
+	if n, _ := valueenc.UnexpectedPanics(); n != before {
+		t.Fatalf("a declared panic was counted: %d, want %d", n, before)
+	}
+	type undeclared struct{ n int }
+	_, _ = valueenc.Encode(func(*tlv.Encoder, tlv.Tag) { panic(undeclared{1}) })
+	_, _ = valueenc.Encode(func(*tlv.Encoder, tlv.Tag) { panic([]int{1}) }) // not comparable
+	n, last := valueenc.UnexpectedPanics()
+	if n != before+2 || !strings.Contains(last, "goroutine") {
+		t.Fatalf("undeclared panics counted %d (want %d), last %q", n, before+2, last)
+	}
+	valueenc.ForgetUnexpectedPanics(n - before)
 }

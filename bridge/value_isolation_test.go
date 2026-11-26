@@ -15,6 +15,7 @@ import (
 	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/im"
 	"thingfabric.dev/go-fabric/im/subscription"
+	"thingfabric.dev/go-fabric/internal/valueenc"
 	"thingfabric.dev/go-fabric/mdns"
 	"thingfabric.dev/go-fabric/tlv"
 	"thingfabric.dev/go-fabric/transport/message"
@@ -40,7 +41,9 @@ func (v failingValueW625) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 		enc.StartStruct(tag)
 		enc.StartList(tlv.ContextTag(0))
 	case "panic":
-		panic("host encoder bug")
+		const p = "host encoder bug"
+		valueenc.ExpectPanic(p)
+		panic(p)
 	case "zero elements":
 	case "two elements":
 		enc.PutUint(tag, 1)

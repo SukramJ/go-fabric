@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"context"
 	"log/slog"
 
 	"thingfabric.dev/go-fabric/im"
@@ -25,44 +26,55 @@ func encodeValueIsolated(v im.AttributeValue) ([]byte, error) {
 
 // reportEncodeFailureLogger is the chunker's hook for a value it could not
 // encode ([reportchunk.EncodeFailure]): the path answers FAILURE, and the
-// log names it at ERROR — the controller sees only the status. A nil
-// logger is no hook.
+// log names it at ERROR — the controller sees only the status
+// ([logEncodeFailure]). A nil logger is no hook.
 func reportEncodeFailureLogger(logger *slog.Logger) func(reportchunk.EncodeFailure) {
 	if logger == nil {
 		return nil
 	}
 	return func(f reportchunk.EncodeFailure) {
 		if f.IsEvent {
-			logger.Error("matter.event.encode_failed",
+			logEncodeFailure(logger, "matter.event.encode_failed", f.Err,
 				slog.Int("endpoint", int(f.EventPath.Endpoint)),
 				slog.Uint64("cluster", uint64(f.EventPath.Cluster)),
 				slog.Uint64("event", uint64(f.EventPath.Event)),
-				slog.String("status", im.StatusFailure.String()),
-				slog.Any("err", f.Err))
+				slog.String("status", im.StatusFailure.String()))
 			return
 		}
-		logger.Error("matter.attribute.encode_failed",
+		logEncodeFailure(logger, "matter.attribute.encode_failed", f.Err,
 			slog.Int("endpoint", int(f.AttributePath.Endpoint)),
 			slog.Uint64("cluster", uint64(f.AttributePath.Cluster)),
 			slog.Uint64("attribute", uint64(f.AttributePath.Attribute)),
-			slog.String("status", im.StatusFailure.String()),
-			slog.Any("err", f.Err))
+			slog.String("status", im.StatusFailure.String()))
 	}
 }
 
 // invokeEncodeFailureLogger is [reportchunk.ResolveInvoke]'s hook for a
 // command response it could not encode: the command answers FAILURE, and
-// the log names it at ERROR. A nil logger is no hook.
+// the log names it at ERROR ([logEncodeFailure]). A nil logger is no hook.
 func invokeEncodeFailureLogger(logger *slog.Logger) func(reportchunk.InvokeFailure) {
 	if logger == nil {
 		return nil
 	}
 	return func(f reportchunk.InvokeFailure) {
-		logger.Error("matter.command.encode_failed",
+		logEncodeFailure(logger, "matter.command.encode_failed", f.Err,
 			slog.Int("endpoint", int(f.Path.Endpoint)),
 			slog.Uint64("cluster", uint64(f.Path.Cluster)),
 			slog.Uint64("command", uint64(f.Path.Command)),
-			slog.String("status", im.StatusFailure.String()),
-			slog.Any("err", f.Err))
+			slog.String("status", im.StatusFailure.String()))
+	}
+}
+
+// logEncodeFailure logs a value that could not be encoded: the path and the
+// error at ERROR, once per occurrence, and — for a panic — its stack at
+// DEBUG, so a value that fails on every Read does not put a stack into the
+// log at the default level. The error names a panic value's type, never
+// the value ([valueenc.PanicError]: a host encoder's panic may carry what
+// it was writing, which log_redact would have redacted).
+func logEncodeFailure(logger *slog.Logger, msg string, err error, path ...slog.Attr) {
+	ctx := context.Background()
+	logger.LogAttrs(ctx, slog.LevelError, msg, append(path, slog.Any("err", err))...)
+	if stack := valueenc.PanicStack(err); stack != nil {
+		logger.LogAttrs(ctx, slog.LevelDebug, msg, append(path, slog.String("stack", string(stack)))...)
 	}
 }

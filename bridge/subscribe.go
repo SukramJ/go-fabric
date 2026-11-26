@@ -585,11 +585,10 @@ func (b *Bridge) reportEventsWith(ctx context.Context, sub *subscription.Subscri
 func (b *Bridge) EmitEvent(endpoint uint16, cluster, event uint32, data any, priority contract.EventPriority) {
 	if data != nil {
 		if _, err := encodeValueIsolated(im.AttributeValue{Value: data}); err != nil {
-			b.logger.Error("matter.event.encode_failed",
+			logEncodeFailure(b.logger, "matter.event.encode_failed", err,
 				slog.Int("endpoint", int(endpoint)),
 				slog.Uint64("cluster", uint64(cluster)),
-				slog.Uint64("event", uint64(event)),
-				slog.Any("err", err))
+				slog.Uint64("event", uint64(event)))
 			return
 		}
 	}
