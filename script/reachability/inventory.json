@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10944,
+  "entry_points": 10954,
   "initializers": 373,
   "entry_packages": [
     ".",
@@ -297,9 +297,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28716,
+    "total_exported": 28726,
     "reachable": 22331,
-    "whitelisted": 6363,
+    "whitelisted": 6373,
     "unreachable": 22
   },
   "by_package": [
@@ -1684,6 +1684,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCASEInitiatorRefusesAFailureReportAfterSigma3AR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 206
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCASEInitiatorRefusesAFailureStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/initiated_handshake_peer_test.go",
@@ -1744,6 +1751,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
       "line": 733
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCaseAdapterWithoutStatedParamsHasNoneAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 338
     },
     {
       "package": "bridge",
@@ -4299,6 +4313,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
       "line": 484
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestEstablishFormerSubscriptionNeedsADispatcherAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 316
     },
     {
       "package": "bridge",
@@ -6969,6 +6990,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRecheckPASECloseWithoutADeferredCloseSchedulesNothingAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 293
+    },
+    {
+      "package": "bridge",
       "identifier": "TestReconciledLeavesOutAValueThatCannotBeCompared",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/uncomparable_r4_test.go",
@@ -7113,6 +7141,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
       "line": 171
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReleaseCASEHandshakeEverywhereSkipsANilConnRouteAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 159
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReleaseHandshakeOnANilConnRouteAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 149
     },
     {
       "package": "bridge",
@@ -7638,6 +7680,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_report_test.go",
       "line": 411
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRootNotifierWithoutReportableAttributesAdvancesTheVersionAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 122
     },
     {
       "package": "bridge",
@@ -8859,6 +8908,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubscriptionTargetOfANilRouteIsNoneAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 86
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubscriptionTerminated_StartsTheFabricsReconnect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_end_reconnect_test.go",
@@ -9083,6 +9139,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTrackingTheSameMessageAgainIsNoRefusalAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 350
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTriggerSessionReannounce_ReconnectEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
@@ -9213,6 +9276,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/unencodable_value_test.go",
       "line": 23
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestUnencodableValueNamesHowItIsServedAR630",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_ar630_test.go",
+      "line": 45
     },
     {
       "package": "bridge",
