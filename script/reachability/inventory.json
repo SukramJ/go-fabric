@@ -1,7 +1,7 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10954,
-  "initializers": 373,
+  "entry_points": 10968,
+  "initializers": 374,
   "entry_packages": [
     ".",
     "bdx",
@@ -240,6 +240,7 @@
     "internal/reportchunk",
     "internal/serialqueue",
     "internal/sessionseam",
+    "internal/valueenc",
     "internal/valuejson",
     "logring",
     "mdns",
@@ -297,9 +298,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28726,
-    "reachable": 22331,
-    "whitelisted": 6373,
+    "total_exported": 28741,
+    "reachable": 22339,
+    "whitelisted": 6380,
     "unreachable": 22
   },
   "by_package": [
@@ -715,6 +716,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bench_test.go",
       "line": 78
+    },
+    {
+      "package": "bridge",
+      "identifier": "BenchmarkChunkInitialReportWildcard",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bench_test.go",
+      "line": 141
     },
     {
       "package": "bridge",
@@ -2164,6 +2172,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/invoke_chunk_test.go",
       "line": 80
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkInvokeResponseRunsTheWriterOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_isolation_test.go",
+      "line": 380
     },
     {
       "package": "bridge",
@@ -4225,6 +4240,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestEmitEventWithAPayloadThatCannotBeEncodedW625",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_isolation_test.go",
+      "line": 419
+    },
+    {
+      "package": "bridge",
       "identifier": "TestEmitFabricRemovedContextClosesTheFabricsSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_removed_sessions_test.go",
@@ -5107,10 +5129,31 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestHostEncoderFailureCostsItsCommandW625",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_isolation_test.go",
+      "line": 319
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHostEncoderFailureCostsItsPathOnReadW625",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_isolation_test.go",
+      "line": 206
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHostEncoderFailureCostsItsPathOnSubscribeW625",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_isolation_test.go",
+      "line": 239
+    },
+    {
+      "package": "bridge",
       "identifier": "TestHostEncoderPanicInOngoingReportKeepsTheNodeW2B10",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/report_panic_w2b10_test.go",
-      "line": 79
+      "line": 83
     },
     {
       "package": "bridge",
@@ -6566,7 +6609,7 @@
       "identifier": "TestPrimingReportThatCannotBeEncodedIsNoSubscriptionW2B2b",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/mutant_c4_fable_gaps_w2b2b_test.go",
-      "line": 204
+      "line": 207
     },
     {
       "package": "bridge",
@@ -6854,6 +6897,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_path_node_parity_matterjs_test.go",
       "line": 145
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReadEventWhosePayloadFailsAtReportTimeW625",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/value_isolation_test.go",
+      "line": 459
     },
     {
       "package": "bridge",

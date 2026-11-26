@@ -184,15 +184,13 @@ func checkFailedAttributeW625(t *testing.T, what string, reports []im.AttributeR
 	}
 }
 
-// waitLogW625 waits for want in the captured log.
+// waitLogW625 checks want is in the captured log. The failure is logged
+// before the message that carries its status is sent, so the log holds it
+// once the peer has seen that message.
 func waitLogW625(t *testing.T, logs *logSinkW2B10, want string) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for !strings.Contains(logs.String(), want) {
-		if time.Now().After(deadline) {
-			t.Fatalf("log lacks %q; log = %q", want, logs.String())
-		}
-		time.Sleep(10 * time.Millisecond)
+	if !strings.Contains(logs.String(), want) {
+		t.Fatalf("log lacks %q; log = %q", want, logs.String())
 	}
 }
 
