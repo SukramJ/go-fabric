@@ -384,7 +384,7 @@ func (r *Registry) storeReportedFabricIndex(n *Node, fabricIndex uint8) {
 }
 
 // leaveLatch is the decommission's watch for the peer's leave event
-// (CommissioningClient.ts:380-391).
+// (CommissioningClient.ts:426-437 at b25ed960).
 type leaveLatch struct {
 	fabricIndex uint8
 	seen        atomic.Bool
@@ -392,12 +392,15 @@ type leaveLatch struct {
 
 // noteLeave is the latch's listener: a leave of the fabric index being
 // removed, while the subscription is active, confirms the removal
-// (:384-390).
-func (r *Registry) noteLeave(n *Node, fabricIndex uint8) {
+// (:430-436, the guard :433). matter.js's listener runs inside the
+// report's awaited emit, so a Leave of the priming report finds the
+// subscription inactive; live — whether it was active when the report
+// arrived — gives the Go listener the same answer (onLeave).
+func (r *Registry) noteLeave(n *Node, fabricIndex uint8, live bool) {
 	r.mu.Lock()
 	l := r.leaves[n]
 	r.mu.Unlock()
-	if l != nil && l.fabricIndex == fabricIndex && n.SubscriptionActive() {
+	if l != nil && l.fabricIndex == fabricIndex && live && n.SubscriptionActive() {
 		l.seen.Store(true)
 	}
 }

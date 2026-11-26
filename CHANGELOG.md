@@ -17,7 +17,7 @@ pseudo-version of `main`.
 
 ### Fixed
 
-- `controller/client`: a BasicInformation Leave event the device still held from before commissioning, delivered in the default subscription's priming report, could delete the node right after it was commissioned. The registry's Leave reaction runs after the report's hooks, on a goroutine of its own; when it ran only after the subscription became established it saw an active subscription and took the stale Leave as the peer leaving. Whether the subscription was active is now read when the report arrives, and a Leave counts only when it was active then and still is (#628).
+- `controller/client`: a BasicInformation Leave event the device still held from before commissioning, delivered in the default subscription's priming report, could delete the node right after it was commissioned. The registry's Leave reaction runs after the report's hooks, on a goroutine of its own; when it ran only after the subscription became established it saw an active subscription and took the stale Leave as the peer leaving. Whether the subscription was active is now read when the report arrives, and a Leave counts only when it was active then and still is. The ShutDown and StartUp reactions had the same window — a ShutDown of the priming report handled late gave up every session with the device, the new subscription's included — and take the same check, as does a decommission's watch for the Leave that confirms the removal (#628).
 
 ### Removed
 

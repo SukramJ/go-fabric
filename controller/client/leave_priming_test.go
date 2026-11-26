@@ -6,6 +6,7 @@ package client_test
 import (
 	"testing"
 
+	"thingfabric.dev/go-fabric/cluster/spec/basicinformation"
 	"thingfabric.dev/go-fabric/controller/client"
 	"thingfabric.dev/go-fabric/fabrictest"
 	"thingfabric.dev/go-fabric/node"
@@ -30,7 +31,10 @@ func TestLeaveOfPrimingReportReactedLate(t *testing.T) {
 	reg := p.Controller.Registry()
 	held := make(chan bool, 1)
 	ctx := parityCtx(t)
-	client.SetLeaveGate(reg, func(n *client.Node) {
+	client.SetReactionGate(reg, func(n *client.Node, event uint32) {
+		if event != basicinformation.EventLeave {
+			return
+		}
 		_ = site.Eventually(ctx, "the default subscription, the Leave reaction held", n.SubscriptionActive)
 		select {
 		case held <- n.SubscriptionActive():
