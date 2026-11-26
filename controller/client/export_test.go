@@ -178,12 +178,20 @@ func PatchRemoveFabric(r *Registry, fn func(fabricIndex uint8, invoke func(fabri
 	}
 }
 
+// SetLeaveGate sets the test seam every Leave reaction of r calls before
+// it runs.
+func SetLeaveGate(r *Registry, gate func(*Node)) {
+	r.mu.Lock()
+	r.leaveGate = gate
+	r.mu.Unlock()
+}
+
 // EmitLeave delivers a BasicInformation Leave event of fabricIndex to r as
-// n's subscription does (onEvent) and waits for the reaction it starts —
+// n's established subscription does (onEvent) and waits for the reaction it starts —
 // matter.js's leave.emit on the peer's BasicInformationClient events
 // (DecommissionTest.ts:239 at b25ed960).
 func EmitLeave(r *Registry, n *Node, fabricIndex uint8) {
-	r.onEvent(n, 0, basicinformation.ClusterID, basicinformation.EventLeave, basicinformation.LeaveEvent{FabricIndex: fabricIndex})
+	r.onEvent(n, 0, basicinformation.ClusterID, basicinformation.EventLeave, basicinformation.LeaveEvent{FabricIndex: fabricIndex}, true)
 	r.work.Wait()
 }
 

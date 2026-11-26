@@ -24,8 +24,10 @@ import (
 // onEvent dispatches a root BasicInformation event: StartUp, ShutDown,
 // Leave (basicinformation.EventStartUp 0, EventShutDown 1, EventLeave 2).
 // A Leave first reaches a decommission's latch
-// (CommissioningClient.ts:383-391).
-func (r *Registry) onEvent(n *Node, endpoint uint16, cluster, event uint32, value any) {
+// (CommissioningClient.ts:383-391). live is whether the default
+// subscription was active when the report carrying the event arrived
+// (Node.deliveryLive).
+func (r *Registry) onEvent(n *Node, endpoint uint16, cluster, event uint32, value any, live bool) {
 	if endpoint != 0 || cluster != basicinformation.ClusterID {
 		return
 	}
@@ -36,7 +38,15 @@ func (r *Registry) onEvent(n *Node, endpoint uint16, cluster, event uint32, valu
 			return
 		}
 		r.noteLeave(n, idx)
-		r.goWork(func() { r.onLeave(n, idx) })
+		r.mu.Lock()
+		gate := r.leaveGate
+		r.mu.Unlock()
+		r.goWork(func() {
+			if gate != nil {
+				gate(n)
+			}
+			r.onLeave(n, idx, live)
+		})
 	case basicinformation.EventShutDown:
 		r.goWork(func() { r.onShutdown(n) })
 	case basicinformation.EventStartUp:
@@ -101,7 +111,15 @@ func (r *Registry) fabricForDescriptor(f fabricDescriptor) *commissioner.Fabric 
 // be stale and is ignored (:812-824); then the peer has left: the node is
 // decommissioned (:826-827), its sessions given up (:828-832) and the node
 // deleted (:833).
-func (r *Registry) onLeave(n *Node, fabricIndex uint8) {
+//
+// live is whether the subscription was active when the event's report
+// arrived. The reaction runs on a goroutine of its own, after the report's
+// hooks ran on the node's job queue, so a Leave of the priming report can
+// reach the check below after the subscription became established; read
+// then, the subscription is active and the stale Leave would delete the
+// node it was just commissioned as (issue #628). The leave counts only
+// when the subscription was active at both points.
+func (r *Registry) onLeave(n *Node, fabricIndex uint8, live bool) {
 	if n.isClosing() {
 		return
 	}
@@ -130,7 +148,7 @@ func (r *Registry) onLeave(n *Node, fabricIndex uint8) {
 	if local := r.fabricForDescriptor(*entry); local == nil || local.FabricIndex != addr.FabricIndex {
 		return
 	}
-	if !n.SubscriptionActive() {
+	if !live || !n.SubscriptionActive() {
 		r.log.Info("matter.controller.client.registry.leave_ignored", slog.String("node", n.ID()))
 		return
 	}

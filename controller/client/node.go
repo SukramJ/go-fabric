@@ -32,6 +32,14 @@ type Node struct {
 	// jobs runs subscription reports' store writes and hooks off their
 	// exchanges, in order (applyDeferred).
 	jobs *jobQueue
+	// deliveryLive is whether the default subscription was active when
+	// the report whose hooks run now arrived (applyWith): the hooks run
+	// on jobs, after the report, so the subscription may have become
+	// active since — a priming report's events are delivered once it is
+	// established. Set by deliver for its emissions, read by the
+	// registry's reactions on the same goroutine (onEvent); the job queue
+	// runs one delivery at a time.
+	deliveryLive atomic.Bool
 	// finalFlush is set while the store's final flush of a Stop whose
 	// context ended is queued on jobs and has not begun.
 	finalFlush atomic.Bool
@@ -206,7 +214,7 @@ func newNode(cfg Config) (*Node, error) {
 		n.saveSettingsLocked()
 	}
 	n.s.recordedFabricFiltered = n.settings.cacheFabricFiltered
-	n.deliver(n.s.takeEmissions())
+	n.deliver(n.s.takeEmissions(), false)
 	n.backfillFabricIndexOnPeer()
 	return n, nil
 }
@@ -239,6 +247,9 @@ func (n *Node) applyDeferred(sc scope, r *Report, emitEvents bool, in *epoch) {
 }
 
 func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool, in *epoch) {
+	// Whether the report arrived on an established subscription is read
+	// now, as it arrives, not when its hooks run (deliveryLive).
+	live := n.SubscriptionActive()
 	n.mu.Lock()
 	before := n.configurationVersionsLocked()
 	icdBefore := n.icdModeLocked()
@@ -254,7 +265,7 @@ func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool, in *epo
 	icdAfter := n.icdModeLocked()
 	job := func() {
 		n.persist.write(saves)
-		n.deliverApplied(em, icdBefore != icdAfter, changed)
+		n.deliverApplied(em, live, icdBefore != icdAfter, changed)
 	}
 	// The job takes its place in the queue under the lock, so two applies
 	// that run concurrently write and deliver in the order they changed
@@ -276,8 +287,8 @@ func (n *Node) applyWith(sc scope, r *Report, emitEvents, deferred bool, in *epo
 // deliverApplied runs the hooks of one applied report: the structure's
 // emissions, the ICD operating-mode change and the endpoints whose
 // ConfigurationVersion moved.
-func (n *Node) deliverApplied(em []emission, icdChanged bool, changed []*Endpoint) {
-	n.deliver(em)
+func (n *Node) deliverApplied(em []emission, live, icdChanged bool, changed []*Endpoint) {
+	n.deliver(em, live)
 	n.backfillFabricIndexOnPeer()
 	// IcdManagementClient.operatingMode$Changed (IcdClient.ts:118-123).
 	if n.icd != nil && icdChanged {
@@ -362,8 +373,11 @@ func (n *Node) IntervalBounds(floor, ceiling *time.Duration) (minFloor, maxCeili
 	return intervalBounds(n.Properties(), floor, ceiling, n.rand, n.log)
 }
 
-// deliver runs the hooks of what the structure emitted, in order.
-func (n *Node) deliver(em []emission) {
+// deliver runs the hooks of what the structure emitted, in order; live is
+// whether the default subscription was active when the report arrived
+// (deliveryLive).
+func (n *Node) deliver(em []emission, live bool) {
+	n.deliveryLive.Store(live)
 	h := n.cfg.Hooks
 	for i := range em {
 		e := &em[i]
