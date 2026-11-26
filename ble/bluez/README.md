@@ -27,6 +27,12 @@ defer radio.(io.Closer).Close()
 cfg.Network.GATT = radio // node.Config
 ```
 
+`NewPeripheralWithOptions(bluez.PeripheralOptions{Adapter: "hci0", Logger: log})`
+adds a logger (nil is `slog.Default()`) for the registrations the peripheral
+repeats on its own — Warn on the first refusal and on each change of the
+error, Info once it held — and for the adapter's `Powered` edges (Warn off,
+Info on).
+
 ```go
 central, err := bluez.NewCentral("hci0") // "" is hci0
 if err != nil {
@@ -61,6 +67,7 @@ The sequence is matter.js's (`packages/nodejs-ble/src/NobleBleClient.ts`,
 | GATT | the `org.bluez.GattService1` with the Matter UUID; its `GattCharacteristic1` C1 (`WriteValue`, type `request`), C2 (`StartNotify`, values as `PropertiesChanged` of `Value`), C3 (`ReadValue`, optional) |
 | ATT_MTU | C1's `MTU` property (BlueZ 5.62 and later): above 23 at discovery it is the exchange's result; 23 waits up to 2 s for its `PropertiesChanged` (the exchange landing, reported as `ble.MTUExchange`), then the BTP minimum; no property is the BTP minimum at once |
 | disconnect | `StopNotify` on C2, `org.bluez.Device1.Disconnect` (each bounded by 5 s); `Connected=false` or the device's removal ends the connection |
+| `Close` | `org.bluez.Device1.Disconnect` for every connection and every connect in flight, concurrently, each bounded, errors ignored, before the bus is released |
 
 The peripheral's plumbing follows connectedhomeip's Linux platform
 (`src/platform/Linux/bluez/` at the harness pin), since matter.js's
@@ -74,7 +81,7 @@ for what goes on the air (`BlenoBleServer.ts`, `BleAdvertisement.ts`):
 | the subscription and indications | `AcquireNotify` on C2: a socket pair, each indication one packet; the confirmation a byte 1 on the socket (BlueZ 5.80 and later) or C2's `Confirm` (up to 5.73); the socket's end is the unsubscription |
 | the advertisement | an `org.bluez.LEAdvertisement1` (`Type` peripheral, `ServiceUUIDs` `fff6`, `ServiceData`, `Discoverable`, `LocalName` `MATTER-<discriminator>`, `MinInterval` = `MaxInterval`); `LEAdvertisingManager1.RegisterAdvertisement`, later changes as `PropertiesChanged`, `UnregisterAdvertisement` |
 | disconnect | `org.bluez.Device1.Disconnect`; `Connected=false` or the device's removal ends the connection |
-| the adapter leaving and coming back | `InterfacesRemoved` of the adapter (`Adapter1`, `GattManager1`, `LEAdvertisingManager1`) marks the advertisement and the application unregistered, without a call; `InterfacesAdded` unregisters what the peripheral believes held, registers the application of a registered or served service again, then the advertisement of the last `Advertise` — retried, the pause doubling from 1 s to 30 s, until it holds; no advertisement before the application. A signal naming `GattManager1` alone covers the application, `LEAdvertisingManager1` alone the advertisement; what a signal owes is kept until it is done, so a later signal naming one manager never drops the other's. `Adapter1.Powered` is not followed |
+| the adapter leaving and coming back | each side follows its own manager. `InterfacesRemoved` naming `GattManager1` marks the application unregistered, `LEAdvertisingManager1` the advertisement, `Adapter1` both, without a call. `InterfacesAdded` naming `GattManager1` unregisters what the peripheral believes held and registers the application of a registered or served service again; naming `LEAdvertisingManager1`, the advertisement of the last `Advertise` — retried, the pause doubling from 1 s to 30 s, until it holds; no advertisement before the application. An addition naming `Adapter1` alone owes nothing. What a signal owes is kept until it is done, so a later signal naming one manager never drops the other's; while a manager is absent the peripheral registers nothing again on its own. `Adapter1.Powered` is logged (see above) and never written; the registrations do not follow it |
 
 bluetoothd keeps the adapter: unlike bleno's HCI user channel, the
 peripheral shares it with every other BlueZ client.
