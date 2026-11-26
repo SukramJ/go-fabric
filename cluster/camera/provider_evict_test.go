@@ -390,9 +390,8 @@ func TestProviderEvictActivity(t *testing.T) {
 		r.port.mu.Lock()
 		r.port.err = errors.New("stack down")
 		r.port.mu.Unlock()
-		if _, err := r.p.MatterInvoke(a, wpdef.CmdProvideAnswer, wpdef.ProvideAnswerRequest{WebRtcSessionId: first, Sdp: "v=0"}); err == nil {
-			t.Fatal("ProvideAnswer the port fails: accepted")
-		}
+		_, err = r.p.MatterInvoke(a, wpdef.CmdProvideAnswer, wpdef.ProvideAnswerRequest{WebRtcSessionId: first, Sdp: "v=0"})
+		wantCode(t, "ProvideAnswer the port fails", statusOf(err), im.StatusFailure)
 		r.port.mu.Lock()
 		r.port.err = nil
 		r.port.mu.Unlock()
