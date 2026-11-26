@@ -116,6 +116,10 @@ var areaKeys = []string{
 	"built_at", "discovery", "instead_of", "superseded", "transport", "vendors",
 	// ble/esphome (brief BP1): the proxy, its advertisement and its link.
 	"encrypted", "feature_flags", "note", "proxy", "rssi", "silent",
+	// ble/bluez (#610, decision 678): the peripheral's adapter object path and,
+	// at its Powered edge, whether an advertisement is registered and a
+	// service registered or served.
+	"adapter", "advertising", "serving",
 	"status_name", "statuses", "step", "stored", "stored_fabrics", "subject",
 	"subsystem", "supported", "suppress_response",
 	"sw_version", "system_mode", "target", "targets", "tcp", "test", "timed", "timeout",
