@@ -48,9 +48,9 @@ type Radio struct {
 	serving bool
 	// registered: a RegisterService whose Serve has not returned.
 	registered bool
-	// changed, when not nil, is closed once serving starts or a
-	// registration ends: a connect held between RegisterService and
-	// Serve looks again.
+	// changed, when not nil, is closed once serving starts or ends, a
+	// registration ends or the advertisement stops: a connect held
+	// between RegisterService and Serve, and an AwaitOff, look again.
 	changed chan struct{}
 	accept  func(contract.BLEConnection)
 	c3      []byte
@@ -112,6 +112,7 @@ func (r *Radio) StopAdvertising(context.Context) error {
 		r.stops++
 	}
 	r.adv = nil
+	r.wakeLocked()
 	r.mu.Unlock()
 	return nil
 }
@@ -171,6 +172,7 @@ func (r *Radio) serve(ctx context.Context, c3 []byte, accept func(contract.BLECo
 	r.serving, r.accept, r.c3 = false, nil, nil
 	links := r.links
 	r.links = nil
+	r.wakeLocked()
 	r.mu.Unlock()
 	r.acceptMu.Unlock()
 	for _, l := range links {
@@ -234,11 +236,42 @@ func matterServiceData(data []byte) ([]byte, bool) {
 	return nil, false
 }
 
-// wakeLocked releases every connect held for the service; r.mu is held.
+// wakeLocked releases every connect held for the service and every
+// [Radio.AwaitOff]; r.mu is held. A waiter looks again at what it waits
+// for, so a wake that changed nothing it waits for costs one look.
 func (r *Radio) wakeLocked() {
 	if r.changed != nil {
 		close(r.changed)
 		r.changed = nil
+	}
+}
+
+// AwaitOff returns once the node is off the radio — it neither serves
+// nor has registered the Matter GATT service and runs no advertisement —
+// at once when it is off already, otherwise when it leaves, bounded by ctx.
+// A node leaves the radio on its own schedule, not in step with what a
+// central observes (a closed channel), so a test that asserts it left
+// waits here instead of reading [Radio.Serving] and [Radio.Advertising]
+// once.
+func (r *Radio) AwaitOff(ctx context.Context) error {
+	for {
+		r.mu.Lock()
+		if !r.serving && !r.registered && r.adv == nil {
+			r.mu.Unlock()
+			return nil
+		}
+		if r.changed == nil {
+			r.changed = make(chan struct{})
+		}
+		changed := r.changed
+		serving, registered, advertising := r.serving, r.registered, r.adv != nil
+		r.mu.Unlock()
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return fmt.Errorf("bletest: waiting for the node to leave the radio (serving %v, registered %v, advertising %v): %w",
+				serving, registered, advertising, ctx.Err())
+		}
 	}
 }
 
