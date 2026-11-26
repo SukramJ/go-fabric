@@ -159,7 +159,13 @@ func (p *Provider) End(ctx context.Context, sessionID uint16, reason uint8) erro
 	if !found {
 		return targetErr(peers, sessionID)
 	}
-	rerr := p.removeSession(contract.OriginHostSet, sessionID)
+	removed, rerr := p.removeSessionReport(contract.OriginHostSet, sessionID)
+	if rerr == nil && !removed {
+		// A racing removal — an eviction, RemoveSession, the requestor's
+		// EndSession — took the session between the lookup and here: its
+		// remover owns the end, so no second End goes out (issue #634).
+		return targetErr(peers, sessionID)
+	}
 	var serr error
 	if peers == nil {
 		serr = ErrNoPeerConnector

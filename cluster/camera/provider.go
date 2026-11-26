@@ -281,10 +281,19 @@ func (p *Provider) RemoveSession(sessionID uint16) {
 }
 
 func (p *Provider) removeSession(origin contract.Origin, sessionID uint16) error {
-	return p.change(origin, func(next []ProviderSession) ([]ProviderSession, bool) {
+	_, err := p.removeSessionReport(origin, sessionID)
+	return err
+}
+
+// removeSessionReport is removeSession reporting whether this call
+// removed the session — false when the table no longer held it.
+func (p *Provider) removeSessionReport(origin contract.Origin, sessionID uint16) (removed bool, err error) {
+	err = p.change(origin, func(next []ProviderSession) ([]ProviderSession, bool) {
 		kept := slices.DeleteFunc(next, func(s ProviderSession) bool { return s.Id == sessionID })
-		return kept, len(kept) != len(next)
+		removed = len(kept) != len(next)
+		return kept, removed
 	})
+	return removed, err
 }
 
 // change applies edit to a copy of the session table and, when edit

@@ -6,7 +6,6 @@ package camera
 import (
 	"context"
 	"log/slog"
-	"slices"
 	"sync"
 	"time"
 
@@ -203,11 +202,7 @@ func (p *Provider) admitNew(ctx context.Context, fabric uint8) (refused bool, er
 // the eviction stands without an End (decision 707). Never under mu or pub
 // across a call out.
 func (p *Provider) evict(ctx context.Context, victim ProviderSession) (removed bool, err error) {
-	err = p.change(contract.OriginCommand, func(next []ProviderSession) ([]ProviderSession, bool) {
-		kept := slices.DeleteFunc(next, func(s ProviderSession) bool { return s.Id == victim.Id })
-		removed = len(kept) != len(next)
-		return kept, removed
-	})
+	removed, err = p.removeSessionReport(contract.OriginCommand, victim.Id)
 	if err != nil {
 		return false, spec.Errorf(im.StatusFailure, "%v", err)
 	}
