@@ -139,8 +139,8 @@ type Central struct {
 type addrHold struct{ k *connection }
 
 var (
-	errAlreadyConnected  = errors.New("the peripheral is already connected")
-	errConnectInProgress = errors.New("a connection to the peripheral is already in progress")
+	errAlreadyConnected  = errors.New("esphome: the peripheral is already connected")
+	errConnectInProgress = errors.New("esphome: a connection to the peripheral is already in progress")
 )
 
 var (
