@@ -98,7 +98,7 @@ func across(total, perFabric int) func(*camera.ProviderConfig) {
 }
 
 // open is a new session of ctx's requestor, then a second on the clock.
-func (r *evictRig) open(t *testing.T, ctx context.Context) uint16 {
+func (r *evictRig) open(ctx context.Context, t *testing.T) uint16 {
 	t.Helper()
 	id, err := provideNew(ctx, t, r.p)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestProviderEvictOwnIdleSession(t *testing.T) {
 	t.Parallel()
 	a := peer(1, 0x55)
 	r := newEvictRig(t, bounds(0, 2))
-	first, second := r.open(t, a), r.open(t, a)
+	first, second := r.open(a, t), r.open(a, t)
 	r.clk.Advance(evictIdle)
 	id, err := provideNew(a, t, r.p)
 	if err != nil {
@@ -169,8 +169,8 @@ func TestProviderEvictNoneIdleLongEnough(t *testing.T) {
 	t.Parallel()
 	a := peer(1, 0x55)
 	r := newEvictRig(t, bounds(0, 2))
-	r.open(t, a)
-	r.open(t, a)
+	r.open(a, t)
+	r.open(a, t)
 	r.clk.Advance(evictIdle - 3*time.Second) // the oldest is EvictIdle less a second
 	before, offers := sessionIDs(r.p), r.port.offerCount()
 	_, err := provideNew(a, t, r.p)
@@ -192,8 +192,8 @@ func TestProviderEvictNeverAnotherFabric(t *testing.T) {
 	t.Parallel()
 	a, b := peer(1, 0x55), peer(2, 0x66)
 	r := newEvictRig(t, bounds(0, 2))
-	b0, b1 := r.open(t, b), r.open(t, b)
-	a0, a1 := r.open(t, a), r.open(t, a)
+	b0, b1 := r.open(b, t), r.open(b, t)
+	a0, a1 := r.open(a, t), r.open(a, t)
 	r.clk.Advance(evictIdle)
 	if _, err := provideNew(a, t, r.p); err != nil {
 		t.Fatal(err)
@@ -204,8 +204,8 @@ func TestProviderEvictNeverAnotherFabric(t *testing.T) {
 	}
 
 	q := newEvictRig(t, bounds(2, 0))
-	q.open(t, a)
-	q.open(t, a)
+	q.open(a, t)
+	q.open(a, t)
 	q.clk.Advance(evictIdle)
 	_, err := provideNew(b, t, q.p)
 	wantCode(t, "fabric B holding none at the provider's bound", statusOf(err), im.StatusResourceExhausted)
@@ -322,7 +322,7 @@ func TestProviderEvictTieTableOrder(t *testing.T) {
 	t.Parallel()
 	a := peer(1, 0x55)
 	r := newEvictRig(t, bounds(0, 3))
-	var ids []uint16
+	ids := make([]uint16, 0, 3)
 	for range 3 {
 		id, err := provideNew(a, t, r.p) // the clock stands: one activity
 		if err != nil {
@@ -367,7 +367,7 @@ func TestProviderEvictActivity(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			r := newEvictRig(t, bounds(0, 2))
-			first, second := r.open(t, a), r.open(t, a)
+			first, second := r.open(a, t), r.open(a, t)
 			r.clk.Advance(evictIdle)
 			if err := signal(r, first); err != nil {
 				t.Fatal(err)
@@ -382,8 +382,8 @@ func TestProviderEvictActivity(t *testing.T) {
 	t.Run("refused", func(t *testing.T) {
 		t.Parallel()
 		r := newEvictRig(t, bounds(0, 2))
-		first := r.open(t, a)
-		r.open(t, a)
+		first := r.open(a, t)
+		r.open(a, t)
 		r.clk.Advance(evictIdle)
 		_, err := r.p.MatterInvoke(other, wpdef.CmdProvideIceCandidates, wpdef.ProvideIceCandidatesRequest{WebRtcSessionId: first, IceCandidates: cand})
 		wantCode(t, "another node's candidates", statusOf(err), im.StatusNotFound)
@@ -409,9 +409,9 @@ func TestProviderEvictAtTotalBoundOwnFabric(t *testing.T) {
 	t.Parallel()
 	a, b := peer(1, 0x55), peer(2, 0x66)
 	r := newEvictRig(t, bounds(3, 0))
-	b0 := r.open(t, b)
-	a0 := r.open(t, a)
-	r.open(t, a)
+	b0 := r.open(b, t)
+	a0 := r.open(a, t)
+	r.open(a, t)
 	r.clk.Advance(evictIdle)
 	if _, err := provideNew(a, t, r.p); err != nil {
 		t.Fatal(err)
@@ -466,7 +466,7 @@ func TestProviderEvictWithoutEnd(t *testing.T) {
 	a := peer(1, 0x55)
 	r := newEvictRig(t, bounds(1, 0))
 	r.p.AttachPeerConnector(nil)
-	first := r.open(t, a)
+	first := r.open(a, t)
 	r.clk.Advance(evictIdle)
 	if _, err := provideNew(a, t, r.p); err != nil {
 		t.Fatal(err)
@@ -475,7 +475,7 @@ func TestProviderEvictWithoutEnd(t *testing.T) {
 
 	q := newEvictRig(t, bounds(1, 0))
 	q.peers.gate = make(chan struct{})
-	held := q.open(t, a)
+	held := q.open(a, t)
 	refused, err := solicitNew(a, t, q.p, 1) // its End holds the queue of one
 	if err != nil {
 		t.Fatal(err)
@@ -508,7 +508,7 @@ func TestProviderEvictPortErrors(t *testing.T) {
 	a := peer(1, 0x55)
 	r := newEvictRig(t, bounds(1, 0))
 	r.port.endErr = errors.New("stack gone")
-	first := r.open(t, a)
+	first := r.open(a, t)
 	r.clk.Advance(evictIdle)
 	id, err := provideNew(a, t, r.p)
 	if err != nil {
@@ -571,7 +571,7 @@ func TestProviderEvictRaces(t *testing.T) {
 	t.Run("host End", func(t *testing.T) {
 		t.Parallel()
 		r := newEvictRig(t, bounds(1, 0))
-		victim := r.open(t, a)
+		victim := r.open(a, t)
 		r.clk.Advance(evictIdle)
 		var wg sync.WaitGroup
 		var hostErr, offerErr error
@@ -613,7 +613,7 @@ func TestProviderEvictRaces(t *testing.T) {
 	t.Run("two offers", func(t *testing.T) {
 		t.Parallel()
 		r := newEvictRig(t, bounds(0, 2))
-		v0, v1 := r.open(t, a), r.open(t, a)
+		v0, v1 := r.open(a, t), r.open(a, t)
 		r.clk.Advance(evictIdle)
 		var wg sync.WaitGroup
 		errs := make([]error, 2)
@@ -634,7 +634,7 @@ func TestProviderEvictRaces(t *testing.T) {
 	t.Run("EndLostPeer", func(t *testing.T) {
 		t.Parallel()
 		r := newEvictRig(t, bounds(1, 0))
-		victim := r.open(t, peer(1, 0x44))
+		victim := r.open(peer(1, 0x44), t)
 		r.clk.Advance(evictIdle)
 		var wg sync.WaitGroup
 		var offerErr error
@@ -653,7 +653,7 @@ func TestProviderEvictRaces(t *testing.T) {
 		b, c := peer(2, 0x66), peer(3, 0x77)
 		r := newEvictRig(t, across(4, 0))
 		for _, ctx := range []context.Context{a, a, a, b} {
-			r.open(t, ctx)
+			r.open(ctx, t)
 		}
 		r.clk.Advance(evictIdle)
 		var wg sync.WaitGroup
@@ -688,13 +688,13 @@ func TestProviderEvictAcrossFabricsWalk(t *testing.T) {
 	t.Parallel()
 	a, b, c := peer(1, 0x55), peer(2, 0x66), peer(3, 0x77)
 	r := newEvictRig(t, across(8, 4))
-	var aIDs, bIDs []uint16
+	aIDs, bIDs := make([]uint16, 0, 4), make([]uint16, 0, 4)
 	for range 4 {
-		aIDs = append(aIDs, r.open(t, a))
-		bIDs = append(bIDs, r.open(t, b))
+		aIDs = append(aIDs, r.open(a, t))
+		bIDs = append(bIDs, r.open(b, t))
 	}
 	r.clk.Advance(evictIdle)
-	c0, c1 := r.open(t, c), r.open(t, c)
+	c0, c1 := r.open(c, t), r.open(c, t)
 	wantEnded(t, r.port, aIDs[0], bIDs[0])
 	if held := fabricsOf(r.p); held[1] != 3 || held[2] != 3 || held[3] != 2 {
 		t.Fatalf("CurrentSessions by fabric %v, want A3 B3 C2", held)
@@ -707,10 +707,10 @@ func TestProviderEvictAcrossFabricsWalk(t *testing.T) {
 	_, err := provideNew(c, t, r.p)
 	wantCode(t, "C at its share, its own entries young", statusOf(err), im.StatusResourceExhausted)
 	r.clk.Advance(evictIdle)
-	r.open(t, c)
+	r.open(c, t)
 	wantEnded(t, r.port, aIDs[0], bIDs[0], c0)
 	r.clk.Advance(evictIdle)
-	r.open(t, a) // A over its share: its own oldest, never B's or C's
+	r.open(a, t) // A over its share: its own oldest, never B's or C's
 	wantEnded(t, r.port, aIDs[0], bIDs[0], c0, aIDs[1])
 	if held := fabricsOf(r.p); held[1] != 3 || held[2] != 3 || held[3] != 2 || !slices.Contains(sessionIDs(r.p), c1) {
 		t.Fatalf("CurrentSessions by fabric %v", held)
@@ -724,23 +724,23 @@ func TestProviderEvictAcrossFabricsWithinShare(t *testing.T) {
 	t.Parallel()
 	a, b, c := peer(1, 0x55), peer(2, 0x66), peer(3, 0x77)
 	r := newEvictRig(t, across(8, 4))
-	var bIDs []uint16
+	bIDs := make([]uint16, 0, 4)
 	for range 4 {
-		bIDs = append(bIDs, r.open(t, b))
+		bIDs = append(bIDs, r.open(b, t))
 	}
-	aFirst := r.open(t, a)
+	aFirst := r.open(a, t)
 	for range 3 {
-		r.open(t, a)
+		r.open(a, t)
 	}
 	r.clk.Advance(evictIdle)
-	r.open(t, a)
+	r.open(a, t)
 	wantEnded(t, r.port, aFirst)
-	r.open(t, b)
+	r.open(b, t)
 	wantEnded(t, r.port, aFirst, bIDs[0])
 
 	q := newEvictRig(t, across(2, 0))
-	q.open(t, a)
-	q.open(t, b)
+	q.open(a, t)
+	q.open(b, t)
 	q.clk.Advance(evictIdle)
 	_, err := provideNew(c, t, q.p)
 	wantCode(t, "a third fabric on two slots", statusOf(err), im.StatusResourceExhausted)
@@ -756,12 +756,12 @@ func TestProviderEvictAcrossFabricsFallback(t *testing.T) {
 	t.Parallel()
 	a, b, c := peer(1, 0x55), peer(2, 0x66), peer(3, 0x77)
 	r := newEvictRig(t, across(4, 0))
-	cOld := r.open(t, c)
+	cOld := r.open(c, t)
 	r.clk.Advance(evictIdle)
 	for range 3 {
-		r.open(t, a) // A holds 3 > share 2 (n 2), all young
+		r.open(a, t) // A holds 3 > share 2 (n 2), all young
 	}
-	r.open(t, c)
+	r.open(c, t)
 	wantEnded(t, r.port, cOld)
 	_, err := provideNew(c, t, r.p)
 	wantCode(t, "nothing idle", statusOf(err), im.StatusResourceExhausted)
@@ -769,12 +769,12 @@ func TestProviderEvictAcrossFabricsFallback(t *testing.T) {
 	wantCode(t, "B under its share, A's entries young", statusOf(err), im.StatusResourceExhausted)
 
 	q := newEvictRig(t, across(8, 0))
-	var aIDs []uint16
+	aIDs := make([]uint16, 0, 8)
 	for range 8 {
-		aIDs = append(aIDs, q.open(t, a))
+		aIDs = append(aIDs, q.open(a, t))
 	}
 	q.clk.Advance(evictIdle)
-	q.open(t, b)
+	q.open(b, t)
 	wantEnded(t, q.port, aIDs[0])
 }
 
@@ -786,11 +786,11 @@ func TestProviderEvictAcrossFabricsInert(t *testing.T) {
 	t.Parallel()
 	a, b, c := peer(1, 0x55), peer(2, 0x66), peer(3, 0x77)
 	r := newEvictRig(t, across(0, 2))
-	r.open(t, a)
-	r.open(t, a)
+	r.open(a, t)
+	r.open(a, t)
 	r.clk.Advance(evictIdle)
-	r.open(t, b)
-	r.open(t, b)
+	r.open(b, t)
+	r.open(b, t)
 	_, err := provideNew(b, t, r.p)
 	wantCode(t, "B at its bound, its own entries young", statusOf(err), im.StatusResourceExhausted)
 	if len(r.port.ended()) != 0 {
@@ -811,9 +811,9 @@ func TestProviderEvictAcrossFabricsInert(t *testing.T) {
 	}
 
 	s := newEvictRig(t, across(4, 0))
-	var aIDs []uint16
+	aIDs := make([]uint16, 0, 4)
 	for range 4 {
-		aIDs = append(aIDs, s.open(t, a))
+		aIDs = append(aIDs, s.open(a, t))
 	}
 	s.clk.Advance(evictIdle)
 	resp, err := solicitNew(c, t, s.p, 1)
