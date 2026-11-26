@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10943,
+  "entry_points": 10944,
   "initializers": 373,
   "entry_packages": [
     ".",
@@ -297,9 +297,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28715,
+    "total_exported": 28716,
     "reachable": 22331,
-    "whitelisted": 6362,
+    "whitelisted": 6363,
     "unreachable": 22
   },
   "by_package": [
@@ -3787,7 +3787,7 @@
       "identifier": "TestDiscriminatorIsZeroUnlessAnAdministratorsWindowIsOpen",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioning_window_state_test.go",
-      "line": 55
+      "line": 105
     },
     {
       "package": "bridge",
@@ -8575,7 +8575,7 @@
       "identifier": "TestStoppedWindowReadsClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioning_window_state_test.go",
-      "line": 81
+      "line": 131
     },
     {
       "package": "bridge",
@@ -9346,6 +9346,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/invoke_wildcard_commit_test.go",
       "line": 55
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWindowDoesNotOpenAfterAStopDuringTheOpen",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioning_window_state_test.go",
+      "line": 69
     },
     {
       "package": "bridge",
