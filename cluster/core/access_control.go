@@ -1699,6 +1699,12 @@ func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 // It names no fabric, so the fabric is not marked as holding Acl rows and
 // its removal may go unreported; [AccessControl.NotifyLocalEntryInstalledOn]
 // names it.
+//
+// Deprecated: use [AccessControl.NotifyLocalEntryInstalledOn], which names
+// the fabric the entry was appended to and marks it, so the fabric's
+// removal is reported as the Acl shrinking; NotifyLocalEntryInstalled keeps
+// its behaviour until it goes and is removable in v0.29.0 (review II,
+// P8-PR1-opus-L4, #622, decision 690).
 func (a *AccessControl) NotifyLocalEntryInstalled() { a.dataVersion.Bump() }
 
 // NotifyLocalEntryInstalledOn is [AccessControl.NotifyLocalEntryInstalled]
