@@ -62,8 +62,8 @@ func eventReport(event, number uint64) im.EventReport {
 
 // TestReactionsNeedSubscription: a leave, shutDown or startUp delivered
 // without an active default subscription may be stale and is ignored
-// (Peers.ts:812-824, :842-851, :872-881). The events come from the
-// newly-commissioned read, which emits them (NetworkClient.ts:303-308)
+// (Peers.ts:869-881, :899-908, :929-938 at b25ed960). The events come from the
+// newly-commissioned read, which emits them (NetworkClient.ts:304-309 at b25ed960)
 // with no default subscription active; a host read would not emit them
 // at all (W4-ctlim-01).
 func TestReactionsNeedSubscription(t *testing.T) {

@@ -2215,10 +2215,11 @@
   {
     "file": "controller/client/reactions_test.go",
     "line": 65,
-    "citation": "Peers.ts:812-824",
+    "citation": "Peers.ts:869-881",
     "resolved": "packages/node/src/node/client/Peers.ts",
+    "at": "b25ed960",
     "identifier": "startUp",
-    "nearest": 774,
+    "nearest": 922,
     "occurrences": 2
   },
   {

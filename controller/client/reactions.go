@@ -118,14 +118,14 @@ func (r *Registry) fabricForDescriptor(f fabricDescriptor) *commissioner.Fabric 
 	return nil
 }
 
-// onLeave is Peers.#onLeave (Peers.ts:842-890 at b25ed960): under the
+// onLeave is Peers.#onLeave (Peers.ts:842-892 at b25ed960): under the
 // mutex a closing node, or one under decommission, is left alone
 // (:843-850); the peer's fabric entry of the event's index (:852-856), the
 // node's peer address (:858-861) and our fabric for that entry, of the
 // address's index (:863-867), must all exist; a leave without an active
 // subscription may be stale and is ignored (:869-881); then the peer has
 // left: the node is decommissioned (:883-884), its sessions given up
-// (:885-889) and the node deleted (:889).
+// (:885-889) and the node deleted (:890).
 //
 // live is whether the subscription was active when the event's report
 // arrived. The reaction runs on a goroutine of its own, after the report's
