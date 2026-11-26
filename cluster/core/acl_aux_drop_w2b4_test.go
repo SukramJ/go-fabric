@@ -156,3 +156,80 @@ func TestAccessControlFailedSyncKeepsNoDroppedFabricContextW2B4(t *testing.T) {
 		t.Error("the failed synchronisation lost fabric 1's owed context")
 	}
 }
+
+// TestAccessControlDropClearsTheBatchDeferredContextW2B4 (#619, batch
+// part; fable-diff-b4 4b): a batch records fabric 3's change context, the
+// fabric is dropped while the batch is open, and the batch's closing sync
+// fails to read the source: the dropped fabric's context is not owed after
+// it.
+func TestAccessControlDropClearsTheBatchDeferredContextW2B4(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	const f uint8 = 3
+	st := &dropACLStore{acl: map[uint8][]store.ACLEntry{f: {dropAdmin(f)}}, fabrics: []uint8{f}}
+	a, src, _ := newAuxACLW2B4(t, st)
+
+	a.beginAuxiliaryBatch()
+	a.mu.Lock()
+	a.auxDeferred = map[uint8]context.Context{f: im.WithFabricFilter(ctx, true, f)}
+	a.mu.Unlock()
+	st.removeFabric(f)
+	if err := a.MatterDropFabric(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	src.failing.Store(true)
+	a.endAuxiliaryBatch(ctx)
+
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if !a.auxOwed {
+		t.Fatal("the failed synchronisation owes nothing")
+	}
+	if _, ok := a.auxOwedCtx[f]; ok {
+		t.Error("the batch's failed synchronisation owes the dropped fabric's context")
+	}
+}
+
+// TestAccessControlDropBeforeTheSyncsTakeIsSeenW2B4 (#619, batch part): the
+// batch's close takes its recorded contexts and then waits for auxSyncMu;
+// a drop of fabric 3 in that wait is seen by the epoch the close noted, so
+// the failed synchronisation owes no context of fabric 3. Not parallel:
+// WaitParkedOnMutexA1 reads every goroutine's stack.
+func TestAccessControlDropBeforeTheSyncsTakeIsSeenW2B4(t *testing.T) {
+	ctx := context.Background()
+	const f uint8 = 3
+	st := &dropACLStore{acl: map[uint8][]store.ACLEntry{f: {dropAdmin(f)}}, fabrics: []uint8{f}}
+	a, src, _ := newAuxACLW2B4(t, st)
+
+	a.beginAuxiliaryBatch()
+	a.mu.Lock()
+	a.auxDeferred = map[uint8]context.Context{f: im.WithFabricFilter(ctx, true, f)}
+	a.mu.Unlock()
+	src.failing.Store(true)
+
+	a.auxSyncMu.Lock()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		a.endAuxiliaryBatch(ctx)
+	}()
+	if !WaitParkedOnMutexA1(t, done, "syncAuxiliaryAs") {
+		a.auxSyncMu.Unlock()
+		t.Fatal("the batch's close did not wait for auxSyncMu")
+	}
+	st.removeFabric(f)
+	if err := a.MatterDropFabric(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	a.auxSyncMu.Unlock()
+	<-done
+
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if !a.auxOwed {
+		t.Fatal("the failed synchronisation owes nothing")
+	}
+	if _, ok := a.auxOwedCtx[f]; ok {
+		t.Error("a drop between the batch's take and the synchronisation's take left the fabric's context owed")
+	}
+}

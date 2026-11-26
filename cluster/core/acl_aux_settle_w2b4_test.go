@@ -52,7 +52,7 @@ func TestAccessControlFailingSourceWarnsOncePerDebtW2B4(t *testing.T) {
 	rctx := im.WithFabricFilter(ctx, true, 1)
 
 	src.failing.Store(true)
-	a.syncAuxiliary(ctx, true, nil) // a change whose synchronisation fails
+	a.syncAuxiliary(ctx, true) // a change whose synchronisation fails
 	for range 5 {
 		for _, attr := range []uint32{accessControlAttrACL, cluster.AttrGlobalClusterRevision, accessControlAttrAuxiliaryACL} {
 			a.MatterReadFiltered(rctx, attr)
@@ -74,7 +74,7 @@ func TestAccessControlFailingSourceWarnsOncePerDebtW2B4(t *testing.T) {
 		t.Fatal("the recovered source left the debt owed")
 	}
 	src.failing.Store(true)
-	a.syncAuxiliary(ctx, true, nil)
+	a.syncAuxiliary(ctx, true)
 	a.MatterReadFiltered(rctx, cluster.AttrGlobalClusterRevision)
 	if n := h.count(slog.LevelWarn); n != 2 {
 		t.Errorf("a new debt after recovery: %d Warns in all, want 2", n)

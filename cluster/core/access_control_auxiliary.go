@@ -53,7 +53,7 @@ func (a *AccessControl) registerAuxiliaryProvider(ctx context.Context, src Auxil
 	a.mu.Lock()
 	a.auxSource = src
 	a.mu.Unlock()
-	a.syncAuxiliary(ctx, false, nil)
+	a.syncAuxiliary(ctx, false)
 	src.OnGroupcastChanged(func(changeCtx context.Context, fabric uint8) {
 		a.mu.Lock()
 		batched := a.auxBatch > 0
@@ -73,7 +73,7 @@ func (a *AccessControl) registerAuxiliaryProvider(ctx context.Context, src Auxil
 		}
 		a.mu.Unlock()
 		if !batched {
-			a.syncAuxiliary(changeCtx, true, nil)
+			a.syncAuxiliary(changeCtx, true)
 		}
 	})
 }
@@ -96,26 +96,34 @@ func (a *AccessControl) endAuxiliaryBatch(ctx context.Context) {
 		a.auxBatch--
 	}
 	open := a.auxBatch > 0
-	var deferred map[uint8]context.Context
+	var (
+		deferred map[uint8]context.Context
+		noted    map[uint8]uint64
+	)
 	if !open {
 		deferred, a.auxDeferred = a.auxDeferred, nil
+		// The drop epochs of the taken contexts, noted in the hold that
+		// takes them: a drop before the synchronisation's own take is
+		// seen there too (#619).
+		noted = a.dropEpochsLocked(deferred)
 	}
 	a.mu.Unlock()
 	if !open {
-		a.syncAuxiliary(ctx, true, deferred)
+		a.syncAuxiliaryAs(ctx, ctx, true, deferred, noted)
 	}
 }
 
 // syncAuxiliary recomputes the auxiliary entries and, for every fabric whose
 // entries changed, bumps the DataVersion and — with emit — fires
 // AuxiliaryAccessUpdated naming the administering node: the node of the
-// change's own context in deferred, else the node of ctx when ctx is a
+// change's own context a batch deferred (endAuxiliaryBatch, owed contexts),
+// else the node of ctx when ctx is a
 // request of that fabric, else none — a fabric's event never names a node
 // of another fabric's request (review II, R2-P6-conc-1007). A fabric that
 // no longer exists gets no event. Mirrors matter.js AccessControlServer
 // #syncAuxAcl.
-func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool, deferred map[uint8]context.Context) {
-	a.syncAuxiliaryAs(ctx, ctx, emit, deferred)
+func (a *AccessControl) syncAuxiliary(ctx context.Context, emit bool) {
+	a.syncAuxiliaryAs(ctx, ctx, emit, nil, nil)
 }
 
 // settleOwedAuxiliary runs the synchronisation a failed read of the source
@@ -131,7 +139,7 @@ func (a *AccessControl) settleOwedAuxiliary(ctx context.Context) {
 	owed, emit := a.auxOwed, a.auxOwedEmit
 	a.mu.RUnlock()
 	if owed {
-		a.syncAuxiliaryAs(ctx, nil, emit, nil)
+		a.syncAuxiliaryAs(ctx, nil, emit, nil, nil)
 	}
 }
 
@@ -143,10 +151,12 @@ func (a *AccessControl) settleOwedAuxiliary(ctx context.Context) {
 // reported with the earlier failed change's node — and a read of the
 // source that fails owes
 // the whole synchronisation again, its contexts and actor's own fabric's
-// kept, rather than dropping them (review II, R4-err-4055). The failure is
+// kept, rather than dropping them (review II, R4-err-4055). noted is the
+// drop epoch of each context in deferred as the caller took it (#619);
+// it overrides the epoch noted at this run's own take. The failure is
 // logged at Warn when nothing was owed before the run and at Debug when
 // the run failed to settle a debt already owed (#621).
-func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, deferred map[uint8]context.Context) {
+func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, deferred map[uint8]context.Context, noted map[uint8]uint64) {
 	a.mu.RLock()
 	src := a.auxSource
 	a.mu.RUnlock()
@@ -162,6 +172,7 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 	// the hold of mu that takes the contexts: a fabric dropped while the
 	// source is read gets no context back from a failure (#619).
 	epochs := a.auxEpochsLocked(actor, deferred)
+	maps.Copy(epochs, noted)
 	a.mu.Unlock()
 	entries, err := src.AuxiliaryACL(ctx, 0)
 	if err != nil {
@@ -252,11 +263,18 @@ func requestFabricOf(actor context.Context) (uint8, bool) {
 // auxEpochsLocked notes the drop epoch (aclDropEpoch) of every fabric
 // deferred names and of actor's own fabric. Called with mu held.
 func (a *AccessControl) auxEpochsLocked(actor context.Context, deferred map[uint8]context.Context) map[uint8]uint64 {
-	out := make(map[uint8]uint64, len(deferred)+1)
-	for f := range deferred {
+	out := a.dropEpochsLocked(deferred)
+	if f, ok := requestFabricOf(actor); ok {
 		out[f] = a.aclDropEpoch[f]
 	}
-	if f, ok := requestFabricOf(actor); ok {
+	return out
+}
+
+// dropEpochsLocked notes the drop epoch (aclDropEpoch) of every fabric
+// ctxs names. Called with mu held.
+func (a *AccessControl) dropEpochsLocked(ctxs map[uint8]context.Context) map[uint8]uint64 {
+	out := make(map[uint8]uint64, len(ctxs)+1)
+	for f := range ctxs {
 		out[f] = a.aclDropEpoch[f]
 	}
 	return out
