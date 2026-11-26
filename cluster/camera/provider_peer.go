@@ -179,6 +179,9 @@ func (p *Provider) signal(ctx context.Context, sessionID uint16, commandID uint3
 	if err != nil {
 		return err
 	}
+	// The camera's signalling is the session's activity at the call
+	// (decision 704), whatever the requestor answers.
+	p.touch(sessionID)
 	return p.send(ctx, peers, session, commandID, fields)
 }
 
@@ -222,10 +225,7 @@ func (p *Provider) target(sessionID uint16) (PeerConnector, ProviderSession, boo
 // step says it began, the line after says how it ended (issue #596 B).
 // The lines go to [ProviderConfig.Logger], slog.Default when nil.
 func (p *Provider) send(ctx context.Context, peers PeerConnector, session ProviderSession, commandID uint32, fields spec.Encodable) error {
-	log := p.cfg.Logger
-	if log == nil {
-		log = slog.Default()
-	}
+	log := p.logger()
 	attrs := []any{
 		slog.Int("webrtc_session_id", int(session.Id)), slog.Int("fabric_index", int(session.FabricIndex)),
 		slog.Uint64("node_id", session.PeerNodeId), slog.Uint64("command", uint64(commandID)),
@@ -245,4 +245,12 @@ func (p *Provider) send(ctx context.Context, peers PeerConnector, session Provid
 		return fmt.Errorf("camera: WebRTC session %d: %w", session.Id, err)
 	}
 	return nil
+}
+
+// logger is [ProviderConfig.Logger], slog.Default when nil.
+func (p *Provider) logger() *slog.Logger {
+	if p.cfg.Logger == nil {
+		return slog.Default()
+	}
+	return p.cfg.Logger
 }
