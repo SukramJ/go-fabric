@@ -155,6 +155,10 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 	a.mu.Lock()
 	deferred = mergeAuxContexts(a.auxOwedCtx, deferred)
 	a.auxOwed, a.auxOwedEmit, a.auxOwedCtx = false, false, nil
+	// The drop epoch of each fabric whose context the run holds, noted in
+	// the hold of mu that takes the contexts: a fabric dropped while the
+	// source is read gets no context back from a failure (#619).
+	epochs := a.auxEpochsLocked(deferred, actor)
 	a.mu.Unlock()
 	entries, err := src.AuxiliaryACL(ctx, 0)
 	if err != nil {
@@ -166,7 +170,7 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 		a.mu.Lock()
 		a.auxOwed = true
 		a.auxOwedEmit = a.auxOwedEmit || emit
-		a.auxOwedCtx = mergeAuxContexts(deferred, a.auxOwedCtx)
+		a.auxOwedCtx = mergeAuxContexts(a.undroppedLocked(deferred, epochs), a.auxOwedCtx)
 		a.mu.Unlock()
 		a.auxSyncMu.Unlock()
 		a.logger().Warn("matter.access_control.auxiliary_sync", slog.Any("err", err))
@@ -219,6 +223,39 @@ func (a *AccessControl) syncAuxiliaryAs(ctx, actor context.Context, emit bool, d
 		emitter.MatterEmitEvent(endpoint, accessControlClusterID, accessControlEventAuxiliaryAccessUpd,
 			AuxiliaryAccessUpdatedEvent{AdminNodeID: admin, FabricIndex: fabric}, contract.EventPriorityInfo)
 	}
+}
+
+// auxEpochsLocked notes the drop epoch (aclDropEpoch) of every fabric
+// deferred names and of actor's own fabric. Called with mu held.
+func (a *AccessControl) auxEpochsLocked(deferred map[uint8]context.Context, actor context.Context) map[uint8]uint64 {
+	out := make(map[uint8]uint64, len(deferred)+1)
+	for f := range deferred {
+		out[f] = a.aclDropEpoch[f]
+	}
+	if actor != nil {
+		if _, f, request := im.LookupFabricFilter(actor); request && f != 0 {
+			out[f] = a.aclDropEpoch[f]
+		}
+	}
+	return out
+}
+
+// undroppedLocked is ctxs without the fabrics whose drop epoch moved since
+// epochs was noted: a context of a fabric dropped meanwhile goes with the
+// fabric, as dropFabric deletes it from auxOwedCtx. A fabric epochs does
+// not name is dropped too. Called with mu held.
+func (a *AccessControl) undroppedLocked(ctxs map[uint8]context.Context, epochs map[uint8]uint64) map[uint8]context.Context {
+	var out map[uint8]context.Context
+	for f, c := range ctxs {
+		if e, ok := epochs[f]; !ok || a.aclDropEpoch[f] != e {
+			continue
+		}
+		if out == nil {
+			out = make(map[uint8]context.Context, len(ctxs))
+		}
+		out[f] = c
+	}
+	return out
 }
 
 // mergeAuxContexts is older with newer laid over it: a fabric newer names

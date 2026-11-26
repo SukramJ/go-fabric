@@ -97,8 +97,11 @@ type AccessControl struct {
 	// before it lists the fabric's rows and marks the fabric held only if
 	// it did not move: a read that listed rows the fabric's removal took
 	// does not mark the fabric again after its drop cleared the mark
-	// (review II, R5-conc-5004; decision 681). Entries are never deleted,
-	// so an index's count only grows.
+	// (review II, R5-conc-5004; decision 681). An auxiliary
+	// synchronisation notes it the same way for the owed contexts it takes,
+	// and a failed one puts back only those of fabrics whose count did not
+	// move (#619). Entries are never deleted, so an index's count only
+	// grows.
 	aclDropEpoch map[uint8]uint64
 	// changes reports what moves outside a write of this cluster: a
 	// fabric drop's removal of Acl rows and of an Extension entry
