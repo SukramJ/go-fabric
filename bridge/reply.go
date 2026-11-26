@@ -411,6 +411,12 @@ func unicastReplyHeader(requestHdr *message.Header) message.Header {
 // every attribute value, which writes each value by its Go type: the
 // scalars and strings, the raw TLV of a list a cluster encodes itself,
 // and the struct values it names.
+//
+// It writes each value on rd's own encoder, as it is: a value whose
+// encoder fails is not contained here. The bridge's reports go out
+// through its chunker, which resolves every value once in isolation and
+// answers a failing one FAILURE for its path (#625); a caller that builds
+// a ReportData itself checks a host value first with [AttributeValueTLV].
 func EncodeReportData(rd im.ReportData) ([]byte, error) {
 	enc := tlv.NewEncoder()
 	rd.MarshalTLV(enc, defaultAttributeValueWriter)

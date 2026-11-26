@@ -21,7 +21,9 @@ func TestEncode(t *testing.T) {
 	good := func(enc *tlv.Encoder, tag tlv.Tag) {
 		enc.StartStruct(tag)
 		enc.PutUint(tlv.ContextTag(0), 7)
+		enc.StartList(tlv.ContextTag(1))
 		enc.PutUTF8(tlv.ContextTag(1), "x")
+		_ = enc.EndContainer()
 		_ = enc.EndContainer()
 	}
 	want := tlv.NewEncoder()
