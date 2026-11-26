@@ -43,7 +43,10 @@ func CommandWriter(write im.CommandFieldsWriter) im.CommandFieldsWriter {
 // distinct one ([im.ValidateInvokeBatch]) and an entry carries its
 // invocation's — or the request's only invocation, or else the only
 // invocation on the entry's cluster whose endpoint is the entry's or a
-// wildcard. An entry none of these names keeps the path it carries.
+// wildcard. An entry none of these names keeps the path it carries —
+// the response command's id, not the request's; the status then names
+// the cluster and endpoint correctly and the command wrongly, which the
+// log line shows.
 func ResolveInvoke(req im.InvokeRequest, resp im.InvokeResponse, write im.CommandFieldsWriter, failed func(InvokeFailure)) im.InvokeResponse {
 	var out []im.InvokeResponseEntry
 	for i, ent := range resp.Responses {

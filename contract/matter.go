@@ -116,8 +116,9 @@ type ClusterServer interface {
 	// The response is encoded for the answer once, on an encoder of its
 	// own (a response checked against a hand-written form is written once
 	// more for the check, in the same isolation), so its encoder must be
-	// deterministic and free of side effects: one whose encoder panics, leaves a container open or writes other than one
-	// element answers FAILURE (a CommandStatusIB on the request's path)
+	// deterministic and free of side effects: one whose encoder panics,
+	// leaves a container open or writes other than one element answers
+	// FAILURE (a CommandStatusIB on the request's path)
 	// for that command, logged at ERROR, the other commands of the
 	// invoke unaffected. The command has run by then, and nothing undoes
 	// what it did: a controller that retries runs it again.

@@ -644,7 +644,8 @@ subscription stays (`packages/node/src/node/server/ServerSubscription.ts:563-606
 `:530-532`). An event payload is encoded at report time with the same outcome
 (`InteractionMessenger.ts:621-626`); a command response is encoded before the
 command's transaction commits, and a throw rolls the transaction back and
-answers that command a status (`packages/protocol/src/action/server/CommandInvokeResponse.ts:490-493`,
+answers that command a status
+(`packages/protocol/src/action/server/CommandInvokeResponse.ts:490-493`,
 `:516`). go-fabric encodes every attribute value, event payload and command
 response once, alone, on an encoder of its own under a recover
 (`internal/valueenc`; #625, owner decisions 694–701): a failing attribute value
@@ -654,7 +655,8 @@ checkpoint taken before the attribute and writes the status
 (`src/app/reporting/Engine.cpp:449-450`, `:487`, `:498` at `6170af84`; the code
 is `Failure`, `src/app/data-model-provider/ActionReturnStatus.cpp:125-127`,
 `src/protocols/interaction_model/StatusCode.cpp:41-63`); a failing event
-payload is refused when it is emitted — not recorded, no event number consumed — as chip, which encodes the payload when the event
+payload is refused when it is emitted — not recorded, no event number
+consumed — as chip, which encodes the payload when the event
 is logged and vends the number only on success
 (`src/app/EventManagement.cpp:468-483`). The record keeps the Go value, so
 the payload is encoded again for every report; one that fails only then

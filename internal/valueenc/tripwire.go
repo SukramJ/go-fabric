@@ -26,7 +26,7 @@ import (
 var (
 	expectedPanics   sync.Map // panic value -> struct{}
 	unexpectedPanics atomic.Int64
-	lastUnexpected   atomic.Pointer[string]
+	lastUnexpected   atomic.Pointer[PanicError]
 )
 
 // ExpectPanic declares v, a comparable panic value a test's encoder
@@ -41,8 +41,8 @@ func ExpectPanic(v any) {
 // declared, and a description of the last one (its type and stack). A
 // test seam for TestMain.
 func UnexpectedPanics() (n int64, last string) {
-	if p := lastUnexpected.Load(); p != nil {
-		last = *p
+	if pe := lastUnexpected.Load(); pe != nil {
+		last = fmt.Sprintf("%s\n%s", pe.Error(), pe.Stack)
 	}
 	return unexpectedPanics.Load(), last
 }
@@ -55,6 +55,5 @@ func notePanic(r any, pe *PanicError) {
 		}
 	}
 	unexpectedPanics.Add(1)
-	desc := fmt.Sprintf("%s\n%s", pe.Error(), pe.Stack)
-	lastUnexpected.Store(&desc)
+	lastUnexpected.Store(pe)
 }
