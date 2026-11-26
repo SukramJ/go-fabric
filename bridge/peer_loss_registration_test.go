@@ -277,7 +277,11 @@ func TestInitiatedExchangeReceivePeerLoss(t *testing.T) {
 		t.Parallel()
 		reg, ex := open(t)
 		_ = ex.Close()
+		// Receive on the closed exchange with an expired deadline reaches
+		// receiveTimedOut only when its select picks the deadline over
+		// the closed exchange; the direct call reaches it every run.
 		_, _ = ex.Receive(expired(t))
+		ex.b.receiveTimedOut(ex)
 		if lost(reg) {
 			t.Fatal("peer declared lost on a closed exchange")
 		}
