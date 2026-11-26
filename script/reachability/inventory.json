@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10955,
+  "entry_points": 10956,
   "initializers": 373,
   "entry_packages": [
     ".",
@@ -297,9 +297,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28727,
+    "total_exported": 28728,
     "reachable": 22331,
-    "whitelisted": 6374,
+    "whitelisted": 6375,
     "unreachable": 22
   },
   "by_package": [
@@ -24521,7 +24521,7 @@
       "identifier": "AddRecordAddress",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 269
+      "line": 277
     },
     {
       "package": "controller/client",
@@ -24535,14 +24535,14 @@
       "identifier": "ApplyAsked",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 240
+      "line": 248
     },
     {
       "package": "controller/client",
       "identifier": "ApplyBridge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 236
+      "line": 244
     },
     {
       "package": "controller/client",
@@ -24598,7 +24598,7 @@
       "identifier": "CompleteOperation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 263
+      "line": 271
     },
     {
       "package": "controller/client",
@@ -24654,7 +24654,7 @@
       "identifier": "EmitLeave",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 185
+      "line": 193
     },
     {
       "package": "controller/client",
@@ -24703,7 +24703,7 @@
       "identifier": "HoldsDefaultSubscription",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 192
+      "line": 200
     },
     {
       "package": "controller/client",
@@ -24717,7 +24717,7 @@
       "identifier": "ICDRegistering",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 255
+      "line": 263
     },
     {
       "package": "controller/client",
@@ -24773,7 +24773,7 @@
       "identifier": "NewWithImageQuota",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 229
+      "line": 237
     },
     {
       "package": "controller/client",
@@ -24787,7 +24787,7 @@
       "identifier": "OnRegisterChecked",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 248
+      "line": 256
     },
     {
       "package": "controller/client",
@@ -24882,6 +24882,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "SetLeaveGate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 183
+    },
+    {
+      "package": "controller/client",
       "identifier": "SetNewlyCommissioned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
@@ -24906,7 +24913,7 @@
       "identifier": "Started",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 199
+      "line": 207
     },
     {
       "package": "controller/client",
@@ -24920,7 +24927,7 @@
       "identifier": "StoredDefaultSubscription",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
-      "line": 207
+      "line": 215
     },
     {
       "package": "controller/client",

@@ -15,6 +15,10 @@ pseudo-version of `main`.
 - CI (`chiptool.yml`, issue 632): a release pull request in release shape — documentation plus, in the nested modules' and the examples' `go.mod`, only `require` lines of `thingfabric.dev/go-fabric…` modules that the same `go.mod` replaces with a local path (no `go.sum`, `replace` or other line) — no longer runs the chip-tool legs, the Go-TH groups or the certification families (`long` included): `certification families (long) on the base commit` requires one nightly or dispatched run on the pull request's base commit in which every one of them passed, and the gate accepts those verdicts for this class only. `nested modules against the versions they require` and `ci.yml` run in full; any other change runs everything.
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.27.0` (was `v0.26.0`) and are tagged `ble/bluez/v0.27.0`, `ble/esphome/v0.27.0` and `wifi/wpasupplicant/v0.27.0` at this commit; `examples/ble-wifi-light` requires the three at `v0.27.0`. The root `go.mod` and `go.sum` did not change between `v0.26.0` and `v0.27.0`.
 
+### Fixed
+
+- `controller/client`: a BasicInformation Leave event the device still held from before commissioning, delivered in the default subscription's priming report, could delete the node right after it was commissioned. The registry's Leave reaction runs after the report's hooks, on a goroutine of its own; when it ran only after the subscription became established it saw an active subscription and took the stale Leave as the peer leaving. Whether the subscription was active is now read when the report arrives, and a Leave counts only when it was active then and still is (#628).
+
 ### Removed
 
 - `examples/ble-wifi-light/ble-wifi-light`: the example's built binary (57 MB), committed by mistake in `v0.25.0` and updated in `v0.26.0`, is no longer in the tree and is ignored; build it with `go build` in the example's directory.
