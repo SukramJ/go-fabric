@@ -546,7 +546,7 @@ func (s *Server) writeIn(ctx context.Context, attrID uint32, value any, own *wri
 		// A joined write's store: while the commit it joined is open,
 		// its notification joins that commit's ([Server.storeWith]).
 		for {
-			all, notify, stale := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, nil, &at)
+			all, notify, stale := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, nil, &at, nil)
 			if !stale {
 				if notify != nil {
 					notify()
@@ -564,7 +564,7 @@ func (s *Server) writeIn(ctx context.Context, attrID uint32, value any, own *wri
 		s.commit = nil
 		earlier := own.changed
 		s.mu.Unlock()
-		all, notify, stale := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, earlier, &at)
+		all, notify, stale := s.storeWith(contract.OriginControllerWrite, map[uint32]any{attrID: v}, earlier, &at, nil)
 		if !stale {
 			if notify != nil {
 				own.notifies = append(own.notifies, notify)
@@ -676,7 +676,11 @@ func (s *Server) SetAttributesFrom(origin contract.Origin, values map[uint32]any
 // nil, run once the values are stored and before any change listener is
 // told: a server that keeps a copy of a stored attribute makes it follow
 // there, so a listener — and whatever it wakes — reads the state it is
-// told about. A refused Set runs nothing. Reached from outside the
+// told about. stored runs under the server's lock, in the hold that
+// stores the values and queues their notification ([Server.storeWith]),
+// so it holds for a Set that joins an open write's commit too, whose
+// notification the write tells from another goroutine; it must not call
+// the server. A refused Set runs nothing. Reached from outside the
 // package through internal/specseam.SetAttributesStored.
 func (s *Server) setAttributesStored(origin contract.Origin, values map[uint32]any, stored func()) error {
 	checked := make(map[uint32]any, len(values))
@@ -830,14 +834,11 @@ func defaultOf(t Type, d any) (any, bool) {
 // and reports the ones that changed, from origin ([Server.storeWith]
 // without an earlier list); false, with nothing stored, when a change was
 // stored since. stored, when not nil, runs between the store and the
-// notification ([Server.setAttributesStored]).
+// notification, under the server's lock ([Server.setAttributesStored]).
 func (s *Server) storeAt(origin contract.Origin, values map[uint32]any, at uint64, stored func()) bool {
-	_, notify, stale := s.storeWith(origin, values, nil, &at)
+	_, notify, stale := s.storeWith(origin, values, nil, &at, stored)
 	if stale {
 		return false
-	}
-	if stored != nil {
-		stored()
 	}
 	s.told(notify)
 	return true
@@ -879,7 +880,14 @@ func (s *Server) told(notify func()) {
 // ([Server.gen]): when a change was stored since, nothing is stored and
 // stale is true, and the caller judges them again (review II,
 // R2-C2-conc-1302). nil stores unconditionally.
-func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlier []uint32, at *uint64) (all []uint32, notify func(), stale bool) {
+//
+// stored, when not nil, runs once the values are stored and the
+// notification is queued or returned, in the same hold of s.mu: no
+// listener can be told of this change before it ran — not by an open
+// commit's write either, which tells from its own goroutine once it left
+// its window (N1, decision 689). It runs under s.mu and must not call
+// the server. A stale store runs nothing.
+func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlier []uint32, at *uint64, stored func()) (all []uint32, notify func(), stale bool) {
 	type quietChange struct {
 		qa              *quietAttr
 		wasNull, isNull bool
@@ -937,6 +945,9 @@ func (s *Server) storeWith(origin contract.Origin, values map[uint32]any, earlie
 			open.notifies = append(open.notifies, notify)
 			notify = nil
 		}
+	}
+	if stored != nil {
+		stored()
 	}
 	s.mu.Unlock()
 	all = slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(changed), earlier...))))

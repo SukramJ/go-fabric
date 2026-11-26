@@ -10,3 +10,8 @@ import "thingfabric.dev/go-fabric/contract"
 // NewPeripheral returns [ErrUnsupported]: BlueZ is Linux's (ADR 0024
 // decision 6 keeps macOS and Windows out while they need cgo).
 func NewPeripheral(string) (contract.GATTPeripheral, error) { return nil, ErrUnsupported }
+
+// NewPeripheralWithOptions returns [ErrUnsupported], as [NewPeripheral].
+func NewPeripheralWithOptions(PeripheralOptions) (contract.GATTPeripheral, error) {
+	return nil, ErrUnsupported
+}

@@ -17,6 +17,9 @@ type statusState struct {
 	lastReceiptAt         time.Time
 	resolveCancel         context.CancelFunc
 	resolving             chan struct{}
+	// resolveStopped is set when stopResolving cancelled the running
+	// resolution; its cleanup reads and clears it (issue #623).
+	resolveStopped bool
 }
 
 // Status tracks the reachability of a [Service] and drives its discovery:
@@ -172,15 +175,24 @@ func (s *Service) maybeStartResolving() {
 				s.names.logger.Debug("matter.discovery.status.resolved", slog.String("service", s.name.qname), slog.Int("addresses", s.addresses.len()), slog.String("targets", s.targets()))
 			}
 			cancel()
+			stopped := s.status.resolveStopped
 			s.status.resolveCancel = nil
 			s.status.resolving = nil
+			s.status.resolveStopped = false
 			// A resolution stopped (stopResolving) keeps its handle until
 			// this cleanup runs; an attempt on a service unreachable again
 			// meanwhile found it set and started none. Start it now when
 			// the status still asks for one — never once the cache is
 			// closing, whose context would end the new one at once
-			// (review II, R4-conc-4552).
-			if s.names.ctx.Err() == nil {
+			// (review II, R4-conc-4552; BD-Matter-IpServiceStatus-RestartInCleanup).
+			// A resolution that ended on its own (an address appeared)
+			// starts nothing here: the next one starts from Connecting or
+			// the reachable-to-unreachable change (issue #623). Mirrors
+			// matter.js IpServiceStatus.ts:177-185 at b25ed960 (the
+			// resolution's .finally clears #resolveAbort and #resolving and
+			// starts nothing; starts come from connecting() :149 and the
+			// isReachable setter :88).
+			if stopped && s.names.ctx.Err() == nil {
 				s.maybeStartResolving()
 			}
 		})
@@ -202,6 +214,7 @@ func (s *Service) stopResolving() {
 		return
 	}
 	s.status.resolveCancel()
+	s.status.resolveStopped = true
 	s.names.logger.Debug("matter.discovery.status.stopped_resolving", slog.String("service", s.name.qname))
 }
 

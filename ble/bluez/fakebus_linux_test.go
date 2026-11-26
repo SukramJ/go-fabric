@@ -59,6 +59,10 @@ type fakeBus struct {
 	// held are calls (by method) that wait for their channel to close
 	// before bluetoothd carries them out.
 	held map[string]chan struct{}
+	// afterCarryW2B1, when set for a method, runs once after bluetoothd
+	// carried out the next call of it and before the reply reaches the
+	// caller: what BlueZ does between the two.
+	afterCarryW2B1 map[string]func()
 }
 
 // bluezSender is bluetoothd's unique name on the fake bus.
@@ -106,7 +110,10 @@ const testAdapter = dbus.ObjectPath("/org/bluez/hci0")
 
 func newFakeBus() *fakeBus {
 	b := &fakeBus{
-		objs:    managedObjects{testAdapter: {ifaceAdapter: {"Address": dbus.MakeVariant("00:AA:01:00:00:23")}}},
+		objs: managedObjects{testAdapter: {
+			ifaceAdapter:     {"Address": dbus.MakeVariant("00:AA:01:00:00:23")},
+			ifaceGattManager: {}, ifaceAdvertising: {},
+		}},
 		args:    map[string][]any{},
 		errs:    map[string]error{},
 		devices: map[dbus.ObjectPath]*fakeDevice{},
@@ -114,6 +121,8 @@ func newFakeBus() *fakeBus {
 		exports: map[dbus.ObjectPath]map[string]map[string]any{},
 		owner:   string(bluezSender),
 		held:    map[string]chan struct{}{},
+
+		afterCarryW2B1: map[string]func(){},
 	}
 	return b
 }
@@ -330,7 +339,15 @@ func (b *fakeBus) Call(ctx context.Context, path dbus.ObjectPath, method string,
 	if dev != nil {
 		return dev.call(ctx, path, method, args)
 	}
-	return b.bluetoothd(path, method, args)
+	out, err := b.bluetoothd(path, method, args)
+	b.mu.Lock()
+	hook := b.afterCarryW2B1[method]
+	delete(b.afterCarryW2B1, method)
+	b.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	return out, err
 }
 
 // bluetoothd answers the peripheral's calls as bluetoothd does: the

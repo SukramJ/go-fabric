@@ -23,7 +23,10 @@ func TestSetAttributesStoredRunsBetweenStoreAndNotification(t *testing.T) {
 	var order []string
 	srv.OnAttributeChange(func(contract.Change) { order = append(order, "told") })
 	stored := func() {
-		v, _ := srv.MatterRead(hepa.AttrCondition)
+		// stored runs under the server's lock and must not call the
+		// server (decision 689): the held value is read as the lock's
+		// holder.
+		v, _ := spec.ValueLockedW2B6(srv, hepa.AttrCondition)
 		if v != uint8(41) {
 			t.Errorf("Condition inside the stored step = %v, want the stored 41", v)
 		}

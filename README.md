@@ -265,6 +265,7 @@ becomes permissible in:
 | `cluster/core.NewAccessControl`, `cluster/core.AccessControl.SetLimits` | `cluster/core.NewAccessControlWith` with `AccessControlConfig{Store, Limits}`, which refuses a limit outside its range at construction | `v0.29.0` |
 | `cluster/core.ARLClusterID` | none: ARL is AccessControl's MNGD feature, `cluster/spec/accesscontrol.ClusterID` (0x001F); 0x002B is LocalizationConfiguration | `v0.29.0` |
 | `cluster/camera.Provider.PeerGone` | `Provider.EndLostPeer`, the same call, which also returns how many of the pair's sessions it ended | `v0.29.0` |
+| `cluster/core.AccessControl.NotifyLocalEntryInstalled` | `AccessControl.NotifyLocalEntryInstalledOn`, which names the fabric the entry was appended to and marks it, so the fabric's removal is reported as the Acl shrinking | `v0.29.0` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

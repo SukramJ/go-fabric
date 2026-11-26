@@ -122,12 +122,26 @@ type Central struct {
 	// capped are the names left out at the bound, logged once each.
 	capped map[string]bool
 
-	// mu guards callback, scanning and sightings.
+	// mu guards callback, scanning, sightings and holds.
 	mu        sync.Mutex
 	callback  func(ble.Peripheral, []byte)
 	scanning  bool
 	sightings map[uint64]map[*proxy]sighting
+	// holds are the addresses a Connect reserved, through whichever
+	// proxy: reserved before the proxy is chosen, so a second Connect
+	// for the address through another proxy is refused while the first
+	// is in progress or up (decision 675).
+	holds map[uint64]*addrHold
 }
+
+// addrHold is one Connect's reservation of an address: k is nil while
+// the connect is in progress and the connection once it is up.
+type addrHold struct{ k *connection }
+
+var (
+	errAlreadyConnected  = errors.New("esphome: the peripheral is already connected")
+	errConnectInProgress = errors.New("esphome: a connection to the peripheral is already in progress")
+)
 
 var (
 	_ ble.Central      = (*Central)(nil)
@@ -149,7 +163,7 @@ func NewCentral(proxies []Proxy, opts Options) (*Central, error) {
 		return nil, ErrNoProxies
 	}
 	opts.normalize()
-	c := &Central{opts: opts, log: opts.Logger, clk: opts.Clock, sightings: map[uint64]map[*proxy]sighting{}, skipped: map[string]string{}, aliases: map[string]alias{}, capped: map[string]bool{}}
+	c := &Central{opts: opts, log: opts.Logger, clk: opts.Clock, sightings: map[uint64]map[*proxy]sighting{}, holds: map[uint64]*addrHold{}, skipped: map[string]string{}, aliases: map[string]alias{}, capped: map[string]bool{}}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	if opts.Discover != nil {
 		d, err := opts.Discover.normalized()
@@ -472,14 +486,69 @@ func (c *Central) Connect(ctx context.Context, p ble.Peripheral) (ble.Connection
 	if err != nil {
 		return nil, err
 	}
+	h, err := c.reserve(addr)
+	if err != nil {
+		return nil, fmt.Errorf("esphome: connect %s: %w", p.Address, err)
+	}
 	px, s, err := c.choose(addr)
 	if err != nil {
+		c.release(addr, h)
 		return nil, fmt.Errorf("esphome: connect %s: %w", p.Address, err)
 	}
 	c.log.Debug("ble.esphome.connect", slog.String("address", p.Address), slog.String("proxy", px.name), slog.Int("rssi", int(s.rssi)))
 	k, err := px.connect(ctx, addr, s.addrType)
 	if err != nil {
+		c.release(addr, h)
 		return nil, err
 	}
+	c.mu.Lock()
+	if c.holds[addr] == h {
+		h.k = k
+	}
+	c.mu.Unlock()
+	// A connection that ended before it was bound to the reservation was
+	// not released by its end (connectionGone); release it here.
+	if k.isGone() {
+		c.release(addr, h)
+	}
 	return k, nil
+}
+
+// reserve reserves addr for one Connect, through whichever proxy: refused
+// while another Connect holds it, up or still connecting.
+// Mirrors matter.js packages/nodejs-ble/src/NobleBleChannel.ts:166-179 at
+// b25ed9604f: #openChannels → "already connected", #connectionsInProgress
+// → "already in progress", the slot reserved before the connect.
+func (c *Central) reserve(addr uint64) (*addrHold, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if h := c.holds[addr]; h != nil {
+		if h.k != nil {
+			return nil, errAlreadyConnected
+		}
+		return nil, errConnectInProgress
+	}
+	h := &addrHold{}
+	c.holds[addr] = h
+	return h, nil
+}
+
+// release frees addr if h still holds it: a later Connect that owns the
+// address keeps it.
+func (c *Central) release(addr uint64, h *addrHold) {
+	c.mu.Lock()
+	if c.holds[addr] == h {
+		delete(c.holds, addr)
+	}
+	c.mu.Unlock()
+}
+
+// connectionGone frees the address of a connection that ended, if its
+// Connect's reservation is bound to it.
+func (c *Central) connectionGone(k *connection) {
+	c.mu.Lock()
+	if h := c.holds[k.addr]; h != nil && h.k == k {
+		delete(c.holds, k.addr)
+	}
+	c.mu.Unlock()
 }

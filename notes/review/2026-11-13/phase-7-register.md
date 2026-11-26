@@ -936,3 +936,144 @@ Opus's code review (`review-pr1-opus.md`) and Fable's bounded read (`fable-revie
 | P8-PR1-opus-L5 | low | open → #623 (`client/discovery/status.go:176-185`, restart after a successful resolve; beyond `by_design.md:9822-9824`, Fable-confirmed) |
 
 #596-B (AVSM count): the `chiptool.yml` dispatch run 45478705992 on `73e3a7cfe`, custom families including AVSM, succeeded; it counts toward #596-B.
+
+## Phase 8, wave 2: the second fix pull request (2026-11-26)
+
+Wave 2 ran on branch `phase8/wave2` from `4cd4e106e` (decisions 686–693, in
+`decisions.md`): B1 `ble/bluez` (#610, on the bluetoothd probe of decision
+574), B4 `cluster/core` AccessControl (#619, #621, #622), B5 `endpoint` and
+`client/discovery` (#618, #623), B6 camera and the spec seam (#620, N1), B8
+`ble/esphome` (decision 675), and B2 the C4 rows of #602 (section below).
+Every fixed row has a test that failed before its fix, except where the row
+says otherwise. Fable read the diffs of B1, B4, B5, B6 and B8 (decision 691:
+decision 672's limit does not bind wave 2). A row closed here keeps its
+earlier entry ("open", "→ #6xx") as it was raised; this table closes it.
+
+### The rows
+
+| ID | sev | disposition |
+| --- | --- | --- |
+| C5-bluetoothd-trigger (#610 row 1) | note | fixed `b1fa79c50`, `51e71abc4` (decision 678): the peripheral follows `GattManager1` and `LEAdvertisingManager1` each on its own, per the probe (BlueZ 5.72, CI run 45459009820); `Powered` logged, never written; tests `TestPeripheralReturnRegistersTheApplicationOnceW2B1`, `TestPeripheralAdvertisementWaitsForItsManagerW2B1`, `TestPeripheralReleaseRetryStopsWithoutTheManagerW2B1`, `TestPeripheralLogsPoweredEdgesW2B1`; `by_design.md` `BD-Matter-BLEPeripheralOverBlueZ` (the three sentences replaced by the measurement) and `BD-Matter-BLEPeripheral-PoweredNotWritten` |
+| R3-err-3305 (#610 row 2) | note | fixed `b1fa79c50`: `PeripheralOptions.Logger`, `NewPeripheralWithOptions`; tests `TestPeripheralLogsRetriedRegistrationsW2B1`, `TestPeripheralLogsPoweredEdgesW2B1` |
+| R3-conc-3306 (#610 row 3) | note | fixed `b1fa79c50`, `51e71abc4`: `advMu` is taken with the caller's context; `Close` and `Serve`'s end wait for it at most `peripheralTimeout`; tests `TestPeripheralStopAdvertisingHonoursItsContextW2B1`, `TestPeripheralCloseBoundsItsWaitForAdvMuW2B1`, `TestPeripheralServeEndBoundsItsWaitForAdvMuW2B1` |
+| C5-bluez-svcregistering (#610 row 4, decision 651) | note | fixed `b1fa79c50`: `RegisterService` holds `advMu` and settles against the application generation; test `TestPeripheralAdapterMovesDuringRegisterServiceW2B1` |
+| R4-conc-4306 (#610 row 5) | note | fixed `b1fa79c50` by row 4's serialisation; row 4's test |
+| R4-err-4355 (#610 row 6) | note | fixed `c6ca3f380`: the central's `Close` sends `Device1.Disconnect` for every connection and every connect in flight before `bus.Close`; test `TestCentralCloseDisconnectsW2B1`. The effect of `Disconnect` on a `Connect` in flight is unmeasured (probe §4) |
+| R5-test-5505 (#610 row 7) | note | fixed `b1fa79c50` (test infrastructure: `peripheralConfig.pause`, 10 ms in the tests) |
+| P8-PR1-fable-L1 (#618) | low | fixed `8427547a0` (decision 687): `Assemble` takes a one-slot, context-honouring semaphore for its whole run; tests `TestConcurrentAssembliesShareTheFirstStateW2B5`, `TestAssembleWaitEndsWithContextW2B5` |
+| P8-PR1-fable-L2 (#619) | low | fixed `1cf1c6402`, `9cba6de38`, `9d79fa5a3`: a failed sync puts back only the owed contexts of fabrics whose drop epoch did not move since the take; a drop clears the batch's deferred context, and a batch notes its opener's epoch at `beginAuxiliaryBatch`; tests `TestAccessControlFailedSyncKeepsNoDroppedFabricContextW2B4`, `TestAccessControlDropClearsTheBatchDeferredContextW2B4`, `TestAccessControlDropBeforeTheSyncsTakeIsSeenW2B4`, `TestAccessControlBatchClosedByTheDroppedFabricW2B4`. Residual → P8-619-actor-residual below |
+| P8-PR1-opus-L1 (#620) | low | fixed `5c4a63317` (decision 686): `End` removes the session also without a connector; a refused removal is joined to the returned error, which is bare when the removal succeeds; tests `TestProviderEndWithoutConnectorRemovesW2B6`, `TestProviderEndReturnsSendAndRemovalErrorsW2B6`; `by_design.md` row of decision 663 extended |
+| P8-PR1-opus-L2 (#621) | low | fixed `8ba6c39b1`: one filtered read settles once; Warn when a debt starts failing, Debug while it stays owed; tests `TestAccessControlFilteredReadSettlesOnceW2B4`, `TestAccessControlFailingSourceWarnsOncePerDebtW2B4` |
+| P8-4055-warn-per-read | note | closed by #621 (`8ba6c39b1`) |
+| P8-PR1-opus-L4 (#622) | low | fixed `3e22dc6e3` (decision 690): `NotifyLocalEntryInstalled` deprecated for `NotifyLocalEntryInstalledOn`, removable in `v0.29.0`; README row and CHANGELOG by REG. No use in openccu-loom (5a8727be), go-ha2fabric (ad41fb8), go-fabric-ui (0fb2ee0), go-fabric-server (d61a545) |
+| P8-PR1-opus-L5 (#623) | low | fixed `c282ac5a1`: the cleanup restarts a resolution only when `stopResolving` cancelled it (`resolveStopped`); test `TestStatus_CompletedResolutionStartsNoneW2B5`; `BD-Matter-IpServiceStatus-RestartInCleanup` made precise |
+| P8-PR1-repair-N1 (`fable-read-pr1-repair.md` N1) | low | fixed `299e0b5f7` (decision 689): the spec seam's `stored` runs under the server's lock in `storeWith`, after the store and the queued notification; tests `TestSetAttributesStoredInsideAnOpenWindowW2B6` and the lock-order tests of `cluster/camera/lockorder_w2b6_test.go`. No `by_design` row (fixed) |
+| P8-esphome-cross-proxy (decision 675) | note | fixed `63ea13e73`: `Central.Connect` reserves the address before choosing the proxy; a second Connect through any proxy is refused while the first is in progress or up, released on failure and on the connection's end; test `TestConnectForOneAddressIsRefusedAcrossProxies` |
+
+`ble-virtual.yml` run 45760478433 on `phase8/wave2` at `276f3cacd` (B1 integrated): success.
+
+### Raised in wave 2, open
+
+| ID | where | what |
+| --- | --- | --- |
+| P8-619-actor-residual (fable-diff-b4 4b, re-read 9d79fa5a3) | `cluster/core/access_control_auxiliary.go` (`syncAuxiliaryAs`) | a request of fabric f still running when f is dropped, without a batch: `syncAuxiliary(ctx of f)` with the source failing notes f's epoch at the run's own take, after the drop, so `auxOwedCtx[f]` holds the removed fabric's request context. A batch closes this case from its begin on (its opener's epoch is noted at `beginAuxiliaryBatch`); a drop while the opener still waits for the command lock (`cluster/core/groupcast.go:493-495`) is the same residual. Closing it needs the epoch noted at the request's start, a change of the sync path's shape. Bound: memory only; under `node` the install-time drop of the index (`node/node.go:1040-1046`) clears it before a new fabric at the index is announced; a `bridge` host without `node`: no such drop found (unverified). `aclDropEpoch` also advances on a cleared mark (an Acl-emptying write during a failing read), which drops that fabric's owed context — fails to no administrator named, kept |
+| P8-camera-listener-under-pub (fable-diff-b6 Q2, pre-existing) | `cluster/camera/provider.go` `change` (`pub` held across `storeAt` → `told`) | on the path without an open write window the change listener is told with `pub` still held, so a listener that calls `Upsert` or `RemoveSession` on the same server synchronously blocks on `pub`. Not N1, not a regression; whether a doc states it was not checked (unverified) |
+| P8-bluez-release-before-removal (fable-diff-b1 N1) | `ble/bluez/peripheral_linux.go` `readvertise` | when the `Release` handler runs before the `LEAdvertisingManager1` removal signal is handled (in-process order unmeasured), `readvertise` makes one `RegisterAdvertisement` call before it sees the manager gone on its next round — one call, not a retry series. Whether a call to an ownerless `org.bluez` activates bluetoothd stays open (probe §2). Note |
+| P8-esphome-reserve-before-lookup (fable-diff-b8 note 1) | `ble/esphome/central.go` `Connect` (`reserve` before `choose`) | for an address that is held and no longer sighted, the answer is "already connected / in progress" where matter.js, which looks the peripheral up first (`NobleBleChannel.ts:163-164` at `b25ed960`), answers the scanner's error (`packages/protocol/src/common/BleScanner.ts:148`, "No device found for address …", or `:150-151`, "… is currently not reachable"). For a free address that the scanner does not know both report the unknown peripheral; which of the two a held, no longer sighted address gets is unverified. Note, no `by_design` row (Fable) |
+
+### C4 (B2, wave 2)
+
+C4 is the mutation sample of `bridge/` with `./node/` as the wide package
+(decisions 664, 668, 685, 692). Line numbers are those of `5efa7460a`; the
+non-test files of `bridge/` did not change between `5efa7460a` and the
+units' bases, except `commissioning_window.go` by decision 688.
+
+**The run.** `mutate.yml` run 45710987130 (dispatch on `main` at
+`4cd4e106e`, ref `5efa7460a`, package `bridge`, wide `./node/`, timeout
+120 s, `-p 4`), 29 of 30 shards: 3081 KILLED, 94 SURVIVED/KILLED
+(bridge-blind, node kills), 1165 SURVIVED/SURVIVED, 8 INVALID. Against run
+3 (`28255e842`): 74 killed → survived, 3 K→S, 13 S→B, 6 without a match.
+The 74 are run-3 artefacts, not CI's: 73 survive `./node/` at `5efa7460a`,
+two measured survive at `28255e842` too, and the 74th's only local kill was
+a port-reuse flake of `TestStopWithDoneContextReleasesThePort` that did not
+reproduce in two reruns. Why run 3's node runs failed is unverified (it kept
+no test output).
+
+**Shard 10** (`bridge/subscribe_dispatch.go`, 106 mutants) killed the CI
+runner twice (lost communication; exit 143). It ran locally in Docker
+(`5efa7460a`, `-p 2`, wide `./node/`, timeout 120 s, memory 6 GB): 69
+KILLED, 2 KILLED by timeout (`:188` and `:229` guard off), 6
+SURVIVED/KILLED, 29 SURVIVED/SURVIVED; the container's `OOMKilled` flag
+was set. Measured alone: `:229` guard off runs away in memory — RSS 39 MB →
+6.01 GB in 3 s (`primingSource.next` goes on after exhaustion; the zero
+`ReadResult` is Success, so `buildInitialReport` appends empty reports
+forever); `:188` guard off spins at a flat 25 MB. That `:229` caused the
+OOM flag and the runner deaths is inferred. Decision 693: `script/mutate`
+kills a mutant's process group above `-maxrss` (default 3 GiB) as KILLED,
+note `memory`.
+
+**Rows tested (B2a, `w2-b2a.md`).** The 10 + 1 marginal rows of the
+result's §4 and the sibling `ota_provider_link.go:277` `>→>=`, each red on
+its mutant (overlay) and green on the original: `ota_provider_link.go:964`
+guard off, `securechannel.go:1715` guard off, `:2656` `==→!=`, `:1655`
+second `&&→||` (marginal: a foreign `ProcessSigma3` returning 0x33 must not
+panic), `pase_close.go:189`, `case_initiator.go:162`, `:472`,
+`commissioning_window.go:520`, `:703`, `fields_reader_scenes.go:33`, `:74`
+`!=→==`, `ota_provider_link.go:277` guard off and `>→>=` — commits
+`acabd0098`, `857d2499e`, `de47b0583`, `ad3f5b620`, `a8cf42b9a` (the
+closed-exchange subtest made deterministic: 30/30 kills, was 13–16/30).
+Decision 688 (stopped > blocked > busy) was implemented in the same unit.
+
+**Triage (B2b, `w2-b2b.md`, read by Fable, `fable-read-b2.md`).** The 74:
+60 test gaps, 14 equivalent. Shard 10's 35 survivors: 26 test gaps (all 6
+SURVIVED/KILLED among them, now killed in `bridge`), 9 equivalent. Code
+defects: 0. Commits `84e91f5c1`, `9085f5e15`, `fdcbb77fd`, `3aea61630`,
+and the follow-up `526436a08` (five rows first held equivalent were gaps:
+`subscribe_dispatch.go:683`, `:761` guard off (err), `:241` both `&&→||`,
+`:483` `&&→||`, and `ble.go:442` guard off). 15 of the gaps are **gap
+(defensive)**: the kill calls a helper with a state no current caller
+produces (a typed-nil route, no manager, nil source, a failure result with a
+DataVersion); the guard is the helper's contract, reachability from
+production is not measured, and a guard whose removal a direct call
+observes is not an equivalent (Fable, Q1): `subscribe.go:2082`, `:2112`;
+`conn.go:247`, `:253`, `:275` `&&→||`, `:436`, `:479`, `:535`;
+`case_seam.go:16`; `subscribe_dispatch.go:158` (×2), `:241` (×2), `:799`
+`&&→||`, `:883`, `:938`.
+
+**Equivalent mutants and their reasons.**
+
+| row | mutation | reason |
+| --- | --- | --- |
+| `bridge.go:2923` | `&&→\|\|`, `>→>=` | differ only for a nil address or port 0; every listener the bridge serves has a non-nil address with a port above 0 (`udp.New`; the one seam, `fabrictest`, port 5540) (`c4-triage.md` #1, #2) |
+| `case_initiator.go:466` | guard off | the only call without opcodes computes the same `statusReportSuccess` on the same message before the same return (#4) |
+| `fields_reader_scenes.go:33`, `:74` | guard off (err) | inferred: the decoder reads bytes just re-encoded from a tree that was read and checked, so `Next` has no error on this path (#9) |
+| `securechannel.go:1719` | guard off | a failed comma-ok assertion leaves `a` nil; the caller acts only on a non-nil establisher (§3) |
+| `subscribe.go:3344` | `\|\|→&&` (×2) | inferred from Go semantics: the mutants reach `a == b` only for different types or one comparable value, where `==` is false and cannot panic (§3) |
+| `securechannel.go:1655` | first `&&→\|\|` | inferred: a foreign handler's step has `resumeInstalled == 0`, and `CaseAdapter.processSigma3` never returns 0x33 (§3) |
+| `securechannel.go:2674` | guard off | read: `named` implies `outcome == sigma3Established` (§3) |
+| `subscribe.go:1595` | `&&→\|\|` | `ok` is always true (the only writer is the Swap at `:1594`); the mutant adds a Delete only when `prevKey == key`, undone by the Store at `:1599`; the window exists only in the mutant, on an input no caller produces (that the allocator never repeats an id for consecutive reports is unverified) |
+| `subscribe.go:2278` | `>→>=` | with no event request the priming events are nil; the chunker treats a nil and an empty events func alike |
+| `subscribe.go:2394` | `!=→==` | feeds only `sourceSeen`, a counter nothing reads (not on the Info line); a dead counter |
+| `subscribe.go:2397` | `!=→==` | log only: the `measurement_seen` field (`:2478`); no test or doc names the line |
+| `subscribe.go:2417` | guard off | with no reportable path the notifier filter returns none, so nothing is wired; only `notifier_ok` (`:2479`) moves |
+| `subscribe.go:2653`, `:2726` | guard off | `endpoint.ClusterServers(nil)` returns nil; the loop runs zero times |
+| `ota_provider_link.go:748` | `&&→\|\|` | log only: the body is one Debug line; `enqueue` is evaluated once either way |
+| `conn.go:246` | drop `!` | read: a loaded entry mapping to a route implies its `sessions ≥ 1` (writers `:248`, `:321`, `:325`; every decrement pairs with the removal of a counted entry), so the extra increment and release are a no-op |
+| `bridge.go:3304` | guard off (err) | log only: both arms return; Debug vs Info |
+| `group_messaging.go:316` | guard off | `UnmarshalProtocolHeader` refuses a header that does not fit and `protocolHeaderSize` counts the same fields, so the offset is within the payload |
+| `device_load.go:61`, `:68` | `>→>=` | the boundary value maps to itself |
+| `diag_session_fabric.go:28` | `&&→\|\|` | the reporters return (0, false) when nothing is named; (0, true) resolves to fabric 0 and adds nothing |
+| `subscribe_dispatch.go:38` | `>→>=` | `buildInitialReport` has no production caller; with no event request both sides add nothing |
+| `subscribe_dispatch.go:241` | `>→>=` | no filters → no match |
+| `subscribe_dispatch.go:370` | first `>→>=` | adds only the event paths of no requests, which is 0 |
+| `subscribe_dispatch.go:552` | `>→>=` | log only: the Info line when nothing was cleared |
+| `subscribe_dispatch.go:569` | guard off | without a node-naming path the paths are copied unchanged; for no paths the result is empty instead of nil, and both consumers append onto nil |
+| `subscribe_dispatch.go:591` | `>→>=` | an equal number sets the same value |
+| `subscribe_dispatch.go:712` | guard off (err) | for a deterministic encoder: each report of a chunk was encoded alone by the chunker first, and an error there ends `Next` |
+| `subscribe_dispatch.go:722` | drop `!` | log only: a Debug field |
+| `subscribe_dispatch.go:808` | guard off (err) | read: `SubscribeResponse.MarshalTLV` opens and closes one struct around three unsigned puts; `Bytes` errs only on an open container |
+
+Not triaged: the 1165 SURVIVED/SURVIVED rows of the CI run outside the 74
+and shard 10, and the 13 S→B rows (CI's own wide kills; one measured as
+spurious). The targeted re-run of the B2 mutants at the release head
+(decision 668) is still to come.

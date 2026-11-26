@@ -556,6 +556,7 @@ func (p *proxy) forget(k *connection) {
 		delete(p.conns, k.addr)
 	}
 	p.mu.Unlock()
+	p.c.connectionGone(k)
 	p.unsubscribeIfIdle()
 }
 

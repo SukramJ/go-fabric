@@ -44,8 +44,20 @@
 // INVALID (the mutant did not build) or NOTRUN (not started within
 // -budget). The wide verdict is empty unless the own-package tests let the
 // mutant survive and -wide is set. The note is "timeout" (killed by the
-// test deadline) or "nospace" (the volume ran out of space; the line is
-// INVALID and says nothing about the tests).
+// test deadline), "memory" (killed by the watchdog below) or "nospace" (the
+// volume ran out of space; the line is INVALID and says nothing about the
+// tests).
+//
+// # Memory
+//
+// A mutant can turn a bounded loop into an unbounded one that allocates
+// on every turn: one was measured at 6 GB of resident memory after 3 s
+// (decision 693). With -maxrss above zero (default 3GiB), each go test
+// run starts in its own process group, and on Linux and macOS a watchdog
+// polls the summed resident memory of that group — the go tool, the
+// compiler and linker it spawns, and the test binary — every 200 ms; over
+// the limit it kills the whole group and the run is KILLED with the note
+// "memory". Elsewhere -maxrss has no effect.
 //
 // # Disk
 //
@@ -165,17 +177,40 @@ func isGuard(x *ast.IfStmt) bool {
 }
 
 // goTest runs `go test` on pkgs with the overlay and returns the verdict
-// and the note.
-func goTest(root, overlay string, pkgs []string, timeout time.Duration) (verdict, note string) {
+// and the note. With maxRSS above zero (and where [watchSupported]) the run
+// gets its own process group, and [watchRSS] kills the group once its
+// resident memory passes maxRSS: KILLED, note "memory".
+func goTest(root, overlay string, pkgs []string, timeout time.Duration, maxRSS int64) (verdict, note string) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout+60*time.Second)
 	defer cancel()
 	args := append([]string{"test", "-count=1", "-overlay", overlay, "-timeout", timeout.String()}, pkgs...)
 	cmd := exec.CommandContext(ctx, "go", args...) //nolint:gosec // the go tool, with the caller's packages
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
-	b, err := cmd.CombinedOutput()
-	s := string(b)
+	var buf bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &buf, &buf
+	watch := maxRSS > 0 && watchSupported
+	if watch {
+		ownGroup(cmd)
+	}
+	err := cmd.Start()
+	overMem := false
+	if err == nil {
+		done := make(chan struct{})
+		over := make(chan bool, 1)
+		if watch {
+			go func() { over <- watchRSS(cmd.Process.Pid, maxRSS, done) }()
+		} else {
+			over <- false
+		}
+		err = cmd.Wait()
+		close(done)
+		overMem = <-over
+	}
+	s := buf.String()
 	switch {
+	case overMem:
+		return "KILLED", "memory"
 	case err == nil:
 		return "SURVIVED", ""
 	case strings.Contains(s, "no space left on device"):
@@ -218,6 +253,7 @@ type result struct {
 type config struct {
 	root, wide, out, tmp string
 	workers, minFree     int
+	maxRSS               byteSize // -maxrss; 0: no watchdog
 	timeout, budget      time.Duration
 	files                []string
 	start                time.Time // -budget counts from here
@@ -236,6 +272,8 @@ func parseFlags(args []string, stderr io.Writer) (config, bool) {
 	fs.StringVar(&c.out, "o", "mutants.tsv", "output TSV")
 	fs.StringVar(&c.tmp, "tmp", "", "scratch dir for the mutated files and overlays (default: a fresh temporary directory, removed at the end)")
 	fs.IntVar(&c.minFree, "minfree", 0, "GiB: when the volume of the build cache has less free, wait for the builds in flight and run `go clean -cache` (0: never)")
+	c.maxRSS = 3 << 30
+	fs.Var(&c.maxRSS, "maxrss", "the resident memory one go test run's process group may hold, in bytes or with a KiB, MiB or GiB suffix; over it the group is killed and the run is KILLED with the note memory (0: no watchdog)")
 	fs.DurationVar(&c.budget, "budget", 0, "stop handing out mutants after this long; the rest are written as NOTRUN (0: no limit)")
 	if err := fs.Parse(args); err != nil {
 		return c, false
@@ -365,10 +403,10 @@ func mutateOne(c config, m *mutant, src []byte, wides []string, mf, of string) r
 		}
 		return result{m: *m, own: "INVALID", note: note}
 	}
-	own, note := goTest(c.root, of, []string{"./" + filepath.Dir(m.file)}, c.timeout)
+	own, note := goTest(c.root, of, []string{"./" + filepath.Dir(m.file)}, c.timeout, int64(c.maxRSS))
 	wide := ""
 	if own == "SURVIVED" && len(wides) > 0 {
-		wide, note = goTest(c.root, of, wides, c.timeout)
+		wide, note = goTest(c.root, of, wides, c.timeout, int64(c.maxRSS))
 	}
 	return result{m: *m, own: own, wide: wide, note: note}
 }

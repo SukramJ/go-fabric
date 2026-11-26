@@ -139,6 +139,10 @@ type Provider struct {
 	// ends sends the End of a SolicitOffer refused at a session bound
 	// (provider_cap.go).
 	ends endQueue
+	// refuseForTests, nil in production, stands for a table the schema
+	// refuses: a non-nil error from it fails [Provider.change] before the
+	// store, as a refused value does.
+	refuseForTests func() error
 }
 
 // Compile-time assertions.
@@ -232,7 +236,10 @@ func (p *Provider) removeSession(origin contract.Origin, sessionID uint16) error
 // The table is kept between the store and the notification
 // (internal/specseam.SetAttributesStored): a change listener, and whatever
 // it wakes, reads through Sessions() the table it is told about (PR 1
-// review M1, decision 682). Mirrors matter.js Datasource.ts at b25ed960:
+// review M1, decision 682). keep runs under the spec server's lock
+// (decision 689), so it takes only mu, and no holder of mu calls the
+// spec server: the lock order is pub, then the server's, then mu.
+// Mirrors matter.js Datasource.ts at b25ed960:
 // commit2 makes the committed values canonical (:1475-1489, the
 // assignment :1488) before postCommit emits the change events (:1520),
 // and a refused commit's values never become canonical (rollback,
@@ -246,6 +253,11 @@ func (p *Provider) change(origin contract.Origin, edit func([]ProviderSession) (
 	}
 	if next == nil {
 		next = []ProviderSession{}
+	}
+	if p.refuseForTests != nil {
+		if err := p.refuseForTests(); err != nil {
+			return fmt.Errorf("camera: CurrentSessions: %w", err)
+		}
 	}
 	keep := func() {
 		p.mu.Lock()

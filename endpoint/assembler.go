@@ -179,16 +179,19 @@ func (c Config) Validate() error {
 	return checkBridgeVendorName(c.VendorName)
 }
 
-// Assembler turns snapshots of [Spec] values into a [Topology].
-// Concurrent calls serialise the endpoint-id allocation through the
-// underlying store transactions, not the endpoint state of a key: two
-// concurrent calls with a key new to both can each build its first state,
-// and the topology whose install lost holds one the next assembly does
-// not reuse (issue #618) — call Assemble from one goroutine at a time.
+// Assembler turns snapshots of [Spec] values into a [Topology]. It is
+// safe for concurrent use, one assembly at a time: [Assembler.Assemble]
+// waits for one in progress, so a key's first state is built and
+// installed by one run before the next looks for it (issue #618).
 type Assembler struct {
 	store  Store
 	cfg    Config
 	logger *slog.Logger
+	// assembly runs the assemblies one at a time, from the first spec to
+	// the registry's installs and retain ([Assembler.enterAssembly]). A
+	// one-slot semaphore, so that the wait for it ends with the caller's
+	// context; made by [New].
+	assembly chan struct{}
 	// states owns the per-endpoint state that must outlive a single
 	// dispatch (DataVersion trackers, the Identify cluster server),
 	// keyed by the stable [SourceKey]. It lives across every
@@ -219,10 +222,11 @@ func New(s Store, cfg Config, logger *slog.Logger) (*Assembler, error) {
 		logger = slog.Default()
 	}
 	a := &Assembler{
-		store:  s,
-		cfg:    cfg,
-		logger: logger,
-		states: newEndpointStateRegistry(cfg.Clock),
+		store:    s,
+		cfg:      cfg,
+		logger:   logger,
+		assembly: make(chan struct{}, 1),
+		states:   newEndpointStateRegistry(cfg.Clock),
 	}
 	a.rootState = newEndpointState(cfg.Clock)
 	a.aggregatorState = newEndpointState(cfg.Clock)
@@ -238,7 +242,15 @@ func New(s Store, cfg Config, logger *slog.Logger) (*Assembler, error) {
 // Snapshots must have unique Scope values; the assembler does not
 // deduplicate. The caller is expected to pass exactly one snapshot per
 // scope.
+//
+// Assemble waits for an assembly in progress until ctx ends; the wait's
+// error wraps ctx's.
 func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topology, error) {
+	release, err := a.enterAssembly(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	// Apple-compatible three-tier topology (mirrors matter.js's
 	// `BridgedDevicesNode.ts`):
 	//   EP 0 = RootNode  (DeviceType 0x0016) — system services
@@ -314,6 +326,25 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		ep.fabrics = a.cfg.Fabrics
 	}
 	return topology, nil
+}
+
+// enterAssembly waits for the assembly slot ([Assembler.assembly]) until
+// ctx ends and returns its release. A free slot is always taken, whatever
+// ctx's state, as the bridge's enterAssembly takes its own: a select over
+// both would pick ctx.Done() at random.
+func (a *Assembler) enterAssembly(ctx context.Context) (release func(), err error) {
+	slot := a.assembly
+	select {
+	case slot <- struct{}{}:
+		return func() { <-slot }, nil
+	default:
+	}
+	select {
+	case slot <- struct{}{}:
+		return func() { <-slot }, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("endpoint: waiting for an assembly in progress: %w", ctx.Err())
+	}
 }
 
 // deviceTypeRootNode is the Matter Device Type ID for the root
