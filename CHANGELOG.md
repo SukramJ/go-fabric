@@ -12,6 +12,7 @@ pseudo-version of `main`.
 
 ### Changed
 
+- CI (`chiptool.yml`, issue 632): a release pull request in release shape — documentation plus, in the nested modules' and the examples' `go.mod`, only `require` lines of `thingfabric.dev/go-fabric…` modules that the same `go.mod` replaces with a local path (no `go.sum`, `replace` or other line) — no longer runs the chip-tool legs, the Go-TH groups or the certification families (`long` included): `certification families (long) on the base commit` requires one nightly or dispatched run on the pull request's base commit in which every one of them passed, and the gate accepts those verdicts for this class only. `nested modules against the versions they require` and `ci.yml` run in full; any other change runs everything.
 - `ble/bluez`, `ble/esphome`, `wifi/wpasupplicant`: the nested modules require go-fabric `v0.27.0` (was `v0.26.0`) and are tagged `ble/bluez/v0.27.0`, `ble/esphome/v0.27.0` and `wifi/wpasupplicant/v0.27.0` at this commit; `examples/ble-wifi-light` requires the three at `v0.27.0`. The root `go.mod` and `go.sum` did not change between `v0.26.0` and `v0.27.0`.
 
 ### Removed

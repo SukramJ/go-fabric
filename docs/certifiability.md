@@ -34,7 +34,13 @@ nested-release-check`: each nested module built against the go-fabric version
 its go.mod requires, its replace dropped; a module out of shape fails a nested
 release, `release/nested-*`, and is a warning on a root release; a sibling's
 require of the version the nested release pull request itself tags is built
-against that sibling's checked copy). Its required
+against that sibling's checked copy). A release pull request in release shape
+— documentation plus, in the nested modules' and the examples' `go.mod`, only
+`require` lines of `thingfabric.dev/go-fabric…` modules that the same `go.mod`
+replaces with a local path, read from the diff line by line — builds nothing
+its base commit did not: it runs the nested modules' release shape (and
+`ci.yml`) and takes every other job's result from one nightly or dispatched
+run on the base commit in which all of them passed. Its required
 check `chip certification cases against the reference daemon` stays red until
 all of them have run and passed, so no release is tagged over a family only
 the nightly run would have shown; the virtual

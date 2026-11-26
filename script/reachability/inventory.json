@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10954,
+  "entry_points": 10955,
   "initializers": 373,
   "entry_packages": [
     ".",
@@ -297,9 +297,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28726,
+    "total_exported": 28727,
     "reachable": 22331,
-    "whitelisted": 6373,
+    "whitelisted": 6374,
     "unreachable": 22
   },
   "by_package": [
@@ -36694,21 +36694,21 @@
       "identifier": "TestWorkflowCodeFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/gocert_select_test.go",
-      "line": 161
+      "line": 164
     },
     {
       "package": "internal/chiptool",
       "identifier": "TestWorkflowFilterVerdict",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/workflow_verdict_test.go",
-      "line": 292
+      "line": 466
     },
     {
       "package": "internal/chiptool",
       "identifier": "TestWorkflowGateVerdict",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/workflow_verdict_test.go",
-      "line": 166
+      "line": 167
     },
     {
       "package": "internal/chiptool",
@@ -36722,21 +36722,28 @@
       "identifier": "TestWorkflowGoCertStepVerdict",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/workflow_verdict_test.go",
-      "line": 114
+      "line": 115
     },
     {
       "package": "internal/chiptool",
       "identifier": "TestWorkflowGroupsSelection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/workflow_verdict_test.go",
-      "line": 224
+      "line": 256
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestWorkflowLongOnBaseNamesEveryLeg",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/workflow_verdict_test.go",
+      "line": 402
     },
     {
       "package": "internal/chiptool",
       "identifier": "TestWorkflowLongOnBaseVerdict",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/workflow_verdict_test.go",
-      "line": 261
+      "line": 297
     },
     {
       "package": "internal/chiptool",
