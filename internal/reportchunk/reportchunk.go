@@ -29,7 +29,10 @@
 // path FAILURE (an AttributeStatusIB, an EventStatusIB) and the rest of the
 // report goes out, as connectedhomeip's report engine rolls the partial
 // AttributeReportIB back and writes a status for the path
-// (src/app/reporting/Engine.cpp:449-450, :487, :498 at 6170af84). matter.js
+// (src/app/reporting/Engine.cpp:449-450, :487, :498 at 6170af84). The
+// EventStatusIB is this module's own floor — chip fails the report on a
+// stored event it cannot copy (src/app/reporting/Engine.cpp:697-703), see
+// the by_design row. matter.js
 // has no containment per attribute; the divergence is recorded in
 // notes/parity/by_design.md (#625).
 package reportchunk

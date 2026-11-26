@@ -550,13 +550,15 @@ func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 		// tag a node carries, and the tree's reader refuses an array with
 		// a tagged element (spec.ErrArrayElementTag). But that code is not
 		// only this module's: a host value's EncodeTLV behind contract/
-		// writes on an encoder too, and one that leaves a container open
-		// or tags an array element fires this panic — on the message's
-		// encoder, inside a report or a response. Every value encoder of
-		// a report, an event payload and a command response therefore
-		// runs on an encoder of its own under a recover
-		// (internal/valueenc), where this panic costs the one path a
-		// FAILURE and nothing else (#625).
+		// writes on an encoder too, and one that leaves an array open or
+		// tags an array element fires this panic — on the message's
+		// encoder, inside a report or a response, when it shares that
+		// encoder. The bridge's and the client stack's report and invoke
+		// paths therefore run every value encoder on an encoder of its own
+		// under a recover (internal/valueenc), where this panic costs the
+		// one path a FAILURE and nothing else (#625). The public
+		// EncodeReportData and a direct MarshalTLV do not: there the panic
+		// reaches the caller.
 		panic(fmt.Sprintf("tlv: context tag inside Array container (tag=%d); use AnonymousTag()", tag.Number))
 	}
 	// Note: chip TLVReader.cpp:865-871 (at 6170af84) enforces two strictness rules

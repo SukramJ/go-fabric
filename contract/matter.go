@@ -109,8 +109,9 @@ type ClusterServer interface {
 	// the request payload; `response` is the cluster-native struct
 	// for the response, or nil for status-only commands.
 	//
-	// The response is encoded once, on an encoder of its own: one whose
-	// encoder panics, leaves a container open or writes other than one
+	// The response is encoded for the answer once, on an encoder of its
+	// own (a response checked against a hand-written form is written once
+	// more for the check, in the same isolation): one whose encoder panics, leaves a container open or writes other than one
 	// element answers FAILURE (a CommandStatusIB on the request's path)
 	// for that command, logged at ERROR, the other commands of the
 	// invoke unaffected. The command has run by then, and nothing undoes

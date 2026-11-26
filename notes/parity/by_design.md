@@ -653,16 +653,28 @@ priming or ongoing report goes out, as connectedhomeip rolls back to the
 checkpoint taken before the attribute and writes the status
 (`src/app/reporting/Engine.cpp:449-450`, `:487`, `:498` at `6170af84`; the code
 is `Failure`, `src/app/data-model-provider/ActionReturnStatus.cpp:125-127`,
-`src/protocols/interaction_model/StatusCode.cpp:41-63`); a failing event payload
-is refused when it is emitted — not recorded, no event number consumed — as
-chip, which encodes the payload when the event is logged
-(`src/app/EventManagement.cpp:468-478`), with an EventStatusIB `Failure` at
-report time as the floor; a failing command response answers a CommandStatusIB
-`Failure` on the request's path after the handler has run, without a rollback
-of its effect, as chip (`src/app/CommandHandlerImpl.cpp:232-240`) — the status
-code is the same in all three. Reasoning: `contract/` is a trust boundary
-matter.js does not have — its values are schema-checked state — so one bad
-host value costs its own path, not a wildcard Read or a subscription.
+`src/protocols/interaction_model/StatusCode.cpp:41-63`); a failing event
+payload is refused when it is emitted — not recorded, no event number consumed — as chip, which encodes the payload when the event
+is logged and vends the number only on success
+(`src/app/EventManagement.cpp:468-483`). The record keeps the Go value, so
+the payload is encoded again for every report; one that fails only then
+answers an EventStatusIB `Failure` for its path and the rest goes out.
+That floor follows neither reference: chip stores the encoded bytes, and a
+stored event that cannot be copied into a report rolls the writer back,
+is skipped for the next attempt and fails the report, which closes the
+ReadHandler (`EventManagement.cpp:635-647`, `:679-688`;
+`src/app/reporting/Engine.cpp:697-703`, `:812-814`, `:861-869`); matter.js
+fails the report as above and does not check a payload when it is emitted
+(`packages/node/src/behavior/Events.ts:203-208`,
+`packages/protocol/src/events/OccurrenceManager.ts:295-309`). A failing
+command response answers a CommandStatusIB `Failure` on the request's path
+after the handler has run, without a rollback of its effect, as chip
+(`src/app/CommandHandlerImpl.cpp:232-240`); matter.js answers `Failure`
+too unless the thrown error is a `StatusResponseError`, whose code it
+answers (`CommandInvokeResponse.ts:512`, `:518-523`). Reasoning:
+`contract/` is a trust boundary matter.js does not have — a host encoder
+is code this module does not control — so one bad host value costs its
+own path, not a wildcard Read or a subscription.
 
 ### BD-Matter-SetupCodecShape — the setup-code codecs always validate, take no flow and encode no TLV data
 
