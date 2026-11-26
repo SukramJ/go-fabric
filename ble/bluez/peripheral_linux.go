@@ -1039,7 +1039,7 @@ type retryLog struct {
 func (r *retryLog) failed(err error, pause time.Duration) {
 	if s := err.Error(); s != r.last {
 		r.last = s
-		r.log.Warn("bluez: registering "+r.what+" failed, retrying", slog.Any("err", err), slog.Duration("pause", pause))
+		r.log.Warn("bluez: registering "+r.what+" failed, retrying", slog.Any("err", err), slog.Duration("retry_in", pause))
 	}
 }
 
