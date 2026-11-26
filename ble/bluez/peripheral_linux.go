@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -43,7 +44,8 @@ const peripheralTimeout = 5 * time.Second
 // readvertiseFirst and readvertiseMax pace the registration of an
 // advertisement BlueZ released (Release): retried after a failure, the
 // pause doubling up to the maximum, until it holds or StopAdvertising or
-// Close ends it (R2-C2-fsm-2001).
+// Close ends it (R2-C2-fsm-2001). readvertiseFirst is the default of the
+// peripheral's first pause (peripheralConfig.pause).
 const (
 	readvertiseFirst = time.Second
 	readvertiseMax   = 30 * time.Second
@@ -81,20 +83,38 @@ const (
 // (src/platform/Linux/bluez/BluezConnection.cpp:220-223 at 6170af84)
 // applies here too.
 func NewPeripheral(adapter string) (contract.GATTPeripheral, error) {
+	return NewPeripheralWithOptions(PeripheralOptions{Adapter: adapter})
+}
+
+// NewPeripheralWithOptions is [NewPeripheral] configured by o: the adapter
+// and the logger that receives the peripheral's diagnostics.
+func NewPeripheralWithOptions(o PeripheralOptions) (contract.GATTPeripheral, error) {
+	adapter := o.Adapter
 	if adapter == "" {
 		adapter = DefaultAdapter
+	}
+	log := o.Logger
+	if log == nil {
+		log = slog.Default()
 	}
 	path := adapterPath(adapter)
 	b, err := dialSystemBus(path)
 	if err != nil {
 		return nil, err
 	}
-	p, err := newPeripheral(b, path)
+	p, err := newPeripheral(b, path, peripheralConfig{log: log, pause: readvertiseFirst})
 	if err != nil {
 		_ = b.Close()
 		return nil, err
 	}
 	return p, nil
+}
+
+// peripheralConfig is what newPeripheral takes beside the bus: the logger
+// and the first pause of a registration the peripheral retries on its own.
+type peripheralConfig struct {
+	log   *slog.Logger
+	pause time.Duration
 }
 
 // peripheral is the BlueZ peripheral.
@@ -113,6 +133,11 @@ type peripheral struct {
 	// readvertising counts the goroutines that register a released
 	// advertisement again; Close waits for them before the bus goes.
 	readvertising sync.WaitGroup
+	// log receives the diagnostics; pause is the first pause of a
+	// registration retried on its own (readvertise, followAdapter),
+	// doubling up to readvertiseMax.
+	log   *slog.Logger
+	pause time.Duration
 
 	// mu guards every field below.
 	mu sync.Mutex
@@ -150,10 +175,16 @@ type peripheral struct {
 	// field set and the PropertiesChanged sent under it, so the signals
 	// follow one another in the order of the states they report.
 	acquiredMu sync.Mutex
-	// advMu serialises Advertise and StopAdvertising, each of which reads
-	// the registration, calls BlueZ and records the result (review II,
-	// R2-P6-conc-2013). Taken before mu.
-	advMu sync.Mutex
+	// advMu serialises Advertise, StopAdvertising, RegisterService, the
+	// end of a registration (Serve, Close) and the work that follows a
+	// Release or the adapter (readvertise, followAdapter): each reads the
+	// registrations, calls BlueZ and records the result (review II,
+	// R2-P6-conc-2013; #610 rows 3-5). A caller with a context waits for it
+	// no longer than the context lets it (R3-conc-3306), the works no
+	// longer than the peripheral is open. Taken before mu. bluetoothd calls
+	// the exported handlers before it answers a registration, so none of
+	// them takes it.
+	advMu ctxMutex
 	// bluezOwner is the unique bus name that owns org.bluez as last read:
 	// the one caller the exported methods serve (fromBluez).
 	bluezOwner string
@@ -161,6 +192,24 @@ type peripheral struct {
 	// InterfacesRemoved: the work each starts (followAdapter) stops when
 	// a later one superseded it (R3-fsm-3301).
 	adapterGen uint64
+	// appGen counts only the signals that name GattManager1 — or Adapter1
+	// on a removal: a registration of the application settles appLost only
+	// while it did not move, so the advertising manager's own
+	// InterfacesAdded, which bluetoothd sends after the adapter's
+	// (#610 probe), does not make a finished registration look superseded
+	// (#610 row 1, R5-fsm-5502).
+	appGen uint64
+	// gattGone and advGone are set while the adapter's GattManager1 and
+	// LEAdvertisingManager1 are absent: read from GetManagedObjects at the
+	// start, then from the InterfacesRemoved and InterfacesAdded that name
+	// each — or Adapter1 on a removal, which takes both. Nothing is
+	// registered again on the side whose manager is absent: the manager's
+	// InterfacesAdded registers it (#610 row 1).
+	gattGone, advGone bool
+	// powered is the adapter's Powered as last read, poweredKnown whether
+	// it was read. It is observed for the log only (#610 row 1, decision
+	// 678): the registrations stay and nothing is registered on its edges.
+	powered, poweredKnown bool
 	// appLost is set when the adapter, or its GattManager1, left or came
 	// back while a service was registered: the application is registered
 	// again by followAdapter, and no advertisement is registered before it
@@ -183,21 +232,34 @@ var (
 )
 
 // newPeripheral is the peripheral over b: the adapter must exist.
-func newPeripheral(b bus, adapter dbus.ObjectPath) (*peripheral, error) {
+func newPeripheral(b bus, adapter dbus.ObjectPath, cfg peripheralConfig) (*peripheral, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
 	defer cancel()
 	objs, err := getManagedObjects(ctx, b)
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := objs[adapter][ifaceAdapter]; !ok {
+	props, ok := objs[adapter][ifaceAdapter]
+	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrNoAdapter, adapter)
 	}
+	if cfg.log == nil {
+		cfg.log = slog.Default()
+	}
+	if cfg.pause <= 0 {
+		cfg.pause = readvertiseFirst
+	}
 	name := string(adapter)[strings.LastIndex(string(adapter), "/")+1:]
+	_, gatt := objs[adapter][ifaceGattManager]
+	_, advertising := objs[adapter][ifaceAdvertising]
+	powered, poweredKnown := variantAs[bool](props["Powered"], hasKey(props, "Powered"))
 	p := &peripheral{
 		bus: b, adapter: adapter, root: dbus.ObjectPath("/gofabric/" + name),
 		done: make(chan struct{}), quit: make(chan struct{}), dispatched: make(chan struct{}),
 		conns: map[dbus.ObjectPath]*pconn{},
+		log:   cfg.log, pause: cfg.pause, advMu: newCtxMutex(),
+		gattGone: !gatt, advGone: !advertising,
+		powered: powered, poweredKnown: poweredKnown,
 	}
 	go p.dispatch()
 	return p, nil
@@ -241,7 +303,9 @@ func (p *peripheral) Close() error {
 	_ = p.StopAdvertising(ctx)
 	if unserved != nil {
 		close(unserved.ended)
+		p.advMu.Lock()
 		_ = p.unregisterApplication(ctx)
+		p.advMu.Unlock()
 		p.endRegistration(unserved)
 	}
 	close(p.done)
@@ -292,10 +356,13 @@ func (p *peripheral) handle(sig *dbus.Signal) {
 		if dbus.Store(sig.Body, &path, &ifaces) != nil || path != p.adapter {
 			return
 		}
-		_, adapter := ifaces[ifaceAdapter]
+		// On a return each side follows its own manager: bluetoothd sends
+		// LEAdvertisingManager1 in an InterfacesAdded of its own, after
+		// the one of Adapter1 and GattManager1 (#610 probe, design point
+		// 3).
 		_, gatt := ifaces[ifaceGattManager]
 		_, advertising := ifaces[ifaceAdvertising]
-		p.adapterChanged(true, adapter || gatt, adapter || advertising)
+		p.adapterChanged(true, gatt, advertising)
 	case sigIfacesRemoved:
 		var path dbus.ObjectPath
 		var ifaces []string
@@ -317,12 +384,42 @@ func (p *peripheral) handle(sig *dbus.Signal) {
 		}
 		iface, _ := sig.Body[0].(string)
 		props, _ := sig.Body[1].(map[string]dbus.Variant)
+		if iface == ifaceAdapter && sig.Path == p.adapter {
+			if on, ok := variantAs[bool](props["Powered"], hasKey(props, "Powered")); ok {
+				p.poweredChanged(on)
+			}
+			return
+		}
 		if iface != ifaceDevice {
 			return
 		}
 		if on, ok := variantAs[bool](props["Connected"], hasKey(props, "Connected")); ok && !on {
 			p.gone(sig.Path)
 		}
+	}
+}
+
+// poweredChanged logs the adapter's Powered edges: off, while BlueZ keeps
+// the registrations and nothing the peripheral can register changes what
+// the radio sends, at Warn; on again at Info. It changes nothing else: the
+// #610 probe (BlueZ 5.72) saw both registrations survive a Powered edge,
+// no Release, and a registration repeated after it refused with
+// AlreadyExists; and the peripheral never writes Powered — the adapter's
+// power is the host's (decision 678).
+func (p *peripheral) poweredChanged(on bool) {
+	p.mu.Lock()
+	edge := !p.poweredKnown || p.powered != on
+	known := p.poweredKnown
+	p.powered, p.poweredKnown = on, true
+	advertising, serving := p.registered, p.serviceLive()
+	p.mu.Unlock()
+	switch {
+	case !edge:
+	case !on:
+		p.log.Warn("bluez: adapter powered off; the registrations stay, nothing is sent until it is powered on",
+			slog.String("adapter", string(p.adapter)), slog.Bool("advertising", advertising), slog.Bool("serving", serving))
+	case known:
+		p.log.Info("bluez: adapter powered on", slog.String("adapter", string(p.adapter)))
 	}
 }
 
@@ -394,7 +491,9 @@ func (p *peripheral) Advertise(ctx context.Context, adv contract.BLEAdvertisemen
 		"MinInterval":  dbus.MakeVariant(ms),
 		"MaxInterval":  dbus.MakeVariant(ms),
 	}
-	p.advMu.Lock()
+	if err := p.advMu.LockContext(ctx); err != nil {
+		return err
+	}
 	defer p.advMu.Unlock()
 	p.mu.Lock()
 	if p.closed {
@@ -449,7 +548,9 @@ func (p *peripheral) registerAdvertisement(ctx context.Context) error {
 // LEAdvertisingManager1.UnregisterAdvertisement (chip
 // BluezAdvertisement.cpp:294-318).
 func (p *peripheral) StopAdvertising(ctx context.Context) error {
-	p.advMu.Lock()
+	if err := p.advMu.LockContext(ctx); err != nil {
+		return err
+	}
 	defer p.advMu.Unlock()
 	p.mu.Lock()
 	registered := p.registered
@@ -545,18 +646,23 @@ func (p *peripheral) release(sender dbus.Sender) *dbus.Error {
 }
 
 // readvertise ends the registration of generation gen that BlueZ released
-// and registers the advertisement again, pausing readvertiseFirst and
-// doubling up to readvertiseMax after each failure. It stops when the
-// registration it saw was replaced meanwhile, when an Advertise registered
-// it, when StopAdvertising withdrew it (adv nil, or an unregister owed
-// when the release came: the advertisement is then forgotten), and when
-// the peripheral closes.
+// and registers the advertisement again, pausing p.pause and doubling up to
+// readvertiseMax after each failure. It stops when the registration it saw
+// was replaced meanwhile, when an Advertise registered it, when
+// StopAdvertising withdrew it (adv nil, or an unregister owed when the
+// release came: the advertisement is then forgotten), when the advertising
+// manager is absent — the Release then reported a loss its InterfacesRemoved
+// announced, and the manager's InterfacesAdded registers the advertisement
+// (#610 row 1, design point 5) — and when the peripheral closes.
 func (p *peripheral) readvertise(gen uint64) {
 	defer p.readvertising.Done()
-	pause := readvertiseFirst
+	pause := p.pause
 	first := true
+	rl := retryLog{log: p.log, what: "the released advertisement"}
 	for {
-		p.advMu.Lock()
+		if !p.lockAdvUnlessDone() {
+			return
+		}
 		p.mu.Lock()
 		if first {
 			first = false
@@ -584,7 +690,7 @@ func (p *peripheral) readvertise(gen uint64) {
 		}
 		// While the application is lost with the adapter, followAdapter
 		// registers the advertisement after it.
-		stop := p.closed || p.registered || p.advOwed || p.adv == nil || p.appMissing()
+		stop := p.closed || p.registered || p.advOwed || p.adv == nil || p.appMissing() || p.advGone
 		p.mu.Unlock()
 		if stop {
 			p.advMu.Unlock()
@@ -595,8 +701,10 @@ func (p *peripheral) readvertise(gen uint64) {
 		cancel()
 		p.advMu.Unlock()
 		if err == nil {
+			rl.held()
 			return
 		}
+		rl.failed(err, pause)
 		wait := time.NewTimer(pause)
 		select {
 		case <-wait.C:
@@ -609,9 +717,11 @@ func (p *peripheral) readvertise(gen uint64) {
 }
 
 // adapterChanged starts followAdapter for an InterfacesAdded (added) or
-// InterfacesRemoved of the adapter's object: app when the adapter or its
-// GattManager1 is among the interfaces (appLost), adv when the adapter or
-// its LEAdvertisingManager1 is (advLost). What a signal owes is recorded as
+// InterfacesRemoved of the adapter's object: app when its GattManager1 is
+// among the interfaces (appLost, appGen, gattGone), adv when its
+// LEAdvertisingManager1 is (advLost, advGone); a removal of Adapter1 counts
+// for both. A registration whose service is still in RegisterService is
+// left to it: it compares appGen across its call. What a signal owes is recorded as
 // state, not handed to its work: a later signal supersedes the work, never
 // what is owed (R4-fsm-4301). It runs on the signal loop, so the work —
 // which waits for advMu and calls BlueZ — runs on a goroutine of its own.
@@ -626,10 +736,15 @@ func (p *peripheral) adapterChanged(added, app, adv bool) {
 	}
 	p.adapterGen++
 	gen := p.adapterGen
-	if app && p.serviceLive() {
-		p.appLost = true
+	if app {
+		p.appGen++
+		p.gattGone = !added
+		if p.serviceLive() {
+			p.appLost = true
+		}
 	}
 	if adv {
+		p.advGone = !added
 		p.advLost = true
 	}
 	p.readvertising.Add(1)
@@ -664,7 +779,10 @@ func (p *peripheral) appMissing() bool {
 // unregistered, the application of a live service unregistered and
 // registered again, then the advertisement the host last asked for
 // registered — the application first, so no advertisement leads a
-// commissioner to a node without the Matter service. The unregisters'
+// commissioner to a node without the Matter service; each only while its
+// manager is present (gattGone, advGone). A work superseded while it
+// registered the application leaves the advertisement to the work that
+// superseded it. The unregisters'
 // errors are ignored: a bluetoothd that ended without InterfacesRemoved
 // holds nothing, while a registration made on the returned adapter before
 // this signal was handled is held. A failed registration is retried with
@@ -677,9 +795,12 @@ func (p *peripheral) appMissing() bool {
 // not done yet (R4-fsm-4301).
 func (p *peripheral) followAdapter(gen uint64, added, adv bool) {
 	defer p.readvertising.Done()
-	pause := readvertiseFirst
+	pause := p.pause
+	rl := retryLog{log: p.log, what: "the registrations on the returned adapter"}
 	for {
-		p.advMu.Lock()
+		if !p.lockAdvUnlessDone() {
+			return
+		}
 		p.mu.Lock()
 		if p.closed || p.adapterGen != gen {
 			p.mu.Unlock()
@@ -712,21 +833,29 @@ func (p *peripheral) followAdapter(gen uint64, added, adv bool) {
 		if !live {
 			p.appLost = false
 		}
-		appReset, advReset := p.appLost, p.advLost
+		appReset, advReset := p.appLost && !p.gattGone, p.advLost
+		appGen := p.appGen
 		p.advLost = false
 		p.mu.Unlock()
 		if advReset {
 			p.dropAdvertisement()
 		}
-		err := p.restoreApplication(gen, appReset, s)
+		err := p.restoreApplication(appGen, appReset, s)
 		if err == nil {
-			err = p.restoreAdvertisement()
+			p.mu.Lock()
+			superseded := p.adapterGen != gen
+			p.mu.Unlock()
+			if !superseded {
+				err = p.restoreAdvertisement()
+			}
 			if err == nil {
 				p.advMu.Unlock()
+				rl.held()
 				return
 			}
 		}
 		p.advMu.Unlock()
+		rl.failed(err, pause)
 		wait := time.NewTimer(pause)
 		select {
 		case <-wait.C:
@@ -739,12 +868,14 @@ func (p *peripheral) followAdapter(gen uint64, added, adv bool) {
 }
 
 // restoreApplication registers the application of the live service s again
-// when register is set (followAdapter of generation gen); the caller holds
-// advMu. A service that ended while BlueZ registered it is unregistered
-// again: its own unregister may have run before this registration. appLost
-// is settled only while gen is current: a signal handled while
-// RegisterApplication was in flight owes the application anew, and the work
-// that superseded this one reads it (R5-fsm-5502).
+// when register is set (followAdapter, which read appLost at appGen gen);
+// the caller holds advMu. A service that ended while BlueZ registered it is
+// unregistered again: its own unregister may have run before this
+// registration. appLost is settled only while appGen is still gen: a signal
+// naming GattManager1 or Adapter1, handled while RegisterApplication was in
+// flight, owes the application anew, and the work that superseded this one
+// reads it (R5-fsm-5502); one naming LEAdvertisingManager1 alone does not
+// (#610 row 1).
 func (p *peripheral) restoreApplication(gen uint64, register bool, s *gattService) error {
 	if !register {
 		return nil
@@ -758,7 +889,7 @@ func (p *peripheral) restoreApplication(gen uint64, register bool, s *gattServic
 	}
 	p.mu.Lock()
 	still := !p.closed && p.svc == s && p.serviceLive()
-	if still && p.adapterGen == gen {
+	if still && p.appGen == gen {
 		p.appLost = false
 	}
 	p.mu.Unlock()
@@ -797,10 +928,11 @@ func (p *peripheral) dropAdvertisement() {
 // Nothing is registered after StopAdvertising (adv nil, or an unregister
 // owed), nor while the application of a live service is missing: the
 // work that registers it registers the advertisement after it
-// (R4-fsm-4301).
+// (R4-fsm-4301); nor while the advertising manager is absent: its
+// InterfacesAdded registers it (#610 row 1).
 func (p *peripheral) restoreAdvertisement() error {
 	p.mu.Lock()
-	register := p.adv != nil && !p.advOwed && !p.registered && !p.appMissing()
+	register := p.adv != nil && !p.advOwed && !p.registered && !p.appMissing() && !p.advGone
 	p.mu.Unlock()
 	if !register {
 		return nil
@@ -845,6 +977,61 @@ func (p *peripheral) fromBluez(sender dbus.Sender) *dbus.Error {
 	return nil
 }
 
+// lockAdvUnlessDone takes advMu for a work of the peripheral's own
+// (readvertise, followAdapter); false, without it, once the peripheral
+// closes.
+func (p *peripheral) lockAdvUnlessDone() bool {
+	select {
+	case p.advMu <- struct{}{}:
+		return true
+	case <-p.done:
+		return false
+	}
+}
+
+// ctxMutex is a mutex whose Lock can give up when a context ends.
+type ctxMutex chan struct{}
+
+func newCtxMutex() ctxMutex { return make(ctxMutex, 1) }
+
+// Lock takes m.
+func (m ctxMutex) Lock() { m <- struct{}{} }
+
+// LockContext takes m, or returns ctx's error once ctx ended first.
+func (m ctxMutex) LockContext(ctx context.Context) error {
+	select {
+	case m <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Unlock releases m.
+func (m ctxMutex) Unlock() { <-m }
+
+// retryLog reports a registration the peripheral retries on its own
+// (R3-err-3305): the first failure and each change of the error at Warn,
+// the registration that held after a failure at Info. One per retry loop.
+type retryLog struct {
+	log  *slog.Logger
+	what string
+	last string
+}
+
+func (r *retryLog) failed(err error, pause time.Duration) {
+	if s := err.Error(); s != r.last {
+		r.last = s
+		r.log.Warn("bluez: registering "+r.what+" failed, retrying", slog.Any("err", err), slog.Duration("pause", pause))
+	}
+}
+
+func (r *retryLog) held() {
+	if r.last != "" {
+		r.log.Info("bluez: registered " + r.what + " after a retry")
+	}
+}
+
 // matterServiceData finds the service data of the Matter service (16-bit
 // UUID 0xFFF6) among the AD structures of data.
 func matterServiceData(data []byte) ([]byte, bool) {
@@ -874,7 +1061,9 @@ func matterServiceData(data []byte) ([]byte, bool) {
 // previous registration is retried first. c3 is copied. ctx bounds the
 // registration only: the service stays registered until its Serve
 // returned, or — never served — until Close. A registration while one is
-// registered is refused with [ErrServing].
+// registered is refused with [ErrServing]. When the adapter's GattManager1
+// left or came back while BlueZ answered, the application stays owed to
+// the work that follows the adapter (#610 rows 4 and 5).
 func (p *peripheral) RegisterService(ctx context.Context, c3 []byte) (contract.GATTService, error) {
 	p.mu.Lock()
 	if p.closed {
@@ -902,6 +1091,13 @@ func (p *peripheral) RegisterService(ctx context.Context, c3 []byte) (contract.G
 		p.endRegistration(s)
 		return nil, err
 	}
+	// advMu orders this registration with the work that follows the
+	// adapter, whose restoreApplication registers and unregisters the same
+	// root, and with the end of a registration (#610 rows 4 and 5).
+	if err := p.advMu.LockContext(ctx); err != nil {
+		return fail(err)
+	}
+	defer p.advMu.Unlock()
 	if owed {
 		if err := p.unregisterApplication(ctx); err != nil {
 			return fail(err)
@@ -912,6 +1108,9 @@ func (p *peripheral) RegisterService(ctx context.Context, c3 []byte) (contract.G
 		p.unexportApplication()
 		return fail(err)
 	}
+	p.mu.Lock()
+	appGen := p.appGen
+	p.mu.Unlock()
 	regCtx, cancel := context.WithTimeout(ctx, peripheralTimeout)
 	_, err := call(regCtx, p.bus, p.adapter, ifaceGattManager+".RegisterApplication", p.root, map[string]dbus.Variant{})
 	cancel()
@@ -924,7 +1123,10 @@ func (p *peripheral) RegisterService(ctx context.Context, c3 []byte) (contract.G
 	closed := p.closed
 	if !closed {
 		s.state = svcRegistered
-		p.appLost = false
+		// A signal naming GattManager1 or Adapter1 during the call may
+		// have taken the registration BlueZ answered: the work it started
+		// waits for advMu and registers the application again.
+		p.appLost = p.appGen != appGen
 	}
 	p.mu.Unlock()
 	if closed {
@@ -1011,7 +1213,9 @@ func (s *gattService) Serve(ctx context.Context, accept func(contract.BLEConnect
 	close(s.ended)
 	s.accepting.Wait()
 	p.dropAll(true) //nolint:contextcheck // Serve's context has ended; each disconnect runs on a fresh bounded one
+	p.advMu.Lock()
 	err := p.unregisterApplication(context.WithoutCancel(ctx))
+	p.advMu.Unlock()
 	p.endRegistration(s)
 	return err
 }

@@ -28,7 +28,9 @@ import (
 func newTestPeripheral(t *testing.T) (*peripheral, *fakeBus) {
 	t.Helper()
 	b := newFakeBus()
-	p, err := newPeripheral(b, testAdapter)
+	// The retry pause in milliseconds (R5-test-5505): the retry tests run
+	// on it.
+	p, err := newPeripheral(b, testAdapter, peripheralConfig{pause: 10 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +83,7 @@ func serveRegistered(t *testing.T, svc contract.GATTService, accept func(contrac
 
 // TestNewPeripheralNeedsTheAdapter: an adapter BlueZ does not have.
 func TestNewPeripheralNeedsTheAdapter(t *testing.T) {
-	if _, err := newPeripheral(newFakeBus(), "/org/bluez/hci7"); !errors.Is(err, ErrNoAdapter) {
+	if _, err := newPeripheral(newFakeBus(), "/org/bluez/hci7", peripheralConfig{}); !errors.Is(err, ErrNoAdapter) {
 		t.Fatalf("err = %v, want ErrNoAdapter", err)
 	}
 }
@@ -967,7 +969,7 @@ func TestNewPeripheralIsBounded(t *testing.T) {
 	b.failWith(methodGetManaged, errHang)
 	done := make(chan error, 1)
 	go func() {
-		_, err := newPeripheral(b, testAdapter)
+		_, err := newPeripheral(b, testAdapter, peripheralConfig{})
 		done <- err
 	}()
 	ctx, cancel := context.WithTimeout(t.Context(), 2*peripheralTimeout)
