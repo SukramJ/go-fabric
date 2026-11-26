@@ -169,7 +169,7 @@ func TestAccessControlDropClearsTheBatchDeferredContextW2B4(t *testing.T) {
 	st := &dropACLStore{acl: map[uint8][]store.ACLEntry{f: {dropAdmin(f)}}, fabrics: []uint8{f}}
 	a, src, _ := newAuxACLW2B4(t, st)
 
-	a.beginAuxiliaryBatch()
+	a.beginAuxiliaryBatch(ctx)
 	a.mu.Lock()
 	a.auxDeferred = map[uint8]context.Context{f: im.WithFabricFilter(ctx, true, f)}
 	a.mu.Unlock()
@@ -201,7 +201,7 @@ func TestAccessControlDropBeforeTheSyncsTakeIsSeenW2B4(t *testing.T) {
 	st := &dropACLStore{acl: map[uint8][]store.ACLEntry{f: {dropAdmin(f)}}, fabrics: []uint8{f}}
 	a, src, _ := newAuxACLW2B4(t, st)
 
-	a.beginAuxiliaryBatch()
+	a.beginAuxiliaryBatch(ctx)
 	a.mu.Lock()
 	a.auxDeferred = map[uint8]context.Context{f: im.WithFabricFilter(ctx, true, f)}
 	a.mu.Unlock()
@@ -231,5 +231,40 @@ func TestAccessControlDropBeforeTheSyncsTakeIsSeenW2B4(t *testing.T) {
 	}
 	if _, ok := a.auxOwedCtx[f]; ok {
 		t.Error("a drop between the batch's take and the synchronisation's take left the fabric's context owed")
+	}
+}
+
+// TestAccessControlBatchClosedByTheDroppedFabricW2B4 (#619, batch part;
+// fable-diff-b4 "Re-read 9cba6de38" Q1): a batch opened and closed by a
+// request of fabric 3, as Groupcast.MatterInvoke holds one, with fabric 3
+// dropped while it is open and the closing sync failing: the closer's own
+// fabric is noted at the batch's begin, so no context of fabric 3 is owed
+// after it.
+func TestAccessControlBatchClosedByTheDroppedFabricW2B4(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	const f uint8 = 3
+	st := &dropACLStore{acl: map[uint8][]store.ACLEntry{f: {dropAdmin(f)}}, fabrics: []uint8{f}}
+	a, src, _ := newAuxACLW2B4(t, st)
+	req := im.WithFabricFilter(ctx, true, f)
+
+	a.beginAuxiliaryBatch(req)
+	a.mu.Lock()
+	a.auxDeferred = map[uint8]context.Context{f: req}
+	a.mu.Unlock()
+	st.removeFabric(f)
+	if err := a.MatterDropFabric(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	src.failing.Store(true)
+	a.endAuxiliaryBatch(req)
+
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if !a.auxOwed {
+		t.Fatal("the failed synchronisation owes nothing")
+	}
+	if _, ok := a.auxOwedCtx[f]; ok {
+		t.Error("the batch closed by the dropped fabric's request owes that fabric's context")
 	}
 }

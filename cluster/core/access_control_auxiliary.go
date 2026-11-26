@@ -79,10 +79,21 @@ func (a *AccessControl) registerAuxiliaryProvider(ctx context.Context, src Auxil
 }
 
 // beginAuxiliaryBatch defers the synchronisation of source changes until
-// the matching endAuxiliaryBatch.
-func (a *AccessControl) beginAuxiliaryBatch() {
+// the matching endAuxiliaryBatch. It notes the drop epoch of the fabric of
+// the request behind ctx, the first one per fabric while batches are open:
+// the request that closes the batch is the synchronisation's actor, and a
+// drop of its fabric during the batch is seen there (#619).
+func (a *AccessControl) beginAuxiliaryBatch(ctx context.Context) {
 	a.mu.Lock()
 	a.auxBatch++
+	if f, ok := requestFabricOf(ctx); ok {
+		if a.auxBatchEpochs == nil {
+			a.auxBatchEpochs = make(map[uint8]uint64)
+		}
+		if _, noted := a.auxBatchEpochs[f]; !noted {
+			a.auxBatchEpochs[f] = a.aclDropEpoch[f]
+		}
+	}
 	a.mu.Unlock()
 }
 
@@ -106,6 +117,11 @@ func (a *AccessControl) endAuxiliaryBatch(ctx context.Context) {
 		// takes them: a drop before the synchronisation's own take is
 		// seen there too (#619).
 		noted = a.dropEpochsLocked(deferred)
+		// The epochs the batch's openers noted at its begin are older and
+		// win: a drop during the batch is seen for the closer's own fabric
+		// too, which the synchronisation notes only at its take.
+		maps.Copy(noted, a.auxBatchEpochs)
+		a.auxBatchEpochs = nil
 	}
 	a.mu.Unlock()
 	if !open {

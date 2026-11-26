@@ -133,6 +133,12 @@ type AccessControl struct {
 	// change, never the node of the command that closes the batch (review
 	// II, R2-P6-conc-1007).
 	auxDeferred map[uint8]context.Context
+	// auxBatchEpochs is the drop epoch (aclDropEpoch) of each fabric whose
+	// request opened a batch, noted at its begin and handed to the
+	// synchronisation that closes the batches, so a fabric dropped while a
+	// batch is open gets no context back from that synchronisation's
+	// failure (#619).
+	auxBatchEpochs map[uint8]uint64
 	// auxOwed records a synchronisation a failed read of the source owes:
 	// the next read of the cluster or the next change runs it
 	// (settleOwedAuxiliary). auxOwedEmit is whether it fires events, and

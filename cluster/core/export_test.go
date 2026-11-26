@@ -70,7 +70,7 @@ func (o *OperationalCredentials) FailCSRBuild(err error) {
 
 // BeginAuxiliaryBatch and EndAuxiliaryBatch expose the batch a Groupcast
 // command holds open (review II, R2-P6-conc-1007).
-func (a *AccessControl) BeginAuxiliaryBatch()                  { a.beginAuxiliaryBatch() }
+func (a *AccessControl) BeginAuxiliaryBatch()                  { a.beginAuxiliaryBatch(context.Background()) }
 func (a *AccessControl) EndAuxiliaryBatch(ctx context.Context) { a.endAuxiliaryBatch(ctx) }
 
 // StaleGroupFabrics reports the fabrics GroupKeyManagement holds marked
