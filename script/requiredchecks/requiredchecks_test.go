@@ -133,8 +133,8 @@ var notRequired = []decision{
 	},
 	{
 		"chiptool.yml", "certification families (long) on the base commit", advisory,
-		"runs on a release pull request that changes documentation only (the comment over the job long-on-base in chiptool.yml); " +
-			"the required gate job needs it and fails such a pull request unless it passed.",
+		"runs on a release pull request that changes documentation only or is in release shape (the comment over the job " +
+			"long-on-base in chiptool.yml); the required gate job needs it and fails such a pull request unless it passed.",
 	},
 	{
 		"pages.yml", "build", sharesName,

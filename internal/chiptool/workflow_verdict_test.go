@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -171,7 +172,23 @@ func TestWorkflowGateVerdict(t *testing.T) {
 	allPass := map[string]string{
 		"CHANGES": "success", "FAMILIES": "success", "GOCERT": "success", "RELEASE": "false",
 		"SUITE": "success", "CONTROL": "success", "BLE_WIFI": "success", "BLE_CASES": "success", "NESTED": "success",
-		"CODE": "true", "LONG_BASE": "skipped",
+		"CODE": "true", "LONG_BASE": "skipped", "SHAPE": "false",
+	}
+	// A release pull request in release shape (issue 632): the `code
+	// touched` job reports code, every chip leg is skipped, nested-release
+	// runs and long-on-base reads the legs on the base commit.
+	shape := map[string]string{
+		"RELEASE": "true", "SHAPE": "true", "SUITE": "skipped", "GOCERT": "skipped", "CONTROL": "skipped",
+		"BLE_WIFI": "skipped", "BLE_CASES": "skipped", "FAMILIES": "skipped", "LONG_BASE": "success",
+	}
+	shapeWith := func(k, v string) map[string]string {
+		m := map[string]string{k: v}
+		for sk, sv := range shape {
+			if sk != k {
+				m[sk] = sv
+			}
+		}
+		return m
 	}
 	for _, tc := range []struct {
 		name string
@@ -199,6 +216,21 @@ func TestWorkflowGateVerdict(t *testing.T) {
 		{"release, docs only, long on base failed", map[string]string{"RELEASE": "true", "CODE": "false", "LONG_BASE": "failure"}, 1},
 		{"release, docs only, long on base skipped", map[string]string{"RELEASE": "true", "CODE": "false", "LONG_BASE": "skipped"}, 1},
 		{"release, code, long on base not read", map[string]string{"RELEASE": "true", "CODE": "true", "LONG_BASE": "failure"}, 0},
+		{"release shape, verdicts on base passed", shape, 0},
+		{"release shape, verdicts on base failed", shapeWith("LONG_BASE", "failure"), 1},
+		{"release shape, verdicts on base skipped", shapeWith("LONG_BASE", "skipped"), 1},
+		{"release shape, verdicts on base cancelled", shapeWith("LONG_BASE", "cancelled"), 1},
+		{"release shape, nested failed", shapeWith("NESTED", "failure"), 1},
+		{"release shape, nested skipped", shapeWith("NESTED", "skipped"), 1},
+		{"release shape, changes failed", shapeWith("CHANGES", "failure"), 1},
+		{"release, code, legs on base not accepted", map[string]string{
+			"RELEASE": "true", "SUITE": "skipped", "GOCERT": "skipped", "CONTROL": "skipped",
+			"BLE_WIFI": "skipped", "BLE_CASES": "skipped", "FAMILIES": "skipped", "LONG_BASE": "success",
+		}, 1},
+		{"release, docs only, legs on base not accepted", map[string]string{
+			"RELEASE": "true", "CODE": "false", "SUITE": "skipped", "GOCERT": "skipped", "CONTROL": "skipped",
+			"BLE_WIFI": "skipped", "BLE_CASES": "skipped", "FAMILIES": "skipped", "LONG_BASE": "success",
+		}, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := make([]string, 0, len(allPass))
@@ -256,28 +288,105 @@ func TestWorkflowGroupsSelection(t *testing.T) {
 }
 
 // TestWorkflowLongOnBaseVerdict runs the long-on-base job's step with a
-// stand-in gh: green only when a nightly or dispatched run on the base
-// commit has a passed `certification families (long)` job.
+// stand-in gh that applies the step's own --jq filters (with jq) to
+// sample API answers: green only when one nightly or dispatched run on the
+// base commit passed every job the pull request takes from there —
+// `certification families (long)` for a documentation-only release pull
+// request, every chip-tool leg, Go-TH group and family group of the
+// release matrix for one in release shape (issue 632).
 func TestWorkflowLongOnBaseVerdict(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Fatalf("jq, which gh's --jq and the step run, is not on PATH: %v", err)
+	}
 	script := runBlockAfter(t, chiptoolWorkflow(t), "  long-on-base:")
+	const families = `{"include":[{"group":"core-su","families":"SU"},{"group":"long","families":"DGGEN"}]}`
+	legs := []string{
+		"chip-tool commissions the reference daemon",
+		"chip-tool control leg (CHIP app, no go-fabric)",
+		"chip-tool commissions over BLE onto Wi-Fi (chip's mocks)",
+		"certification cases commissioning over BLE onto Wi-Fi (chip's mocks)",
+		"Go-TH certification cases (gocert-cadmin)",
+		"Go-TH certification cases (gocert-dd)",
+		"Go-TH certification cases (gocert-rest)",
+		"certification families (core-su)",
+		"certification families (long)",
+	}
+	type run struct {
+		id, event string
+		passed    []string // the jobs that concluded success
+		failed    []string
+	}
+	without := func(name string) []string {
+		var out []string
+		for _, l := range legs {
+			if l != name {
+				out = append(out, l)
+			}
+		}
+		return out
+	}
+	long := []string{"certification families (long)"}
 	for _, tc := range []struct {
-		name       string
-		runs, jobs string // what the stand-in prints for the runs and the jobs query
-		want       int
+		name  string
+		shape string
+		runs  []run
+		want  int
 	}{
-		{"passed", "11", "success", 0},
-		{"failed", "11", "failure", 1},
-		{"no long job", "11", "", 1},
-		{"no run", "", "", 1},
-		{"second run passed", "11\n12", "success", 0},
+		{"docs only, passed", "false", []run{{"11", "schedule", long, nil}}, 0},
+		{"docs only, failed", "false", []run{{"11", "schedule", nil, long}}, 1},
+		{"docs only, no long job", "false", []run{{"11", "schedule", []string{"certification families (core-su)"}, nil}}, 1},
+		{"docs only, no run", "false", nil, 1},
+		{"docs only, second run passed", "false", []run{{"11", "schedule", nil, long}, {"12", "workflow_dispatch", long, nil}}, 0},
+		{"docs only, a pull request's run", "false", []run{{"11", "pull_request", long, nil}}, 1},
+		{"release shape, every leg passed", "true", []run{{"11", "schedule", legs, nil}}, 0},
+		{"release shape, dispatched", "true", []run{{"11", "workflow_dispatch", legs, nil}}, 0},
+		{"release shape, long alone", "true", []run{{"11", "schedule", long, nil}}, 1},
+		{"release shape, a Go-TH group failed", "true", []run{{"11", "schedule", without("Go-TH certification cases (gocert-dd)"), []string{"Go-TH certification cases (gocert-dd)"}}}, 1},
+		{"release shape, a family group missing", "true", []run{{"11", "schedule", without("certification families (core-su)"), nil}}, 1},
+		{"release shape, the control leg missing", "true", []run{{"11", "schedule", without("chip-tool control leg (CHIP app, no go-fabric)"), nil}}, 1},
+		{"release shape, split over two runs", "true", []run{{"11", "schedule", legs[:4], nil}, {"12", "schedule", legs[4:], nil}}, 1},
+		{"release shape, second run passed", "true", []run{{"11", "schedule", legs[1:], nil}, {"12", "workflow_dispatch", legs, nil}}, 0},
+		{"release shape, a pull request's run", "true", []run{{"11", "pull_request", legs, nil}}, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			bin := t.TempDir()
-			stub := "#!/usr/bin/env bash\ncase \"$2\" in\n  */runs\\?*) printf '" + tc.runs + "\\n' ;;\n  *) printf '%s\\n' '" + tc.jobs + "' ;;\nesac\n"
+			dir := t.TempDir()
+			bin := filepath.Join(dir, "bin")
+			if err := os.Mkdir(bin, 0o750); err != nil {
+				t.Fatal(err)
+			}
+			var runsJSON []string
+			for _, r := range tc.runs {
+				runsJSON = append(runsJSON, `{"id":`+r.id+`,"event":"`+r.event+`"}`)
+				var jobs []string
+				for _, n := range r.passed {
+					jobs = append(jobs, `{"name":`+strconv.Quote(n)+`,"conclusion":"success"}`)
+				}
+				for _, n := range r.failed {
+					jobs = append(jobs, `{"name":`+strconv.Quote(n)+`,"conclusion":"failure"}`)
+				}
+				jobs = append(jobs, `{"name":"code touched","conclusion":"success"}`)
+				if err := os.WriteFile(filepath.Join(dir, r.id+".json"), []byte(`{"jobs":[`+strings.Join(jobs, ",")+`]}`), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(dir, "runs.json"), []byte(`{"workflow_runs":[`+strings.Join(runsJSON, ",")+`]}`), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			// gh api <path> --jq <filter>: the runs query or a run's jobs.
+			stub := "#!/usr/bin/env bash\nset -euo pipefail\n" +
+				"[ \"$1\" = api ] && [ \"$3\" = --jq ] || { echo \"unexpected gh call: $*\" >&2; exit 2; }\n" +
+				"case \"$2\" in\n" +
+				"  repos/o/r/actions/workflows/chiptool.yml/runs\\?head_sha=abc\\&*) f=\"$FIXTURES/runs.json\" ;;\n" +
+				"  repos/o/r/actions/runs/*/jobs\\?*) id=${2#repos/o/r/actions/runs/}; f=\"$FIXTURES/${id%%/*}.json\" ;;\n" +
+				"  *) echo \"unexpected gh path: $2\" >&2; exit 2 ;;\n" +
+				"esac\njq -r \"$4\" \"$f\"\n"
 			if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(stub), 0o700); err != nil { //nolint:gosec // a test stand-in
 				t.Fatal(err)
 			}
-			env := []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "REPO=o/r", "BASE=abc", "GH_TOKEN=x"}
+			env := []string{
+				"PATH=" + bin + ":" + os.Getenv("PATH"), "FIXTURES=" + dir, "REPO=o/r", "BASE=abc", "GH_TOKEN=x",
+				"SHAPE=" + tc.shape, "FAMILIES=" + families,
+			}
 			if got := runStepScript(t, script, env); got != tc.want {
 				t.Errorf("exit %d, want %d", got, tc.want)
 			}
@@ -285,10 +394,75 @@ func TestWorkflowLongOnBaseVerdict(t *testing.T) {
 	}
 }
 
+// TestWorkflowLongOnBaseNamesEveryLeg holds the release-shape path to the
+// gate: every job the gate reads on a release pull request but the nested
+// modules' and long-on-base itself steps aside in release shape, and
+// long-on-base names it by the name it reports under on the base commit —
+// a leg added to the gate without both would be neither run nor read.
+func TestWorkflowLongOnBaseNamesEveryLeg(t *testing.T) {
+	wf := chiptoolWorkflow(t)
+	script := runBlockAfter(t, wf, "  long-on-base:")
+	needs := regexp.MustCompile(`(?m)^  chip-families-gate:\n(?:    .*\n)*?    needs: \[([^\]]+)\]$`).FindStringSubmatch(wf)
+	if needs == nil {
+		t.Fatal("chiptool.yml's chip-families-gate has no `needs: [...]` list")
+	}
+	legs := 0
+	for _, id := range strings.Split(needs[1], ",") {
+		id = strings.TrimSpace(id)
+		if id == "changes" || id == "nested-release" || id == "long-on-base" {
+			continue
+		}
+		legs++
+		job := regexp.MustCompile(`(?m)^  ` + regexp.QuoteMeta(id) + `:\n((?:(?:    .*)?\n)*?)    if: \|\n      (.*)\n`).FindStringSubmatch(wf)
+		if job == nil {
+			t.Errorf("job %s has no `if: |` block", id)
+			continue
+		}
+		if job[2] != "needs.changes.outputs.release_shape != 'true' && (" {
+			t.Errorf("job %s runs in release shape (its condition opens with %q): long-on-base reads its verdict on the base commit instead", id, job[2])
+		}
+		name := regexp.MustCompile(`(?m)^ {4}name: (.+)$`).FindStringSubmatch(job[1])
+		if name == nil {
+			t.Errorf("job %s has no name", id)
+			continue
+		}
+		switch id {
+		case "gocert":
+			groups := gocertGroup.FindAllStringSubmatch(wf, -1)
+			if len(groups) == 0 {
+				t.Error("chiptool.yml's gocert matrix has no group")
+			}
+			for _, g := range groups {
+				if want := `"Go-TH certification cases (` + g[1] + `)"`; !strings.Contains(script, want) {
+					t.Errorf("long-on-base does not read %s on the base commit", want)
+				}
+			}
+		case "chip-families":
+			if !strings.Contains(script, `required+=("certification families ($group)")`) || !strings.Contains(script, `jq -r '.include[].group' <<<"$FAMILIES"`) {
+				t.Error("long-on-base does not read every family group of the release matrix on the base commit")
+			}
+		default:
+			if !strings.Contains(script, `"`+name[1]+`"`) {
+				t.Errorf("long-on-base does not read %q (job %s) on the base commit", name[1], id)
+			}
+		}
+	}
+	if legs != 6 {
+		t.Errorf("the gate reads %d legs besides changes, nested-release and long-on-base; this test was written for 6 — check the new one", legs)
+	}
+}
+
 // TestWorkflowFilterVerdict runs the `changes` job's filter step against a
 // scratch repository. git diff reports a rename by its new path alone, so
 // a Go file moved to a Markdown name counted as documentation only and
-// the suites stayed off (DR5a-ci-10).
+// the suites stayed off (DR5a-ci-10). The step also decides the release
+// shape (issue 632): a release pull request whose only paths that are not
+// documentation are go.mod files below the root, each changed only in
+// require lines of thingfabric.dev/go-fabric… modules it replaces with a
+// local path. Its boundaries are code: a go.sum, a replace, a require of
+// another module, any other go.mod line, the root go.mod, a go.mod that
+// does not replace the module it raises, any other file — and a pull
+// request that is not a release one.
 func TestWorkflowFilterVerdict(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Fatalf("git, which the filter step runs, is not on PATH: %v", err)
@@ -321,27 +495,111 @@ func TestWorkflowFilterVerdict(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// The shapes of the repository's own go.mod files: a nested module
+	// (ble/bluez: a require block, a single replace line), an example
+	// (examples/ble-wifi-light: three thingfabric.dev requires, a replace
+	// block) and a go.mod that replaces nothing.
+	nested := func(fabric, dbus, replace string) string {
+		return "module thingfabric.dev/go-fabric/ble/bluez\n\ngo 1.27.4\n\nrequire (\n" +
+			"\tgithub.com/godbus/dbus/v5 " + dbus + "\n\tthingfabric.dev/go-fabric " + fabric + "\n)\n\n" +
+			"require golang.org/x/sys v0.49.0 // indirect\n\nreplace thingfabric.dev/go-fabric => " + replace + "\n"
+	}
+	example := func(v string) string {
+		return "module thingfabric.dev/go-fabric/examples/ble-wifi-light\n\ngo 1.27.4\n\nrequire (\n" +
+			"\tthingfabric.dev/go-fabric " + v + "\n\tthingfabric.dev/go-fabric/ble/bluez " + v + "\n" +
+			"\tthingfabric.dev/go-fabric/wifi/wpasupplicant " + v + "\n)\n\n" +
+			"// From the clone.\nreplace (\n\tthingfabric.dev/go-fabric => ../..\n" +
+			"\tthingfabric.dev/go-fabric/ble/bluez => ../../ble/bluez\n" +
+			"\tthingfabric.dev/go-fabric/wifi/wpasupplicant => ../../wifi/wpasupplicant\n)\n"
+	}
+	unreplaced := func(v string) string {
+		return "module example.invalid/fixture\n\ngo 1.27.4\n\nrequire thingfabric.dev/go-fabric " + v + "\n"
+	}
 	git("init", "-q")
 	write("bridge/x.go", "package bridge\n\n// A file long enough for git to see its move as a rename.\nconst x = 1\n")
 	write("docs/index.md", "# docs\n")
+	write("CHANGELOG.md", "# Changelog\n")
+	write("go.mod", "module thingfabric.dev/go-fabric\n\ngo 1.27.4\n\nrequire golang.org/x/sys v0.49.0\n")
+	write("ble/bluez/go.mod", nested("v0.26.0", "v5.2.4", "../.."))
+	write("ble/bluez/go.sum", "github.com/godbus/dbus/v5 v5.2.4 h1:x=\n")
+	write("examples/ble-wifi-light/go.mod", example("v0.26.0"))
+	write("fixture/go.mod", unreplaced("v0.26.0"))
 	base := commit("base")
-	write("docs/index.md", "# docs, edited\n")
-	docsOnly := commit("docs only")
+	// branch commits one change set on top of base and returns to base.
+	branch := func(msg string, files map[string]string) string {
+		t.Helper()
+		git("checkout", "-q", "--detach", base)
+		for name, body := range files {
+			if body == "" {
+				if err := os.Remove(filepath.Join(dir, name)); err != nil {
+					t.Fatal(err)
+				}
+				continue
+			}
+			write(name, body)
+		}
+		head := commit(msg)
+		git("checkout", "-q", "--detach", base)
+		return head
+	}
+	release := map[string]string{
+		"CHANGELOG.md":                   "# Changelog\n\n- v0.27.0\n",
+		"ble/bluez/go.mod":               nested("v0.27.0", "v5.2.4", "../.."),
+		"examples/ble-wifi-light/go.mod": example("v0.27.0"),
+	}
+	with := func(extra map[string]string) map[string]string {
+		m := map[string]string{}
+		for k, v := range release {
+			m[k] = v
+		}
+		for k, v := range extra {
+			m[k] = v
+		}
+		return m
+	}
+	docsOnly := branch("docs only", map[string]string{"docs/index.md": "# docs, edited\n"})
+	shape := branch("release shape", release)
+	requiresOnly := branch("require lines alone", map[string]string{"ble/bluez/go.mod": nested("v0.27.0", "v5.2.4", "../..")})
+	goSum := branch("and a go.sum", with(map[string]string{"ble/bluez/go.sum": "github.com/godbus/dbus/v5 v5.2.4 h1:y=\n"}))
+	replace := branch("and a replace", with(map[string]string{"ble/bluez/go.mod": nested("v0.27.0", "v5.2.4", "../../")}))
+	otherRequire := branch("and another module's require", with(map[string]string{"ble/bluez/go.mod": nested("v0.27.0", "v5.2.5", "../..")}))
+	otherLine := branch("and the go line", with(map[string]string{
+		"ble/bluez/go.mod": strings.Replace(nested("v0.27.0", "v5.2.4", "../.."), "go 1.27.4", "go 1.27.5", 1),
+	}))
+	rootGoMod := branch("and the root go.mod", with(map[string]string{"go.mod": "module thingfabric.dev/go-fabric\n\ngo 1.27.4\n\nrequire golang.org/x/sys v0.50.0\n"}))
+	notReplaced := branch("a go.mod that does not replace", with(map[string]string{"fixture/go.mod": unreplaced("v0.27.0")}))
+	goFile := branch("and a Go file", with(map[string]string{"bridge/x.go": "package bridge\n\nconst x = 2\n"}))
+	binary := branch("and another file", with(map[string]string{".gitignore": "/examples/ble-wifi-light/ble-wifi-light\n"}))
+	deleted := branch("a nested go.mod deleted", map[string]string{"CHANGELOG.md": "# Changelog\n\n- x\n", "fixture/go.mod": ""})
+	git("checkout", "-q", "--detach", docsOnly)
 	git("mv", "bridge/x.go", "docs/x.md")
 	renamed := commit("a Go file renamed into docs/")
 
 	for _, tc := range []struct {
-		name       string
-		base, head string
-		want       string
+		name          string
+		base, head    string
+		release, want string
 	}{
-		{"documentation only", base, docsOnly, "code=false"},
-		{"a Go file renamed to a Markdown name", docsOnly, renamed, "code=true"},
+		{"documentation only", base, docsOnly, "true", "code=false\nrelease_shape=false"},
+		{"a Go file renamed to a Markdown name", docsOnly, renamed, "true", "code=true\nrelease_shape=false"},
+		{"release shape", base, shape, "true", "code=true\nrelease_shape=true"},
+		{"release shape, require lines alone", base, requiresOnly, "true", "code=true\nrelease_shape=true"},
+		{"release shape, not a release pull request", base, shape, "false", "code=true\nrelease_shape=false"},
+		{"a go.sum changed", base, goSum, "true", "code=true\nrelease_shape=false"},
+		{"a replace changed", base, replace, "true", "code=true\nrelease_shape=false"},
+		{"a require of another module", base, otherRequire, "true", "code=true\nrelease_shape=false"},
+		{"another go.mod line", base, otherLine, "true", "code=true\nrelease_shape=false"},
+		{"the root go.mod", base, rootGoMod, "true", "code=true\nrelease_shape=false"},
+		{"a require the go.mod does not replace", base, notReplaced, "true", "code=true\nrelease_shape=false"},
+		{"a Go file", base, goFile, "true", "code=true\nrelease_shape=false"},
+		{"a file that is neither", base, binary, "true", "code=true\nrelease_shape=false"},
+		{"a go.mod deleted", base, deleted, "true", "code=true\nrelease_shape=false"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out := filepath.Join(t.TempDir(), "output")
 			s := "cd \"" + dir + "\"\n" + script
-			if got := runStepScript(t, s, []string{"EVENT=pull_request", "BASE=" + tc.base, "HEAD=" + tc.head, "GITHUB_OUTPUT=" + out}); got != 0 {
+			env := []string{"EVENT=pull_request", "RELEASE=" + tc.release, "BASE=" + tc.base, "HEAD=" + tc.head, "GITHUB_OUTPUT=" + out}
+			if got := runStepScript(t, s, env); got != 0 {
 				t.Fatalf("the filter step exited %d", got)
 			}
 			raw, err := os.ReadFile(out)

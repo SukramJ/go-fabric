@@ -157,7 +157,10 @@ func TestWorkflowGoCertGroups(t *testing.T) {
 // (the harness image's digest, the timeouts, the skip lists) and every
 // file a package of the module embeds are inputs of the daemon or of the
 // harness, and a pull request that changes only one of them must run the
-// suites (review II, R2-P5-sup-03).
+// suites (review II, R2-P5-sup-03). A go.mod is code here; whether a
+// release pull request's go.mod changes are the release shape (issue 632)
+// is read from the diff line by line, and TestWorkflowFilterVerdict holds
+// that class and its boundaries.
 func TestWorkflowCodeFilter(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "chiptool.yml"))
 	if err != nil {
