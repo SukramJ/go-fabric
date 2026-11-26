@@ -139,6 +139,10 @@ type Provider struct {
 	// ends sends the End of a SolicitOffer refused at a session bound
 	// (provider_cap.go).
 	ends endQueue
+	// refuseForTests, nil in production, stands for a table the schema
+	// refuses: a non-nil error from it fails [Provider.change] before the
+	// store, as a refused value does.
+	refuseForTests func() error
 }
 
 // Compile-time assertions.
@@ -246,6 +250,11 @@ func (p *Provider) change(origin contract.Origin, edit func([]ProviderSession) (
 	}
 	if next == nil {
 		next = []ProviderSession{}
+	}
+	if p.refuseForTests != nil {
+		if err := p.refuseForTests(); err != nil {
+			return fmt.Errorf("camera: CurrentSessions: %w", err)
+		}
 	}
 	keep := func() {
 		p.mu.Lock()

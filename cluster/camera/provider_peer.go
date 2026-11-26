@@ -138,7 +138,10 @@ func (p *Provider) IceCandidates(ctx context.Context, sessionID uint16, candidat
 // session leaves CurrentSessions first, before the command is sent, so
 // the removal waits neither for the requestor's response nor for a
 // session to the requestor, and holds when the requestor cannot be
-// reached at all (decisions 654, 663). The command's error is returned.
+// reached at all (decisions 654, 663) — also on a provider no
+// [PeerConnector] was attached to, which sends nothing and returns
+// [ErrNoPeerConnector] (decision 686). The command's error is returned,
+// joined with the removal's when the table refused the shorter one.
 //
 // chip's camera app sends End without waiting for its response
 // (SendEndCommand :1301-1329, InvokeCommandRequest with logging
@@ -152,15 +155,21 @@ func (p *Provider) IceCandidates(ctx context.Context, sessionID uint16, candidat
 // OnDeviceConnectionFailure (:1014-1019) only logs and keeps the session;
 // this one removes it — a divergence from chip (decision 663).
 func (p *Provider) End(ctx context.Context, sessionID uint16, reason uint8) error {
-	peers, session, err := p.signalTarget(sessionID)
-	if err != nil {
-		return err
+	peers, session, found := p.target(sessionID)
+	if !found {
+		return targetErr(peers, sessionID)
 	}
 	rerr := p.removeSession(contract.OriginHostSet, sessionID)
-	if err := p.send(ctx, peers, session, wrdef.CmdEnd, wrdef.EndRequest{WebRtcSessionId: sessionID, Reason: reason}); err != nil {
-		return err
+	var serr error
+	if peers == nil {
+		serr = ErrNoPeerConnector
+	} else {
+		serr = p.send(ctx, peers, session, wrdef.CmdEnd, wrdef.EndRequest{WebRtcSessionId: sessionID, Reason: reason})
 	}
-	return rerr
+	if rerr == nil {
+		return serr
+	}
+	return errors.Join(serr, rerr)
 }
 
 // signal invokes one requestor command for the session of the id on the
@@ -177,24 +186,33 @@ func (p *Provider) signal(ctx context.Context, sessionID uint16, commandID uint3
 // entry of the id, both read under one lock: [ErrNoPeerConnector]
 // without a connector, [ErrUnknownSession] without the entry.
 func (p *Provider) signalTarget(sessionID uint16) (PeerConnector, ProviderSession, error) {
-	p.mu.Lock()
-	peers := p.peers
-	var session ProviderSession
-	found := false
-	for _, s := range p.sessions {
-		if s.Id == sessionID {
-			session, found = s, true
-			break
-		}
-	}
-	p.mu.Unlock()
-	if peers == nil {
-		return nil, ProviderSession{}, ErrNoPeerConnector
-	}
-	if !found {
-		return nil, ProviderSession{}, fmt.Errorf("%w: %d", ErrUnknownSession, sessionID)
+	peers, session, found := p.target(sessionID)
+	if peers == nil || !found {
+		return nil, ProviderSession{}, targetErr(peers, sessionID)
 	}
 	return peers, session, nil
+}
+
+// targetErr is a signal's refusal when the connector or the session is
+// missing: [ErrNoPeerConnector] first, then [ErrUnknownSession].
+func targetErr(peers PeerConnector, sessionID uint16) error {
+	if peers == nil {
+		return ErrNoPeerConnector
+	}
+	return fmt.Errorf("%w: %d", ErrUnknownSession, sessionID)
+}
+
+// target is the attached connector, nil without one, and the session of
+// the id with whether CurrentSessions holds it, both read under one lock.
+func (p *Provider) target(sessionID uint16) (PeerConnector, ProviderSession, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, s := range p.sessions {
+		if s.Id == sessionID {
+			return p.peers, s, true
+		}
+	}
+	return p.peers, ProviderSession{}, false
 }
 
 // send reaches the session's requestor through peers and invokes the
