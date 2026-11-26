@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -326,4 +327,61 @@ func TestPeripheralLogsPoweredEdgesW2B1(t *testing.T) {
 	if app, adv := heldByBluetoothd(b); !app || !adv || !advertised(p, b) {
 		t.Fatalf("application %v, advertisement %v after the Powered edges", app, adv)
 	}
+}
+
+// heldAdvertiseW2B1 starts a host Advertise without a deadline whose
+// RegisterAdvertisement BlueZ does not answer, and returns once it holds
+// advMu inside that call; release lets bluetoothd answer.
+func heldAdvertiseW2B1(t *testing.T, p *peripheral, b *fakeBus) (release func()) {
+	t.Helper()
+	release = b.hold(regAdv)
+	go func() {
+		data := btp.EncodeAdvertisementData(3840, 0xFFF1, 0x8001, false, false)
+		_ = p.Advertise(context.Background(), contract.BLEAdvertisement{Data: data})
+	}()
+	synctest.Wait()
+	if n := callsOf(b, regAdv); n != 1 {
+		t.Fatalf("RegisterAdvertisement calls %d, want the one in flight", n)
+	}
+	return release
+}
+
+// TestPeripheralCloseBoundsItsWaitForAdvMuW2B1 holds the follow-up of
+// #610 row 3 (Fable N3): Close of a registered, unserved service while a
+// host Advertise without a deadline waits on an unanswered bus call still
+// returns, and unregisters the application.
+func TestPeripheralCloseBoundsItsWaitForAdvMuW2B1(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p, b := newTestPeripheral(t)
+		if _, err := p.RegisterService(context.Background(), nil); err != nil {
+			t.Fatal(err)
+		}
+		release := heldAdvertiseW2B1(t, p, b)
+		defer release()
+		if err := p.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(b.calledBeforeClose(), string(testAdapter)+" "+ifaceGattManager+".UnregisterApplication") {
+			t.Fatalf("Close did not unregister the application: %q", b.calledBeforeClose())
+		}
+	})
+}
+
+// TestPeripheralServeEndBoundsItsWaitForAdvMuW2B1 holds the follow-up of
+// #610 rows 3-5 (Fable N3): Serve's end while a host Advertise without a
+// deadline waits on an unanswered bus call still returns, and unregisters
+// the application.
+func TestPeripheralServeEndBoundsItsWaitForAdvMuW2B1(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p, b := newTestPeripheral(t)
+		s := serve(t, p, nil, func(contract.BLEConnection) {})
+		synctest.Wait()
+		release := heldAdvertiseW2B1(t, p, b)
+		defer release()
+		s.cancel()
+		<-s.done
+		if n := callsOf(b, ifaceGattManager+".UnregisterApplication"); n != 1 {
+			t.Fatalf("UnregisterApplication calls %d, want 1; calls %q", n, b.called())
+		}
+	})
 }

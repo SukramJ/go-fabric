@@ -196,7 +196,7 @@ type peripheral struct {
 	// on a removal: a registration of the application settles appLost only
 	// while it did not move, so the advertising manager's own
 	// InterfacesAdded, which bluetoothd sends after the adapter's
-	// (#610 probe), does not make a finished registration look superseded
+	// (#610 probe, BlueZ 5.72), does not make a finished registration look superseded
 	// (#610 row 1, R5-fsm-5502).
 	appGen uint64
 	// gattGone and advGone are set while the adapter's GattManager1 and
@@ -303,9 +303,7 @@ func (p *peripheral) Close() error {
 	_ = p.StopAdvertising(ctx)
 	if unserved != nil {
 		close(unserved.ended)
-		p.advMu.Lock()
-		_ = p.unregisterApplication(ctx)
-		p.advMu.Unlock()
+		p.endUnderAdvMu(func(uctx context.Context) { _ = p.unregisterApplication(uctx) })
 		p.endRegistration(unserved)
 	}
 	close(p.done)
@@ -358,8 +356,8 @@ func (p *peripheral) handle(sig *dbus.Signal) {
 		}
 		// On a return each side follows its own manager: bluetoothd sends
 		// LEAdvertisingManager1 in an InterfacesAdded of its own, after
-		// the one of Adapter1 and GattManager1 (#610 probe, design point
-		// 3).
+		// the one of Adapter1 and GattManager1 (#610 probe, BlueZ 5.72,
+		// design point 3).
 		_, gatt := ifaces[ifaceGattManager]
 		_, advertising := ifaces[ifaceAdvertising]
 		p.adapterChanged(true, gatt, advertising)
@@ -416,7 +414,7 @@ func (p *peripheral) poweredChanged(on bool) {
 	switch {
 	case !edge:
 	case !on:
-		p.log.Warn("bluez: adapter powered off; the registrations stay, nothing is sent until it is powered on",
+		p.log.Warn("bluez: adapter powered off; the registrations stay; the radio is off",
 			slog.String("adapter", string(p.adapter)), slog.Bool("advertising", advertising), slog.Bool("serving", serving))
 	case known:
 		p.log.Info("bluez: adapter powered on", slog.String("adapter", string(p.adapter)))
@@ -977,6 +975,25 @@ func (p *peripheral) fromBluez(sender dbus.Sender) *dbus.Error {
 	return nil
 }
 
+// endUnderAdvMu runs end — the unregister that ends a registration (Serve,
+// Close) — under advMu, waiting for it at most peripheralTimeout, and on a
+// fresh context bounded by peripheralTimeout. A holder that waits on a bus
+// call BlueZ does not answer without a deadline of its own (a host
+// Advertise or StopAdvertising whose context has none) must not keep the
+// registration from ending: past the bound, end runs without advMu. The
+// works it would then overlap bound every call they make.
+func (p *peripheral) endUnderAdvMu(end func(context.Context)) {
+	lctx, lcancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	locked := p.advMu.LockContext(lctx) == nil
+	lcancel()
+	if locked {
+		defer p.advMu.Unlock()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), peripheralTimeout)
+	defer cancel()
+	end(ctx)
+}
+
 // lockAdvUnlessDone takes advMu for a work of the peripheral's own
 // (readvertise, followAdapter); false, without it, once the peripheral
 // closes.
@@ -1213,9 +1230,9 @@ func (s *gattService) Serve(ctx context.Context, accept func(contract.BLEConnect
 	close(s.ended)
 	s.accepting.Wait()
 	p.dropAll(true) //nolint:contextcheck // Serve's context has ended; each disconnect runs on a fresh bounded one
-	p.advMu.Lock()
-	err := p.unregisterApplication(context.WithoutCancel(ctx))
-	p.advMu.Unlock()
+	var err error
+	//nolint:contextcheck // Serve's context has ended; the unregister runs on a fresh bounded one, as before
+	p.endUnderAdvMu(func(uctx context.Context) { err = p.unregisterApplication(uctx) })
 	p.endRegistration(s)
 	return err
 }
