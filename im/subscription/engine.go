@@ -131,7 +131,15 @@ func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 // Mirrors matter.js packages/node/src/node/server/ServerSubscription.ts
 // :530-532 at b25ed9604f: #triggerSendUpdate ends #sendUpdate's promise in
 // `.catch(error => logger.warn("Sending subscription update failed:",
-// error))` — the update is dropped, the subscription is not closed.
+// error))` — whatever an update throws ends there and the subscription is
+// not closed. Its #flush sends through the same call (:777) and awaits
+// that caught promise (:778-780), so the flush is under the same rule.
+// The module's own: the report is dropped at once, and the level is ERROR
+// with a stack. matter.js requeues an ongoing update whose send threw for
+// its first two failures (:584-585) and drops it from the third (:606);
+// only on a closed subscription, which its flush is, does it give the
+// update up at once (:564-567). A panic is a host coding fault that a
+// requeue would run into again on the next tick.
 func (m *Manager) recoverReport(sub *Subscription) {
 	r := recover()
 	if r == nil {
