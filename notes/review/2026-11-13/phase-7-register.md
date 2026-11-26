@@ -983,4 +983,97 @@ earlier entry ("open", "→ #6xx") as it was raised; this table closes it.
 
 ### C4 (B2, wave 2)
 
-To follow: the B2a and B2b results and the C4 line of #602 (decision 692).
+C4 is the mutation sample of `bridge/` with `./node/` as the wide package
+(decisions 664, 668, 685, 692). Line numbers are those of `5efa7460a`; the
+non-test files of `bridge/` did not change between `5efa7460a` and the
+units' bases, except `commissioning_window.go` by decision 688.
+
+**The run.** `mutate.yml` run 45710987130 (dispatch on `main` at
+`4cd4e106e`, ref `5efa7460a`, package `bridge`, wide `./node/`, timeout
+120 s, `-p 4`), 29 of 30 shards: 3081 KILLED, 94 SURVIVED/KILLED
+(bridge-blind, node kills), 1165 SURVIVED/SURVIVED, 8 INVALID. Against run
+3 (`28255e842`): 74 killed → survived, 3 K→S, 13 S→B, 6 without a match.
+The 74 are run-3 artefacts, not CI's: 73 survive `./node/` at `5efa7460a`,
+two measured survive at `28255e842` too, and the 74th's only local kill was
+a port-reuse flake of `TestStopWithDoneContextReleasesThePort` that did not
+reproduce in two reruns. Why run 3's node runs failed is unverified (it kept
+no test output).
+
+**Shard 10** (`bridge/subscribe_dispatch.go`, 106 mutants) killed the CI
+runner twice (lost communication; exit 143). It ran locally in Docker
+(`5efa7460a`, `-p 2`, wide `./node/`, timeout 120 s, memory 6 GB): 69
+KILLED, 2 KILLED by timeout (`:188` and `:229` guard off), 6
+SURVIVED/KILLED, 29 SURVIVED/SURVIVED; the container's `OOMKilled` flag
+was set. Measured alone: `:229` guard off runs away in memory — RSS 39 MB →
+6.01 GB in 3 s (`primingSource.next` goes on after exhaustion; the zero
+`ReadResult` is Success, so `buildInitialReport` appends empty reports
+forever); `:188` guard off spins at a flat 25 MB. That `:229` caused the
+OOM flag and the runner deaths is inferred. Decision 693: `script/mutate`
+kills a mutant's process group above `-maxrss` (default 3 GiB) as KILLED,
+note `memory`.
+
+**Rows tested (B2a, `w2-b2a.md`).** The 10 + 1 marginal rows of the
+result's §4 and the sibling `ota_provider_link.go:277` `>→>=`, each red on
+its mutant (overlay) and green on the original: `ota_provider_link.go:964`
+guard off, `securechannel.go:1715` guard off, `:2656` `==→!=`, `:1655`
+second `&&→||` (marginal: a foreign `ProcessSigma3` returning 0x33 must not
+panic), `pase_close.go:189`, `case_initiator.go:162`, `:472`,
+`commissioning_window.go:520`, `:703`, `fields_reader_scenes.go:33`, `:74`
+`!=→==`, `ota_provider_link.go:277` guard off and `>→>=` — commits
+`acabd0098`, `857d2499e`, `de47b0583`, `ad3f5b620`, `a8cf42b9a` (the
+closed-exchange subtest made deterministic: 30/30 kills, was 13–16/30).
+Decision 688 (stopped > blocked > busy) was implemented in the same unit.
+
+**Triage (B2b, `w2-b2b.md`, read by Fable, `fable-read-b2.md`).** The 74:
+60 test gaps, 14 equivalent. Shard 10's 35 survivors: 26 test gaps (all 6
+SURVIVED/KILLED among them, now killed in `bridge`), 9 equivalent. Code
+defects: 0. Commits `84e91f5c1`, `9085f5e15`, `fdcbb77fd`, `3aea61630`,
+and the follow-up `526436a08` (five rows first held equivalent were gaps:
+`subscribe_dispatch.go:683`, `:761` guard off (err), `:241` both `&&→||`,
+`:483` `&&→||`, and `ble.go:442` guard off). 15 of the gaps are **gap
+(defensive)**: the kill calls a helper with a state no current caller
+produces (a typed-nil route, no manager, nil source, a failure result with a
+DataVersion); the guard is the helper's contract, reachability from
+production is not measured, and a guard whose removal a direct call
+observes is not an equivalent (Fable, Q1): `subscribe.go:2082`, `:2112`;
+`conn.go:247`, `:253`, `:275` `&&→||`, `:436`, `:479`, `:535`;
+`case_seam.go:16`; `subscribe_dispatch.go:158` (×2), `:241` (×2), `:799`
+`&&→||`, `:883`, `:938`.
+
+**Equivalent mutants and their reasons.**
+
+| row | mutation | reason |
+| --- | --- | --- |
+| `bridge.go:2923` | `&&→\|\|`, `>→>=` | differ only for a nil address or port 0; every listener the bridge serves has a non-nil address with a port above 0 (`udp.New`; the one seam, `fabrictest`, port 5540) (`c4-triage.md` #1, #2) |
+| `case_initiator.go:466` | guard off | the only call without opcodes computes the same `statusReportSuccess` on the same message before the same return (#4) |
+| `fields_reader_scenes.go:33`, `:74` | guard off (err) | inferred: the decoder reads bytes just re-encoded from a tree that was read and checked, so `Next` has no error on this path (#9) |
+| `securechannel.go:1719` | guard off | a failed comma-ok assertion leaves `a` nil; the caller acts only on a non-nil establisher (§3) |
+| `subscribe.go:3344` | `\|\|→&&` (×2) | inferred from Go semantics: the mutants reach `a == b` only for different types or one comparable value, where `==` is false and cannot panic (§3) |
+| `securechannel.go:1655` | first `&&→\|\|` | inferred: a foreign handler's step has `resumeInstalled == 0`, and `CaseAdapter.processSigma3` never returns 0x33 (§3) |
+| `securechannel.go:2674` | guard off | read: `named` implies `outcome == sigma3Established` (§3) |
+| `subscribe.go:1595` | `&&→\|\|` | `ok` is always true (the only writer is the Swap at `:1594`); the mutant adds a Delete only when `prevKey == key`, undone by the Store at `:1599`; the window exists only in the mutant, on an input no caller produces (that the allocator never repeats an id for consecutive reports is unverified) |
+| `subscribe.go:2278` | `>→>=` | with no event request the priming events are nil; the chunker treats a nil and an empty events func alike |
+| `subscribe.go:2394` | `!=→==` | feeds only `sourceSeen`, a counter nothing reads (not on the Info line); a dead counter |
+| `subscribe.go:2397` | `!=→==` | log only: the `measurement_seen` field (`:2478`); no test or doc names the line |
+| `subscribe.go:2417` | guard off | with no reportable path the notifier filter returns none, so nothing is wired; only `notifier_ok` (`:2479`) moves |
+| `subscribe.go:2653`, `:2726` | guard off | `endpoint.ClusterServers(nil)` returns nil; the loop runs zero times |
+| `ota_provider_link.go:748` | `&&→\|\|` | log only: the body is one Debug line; `enqueue` is evaluated once either way |
+| `conn.go:246` | drop `!` | read: a loaded entry mapping to a route implies its `sessions ≥ 1` (writers `:248`, `:321`, `:325`; every decrement pairs with the removal of a counted entry), so the extra increment and release are a no-op |
+| `bridge.go:3304` | guard off (err) | log only: both arms return; Debug vs Info |
+| `group_messaging.go:316` | guard off | `UnmarshalProtocolHeader` refuses a header that does not fit and `protocolHeaderSize` counts the same fields, so the offset is within the payload |
+| `device_load.go:61`, `:68` | `>→>=` | the boundary value maps to itself |
+| `diag_session_fabric.go:28` | `&&→\|\|` | the reporters return (0, false) when nothing is named; (0, true) resolves to fabric 0 and adds nothing |
+| `subscribe_dispatch.go:38` | `>→>=` | `buildInitialReport` has no production caller; with no event request both sides add nothing |
+| `subscribe_dispatch.go:241` | `>→>=` | no filters → no match |
+| `subscribe_dispatch.go:370` | first `>→>=` | adds only the event paths of no requests, which is 0 |
+| `subscribe_dispatch.go:552` | `>→>=` | log only: the Info line when nothing was cleared |
+| `subscribe_dispatch.go:569` | guard off | without a node-naming path the paths are copied unchanged; for no paths the result is empty instead of nil, and both consumers append onto nil |
+| `subscribe_dispatch.go:591` | `>→>=` | an equal number sets the same value |
+| `subscribe_dispatch.go:712` | guard off (err) | for a deterministic encoder: each report of a chunk was encoded alone by the chunker first, and an error there ends `Next` |
+| `subscribe_dispatch.go:722` | drop `!` | log only: a Debug field |
+| `subscribe_dispatch.go:808` | guard off (err) | read: `SubscribeResponse.MarshalTLV` opens and closes one struct around three unsigned puts; `Bytes` errs only on an open container |
+
+Not triaged: the 1165 SURVIVED/SURVIVED rows of the CI run outside the 74
+and shard 10, and the 13 S→B rows (CI's own wide kills; one measured as
+spurious). The targeted re-run of the B2 mutants at the release head
+(decision 668) is still to come.
