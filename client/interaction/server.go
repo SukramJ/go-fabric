@@ -489,10 +489,13 @@ func (s *server) encodeFailed(f reportchunk.EncodeFailure) {
 // the log at the default level, and the error names a panic value's type,
 // never the value ([valueenc.PanicError]).
 func (s *server) logEncodeFailure(msg string, err error, path ...slog.Attr) {
-	ctx := context.Background()
-	s.log.LogAttrs(ctx, slog.LevelError, msg, append(path, slog.Any("err", err))...)
+	args := make([]any, 0, len(path)+1)
+	for _, a := range path {
+		args = append(args, a)
+	}
+	s.log.Error(msg, append(args, slog.Any("err", err))...)
 	if stack := valueenc.PanicStack(err); stack != nil {
-		s.log.LogAttrs(ctx, slog.LevelDebug, msg, append(path, slog.String("stack", string(stack)))...)
+		s.log.Debug(msg, append(args[:len(path):len(path)], slog.String("stack", string(stack)))...)
 	}
 }
 

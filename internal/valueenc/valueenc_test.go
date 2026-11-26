@@ -88,11 +88,12 @@ func TestEncode(t *testing.T) {
 	}
 	// A runtime error keeps the runtime's own message.
 	_, err = valueenc.Encode(func(*tlv.Encoder, tlv.Tag) {
-		var m map[string]int
-		m["x"] = 1
+		s := []int{1}
+		i := len(s)
+		_ = s[i]
 	})
 	valueenc.ForgetUnexpectedPanics(1) // provoked on purpose; a runtime error cannot be declared by value
-	if msg := err.Error(); !errors.Is(err, valueenc.ErrPanic) || !strings.Contains(msg, "assignment to entry in nil map") {
+	if msg := err.Error(); !errors.Is(err, valueenc.ErrPanic) || !strings.Contains(msg, "index out of range") {
 		t.Fatalf("runtime panic error %q, want the runtime's message", msg)
 	}
 	if valueenc.PanicStack(errors.New("x")) != nil {

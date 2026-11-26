@@ -4,7 +4,6 @@
 package bridge
 
 import (
-	"context"
 	"log/slog"
 
 	"thingfabric.dev/go-fabric/im"
@@ -72,9 +71,12 @@ func invokeEncodeFailureLogger(logger *slog.Logger) func(reportchunk.InvokeFailu
 // the value ([valueenc.PanicError]: a host encoder's panic may carry what
 // it was writing, which log_redact would have redacted).
 func logEncodeFailure(logger *slog.Logger, msg string, err error, path ...slog.Attr) {
-	ctx := context.Background()
-	logger.LogAttrs(ctx, slog.LevelError, msg, append(path, slog.Any("err", err))...)
+	args := make([]any, 0, len(path)+1)
+	for _, a := range path {
+		args = append(args, a)
+	}
+	logger.Error(msg, append(args, slog.Any("err", err))...)
 	if stack := valueenc.PanicStack(err); stack != nil {
-		logger.LogAttrs(ctx, slog.LevelDebug, msg, append(path, slog.String("stack", string(stack)))...)
+		logger.Debug(msg, append(args[:len(path):len(path)], slog.String("stack", string(stack)))...)
 	}
 }
