@@ -433,7 +433,7 @@ func TestEmitEventWithAPayloadThatCannotBeEncodedW625(t *testing.T) {
 			if recs := b.EventLog().Query(1, 0x003B, 2, 0); len(recs) != 0 {
 				t.Fatalf("the failing event was recorded: %+v", recs)
 			}
-			waitLogW625(t, logs, "level=ERROR msg=matter.event.encode_failed subsystem=matter.bridge endpoint=1 cluster=59 event=2 answered=\"not recorded\"")
+			waitLogW625(t, logs, "level=ERROR msg=matter.event.encode_failed subsystem=matter.bridge endpoint=1 cluster=59 event=2 err=")
 		})
 	}
 }
@@ -482,5 +482,5 @@ func TestReadEventWhosePayloadFailsAtReportTimeW625(t *testing.T) {
 	if !failed || !delivered {
 		t.Fatalf("event reports %+v; want FAILURE for event 2 and event 1 delivered", evs)
 	}
-	waitLogW625(t, logs, "level=ERROR msg=matter.event.encode_failed subsystem=matter.bridge endpoint=1 cluster=59 event=2 answered=\"EventStatusIB FAILURE\"")
+	waitLogW625(t, logs, "level=ERROR msg=matter.event.encode_failed subsystem=matter.bridge endpoint=1 cluster=59 event=2 status=Failure")
 }

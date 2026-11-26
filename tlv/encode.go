@@ -543,16 +543,20 @@ func (e *Encoder) writeControlAndTag(t ElementType, tag Tag) {
 	if len(e.containerStack) > 0 &&
 		e.containerStack[len(e.containerStack)-1] == TypeArray &&
 		tag.Kind == TagKindContext {
-		// invariant: both the container nesting (StartArray/EndContainer
-		// calls) and the tag kind passed to every Put* method are chosen
-		// by our own encoding code. The one encoder that writes a tree
-		// read from a peer (cluster/spec Node.EncodeTLV) writes an
-		// array's elements anonymous whatever tag a node carries, and
-		// the tree's reader refuses an array with a tagged element
-		// (spec.ErrArrayElementTag) — so this only fires when a caller
-		// in this codebase picks ContextTag() for an element it is
-		// writing into an Array, a coding mistake caught by the
-		// parity/encode tests, not a wire-triggerable path.
+		// Not wire-triggerable: the container nesting and the tag kinds
+		// are chosen by the code that encodes, never by a peer. The one
+		// encoder that writes a tree read from a peer (cluster/spec
+		// Node.EncodeTLV) writes an array's elements anonymous whatever
+		// tag a node carries, and the tree's reader refuses an array with
+		// a tagged element (spec.ErrArrayElementTag). But that code is not
+		// only this module's: a host value's EncodeTLV behind contract/
+		// writes on an encoder too, and one that leaves a container open
+		// or tags an array element fires this panic — on the message's
+		// encoder, inside a report or a response. Every value encoder of
+		// a report, an event payload and a command response therefore
+		// runs on an encoder of its own under a recover
+		// (internal/valueenc), where this panic costs the one path a
+		// FAILURE and nothing else (#625).
 		panic(fmt.Sprintf("tlv: context tag inside Array container (tag=%d); use AnonymousTag()", tag.Number))
 	}
 	// Note: chip TLVReader.cpp:865-871 (at 6170af84) enforces two strictness rules

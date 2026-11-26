@@ -37,7 +37,7 @@ func reportEncodeFailureLogger(logger *slog.Logger) func(reportchunk.EncodeFailu
 				slog.Int("endpoint", int(f.EventPath.Endpoint)),
 				slog.Uint64("cluster", uint64(f.EventPath.Cluster)),
 				slog.Uint64("event", uint64(f.EventPath.Event)),
-				slog.String("answered", "EventStatusIB FAILURE"),
+				slog.String("status", im.StatusFailure.String()),
 				slog.Any("err", f.Err))
 			return
 		}
@@ -45,7 +45,7 @@ func reportEncodeFailureLogger(logger *slog.Logger) func(reportchunk.EncodeFailu
 			slog.Int("endpoint", int(f.AttributePath.Endpoint)),
 			slog.Uint64("cluster", uint64(f.AttributePath.Cluster)),
 			slog.Uint64("attribute", uint64(f.AttributePath.Attribute)),
-			slog.String("answered", "AttributeStatusIB FAILURE"),
+			slog.String("status", im.StatusFailure.String()),
 			slog.Any("err", f.Err))
 	}
 }
@@ -62,7 +62,7 @@ func invokeEncodeFailureLogger(logger *slog.Logger) func(reportchunk.InvokeFailu
 			slog.Int("endpoint", int(f.Path.Endpoint)),
 			slog.Uint64("cluster", uint64(f.Path.Cluster)),
 			slog.Uint64("command", uint64(f.Path.Command)),
-			slog.String("answered", "CommandStatusIB FAILURE"),
+			slog.String("status", im.StatusFailure.String()),
 			slog.Any("err", f.Err))
 	}
 }

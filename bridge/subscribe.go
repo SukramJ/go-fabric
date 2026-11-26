@@ -589,7 +589,6 @@ func (b *Bridge) EmitEvent(endpoint uint16, cluster, event uint32, data any, pri
 				slog.Int("endpoint", int(endpoint)),
 				slog.Uint64("cluster", uint64(cluster)),
 				slog.Uint64("event", uint64(event)),
-				slog.String("answered", "not recorded"),
 				slog.Any("err", err))
 			return
 		}

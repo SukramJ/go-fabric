@@ -65,6 +65,13 @@ type ClusterServer interface {
 	// EncodeTLV(*tlv.Encoder, tlv.Tag), as the generated types of
 	// cluster/spec have. A value of another type is encoded as null.
 	//
+	// An EncodeTLV runs once per report, on an encoder of its own: it
+	// writes exactly one element under the tag it is handed. One that
+	// panics, leaves a container open or writes no element or more than
+	// one answers FAILURE (an AttributeStatusIB) for its own path, logged
+	// at ERROR; the rest of the read, the priming report or the
+	// subscription's report goes out, and the subscription stays.
+	//
 	// It takes no context on purpose: a read answers from memory —
 	// the value the server holds or its source last observed — and
 	// does not wait on a backend, so there is nothing to cancel. A
@@ -101,6 +108,13 @@ type ClusterServer interface {
 	// cluster-native struct (or nil for parameterless commands) for
 	// the request payload; `response` is the cluster-native struct
 	// for the response, or nil for status-only commands.
+	//
+	// The response is encoded once, on an encoder of its own: one whose
+	// encoder panics, leaves a container open or writes other than one
+	// element answers FAILURE (a CommandStatusIB on the request's path)
+	// for that command, logged at ERROR, the other commands of the
+	// invoke unaffected. The command has run by then, and nothing undoes
+	// what it did: a controller that retries runs it again.
 	MatterInvoke(ctx context.Context, cmdID uint32, fields any) (response any, err error)
 
 	// MatterReportable lists the attributes whose change the server
@@ -1118,7 +1132,12 @@ const (
 // on the network: it records the event and returns, and the reports go
 // out on the subscriptions' own schedule.
 //
-// `data` is the cluster-native event payload (struct, scalar, …).
+// `data` is the cluster-native event payload (struct, scalar, …). It is
+// encoded once, on the caller's goroutine, before the event is recorded —
+// CPU only, no wait: a payload whose encoder panics, leaves a container
+// open or writes other than one element is not recorded (no event number
+// is consumed, no subscriber hears of it) and is logged at ERROR; the
+// call returns normally.
 // `priority` is the priority the event is recorded and reported with. It
 // does not decide when a subscriber is told: an event is reported with
 // the subscription's next report, and it asks for one itself only when
