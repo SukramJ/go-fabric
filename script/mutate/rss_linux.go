@@ -16,15 +16,5 @@ func groupRSS(pgid int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	var pages int64
-	for _, p := range stats {
-		b, err := os.ReadFile(p) //nolint:gosec // a /proc stat file
-		if err != nil {
-			continue
-		}
-		if g, r, ok := parseProcStat(b); ok && g == pgid {
-			pages += r
-		}
-	}
-	return pages * int64(os.Getpagesize()), nil
+	return statGroupPages(stats, pgid) * int64(os.Getpagesize()), nil
 }
