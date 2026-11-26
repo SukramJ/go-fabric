@@ -2178,7 +2178,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 88,
+    "line": 96,
     "citation": "NetworkClient.ts:385-391",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "isNewlyCommissioned",
@@ -2187,7 +2187,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 105,
+    "line": 113,
     "citation": "NetworkClient.ts:268-273",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "fabricLabelReconciled",
@@ -2196,7 +2196,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 449,
+    "line": 463,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -2223,7 +2223,7 @@
   },
   {
     "file": "controller/client/reactions_test.go",
-    "line": 185,
+    "line": 254,
     "citation": "Peers.ts:945-947",
     "resolved": "packages/node/src/node/client/Peers.ts",
     "at": "b25ed960",
@@ -2305,7 +2305,7 @@
   },
   {
     "file": "controller/client/registry.go",
-    "line": 437,
+    "line": 443,
     "citation": "CommissioningClient.ts:685-714",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "#bindPeer",
