@@ -147,22 +147,18 @@ func answerAndDecodeW625(t *testing.T, b *Bridge, peerConn *net.UDPConn) <-chan 
 	return out
 }
 
-// nextSentW625 takes the next IM message of opcode the peer saw.
+// nextSentW625 takes the next IM message of opcode the peer saw; the
+// peer's read deadline bounds the wait (the channel closes).
 func nextSentW625(t *testing.T, sent <-chan sentW625, opcode uint8) sentW625 {
 	t.Helper()
-	select {
-	case s, ok := <-sent:
-		if !ok {
-			t.Fatal("peer saw no further message before its read deadline")
-		}
-		if s.opcode != opcode {
-			t.Fatalf("message opcode 0x%02X, want 0x%02X", s.opcode, opcode)
-		}
-		return s
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for the next message")
-		return sentW625{}
+	s, ok := <-sent
+	if !ok {
+		t.Fatal("peer saw no further message before its read deadline")
 	}
+	if s.opcode != opcode {
+		t.Fatalf("message opcode 0x%02X, want 0x%02X", s.opcode, opcode)
+	}
+	return s
 }
 
 // checkFailedAttributeW625 holds a report's two attribute entries: the

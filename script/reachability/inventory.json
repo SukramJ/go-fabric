@@ -2178,7 +2178,7 @@
       "identifier": "TestChunkInvokeResponseRunsTheWriterOnce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/value_isolation_test.go",
-      "line": 380
+      "line": 374
     },
     {
       "package": "bridge",
@@ -4243,7 +4243,7 @@
       "identifier": "TestEmitEventWithAPayloadThatCannotBeEncodedW625",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/value_isolation_test.go",
-      "line": 419
+      "line": 413
     },
     {
       "package": "bridge",
@@ -5132,21 +5132,21 @@
       "identifier": "TestHostEncoderFailureCostsItsCommandW625",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/value_isolation_test.go",
-      "line": 319
+      "line": 313
     },
     {
       "package": "bridge",
       "identifier": "TestHostEncoderFailureCostsItsPathOnReadW625",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/value_isolation_test.go",
-      "line": 206
+      "line": 200
     },
     {
       "package": "bridge",
       "identifier": "TestHostEncoderFailureCostsItsPathOnSubscribeW625",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/value_isolation_test.go",
-      "line": 239
+      "line": 233
     },
     {
       "package": "bridge",
@@ -6903,7 +6903,7 @@
       "identifier": "TestReadEventWhosePayloadFailsAtReportTimeW625",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/value_isolation_test.go",
-      "line": 459
+      "line": 453
     },
     {
       "package": "bridge",
