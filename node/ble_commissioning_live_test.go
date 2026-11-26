@@ -66,14 +66,15 @@ func nodePeripheral() *bletest.Peripheral {
 	return &bletest.Peripheral{Address: "C0:FF:EE:00:0B:1E", Discriminator: 3840, VendorID: 0xFFF1, ProductID: 0x8001}
 }
 
-// offTheRadio checks that the node no longer serves or advertises on r:
-// CommissioningComplete took it off the radio before it answered.
-func offTheRadio(t *testing.T, r *bletest.Radio) {
+// offTheRadio checks that the node leaves r — it no longer serves or
+// advertises on it — bounded by ctx. CommissioningComplete starts the
+// node's leaving without waiting for it (node.leaveRadioWhenCommissioned),
+// and the commissioner closes its channel on its own, so the channel's
+// close does not order the node's leaving: the check waits for it.
+func offTheRadio(ctx context.Context, t *testing.T, r *bletest.Radio) {
 	t.Helper()
-	serving, _ := r.Serving()
-	_, advertising := r.Advertising()
-	if serving || advertising {
-		t.Fatalf("the commissioned node is still on the radio: serving %v, advertising %v", serving, advertising)
+	if err := r.AwaitOff(ctx); err != nil {
+		t.Fatalf("the commissioned node is still on the radio: %v", err)
 	}
 }
 
@@ -122,7 +123,7 @@ func TestLiveCommissioningOverBLE(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the BLE channel outlived the commissioning")
 	}
-	offTheRadio(t, p.Radio())
+	offTheRadio(ctx, t, p.Radio())
 
 	// Over IP now: CASE to the node, a read.
 	ia := f.com.Interaction(f.set.Get(res.Address))
