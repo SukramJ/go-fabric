@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-11-26
+
+Review II, phase 8 (decisions 667–694): the C5 follow-up issues #595–#613 (#596's flake count stays open, decision 670) and the pull request 1 review issues #618–#623, in two waves (#615, #626). Correctness and concurrency fixes across the core servers (AccessControl, GroupKeyManagement, OperationalCredentials, NetworkCommissioning), the camera and WebRTC servers, `endpoint`, `node`'s batches, `bridge`, `client/discovery` and `client/peer`, and the nested modules; a panic while a subscription report is built or sent no longer ends the process; mutation sampling on CI (`script/mutate`, `mutate.yml`). No source change required: `make apidiff` reports no incompatible change against `v0.26.0`, here or in the nested modules. Five identifiers are deprecated, each removable in `v0.29.0` — see *Deprecated*. Several calls now refuse input they accepted before — see *Changed*. The nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in a release of their own that requires `v0.27.0`.
+
 ### Security
 
 - `bridge`: the CASE adapter clears its copy of the shared secret of every session value it drops — a resume that installs no session (a replayed resume included), a resume or Sigma3 whose `SetOnEstablished` callback refuses it, a Sigma3 with no callback, and a Sigma3 handed to the deprecated `CaseSessionEstablished` callback, which receives only the keys and the peer session id; a value a host's `SetOnEstablished` callback installs stays the host's (review II, C5-h1-n3, decision 658; #602).
@@ -7096,7 +7100,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/thingfabric/go-fabric/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/thingfabric/go-fabric/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/thingfabric/go-fabric/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/thingfabric/go-fabric/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/thingfabric/go-fabric/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/thingfabric/go-fabric/compare/v0.24.0...v0.24.1
