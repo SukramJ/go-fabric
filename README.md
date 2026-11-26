@@ -125,7 +125,7 @@ seams through which the facade, the test-support packages, the reference
 programs and the module's own tests reach package internals (`bridgeseam`,
 `channelseam`, `coreseam`, `dclseam`, `deviceseam`, `exchangeseam`, `facadeseam`, `fabrictestseam`,
 `nodeseam`, `sealseam`, `sessionseam`, `specseam`, `surfaceseam`, `udpseam`, `inflight`, `clockvar`); shared
-internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`, `caseauth`, `deepcopy`);
+internals behind them (`serialqueue`, `forward`, `netwatch`, `valuejson`, `attestids`, `reportchunk`, `valueenc`, `caseauth`, `deepcopy`);
 and test support (`paritytest`, `chipdm`, the chip-tool suite `chiptool`). Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
