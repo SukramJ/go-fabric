@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"os"
 	"strconv"
 	"time"
 )
@@ -55,6 +56,24 @@ func parseProcStat(b []byte) (pgrp int, rssPages int64, ok bool) {
 		return 0, 0, false
 	}
 	return g, r, true
+}
+
+// statGroupPages sums, in pages, the resident set of the processes of group
+// pgid from the Linux /proc/<pid>/stat files at paths. A file that cannot be
+// read — its process exited between the listing and the read — or does not
+// parse is skipped.
+func statGroupPages(paths []string, pgid int) int64 {
+	var pages int64
+	for _, p := range paths {
+		b, err := os.ReadFile(p) //nolint:gosec // a /proc stat file
+		if err != nil {
+			continue
+		}
+		if g, r, ok := parseProcStat(b); ok && g == pgid {
+			pages += r
+		}
+	}
+	return pages
 }
 
 // sumPsGroupRSS sums, in bytes, the rss column of the lines of
