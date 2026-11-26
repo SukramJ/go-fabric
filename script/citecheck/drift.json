@@ -118,7 +118,7 @@
   },
   {
     "file": "ble/bluez/central_linux.go",
-    "line": 467,
+    "line": 484,
     "citation": "NobleBleChannel.ts:299-440",
     "resolved": "packages/nodejs-ble/src/NobleBleChannel.ts",
     "identifier": "openChannel",
@@ -216,7 +216,7 @@
   },
   {
     "file": "bridge/commissioning_window.go",
-    "line": 1152,
+    "line": 1162,
     "citation": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts:524",
     "resolved": "packages/node/src/behavior/system/commissioning/CommissioningClient.ts",
     "identifier": "randomBytes",
@@ -1152,7 +1152,7 @@
   },
   {
     "file": "cluster/camera/requestor.go",
-    "line": 258,
+    "line": 261,
     "citation": "packages/node/src/behavior/state/managed/values/ListManager.ts:461-478",
     "resolved": "packages/node/src/behavior/state/managed/values/ListManager.ts",
     "identifier": "createProxy",
@@ -1170,7 +1170,7 @@
   },
   {
     "file": "cluster/core/access_control.go",
-    "line": 278,
+    "line": 287,
     "citation": "packages/model/src/standard/elements/access-control.element.ts:35-39",
     "resolved": "packages/model/src/standard/elements/access-control.element.ts",
     "identifier": "ChangeTypeEnum",

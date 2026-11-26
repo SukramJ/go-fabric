@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 10860,
+  "entry_points": 10939,
   "initializers": 373,
   "entry_packages": [
     ".",
@@ -297,9 +297,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28640,
+    "total_exported": 28713,
     "reachable": 22330,
-    "whitelisted": 6288,
+    "whitelisted": 6361,
     "unreachable": 22
   },
   "by_package": [
@@ -410,7 +410,7 @@
       "package": "cluster/core",
       "identifier": "AccessControl.NotifyLocalEntryInstalled",
       "file": "cluster/core/access_control.go",
-      "line": 1688,
+      "line": 1716,
       "kind": "method"
     },
     {
@@ -778,6 +778,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_values_list_test.go",
       "line": 20
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAbandonPrimingSubscriptionWithoutManagerW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
+      "line": 205
     },
     {
       "package": "bridge",
@@ -1194,6 +1201,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestAttributeFixedOfAnUnknownClusterW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_decoders_w2b2b_test.go",
+      "line": 105
+    },
+    {
+      "package": "bridge",
       "identifier": "TestAttributeReadingEqual",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/value_compare_test.go",
@@ -1292,10 +1306,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestAwaitInitiatedSkipsAStrayMessageW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_case_w2b2a_test.go",
+      "line": 67
+    },
+    {
+      "package": "bridge",
       "identifier": "TestBDXBlockWaitsForTheAcceptsAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bdx_ack_wait_test.go",
       "line": 123
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXGateLeavesOtherProtocolsW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peers_inbound_w2b2b_test.go",
+      "line": 240
     },
     {
       "package": "bridge",
@@ -1422,6 +1450,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
       "line": 415
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBlockedOwnWindowConsultsNoFabricCounterW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_window_w2b2a_test.go",
+      "line": 24
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBlockedWindowWithArmedFailSafeIsNotBusyW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_window_w2b2a_test.go",
+      "line": 46
     },
     {
       "package": "bridge",
@@ -1887,6 +1929,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCaseEstablishmentSeamRefusesANonAdapterW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_decoders_w2b2b_test.go",
+      "line": 115
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCaseInitiatorStopsWhenTheNextInitiatorFailsW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_case_w2b2a_test.go",
+      "line": 33
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCaseProviderEvictsOnlyForAHandshakeThatBegan",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_sigma1_replay_test.go",
@@ -2335,6 +2391,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCloseConnRouteClosesOnlyTCPW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_conn_routes_w2b2b_test.go",
+      "line": 148
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCloseFabricSessionsAfterUpdate_ClosesTheInvokingSessionToo",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_session_close_test.go",
@@ -2601,6 +2664,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCommissioningCompleteWithoutPASESessionClosesNothingW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peer_w2b2a_test.go",
+      "line": 24
+    },
+    {
+      "package": "bridge",
       "identifier": "TestConcreteDeniedEventPathIsAnsweredWithAStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_acl_test.go",
@@ -2643,6 +2713,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestConnectPeerFailureIsNotAFabricUpdateW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peers_inbound_w2b2b_test.go",
+      "line": 66
+    },
+    {
+      "package": "bridge",
       "identifier": "TestContainerWrittenToAScalarIsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/written_value_refused_test.go",
@@ -2675,6 +2752,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/energy_measured_event_test.go",
       "line": 107
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCurrentPeerAddrSkipsANilRouteW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
+      "line": 217
     },
     {
       "package": "bridge",
@@ -3637,6 +3721,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestDetachOfAnOvertakenGenerationKeepsTheListenersW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_listener_wiring_w2b2b_test.go",
+      "line": 179
+    },
+    {
+      "package": "bridge",
       "identifier": "TestDeviceAdvertiserIcdAdvertisementProvider",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/advertiser_parity_matterjs_test.go",
@@ -3669,6 +3760,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/device_load_test.go",
       "line": 24
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDeviceTypeValidationStatesTheRadioW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peers_inbound_w2b2b_test.go",
+      "line": 184
     },
     {
       "package": "bridge",
@@ -4106,6 +4204,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestDuplicateAckRouteIsTheExchangesW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_acks_routes_w2b2b_test.go",
+      "line": 56
+    },
+    {
+      "package": "bridge",
       "identifier": "TestEmitFabricRemovedContextClosesTheFabricsSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_removed_sessions_test.go",
@@ -4211,10 +4316,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestEventPathAllowedWithoutDispatcherW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 176
+    },
+    {
+      "package": "bridge",
       "identifier": "TestEveryHandReadRequestIsJudgedInItsGeneratedForm",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/hand_form_judged_test.go",
       "line": 43
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestEvictSessionRegistryMissRecordsNothingW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_conn_routes_w2b2b_test.go",
+      "line": 170
     },
     {
       "package": "bridge",
@@ -4491,6 +4610,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestForeignSigma1ResumeNamesItsSessionW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_case_w2b2a_test.go",
+      "line": 118
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestForeignSigma3AnsweringResumeIsToleratedW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_case_w2b2a_test.go",
+      "line": 136
+    },
+    {
+      "package": "bridge",
       "identifier": "TestForgetSigma1Replied_ClearsEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
@@ -4579,6 +4712,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/group_messaging_e2e_test.go",
       "line": 483
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupMessageFromANonInitiatorIsDroppedW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peers_inbound_w2b2b_test.go",
+      "line": 212
     },
     {
       "package": "bridge",
@@ -4841,6 +4981,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestHandshakeFailureReportAckAndHoldW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_acks_routes_w2b2b_test.go",
+      "line": 75
+    },
+    {
+      "package": "bridge",
       "identifier": "TestHandshakeFailureUnreportedWhileAReplyIsUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handshake_failure_unreported_test.go",
@@ -4866,6 +5013,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_incorrect_ack_test.go",
       "line": 190
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestHandshakeReplyLeavesAnotherInitiatorsAckW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_acks_routes_w2b2b_test.go",
+      "line": 37
     },
     {
       "package": "bridge",
@@ -5142,6 +5296,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestInvokeRefusesARequestLargerThanOneMessageW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peer_w2b2a_test.go",
+      "line": 94
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInvokeRequestWithOverWideFieldCarriesConstraintErrorStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_range_test.go",
@@ -5202,6 +5363,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/review2_r3_test.go",
       "line": 34
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestLatestEventNumberOfTheDataEventsW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 153
     },
     {
       "package": "bridge",
@@ -5289,6 +5457,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestMeasurementWiringPicksTheNotifierThatCoversPathsW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_listener_wiring_w2b2b_test.go",
+      "line": 142
+    },
+    {
+      "package": "bridge",
       "identifier": "TestMessagesUnderAHandshakeInProgressChangeNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_handshake_in_progress_test.go",
@@ -5335,6 +5510,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/tcp_inbound_bound_test.go",
       "line": 67
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestNilConnRoutesAreSkippedW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_conn_routes_w2b2b_test.go",
+      "line": 87
     },
     {
       "package": "bridge",
@@ -6080,6 +6262,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestPathMemoryRefreshLeavesAnUnheldPathUnheldW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_listener_wiring_w2b2b_test.go",
+      "line": 279
+    },
+    {
+      "package": "bridge",
       "identifier": "TestPathValuesCompareByValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/value_compare_test.go",
@@ -6098,6 +6287,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/boolean_state_event_test.go",
       "line": 107
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPeerExchangeHeldByAStatusResponseWaitW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_acks_routes_w2b2b_test.go",
+      "line": 120
     },
     {
       "package": "bridge",
@@ -6262,6 +6458,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestPrimingDataVersionFilterSkipsOnlyAnUnchangedClusterW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 72
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPrimingDataVersionFiltersForAnotherNodeW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 100
+    },
+    {
+      "package": "bridge",
       "identifier": "TestPrimingEventPathNamingAnotherNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_path_node_parity_matterjs_test.go",
@@ -6273,6 +6483,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_stop_unanswered_chunk_test.go",
       "line": 135
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPrimingLeavesDeniedWildcardResultsOutW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 45
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPrimingMatchesOnEventPathsW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 130
     },
     {
       "package": "bridge",
@@ -6308,6 +6532,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_change_report_parity_matterjs_test.go",
       "line": 49
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPrimingReportThatCannotBeEncodedIsNoSubscriptionW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_fable_gaps_w2b2b_test.go",
+      "line": 204
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPrimingReportsAStatusWhateverItsVersionW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_fable_gaps_w2b2b_test.go",
+      "line": 135
     },
     {
       "package": "bridge",
@@ -6577,6 +6815,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestReadDenialStatusWithoutCheckerOrFabricW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 115
+    },
+    {
+      "package": "bridge",
       "identifier": "TestReadEventPathNamingAnotherNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_path_node_parity_matterjs_test.go",
@@ -6689,6 +6934,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestReceiveTimeoutOnAClosedExchangeDeclaresNothingW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peer_w2b2a_test.go",
+      "line": 131
+    },
+    {
+      "package": "bridge",
       "identifier": "TestReceive_NewMessageFromNewAddressMovesSessionRoute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_route_replay_test.go",
@@ -6735,6 +6987,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/chunk_wait_bound_test.go",
       "line": 249
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReestablishSkipsABlockedPeerW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peers_inbound_w2b2b_test.go",
+      "line": 81
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReestablishStopsAtABlockMidwayW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peers_inbound_w2b2b_test.go",
+      "line": 126
     },
     {
       "package": "bridge",
@@ -6801,6 +7067,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRefusedSubscribeIsLoggedAtWarnW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_fable_gaps_w2b2b_test.go",
+      "line": 88
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRefusedSubscribeTearsDownFirst",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_teardown_order_test.go",
@@ -6826,6 +7099,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
       "line": 152
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRejectSubscribeStatusDischargesTheOwedAckW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
+      "line": 171
     },
     {
       "package": "bridge",
@@ -6910,6 +7190,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_closed_report_test.go",
       "line": 45
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReportServerChangeMarksAndAdvancesW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_listener_wiring_w2b2b_test.go",
+      "line": 226
     },
     {
       "package": "bridge",
@@ -7179,6 +7466,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRetransmittedFirstMessageKeepsTheHoldW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_conn_routes_w2b2b_test.go",
+      "line": 104
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRevokeClosesThePASESessionWhenItIsIdle",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_deferred_close_test.go",
@@ -7319,6 +7613,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRootChangeNotifierIsNotWiredTwiceW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_listener_wiring_w2b2b_test.go",
+      "line": 202
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRootInvokeChangeAdvancesTheEndpointHeldVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/root_dataversion_invoke_test.go",
@@ -7400,6 +7701,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/scenes_signed_value_test.go",
       "line": 17
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestScenesHandFormCarriesTheRequestW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_scenes_w2b2a_test.go",
+      "line": 21
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestScenesRequestsKeepTheirFieldsW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_decoders_w2b2b_test.go",
+      "line": 63
     },
     {
       "package": "bridge",
@@ -7571,6 +7886,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSendViaNilUDPAddrHasNoRouteW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_conn_routes_w2b2b_test.go",
+      "line": 69
+    },
+    {
+      "package": "bridge",
       "identifier": "TestServerChangeNotifierIsHeardWithoutASourceNotifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/server_notifier_test.go",
@@ -7624,6 +7946,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/exchange_session_end_test.go",
       "line": 260
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSessionHoldsSubscriptionWithoutManagerW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_conn_routes_w2b2b_test.go",
+      "line": 160
     },
     {
       "package": "bridge",
@@ -7694,6 +8023,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_evse_targets_test.go",
       "line": 26
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSettleHandshakeBindsOnlyAnEstablishedSessionW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_conn_routes_w2b2b_test.go",
+      "line": 124
     },
     {
       "package": "bridge",
@@ -7802,6 +8138,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSigma3EstablisherIsNilForAStepThatEstablishedNothingW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_case_w2b2a_test.go",
+      "line": 85
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSigma3EstablisherNamesTheStepsSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
@@ -7858,6 +8201,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSigma3WaitTreatsZeroActiveAsDefaultW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_peers_inbound_w2b2b_test.go",
+      "line": 166
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSigma3WithoutStepValueIsNoEstablishment",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_established_r5_test.go",
@@ -7883,6 +8233,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
       "line": 78
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSingleUint16RequestReadsOnlyContextTagZeroW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_decoders_w2b2b_test.go",
+      "line": 44
     },
     {
       "package": "bridge",
@@ -8089,6 +8446,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestStopBLEWithNothingToStopLogsNothingW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_fable_gaps_w2b2b_test.go",
+      "line": 110
+    },
+    {
+      "package": "bridge",
       "identifier": "TestStopDuringStartWaitsForIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/lifecycle_race_test.go",
@@ -8278,10 +8642,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubscribeAtQuotaMatchingNothingEvictsNobodyW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
+      "line": 234
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubscribeAttributesToTheSessionPeerNotTheHeader",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_peer_identity_test.go",
       "line": 63
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscribeBeyondTheChunkWaitBoundIsBusyW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
+      "line": 123
     },
     {
       "package": "bridge",
@@ -8306,6 +8684,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubscribeGatesAnswerBeforeTheRegistrationW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
+      "line": 80
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubscribeRejectsEventPathsTheSubjectMayNotRead",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_acl_test.go",
@@ -8320,10 +8705,31 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubscribeResponseMaxIntervalIsTheSubscriptionsW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 188
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscribeResponseNotSentAbandonsTheSubscriptionW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
+      "line": 282
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubscribeResponseWaitsForThePrimingReportsAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_route_release_test.go",
       "line": 188
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscribeWithoutDispatcherSendsNothingW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_subscribe_gates_w2b2b_test.go",
+      "line": 146
     },
     {
       "package": "bridge",
@@ -8373,6 +8779,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_node_path_test.go",
       "line": 39
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionPeerOfAnUnsecuredFrameW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_dispatch_w2b2b_test.go",
+      "line": 167
     },
     {
       "package": "bridge",
@@ -8646,6 +9059,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_tx_wallstep_test.go",
       "line": 85
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTimedSweepRunsOncePerIntervalW2B2b",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_acks_routes_w2b2b_test.go",
+      "line": 133
     },
     {
       "package": "bridge",
@@ -8926,6 +9346,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioning_window_state_test.go",
       "line": 28
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWindowRefusalPrecedenceW2B2a",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/mutant_c4_window_w2b2a_test.go",
+      "line": 61
     },
     {
       "package": "bridge",
@@ -9766,6 +10193,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "client/discovery/solicitor_test.go",
       "line": 25
+    },
+    {
+      "package": "client/discovery",
+      "identifier": "TestStatus_CompletedResolutionStartsNoneW2B5",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "client/discovery/status_w2b5_test.go",
+      "line": 20
     },
     {
       "package": "client/discovery",
@@ -12373,6 +12807,13 @@
     },
     {
       "package": "cluster/camera",
+      "identifier": "SetProviderCommitRefusalW2B6",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/camera/export_w2b6_test.go",
+      "line": 8
+    },
+    {
+      "package": "cluster/camera",
       "identifier": "SetZoneCommitRefusal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/camera/export_test.go",
@@ -12814,6 +13255,27 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestAccessControlBatchClosedByTheDroppedFabricW2B4",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_aux_drop_w2b4_test.go",
+      "line": 243
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestAccessControlDropBeforeTheSyncsTakeIsSeenW2B4",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_aux_drop_w2b4_test.go",
+      "line": 198
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestAccessControlDropClearsTheBatchDeferredContextW2B4",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_aux_drop_w2b4_test.go",
+      "line": 165
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestAccessControlDropForgetsTheOwedContextP8G",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/acl_read_hook_p8g_test.go",
@@ -12832,6 +13294,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/access_control_r4_test.go",
       "line": 54
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestAccessControlFailedSyncKeepsNoDroppedFabricContextW2B4",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_aux_drop_w2b4_test.go",
+      "line": 117
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestAccessControlFailingSourceWarnsOncePerDebtW2B4",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_aux_settle_w2b4_test.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestAccessControlFilteredReadSettlesOnceW2B4",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/acl_aux_settle_w2b4_test.go",
+      "line": 20
     },
     {
       "package": "cluster/core",
@@ -16734,6 +17217,13 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "ServerLockedW2B6",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/export_w2b6_test.go",
+      "line": 8
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "SetJudgedHookForTests",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/export_test.go",
@@ -16920,6 +17410,13 @@
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
       "line": 148
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "ValueLockedW2B6",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/export_w2b6_test.go",
+      "line": 18
     },
     {
       "package": "cluster/spec/accesscontrol",
@@ -29614,6 +30111,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestAssembleWaitEndsWithContextW2B5",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/assembler_concurrent_w2b5_test.go",
+      "line": 107
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestAssemblerStampsGroupState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
@@ -29842,6 +30346,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/parts_test.go",
       "line": 117
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestConcurrentAssembliesShareTheFirstStateW2B5",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/assembler_concurrent_w2b5_test.go",
+      "line": 64
     },
     {
       "package": "endpoint",

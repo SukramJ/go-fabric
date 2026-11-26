@@ -108,7 +108,10 @@ WebRtcTransportRequestor through `camera.Provider`:
   `SdpMid` is empty goes as null, as connectedhomeip sends it.
 - `Provider.End(ctx, sessionID, reason)` tells the requestor the camera
   ended the session and removes the session from `CurrentSessions`,
-  whether or not the command reached the peer.
+  whether or not the command reached the peer — also on a provider without
+  a peer connector, which sends nothing and returns
+  `camera.ErrNoPeerConnector`. A removal the table refuses is returned
+  with the send's error (`errors.Join`).
 
 Each signal is one `Invoke` of the requestor's command on the session's
 peer node and fabric, at the endpoint the session recorded as
@@ -123,7 +126,8 @@ attaches the route (`camera.PeerConnector`) to every provider it
 assembles, at `Start` and with each assembly, so a camera added to a
 running node has it before a controller can offer it a session. A
 provider that runs outside a node answers `camera.ErrNoPeerConnector`
-until the host attaches a connector with `Provider.AttachPeerConnector`.
+until the host attaches a connector with `Provider.AttachPeerConnector`
+(`End` still removes the session).
 
 A session id `CurrentSessions` does not hold is `camera.ErrUnknownSession`.
 The peer's refusal comes back as an error carrying its status
