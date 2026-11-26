@@ -242,4 +242,44 @@ func TestResolveInvoke(t *testing.T) {
 	if r := single.Responses[0]; !r.IsStatus || r.Path != path(1) {
 		t.Fatalf("single failing response %+v, want FAILURE on command 1", r)
 	}
+	// An entry without a CommandRef in a request of several is matched by
+	// its cluster and endpoint when one invocation alone has them.
+	other := im.CommandInvocation{Path: im.ConcreteCommandPath{Endpoint: 2, Cluster: 8, Command: 4, HasEndpoint: true, HasCluster: true, HasCommand: true}}
+	byPath := reportchunk.ResolveInvoke(im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: path(1)}, other}},
+		im.InvokeResponse{Responses: []im.InvokeResponseEntry{{Path: path(0x81), Response: badValue("open"), HasResponse: true}}}, fieldsWrite, nil)
+	if r := byPath.Responses[0]; !r.IsStatus || r.Path != path(1) {
+		t.Fatalf("failing response matched by path %+v, want FAILURE on command 1", r)
+	}
+}
+
+// TestSplitFastPathEventThatCannotBeEncoded (#625, review L4): the ongoing
+// report path (Split, a report that fits whole) resolves its events too —
+// a payload that cannot be encoded answers EventStatusIB FAILURE, the
+// other event and the attribute are delivered, the hook hears of it once.
+func TestSplitFastPathEventThatCannotBeEncoded(t *testing.T) {
+	t.Parallel()
+	ev := func(id uint32, v any) im.EventReport {
+		return im.EventReport{
+			Path:   im.ConcreteEventPath{Endpoint: 1, Cluster: 0x3B, Event: id, HasEndpoint: true, HasCluster: true, HasEvent: true},
+			Number: uint64(id), Priority: im.EventPriorityInfo, Data: im.AttributeValue{Value: v},
+		}
+	}
+	for _, kind := range []badValue{"open", "panic"} {
+		var got failures
+		rd := im.ReportData{Reports: []im.AttributeReport{attr(1, "x")}, EventReports: []im.EventReport{ev(1, "a"), ev(2, kind)}}
+		chunks, err := reportchunk.Split(rd, 4000, 4000, writeOrFail, got.hook)
+		if err != nil || len(chunks) != 1 {
+			t.Fatalf("%s: %d chunks, %v; want the report whole", kind, len(chunks), err)
+		}
+		evs := chunks[0].EventReports
+		if len(chunks[0].Reports) != 1 || len(evs) != 2 || evs[0].IsStatus || !evs[1].IsStatus || evs[1].Status.Status != im.StatusFailure {
+			t.Fatalf("%s: chunk %+v, want event 2 FAILURE and the rest delivered", kind, chunks[0])
+		}
+		if len(got) != 1 || !got[0].IsEvent || got[0].EventPath.Event != 2 {
+			t.Fatalf("%s: hook heard %+v", kind, got)
+		}
+		if rd.EventReports[1].IsStatus {
+			t.Fatalf("%s: the caller's report was modified", kind)
+		}
+	}
 }

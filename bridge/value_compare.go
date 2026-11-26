@@ -35,7 +35,10 @@ type attributeReading struct {
 	// container open or wrote other than one element). Two failing
 	// readings then compare by raw, so a value that always fails is no
 	// change on every tick, and the chunker's FAILURE for its path (with
-	// its log line) is not repeated per tick (#625).
+	// its log line) is not repeated per tick (#625). Known edge, not
+	// handled: a failing value whose Go form holds a NaN, a func or a
+	// field that changes on every read is never DeepEqual to itself, so
+	// it reports — and logs — again on every check.
 	wire []byte
 	// raw is the Go value with its outer pointers followed, compared
 	// with [reflect.DeepEqual] when the wire form cannot tell two values

@@ -41,8 +41,9 @@ func CommandWriter(write im.CommandFieldsWriter) im.CommandFieldsWriter {
 // The request's command is the invocation the entry answers: the one
 // with the entry's CommandRef — every command of a batch carries a
 // distinct one ([im.ValidateInvokeBatch]) and an entry carries its
-// invocation's — or the request's only invocation. An entry neither names
-// keeps the path it carries.
+// invocation's — or the request's only invocation, or else the only
+// invocation on the entry's cluster whose endpoint is the entry's or a
+// wildcard. An entry none of these names keeps the path it carries.
 func ResolveInvoke(req im.InvokeRequest, resp im.InvokeResponse, write im.CommandFieldsWriter, failed func(InvokeFailure)) im.InvokeResponse {
 	var out []im.InvokeResponseEntry
 	for i, ent := range resp.Responses {
@@ -92,5 +93,12 @@ func requestCommand(req im.InvokeRequest, ent im.InvokeResponseEntry) (uint32, b
 	if len(req.Invokes) == 1 {
 		return req.Invokes[0].Path.Command, true
 	}
-	return 0, false
+	cmd, found := uint32(0), 0
+	for _, inv := range req.Invokes {
+		if inv.Path.Cluster == ent.Path.Cluster && (!inv.Path.HasEndpoint || inv.Path.Endpoint == ent.Path.Endpoint) {
+			cmd = inv.Path.Command
+			found++
+		}
+	}
+	return cmd, found == 1
 }

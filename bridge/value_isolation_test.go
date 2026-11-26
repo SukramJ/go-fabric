@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"thingfabric.dev/go-fabric/contract"
+	endpointpkg "thingfabric.dev/go-fabric/endpoint"
 	"thingfabric.dev/go-fabric/im"
 	"thingfabric.dev/go-fabric/im/subscription"
 	"thingfabric.dev/go-fabric/internal/valueenc"
@@ -480,4 +481,78 @@ func TestReadEventWhosePayloadFailsAtReportTimeW625(t *testing.T) {
 		t.Fatalf("event reports %+v; want FAILURE for event 2 and event 1 delivered", evs)
 	}
 	waitLogW625(t, logs, "level=ERROR msg=matter.event.encode_failed subsystem=matter.bridge endpoint=1 cluster=59 event=2 status=Failure")
+}
+
+// TestAlwaysFailingValueIsNoChangeW625 (#625, review L4): a value whose
+// encoder always fails compares equal to itself, so the change filter
+// reports it once when it turns bad and not again on every check — no
+// FAILURE report, and no ERROR line, per tick.
+func TestAlwaysFailingValueIsNoChangeW625(t *testing.T) {
+	t.Parallel()
+	for _, kind := range failingKindsW625 {
+		t.Run(kind, func(t *testing.T) {
+			t.Parallel()
+			srv := &failingServerW625{}
+			ep := &endpointpkg.Endpoint{ID: 5}
+			ep.PublishClusterServers([]contract.ClusterServer{srv})
+			path := im.ConcreteAttributePath{Endpoint: 5, Cluster: 0x0006, Attribute: 0, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+			v := newPathValues(ep, []im.ConcreteAttributePath{path})
+			srv.set(kind)
+			if got := v.changed(); len(got) != 1 {
+				t.Fatalf("the value turned bad: %v, want it reported once", got)
+			}
+			for i := range 3 {
+				if got := v.changed(); len(got) != 0 {
+					t.Fatalf("check %d of the unchanged failing value: %v, want quiet", i, got)
+				}
+			}
+			srv.set("")
+			if got := v.changed(); len(got) != 1 {
+				t.Fatalf("the value turned good: %v, want it reported", got)
+			}
+		})
+	}
+}
+
+// TestFailingResponseInAChunkedBatchW625 (#625, review L4): a batch whose
+// responses need several messages, one of them failing, is chunked with
+// that command answered FAILURE on its request path with its CommandRef
+// and the others' responses delivered.
+func TestFailingResponseInAChunkedBatchW625(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	path := func(cmd uint32) im.ConcreteCommandPath {
+		return im.ConcreteCommandPath{Endpoint: 1, Cluster: 6, Command: cmd, HasEndpoint: true, HasCluster: true, HasCommand: true}
+	}
+	req := im.InvokeRequest{Invokes: []im.CommandInvocation{
+		{Path: path(1), CommandRef: 1, HasCommandRef: true},
+		{Path: path(2), CommandRef: 2, HasCommandRef: true},
+		{Path: path(3), CommandRef: 3, HasCommandRef: true},
+	}}
+	resp := im.InvokeResponse{Responses: []im.InvokeResponseEntry{
+		{Path: path(0x81), Response: countingResponseW625{calls: &calls, n: 700}, HasResponse: true, CommandRef: 1, HasCommandRef: true},
+		{Path: path(0x82), Response: failingValueW625{kind: "two open"}, HasResponse: true, CommandRef: 2, HasCommandRef: true},
+		{Path: path(0x83), Response: countingResponseW625{calls: &calls, n: 700}, HasResponse: true, CommandRef: 3, HasCommandRef: true},
+	}}
+	chunks, err := chunkInvokeResponse(nil, req, resp, reportChunkPayloadBudget, reportChunkHardCap)
+	if err != nil || len(chunks) < 2 {
+		t.Fatalf("%d chunks, %v; want the batch chunked", len(chunks), err)
+	}
+	var got []im.InvokeResponseEntry
+	for _, c := range chunks {
+		r, err := im.UnmarshalInvokeResponseTLV(tlv.NewDecoder(c), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, r.Responses...)
+	}
+	if len(got) != 3 {
+		t.Fatalf("%d entries over the chunks, want 3: %+v", len(got), got)
+	}
+	for _, e := range got {
+		failing := e.CommandRef == 2
+		if failing != e.IsStatus || (failing && (e.Status.Status != im.StatusFailure || e.Path.Command != 2)) {
+			t.Fatalf("entry %+v: want FAILURE on command 2 for CommandRef 2 and data otherwise", e)
+		}
+	}
 }

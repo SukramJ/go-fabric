@@ -195,7 +195,7 @@ func (c *udpLikeConnW2B2b) sentCount() int {
 	return len(c.sent)
 }
 
-// TestPrimingReportThatCannotBeEncodedIsNoSubscriptionW2B2b: a priming
+// TestPrimingReportWithAValueThatCannotBeEncodedEstablishesTheSubscriptionW2B2b: a priming
 // report one of whose values cannot be encoded — in the first chunk or in
 // a later one — failed the Subscribe before #625 (no subscription, no
 // SubscribeResponse; the test killed subscribe_dispatch.go:683 and :761,
@@ -204,7 +204,7 @@ func (c *udpLikeConnW2B2b) sentCount() int {
 // priming goes out in full, the SubscribeResponse follows and the
 // subscription is established. A value can no longer make the chunker
 // fail, so the two guards are defensive.
-func TestPrimingReportThatCannotBeEncodedIsNoSubscriptionW2B2b(t *testing.T) {
+func TestPrimingReportWithAValueThatCannotBeEncodedEstablishesTheSubscriptionW2B2b(t *testing.T) {
 	t.Parallel()
 	const cluster = uint32(0xFFF6)
 	big := strings.Repeat("x", 900)
