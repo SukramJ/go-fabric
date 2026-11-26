@@ -443,7 +443,8 @@ const (
 var ErrAdministratorWindowOpen = errors.New("bridge: an administrator's commissioning window is open")
 
 // ErrCommissioningBlocked is wrapped by every window open refused while
-// the host has blocked commissioning ([CommissioningWindow.SetBlocked]).
+// the host has blocked commissioning ([CommissioningWindow.SetBlocked]),
+// unless the bridge has stopped: [ErrStopped] comes first (decision 688).
 // An AdministratorCommissioning command refused this way answers
 // FAILURE: none of the cluster's own statuses means "refused by policy"
 // (matter.js AdministratorCommissioningServer.ts: Busy only for a window
@@ -453,9 +454,10 @@ var ErrCommissioningBlocked = errors.New("bridge: commissioning is blocked by th
 
 // SetBlocked refuses every commissioning window while err is non-nil:
 // [CommissioningWindow.OpenOwnWindow] and [CommissioningWindow.OpenWindow]
-// return an error wrapping [ErrCommissioningBlocked] and err, so the
-// node's own window, a basic window, the host's opener and both
-// AdministratorCommissioning commands stay closed and no commissionable
+// return an error wrapping [ErrCommissioningBlocked] and err — after
+// [Bridge.Stop], [ErrStopped] first — so the node's own window, a basic
+// window, the host's opener and both AdministratorCommissioning commands
+// stay closed and no commissionable
 // record is advertised; a commissioning under way when the block is set
 // ends as RevokeCommissioning ends it — the PASE sessions close, the
 // fail-safe armed over PASE expires and an open window is revoked —
@@ -477,17 +479,25 @@ func (w *CommissioningWindow) SetBlocked(ctx context.Context, err error) {
 	}
 }
 
-// blockedErr is the refusal while commissioning is blocked, nil otherwise.
-func (w *CommissioningWindow) blockedErr() error {
+// openRefusedEarly is the refusal an open answers before it calls out —
+// the fabric counter, the fail-safe check: [ErrStopped] when the bridge
+// stopped, before [ErrCommissioningBlocked] while commissioning is
+// blocked, the order [CommissioningWindow.adminOpenRefusedLocked] applies
+// under the lock (stopped > blocked > busy, decision 688); nil otherwise.
+func (w *CommissioningWindow) openRefusedEarly() error {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
+	if w.stopped {
+		return ErrStopped
+	}
 	return w.blockedLocked()
 }
 
-// blockedLocked is [CommissioningWindow.blockedErr] for a caller that holds
-// w.mu: the open paths read it again in the critical section that sets
-// open, so a block set while they called out — the fabric counter, the
-// fail-safe check — still refuses them (review II, R2-P6-fsm-0305).
+// blockedLocked is the refusal while commissioning is blocked, nil
+// otherwise, for a caller that holds w.mu: the open paths read it again in
+// the critical section that sets open, so a block set while they called
+// out — the fabric counter, the fail-safe check — still refuses them
+// (review II, R2-P6-fsm-0305).
 func (w *CommissioningWindow) blockedLocked() error {
 	if w.blocked == nil {
 		return nil
@@ -517,7 +527,7 @@ func (w *CommissioningWindow) blockedLocked() error {
 // packages/node/src/behavior/system/commissioning/CommissioningServer.ts
 // enterCommissionableMode.
 func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
-	if err := w.blockedErr(); err != nil {
+	if err := w.openRefusedEarly(); err != nil {
 		return err
 	}
 	w.mu.RLock()
@@ -700,7 +710,7 @@ func (w *CommissioningWindow) CurrentWindow() wire.WindowStatusSnapshot {
 // commissioner's ArmFailSafe or the 60 s arm of its PASE session
 // (GeneralCommissioning.AutoArmOnPaseEstablished) does, as in matter.js.
 func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWindowParams) error {
-	if err := w.blockedErr(); err != nil {
+	if err := w.openRefusedEarly(); err != nil {
 		return err
 	}
 	// Reject if a FailSafe from a prior commissioning session is still
