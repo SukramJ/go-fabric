@@ -297,8 +297,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 28714,
-    "reachable": 22330,
+    "total_exported": 28715,
+    "reachable": 22331,
     "whitelisted": 6362,
     "unreachable": 22
   },

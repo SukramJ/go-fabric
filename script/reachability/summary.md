@@ -7,8 +7,8 @@ Entry points: 10942 across 292 test packages, and 373 package initializers.
 
 | Metric | Count |
 |---|---|
-| Total exported | 28714 |
-| Reached by a test | 22330 |
+| Total exported | 28715 |
+| Reached by a test | 22331 |
 | Whitelisted | 6362 |
 | **Unreached** | **22** |
 

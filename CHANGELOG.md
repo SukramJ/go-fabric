@@ -16,6 +16,7 @@ pseudo-version of `main`.
 
 ### Added
 
+- `controller/ble/bletest`: `Radio.AwaitOff` waits until the node is off the radio (not serving, no service registered, not advertising), bounded by a context; the live BLE commissioning test uses it instead of one read after the channel closed (phase 8 wave 2).
 - `cluster/core`: `AccessControlConfig` and `NewAccessControlWith(ctx, cfg)`, the AccessControl server's store and capacity limits at construction, in the form of `NewThreadNetworkCommissioning`; a limit outside its range (EntriesPerFabric and SubjectsPerEntry 4..65534, TargetsPerEntry 3..65534) is refused with an error naming the field. `node` constructs its server through it (review II, R4-api-4157, decision 669; #595).
 - `cluster/core`: `(*AccessControl).NotifyLocalEntryInstalledOn(ctx, fabricIndex)` — a local entry written under `WithACLWriteLock` marks its fabric from the store's rows, so the fabric's removal reports the Acl that shrank; `node`'s OTA provider and WebRTC requestor call it (review II, R5-par-5003; #595).
 - `cluster/core`: `ThreadNetworkCommissioningConfig.Logger`, the logger of the Thread NetworkCommissioning server's lines, as the Wi-Fi server's; nil is `slog.Default()` (review II, R3-sup-3002; #595).
