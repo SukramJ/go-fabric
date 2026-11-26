@@ -141,7 +141,12 @@ func newCentral(b bus, adapter dbus.ObjectPath) (*central, error) {
 
 // Close stops the central's connections and releases the bus, and
 // returns once the signal loop returned. The scan callback runs on that
-// loop, so it must not call Close.
+// loop, so it must not call Close. Before the bus goes, every connection
+// and every device a Connect is in flight for gets Device1.Disconnect,
+// concurrently, each bounded by disconnectTimeout and its error ignored:
+// bluetoothd keeps a link when the bus name that connected it leaves (the
+// #610 probe, BlueZ 5.72), and the peripheral would stay occupied (#610
+// row 6).
 func (c *central) Close() error {
 	c.mu.Lock()
 	if c.closed {
@@ -151,13 +156,25 @@ func (c *central) Close() error {
 	}
 	c.closed = true
 	conns := make([]*connection, 0, len(c.conns))
-	for _, conn := range c.conns {
+	paths := make([]dbus.ObjectPath, 0, len(c.conns)+len(c.connecting))
+	for path, conn := range c.conns {
 		conns = append(conns, conn)
+		paths = append(paths, path)
+	}
+	for path := range c.connecting {
+		if c.conns[path] == nil {
+			paths = append(paths, path)
+		}
 	}
 	c.mu.Unlock()
 	for _, conn := range conns {
 		conn.markGone()
 	}
+	var disconnects sync.WaitGroup
+	for _, path := range paths {
+		disconnects.Go(func() { c.disconnectDevice(context.Background(), path) })
+	}
+	disconnects.Wait()
 	close(c.done)
 	err := c.bus.Close()
 	<-c.dispatched
