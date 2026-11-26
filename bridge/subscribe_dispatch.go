@@ -656,7 +656,7 @@ func (b *Bridge) streamInitialReportChunks(
 	initialReport im.ReportData,
 ) error {
 	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
-	chunker := newReportChunker(initialReport, limits.budget, limits.hardCap,
+	chunker := newReportChunker(b.logger, initialReport, limits.budget, limits.hardCap,
 		sliceAttributeReports(initialReport.Reports), func() []im.EventReport { return initialReport.EventReports })
 	return b.streamPrimingChunks(ctx, abort, src, requestHdr, proto, subID, chunker)
 }

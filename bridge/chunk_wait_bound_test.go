@@ -274,7 +274,7 @@ func TestReestablishPrimingWaitEnds(t *testing.T) {
 					Value: im.AttributeValue{Value: uint32(i)},
 				}
 			}
-			chunker := newReportChunker(im.ReportData{HasSubscription: true, SubscriptionID: 9}, reportChunkPayloadBudget, reportChunkHardCap, sliceAttributeReports(reports), nil)
+			chunker := newReportChunker(nil, im.ReportData{HasSubscription: true, SubscriptionID: 9}, reportChunkPayloadBudget, reportChunkHardCap, sliceAttributeReports(reports), nil)
 			done := make(chan error, 1)
 			go func() { done <- b.sendPrimingReport(target, chunker) }()
 			if _, _, ok := readOneIMDatagram(t, p.conn, p.sess, 3*time.Second); !ok {

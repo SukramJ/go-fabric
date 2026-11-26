@@ -29,7 +29,8 @@ const redactedValue = "(redacted)"
 // to a [spec.Node]) redacted by the model ([spec.Redact]), rendered as the
 // untyped JSON form of [spec.DecodeJSON] — struct members keyed by field
 // id. It fails closed: a value the writer cannot encode (it writes null
-// for a Go type it does not know) or a form that does not read back is
+// for a Go type it does not know; an encoder that fails in isolation,
+// [encodeValueIsolated]) or a form that does not read back is
 // logged as "(redacted)", never raw, and a secret-bearing list or struct
 // whose wire form is another type than its model is redacted whole
 // ([spec.Redact]; review II, R2-C2-sec-1303). A null stays null.
@@ -44,9 +45,7 @@ func (l loggedAttributeValue) LogValue() slog.Value {
 	if field == nil || l.v.IsNull || l.v.Value == nil {
 		return slog.AnyValue(l.v.Value)
 	}
-	enc := tlv.NewEncoder()
-	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), l.v)
-	wire, err := enc.Bytes()
+	wire, err := encodeValueIsolated(l.v)
 	if err != nil {
 		return slog.StringValue(redactedValue)
 	}

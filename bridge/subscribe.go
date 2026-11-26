@@ -573,7 +573,25 @@ func (b *Bridge) reportEventsWith(ctx context.Context, sub *subscription.Subscri
 // (assigned by the topology assembler). `cluster` is the cluster
 // ID (e.g. 0x003B Switch). `event` is the event ID per the cluster
 // spec (e.g. 0x00 InitialPress).
+//
+// The payload is encoded once, in isolation, before the event is
+// recorded: a payload whose encoder panics, leaves a container open or
+// writes other than one element is not recorded at all — no event number
+// is consumed, no subscriber is told — and is logged at ERROR. As chip,
+// which encodes the payload when the event is logged and vends the number
+// only on success (src/app/EventManagement.cpp:468-469, :473-478, :479-483
+// at 6170af84); matter.js encodes at report time instead (#625,
+// notes/parity/by_design.md).
 func (b *Bridge) EmitEvent(endpoint uint16, cluster, event uint32, data any, priority contract.EventPriority) {
+	if data != nil {
+		if _, err := encodeValueIsolated(im.AttributeValue{Value: data}); err != nil {
+			logEncodeFailure(b.logger, "matter.event.encode_failed", err,
+				slog.Int("endpoint", int(endpoint)),
+				slog.Uint64("cluster", uint64(cluster)),
+				slog.Uint64("event", uint64(event)))
+			return
+		}
+	}
 	// Append to the persistent log first (always, even with no active
 	// subscriptions) so retrospective Read-Event requests see the event.
 	// The log allocates its own monotonic number internally; we read it
@@ -1770,7 +1788,7 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // A failed send disarms it.
 func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, armFinal bool) (counters []uint32, finalWait <-chan statusAnswer, err error) {
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
-	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
+	chunks, err := chunkReportData(b.logger, report, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "chunk_ongoing_report", target.src, err)
 		return nil, nil, err
@@ -2282,7 +2300,7 @@ func (b *Bridge) subscribeWith(
 		}
 	}
 	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
-	chunker := newReportChunker(stamp, limits.budget, limits.hardCap, attributes.next, events)
+	chunker := newReportChunker(b.logger, stamp, limits.budget, limits.hardCap, attributes.next, events)
 	// The priming report waits for the peer's StatusResponse per chunk,
 	// which arrives on this session: hand its turn on. The wait ends with
 	// the subscription too — a KeepSubscriptions=false request that

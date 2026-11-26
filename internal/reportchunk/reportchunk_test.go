@@ -57,7 +57,7 @@ func encodedSize(t *testing.T, rd im.ReportData) int {
 func TestSplit(t *testing.T) {
 	t.Parallel()
 	small := im.ReportData{SuppressResponse: true, Reports: []im.AttributeReport{attr(1, "x")}}
-	got, err := reportchunk.Split(small, 200, 400, write)
+	got, err := reportchunk.Split(small, 200, 400, write, nil)
 	if err != nil || len(got) != 1 || !got[0].SuppressResponse {
 		t.Fatalf("small report: %+v, %v", got, err)
 	}
@@ -77,7 +77,7 @@ func TestSplit(t *testing.T) {
 		EventReports: []im.EventReport{{Path: im.ConcreteEventPath{Endpoint: 1, Cluster: 6, Event: 0, HasEndpoint: true, HasCluster: true, HasEvent: true}, IsStatus: true, Status: im.StatusIB{Status: im.StatusUnsupportedEvent}}},
 	}
 	const budget, hardCap = 200, 300
-	chunks, err := reportchunk.Split(rd, budget, hardCap, write)
+	chunks, err := reportchunk.Split(rd, budget, hardCap, write, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestSplit(t *testing.T) {
 // TestChunkerEmpty: a report with no entry is one chunk, the template's.
 func TestChunkerEmpty(t *testing.T) {
 	t.Parallel()
-	c := reportchunk.New(im.ReportData{HasSubscription: true, SubscriptionID: 7, SuppressResponse: true}, 100, 100, write, reportchunk.Slice(nil), nil)
+	c := reportchunk.New(im.ReportData{HasSubscription: true, SubscriptionID: 7, SuppressResponse: true}, 100, 100, write, reportchunk.Slice(nil), nil, nil)
 	chunk, ok, err := c.Next()
 	if err != nil || !ok || !chunk.HasSubscription || chunk.SubscriptionID != 7 || !chunk.SuppressResponse || chunk.MoreChunkedMessages {
 		t.Fatalf("empty report: %+v %v %v", chunk, ok, err)
@@ -187,7 +187,7 @@ func TestSplitOversizedListMember(t *testing.T) {
 			IsStatus: true, Status: im.StatusIB{Status: im.StatusUnsupportedEvent},
 		})
 	}
-	chunks, err := reportchunk.Split(rd, 200, 300, write)
+	chunks, err := reportchunk.Split(rd, 200, 300, write, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

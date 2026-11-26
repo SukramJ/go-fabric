@@ -72,10 +72,14 @@ func (l *logSinkW2B10) String() string {
 
 // TestHostEncoderPanicInOngoingReportKeepsTheNodeW2B10: a host value
 // whose EncodeTLV leaves one container open in an active subscription's
-// ongoing report panics in the report goroutine (w2-b2b: the process
-// exited). The engine's backstop logs it at ERROR and drops the report;
-// the node and the subscription live, and the next change reports again
-// once the value encodes. Red before the backstop: the test binary dies.
+// ongoing report panicked in the report goroutine (w2-b2b: the process
+// exited); wave 2's engine backstop then logged it and dropped the report.
+// Since #625 the value is encoded in isolation when the chunker admits
+// it: the report goes out with FAILURE for the path, the backstop is not
+// reached, the node and the subscription live, and the next change
+// reports again once the value encodes. Red before the backstop: the test
+// binary dies; red before #625: the backstop's ERROR is logged and no
+// report goes out.
 func TestHostEncoderPanicInOngoingReportKeepsTheNodeW2B10(t *testing.T) {
 	t.Parallel()
 	srv := &turningBadW2B10{}
@@ -109,17 +113,20 @@ func TestHostEncoderPanicInOngoingReportKeepsTheNodeW2B10(t *testing.T) {
 		t.Fatalf("handleSubscribeRequest: %v", err)
 	}
 
-	// The value turns bad: the ongoing report panics in the engine's
-	// report goroutine. Tick waits for that goroutine.
+	// The value turns bad: the ongoing report goes out with FAILURE for
+	// the path. Tick waits for the report goroutine.
 	t0 := time.Now()
 	srv.bad.Store(true)
 	mgr.OnAttributeChanged(path)
 	mgr.Tick(context.Background(), t0.Add(2*time.Second))
-	if !strings.Contains(logs.String(), "level=ERROR msg=im.subscription.report_panic") {
-		t.Fatalf("no ERROR im.subscription.report_panic logged; log = %q", logs.String())
+	if strings.Contains(logs.String(), "im.subscription.report_panic") {
+		t.Fatalf("the report panicked; log = %q", logs.String())
+	}
+	if op := nextSubscribeOpcode(t, opcodes); op != im.OpcodeReportData {
+		t.Fatalf("reply for the failing value = 0x%02X, want ReportData", op)
 	}
 	if n := mgr.Active(); n != 1 {
-		t.Fatalf("mgr.Active() = %d after the dropped report, want the subscription kept", n)
+		t.Fatalf("mgr.Active() = %d after the failing report, want the subscription kept", n)
 	}
 
 	// The value encodes again: the next change reports.
@@ -127,6 +134,6 @@ func TestHostEncoderPanicInOngoingReportKeepsTheNodeW2B10(t *testing.T) {
 	mgr.OnAttributeChanged(path)
 	mgr.Tick(context.Background(), t0.Add(4*time.Second))
 	if op := nextSubscribeOpcode(t, opcodes); op != im.OpcodeReportData {
-		t.Fatalf("reply after the dropped report = 0x%02X, want ReportData", op)
+		t.Fatalf("reply after the failing report = 0x%02X, want ReportData", op)
 	}
 }

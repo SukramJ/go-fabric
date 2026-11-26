@@ -631,6 +631,51 @@ versus SDK interpretation issue and applies it only in part, so the module
 keeps the value as encoded and leaves the null-or-empty reading to the host
 that consumes it.
 
+### BD-Matter-HostEncoderFailureCostsItsPath — a value encoder that fails answers FAILURE for its path
+
+matter.js at `b25ed9604f` has no containment per attribute: an encode that
+throws (`packages/protocol/src/interaction/InteractionMessenger.ts:581`, no
+catch in `sendDataReport`) fails a Read as a whole with `Failure` or the
+error's own code (`:425`, `:431`, `:433-435`, `:459`); a priming report closes
+the subscription and answers a status only for a `StatusResponseError`,
+otherwise nothing (`packages/node/src/node/server/InteractionServer.ts:824-830`,
+`:734-759`); an ongoing update is requeued twice, then dropped, and the
+subscription stays (`packages/node/src/node/server/ServerSubscription.ts:563-606`,
+`:530-532`). An event payload is encoded at report time with the same outcome
+(`InteractionMessenger.ts:621-626`); a command response is encoded before the
+command's transaction commits, and a throw rolls the transaction back and
+answers that command a status (`packages/protocol/src/action/server/CommandInvokeResponse.ts:490-493`,
+`:516`). go-fabric encodes every attribute value, event payload and command
+response once, alone, on an encoder of its own under a recover
+(`internal/valueenc`; #625, owner decisions 694–701): a failing attribute value
+answers an AttributeStatusIB `Failure` for its path and the rest of the Read,
+priming or ongoing report goes out, as connectedhomeip rolls back to the
+checkpoint taken before the attribute and writes the status
+(`src/app/reporting/Engine.cpp:449-450`, `:487`, `:498` at `6170af84`; the code
+is `Failure`, `src/app/data-model-provider/ActionReturnStatus.cpp:125-127`,
+`src/protocols/interaction_model/StatusCode.cpp:41-63`); a failing event
+payload is refused when it is emitted — not recorded, no event number consumed — as chip, which encodes the payload when the event
+is logged and vends the number only on success
+(`src/app/EventManagement.cpp:468-483`). The record keeps the Go value, so
+the payload is encoded again for every report; one that fails only then
+answers an EventStatusIB `Failure` for its path and the rest goes out.
+That floor follows neither reference: chip stores the encoded bytes, and a
+stored event that cannot be copied into a report rolls the writer back,
+is skipped for the next attempt and fails the report, which closes the
+ReadHandler (`EventManagement.cpp:635-647`, `:679-688`;
+`src/app/reporting/Engine.cpp:697-703`, `:812-814`, `:861-869`); matter.js
+fails the report as above and does not check a payload when it is emitted
+(`packages/node/src/behavior/Events.ts:203-208`,
+`packages/protocol/src/events/OccurrenceManager.ts:295-309`). A failing
+command response answers a CommandStatusIB `Failure` on the request's path
+after the handler has run, without a rollback of its effect, as chip
+(`src/app/CommandHandlerImpl.cpp:232-240`); matter.js answers `Failure`
+too unless the thrown error is a `StatusResponseError`, whose code it
+answers (`CommandInvokeResponse.ts:512`, `:518-523`). Reasoning:
+`contract/` is a trust boundary matter.js does not have — a host encoder
+is code this module does not control — so one bad host value costs its
+own path, not a wildcard Read or a subscription.
+
 ### BD-Matter-SetupCodecShape — the setup-code codecs always validate, take no flow and encode no TLV data
 
 matter.js's pairing-code codecs can skip validation on decode

@@ -311,7 +311,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 652,
+    "line": 653,
     "citation": "InteractionMessenger.ts:431-460",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "at": "db021da0",
@@ -321,7 +321,7 @@
   },
   {
     "file": "bridge/receive_dispatch.go",
-    "line": 734,
+    "line": 735,
     "citation": "CommandInvokeResponse.ts:292-295",
     "resolved": "packages/protocol/src/action/server/CommandInvokeResponse.ts",
     "at": "db021da0",
@@ -350,7 +350,7 @@
   },
   {
     "file": "bridge/subscribe.go",
-    "line": 2447,
+    "line": 2465,
     "citation": "packages/node/src/behavior/state/managed/Datasource.ts:776-796",
     "resolved": "packages/node/src/behavior/state/managed/Datasource.ts",
     "identifier": "onChange",
@@ -967,7 +967,7 @@
   },
   {
     "file": "client/interaction/server.go",
-    "line": 23,
+    "line": 24,
     "citation": "InteractionServer.ts:302-304",
     "resolved": "packages/node/src/node/server/InteractionServer.ts",
     "at": "db021da0",
@@ -977,7 +977,7 @@
   },
   {
     "file": "client/interaction/server.go",
-    "line": 211,
+    "line": 212,
     "citation": "AttributeReadResponse.ts:160-162",
     "resolved": "packages/protocol/src/action/server/AttributeReadResponse.ts",
     "at": "db021da0",

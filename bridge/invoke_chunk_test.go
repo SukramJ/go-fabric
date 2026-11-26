@@ -27,12 +27,12 @@ func TestChunkInvokeResponseSplitsWhatDoesNotFit(t *testing.T) {
 			CommandRef: uint16(cmd), HasCommandRef: true,
 		}
 	}
-	small, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 10), entry(5, 10)}}, reportChunkPayloadBudget, reportChunkHardCap)
+	small, err := chunkInvokeResponse(nil, im.InvokeRequest{}, im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 10), entry(5, 10)}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil || len(small) != 1 {
 		t.Fatalf("small response: %d chunks, %v", len(small), err)
 	}
 
-	big, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 800), entry(5, 600)}}, reportChunkPayloadBudget, reportChunkHardCap)
+	big, err := chunkInvokeResponse(nil, im.InvokeRequest{}, im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 800), entry(5, 600)}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestChunkInvokeResponseSplitsWhatDoesNotFit(t *testing.T) {
 		}
 	}
 
-	huge, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 2000)}}, reportChunkPayloadBudget, reportChunkHardCap)
+	huge, err := chunkInvokeResponse(nil, im.InvokeRequest{}, im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 2000)}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil || len(huge) != 1 {
 		t.Fatalf("oversized response: %d chunks, %v", len(huge), err)
 	}
@@ -110,20 +110,20 @@ func TestChunkInvokeResponseAtTheBudgetAndHardCap(t *testing.T) {
 
 	// Two responses exactly the budget long in one message: one chunk.
 	n := sized(reportChunkPayloadBudget, func(n int) int { return size(false, entry(4, 10), entry(5, n)) })
-	if got, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 10), entry(5, n)}}, reportChunkPayloadBudget, reportChunkHardCap); err != nil || len(got) != 1 {
+	if got, err := chunkInvokeResponse(nil, im.InvokeRequest{}, im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 10), entry(5, n)}}, reportChunkPayloadBudget, reportChunkHardCap); err != nil || len(got) != 1 {
 		t.Errorf("a response exactly the budget long: %d chunks, %v; want 1", len(got), err)
 	}
 
 	// One response exactly the hard cap long: sent as it is.
 	n = sized(reportChunkHardCap, func(n int) int { return size(false, entry(4, n)) })
-	if got, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, n)}}, reportChunkPayloadBudget, reportChunkHardCap); err != nil || len(got) != 1 || isExhausted(got[0]) {
+	if got, err := chunkInvokeResponse(nil, im.InvokeRequest{}, im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, n)}}, reportChunkPayloadBudget, reportChunkHardCap); err != nil || len(got) != 1 || isExhausted(got[0]) {
 		t.Errorf("a single response exactly the hard cap long: %d chunks, %v; want it sent as it is", len(got), err)
 	}
 
 	// Splitting: the first chunk reaches the budget exactly with its
 	// second response, a large third follows in its own chunk.
 	n = sized(reportChunkPayloadBudget, func(n int) int { return size(true, entry(4, 10), entry(5, n)) })
-	got, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 10), entry(5, n), entry(6, 1000)}}, reportChunkPayloadBudget, reportChunkHardCap)
+	got, err := chunkInvokeResponse(nil, im.InvokeRequest{}, im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 10), entry(5, n), entry(6, 1000)}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil || len(got) != 2 {
 		t.Fatalf("a chunk exactly at the budget: %d chunks, %v; want 2", len(got), err)
 	}
@@ -135,7 +135,7 @@ func TestChunkInvokeResponseAtTheBudgetAndHardCap(t *testing.T) {
 	// chunk; one exactly the hard cap long (with MoreChunkedMessages) is
 	// kept.
 	n = sized(reportChunkHardCap, func(n int) int { return size(true, entry(4, n)) })
-	got, err = chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, n), entry(5, 10)}}, reportChunkPayloadBudget, reportChunkHardCap)
+	got, err = chunkInvokeResponse(nil, im.InvokeRequest{}, im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, n), entry(5, 10)}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil || len(got) != 2 {
 		t.Fatalf("a first response at the hard cap: %d chunks, %v; want 2", len(got), err)
 	}

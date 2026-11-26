@@ -287,7 +287,7 @@ func TestDispatcherScopesAListBeforeItIsSplit(t *testing.T) {
 			reports = append(reports, im.AttributeReport{Path: rr.Path, Value: rr.Value, FabricScope: rr.FabricScope})
 		}
 	}
-	chunks, err := chunkReportData(im.ReportData{Reports: reports}, 400, reportChunkHardCap)
+	chunks, err := chunkReportData(nil, im.ReportData{Reports: reports}, 400, reportChunkHardCap)
 	if err != nil {
 		t.Fatal(err)
 	}

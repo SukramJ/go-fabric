@@ -319,7 +319,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 		}
 	}
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
-	chunker := newReportChunker(im.ReportData{HasSubscription: true, SubscriptionID: sub.ID}, limits.budget, limits.hardCap, attributes.next, events)
+	chunker := newReportChunker(b.logger, im.ReportData{HasSubscription: true, SubscriptionID: sub.ID}, limits.budget, limits.hardCap, attributes.next, events)
 	if err := b.sendPrimingReport(target, chunker); err != nil {
 		_ = m.Release(sub.ID)
 		return err

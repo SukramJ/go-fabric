@@ -6,6 +6,7 @@ package im
 import (
 	"slices"
 
+	"thingfabric.dev/go-fabric/internal/valueenc"
 	"thingfabric.dev/go-fabric/tlv"
 )
 
@@ -122,13 +123,13 @@ func MaskFabricScoped(element []byte, scope FabricScope) (masked []byte, ok bool
 	}
 }
 
-// scopeAttributeValue encodes v with write as one anonymous element and
-// applies scope to it ([MaskFabricScoped]); ok is false when the value
-// cannot be encoded or scoped, and the path then answers FAILURE.
+// scopeAttributeValue encodes v with write as one anonymous element, in
+// isolation ([valueenc.Encode]: a write that panics, leaves a container
+// open or writes other than one element fails), and applies scope to it
+// ([MaskFabricScoped]); ok is false when the value cannot be encoded or
+// scoped, and the path then answers FAILURE.
 func scopeAttributeValue(v AttributeValue, scope FabricScope, write AttributeValueWriter) (element []byte, ok bool) {
-	enc := tlv.NewEncoder()
-	write(enc, tlv.AnonymousTag(), v)
-	encoded, err := enc.Bytes()
+	encoded, err := valueenc.Encode(func(enc *tlv.Encoder, tag tlv.Tag) { write(enc, tag, v) })
 	if err != nil {
 		return nil, false
 	}

@@ -411,6 +411,12 @@ func unicastReplyHeader(requestHdr *message.Header) message.Header {
 // every attribute value, which writes each value by its Go type: the
 // scalars and strings, the raw TLV of a list a cluster encodes itself,
 // and the struct values it names.
+//
+// It writes each value on rd's own encoder, as it is: a value whose
+// encoder fails is not contained here. The bridge's reports go out
+// through its chunker, which resolves every value once in isolation and
+// answers a failing one FAILURE for its path (#625); a caller that builds
+// a ReportData itself checks a host value first with [AttributeValueTLV].
 func EncodeReportData(rd im.ReportData) ([]byte, error) {
 	enc := tlv.NewEncoder()
 	rd.MarshalTLV(enc, defaultAttributeValueWriter)
@@ -564,8 +570,12 @@ func (b *Bridge) sendRouted(listener *udp.Listener, dst net.Addr, sessionID uint
 // EventStatusIB carrying StatusResourceExhausted for that one path
 // instead — the rest of the report, and the SubscribeResponse that
 // depends on it, still go out.
-func chunkReportData(rd im.ReportData, budget, hardCap int) ([]im.ReportData, error) {
-	return reportchunk.Split(rd, budget, hardCap, defaultAttributeValueWriter)
+//
+// Every value is resolved once first ([reportchunk.Encoded]); a value
+// whose encoder fails answers its path FAILURE and is logged at ERROR on
+// logger (nil: not logged) (#625).
+func chunkReportData(logger *slog.Logger, rd im.ReportData, budget, hardCap int) ([]im.ReportData, error) {
+	return reportchunk.Split(rd, budget, hardCap, defaultAttributeValueWriter, reportEncodeFailureLogger(logger))
 }
 
 // attributeReportSource yields a report's attribute reports one at a
@@ -583,9 +593,11 @@ func sliceAttributeReports(reports []im.AttributeReport) attributeReportSource {
 type reportChunker = reportchunk.Chunker
 
 // newReportChunker chunks the reports of template's subscription drawn
-// from attributes and then events ([reportchunk.New]).
-func newReportChunker(template im.ReportData, budget, hardCap int, attributes attributeReportSource, events func() []im.EventReport) *reportChunker {
-	return reportchunk.New(template, budget, hardCap, defaultAttributeValueWriter, attributes, events)
+// from attributes and then events ([reportchunk.New]); a value whose
+// encoder fails answers its path FAILURE and is logged at ERROR on logger
+// (nil: not logged) (#625).
+func newReportChunker(logger *slog.Logger, template im.ReportData, budget, hardCap int, attributes attributeReportSource, events func() []im.EventReport) *reportChunker {
+	return reportchunk.New(template, budget, hardCap, defaultAttributeValueWriter, attributes, events, reportEncodeFailureLogger(logger))
 }
 
 // rawListValue is a list attribute value carried as the TLV encodings of
@@ -595,6 +607,9 @@ func newReportChunker(template im.ReportData, budget, hardCap int, attributes at
 type (
 	rawListValue  = reportchunk.List
 	rawListMember = reportchunk.Member
+	// rawEncodedValue is a value the chunker resolved
+	// ([reportchunk.Encoded]), written back verbatim.
+	rawEncodedValue = reportchunk.Encoded
 )
 
 // applyFabricScope applies rep's fabric scope to its value before the
@@ -685,10 +700,14 @@ func EncodesAttributeValue(v any) bool {
 // wire: one anonymous TLV element — the Data of an AttributeDataIB or an
 // EventDataIB. A nil value, and one of a type the writer does not know,
 // is TLV null, as on the wire.
+//
+// The value is encoded as a report encodes it: once, on an encoder of its
+// own, under a recover. An encoder that panics, leaves a container open
+// or writes other than one element returns an error here, and answers
+// FAILURE for its path in a report — a host tests its EncodeTLV through
+// this function.
 func AttributeValueTLV(v any) ([]byte, error) {
-	enc := tlv.NewEncoder()
-	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), im.AttributeValue{Value: v})
-	return enc.Bytes()
+	return encodeValueIsolated(im.AttributeValue{Value: v})
 }
 
 // defaultAttributeValueWriter is the wire writer the bridge plugs
@@ -725,6 +744,8 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		}
 		_ = enc.EndContainer()
 	case rawListMember:
+		_ = enc.PutRawElement(tag, x)
+	case rawEncodedValue:
 		_ = enc.PutRawElement(tag, x)
 	case bool:
 		enc.PutBool(tag, x)
@@ -1275,6 +1296,10 @@ func warnUnencodableValue(v any) {
 // rich response struct.
 func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) { //nolint:funlen // a dispatch table: one case per response type
 	switch x := v.(type) {
+	case rawEncodedValue:
+		// A response resolved once ([reportchunk.ResolveInvoke]), written
+		// back verbatim.
+		_ = enc.PutRawElement(tag, x)
 	case mattercore.ArmFailSafeResponse:
 		// Matter §11.10.6.3 — [0] enum8 ErrorCode, [1] string DebugText.
 		enc.StartStruct(tag)
