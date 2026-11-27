@@ -32,18 +32,19 @@ func silenceAfterPASE(site *fabrictest.Site) func(controller.PairingStep) {
 	}
 }
 
-// checkBounded fails t unless the silenced commissioning ended through
-// its context (context.Canceled, the step's own error) because the bound
-// passed (context.DeadlineExceeded). Without the bound the step ends
-// when its exchange gives up, "peer is no longer responding" (measured on
-// the site), neither of the two. The end's time on the site's clock is
-// no measure: the failed step is reported after the abort's disarm of
-// the fail-safe (commissioner flow.go, disarmAfterAbort before the
+// checkBounded fails t unless the silenced commissioning ended because
+// the bound passed: the flow returns the cancel's reason, here
+// context.DeadlineExceeded (commissioner flow.go, cancelError; matter.js
+// rejects with the cancel's reason, ControllerCommissioningFlow.ts:486 at
+// db91886c). Without the bound the step ends when its exchange gives up,
+// "peer is no longer responding" (measured on the site), which is not it.
+// The end's time on the site's clock is no measure: the failed step is
+// reported after the fail-safe's expiry (expireFailsafe before the
 // report).
 func checkBounded(t *testing.T, err error) {
 	t.Helper()
-	if !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, context.Canceled) {
-		t.Fatalf("pairing: %v, want the step canceled by the bound (context.Canceled and context.DeadlineExceeded)", err)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("pairing: %v, want the commissioning canceled by the bound (context.DeadlineExceeded)", err)
 	}
 }
 

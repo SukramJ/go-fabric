@@ -246,8 +246,9 @@ const testparityPlannedRatchet = 3
 // responder (P6-D): 179 ported, 1009 missing.
 // Review II phase 8 (#604, R2-C2-doc-2156) takes PeerAddressMonitorTest.ts's
 // four sleeping-LIT-ICD cases out of missing: 179 ported, 1005 missing.
+// Pin lift db91886c, P1-D: CommissioningCancelTest.ts (new) ported: 180 ported.
 const (
-	testparityPortedRatchet  = 179
+	testparityPortedRatchet  = 180
 	testparityMissingRatchet = 1005
 )
 
@@ -355,6 +356,9 @@ const (
 // Pin lift b25ed960 wave P6 leaves ServerSubscriptionTest.ts's flush on a
 // given session (by design, BD-Matter-Subscription-FlushOnOwnSessionOnly,
 // P6-B): 773.
+// Pin lift db91886c, P1-D: CommissioningFailsafeExpiryTest.ts's expiry
+// before the flow armed leaves (matter.js caught up, #5049) and
+// DiscoveryCancelTest.ts's settled read joins (js-runtime-only, #5051): 773.
 const testparityLeftRatchet = 773
 
 // The matterjs-server register's four ratchets, exact in both directions as

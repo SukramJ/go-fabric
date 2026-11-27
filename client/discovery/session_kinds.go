@@ -260,11 +260,14 @@ type raceKind[W any] struct {
 	accept  func(*Session[W], Candidate) bool
 	failure string
 
-	mu           sync.Mutex
-	isDecided    bool
-	decided      chan struct{}
-	paseWon      bool
-	winnerIndex  int
+	mu          sync.Mutex
+	isDecided   bool
+	decided     chan struct{}
+	paseWon     bool
+	winnerIndex int
+	// winnerCancel ends the winner's attempt with a cancel's reason
+	// (onCancel); set with paseWon.
+	winnerCancel context.CancelCauseFunc
 	winnerDone   chan struct{}
 	winner       W
 	winnerErr    error
@@ -297,7 +300,7 @@ type raceAttempt struct {
 	dropped chan struct{} // closed when it left the queue unreleased (maxRaceWaiting)
 
 	ctx      context.Context
-	cancel   context.CancelFunc
+	cancel   context.CancelCauseFunc
 	answered bool // AttemptAnswered was called
 	replaced bool // ended for a later candidate; in active only while unwinding is full
 }
@@ -319,7 +322,7 @@ func (k *raceKind[W]) decideLocked() {
 	}
 	for _, a := range k.active {
 		if !k.paseWon || a.index != k.winnerIndex {
-			a.cancel()
+			a.cancel(nil)
 		}
 	}
 }
@@ -455,7 +458,7 @@ func (k *raceKind[W]) releaseLocked(s *Session[W]) {
 			next.answered = true
 			k.mu.Unlock()
 		}}
-		next.ctx, next.cancel = context.WithCancel(context.WithValue(s.ctx, attemptKey{}, mark)) //nolint:gosec // G118: run and decideLocked call cancel
+		next.ctx, next.cancel = context.WithCancelCause(context.WithValue(s.ctx, attemptKey{}, mark))
 		k.active = append(k.active, next)
 		k.lastRelease = now
 		close(next.release)
@@ -495,7 +498,7 @@ func (k *raceKind[W]) replaceLocked(s *Session[W], now time.Time) bool {
 			break
 		}
 		oldest.replaced = true
-		oldest.cancel()
+		oldest.cancel(nil)
 		s.log.Info("matter.controller.discovery.attempt_replaced", slog.String("discovery", s.description),
 			slog.String("device", oldest.device), slog.String("candidate", k.waiting[ending].device))
 		if len(k.unwinding) < maxRaceUnwinding {
@@ -548,7 +551,7 @@ func (k *raceKind[W]) run(s *Session[W], c Candidate, a *raceAttempt) {
 	case <-k.decided:
 		return
 	}
-	defer a.cancel()
+	defer a.cancel(nil)
 	s.checkCaller()
 	k.mu.Lock()
 	if k.isDecided || a.replaced {
@@ -565,7 +568,7 @@ func (k *raceKind[W]) run(s *Session[W], c Candidate, a *raceAttempt) {
 			k.mu.Unlock()
 			return false
 		}
-		k.paseWon, isWinner, k.winnerIndex = true, true, a.index
+		k.paseWon, isWinner, k.winnerIndex, k.winnerCancel = true, true, a.index, a.cancel
 		k.winnerDone = make(chan struct{})
 		k.decideLocked()
 		k.mu.Unlock()
@@ -597,6 +600,24 @@ func (k *raceKind[W]) onStop(*Session[W]) {
 	if !k.paseWon {
 		k.decideLocked()
 	}
+}
+
+// onCancel passes a cancel that comes after a candidate won PASE to the
+// winner: its attempt's context ends with the reason, and the discovery
+// is not interrupted — the winner's outcome decides, and it may still
+// succeed when its operation can no longer be canceled. Before the win it
+// reports false, and the cancel interrupts the discovery. Mirrors matter.js
+// packages/node/src/behavior/system/controller/discovery/ParallelPaseDiscovery.ts:178-185
+// at db91886c (onCancel; the winner's AbortController kept at :102).
+func (k *raceKind[W]) onCancel(s *Session[W], reason error) bool {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.winnerCancel == nil {
+		return false
+	}
+	s.log.Info("matter.controller.discovery.cancel_to_winner", slog.String("discovery", s.description), slog.Any("reason", reason))
+	k.winnerCancel(reason)
+	return true
 }
 
 func (k *raceKind[W]) onInterrupt(*Session[W], error) bool {

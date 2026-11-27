@@ -349,56 +349,58 @@ _, err := c.Pair(ctx, code, controller.PairOptions{
 
 A `Pair` or `Commission` whose context ends — cancelled, or past its
 deadline — after the PASE session was established does not leave the
-device armed: the device arms its fail-safe when the PASE session is
-established, and the commissioner sends ArmFailSafe with expiry 0
-over the session the commissioning still has (PASE, or CASE after
-`Reconnect`), on a context of its own for at most 10 s, and returns the
-failed step's error as it is. A step that stopped at the ended context
-returns an error that matches the context's with `errors.Is` —
-`context.Canceled` or `context.DeadlineExceeded` — and is not always
-identical to it: a context that ends while `Reconnect` waits for the
-operational connection returns that step's
-`*commissioner.CommissioningError` of kind `ErrOperativeConnectionFailed`,
-which names the device's last report when the device gave one and has
-the context's error as its `Cause`, so both
-`errors.Is(err, commissioner.ErrOperativeConnectionFailed)` and
-`errors.Is(err, context.DeadlineExceeded)` hold. A device left armed
-would refuse a new commissioning until the fail-safe ran out. The disarm
-does not wait for the device to have answered the ArmFailSafe: a context
-that ends while the first one, or a later extension, is still under way
-is followed by the disarm too, since the request may have armed the
-device (one that holds no fail-safe answers the disarm with success and
-nothing happens).
-Nothing is sent once the device has confirmed CommissioningComplete, or
-on a closed session; a disarm that fails is logged
-(`matter.controller.commissioning.reset_failsafe_failed`) and the
-fail-safe then expires on the device by itself. matter.js's flow has no
-abort signal; the behaviour follows connectedhomeip's `StopPairing`
-(*Ahead of matter.js*, `BD-chip-Commissioner-AbortDisarmsFailSafe`).
+device armed, and follows matter.js's cancel (`abort` option,
+`ControllerCommissioningFlow`): the device arms its fail-safe when the
+PASE session is established, and the commissioner sends ArmFailSafe
+with expiry 0 over the session the commissioning still has (PASE, or
+CASE after `Reconnect`), on a context of its own, and waits for the
+device's answer at most 2 s after the cancel. It then returns the
+cancel's reason — `context.Cause(ctx)` — not the error of the step the
+cancel stopped; the returned error always matches the context's error
+with `errors.Is` (`context.Canceled` or `context.DeadlineExceeded`),
+and matches the cause too when the context was cancelled with one
+(`context.WithCancelCause`). Each step checks the context before it
+starts, so a step that does not watch the context is the last one to
+run. The disarm does not wait for the device to have answered an
+ArmFailSafe: the request may have armed the device (one that holds no
+fail-safe answers the disarm with success and nothing happens). A
+device left armed would refuse a new commissioning until the fail-safe
+ran out.
+
+Once `CommissioningComplete` has been sent the context no longer stops
+the commissioning: that command and every step after it run on a
+context the caller cannot end — which drops the caller's deadline as
+well; the exchange's own response timeout bounds each request — the
+device's answer decides, and a failure of the command is reported as
+itself. `CommissioningComplete` is sent on the unthrottled "unlimited"
+network profile. With `FinalizeCommissioning`, a context that ended
+before the hand-off starts none, and a hand-off already running is
+handed the context; one that ignores it completes the commissioning.
 
 A commissioning that fails for any other reason after the PASE session
 was established — the device's terms not acknowledged, its attestation
-refused, a refused or unanswered command, a node id claim lost to
-another candidate — disarms the same way, bounded by the caller's
-context and the exchange's response timeout, so cancelling the context
-ends the disarm too, or, when that context has already ended, by the
-same 10 s as after an abort: the device ends its PASE
-session with the fail-safe, and while that session exists it accepts no
-new PASE, so without the disarm the next `Pair` would be refused until
-the fail-safe ran out. Nothing is sent when the commissioning channel
-dropped or the device stopped responding; a re-arm already sent is
-awaited first, and the ArmFailSafeResponse is checked. matter.js ends the
-fail-safe the same way after every step failure, once it knows a
-fail-safe end, that is once an ArmFailSafe of its own was answered
-(`#expireFailsafe`, mirrored since pin lift b25ed960, P3-D); the disarm
-before that answer is this module's;
-connectedhomeip disarms after any failure before its network setup.
-A PASE session the commissioner does not keep is disarmed before it is
-closed as well: one established on a candidate after another candidate
-won the connection (an aborted connection returns only once those are
-disarmed), and one that `EstablishPASE`'s `ContinueAfterPASE` refuses.
+refused, a refused or unanswered command — disarms the same way, with
+the exchange's response timeout as the bound; a cancel that comes while
+that disarm is pending ends the wait 2 s later and returns the cancel's
+reason. Nothing is sent when the commissioning channel dropped or the
+device stopped responding, once the device has confirmed
+`CommissioningComplete`, or on a closed session; a re-arm already sent
+is awaited first (cancelled when the context has ended), the
+ArmFailSafeResponse is checked, and a disarm that fails is logged
+(`matter.controller.commissioning.reset_failsafe_failed`) — the
+fail-safe then expires on the device by itself.
 
-*Source: `controller/commissioner/flow.go` (`execute`, `callerAborted`, `disarmAfterAbort`, `disarmAfterFailure`), `controller/commissioner/commissioner.go` (`disarmPASE`, `giveUpPASE`, `EstablishPASE`), `controller/commissioner/connection.go` (`launch`).*
+A PASE session the commissioner gives up before its commissioning runs
+is disarmed before it is closed as well — ahead of matter.js, which
+only closes it (`BD-Matter-Commissioner-GivenUpPASEDisarmed`): one
+established on a candidate after another candidate won the connection
+(an aborted connection returns only once those are disarmed), a node id
+claim lost to another candidate, and one that `EstablishPASE`'s
+`ContinueAfterPASE` refuses. In a discovery race, a cancel after a
+candidate won PASE goes to the winner's attempt, whose outcome then
+decides.
+
+*Source: `controller/commissioner/flow.go` (`execute`, `expireFailsafe`, `requestContext`, `cancelError`, `completeCommissioning`, `validateAttestation`), `controller/commissioner/commissioner.go` (`transitionToCase`, `disarmPASE`, `giveUpPASE`, `EstablishPASE`), `controller/commissioner/connection.go` (`launch`), `client/discovery/session_kinds.go` (`raceKind.onCancel`).*
 
 A second `Commission` of a commissioned node is `ErrAlreadyCommissioned`.
 A commission or decommission already running for that node is

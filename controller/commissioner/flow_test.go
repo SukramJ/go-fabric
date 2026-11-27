@@ -270,13 +270,13 @@ func TestFlowErrorClasses(t *testing.T) {
 
 // TestFlowResetsFailsafeAfterContextEnded: a step that fails because the
 // caller's context ended still expires the fail-safe on the device —
-// matter.js's #resetFailsafeTimer carries no abort signal
-// (ControllerCommissioningFlow.ts:1092-1108 at db021da0, called at :457).
+// matter.js's expiry is sent with a signal of its own, not the caller's
+// (expiryWait, ControllerCommissioningFlow.ts:1164, :1188 at db91886c).
 // Found on a BLE-to-Thread pairing whose deadline passed in step 18: the
 // reset failed with "context canceled" and the device kept its fail-safe.
-// Since review II (R2-P0-rv-C02) such a step is the caller's abort and
-// the disarm is disarmAfterAbort's (TestFlowReconnectAbort); what this
-// test holds is unchanged.
+// Since #5049 (pin lift db91886c, P1-D) such a step is the caller's cancel:
+// the expiry is still sent, and the cancel is what returns
+// (ControllerCommissioningFlow.ts:477-487 at db91886c).
 func TestFlowResetsFailsafeAfterContextEnded(t *testing.T) {
 	t.Parallel()
 	dev := &failsafeDevice{info: gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}}
@@ -291,8 +291,8 @@ func TestFlowResetsFailsafeAfterContextEnded(t *testing.T) {
 		}},
 	}
 	err := f.execute(ctx)
-	if !errors.Is(err, ErrOperativeConnectionFailed) || !slices.Equal(dev.armed(), []uint16{60, 0}) {
-		t.Fatalf("error %v, arms %v, want the reset (0) after the ended context", err, dev.armed())
+	if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60, 0}) { //nolint:errorlint // the cancel's reason itself
+		t.Fatalf("error %v, arms %v, want context.Canceled and the reset (0) after the ended context", err, dev.armed())
 	}
 }
 
@@ -309,12 +309,10 @@ func abortStep(n int, end context.CancelFunc) step {
 
 // TestFlowDisarmsFailsafeWhenCallerAborts: a commissioning whose context
 // ends — cancelled or past its deadline — expires the fail-safe it armed,
-// on a context of its own, and returns the context's error unchanged.
-// matter.js's flow has no abort signal and rethrows such an error without
-// the reset (ControllerCommissioningFlow.ts:463-465 at db021da0); chip's
-// commissioner expires the fail-safe when StopPairing cancels
-// (src/controller/CHIPDeviceController.cpp:2219-2247 at 6170af84) and
-// ignores a failure to (:2233-2236).
+// on a context of its own, and returns the cancel's reason — matter.js
+// ControllerCommissioningFlow.ts:477-487 at db91886c; the expiry is
+// bounded by canceledExpiryWait from the cancel (:1166-1173) and a failure
+// of it is only logged (:1192-1197).
 func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 	t.Parallel()
 	info := gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}
@@ -352,16 +350,17 @@ func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 		t.Parallel()
 		dev := &failsafeDevice{info: info}
 		f, _ := newTestFlow(t, dev.handle)
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-		defer cancel()
-		f.steps = []step{arm(f), abortStep(8, func() {})}
+		// The deadline passes in the step, not after a wall-clock budget the
+		// arming before it may use up on a slow host.
+		ctx := newStepDeadline()
+		f.steps = []step{arm(f), abortStep(8, ctx.expire)}
 		err := f.execute(ctx)
 		if err != context.DeadlineExceeded || !slices.Equal(dev.armed(), []uint16{60, 0}) { //nolint:errorlint // returned as is
 			t.Fatalf("error %v, arms %v, want context.DeadlineExceeded and ArmFailSafe [60 0]", err, dev.armed())
 		}
 	})
 
-	t.Run("after CommissioningComplete nothing is sent", func(t *testing.T) {
+	t.Run("a cancel after CommissioningComplete was started reaches no later step", func(t *testing.T) {
 		t.Parallel()
 		dev := &failsafeDevice{info: info}
 		f, _ := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
@@ -375,10 +374,17 @@ func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 		})
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		f.steps = []step{arm(f), {20, 1, "complete", f.completeCommissioning}, abortStep(98, cancel)}
+		// The commit cut-off (:2176, #requestAbort :557-559): the step after
+		// it runs on a context the cancel does not end.
+		var stepErr error
+		f.steps = []step{arm(f), {20, 1, "complete", f.completeCommissioning}, {98, 1, "after", func(ctx context.Context) (stepResult, error) {
+			cancel()
+			stepErr = ctx.Err()
+			return stepSuccess, nil
+		}}}
 		err := f.execute(ctx)
-		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60}) { //nolint:errorlint // returned as is
-			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [60]", err, dev.armed())
+		if err != nil || stepErr != nil || !slices.Equal(dev.armed(), []uint16{60}) {
+			t.Fatalf("error %v, the step's context %v, arms %v, want nil, nil and ArmFailSafe [60]", err, stepErr, dev.armed())
 		}
 	})
 
@@ -404,7 +410,7 @@ func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 		// The device takes ArmFailSafe(0) and never answers it.
 		dev := &failsafeDevice{info: info}
 		var silent atomic.Int32
-		f, _ := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+		f, clock := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
 			if req.opcode == im.OpcodeInvokeRequest {
 				if _, fields, err := decodeInvoke(req.payload); err == nil {
 					var arm gencomm.ArmFailSafeRequest
@@ -416,19 +422,18 @@ func TestFlowDisarmsFailsafeWhenCallerAborts(t *testing.T) {
 			}
 			return dev.handle(req)
 		})
-		var logged bytes.Buffer
+		var logged syncBuffer
 		f.log = slog.New(slog.NewTextHandler(&logged, nil))
-		f.abortDisarm = 50 * time.Millisecond
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		f.steps = []step{arm(f), abortStep(8, cancel)}
-		start := time.Now()
-		err := f.execute(ctx)
+		var canceledAt time.Time
+		f.steps = []step{arm(f), abortStep(8, func() { canceledAt = clock.Now(); cancel() })}
+		end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
 		if err != context.Canceled || silent.Load() != 1 { //nolint:errorlint // returned as is
 			t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, silent.Load())
 		}
-		if took := time.Since(start); took > abortDisarmTimeout/2 {
-			t.Fatalf("the abort took %v: the disarm is not bounded by its own context", took)
+		if waited := end.Sub(canceledAt); waited >= canceledExpiryWait+time.Second {
+			t.Fatalf("the expiry waited %v after the cancel, want less than %v (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
 		}
 		if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
 			t.Fatalf("the failed disarm is not logged: %q", logged.String())
@@ -572,24 +577,27 @@ func TestFlowDisarmsFailsafeStartedNotAnswered(t *testing.T) {
 		defer cancel()
 		first := unanswered(dev, 1, cancel)
 		var disarms atomic.Int32
-		f, _ := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+		var disarmAt atomic.Int64
+		var clock *fakeClock
+		var f *flow
+		f, clock = newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
 			if expiry, ok := armRequest(req); ok && expiry == 0 {
-				disarms.Add(1)
+				if disarms.Add(1) == 1 {
+					disarmAt.Store(clock.Now().UnixNano())
+				}
 				return 0, nil, false
 			}
 			return first(req)
 		})
-		var logged bytes.Buffer
+		var logged syncBuffer
 		f.log = slog.New(slog.NewTextHandler(&logged, nil))
-		f.abortDisarm = 50 * time.Millisecond
 		f.steps = []step{arm(f)}
-		start := time.Now()
-		err := f.execute(ctx)
+		end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
 		if err != context.Canceled || disarms.Load() != 1 { //nolint:errorlint // returned as is
 			t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, disarms.Load())
 		}
-		if took := time.Since(start); took > abortDisarmTimeout/2 {
-			t.Fatalf("the abort took %v: the disarm is not bounded by its own context", took)
+		if waited := end.Sub(time.Unix(0, disarmAt.Load())); waited >= canceledExpiryWait+time.Second {
+			t.Fatalf("the expiry waited %v, want less than %v from the cancel (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
 		}
 		if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
 			t.Fatalf("the failed disarm is not logged: %q", logged.String())
@@ -600,98 +608,15 @@ func TestFlowDisarmsFailsafeStartedNotAnswered(t *testing.T) {
 	})
 }
 
-// TestFlowDisarmAfterFailureIsBoundedByTheCaller (review II,
-// R2-P3-rr-ctl-03): the disarm after a step's own failure, with the
-// device's answer to an ArmFailSafe known, is bounded as every disarm on a
-// way out is — by the caller's context while it lives, and by the flow's
-// own abort bound (abortDisarmTimeout) once it has ended. A device that
-// stops answering after it armed keeps neither the caller's cancel nor an
-// ended context from returning.
-func TestFlowDisarmAfterFailureIsBoundedByTheCaller(t *testing.T) {
-	t.Parallel()
-	info := gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}
-	// rig is a flow over a device that answers the first ArmFailSafe and
-	// then nothing: disarmed is closed when its ArmFailSafe(0) arrives.
-	rig := func(t *testing.T, fail step) (f *flow, disarmed <-chan struct{}) {
-		t.Helper()
-		dev := &failsafeDevice{info: info}
-		got := make(chan struct{})
-		var once sync.Once
-		f, _ = newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
-			if expiry, ok := armRequest(req); ok && expiry == 0 {
-				once.Do(func() { close(got) })
-				return 0, nil, false
-			}
-			return dev.handle(req)
-		})
-		f.log = discard()
-		f.abortDisarm = 50 * time.Millisecond
-		f.steps = []step{{7, 1, "arm", func(ctx context.Context) (stepResult, error) { return f.armFailsafe(ctx, 0) }}, fail}
-		return f, got
-	}
-	// within waits for c within the test's own deadline, as
-	// TestFlowReconnectAbort does. The exchange's response timeout runs on
-	// the fake clock, which nothing advances: a disarm that only it bounds
-	// never returns.
-	within := func(t *testing.T, c <-chan struct{}, what string) {
-		t.Helper()
-		waitCtx, stopWait := context.WithTimeout(t.Context(), abortDisarmTimeout/2)
-		defer stopWait()
-		select {
-		case <-c:
-		case <-waitCtx.Done():
-			t.Fatal(what)
-		}
-	}
-	// run runs the flow and returns its error once it returned.
-	run := func(t *testing.T, ctx context.Context, f *flow, disarmed <-chan struct{}, afterDisarm func()) error {
-		t.Helper()
-		var err error
-		done := make(chan struct{})
-		go func() { err = f.execute(ctx); close(done) }()
-		within(t, disarmed, "the flow sent no ArmFailSafe(0) after the failure")
-		afterDisarm()
-		within(t, done, "the flow has not returned: the disarm after the failure is not bounded by the caller")
-		return err
-	}
-
-	t.Run("the caller's cancel ends the disarm", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		gone := errors.New("the device stopped answering")
-		f, disarmed := rig(t, step{8, 1, "fail", func(context.Context) (stepResult, error) { return 0, gone }})
-		if err := run(t, ctx, f, disarmed, cancel); err != gone { //nolint:errorlint // returned as is
-			t.Fatalf("error %v, want the step's", err)
-		}
-	})
-
-	t.Run("after the caller's context ended the disarm has the abort bound", func(t *testing.T) {
-		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		// A classed failure that does not carry the context's error is the
-		// step's own (callerAborted), although the context has ended.
-		f, disarmed := rig(t, step{8, 1, "fail", func(context.Context) (stepResult, error) {
-			cancel()
-			return 0, newError(ErrCommissioning, "the device stopped answering", nil)
-		}})
-		if err := run(t, ctx, f, disarmed, func() {}); !errors.Is(err, ErrCommissioning) {
-			t.Fatalf("error %v, want the step's ErrCommissioning", err)
-		}
-	})
-}
-
-// TestFlowReconnectAbort (review II, R2-P0-rv-C02): the caller's context
-// ending in the Reconnect step — the flow's longest wait — is the abort
-// it is in any other step, although the step wraps the transition's error
-// in ErrOperativeConnectionFailed (matter.js
-// OperativeConnectionFailedError, ControllerCommissioningFlow.ts:2048 at
-// db021da0): the disarm is bounded by the flow's own context, skipped on a
-// closed session, and the step's error is returned as it is — it matches
-// ErrOperativeConnectionFailed and the context's error. An error that
-// only looks like the context's, on a context that has not ended, stays
-// the step's failure.
+// TestFlowReconnectAbort (review II, R2-P0-rv-C02; reshaped by #5049,
+// pin lift db91886c, P1-D): the caller's context ending in the Reconnect
+// step — the flow's longest wait — is the cancel it is in any other step,
+// although the step wraps the transition's error in
+// ErrOperativeConnectionFailed: the expiry is bounded by canceledExpiryWait
+// from the cancel, skipped on a closed session, and the cancel's reason is
+// returned, not the step's error (ControllerCommissioningFlow.ts:477-487
+// at db91886c). An error that only looks like the context's, on a context
+// that has not ended, stays the step's failure.
 func TestFlowReconnectAbort(t *testing.T) {
 	t.Parallel()
 	info := gencomm.BasicCommissioningInfo{FailSafeExpiryLengthSeconds: 60, MaxCumulativeFailsafeSeconds: 900}
@@ -719,7 +644,7 @@ func TestFlowReconnectAbort(t *testing.T) {
 		return ctx.Err()
 	}
 
-	t.Run("the step's error is returned, matching the context's", func(t *testing.T) {
+	t.Run("the cancel's reason is returned, not the step's error", func(t *testing.T) {
 		t.Parallel()
 		dev := &failsafeDevice{info: info}
 		ctx, cancel := context.WithCancel(context.Background())
@@ -729,13 +654,8 @@ func TestFlowReconnectAbort(t *testing.T) {
 			return waitForContext(ctx, f)
 		})
 		err := f.execute(ctx)
-		var ce *CommissioningError
-		if !errors.As(err, &ce) || ce.Kind != ErrOperativeConnectionFailed || ce.Cause != context.Canceled || //nolint:errorlint // the identity of the kind and of the cause
-			!errors.Is(err, ErrOperativeConnectionFailed) || !errors.Is(err, context.Canceled) {
-			t.Fatalf("error %#v, want a CommissioningError of kind ErrOperativeConnectionFailed caused by context.Canceled", err)
-		}
-		if err.Error() != "commissioner: Operative reconnection with device failed: context canceled" {
-			t.Fatalf("error %q", err)
+		if err != context.Canceled { //nolint:errorlint // the reason itself
+			t.Fatalf("error %#v, want context.Canceled", err)
 		}
 		// The first arm, the extension for the CASE reconnect (320 s,
 		// TestEnsureFailsafeTimerFor), the disarm.
@@ -759,21 +679,23 @@ func TestFlowReconnectAbort(t *testing.T) {
 			return waitForContext(c, f)
 		})
 		err := f.execute(ctx)
-		if !errors.Is(err, ErrOperativeConnectionFailed) || !errors.Is(err, context.DeadlineExceeded) || !slices.Equal(dev.armed(), []uint16{60, 320, 0}) {
-			t.Fatalf("error %v, arms %v, want ErrOperativeConnectionFailed caused by context.DeadlineExceeded and [60 320 0]", err, dev.armed())
+		if err != context.DeadlineExceeded || !slices.Equal(dev.armed(), []uint16{60, 320, 0}) { //nolint:errorlint // the reason itself
+			t.Fatalf("error %v, arms %v, want context.DeadlineExceeded and [60 320 0]", err, dev.armed())
 		}
 		if l := logged.String(); !strings.Contains(l, "matter.controller.commissioning.aborted") {
 			t.Fatalf("the abort is not logged: %q", l)
 		}
 	})
 
-	t.Run("the disarm is bounded by the flow's own context", func(t *testing.T) {
+	t.Run("the expiry is bounded from the cancel", func(t *testing.T) {
 		t.Parallel()
 		// The device takes ArmFailSafe(0) and never answers it.
 		dev := &failsafeDevice{info: info}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		var disarms atomic.Int32
+		var canceledAt time.Time
+		var clock *fakeClock
 		f, logged := rig(t, func(req imRequest) (uint8, []byte, bool) {
 			if expiry, ok := armRequest(req); ok && expiry == 0 {
 				disarms.Add(1)
@@ -781,26 +703,17 @@ func TestFlowReconnectAbort(t *testing.T) {
 			}
 			return dev.handle(req)
 		}, func(ctx context.Context, f *flow) error {
+			canceledAt = f.now()
 			cancel()
 			return waitForContext(ctx, f)
 		})
-		f.abortDisarm = 50 * time.Millisecond
-		done := make(chan error, 1)
-		start := time.Now()
-		go func() { done <- f.execute(ctx) }()
-		// The test's own deadline, as the bridge's tests bound a wait.
-		waitCtx, stopWait := context.WithTimeout(t.Context(), abortDisarmTimeout/2)
-		defer stopWait()
-		select {
-		case err := <-done:
-			if !errors.Is(err, context.Canceled) || !errors.Is(err, ErrOperativeConnectionFailed) || disarms.Load() != 1 {
-				t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want the aborted Reconnect and once", err, disarms.Load())
-			}
-		case <-waitCtx.Done():
-			// The exchange's response timeout runs on the fake clock,
-			// which nothing advances: without the flow's bound the
-			// disarm waits for good.
-			t.Fatalf("the flow has not returned after %v: the disarm is not bounded by its own context", time.Since(start))
+		clock = f.c.ctx.Clock.(*fakeClock)
+		end, err := runDriven(t, clock, func() error { return f.execute(ctx) })
+		if err != context.Canceled || disarms.Load() != 1 { //nolint:errorlint // the reason itself
+			t.Fatalf("error %v, ArmFailSafe(0) sent %d times, want context.Canceled and once", err, disarms.Load())
+		}
+		if waited := end.Sub(canceledAt); waited >= canceledExpiryWait+time.Second {
+			t.Fatalf("the expiry waited %v after the cancel, want less than %v (CommissioningCancelTest.ts: settled in less than 3 s)", waited, canceledExpiryWait+time.Second)
 		}
 		if !strings.Contains(logged.String(), "matter.controller.commissioning.reset_failsafe_failed") {
 			t.Fatalf("the failed disarm is not logged: %q", logged.String())
@@ -823,8 +736,8 @@ func TestFlowReconnectAbort(t *testing.T) {
 		concurrent := false
 		f.data.supportsConcurrentConnection = &concurrent
 		err := f.execute(ctx)
-		if !errors.Is(err, context.Canceled) || !errors.Is(err, ErrOperativeConnectionFailed) || !slices.Equal(dev.armed(), []uint16{60}) {
-			t.Fatalf("error %v, arms %v, want the aborted Reconnect and ArmFailSafe [60]", err, dev.armed())
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60}) { //nolint:errorlint // the reason itself
+			t.Fatalf("error %v, arms %v, want context.Canceled and ArmFailSafe [60]", err, dev.armed())
 		}
 		l := logged.String()
 		if strings.Contains(l, "matter.controller.commissioning.reset_failsafe_failed") {
@@ -851,7 +764,7 @@ func TestFlowReconnectAbort(t *testing.T) {
 		}
 	})
 
-	t.Run("a failure of the step's own beside an ended context is the step's failure", func(t *testing.T) {
+	t.Run("a failure of the step's own beside an ended context returns the cancel", func(t *testing.T) {
 		t.Parallel()
 		dev := &failsafeDevice{info: info}
 		ctx, cancel := context.WithCancel(context.Background())
@@ -861,11 +774,13 @@ func TestFlowReconnectAbort(t *testing.T) {
 			return errors.New("peer: unreachable")
 		})
 		err := f.execute(ctx)
-		if !errors.Is(err, ErrOperativeConnectionFailed) || errors.Is(err, context.Canceled) || !slices.Equal(dev.armed(), []uint16{60, 320, 0}) {
-			t.Fatalf("error %v, arms %v, want ErrOperativeConnectionFailed and the reset [60 320 0]", err, dev.armed())
+		// matter.js: the signal is aborted when the step fails, whatever the
+		// error (:458), and the cancel is what returns (:479-487).
+		if err != context.Canceled || !slices.Equal(dev.armed(), []uint16{60, 320, 0}) { //nolint:errorlint // the reason itself
+			t.Fatalf("error %v, arms %v, want context.Canceled and the reset [60 320 0]", err, dev.armed())
 		}
-		if l := logged.String(); strings.Contains(l, "matter.controller.commissioning.aborted") {
-			t.Fatalf("a failure that is not the context's is logged as an abort: %q", l)
+		if l := logged.String(); !strings.Contains(l, "matter.controller.commissioning.aborted") || strings.Contains(l, "matter.controller.commissioning.step_failed") {
+			t.Fatalf("the cancel is not logged as one: %q", l)
 		}
 	})
 }
@@ -943,5 +858,31 @@ func (d *stepDeadline) Err() error {
 		return context.DeadlineExceeded
 	default:
 		return nil
+	}
+}
+
+// driveStep is how far runDriven moves the fake clock at a time.
+const driveStep = 50 * time.Millisecond
+
+// runDriven runs run and advances clock by driveStep at a time until it
+// returns: the flow's waits — the exchange's response timeout, the
+// expiry's canceledExpiryWait — run on clock. It returns clock's time at the return and
+// clock's time at the return; the test fails after ten wall seconds.
+func runDriven(t *testing.T, clock *fakeClock, run func() error) (time.Time, error) {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() { done <- run() }()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		select {
+		case err := <-done:
+			return clock.Now(), err
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the flow has not returned")
+		}
+		clock.Advance(driveStep)
+		time.Sleep(time.Millisecond)
 	}
 }

@@ -2452,7 +2452,7 @@
   },
   {
     "file": "controller/commissioner/commissioner.go",
-    "line": 448,
+    "line": 449,
     "citation": "NodeSession.ts:349-352",
     "resolved": "packages/protocol/src/session/NodeSession.ts",
     "identifier": "initiateForceClose",

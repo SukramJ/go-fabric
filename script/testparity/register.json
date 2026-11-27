@@ -3013,10 +3013,15 @@
           "it": "rejects with the cancel reason when the node fails to start after the cancel",
           "class": "js-runtime-only",
           "reason": "a Go discovery session starts no node: the outcome after a cancel is the cancel reason with nothing left to fail (matter.js's ClientNode start inside the discovery, Discovery.ts:333-357)"
+        },
+        {
+          "it": "reports settled when first read after the discovery ${outcome}",
+          "class": "js-runtime-only",
+          "reason": "#5051: matter.js made the settled promise lazily in its getter, so a first read after the end never resolved; a Go session makes its done channel in the constructor and closes it at the end (client/discovery/session.go, start and run), and a closed channel reads as closed whenever it is first read — nothing to port."
         }
       ],
-      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. The three real-device cases run a commissioning race against a fabrictest device whose PASE answers fabrictest.Network.Filter holds until the interruption (TestDiscoveryCancelWithRealDeviceParity). Left: the node's start (a Go session starts no node).",
-      "snapshotSha": "1613033bcf3b348c3340969c197ef12d366c0995"
+      "reason": "The interruption of a discovery session (client/discovery Session, matter.js Discovery.ts:37-483 at 862ad75f) on fixed and failing transports: a cancel, the timeout and the caller's context before the result close the race, an interruption after it is ignored, the first reason stays, the outcome waits for the aborted attempts, and the failure of one transport against all. The three real-device cases run a commissioning race against a fabrictest device whose PASE answers fabrictest.Network.Filter holds until the interruption (TestDiscoveryCancelWithRealDeviceParity). Left: the node's start (a Go session starts no node). Pin lift db91886c, P1-D (#5049, #5051): the two cases after the PASE win renamed (\"… despite a cancel …\"), and two added — the winner's operation stopping on the cancel rejects with its reason, and a decided race aborts the losers but not the winner (raceKind.onCancel); left: the lazily created settled promise (#5051).",
+      "snapshotSha": "34cc59d1b1534483ef1995d531648166133eee42"
     },
     {
       "path": "packages/node/test/behavior/system/controller/discovery/DiscoveryErrorTest.ts",
@@ -5490,7 +5495,8 @@
         "controller/client:TestClientAttestationNoTrustStoreParity",
         "controller/client:TestClientAttestationTrustStoreParity",
         "controller/client:TestClientAttestationCallbackContractParity",
-        "controller/commissioner:TestClientAttestationBasicInformationVendorIDParity"
+        "controller/commissioner:TestClientAttestationBasicInformationVendorIDParity",
+        "controller/commissioner:TestClientAttestationCancelParity"
       ],
       "missing": [
         "self-heals a corrupt cached PAA by re-fetching from DCL",
@@ -5502,8 +5508,8 @@
         "commissions when policy accepts",
         "reports DacFormatInvalid and rejects when policy rejects"
       ],
-      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest. Pin lift b25ed960 (P2-D): the BasicInformation VendorID that does not match the CD (#4939/#4940) runs through the flow's attestation step on the commissioner's scripted device (TestClientAttestationBasicInformationVendorIDParity), BasicInformation set to 0xFFF2 in the collected data instead of on a MockSite device; the rejection message naming every error finding is also asserted by controller/client:TestClientAttestationTrustStoreParity (ClientAttestationTest.ts:524). The test-only PAA case asserts both TrustedAsTestCertificate errors, the PAA's and the test CD signer's (ClientAttestationTest.ts:519-530 at b25ed960; P2b-K).",
-      "snapshotSha": "7c8ce4d9b7c67d834fcc8aa5736a771f5645680b"
+      "reason": "Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest. Pin lift b25ed960 (P2-D): the BasicInformation VendorID that does not match the CD (#4939/#4940) runs through the flow's attestation step on the commissioner's scripted device (TestClientAttestationBasicInformationVendorIDParity), BasicInformation set to 0xFFF2 in the collected data instead of on a MockSite device; the rejection message naming every error finding is also asserted by controller/client:TestClientAttestationTrustStoreParity (ClientAttestationTest.ts:524). The test-only PAA case asserts both TrustedAsTestCertificate errors, the PAA's and the test CD signer's (ClientAttestationTest.ts:519-530 at b25ed960; P2b-K). Pin lift db91886c, P1-D (#5049): the cancel during a DCL lookup runs through the flow's attestation step with a trust store whose revocation lookup cancels and blocks (TestClientAttestationCancelParity): the wait ends with the cancel's reason.",
+      "snapshotSha": "52ed65c64b296b77f87f1178512e5cacb5f37e7f"
     },
     {
       "path": "packages/node/test/node/ClientBridgeStructureTest.ts",
@@ -6309,6 +6315,17 @@
       "snapshotSha": "f5ffae1edecf26ffec59bfd5cc5d9e2112783317"
     },
     {
+      "path": "packages/node/test/node/CommissioningCancelTest.ts",
+      "status": "ported",
+      "go": [
+        "controller/commissioner:TestCommissioningCancelParity",
+        "controller/commissioner:TestFlowDisarmsFailsafeStartedNotAnswered",
+        "controller/commissioner:TestFlowReconnectAbort"
+      ],
+      "reason": "The cancel after PASE (#5049) on the commissioner's flow over a scripted device and the fake clock: the caller's context is matter.js's abort signal and its cancel alike, so the two cases of the loop over \"abort signal\" and \"cancel\" are one. A canceled step ends the fail-safe once and rejects with the cancel's reason; a withheld read and a withheld expiry settle within the 2 s canceled-expiry wait; no step runs after a step that did not observe the cancel; a cancel after CommissioningComplete was sent reaches nothing, and a CommissioningComplete failure is reported as itself; a cancel during an external finalization leaves it to complete, one during the re-arm before it starts none; a cancel during the expiry after a failed step ends the wait. \"ends a failsafe the device armed before the cancel abandoned the ArmFailSafe response\" is TestFlowDisarmsFailsafeStartedNotAnswered, \"stops the operational CASE connection\" TestFlowReconnectAbort. Pin lift db91886c, P1-D.",
+      "snapshotSha": "dee6d5e9d96150aea3487fd0112d667049b055ce"
+    },
+    {
       "path": "packages/node/test/node/CommissioningClosedSessionReArmTest.ts",
       "status": "ported",
       "go": [
@@ -6323,15 +6340,8 @@
       "go": [
         "controller/commissioner:TestCommissioningFailsafeExpiry"
       ],
-      "left": [
-        {
-          "it": "sends no expiry before the commissioner armed the failsafe",
-          "class": "by-design",
-          "reason": "BD-chip-Commissioner-AbortDisarmsFailSafe (Every exit after PASE): the flow also ends the fail-safe the device armed when the PASE session was established; pinned by controller/commissioner:TestCommissioningFailsafeExpiry/ahead of matter.js: ends the PASE session's fail-safe before the flow armed."
-        }
-      ],
-      "reason": "The flow over a scripted device: which step failures send ArmFailSafe(0) and which leave the fail-safe to expire (#expireFailsafe). Left, by design: the expiry before the flow armed. Pin lift b25ed960, unit P3-D (#4928).",
-      "snapshotSha": "de0fb0b540bc0dc97c8bce3416ad518867e1c335"
+      "reason": "The flow over a scripted device: which step failures send ArmFailSafe(0) and which leave the fail-safe to expire (#expireFailsafe), the fail-safe the device armed at PASE ended before the commissioner armed it, and no expiry after CommissioningComplete succeeded. Pin lift b25ed960, unit P3-D (#4928); pin lift db91886c, unit P1-D (#5049): matter.js's #failSafeMayBeArmed caught up with the expiry before the flow armed, which is no longer left by design.",
+      "snapshotSha": "982e496bbe50eb54d79116d4c085796c050979fa"
     },
     {
       "path": "packages/node/test/node/CommissioningPaseLifetimeTest.ts",
@@ -7088,15 +7098,16 @@
       "path": "packages/node/test/node/SplitCommissioningTest.ts",
       "status": "partial",
       "go": [
-        "controller/client:TestSplitCommissioningParity"
+        "controller/client:TestSplitCommissioningParity",
+        "controller/commissioner:TestSplitCommissioningHandOffOutlastsTimeLimit"
       ],
       "missing": [
         "throws CommissioningError and removes the peer when CommissioningComplete returns a non-Ok errorCode",
         "keeps the device's CommissioningComplete status as the cause of the CommissioningError",
         "aborts and leaves no node if the fabric cannot be persisted"
       ],
-      "reason": "Registry.CompleteCommissioning ports Peers.completeCommissioning (Peers.ts:236-359 at 862ad75f): the hand-off of the commissioner's FinalizeCommissioning completed — the node created on the shared fabric, its peer seeded, started, CommissioningComplete with the extended fail-safe timeout, the device's fail-safe disarmed and the default subscription up; a second completion refused (ErrAlreadyCommissioned) without touching the node; no phantom node when it cannot be reached; a fabric the registry does not hold refused (ErrForeignFabric). matter.js runs the halves on two controllers sharing a fabric; fabrictest gives each controller its own CA and fabric, so the port runs both on one controller. Missing: the non-Ok errorCode and the status cause need a device that answers CommissioningComplete so (the Go device answers Ok once its fail-safe is armed by the same fabric); the fabric persistence failure has no Go shape (commissioner.NewFabric persists at creation).",
-      "snapshotSha": "d891eb17597311ef293584b301a8fd74ba18ab57"
+      "reason": "Registry.CompleteCommissioning ports Peers.completeCommissioning (Peers.ts:236-359 at 862ad75f): the hand-off of the commissioner's FinalizeCommissioning completed — the node created on the shared fabric, its peer seeded, started, CommissioningComplete with the extended fail-safe timeout, the device's fail-safe disarmed and the default subscription up; a second completion refused (ErrAlreadyCommissioned) without touching the node; no phantom node when it cannot be reached; a fabric the registry does not hold refused (ErrForeignFabric). matter.js runs the halves on two controllers sharing a fabric; fabrictest gives each controller its own CA and fabric, so the port runs both on one controller. Missing: the non-Ok errorCode and the status cause need a device that answers CommissioningComplete so (the Go device answers Ok once its fail-safe is armed by the same fabric); the fabric persistence failure has no Go shape (commissioner.NewFabric persists at creation). Pin lift db91886c, P1-D (#5049): \"completes when the hand-off outlasts the commissioning time limit\" runs on the commissioner's flow — the Reconnect step's external finalization moves the fake clock past MaxCumulativeFailsafeSeconds and Stop ends the loop before the time-limit check (TestSplitCommissioningHandOffOutlastsTimeLimit).",
+      "snapshotSha": "60a2ef797d0a088f95f648600143dff9ee7fc8ef"
     },
     {
       "path": "packages/node/test/node/client/CacheFabricFilterTest.ts",
@@ -9378,13 +9389,14 @@
         "controller/commissioner:TestConnectionErrorClasses",
         "controller/commissioner:TestCommissioningConnection",
         "controller/commissioner:TestCommissioningConnectionStagger",
-        "controller/commissioner:TestCommissioningConnectionScripted"
+        "controller/commissioner:TestCommissioningConnectionScripted",
+        "controller/commissioner:TestConnectionLosingGiveUpHoldsTheRun"
       ],
       "missing": [
         "keeps trying the other addresses when ${failure}"
       ],
-      "reason": "Every CommissioningConnection case ported on clocktest.Fake: the credential drop and its late-success close cause (inverted, ahead of matter.js: a confirmation failure ends the address, not the device, review II R2-P6-fsm-1806), invalid PASE data, the concurrent-winner and timeout session closes, the winner not waiting for an abort-unresponsive loser, external and budget aborts reaching the attempt's ctx, the per-address stagger (global across devices, cancelled by a winner, default 10 s, a third address within 30 s), the responder hold (bounded at the delay, ahead of matter.js, R2-P6-fsm-1806) and the five scripted stagger/hold timelines. Pin lift b25ed960: a BLE address that closes during PASE or cannot be opened ending the address, not the device (#4908, #4922), is open, unit P3-D.",
-      "snapshotSha": "d3586377ccff4baf8eba7579339e8ba55ce72ca5"
+      "reason": "Every CommissioningConnection case ported on clocktest.Fake: the credential drop and its late-success close cause (inverted, ahead of matter.js: a confirmation failure ends the address, not the device, review II R2-P6-fsm-1806), invalid PASE data, the concurrent-winner and timeout session closes, the winner not waiting for an abort-unresponsive loser, external and budget aborts reaching the attempt's ctx, the per-address stagger (global across devices, cancelled by a winner, default 10 s, a third address within 30 s), the responder hold (bounded at the delay, ahead of matter.js, R2-P6-fsm-1806) and the five scripted stagger/hold timelines. Pin lift b25ed960: a BLE address that closes during PASE or cannot be opened ending the address, not the device (#4908, #4922), is open, unit P3-D. Pin lift db91886c, P1-D (#5053): \"rejects only after a session that completed after the timeout has been closed\" is TestConnectionLosingGiveUpHoldsTheRun — a session established after the budget is given up before the run returns.",
+      "snapshotSha": "4dc9e970ca51938c50a80f0790b831e68b72018b"
     },
     {
       "path": "packages/protocol/test/peer/InitialContactScheduleTest.ts",

@@ -150,7 +150,6 @@ unit removes the line with the row.
 | BD-Matter-ControllerDiagnostics | `PeerSet.ts:218` at `db021da0` exposes the peers as a live set (`get peers()`) and `SessionManager.ts:376` the sessions (`get sessions()`); no snapshot, trace or finding type serves a host's diagnostics view (presence) | `packages/protocol/src/peer/PeerSet.ts` | `"    get peers() {"` | this module's node-side facade (`node.SessionDiagnostics`, `diagevent.Ring`, `mdns.Diagnose`) applied to the controller role; matterjs-server at `0bd06f2` serves only Thread diagnostics (`packages/ws-controller/src/server/WebSocketControllerHandler.ts:144`) | no |
 | BD-Matter-OnboardingCodeKept | `CommissioningClient.ts:1067` ff. at `db91886c`: `State` persists the discriminator (:1155-1156), vendor and product, and no passcode or pairing code; the passcode's only use is the hand-over to the commissioner (presence, :304-305) | `packages/node/src/behavior/system/commissioning/CommissioningClient.ts` | `"            passcode,\n            discoveryData: this.descriptor,"` | this module's own design (owner decision 2026-11-13); the long manual code of a non-standard flow follows connectedhomeip `src/setup_payload/ManualSetupPayloadGenerator.cpp:116` at `6170af84` | no |
 | BD-Matter-Commissioner-ReconnectProbe | `ControllerCommissioningFlow.ts:2138-2142` at `db91886c`: `#reconnectWithDevice` goes from the fail-safe re-arm (:2125-2134) straight to `transitionToCase` and reads nothing from the device in between; the peer it connects has discovery as its only address source (`ControllerCommissioner.ts:748-766`) (presence) | `packages/protocol/src/peer/ControllerCommissioningFlow.ts` | `"            transitionResult = await this.transitionToCase("` | this module's own design (owner decision 2026-11-13); connectedhomeip reads nothing there either (`src/controller/CHIPDeviceController.cpp:4487-4497` at `6170af84`, `FindOrEstablishSession`), its one address beside DNS-SD is the commissioning session's own for UDP and TCP (`:4469-4482`) | no |
-| BD-chip-Commissioner-AbortDisarmsFailSafe | `ControllerCommissioningFlow.ts` at `b25ed960`: every step failure now ends the fail-safe (`executeCommissioning` runs `#expireFailsafe(error)` before the rethrow, `:448`, `:450-454`), so what remains ahead is the abort and the disarm before an answered ArmFailSafe: the flow's constructor takes no abort signal (`:332-350`, absence: its last parameter and first statement, `:349-351`; `abort` occurs in the file only in comments) and `executeCommissioning()` is called without one (`ControllerCommissioner.ts:771`, presence), while the commissioner's `abort` option "cancels all in-flight PASE attempts" (`ControllerCommissioner.ts:196`, presence); `#expireFailsafe` sends nothing while no fail-safe end is known (`ControllerCommissioningFlow.ts:1101`, presence), and a PASE session the commissioner gives up is force-closed, no more (`ControllerCommissioner.ts:317-319`, `:326-332`; the commissioning connection's own close was not re-read at this pin). The mirrored part (`#expireFailsafe`) is mirrored by `flow.expireFailsafe` since pin-lift unit P3-D | `packages/protocol/src/peer/ControllerCommissioningFlow.ts`<br>`packages/protocol/src/peer/ControllerCommissioningFlow.ts`<br>`packages/protocol/src/peer/ControllerCommissioner.ts`<br>`packages/protocol/src/peer/ControllerCommissioner.ts` | `"        if (this.#currentFailSafeEndTime === undefined) return;"`<br>`"undefined>,\n    ) {\n        this.interaction = interaction;"`<br>`"            await commissioner.executeCommissioning();"`<br>`"    /** External abort signal that, when fired, cancels all in-flight PASE attempts. */"` | connectedhomeip `src/controller/CHIPDeviceController.cpp` at `6170af84` (the `CHIP_ERROR_CANCELLED` branch of `CleanupCommissioning` :2219-2247, `DisarmFailsafeRequest` :2164-2170, `StopPairing` :1204-1233; the disarm after a failure before the network setup stages, :2248, :2271-2278) | no |
 | BD-chip-HandshakeSecretsOverwritten | `PaseServer.ts:174` at `db021da0` takes `Ke`, `hAY` and `hBX` as locals and hands `Ke` to `createSecureSession` (`:190`); `CaseServer.ts:243`, `:251` and `:284` hold `sharedSecret`, `sigma2Key` and `sigma3Key` as locals; nothing overwrites them (presence of the locals; a search for `fill(`, `zeroize`, `zeroise` and `wipe` over `packages/protocol/src/session/pase`, `session/case`, `session/NodeSession.ts` and `packages/general/src/crypto/Spake2p.ts` finds no line) | `packages/protocol/src/session/pase/PaseServer.ts`<br>`packages/protocol/src/session/case/CaseServer.ts` | `"const { Ke, hAY, hBX } = await spake2p.computeSecretAndVerifiersFromX(this.L, X, Y);"`<br>`"const sharedSecret = await crypto.generateDhSecret(key, PublicKey(cx.peerEcdhPublicKey));"` | connectedhomeip at `6170af84`: `Spake2p_P256_SHA256_HKDF_HMAC::Clear` (`src/crypto/CHIPCryptoPALOpenSSL.cpp:1119-1154`), `PASESession::Clear` (`src/protocols/secure_channel/PASESession.cpp:137-158`), `SensitiveDataBuffer` and `SensitiveDataFixedBuffer` (`src/crypto/CHIPCryptoPAL.h:299-306`, `:375-394`), `CASESession::Clear` (`src/protocols/secure_channel/CASESession.cpp:376-397`) | no |
 | BD-Matter-UnsecuredRetransmitEviction | `MessageExchange.ts:285` and `:293` at `db021da0`: the message awaiting its acknowledgement and its retransmission timer are fields of the exchange, with no table and no count over them (presence); `SessionIntervals.ts:52-53` says SII and SAI of the session parameters are "uint32 and accepted unbounded" | `packages/protocol/src/protocol/MessageExchange.ts` | `"    #sentMessageToAck?: Message;"` | this module's own rule (review II, owner decision 23): the unsecured session holds at most 16 messages awaiting an acknowledgement, a message at a full table is sent and tracked and the entry tracked first loses its retransmissions, an entry ends with its handshake or 60 s after it was tracked. connectedhomeip at `6170af84` is the comparison, not the source: its table for all sessions has the same default size (`src/messaging/ReliableMessageMgr.h:267`, `src/messaging/ReliableMessageProtocolConfig.h:134`, `:146`, `src/lib/core/CHIPConfig.h:303-305`) and refuses the message that does not fit (`src/messaging/ReliableMessageMgr.cpp:254-263`, `src/messaging/ExchangeMessageDispatch.cpp:63-64`) | no |
 | BD-Matter-OTAImage-DownloadBound | `DclOtaUpdateService.ts:690-693` at `db021da0` fetches the image with a timeout as its only limit and hands the response body to `store` (`:703`), which streams it to storage (`:571`) before anything is verified (`:573-574`) (presence: the hand-over) | `packages/protocol/src/dcl/DclOtaUpdateService.ts` | `"return await this.store(response.body, updateInfo, mode);"` | this module: `dcl.OTAVersions.MaxImageSize`, default 256 MiB — owner decision 11 of review II, a judgement without measured image sizes; connectedhomeip has no DCL image download to follow | no |
@@ -3805,6 +3804,7 @@ names one of these IDs is stale.
 | BD-chip-ZoneManagement-RulesInServer | 2026-11-20 (pin lift b25ed960, unit P3-B, decisions 290, 371, 377) | Caught up and closed: matter.js's server carries the command rules (`packages/node/src/behaviors/zone-management/ZoneManagementServer.ts:67-251` at `db91886c`, #4840) and `TwoDCartesianGeometry.ts:24-60` the polygon check; reconciled in P3-B — `camera.Zones` mirrors both, the server assigns the zone ID, and `ZoneManagementServerTest.ts` is ported. The last assigned ID is the host's (`BD-Matter-ZoneManagement-LastZoneIdHostPersisted`). |
 | BD-chip-EnergyReporting-FakeReadings | 2026-11-20 (pin lift b25ed960, unit P3-E, decision 303) | Caught up and closed: matter.js's chip-testing node answers the three EnergyReporting triggers at `db91886c` (`support/chip-testing/src/cluster/FakeElectricalReadingsHandler.ts`, dispatched by `TestGeneralDiagnosticsServer.ts:20`); the reference daemon's grid meter mirrors it — the nine stepped values, the step running on across starts, the endpoint bits, a reading's setMeasurement on every reading — on its narrower ImportedEnergy + CumulativeEnergy feature set (decision 303), with endpoint bits 0 reaching both of its measurement endpoints (`BD-Matter-Example-FakeReadingsBothEndpoints`). `script/aheadcheck/caught-up.txt` no longer lists it. |
 | BD-Matter-PeerLoss-OwnSessionAtTheSameInstant | 2026-11-21 (pin lift b25ed960, unit P4-D1, decisions 405, 417) | Not a divergence at the pin: at db91886c the cutoff is the registration count read when the exchange's context is created (`packages/protocol/src/protocol/ExchangeManager.ts:623`), and the exchange's session registered before that (`packages/protocol/src/session/SessionManager.ts:1266-1284`), so matter.js gives it up as this module does: no divergence remains. The entry recorded `client/exchange`'s exception to the time cutoff `asOf` of db021da0; the bridge now cuts by registration order too (`secure/operational` `Manager.ClosePeerLostBefore`, F-b25ed960-49 closed). `client/exchange:TestExchangePeerLossLosesItsOwnSessionAtTheSameInstant` stays as a parity case. |
+| BD-chip-Commissioner-AbortDisarmsFailSafe | 2026-11-27 (pin lift db91886c, unit P1-D, decision 736) | Caught up and closed: matter.js's flow takes the caller's abort signal and ends the fail-safe on a cancel (#5049) — `#failSafeMayBeArmed` from PASE on (`packages/protocol/src/peer/ControllerCommissioningFlow.ts:354-355`, the gate of `#expireFailsafe` `:1157` at `db91886c`, where the end-time return of marker 1 stood), the cancel checked at each step's entry (`:413`), the expiry after a cancel bounded by `CANCELED_EXPIRY_WAIT` = 2 s (`:323`, `:1166-1173`), the cancel's reason returned (`:479-487`) and the cancel cut off when CommissioningComplete starts (`:2176`, `#requestAbort` `:557-559`). `controller/commissioner` reconciled onto it: `flow.execute`, `expireFailsafe` (one path for failure and cancel), `requestContext`, `cancelError`, `canceledExpiryWait`; `disarmAfterAbort`, `disarmAfterFailure` and `callerAborted` are gone, the 10 s `abortDisarmTimeout` too. A canceled commissioning now returns the cancel's reason (matching `ctx.Err()`), not the step's error. The surviving half — the disarm of a PASE session given up before its flow — is `BD-Matter-Commissioner-GivenUpPASEDisarmed`. Pinned by `controller/commissioner:TestCommissioningCancelParity` (`CommissioningCancelTest.ts`), `TestFlowDisarmsFailsafeWhenCallerAborts`, `TestFlowDisarmsFailsafeStartedNotAnswered`, `TestFlowReconnectAbort`, `TestCommissioningFailsafeExpiry`. Closes F-db91886c-5. |
 
 ### BD-Matter-LevelControl-LenientDecoders — LevelControl's omitted request fields take a fallback
 
@@ -7520,74 +7520,52 @@ clock.
 
 Review II, phase 6b (owner decision 193, R2-P6-par-1805): the entry holds for a validation context without a clock only. With a clock — the commissioner always sets one — a DAC past its notAfter is the error finding `CertificateExpired`, as connectedhomeip refuses it (`BD-chip-Attestation-DacExpiredAtClock`).
 
-### BD-chip-Commissioner-AbortDisarmsFailSafe — a commissioning that ends after PASE disarms the device's fail-safe, whatever ended it
+### BD-Matter-Commissioner-GivenUpPASEDisarmed — a PASE session given up before its commissioning flow gets ArmFailSafe(0) before it is closed
 
-matter.js's `#expireFailsafe`
-(`packages/protocol/src/peer/ControllerCommissioningFlow.ts:1097-1132` at
-`b25ed960`) runs after every step failure `executeCommissioning` does not
-recover from (`:448`). In its order it stops the re-arm timer; sends nothing
-without an end time (`:1101`) or when the device stopped responding
-(`:1102-1105`, `#deviceStoppedResponding` `:996-1003`); then awaits a re-arm
-in flight (`:1107`) and sends ArmFailSafe(0) over an existing session only,
-checks the response, and only logs a failure (`:1108-1131`).
-`flow.expireFailsafe` mirrors this; on a skip it cancels the re-arm in
-flight (pin lift b25ed960, unit P3-D). What remains ahead is the abort and
-the disarm before an ArmFailSafe of the flow's was answered (the end time is
-set only at `:878`). The flow takes no abort signal (the constructor, `:332-351` at `b25ed960`); the
-commissioner's `abort` option is the "External abort signal that, when
-fired, cancels all in-flight PASE attempts"
-(`packages/protocol/src/peer/ControllerCommissioner.ts:196` at `b25ed960`;
-handed on at `:262` and `:277` at `db021da0`, not re-read), and
-`executeCommissioning()` is called without one (`:771` at `b25ed960`). A Go caller ends a commissioning through its context: a step that
-returned the context's error left the device's fail-safe armed until it
-expired. `controller/commissioner` follows connectedhomeip, whose
-`CleanupCommissioning` — "If we're cleaning up because cancellation has
-been requested via StopPairing(), expire the failsafe in the background" —
-sends ArmFailSafe with expiry 0 over the session the commissioning holds
-and ignores a failure (`src/controller/CHIPDeviceController.cpp:2219-2247`,
-the request `:2164-2170`, the ignored failure `:2233-2236`, `StopPairing`
-`:1204-1233` at `6170af84`). When `execute`'s context has ended and the
-step's error is neither a CommissioningError nor a status error, or is one
-that carries the context's error — the Reconnect step's
-ErrOperativeConnectionFailed, which wraps what the operational connection
-gave up with (`callerAborted`) — `disarmAfterAbort`
-(`controller/commissioner/flow.go`) stops the BLE re-arm timer and sends
-the request `#expireFailsafe` sends (`sendFailsafeExpiry`, the response
-checked) on a context of its own,
-then returns the step's error unchanged (from the Reconnect step that is
-the step's error with the context's as its cause: it matches the context's
-with `errors.Is` and is not that error). The disarm is owed from the PASE
-session's establishment, which armed the device's fail-safe (the last
-paragraph), and for an ArmFailSafe that was started, not only for one that
-was answered (`armStarted`, set in `newFlow` and in `armFailsafe` before the
-invoke); a device that holds no fail-safe answers it with "a success
-response with no side effect" (matter.js
-`packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:96-98`
-at `db021da0`). Nothing is sent once the device has confirmed
-CommissioningComplete or a disarm, or when the session is closed.
-connectedhomeip does not ask what was armed either: its branch tests the
-completion status alone (`:2219`) and a failed stage's next stage is
-`kCleanup` whatever it was (`src/controller/AutoCommissioner.cpp:465-468`
-at `6170af84`; the path from there to `CleanupCommissioning` was not
-traced, unverified). Two differences from connectedhomeip, both this
-module's: the send is awaited, for at most
-`abortDisarmTimeout` = `FailSafeMaxSendTime` (10 s; `FAILSAFE_MAX_SEND_TIME`,
-`:302`), because `Commission` closes the PASE session when the flow returns;
-and the request carries the flow's current breadcrumb where connectedhomeip
-sends 0 (`:2168`). That the disarm leaves over BLE too is inferred from the
-channel keeping its own context, not exercised (unverified). Not covered,
-and said in `disarmAfterAbort`'s comment: a datagram of the aborted
-ArmFailSafe still on its way can reach the device behind the disarm, and so
-can a re-arm of the BLE timer already in flight. Owner decision 5
-(review II, W4-ctlsec-08, R2-P0-rv-C01, R2-P0-rv-C02). Pinned by
-`controller/commissioner:TestFlowDisarmsFailsafeWhenCallerAborts`,
-`TestFlowDisarmsFailsafeStartedNotAnswered` and `TestFlowReconnectAbort`.
-Register row above; the row closes when matter.js's flow takes an abort
-signal and resets on it.
+matter.js's devices arm a fail-safe when a PASE session is established
+(`packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:55-65`
+at `db021da0`), and the commissioner's flow ends it on every failure and
+cancel since #5049 (`#failSafeMayBeArmed`,
+`packages/protocol/src/peer/ControllerCommissioningFlow.ts:354-355`,
+`#expireFailsafe` `:1153-1200` at `db91886c`; mirrored by
+`flow.expireFailsafe`). A PASE session given up *before* its flow runs is
+only force-closed there: a node id `claimNodeIdAfterPase` refuses
+(`packages/protocol/src/peer/ControllerCommissioner.ts:305-309`, the catch
+`:322-324`, `#closePaseSession` `:331-337` at `db91886c`) and a session
+established after another candidate won the connection
+(`packages/protocol/src/peer/CommissioningConnection.ts:144-157`). Here each
+of them gets the request of the flow's expiry — ArmFailSafe with expiry 0
+and the flow's starting breadcrumb (`initialBreadcrumb` = 1) — before the
+close (`Commissioner.disarmPASE`, `controller/commissioner/commissioner.go`;
+callers: a node id another candidate claimed and a failure before the flow
+in `Commission`, a losing session through `connectionConfig.giveUp` /
+`Commissioner.giveUpPASE`, and one `EstablishPASE`'s `ContinueAfterPASE`
+refuses): the device's rollback ends the PASE session
+(`packages/protocol/src/common/FailsafeContext.ts:277-279` at `db021da0`),
+and until it ends the device accepts no new PASE exchange
+(`PaseServer.ts:76-82` at `db021da0`). The disarm is bounded by the
+caller's context and the exchange's response timeout and, that context
+having ended, by `canceledExpiryWait` (2 s, matter.js's
+`CANCELED_EXPIRY_WAIT`, `ControllerCommissioningFlow.ts:323` at `db91886c`);
+nothing is sent on a closed session, a failure is logged. A losing session
+is disarmed beside the next candidate's attempt, and a connection without a
+winner returns only after its losing sessions were disarmed. Two choices are
+this module's, with no reference: a losing session is disarmed without a
+check that it does not reach the winner's device — it relies on a device
+accepting one PASE at a time — and the disarm carries the flow's starting
+breadcrumb. Who sees it: a device a `Pair` gave up on before the flow,
+which accepts the next commissioning at once and not after its fail-safe;
+a caller, whose failed `Pair` returns after the disarm's exchange. Pinned by
+`controller/commissioner:TestCommissionGivenUpBeforeTheFlowFreesThePASESession`,
+`TestEstablishPASERefusedAfterPASEFreesThePASESession`,
+`TestPASESessionThatLostTheRaceIsFreed`,
+`TestConnectionLosingGiveUpHoldsTheRun` and
+`controller:TestPairThatGivesUpLeavesNoPASESession`. Split out of
+`BD-chip-Commissioner-AbortDisarmsFailSafe` when that row closed (pin lift
+db91886c, unit P1-D, decision 736, coordinator decision C2). Retire when
+matter.js ends the fail-safe of a PASE session it gives up before the flow.
 
-**Every exit after PASE (added 2026-11-14; review II, phase 3 rework, R2-P3-rr-ctl-03, R2-P3-rr-ctl-05).** Both references' devices arm a fail-safe when a PASE session is established — matter.js "As required by Commissioning Flows any new PASE session needs to arm the failsafe for 60s" (`packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:55-65` at `db021da0`), connectedhomeip in `OnSessionEstablished` (`src/app/server/CommissioningWindowManager.cpp:226-236` at `6170af84`, the arm at `:236`) — and matter.js's accepts no new PASE exchange while a PASE session exists that is not closing (`packages/protocol/src/session/pase/PaseServer.ts:76-82` at `db021da0`), which the fail-safe's expiry closes (`packages/protocol/src/common/FailsafeContext.ts:277-279`). matter.js's commissioner disarms on one way out: `#expireFailsafe` after a step failure it does not recover from (`packages/protocol/src/peer/ControllerCommissioningFlow.ts:439-454` at `b25ed960`, the call at `:448`), which returns at once while no fail-safe end is known (`:1101`). Its other exits close only: the catch of `commission` force-closes the PASE session (`packages/protocol/src/peer/ControllerCommissioner.ts:304-306`, `#closePaseSession`, `:313-319` at `db021da0`), a session `continueAfterPase` refuses is force-closed (`:368-373` at `db021da0`), and so is one established after another candidate won the connection (`packages/protocol/src/peer/CommissioningConnection.ts:140-157` at `db021da0`). connectedhomeip disarms after a failure before its network setup stages — the branch at `src/controller/CHIPDeviceController.cpp:2248` at `6170af84` keeps the fail-safe from `kWiFiNetworkSetup` on, the one at `:2271-2278` sends the disarm, "we also need to force a reset on the failsafe so we can start fresh on the next attempt". Here every exit after PASE disarms while the device may hold the fail-safe and the session stands (`controller/commissioner`): a step that failed for any reason, classed or not and whether or not an ArmFailSafe of the flow's was answered (`flow.disarmAfterFailure` → `expireFailsafe`; with a fail-safe end known it is matter.js's `#expireFailsafe`, without one ahead of it, and in both cases skipped when the device stopped responding); a node id another candidate claimed, and a failure before the flow runs (`Commissioner.disarmPASE`); a PASE session established after another candidate had won the connection or after the abort (`connectionConfig.giveUp`, `Commissioner.giveUpPASE`); and one that `EstablishPASE`'s `ContinueAfterPASE` refuses. Each disarm is bounded by the caller's context and the exchange's response timeout and, that context having ended, by `abortDisarmTimeout`; a losing session is disarmed beside the next candidate's attempt, and a connection without a winner returns only after its losing sessions were disarmed. No CloseSession is added: the device's rollback closes the session. Two choices are this module's, with no reference: a losing session is disarmed without a check that it does not reach the winner's device — it relies on a device accepting one PASE at a time — and a disarm before the flow carries the flow's starting breadcrumb (`initialBreadcrumb` = 1, matter.js's `lastBreadcrumb`, `ControllerCommissioningFlow.ts:326` at `b25ed960`). Not covered: a commissioning whose Reconnect fails on a non-concurrent device holds no session to disarm over, as in matter.js ("For non-concurrent flow the BLE connection already dropped when connectNetwork was sent", `ControllerCommissioningFlow.ts:2050` at `b25ed960`), and neither does one whose device completed PASE while the commissioner never saw its last message. Who sees it: a device a `Pair` gave up on, which accepts the next one at once and not after its fail-safe; a caller, whose failed `Pair` returns after the disarm's exchange. Pinned by `controller/commissioner:TestCommissionGivenUpBeforeTheFlowFreesThePASESession`, `TestEstablishPASERefusedAfterPASEFreesThePASESession`, `TestPASESessionThatLostTheRaceIsFreed`, `TestFlowDisarmAfterFailureIsBoundedByTheCaller` and `TestConnectionLosingDisarmRunsBesideTheNextAddress`, `TestCommissioningFailsafeExpiry` with its subtest "ahead of matter.js: ends the PASE session's fail-safe before the flow armed" and `TestFailsafeExpirySkipCancelsTheRearmInFlight`, and `controller:TestPairThatGivesUpLeavesNoPASESession`.
-
-**A step after the commissioning channel's loss (pin lift b25ed960, unit P3-D, coordinator decision C-12, 390).** A flow step that starts on the PASE session after its commissioning channel was lost fails with `exchange.ErrSessionClosed` plus the channel's `ClosedCause` (`flow.channelLoss`, `controller/commissioner/flow.go`), so the network steps read it as a channel drop (`isChannelDrop`) and the expiry is skipped as for a device that stopped responding. matter.js attaches the BLE cause to the exchanges pending at the force-close (`packages/protocol/src/peer/ControllerCommissioner.ts:523-558` at `b25ed960`, `#closeOnBleLoss`); what it reports for an exchange started after the close was not established (Fable post-read of P3-D, F1; unverified). This is the module's addition; it has no security effect, because over a closed channel the expiry could not be delivered either way.
+**A step after the commissioning channel's loss (pin lift b25ed960, unit P3-D, coordinator decision C-12, 390; moved here from `BD-chip-Commissioner-AbortDisarmsFailSafe` when it closed).** A flow step that starts on the PASE session after its commissioning channel was lost fails with `exchange.ErrSessionClosed` plus the channel's `ClosedCause` (`flow.channelLoss`, `controller/commissioner/flow.go`), so the network steps read it as a channel drop (`isChannelDrop`) and the expiry is skipped as for a device that stopped responding. matter.js attaches the BLE cause to the exchanges pending at the force-close (`packages/protocol/src/peer/ControllerCommissioner.ts:523-558` at `b25ed960`, `#closeOnBleLoss`); what it reports for an exchange started after the close was not established (Fable post-read of P3-D, F1; unverified). This is the module's addition; it has no security effect, because over a closed channel the expiry could not be delivered either way.
 
 ### BD-chip-HandshakeSecretsOverwritten — handshake key material is overwritten once it has served or the handshake has failed
 

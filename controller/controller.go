@@ -1140,9 +1140,10 @@ type PairOptions struct {
 	// independently of the search's bound: a ctx without a deadline keeps
 	// [DefaultPairTimeout] on the search and this on what follows it. A
 	// commissioning that outlasts it is given up as a caller's
-	// cancellation is — the fail-safe disarmed within
-	// commissioner.FailSafeMaxSendTime — and ends with an error that is
-	// context.DeadlineExceeded.
+	// cancellation is — the fail-safe's expiry waited for at most 2 s
+	// (matter.js CANCELED_EXPIRY_WAIT) — and ends with an error that is
+	// context.DeadlineExceeded; once CommissioningComplete was sent it no
+	// longer ends the commissioning (matter.js's commit cut-off).
 	// Zero (or less) sets none, as matter.js's commissionNode sets no
 	// overall deadline (CommissioningController.ts:465-511 at db021da0);
 	// ctx, the commissioner's own budgets and the fail-safe still apply

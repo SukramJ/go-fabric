@@ -7,4 +7,3 @@
 # not ride across another lift. The closing unit removes its line together
 # with the row.
 BD-chip-Thermostat-Schedules db91886c P1-F # #5044 released MatterScheduleConfiguration; the forward gate is gone
-BD-chip-Commissioner-AbortDisarmsFailSafe db91886c P1-D # #5049: cancel after PASE and the disarm are matter.js's
