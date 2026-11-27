@@ -188,7 +188,7 @@ var serverRelaxations = []struct {
 		// the server's $AtomicChanging reactor judges it
 		// (#validatePresetWriteRequest, ThermostatServer.ts:1367-1375:
 		// RESOURCE_EXHAUSTED over NumberOfPresets), so the list's count is
-		// the server's — as Schedules' is (BD-chip-Thermostat-Schedules).
+		// the server's — as Schedules' is (schedules_write.go).
 		{kind: relaxAttribute, key: "Thermostat.Presets", ref: thermostatAtomic},
 		{kind: relaxAttribute, key: "Thermostat.Schedules", ref: thermostatAtomic},
 	}},

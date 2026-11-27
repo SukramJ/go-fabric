@@ -2,15 +2,15 @@
 // Copyright (C) 2026 SukramJ.
 
 // A port of matter.js packages/node/test/behavior/cluster/ClusterBehaviorFeaturesTest.ts
-// at 862ad75f, its "published behaviors" cases (:121-200) on the device
+// at db91886c, its "published behaviors" cases (:194-308) on the device
 // kit: which features a cluster's default server serves, which elements a
 // selection leaves out, and that a selection breaking the FeatureMap
 // conformance is refused when the device is built. The with()/for()/
-// alter()/enable() cases (:47-119) are TypeScript's behavior-type algebra,
+// alter()/enable() cases (:92-192) are TypeScript's behavior-type algebra,
 // which the Go kit expresses as a declaration's Features. "Enable only
-// features matter.js implements unconditionally" (:201-232) is ported as
+// features matter.js implements unconditionally" (:310-340) is ported as
 // two tests: node's TestIntentionallyEnabledFeaturesParityMatterJS holds
-// the nine INTENTIONALLY_ENABLED rows (:27-37) against the default
+// the nine INTENTIONALLY_ENABLED rows (:28-38) against the default
 // servers, and the device package's TestBareDevicesServeTheDefaultSelection
 // holds every generated type built bare to its default selection.
 package device_test
@@ -26,6 +26,7 @@ import (
 	powersourcedef "thingfabric.dev/go-fabric/cluster/spec/powersource"
 	thermostatdef "thingfabric.dev/go-fabric/cluster/spec/thermostat"
 	"thingfabric.dev/go-fabric/device"
+	"thingfabric.dev/go-fabric/surface"
 )
 
 func TestClusterBehaviorFeaturesParityMatterJS(t *testing.T) {
@@ -33,8 +34,8 @@ func TestClusterBehaviorFeaturesParityMatterJS(t *testing.T) {
 	opts := func(key string) device.Options { return device.Options{StableKey: device.StringKey(key), Name: key} }
 
 	// "LevelControl enables nothing, though the spec assigns OnOff a
-	// fallback of 1" (:122-128) and "do not serve Lighting elements on an
-	// endpoint" (:159-172): a Speaker's LevelControl — a type that selects
+	// fallback of 1" (:195-201) and "do not serve Lighting elements on an
+	// endpoint" (:235-248): a Speaker's LevelControl — a type that selects
 	// no LevelControl feature — serves CurrentLevel and none of the
 	// Lighting attributes.
 	t.Run("LevelControl selects nothing and serves no Lighting element", func(t *testing.T) {
@@ -59,7 +60,7 @@ func TestClusterBehaviorFeaturesParityMatterJS(t *testing.T) {
 	})
 
 	// "are rejected on an endpoint when the selection violates FeatureMap
-	// conformance" (:174-198): PowerSource needs one of Wired or Battery and
+	// conformance" (:250-275): PowerSource needs one of Wired or Battery and
 	// takes not both; Wired alone builds.
 	t.Run("a selection breaking the FeatureMap conformance is refused", func(t *testing.T) {
 		t.Parallel()
@@ -80,8 +81,8 @@ func TestClusterBehaviorFeaturesParityMatterJS(t *testing.T) {
 	})
 
 	// "enable only features matter.js implements unconditionally"
-	// (:201-232) with its INTENTIONALLY_ENABLED table (:27-37):
-	// BooleanStateServer enables ChangeEvent (:29;
+	// (:310-340) with its INTENTIONALLY_ENABLED table (:28-38):
+	// BooleanStateServer enables ChangeEvent (:30;
 	// packages/node/src/behaviors/boolean-state/BooleanStateServer.ts:11-13
 	// at db021da0), so a device that declares nothing about BooleanState
 	// serves the feature and lists StateChange.
@@ -103,7 +104,7 @@ func TestClusterBehaviorFeaturesParityMatterJS(t *testing.T) {
 	})
 
 	// "publish nothing of what their base implementation enables"
-	// (:130-153): a Thermostat device selects only what its device type
+	// (:203-229): a Thermostat device selects only what its device type
 	// mandates — Heating or Cooling is the type's choice, not all of the
 	// base server's AutoMode, Occupancy and Presets.
 	t.Run("a default selects no base-implementation feature", func(t *testing.T) {
@@ -115,6 +116,45 @@ func TestClusterBehaviorFeaturesParityMatterJS(t *testing.T) {
 		fm, _ := d.Thermostat().Underlying().MatterRead(spec.AttrFeatureMap)
 		if fm != uint32(thermostatdef.FeatureHeating) {
 			t.Errorf("FeatureMap %v, want Heating alone: the kit adds none of the base server's features", fm)
+		}
+	})
+
+	// "drops the default the schema selected" (:123-126, #5057):
+	// ThermostatRunningMode ("TEVT & AUTO, [AUTO]") is served, Off, with
+	// AutoMode and Events; with AutoMode alone it is optional and not
+	// served — a Go selection has no derivation chain, so no default of a
+	// wider selection can carry over.
+	t.Run("ThermostatRunningMode is served with AutoMode and Events only", func(t *testing.T) {
+		t.Parallel()
+		base := thermostatdef.FeatureHeating | thermostatdef.FeatureCooling | thermostatdef.FeatureAutoMode
+		for _, tc := range []struct {
+			name     string
+			features thermostatdef.Feature
+			served   bool
+		}{
+			{"AutoMode and Events", base | thermostatdef.FeatureEvents, true},
+			{"AutoMode without Events", base, false},
+		} {
+			p := surface.Policies{Extensions: surface.NewExtensions("BD-chip-Thermostat-Events")}
+			o := opts("thermo")
+			o.Surface = p
+			d, err := device.NewThermostat(o, thermostatdef.Declare{Features: tc.features})
+			if err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+			srv := d.Thermostat().Underlying()
+			lister, ok := srv.(interface{ MatterAttributes() []uint32 })
+			if !ok {
+				t.Fatalf("%s: the server lists no attributes", tc.name)
+			}
+			listed := slices.Contains(lister.MatterAttributes(), thermostatdef.AttrThermostatRunningMode)
+			v, held := srv.MatterRead(thermostatdef.AttrThermostatRunningMode)
+			switch {
+			case listed != tc.served || held != tc.served:
+				t.Errorf("%s: ThermostatRunningMode listed %v, read %v; want served %v", tc.name, listed, held, tc.served)
+			case tc.served && v != uint8(thermostatdef.ThermostatRunningModeOff):
+				t.Errorf("%s: ThermostatRunningMode %v, want Off", tc.name, v)
+			}
 		}
 	})
 }

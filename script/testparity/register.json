@@ -2279,7 +2279,7 @@
         "retain features enabled as a matter.js implementation decision",
         "enable only features matter.js implements unconditionally"
       ],
-      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes.",
+      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Pin lift db91886c (P1-F, #5057): \"drops the default the schema selected\" is ported (device:TestClusterBehaviorFeaturesParityMatterJS, ThermostatRunningMode served Off with AutoMode and Events, not served with AutoMode alone). Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes.",
       "snapshotSha": "963e5672f0f7fe9e6371f0f78c83abd96d549499"
     },
     {
