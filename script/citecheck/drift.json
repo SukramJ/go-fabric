@@ -1197,21 +1197,12 @@
   },
   {
     "file": "cluster/camera/requestor.go",
-    "line": 261,
+    "line": 380,
     "citation": "packages/node/src/behavior/state/managed/values/ListManager.ts:461-478",
     "resolved": "packages/node/src/behavior/state/managed/values/ListManager.ts",
     "identifier": "createProxy",
     "nearest": 608,
     "occurrences": 2
-  },
-  {
-    "file": "cluster/camera/requestor_parity_matterjs_test.go",
-    "line": 35,
-    "citation": "WebRtcTransportRequestorServerTest.ts:66-78",
-    "resolved": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
-    "identifier": "makeSession",
-    "nearest": 99,
-    "occurrences": 32
   },
   {
     "file": "cluster/closure/closurecontrol_payload_shapes_test.go",
