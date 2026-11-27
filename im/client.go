@@ -154,8 +154,9 @@ const FalseRequestFlagsOmittedFromRevision = 14
 // given. Every client sender of an Invoke or Write takes its
 // [RequestEncoding] from here — client/interaction for unicast, groups for
 // group requests — the Write before it is chunked, so chunk sizes and sent
-// bytes agree. One sender does not yet: the OTA requestor's QueryImage in
-// bridge/ota_provider_link.go writes the zero encoding, equal on the wire
+// bytes agree. One sender does not yet: the OTA requestor's invokes
+// (bridge.PeerSession.Invoke, bridge/ota_provider_link.go) write the zero
+// encoding, equal on the wire
 // while this module's revision is below 14, and must take the rule when
 // the revision is raised (TestRequestFlagsForSendingParityMatterJS fails
 // then). Mirrors matter.js InteractionClientMessenger.requestFlagsForSending

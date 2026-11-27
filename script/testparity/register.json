@@ -11056,14 +11056,11 @@
     },
     {
       "path": "packages/types/test/protocol/TlvInvokeRequestTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
+        "im:TestInvokeClientRequestOptionsParityMatterJS",
         "im:TestTlvInvokeRequestParityMatterJS",
         "node:TestDelayReportDataParity"
-      ],
-      "missing": [
-        "encodes DelayReportDataIB with context tags 0 and 1",
-        "round-trips DelayReportData in context tag 3"
       ],
       "left": [
         {
@@ -11072,7 +11069,7 @@
           "reason": "a second TLV schema object without the field; the module's one InvokeRequest decoder reads tag 3 and skips other unknown context tags"
         }
       ],
-      "reason": "The CHIP SDK's group invoke without SuppressResponse and TimedRequest decodes with both false (pin lift db91886c, #5047), and the decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. The encode half — tag 3 with both fields, the bytes asserted — is im:TestInvokeClientRequestOptionsParityMatterJS (im/invoke_client.go writes tag 3), not yet an entry of this file's go tests; the two encode cases stay listed as missing until it is.",
+      "reason": "The CHIP SDK's group invoke without SuppressResponse and TimedRequest decodes with both false (pin lift db91886c, #5047), and the decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. The encode half is im:TestInvokeClientRequestOptionsParityMatterJS: tag 3 with both fields from the client encoder, decoded back, and matter.js's two literals — 35032500e8032501e80318 for {1000, 1000} (:55) and the IB of :38 for {200, 500} inside tag 3 (35032400c82501f40118); the IB alone has no Go encoder, the module writes it only as tag 3.",
       "snapshotSha": "1ee2a8f6ade2c5664c1d6ea3223bd473e3a5b821"
     },
     {

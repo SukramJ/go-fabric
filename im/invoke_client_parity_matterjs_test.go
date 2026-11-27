@@ -6,6 +6,7 @@ package im
 import (
 	"bytes"
 	"encoding/hex"
+	"strings"
 	"testing"
 
 	"thingfabric.dev/go-fabric/tlv"
@@ -154,6 +155,23 @@ func TestInvokeClientRequestOptionsParityMatterJS(t *testing.T) {
 		}
 		if back.InteractionModelRevision != c.revision || (c.drd == nil) != (back.DelayReportData == nil) || (c.drd != nil && *back.DelayReportData != *c.drd) {
 			t.Fatalf("%s: decoded %+v", c.name, back)
+		}
+	}
+	// matter.js's literals: :55 "round-trips DelayReportData in context tag
+	// 3" (35032500e8032501e80318 for {1000, 1000}) and :38 "encodes
+	// DelayReportDataIB with context tags 0 and 1" (152400c82501f40118 for
+	// {200, 500}, here inside tag 3, so with its control byte 0x35 0x03 in
+	// place of the anonymous 0x15) — TlvInvokeRequestTest.ts at db91886c.
+	for _, c := range []struct {
+		drd DelayReportData
+		hex string
+	}{
+		{DelayReportData{DelayMinMs: 1000, DelayJitterWindowMs: 1000}, "35032500e8032501e80318"},
+		{DelayReportData{DelayMinMs: 200, DelayJitterWindowMs: 500}, "35032400c82501f40118"},
+	} {
+		got := hex.EncodeToString(encode(InvokeRequest{DelayReportData: &c.drd}))
+		if !strings.Contains(got, c.hex) {
+			t.Fatalf("%+v: %s does not contain matter.js's %s", c.drd, got, c.hex)
 		}
 	}
 }
