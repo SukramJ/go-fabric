@@ -4,7 +4,7 @@
 package commissioner
 
 // A port of matter.js packages/node/test/node/CommissioningFailsafeExpiryTest.ts
-// at b25ed960 (#4928): which commissioning step failures end the device's
+// at db91886c (#4928, #5049): which commissioning step failures end the device's
 // fail-safe — ArmFailSafe with ExpiryLengthSeconds 0 — and which leave it
 // to expire. matter.js runs a whole commissioning against a mock device
 // and replaces the steps from the failing one on (:62-79); here the flow
@@ -13,11 +13,6 @@ package commissioner
 // The device's "armed after the failure" is the flow's own end time and
 // the expiries the device saw; "failed after 0 ms" of mock time is a flow
 // that returns with the fake clock standing.
-//
-// "sends no expiry before the commissioner armed the failsafe" (:182-189)
-// is not ported: this module disarms the fail-safe the PASE session armed
-// as well (BD-chip-Commissioner-AbortDisarmsFailSafe, "Every exit after
-// PASE"), pinned by TestFlowDisarmsFailsafeStartedNotAnswered.
 
 import (
 	"context"
@@ -186,11 +181,10 @@ func TestCommissioningFailsafeExpiry(t *testing.T) {
 		leftArmed(t, dev)
 	})
 
-	// The inverse of "sends no expiry before the commissioner armed the
-	// failsafe" (:182-189), which is not ported: the device armed its
-	// fail-safe when the PASE session was established, and the flow ends it
-	// (BD-chip-Commissioner-AbortDisarmsFailSafe, Every exit after PASE).
-	t.Run("ahead of matter.js: ends the PASE session's fail-safe before the flow armed", func(t *testing.T) {
+	// The device armed its fail-safe when the PASE session was established
+	// (#failSafeMayBeArmed, ControllerCommissioningFlow.ts:354-355 at
+	// db91886c), and the flow ends it.
+	t.Run("ends the failsafe the device armed at PASE before the commissioner armed it", func(t *testing.T) {
 		t.Parallel()
 		dev := &failsafeDevice{info: expiryInfo}
 		f, _ := newTestFlow(t, dev.handle)
@@ -239,6 +233,27 @@ func TestCommissioningFailsafeExpiry(t *testing.T) {
 		if !f.failSafeEnd.IsZero() || f.failsafeMayBeArmed() {
 			t.Fatal("the flow still counts the fail-safe after the device ended it")
 		}
+	})
+
+	t.Run("sends no expiry when a step fails after CommissioningComplete succeeded", func(t *testing.T) {
+		t.Parallel()
+		boom := errors.New("Simulated failure after CommissioningComplete (test)")
+		pase := &failsafeDevice{info: expiryInfo}
+		f, _ := newTestFlow(t, func(req imRequest) (uint8, []byte, bool) {
+			if isCommand(gencomm.CmdCommissioningComplete)(req) {
+				path, _, _ := decodeInvoke(req.payload)
+				path.Command = gencomm.CmdCommissioningCompleteResponse
+				return im.OpcodeInvokeResponse, invokeResponseOf(path, gencomm.CommissioningCompleteResponse{}), true
+			}
+			return pase.handle(req)
+		})
+		// #failSafeMayBeArmed is cleared once CommissioningComplete
+		// succeeded (:2193).
+		f.steps = []step{arm(f), {20, 1, "GeneralCommissioning.Complete", f.completeCommissioning}, failing(98, boom)}
+		if err := executeStanding(t, f); err != boom { //nolint:errorlint // returned as is
+			t.Fatalf("error %v, want the step's error as it is", err)
+		}
+		leftArmed(t, pase)
 	})
 
 	t.Run("does not reconnect to end the failsafe after the operational session closed", func(t *testing.T) {

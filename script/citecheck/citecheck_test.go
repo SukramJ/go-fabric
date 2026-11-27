@@ -277,6 +277,8 @@ const citecheckDriftRatchet = 416
 // TlvInvokeRequest/TlvWriteRequest cites re-read and relabelled at db91886c.
 // 3352 after phase 9 P1-B: client/interaction's report-interruption and
 // readDataReports cites re-read and relabelled at db91886c.
+// P1-D (#5049): the commissioner's cancel and expiry comments re-cited at
+// db91886c, older b25ed960/db021da0 citations rewritten: 3355.
 const citecheckOffPinRatchet = 0 // MEASURE
 
 // offPinRowRE reads the off-pin row of summary.md.

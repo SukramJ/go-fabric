@@ -253,6 +253,7 @@ const testparityPlannedRatchet = 3
 // 1007 missing.
 // Pin lift db91886c P1-A ports the new TlvWriteRequestTest.ts (#5047): 180
 // ported.
+// Pin lift db91886c, P1-D: CommissioningCancelTest.ts (new) ported: 180 ported.
 const (
 	testparityPortedRatchet  = 0 // MEASURE
 	testparityMissingRatchet = 0 // MEASURE
@@ -368,7 +369,10 @@ const (
 // Pin lift db91886c, P1-F: SchedulesConfigurationTest.ts's "refuses to start"
 // (by design, the retired extension) left with the case matter.js deleted
 // (#5044): -1.
-const testparityLeftRatchet = 772
+// Pin lift db91886c, P1-D: CommissioningFailsafeExpiryTest.ts's expiry
+// before the flow armed leaves (matter.js caught up, #5049) and
+// DiscoveryCancelTest.ts's settled read joins (js-runtime-only, #5051): 773.
+const testparityLeftRatchet = 0 // MEASURE
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

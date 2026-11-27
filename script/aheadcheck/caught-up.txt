@@ -6,4 +6,3 @@
 # pin; a line whose sha is not the current pin's is a finding, so a row may
 # not ride across another lift. The closing unit removes its line together
 # with the row.
-BD-chip-Commissioner-AbortDisarmsFailSafe db91886c P1-D # #5049: cancel after PASE and the disarm are matter.js's

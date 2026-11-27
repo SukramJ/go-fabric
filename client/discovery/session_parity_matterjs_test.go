@@ -11,12 +11,15 @@ package discovery_test
 // scans until the discovery stops (FixedScanner), one that fails on demand
 // (FailingScanner) and a race whose attempts the test supplies
 // (TestDiscovery). The attempts block on channels instead of MockTime; the
-// discovery's timeout and stagger run on a fake clock.
+// discovery's timeout and stagger run on a fake clock. DiscoveryCancelTest.ts
+// re-read at db91886c (#5049): the cases "after the result" (:276-416) —
+// two renamed, two added — are its cases there.
 
 import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -307,13 +310,15 @@ func TestDiscoveryCancelParity(t *testing.T) {
 			}
 		})
 	})
-	t.Run("resolves with the winner when the cancel comes right after the PASE win", func(t *testing.T) {
+	t.Run("resolves with the winner when its operation completes despite a cancel after the PASE win", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			clk := newClock()
 			var r *testRace
 			ready := make(chan struct{})
-			r = race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, win func() bool, i int) error {
+			logged := &logBuffer{}
+			opts := discovery.SessionOptions{Timeout: 30 * time.Second, Logger: slog.New(slog.NewTextHandler(logged, nil))}
+			r = race(context.Background(), clk, opts, func(ctx context.Context, win func() bool, i int) error {
 				<-ready
 				return winner(func() { r.session.Cancel(reason) }, nil)(ctx, win, i)
 			}, newFixed(deviceA))
@@ -321,9 +326,13 @@ func TestDiscoveryCancelParity(t *testing.T) {
 			if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
 				t.Fatalf("%+v, %v; want the winner", c, err)
 			}
+			// "passes the cancel to the candidate that won PASE", at info.
+			if l := logged.String(); !strings.Contains(l, "level=INFO msg=matter.controller.discovery.cancel_to_winner") {
+				t.Fatalf("the cancel handed to the winner is not logged: %q", l)
+			}
 		})
 	})
-	t.Run("resolves with the winner when the cancel comes while the winner commissions", func(t *testing.T) {
+	t.Run("resolves with the winner when its operation completes despite a cancel while it commissions", func(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			clk := newClock()
@@ -334,6 +343,61 @@ func TestDiscoveryCancelParity(t *testing.T) {
 			close(commissioned)
 			if c, err := outcome(t, r.session, clk); err != nil || c.Device.InstanceID != "device-a" {
 				t.Fatalf("%+v, %v; want the winner", c, err)
+			}
+		})
+	})
+	t.Run("rejects with the cancel reason when the winner's operation stops on the cancel", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			won := make(chan struct{})
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, win func() bool, _ int) error {
+				if !win() {
+					return errors.New("lost")
+				}
+				close(won)
+				<-ctx.Done()
+				return context.Cause(ctx)
+			}, newFixed(deviceA))
+			recv(t, won)
+			r.session.Cancel(reason)
+			if _, err := outcome(t, r.session, clk); err != reason { //nolint:errorlint // the reason itself
+				t.Fatalf("err %v, want the cancel reason", err)
+			}
+		})
+	})
+	t.Run("aborts the losers but not the winner when the race is decided", func(t *testing.T) {
+		t.Parallel()
+		synctest.Test(t, func(t *testing.T) {
+			clk := newClock()
+			var started atomic.Int32
+			var ended [2]atomic.Bool
+			r := race(context.Background(), clk, discovery.SessionOptions{Timeout: 30 * time.Second}, func(ctx context.Context, win func() bool, i int) error {
+				started.Add(1)
+				if i == 0 {
+					// Wins after the second attempt started, and commissions
+					// until the loser has ended.
+					for started.Load() < 2 {
+						time.Sleep(time.Millisecond)
+					}
+					if !win() {
+						return errors.New("lost")
+					}
+					for !ended[1].Load() {
+						time.Sleep(time.Millisecond)
+					}
+					ended[0].Store(ctx.Err() != nil)
+					return nil
+				}
+				<-ctx.Done()
+				ended[1].Store(true)
+				return ctx.Err()
+			}, newFixed(deviceA, deviceB))
+			if _, err := outcome(t, r.session, clk); err != nil {
+				t.Fatal(err)
+			}
+			if started.Load() != 2 || ended[0].Load() || !ended[1].Load() {
+				t.Fatalf("%d started, the winner's context ended %v, the loser's %v; want 2, false, true", started.Load(), ended[0].Load(), ended[1].Load())
 			}
 		})
 	})
@@ -991,4 +1055,23 @@ func TestSessionReleasesTheCallerBeforeTheOutcome(t *testing.T) {
 			}
 		}
 	})
+}
+
+// logBuffer is a log sink the discovery's goroutines may write beside
+// each other.
+type logBuffer struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (l *logBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *logBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
 }

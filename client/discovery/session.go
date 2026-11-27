@@ -180,13 +180,22 @@ type kind[T any] interface {
 	onStop(s *Session[T])
 }
 
+// cancelKind is a kind that takes a cancel itself instead of having it
+// interrupt the discovery — matter.js's onCancel override (Discovery.ts:198-200
+// at db91886c is the default, the interruption): onCancel reports whether
+// it took it.
+type cancelKind[T any] interface {
+	onCancel(s *Session[T], reason error) bool
+}
+
 // Session is one running discovery — matter.js Discovery, a cancelable
 // promise (Discovery.ts:37-483). [Session.Stop] ends the search with the
 // result it has, [Session.Cancel] or the end of the context it was started
 // under interrupt it with a reason, as does the failure of every
 // transport; the failure of only some is logged. An interruption after the
 // discovery has its result (a race's winner, an instance's node) is
-// ignored. [Session.Wait] returns the outcome once the discovery wound
+// ignored — except a race's cancel, which goes to the winner's attempt.
+// [Session.Wait] returns the outcome once the discovery wound
 // down — after every preparation and attempt finished.
 type Session[T any] struct {
 	kind   kind[T]
@@ -286,10 +295,16 @@ func (s *Session[T]) Stop() {
 
 // Cancel interrupts the discovery with reason (nil is context.Canceled):
 // the search stops and the outcome is reason, unless the discovery
-// already has its result. The first reason stays (:205-217).
+// already has its result. The first reason stays (:205-217). In a race
+// ([CommissioningRace], [PASERace]) whose candidate has won PASE, the
+// cancel ends the winner's attempt context with reason instead, and the
+// winner's outcome decides (raceKind.onCancel).
 func (s *Session[T]) Cancel(reason error) {
 	if reason == nil {
 		reason = context.Canceled
+	}
+	if c, ok := s.kind.(cancelKind[T]); ok && c.onCancel(s, reason) {
+		return
 	}
 	s.interrupt(reason)
 }
