@@ -145,6 +145,11 @@ type attempt struct {
 	// exchange is the CASE exchange of the current try, which the kick
 	// reads.
 	exchange atomic.Pointer[exchange.Exchange]
+	// busyUntil is the deadline of the last Busy this attempt received —
+	// the raw minimum wait the peer asked for (holdBusyAt), never moved
+	// earlier; zero when none holds. Only the attempt's own goroutine
+	// (connection.connect) reads and writes it.
+	busyUntil time.Time
 }
 
 // connection is one run of the connection process of a peer — matter.js
@@ -1451,6 +1456,15 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 	if err != nil || addr == nil {
 		return err
 	}
+	// A Busy at another address may have arrived while the socket opened
+	// (matter.js PeerConnection.ts:579-580 at db91886c); in Go only a TCP
+	// dial blocks here.
+	if !c.waitOutBusy(att) {
+		if ch != nil {
+			_ = ch.Close()
+		}
+		return nil
+	}
 	s, _, err := handshake.CASE(local, p.set.ctx.Exchanges, addr, fabric, p.address.NodeID, opts)
 	if err == nil && att.tcp && p.tcpDenied(s.ReportedParameters()) {
 		// The session-parameter validation of a TCP attempt
@@ -1469,27 +1483,73 @@ func (c *connection) attemptOnce(att *attempt, schedule *initialContactSchedule,
 		// :640-650).
 		_ = ch.Close()
 	}
+	c.holdBusyAt(att, err)
 	if local.Err() != nil {
 		return nil
 	}
 	return c.afterFailure(att, a, err)
 }
 
-// waitOutBusy holds the attempt's next Sigma1 until the peer's Busy
-// deadline passed (Peer.busyRemaining); false when the attempt ended
-// first. The deadline may move while it waits — another address of the
-// peer answered Busy again — so it looks again after each wait.
+// holdBusyAt records a Busy answer's minimum wait before anything else
+// looks at the failure — the schedule (afterFailure) and the error handler
+// (handleConnectionError): the raw delay the peer asked for, without the
+// jitter and whatever the handler returns, so no handler delay shortens
+// it. Mirrors matter.js holdNewSigma1WhilePeerBusy
+// (packages/protocol/src/peer/PeerConnection.ts:536-545 at db91886c),
+// called in attemptOnce's catch before attempt.fail (:683, :686).
+//
+// The attempt that received it is held at every address (att.busyUntil,
+// waitOutBusy); every attempt of the peer only when it came from the
+// address a session proved to be the node's (Peer.provenAddress,
+// Peer.holdBusy). matter.js holds the connection process for a Busy from
+// any address (notes/parity/by_design.md, BD-Matter-PeerBusyDeadline).
+func (c *connection) holdBusyAt(att *attempt, err error) {
+	busy, ok := busyDelayOf(err)
+	if !ok || busy <= 0 {
+		return
+	}
+	if until := c.p.set.clock.Now().Add(busy); until.After(att.busyUntil) {
+		att.busyUntil = until
+	}
+	if c.p.provenAddress(att.addr) {
+		c.p.holdBusy(busy)
+	}
+}
+
+// waitOutBusy holds the attempt's next Sigma1 until the Busy deadlines
+// that hold it passed — the peer's (Peer.busyRemaining) and the attempt's
+// own (attempt.busyUntil) — plus a jitter of up to DelayAfterNetworkError,
+// drawn once per call, so the waiting attempts do not all send Sigma1 at
+// the same moment; false when the attempt ended first. A deadline may move
+// while it waits — the peer answered Busy again — so it looks again after
+// each wait and adds the same jitter. Mirrors matter.js waitWhilePeerBusy
+// (packages/protocol/src/peer/PeerConnection.ts:523-534 at db91886c),
+// called before the attempt begins (:558) and again once its socket is
+// open (:580).
 func (c *connection) waitOutBusy(att *attempt) bool {
+	jitter := time.Duration(-1)
 	for {
 		d := c.p.busyRemaining()
+		if !att.busyUntil.IsZero() {
+			d = max(d, att.busyUntil.Sub(c.p.set.clock.Now()))
+		}
 		if d <= 0 {
 			return true
 		}
-		c.p.log.Debug("matter.controller.peer.busy_wait", slog.String("address", att.addr.String()), slog.Duration("delay", d))
-		if !c.sleep(att.ctx, d, nil) {
+		if jitter < 0 {
+			jitter = jitterOf(c.timing, c.p.set.rand)
+		}
+		c.p.log.Debug("matter.controller.peer.busy_wait", slog.String("address", att.addr.String()), slog.Duration("delay", d+jitter))
+		if !c.sleep(att.ctx, d+jitter, nil) {
 			return false
 		}
 	}
+}
+
+// jitterOf is Math.round(Math.random() * delayAfterNetworkError) in
+// milliseconds (PeerConnection.ts:530, :749 at db91886c).
+func jitterOf(timing Timing, rand func() float64) time.Duration {
+	return time.Duration(math.Round(rand()*float64(timing.DelayAfterNetworkError.Milliseconds()))) * time.Millisecond
 }
 
 // adopt takes the session the attempt established and ends the process.
@@ -1607,9 +1667,8 @@ func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 
 // handleConnectionError picks the pause after a failed attempt and sleeps
 // it (PeerConnection.ts:653-752): a Busy status
-// waits the peer's delay plus up to DelayAfterNetworkError of jitter — and,
-// received at the peer's proven address (Peer.provenAddress), holds
-// every attempt of the peer for as long (Peer.holdBusy); a
+// waits the peer's delay plus up to DelayAfterNetworkError of jitter (the
+// minimum wait it holds was recorded before, holdBusyAt); a
 // NoSharedTrustRoots status whose resumption record could be deleted
 // retries at once; any other status waits DelayAfterPeerError; a transient
 // error DelayAfterNetworkError; anything else DelayAfterUnhandledError. A
@@ -1653,13 +1712,6 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 		if replace {
 			delay = d
 		}
-	}
-	if category == "busy" && p.provenAddress(att.addr) {
-		// The final delay, the error handler's replacement included. A
-		// Busy from an address no session proved to be the node's holds
-		// only the attempt that received it, which waits it out below as
-		// matter.js does (review II, R2-P1-net-05).
-		p.holdBusy(delay)
 	}
 	switch category {
 	case "busy":
@@ -1731,12 +1783,11 @@ func classifyError(err error, timing Timing, rand func() float64, deleteRecord f
 	case errors.As(err, &sre):
 		r := sre.Report
 		switch {
-		case r.GeneralCode == generalStatusBusy && r.ProtocolCode == secureChannelStatusBusy && len(r.ProtocolData) == 2:
-			// busyDelay (SecureChannelMessenger.ts:44-50) plus
-			// Math.round(Math.random() * delayAfterNetworkError) (:679).
-			busy := time.Duration(binary.LittleEndian.Uint16(r.ProtocolData)) * time.Millisecond
-			jitter := time.Duration(math.Round(rand()*float64(timing.DelayAfterNetworkError.Milliseconds()))) * time.Millisecond
-			return busy + jitter, true, "busy"
+		case isBusy(r):
+			// busyDelay plus Math.round(Math.random() *
+			// delayAfterNetworkError) (PeerConnection.ts:749 at db91886c).
+			busy, _ := busyDelayOf(err)
+			return busy + jitterOf(timing, rand), true, "busy"
 		case r.ProtocolCode == mrp.SCStatusProtocolNoSharedTrustRoots && deleteRecord():
 			return 0, false, "resumption"
 		default:
@@ -1747,6 +1798,24 @@ func classifyError(err error, timing Timing, rand func() float64, deleteRecord f
 	default:
 		return timing.DelayAfterUnhandledError, true, "general"
 	}
+}
+
+// isBusy reports whether r is a Busy status report carrying the peer's
+// minimum wait.
+func isBusy(r exchange.StatusReport) bool {
+	return r.GeneralCode == generalStatusBusy && r.ProtocolCode == secureChannelStatusBusy && len(r.ProtocolData) == 2
+}
+
+// busyDelayOf is the minimum wait a Busy status report asks for — matter.js
+// busyDelay, the report's 2-byte little-endian protocol data in
+// milliseconds (packages/protocol/src/securechannel/SecureChannelMessenger.ts:44-50
+// at db91886c); false for any other error.
+func busyDelayOf(err error) (time.Duration, bool) {
+	var sre *exchange.StatusReportError
+	if !errors.As(err, &sre) || !isBusy(sre.Report) {
+		return 0, false
+	}
+	return time.Duration(binary.LittleEndian.Uint16(sre.Report.ProtocolData)) * time.Millisecond, true
 }
 
 // deleteResumptionRecord forgets the peer's resumption record and reports

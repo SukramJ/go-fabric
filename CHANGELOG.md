@@ -12,6 +12,7 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `client/peer`: a Busy answer holds the node for the minimum wait it asked for, as matter.js does since #5050: the deadline is the raw Busy delay, recorded before the error handler runs, so a shorter delay from `HandleError` no longer shortens it — also at an address no session proved, where the Busy holds the attempt that received it; every waiting attempt adds its own jitter of up to `DelayAfterNetworkError`, and a TCP attempt checks the hold again after its dial. A Busy from the proven operational address holds every address of the peer as before.
 - Dependencies: `golang.org/x/net` v0.62.0 → v0.63.0, `golang.org/x/tools` v0.52.0 → v0.53.0, `modernc.org/sqlite` v1.61.1 → v1.63.0 (with `modernc.org/libc` v1.80.1, `golang.org/x/sys` v0.50.0, `golang.org/x/sync` v0.25.0, `golang.org/x/mod` v0.43.0 and the `golang.org/x/exp` of the `apidiff` tool at `d6646c509b6d`); the nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in their `go.sum`. The pinned `golangci-lint` moves to v2.15.0 (`Makefile`, `ci.yml`); `script/ble-virtual` takes `semver` 7.8.6 (supersedes #531 and #541). No licence changes.
 
 ## [0.28.0] — 2026-11-27
