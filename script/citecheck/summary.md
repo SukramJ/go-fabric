@@ -37,12 +37,12 @@ Line citations whose sentence names a matter.js commit other than the pin are ch
 
 | Reference | Count |
 |---|---|
-| A .ts file named without a line part | 2794 |
+| A .ts file named without a line part | 2796 |
 | … whose sentence names another matter.js commit | 614 |
 | A bare line part bound to the .ts file named before it (checked; not a citation, drift or hard error of the run) | 599 |
 | … checked at another matter.js commit | 319 |
 | … with a hard error at the commit it was checked at | 3 |
-| A bare line part after a .ts citation or after no file (not checked) | 3124 |
+| A bare line part after a .ts citation or after no file (not checked) | 3126 |
 | A chip citation (a chip source in a sentence naming chip or connectedhomeip) | 1827 |
 | … naming a commit that is no matter.js commit | 883 |
 | … at a commit other than the harness commit `6170af84` (Makefile CHIP_TEST_IMAGE_COMMIT) | 6 |

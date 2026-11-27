@@ -15,8 +15,8 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | status | files |
 | --- | ---: |
-| ported | 182 |
-| partial | 156 |
+| ported | 183 |
+| partial | 155 |
 | planned | 3 |
 | excluded | 301 |
 | total | 642 |
@@ -169,7 +169,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 | [types/test/clusters](#typestestclusters) | 3 | 0 | 0 | 0 | 3 |
 | [types/test/common](#typestestcommon) | 1 | 0 | 0 | 0 | 1 |
 | [types/test/datatype](#typestestdatatype) | 4 | 0 | 0 | 0 | 4 |
-| [types/test/protocol](#typestestprotocol) | 2 | 1 | 1 | 0 | 0 |
+| [types/test/protocol](#typestestprotocol) | 2 | 2 | 0 | 0 | 0 |
 | [types/test/schema](#typestestschema) | 5 | 2 | 0 | 0 | 3 |
 | [types/test/tlv](#typestesttlv) | 13 | 8 | 3 | 0 | 2 |
 
@@ -1519,7 +1519,7 @@ names the `it` cases that will not be ported, each with its class and reason. Th
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| TlvInvokeRequestTest.ts | 96 | partial | `im:TestTlvInvokeRequestParityMatterJS`<br>`node:TestDelayReportDataParity` | The CHIP SDK's group invoke without SuppressResponse and TimedRequest decodes with both false (pin lift db91886c, #5047), and the decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. The encode half — tag 3 with both fields, the bytes asserted — is im:TestInvokeClientRequestOptionsParityMatterJS (im/invoke_client.go writes tag 3), not yet an entry of this file's go tests; the two encode cases stay listed as missing until it is. Missing: “encodes DelayReportDataIB with context tags 0 and 1”; “round-trips DelayReportData in context tag 3”. Left: “is skipped by a decoder that does not know the field” (js-runtime-only: a second TLV schema object without the field; the module's one InvokeRequest decoder reads tag 3 and skips other unknown context tags). |
+| TlvInvokeRequestTest.ts | 96 | ported | `im:TestInvokeClientRequestOptionsParityMatterJS`<br>`im:TestTlvInvokeRequestParityMatterJS`<br>`node:TestDelayReportDataParity` | The CHIP SDK's group invoke without SuppressResponse and TimedRequest decodes with both false (pin lift db91886c, #5047), and the decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. The encode half is im:TestInvokeClientRequestOptionsParityMatterJS: tag 3 with both fields from the client encoder, decoded back, and matter.js's two literals — 35032500e8032501e80318 for {1000, 1000} (:55) and the IB of :38 for {200, 500} inside tag 3 (35032400c82501f40118); the IB alone has no Go encoder, the module writes it only as tag 3. Left: “is skipped by a decoder that does not know the field” (js-runtime-only: a second TLV schema object without the field; the module's one InvokeRequest decoder reads tag 3 and skips other unknown context tags). |
 | TlvWriteRequestTest.ts | 24 | ported | `im:TestTlvWriteRequestParityMatterJS`<br>`im:TestMandatoryWriteInvokeFieldParity` | A WriteRequest that carries only WriteRequests decodes on im.UnmarshalWriteRequestTLV with SuppressResponse absent and TimedRequest false (pin lift db91886c, #5047). |
 
 ## types/test/schema

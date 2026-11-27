@@ -29464,7 +29464,7 @@
       "identifier": "TestEveryKitServerHasItsHostDecided",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 382
+      "line": 384
     },
     {
       "package": "device",
@@ -29555,7 +29555,7 @@
       "identifier": "TestHostIsTheKitServer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_methods_test.go",
-      "line": 417
+      "line": 419
     },
     {
       "package": "device",
@@ -35099,21 +35099,21 @@
       "identifier": "TestInvokeClientRequestOptionsParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_client_parity_matterjs_test.go",
-      "line": 107
+      "line": 108
     },
     {
       "package": "im",
       "identifier": "TestInvokeClientRequestParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_client_parity_matterjs_test.go",
-      "line": 17
+      "line": 18
     },
     {
       "package": "im",
       "identifier": "TestInvokeClientResponseRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_client_parity_matterjs_test.go",
-      "line": 43
+      "line": 44
     },
     {
       "package": "im",
