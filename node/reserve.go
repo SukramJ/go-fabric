@@ -673,10 +673,13 @@ func splitErasures(ops []reservationOp) (pre, erase []reservationOp) {
 //
 // again are the parked erasures among those left out ([Aggregator.leave]):
 // their forget in progress is recorded, so they are parked once more.
-func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp, calls *callErrors) (run, again []reservationOp, held []heldKey, cancel, keep []string, err error) {
+func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp, calls *callErrors) (erasurePlan, error) {
 	if len(erase) == 0 {
-		return nil, nil, nil, nil, nil, nil
+		return erasurePlan{}, nil
 	}
+	var run, again []reservationOp
+	var held []heldKey
+	var cancel, keep []string
 	forgotten := map[string]bool{}
 	fresh := map[string]bool{}
 	var errs []error
@@ -739,7 +742,16 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp,
 			keep = append(keep, k)
 		}
 	}
-	return run, again, held, cancel, keep, errors.Join(errs...)
+	return erasurePlan{run: run, again: again, held: held, cancel: cancel, keep: keep}, errors.Join(errs...)
+}
+
+// erasurePlan is what [Aggregator.servedInErasure] finds: the erasures
+// to run and to park again, the endpoints to hold back, the keys to
+// cancel and to keep.
+type erasurePlan struct {
+	run, again   []reservationOp
+	held         []heldKey
+	cancel, keep []string
 }
 
 // heldKey names an endpoint to hold back: its partition and its key.

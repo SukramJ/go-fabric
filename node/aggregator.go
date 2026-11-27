@@ -676,11 +676,12 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	}
 	erase = append(left, erase...)
 	storeErr = errors.Join(storeErr, a.applyReservations(ctx, pre, nil, &b.calls))
-	erase, again, served, cancel, keep, findErr := a.servedInErasure(ctx, erase, &b.calls)
+	plan, findErr := a.servedInErasure(ctx, erase, &b.calls)
+	erase, served, cancel, keep := plan.run, plan.held, plan.cancel, plan.keep
 	storeErr = errors.Join(storeErr, findErr)
 	// A parked erasure whose judgement could not read the store stays
 	// parked, its forget in progress still recorded (decision 726).
-	defer a.park(again)
+	defer a.park(plan.again)
 	var reErr error
 	var restore func() bool
 	switch {
@@ -796,10 +797,10 @@ func (a *Aggregator) markBehind() {
 // records of what it holds as a batch's erasure does. What fails stays
 // recorded for the next New.
 func (a *Aggregator) finishLeft(ctx context.Context, erase []reservationOp) {
-	run, again, _, cancel, keep, err := a.servedInErasure(ctx, erase, nil)
-	_ = again // recorded; the next New finishes them
-	err = errors.Join(err, a.applyReservations(ctx, run, keep, nil))
-	for _, k := range cancel {
+	// What cannot be judged (plan.again) stays recorded for the next New.
+	plan, err := a.servedInErasure(ctx, erase, nil)
+	err = errors.Join(err, a.applyReservations(ctx, plan.run, plan.keep, nil))
+	for _, k := range plan.cancel {
 		err = errors.Join(err, a.cancelForget(ctx, k))
 	}
 	if err != nil {
@@ -1199,7 +1200,7 @@ func (b *Batch) commitPending() error {
 				}
 				// An error of a call that changed the set anyway is the
 				// call's, applied (decision 728).
-				changed, isChanged := err.(changedError)
+				changed, isChanged := errors.AsType[changedError](err)
 				if isChanged {
 					err = changed.err
 				}

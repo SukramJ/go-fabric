@@ -28,7 +28,7 @@ type faultyCreds struct {
 
 var errFaulty = errors.New("store refused")
 
-func (s *faultyCreds) GetSetting(ctx context.Context, key string) (string, bool, error) {
+func (s *faultyCreds) GetSetting(ctx context.Context, key string) (value string, found bool, err error) {
 	if key == s.readKey && s.failRead.Load() {
 		return "", false, errFaulty
 	}
