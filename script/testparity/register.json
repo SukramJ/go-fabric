@@ -7378,6 +7378,11 @@
       ],
       "left": [
         {
+          "it": "opens channels again after it was closed and a listener registered again",
+          "class": "js-runtime-only",
+          "reason": "noble's central is one long-lived object whose close() sets #closed and onData clears it again (#5052, NobleBleChannel.ts:491-493 at db91886c); controller/ble's Central has no close and no closed state and ble.Dial builds a new Channel per dial, so the controller has nothing to reopen"
+        },
+        {
           "it": "retries a connect reported as failed and gives up after three attempts",
           "class": "js-runtime-only",
           "reason": "noble's connect retries, interview and abort handling in NobleBleCentralInterface.openChannel (NobleBleChannel.ts:91-517): the platform's, behind the ble.Central seam — ble/bluez and ble/esphome connect on their own stacks and carry their own tests"
@@ -7464,7 +7469,7 @@
         }
       ],
       "reason": "controller/ble/channel_parity_matterjs_test.go ports the ATT_MTU settle wait and the BTP renegotiation after a stall by meaning (phase 39): the bletest peripheral's Stall and Faults play handshakeOnlyMatterService, a synctest bubble on clocktest plays MockTime, a goroutine the parked send. The left cases are noble's connect handling, the platform's behind the ble.Central seam, and one recorded difference.",
-      "snapshotSha": "a503a1d478babcb72040f4f5dbaac2cbabef83ad"
+      "snapshotSha": "3d7bdbcae226bbd9c432df2d53311a39de1afd95"
     },
     {
       "path": "packages/nodejs-ble/test/ScanControlTest.ts",

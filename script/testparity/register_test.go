@@ -246,17 +246,14 @@ const testparityPlannedRatchet = 3
 // responder (P6-D): 179 ported, 1009 missing.
 // Review II phase 8 (#604, R2-C2-doc-2156) takes PeerAddressMonitorTest.ts's
 // four sleeping-LIT-ICD cases out of missing: 179 ported, 1005 missing.
-// Review II phase 9 unit P1-C ports the new PeerConnectionBusyTest.ts (#5050), all nine cases: +1 ported.
-// Pin lift db91886c unit P1-I: ClusterBehaviorTest.ts excluded → ported (its
-// nullable-struct default case, #5058), ClusterBehaviorFeaturesTest.ts's
-// Thermostat default case and SERVER_ONLY_DEFAULTS case missing: 180 ported,
-// 1007 missing.
-// Pin lift db91886c P1-A ports the new TlvWriteRequestTest.ts (#5047): 180
-// ported.
-// Pin lift db91886c, P1-D: CommissioningCancelTest.ts (new) ported: 180 ported.
+// Pin lift db91886c (review II phase 9) ports four files: PeerConnectionBusyTest.ts
+// (#5050, P1-C), TlvWriteRequestTest.ts (#5047, P1-A) and CommissioningCancelTest.ts
+// (#5049, P1-D), all new, and ClusterBehaviorTest.ts, excluded before (#5058, P1-I);
+// ClusterBehaviorFeaturesTest.ts's SERVER_ONLY_DEFAULTS case is missing (P1-I):
+// 183 ported, 1006 missing.
 const (
-	testparityPortedRatchet  = 0 // MEASURE
-	testparityMissingRatchet = 0 // MEASURE
+	testparityPortedRatchet  = 183
+	testparityMissingRatchet = 1006
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -363,16 +360,15 @@ const (
 // Pin lift b25ed960 wave P6 leaves ServerSubscriptionTest.ts's flush on a
 // given session (by design, BD-Matter-Subscription-FlushOnOwnSessionOnly,
 // P6-B): 773.
-// Pin lift db91886c unit P1-I leaves ClusterBehaviorTest.ts's class mechanism
-// (17 rows) and ClusterBehaviorFeaturesTest.ts's three .with()/.set()
-// default cases (js-runtime-only): 793.
-// Pin lift db91886c, P1-F: SchedulesConfigurationTest.ts's "refuses to start"
-// (by design, the retired extension) left with the case matter.js deleted
-// (#5044): -1.
-// Pin lift db91886c, P1-D: CommissioningFailsafeExpiryTest.ts's expiry
-// before the flow armed leaves (matter.js caught up, #5049) and
-// DiscoveryCancelTest.ts's settled read joins (js-runtime-only, #5051): 773.
-const testparityLeftRatchet = 0 // MEASURE
+// Pin lift db91886c (review II phase 9): ClusterBehaviorTest.ts's class
+// mechanism (17 rows) and ClusterBehaviorFeaturesTest.ts's three .with()/.set()
+// default cases (js-runtime-only, P1-I) and DiscoveryCancelTest.ts's settled
+// read (js-runtime-only, #5051, P1-D) join; SchedulesConfigurationTest.ts's
+// "refuses to start" (matter.js deleted it, #5044, P1-F) and
+// CommissioningFailsafeExpiryTest.ts's expiry before the flow armed (matter.js
+// caught up, #5049, P1-D) leave; NobleBleChannelTest.ts's reopen after close
+// joins (js-runtime-only, #5052, Fable P0 verdict: nothing to reopen): 793.
+const testparityLeftRatchet = 793
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

@@ -268,18 +268,13 @@ const citecheckDriftRatchet = 416
 // pin); 734 stay at b25ed960 because a bound file changed upstream or a
 // bare part binds no file. binding/manager.go's ClientGroupInteraction.ts
 // range is re-cut to :33-81 (#5069 shortened the class by one line).
-// Phase 9 unit P1-C: two client/peer Busy citations at b25ed960 re-cited at db91886c (3370).
-// Phase 9 unit P1-E/H/I re-cites ClusterDerivation.ts, SelectDefaultValue.ts and
-// ClientStructure.ts lines to db91886c: 3358.
-// P1-F (pin lift db91886c): the Thermostat MSCH/TSUGGEST citations
-// re-anchored from b25ed960 to db91886c, the forward-gate ones gone: 3364.
-// 3365 after phase 9 P1-A: the im request decoders' and encoders'
-// TlvInvokeRequest/TlvWriteRequest cites re-read and relabelled at db91886c.
-// 3352 after phase 9 P1-B: client/interaction's report-interruption and
-// readDataReports cites re-read and relabelled at db91886c.
-// P1-D (#5049): the commissioner's cancel and expiry comments re-cited at
-// db91886c, older b25ed960/db021da0 citations rewritten: 3355.
-const citecheckOffPinRatchet = 0 // MEASURE
+// Pin lift db91886c (review II phase 9): the units P1-A…F and P1-H/I re-read
+// the citations their changes touch and relabel them at db91886c (client/peer
+// Busy, ClusterDerivation.ts, SelectDefaultValue.ts, ClientStructure.ts, the
+// Thermostat MSCH/TSUGGEST ones, the im request codecs, client/interaction's
+// report interruption, the commissioner's cancel and expiry); the forward-gate
+// citations are gone with the gate: 3311 (measured after merging P1-A+B and P1-D).
+const citecheckOffPinRatchet = 3311
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)
