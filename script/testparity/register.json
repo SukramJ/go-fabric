@@ -2089,8 +2089,8 @@
       "path": "packages/model/test/logic/SelectDefaultValueTest.ts",
       "status": "excluded",
       "class": "js-runtime-only",
-      "reason": "Choice of a default value for a model element when matter.js instantiates TypeScript behavior state; the Go generator writes the snapshot's defaults into the definitions.",
-      "snapshotSha": "f99a4168d33b85da0716569737eaed4e31d2c764"
+      "reason": "Choice of a default value for a model element when matter.js instantiates TypeScript behavior state; the Go generator writes the snapshot's defaults into the definitions. Pin lift db91886c (#5058): the three new cases (null for a nullable struct and for a nullable bitmap rather than a value built from their members' defaults, the stated default of a nullable bitmap) test the model function SelectDefaultValue; in Go only their outcome exists — no nullable struct or bitmap attribute of the snapshot carries a generated non-null default (13 state null, 19 none), and the device layer's fallback gives a listed nullable attribute null — held for the served servers by cluster/energy:TestParityMatterJS_ClusterBehaviorNullableStructDefault.",
+      "snapshotSha": "857d24d62cf6c0f5b6c263485e0b77a874b8d86c"
     },
     {
       "path": "packages/model/test/logic/ValidateModelTest.ts",
@@ -2277,10 +2277,29 @@
         "alter retains feature selection",
         "enable retains feature selection",
         "retain features enabled as a matter.js implementation decision",
-        "enable only features matter.js implements unconditionally"
+        "enable only features matter.js implements unconditionally",
+        "drops the default the schema selected",
+        "set defaults the model leaves undefined only where pinned"
       ],
-      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes.",
-      "snapshotSha": "963e5672f0f7fe9e6371f0f78c83abd96d549499"
+      "reason": "The published-behaviors cases on the device kit (device/cluster_features_parity_matterjs_test.go): LevelControl selects nothing and serves no Lighting element, a PowerSource selection breaking the FeatureMap conformance (none, or Wired and Battery) is refused while Wired builds, a Thermostat serves only the selected feature. Left out: with()/for()/alter()/enable(), TypeScript's behavior-type algebra (the Go form is a declaration's Features), and the walk over matter.js's exported behavior classes. Pin lift db91886c (#5057): Go has no derivation chain — an attribute is served when mandatory under the features or declared, and a stated default is filled only for a served one (cluster/spec instance.go, server.go), so a default for an attribute optional and undeclared in the derivative cannot be exposed; the portable case (Thermostat HEAT|COOL|AUTO|TEVT serves ThermostatRunningMode Off, HEAT|COOL|AUTO does not serve it) is missing until it is ported with the Thermostat work in cluster/thermo or on the device kit; the case of the defaults the model leaves undefined (SERVER_ONLY_DEFAULTS) is missing and unclassified, what the Go servers serve there not read.",
+      "snapshotSha": "55983c9e99088a4023faff622031dc74855a4d3a",
+      "left": [
+        {
+          "it": "does not restore the default the schema selected after a derivative dropped the attribute",
+          "class": "js-runtime-only",
+          "reason": "a chain of .with() derivations restoring the base's defaults (ClusterDerivation); Go builds one Instance per definition, features and declaration, with no derivation chain (cluster/spec instance.go)"
+        },
+        {
+          "it": "keeps a default the application set",
+          "class": "js-runtime-only",
+          "reason": "a default the application set on the behavior class with .set(), carried through a derivation; Go has no class-level defaults to carry — a host states an initial value per server, and cluster/thermo offers no declaration of ThermostatRunningMode without TEVT"
+        },
+        {
+          "it": "restores a default the application set after a derivative dropped the attribute",
+          "class": "js-runtime-only",
+          "reason": "a chain of .with() derivations restoring a default the application set with .set(); Go has no derivation chain and no class-level defaults (cluster/spec instance.go)"
+        }
+      ]
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorSemanticsTest.ts",
@@ -2291,10 +2310,99 @@
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorTest.ts",
-      "status": "excluded",
-      "class": "js-runtime-only",
-      "reason": "The ClusterBehavior class mechanism (for/set/alter/with, ID derivation, method carry-forward, quiet event classes).",
-      "snapshotSha": "f28cbf8d54f772e74610dabe55e652a463d28249"
+      "status": "ported",
+      "go": [
+        "cluster/energy:TestParityMatterJS_ClusterBehaviorNullableStructDefault"
+      ],
+      "reason": "Pin lift db91886c (#5058): a nullable struct attribute without a stated default starts null — CommodityPrice CurrentPrice, and DeviceEnergyManagement Forecast with PowerForecastReporting (cluster/energy:TestParityMatterJS_ClusterBehaviorNullableStructDefault). Left: the ClusterBehavior class mechanism (for/set/alter/with, ID derivation, method carry-forward, quiet event classes), which has no Go counterpart.",
+      "snapshotSha": "2180172bf32b5e3fd68eb8d778899a7deac0fd45",
+      "left": [
+        {
+          "it": "ClusterBehavior > base class",
+          "class": "js-runtime-only",
+          "reason": "TypeScript type-level checks of the base class's state types"
+        },
+        {
+          "it": "ClusterBehavior > for > exposes mandatory properties for enabled cluster elements",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .for() and the properties it exposes"
+        },
+        {
+          "it": "ClusterBehavior > for > maintains ID after second for",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: behavior ID derivation"
+        },
+        {
+          "it": "ClusterBehavior > for > exposes optional properties for disabled cluster elements",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .for() and the properties it exposes"
+        },
+        {
+          "it": "ClusterBehavior > for > quieter element whose quality is inherited from the element it overrides",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: quiet event classes"
+        },
+        {
+          "it": "ClusterBehavior > for > quieter element a derived schema adds to a base behavior without it",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: quiet event classes"
+        },
+        {
+          "it": "ClusterBehavior > for > instance exposes values for enabled cluster elements",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: a behavior instance's state properties"
+        },
+        {
+          "it": "ClusterBehavior > for > instance does not expose values for disabled cluster elements",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: a behavior instance's state properties"
+        },
+        {
+          "it": "ClusterBehavior > for > instance allows standard method override",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: method override on a derived class"
+        },
+        {
+          "it": "ClusterBehavior > for > assigns correct default values",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: the defaults of a derived behavior class; the Go generator writes the snapshot's defaults into the definitions"
+        },
+        {
+          "it": "ClusterBehavior > for > carries forward non-command methods",
+          "class": "js-runtime-only",
+          "reason": "TypeScript type-level checks of method carry-forward"
+        },
+        {
+          "it": "ClusterBehavior > set",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .set() recreating the type"
+        },
+        {
+          "it": "ClusterBehavior > alter",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .alter(), ID derivation and event classes"
+        },
+        {
+          "it": "ClusterBehavior > with",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .with() feature extension and overrides"
+        },
+        {
+          "it": "ClusterBehavior > non-Matter methods",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: methods that are not Matter commands kept out of the command lists"
+        },
+        {
+          "it": "ClusterBehavior > enable",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: .enable() of events and properties"
+        },
+        {
+          "it": "ClusterBehavior > typesOf",
+          "class": "js-runtime-only",
+          "reason": "the ClusterBehavior class mechanism: typesOf over behavior types"
+        }
+      ]
     },
     {
       "path": "packages/node/test/behavior/cluster/ClusterBehaviorVarianceTest.ts",
@@ -5587,7 +5695,8 @@
         "controller/client:TestClientEventNotificationEventNumbersParity",
         "controller/client:TestHostReadDoesNotEmitEvents",
         "controller/client:TestClientEventNotificationLocalParity",
-        "controller/client:TestClientEventNotificationResolvedTimestampsParity"
+        "controller/client:TestClientEventNotificationResolvedTimestampsParity",
+        "controller/client:TestParityMatterJS_ClientEventNotificationDelayed"
       ],
       "missing": [
         "ignores events and event numbers of a replaced default subscription",
@@ -5595,8 +5704,8 @@
         "does not store the number of an event dropped because the node is being deleted",
         "warns once per kind of failure when a change observer fails for each event report"
       ],
-      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission). Pin lift wave P4 (#433): a system timestamp and two system deltas of one report reach Hooks.Event with the wire delta and the resolved absolute time (controller/client:TestClientEventNotificationResolvedTimestampsParity). Pin lift b25ed960: events are not delivered again when the device drops the subscription and the session stays (d7e3a454f, a test-only commit; on the Go client the replacement subscription asks above the stored event number) (controller/client:TestClientEventNotificationEventNumbersParity).",
-      "snapshotSha": "ecbc8fd99b9a8c1953544b108f0bb65a4126f379",
+      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). A host's own read or subscription returns its events to the caller only and a sustained one resubscribes above the last event it delivered (controller/client:TestHostReadDoesNotEmitEvents, TestClientEventNotificationLocalParity). Left: ChangeNotificationService, the observer set and the emit job queue (js-runtime-only). Missing: the events of a held report of a replaced default subscription (its other callbacks are held by TestClientSubscribeDefaultSubscriptionParity), a read failing after its reports (no hook aborts a read mid-stream) and an event of a node being deleted (no hook inside Registry.Decommission). Pin lift wave P4 (#433): a system timestamp and two system deltas of one report reach Hooks.Event with the wire delta and the resolved absolute time (controller/client:TestClientEventNotificationResolvedTimestampsParity). Pin lift b25ed960: events are not delivered again when the device drops the subscription and the session stays (d7e3a454f, a test-only commit; on the Go client the replacement subscription asks above the stored event number) (controller/client:TestClientEventNotificationEventNumbersParity). Pin lift db91886c (#5030): an event arriving with its cluster's data is emitted once the cluster has its behaviour, an event for a cluster the endpoint does not hold is delayed behind the report's change, and the events of a report keep the device's order when an earlier one is delayed (controller/client:TestParityMatterJS_ClientEventNotificationDelayed, on the structure: Go merges a report's chunks and applies its data before its events, so the first case is pinned in its merged form); the helper's move of eventOn from Switch to BasicInformation needs no Go counterpart, no Go event test relied on immediate emission for an unknown cluster.",
+      "snapshotSha": "1bd3786a8dbad8c7797ad1637c4afd3ce3ad7f3c",
       "left": [
         {
           "it": "emits EventOccurrence for MS initialPress",

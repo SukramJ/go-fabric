@@ -491,6 +491,12 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 // simConnections are three kept push transports of fabric 1: 1 continuous,
 // 2 motion-triggered, 3 command-triggered, all CMAF and Inactive.
 func simConnections() json.RawMessage {
+	return simConnectionsWith(padef.TransportMotionTriggerTimeControlStruct{InitialDuration: 4, AugmentationDuration: 4, MaxDuration: 7, BlindDuration: 3})
+}
+
+// simConnectionsWith is simConnections with the motion transport's time
+// control tc.
+func simConnectionsWith(tc padef.TransportMotionTriggerTimeControlStruct) json.RawMessage {
 	noPreRoll := uint16(0) // MaxPreRollLen is "TriggerType == Command | TriggerType == Motion" (R2-P6-par-1304)
 	conn := func(id uint16, trigger padef.TransportTriggerOptionsStruct) padef.TransportConfigurationStruct {
 		return padef.TransportConfigurationStruct{
@@ -505,7 +511,7 @@ func simConnections() json.RawMessage {
 	}
 	motion := padef.TransportTriggerOptionsStruct{
 		TriggerType:       padef.TransportTriggerTypeMotion,
-		MotionTimeControl: &padef.TransportMotionTriggerTimeControlStruct{InitialDuration: 4, AugmentationDuration: 4, MaxDuration: 7, BlindDuration: 3},
+		MotionTimeControl: &tc,
 		MaxPreRollLen:     &noPreRoll,
 	}
 	raw, _ := json.Marshal(padef.Patch{CurrentConnections: &[]padef.TransportConfigurationStruct{
@@ -704,6 +710,73 @@ func TestCameraSimMotionTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec.none(t)
+}
+
+// TestCameraSimMotionTransportAugmentation: chip's PushAVTransport augments
+// a recording once, then again only once the clip ran for the previous
+// detected duration, and its blind period starts at the instant the
+// recording ends, counted in whole seconds (decision 746).
+func TestCameraSimMotionTransportAugmentation(t *testing.T) {
+	t.Parallel()
+	tc := padef.TransportMotionTriggerTimeControlStruct{InitialDuration: 4, AugmentationDuration: 2, MaxDuration: 20, BlindDuration: 3}
+	c, fake, rec := simCamera(t, cameraOptions{}, func(c *demoCamera) { c.restored.Push = simConnectionsWith(tc) })
+	port := camPushPort{c}
+	if err := port.SetTransportStatus(context.Background(), []uint16{2}, padef.TransportStatusActive); err != nil {
+		t.Fatal(err)
+	}
+	rec.none(t)
+	// endsAfter asserts the recording of session ends exactly d from now.
+	endsAfter := func(d time.Duration, session uint64) {
+		t.Helper()
+		fake.Advance(d - time.Millisecond)
+		rec.none(t)
+		fake.Advance(time.Millisecond)
+		wantPush(t, rec, padef.EventPushTransportEnd, 2, session)
+	}
+
+	// Mirrors chip examples/camera-app/linux/src/pushav-transport/pushav-transport.cpp:370-388 at 6170af84:
+	// motions at 0 s, 1 s and 2 s — the second augments (not augmented
+	// yet, :375), the third does not (2 s < the previous 4 s): the
+	// recording ends at 4 s + 2 s.
+	c.motionTriggered()
+	wantPush(t, rec, padef.EventPushTransportBegin, 2, 1)
+	fake.Advance(time.Second)
+	c.motionTriggered()
+	fake.Advance(time.Second)
+	c.motionTriggered()
+	endsAfter(4*time.Second, 1)
+
+	// Mirrors chip examples/camera-app/linux/src/pushav-transport/pushav-transport.cpp:330-342 at 6170af84:
+	// a motion at the recording's end instant is inside the blind period
+	// (elapsedSeconds >= 0, :341) and begins nothing.
+	c.motionTriggered()
+	rec.none(t)
+	// The period ends BlindDuration later, exclusive: a motion then begins
+	// a new recording.
+	fake.Advance(3 * time.Second)
+	c.motionTriggered()
+	wantPush(t, rec, padef.EventPushTransportBegin, 2, 2)
+
+	// Mirrors chip examples/camera-app/linux/src/pushav-transport/pushav-transport.cpp:375 at 6170af84:
+	// motions at 0 s, 1 s and 4 s — the third comes at the previous
+	// detected duration (>=) and augments again: 4 s + 2 s + 2 s.
+	fake.Advance(time.Second)
+	c.motionTriggered()
+	fake.Advance(3 * time.Second)
+	c.motionTriggered()
+	endsAfter(4*time.Second, 2)
+
+	// Mirrors chip examples/camera-app/linux/src/pushav-transport/pushav-transport.cpp:339-341 at 6170af84:
+	// the blind check truncates to whole seconds, so a motion 500 ms
+	// before the end of a new recording is blind too — it neither
+	// augments nor begins, and the recording ends at its 4 s.
+	fake.Advance(3 * time.Second)
+	c.motionTriggered()
+	wantPush(t, rec, padef.EventPushTransportBegin, 2, 3)
+	fake.Advance(4*time.Second - 500*time.Millisecond)
+	c.motionTriggered()
+	rec.none(t)
+	endsAfter(500*time.Millisecond, 3)
 }
 
 // TestCameraSimMechanicalPTZ: a mechanical move completes two seconds

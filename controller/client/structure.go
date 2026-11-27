@@ -387,18 +387,28 @@ func (s *structure) mutateAttribute(a *AttributeData, sc scope, cur *batch, q *m
 	return cur
 }
 
-// emitEvent is #emitEvent (:626-647 at b25ed960): delayed to the end of the
-// report when the endpoint is unknown or not installed, received data in
-// this report or has a structural change pending (:637-643), else
-// delivered now (:644-646).
+// emitEvent is #emitEvent (ClientStructure.ts:626-651 at db91886c): delayed
+// to the end of the report, in matter.js's order of conditions (:637-646),
+// when an earlier event of the report is already delayed (:638-639, so the
+// device's order is kept), the endpoint is unknown or not installed
+// (:640-641), the cluster has no behaviour yet — unknown on the endpoint or
+// without current (:642-643, a device may send an event in an earlier chunk
+// than its cluster's data), the endpoint received data in this report (:644)
+// or has a structural change pending (:645); else delivered now (:648-649).
+// ep.clusters is read directly: the check has no side effect.
 func (s *structure) emitEvent(e *EventData, q *mutateContext) {
-	// Mirrors matter.js ClientStructure.ts:1830-1832 at b25ed960: no emit unless
+	// Mirrors matter.js ClientStructure.ts:1834 at db91886c: no emit unless
 	// q.emitsEvents() (W4-ctlim-01).
 	if !q.emitsEvents {
 		return
 	}
 	ep := s.endpoints[e.Path.Endpoint]
-	if ep == nil || !ep.installed || q.endpointsWithData[e.Path.Endpoint] || s.pending[ep] != nil {
+	var c *Cluster
+	if ep != nil {
+		c = ep.clusters[e.Path.Cluster]
+	}
+	if len(s.delayed) > 0 || ep == nil || !ep.installed || c == nil || c.current == nil ||
+		q.endpointsWithData[e.Path.Endpoint] || s.pending[ep] != nil {
 		s.delayed = append(s.delayed, *e)
 		return
 	}

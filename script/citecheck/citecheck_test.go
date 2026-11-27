@@ -269,7 +269,9 @@ const citecheckDriftRatchet = 416
 // bare part binds no file. binding/manager.go's ClientGroupInteraction.ts
 // range is re-cut to :33-81 (#5069 shortened the class by one line).
 // Phase 9 unit P1-C: two client/peer Busy citations at b25ed960 re-cited at db91886c (3370).
-const citecheckOffPinRatchet = 3370
+// Phase 9 unit P1-E/H/I re-cites ClusterDerivation.ts, SelectDefaultValue.ts and
+// ClientStructure.ts lines to db91886c: 3358.
+const citecheckOffPinRatchet = 3358
 
 // offPinRowRE reads the off-pin row of summary.md.
 var offPinRowRE = regexp.MustCompile(`(?m)^\| ` + regexp.QuoteMeta(offPinRow) + ` \| (\d+) \|$`)

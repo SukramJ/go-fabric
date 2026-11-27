@@ -216,6 +216,12 @@ type camTransport struct {
 	// manual is an activation by ManuallyTriggerTransport, whose end
 	// starts no blind period (mCurrentActivationByManualTrigger).
 	manual bool
+	// augmented and prevDetected are mHasAugmented and
+	// mPreviousMotionDetectedDurationS: whether the recording was
+	// augmented, and its detected duration before the last augmentation.
+	// Both reset where a recording starts.
+	augmented    bool
+	prevDetected time.Duration
 	// maxClip bounds an augmented recording (mMaxClipDurationS).
 	maxClip time.Duration
 }
@@ -1008,8 +1014,9 @@ func (p camPushPort) ManuallyTriggerTransport(_ context.Context, id uint16, reas
 	}
 	if active {
 		// A manual activation (TriggerTransport with the manual flag,
-		// pushav-transport.cpp:345-405).
+		// pushav-transport.cpp:344-407 at 6170af84).
 		t.activated, t.detected, t.manual, t.maxClip = p.c.clk.Now(), d, true, maxClip
+		t.augmented, t.prevDetected = false, 0
 	}
 	p.c.mu.Unlock()
 	if active {
@@ -1114,19 +1121,35 @@ func (c *demoCamera) motionTriggered() {
 			tc = *t.trigger.MotionTimeControl
 		}
 		sec := func(v uint32) time.Duration { return time.Duration(v) * time.Second }
-		// HandleTriggerDetected (pushav-transport.cpp:345-405), whether
-		// or not the transport is Active: nothing in the blind period
-		// after a recording; a new activation once the detected
-		// duration is over, else the recording augmented up to the
-		// maximum.
-		if !t.manual && !t.activated.IsZero() && now.Before(t.activated.Add(t.detected).Add(sec(uint32(tc.BlindDuration)))) && now.After(t.activated.Add(t.detected)) {
-			continue
+		// Mirrors chip examples/camera-app/linux/src/pushav-transport/pushav-transport.cpp:344-407
+		// (HandleTriggerDetected) at 6170af84, whether or not the
+		// transport is Active. The blind check comes first and changes
+		// nothing (:349-354): InBlindPeriod (:330-342) counts the whole
+		// seconds since the recording's end, truncated toward zero, and
+		// is blind for 0 <= elapsed < BlindDuration (:339-341), the
+		// period starting at activation + detected (:392) — so a motion
+		// in the last second of a clip falls into it too.
+		if !t.manual && !t.activated.IsZero() && tc.BlindDuration > 0 {
+			elapsed := int64(now.Sub(t.activated.Add(t.detected)) / time.Second)
+			if elapsed >= 0 && elapsed < int64(tc.BlindDuration) {
+				continue
+			}
 		}
+		// A new activation once the detected duration is over (:357-369,
+		// augmented and the previous duration reset, :362, :367); else
+		// the recording is augmented up to the maximum, but only if it
+		// was not augmented yet or ran for at least the previous
+		// detected duration (:370-388, :375). chip compares truncated
+		// whole seconds (:356); the durations here are whole seconds, so
+		// comparing the exact elapsed time gives the same answer.
 		if t.activated.IsZero() || now.Sub(t.activated) >= t.detected {
 			t.activated, t.detected, t.manual = now, sec(uint32(max(tc.InitialDuration, 1))), false
 			t.maxClip = sec(max(tc.MaxDuration, uint32(tc.InitialDuration)))
-		} else {
+			t.augmented, t.prevDetected = false, 0
+		} else if !t.augmented || now.Sub(t.activated) >= t.prevDetected {
+			t.prevDetected = t.detected
 			t.detected = min(t.detected+sec(uint32(tc.AugmentationDuration)), max(t.maxClip, t.detected))
+			t.augmented = true
 		}
 		if t.status == padef.TransportStatusActive {
 			ids, durations = append(ids, id), append(durations, t.activated.Add(t.detected).Sub(now))
