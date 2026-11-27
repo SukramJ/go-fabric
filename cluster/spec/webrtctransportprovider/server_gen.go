@@ -344,7 +344,9 @@ type Declare struct {
 	// once that is at least EvictIdle old (cluster/camera
 	// ProviderConfig.EvictIdle): the entry leaves CurrentSessions, the
 	// port's EndSession and the requestor's End both carry
-	// OutOfResources, and the offer goes on. Idle is signalling-idle,
+	// OutOfResources, and the offer goes on to the port; the eviction
+	// stands whatever the port then answers, and the slot is then
+	// free. Idle is signalling-idle,
 	// not abandonment: a fabric at its bound loses its oldest
 	// established view to its own next offer once that view is older
 	// than EvictIdle. 0 evicts nothing; a negative value is refused
@@ -358,7 +360,9 @@ type Declare struct {
 	// accessing one included, at most MaxSessionsPerFabric — takes the
 	// place of the longest-idle entry of a fabric over its share; an
 	// entry within its fabric's share is never ended by another
-	// fabric. Inert without EvictIdle and MaxSessions.
+	// fabric. A fabric whose offer fails after it took another
+	// fabric's entry takes only its own for EvictIdle, or until a
+	// session of it is stored. Inert without EvictIdle and MaxSessions.
 	EvictAcrossFabrics bool
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not

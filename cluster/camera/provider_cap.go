@@ -37,10 +37,13 @@ import (
 // its share — a divergence from the camera app, this module's own
 // (notes/parity/by_design.md, BD-chip-WebRtcTransportProvider-RulesInServer).
 // The evicted entry leaves the table first, under the command
-// serialisation only, so a racing End, RemoveSession or EndSession ends
-// it once; then the port's EndSession and the requestor's End, both
+// serialisation only, so a host's racing End or RemoveSession ends it
+// once; then the port's EndSession and the requestor's End, both
 // OutOfResources (decision 703), the End through the queue below and
-// left out when it cannot be sent (decision 707).
+// left out when it cannot be sent (decision 707). The offer then goes on
+// to the port; the eviction stands whatever the port answers, and a
+// fabric whose offer fails after a cross-fabric eviction has its claim on
+// other fabrics' entries spent for EvictIdle (decision 713).
 
 // endReasonOutOfResources is WebRTCEndReasonEnum OutOfResources, the
 // generated value (decision 633).

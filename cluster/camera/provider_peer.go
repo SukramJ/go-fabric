@@ -144,8 +144,11 @@ func (p *Provider) IceCandidates(ctx context.Context, sessionID uint16, candidat
 // joined with the removal's when the table refused the shorter one. A
 // session another removal takes first — the requestor's EndSession,
 // RemoveSession, an eviction at a bound ([ProviderConfig.EvictIdle]) —
-// is that removal's to end: End then sends nothing and returns
-// [ErrUnknownSession], so the requestor is told once.
+// is that removal's to end: End then sends nothing and returns what it
+// returns for a session the table does not hold — [ErrUnknownSession],
+// [ErrNoPeerConnector] without a connector — so the requestor is told
+// once by an eviction, and not at all after a RemoveSession, which
+// never tells it.
 //
 // chip's camera app sends End without waiting for its response
 // (SendEndCommand :1301-1329, InvokeCommandRequest with logging

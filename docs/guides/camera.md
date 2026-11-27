@@ -414,15 +414,19 @@ Sessions the host sets are never refused.
 a new session at a bound takes the place of the accessing fabric's
 entry whose signalling is oldest, once that is at least `EvictIdle`
 old: the entry leaves CurrentSessions, the port's `EndSession` and the
-requestor's `End` both carry OutOfResources, and the offer goes on.
+requestor's `End` both carry OutOfResources, and the offer goes on to
+the port; the eviction stands whatever the port then answers, and the
+slot is then free.
 Signalling is a session's accepted signalling in either direction — its
 commit, an accepted re-offer, `ProvideAnswer` or `ProvideICECandidates`,
 and the camera's `Offer`, `Answer` and `IceCandidates`; a host's row
-counts from its `UpsertSession`. Only a new session evicts (a re-offer
+counts from the `UpsertSession` that entered it — a later
+`UpsertSession` of the row does not count. Only a new session evicts (a re-offer
 never does), one entry per offer, and only when that one makes room: a
 table the host's rows hold over the bound is refused as without
 eviction. Without a `PeerConnector`, or with the End queue full, the
-entry goes without an `End`. Another fabric's entry is never taken.
+entry goes without an `End`. Another fabric's entry is never taken
+unless `EvictAcrossFabrics` is set (below).
 
 Idle here is signalling-idle, not abandonment: a live view signals
 nothing once it is up. With `EvictIdle` set, a fabric at its bound
@@ -432,8 +436,9 @@ detection of a dead session. A fabric's live views that each re-offer
 can take turns evicting each other; the value bounds how often. The
 cost of a controller that abandons a view without `EndSession` and
 stays on Matter — it is never proven lost — is what the option exists
-for. Below 30 s, connectedhomeip's timeout for a session that never
-connected, a session still being set up can be taken; a camera run
+for. Below 30 s — the time connectedhomeip's camera app gives a new
+session to report a connection state — a session still being set up
+can be taken; a camera run
 against the certification cases keeps 0, or a value longer than the
 run.
 
@@ -451,7 +456,10 @@ administrator's view that is being watched. The share moves with the
 fabrics holding entries — commissioned fabrics that hold none do not
 count — so a fabric's protected count shrinks when another fabric first
 offers; a fabric over its share has the own-fabric rule only and cannot
-take a slot back. With 8 sessions and 4 per fabric, two fabrics never
+take a slot back. A fabric whose offer fails after it took another
+fabric's entry takes only its own for `EvictIdle`, or until a session
+of it is stored, so a camera that keeps refusing the fabric ends at
+most one view of another fabric per `EvictIdle`. With 8 sessions and 4 per fabric, two fabrics never
 cross (the share is 4); a third fabric's offers bring the table to
 3, 3 and 2.
 

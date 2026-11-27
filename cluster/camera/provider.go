@@ -94,11 +94,13 @@ type ProviderConfig struct {
 	// once that is at least EvictIdle old (issue #634, owner decisions
 	// 702-707): the entry leaves CurrentSessions, the port's EndSession
 	// and the requestor's End both carry OutOfResources, and the offer
-	// goes on. Signalling is a session's accepted signalling in either
+	// goes on to the port; the eviction stands whatever the port then
+	// answers, and the slot is then free. Signalling is a session's accepted signalling in either
 	// direction: its commit as a new session, an accepted re-offer,
 	// ProvideAnswer or ProvideICECandidates, and the camera's
 	// [Provider.Offer], [Provider.Answer] and [Provider.IceCandidates];
-	// a row the host set counts from its UpsertSession. Idle is
+	// a row the host set counts from the UpsertSession that entered it —
+	// a later UpsertSession of the row does not count. Idle is
 	// signalling-idle, not abandonment: a live view signals nothing once
 	// it is up, so with EvictIdle set a fabric at its bound loses its
 	// oldest established view to its own next offer once that view is
@@ -110,11 +112,12 @@ type ProviderConfig struct {
 	// full, the entry goes without an End. Another fabric's entry is
 	// never taken unless [ProviderConfig.EvictAcrossFabrics] is set. 0,
 	// the default, evicts nothing; negative is [ErrNegativeEvictIdle];
-	// without a bound it is inert. connectedhomeip's camera app ends a
-	// session on time only when it never connected, after 30 s
-	// (kConnectionTimeoutSeconds, webrtc-provider-manager.cpp:40 at
-	// 6170af84): a value below that lets a session still being set up be
-	// taken. A camera run against the certification cases keeps 0, or a
+	// without a bound it is inert. connectedhomeip's camera app cleans
+	// up on time only a session whose peer connection reported no state
+	// within 30 s (kConnectionTimeoutSeconds, webrtc-provider-manager.cpp:40,
+	// the timer :305-306, :526-527, cancelled at :1163, the cleanup
+	// :1408-1420 at 6170af84): a value below that lets a session still
+	// being set up be taken. A camera run against the certification cases keeps 0, or a
 	// value longer than the run, as those cases expect the refusal.
 	EvictIdle time.Duration
 	// EvictAcrossFabrics extends [ProviderConfig.EvictIdle] to a fair
@@ -132,8 +135,11 @@ type ProviderConfig struct {
 	// an entry (the fabrics with sessions, not the commissioned ones), so
 	// a fabric's protected count shrinks when another fabric first
 	// offers. A fabric over its share has the own-fabric rule only, so it
-	// cannot take a slot back. Inert without EvictIdle > 0 and
-	// MaxSessions > 0.
+	// cannot take a slot back. A fabric whose offer fails after it took
+	// another fabric's entry takes only its own for EvictIdle, or until a
+	// session of it is stored (decision 713): a camera that keeps refusing
+	// the fabric ends at most one view of another fabric per EvictIdle.
+	// Inert without EvictIdle > 0 and MaxSessions > 0.
 	EvictAcrossFabrics bool
 	// DataVersion is an optional host-owned tracker.
 	//
