@@ -457,8 +457,8 @@ fabrics holding entries — commissioned fabrics that hold none do not
 count — so a fabric's protected count shrinks when another fabric first
 offers; a fabric over its share has the own-fabric rule only and cannot
 take a slot back. A fabric whose offer fails after it took another
-fabric's entry takes only its own for `EvictIdle`, or until a session
-of it is stored, so a camera that keeps refusing the fabric ends at
+fabric's entry takes only its own for `EvictIdle`, or until an offer
+of it succeeds, so a camera that keeps refusing the fabric ends at
 most one view of another fabric per `EvictIdle`. With 8 sessions and 4 per fabric, two fabrics never
 cross (the share is 4); a third fabric's offers bring the table to
 3, 3 and 2.

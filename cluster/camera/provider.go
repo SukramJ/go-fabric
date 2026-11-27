@@ -136,8 +136,8 @@ type ProviderConfig struct {
 	// a fabric's protected count shrinks when another fabric first
 	// offers. A fabric over its share has the own-fabric rule only, so it
 	// cannot take a slot back. A fabric whose offer fails after it took
-	// another fabric's entry takes only its own for EvictIdle, or until a
-	// session of it is stored (decision 713): a camera that keeps refusing
+	// another fabric's entry takes only its own for EvictIdle, or until an
+	// offer of it succeeds (decision 713): a camera that keeps refusing
 	// the fabric ends at most one view of another fabric per EvictIdle.
 	// Inert without EvictIdle > 0 and MaxSessions > 0.
 	EvictAcrossFabrics bool
@@ -202,8 +202,8 @@ type Provider struct {
 	// eviction is on ([ProviderConfig.EvictIdle], provider_cap.go).
 	activity map[uint16]time.Time
 	// spent holds, per fabric, when its offer failed after it took
-	// another fabric's entry: until EvictIdle has passed or a session of
-	// it is stored, it takes only its own (decision 713, provider_cap.go).
+	// another fabric's entry: until EvictIdle has passed or an offer of
+	// it succeeds, it takes only its own (decision 713, provider_cap.go).
 	spent map[uint8]time.Time
 	// beforeEvictForTests, nil in production, runs between the admission
 	// and the eviction's removal, so a test can race the removal.

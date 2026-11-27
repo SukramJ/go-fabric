@@ -140,8 +140,8 @@ func (p *Provider) admission(fabric uint8) (refuse bool, victim *ProviderSession
 
 // spentLocked reports whether the fabric's claim on other fabrics'
 // entries is spent (decision 713): its offer failed after it took another
-// fabric's entry, less than EvictIdle ago, and no session of it has been
-// stored since. An expired mark is dropped. The caller holds mu.
+// fabric's entry, less than EvictIdle ago, and no offer of it has
+// succeeded since. An expired mark is dropped. The caller holds mu.
 func (p *Provider) spentLocked(fabric uint8, now time.Time) bool {
 	at, ok := p.spent[fabric]
 	if !ok {

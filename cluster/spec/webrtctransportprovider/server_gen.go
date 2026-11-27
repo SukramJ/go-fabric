@@ -361,8 +361,8 @@ type Declare struct {
 	// place of the longest-idle entry of a fabric over its share; an
 	// entry within its fabric's share is never ended by another
 	// fabric. A fabric whose offer fails after it took another
-	// fabric's entry takes only its own for EvictIdle, or until a
-	// session of it is stored. Inert without EvictIdle and MaxSessions.
+	// fabric's entry takes only its own for EvictIdle, or until an
+	// offer of it succeeds. Inert without EvictIdle and MaxSessions.
 	EvictAcrossFabrics bool
 	// HostServer is the host's own server for the cluster, mounted in
 	// place of the kit's — also for a cluster the device type does not
