@@ -579,10 +579,13 @@ func (g *groupPlan) joinGroup(th *goTH) error {
 
 // caseSC53 mirrors TC-SC-5.3: the group is provisioned on the daemon, and a
 // command sent as a group message reaches the endpoint that joined.
+// Read at b25ed960: at db91886c #5033 rewrote the flavor dispatch of the
+// file's group-invoke log check (:308-320) and every line below it moved
+// by one; the case is re-read at the pin before its readAt goes.
 func caseSC53() goCertCase {
 	g := &groupPlan{}
 	return goCertCase{
-		tc: "TC-SC-5.3", line: 370, pics: []string{"MCORE.ROLE.COMMISSIONER", "GRPKEY.C"}, multicast: true,
+		tc: "TC-SC-5.3", line: 370, readAt: "b25ed960", pics: []string{"MCORE.ROLE.COMMISSIONER", "GRPKEY.C"}, multicast: true,
 		steps: []goStep{
 			{n: "1a", line: 385, title: "TH should have the ACL entry with the AuthMode as Group by DUT", run: g.aclAdmitsGroup(privManage)},
 			{n: "1b", line: 404, title: "DUT generates a random key and EpochKey0 assigned to GroupKeySetID 1", run: keyMaterial},

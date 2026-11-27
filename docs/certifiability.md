@@ -568,7 +568,7 @@ Harness image: `ghcr.io/thingfabric/go-fabric-chip@sha256:a22ed731e3fa28eb380ca1
 | OPCREDS/3.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | OPCREDS/3.9 | (b) not supported | not applicable: the case's PICS `OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
 | OVENOPSTATE/2.6 | (b) not supported | not applicable: the case's PICS `OVENOPSTATE.S & OVENOPSTATE.S.A0002` is false for the reference DUT |
-| PAVST/2.15 | (b) not supported | TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at b25ed960 lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND |
+| PAVST/2.15 | (b) not supported | TC-PAVST-2.15 drives UpdateMotionZoneOptions (command 0x08), which the matter.js snapshot does not carry (push-av-stream-transport.element.ts at db91886c lists commands 0x00-0x07); the module's server answers UNSUPPORTED_COMMAND |
 | PAVST/2.8 | (c) harness | TC-PAVST-2.8 step 4 has TH2, a second controller on a fresh fabric commissioned on-network, send FindTransport — a Large Message ("L") command, push-av-stream-transport.element.ts:130 at db021da0 — with MRP_PAYLOAD and expects NOT_FOUND (TC_PAVST_2_8.py:179-189, TC_PAVSTTestBase.py:352-368, matter_testing.py:3105 at 6170af84); the module answers INVALID_TRANSPORT_TYPE (0xD1) on a UDP session, as matter.js does (CommandInvokeResponse.ts:281-285). chip's engine carries the same gate (InteractionModelEngine.cpp:1875-1884), inert for its code-driven clusters because its generator drops kLargeMessage (sdk_generator.py:62; PushAvStreamTransport Metadata.h:79-81): chip's camera-app answers NOT_FOUND there (PushAVStreamTransportLogic.cpp:1576-1585) only because that gate is inert. Kept by owner decision 183, notes/parity/by_design.md BD-chip-LargeMessageGateEnforced (runs, and fails as recorded) |
 | PS/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | PS/2.3 | (b) not supported | not applicable: the case's PICS `PWRTL.S` is false for the reference DUT |
@@ -793,7 +793,7 @@ the harness image lists; those a family lists carry the same reason on their row
 
 ### matter.js certification cases not run
 
-matter.js automates 121 certification cases at `b25ed9604f2825857b8de28a3c29cae8124a7e49` (`support/chip-testing/test/cert/TC-*.test.ts`,
+matter.js automates 121 certification cases at `db91886cbe742f28d2d6ae513dfc33988436bf02` (`support/chip-testing/test/cert/TC-*.test.ts`,
 the snapshot's pin, listed in `internal/chiptool/testdata/matterjs-cert-cases.json`). The Go controller
 runs 102 of them, as TH or as DUT (above); 10 controller-role cases carry their reason under "Controller role",
 and 9 are not run yet: the module is unmeasured against them, and each names what a port needs. 0 of them
