@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package and the package initializer of each such package (this module is a library; its example programs are one host's composition, not a production root set)",
-  "entry_points": 11001,
+  "entry_points": 11003,
   "initializers": 374,
   "entry_packages": [
     ".",
@@ -12958,14 +12958,14 @@
       "identifier": "SetAvStreamCommitRefusal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/camera/export_test.go",
-      "line": 11
+      "line": 9
     },
     {
       "package": "cluster/camera",
-      "identifier": "SetProviderClock",
+      "identifier": "SetEvictHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/camera/export_test.go",
-      "line": 22
+      "line": 21
     },
     {
       "package": "cluster/camera",
@@ -12979,7 +12979,7 @@
       "identifier": "SetZoneCommitRefusal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/camera/export_test.go",
-      "line": 16
+      "line": 14
     },
     {
       "package": "cluster/camera",
@@ -29709,7 +29709,7 @@
       "identifier": "TestProviderSessionBoundsThroughTheFacade",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_camera_test.go",
-      "line": 223
+      "line": 224
     },
     {
       "package": "device",
@@ -30059,7 +30059,7 @@
       "identifier": "TestZonesThroughTheFacadeContinueAfterThePortsLastID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/defaults_camera_test.go",
-      "line": 78
+      "line": 79
     },
     {
       "package": "diag",
