@@ -59,6 +59,9 @@ func TestRequestEncodingOmitFalseFlags(t *testing.T) {
 		{"zero encoding writes both", false, false, false, true, true, false, true},
 		{"omit drops false flags", true, false, false, false, false, false, false},
 		{"omit keeps true flags", true, true, true, true, true, true, true},
+		// InteractionClientMessengerTest.ts:931-938 at db91886c: the false
+		// SuppressResponse is left out, the true TimedRequest stays.
+		{"omit drops a false flag beside a true one", true, false, true, false, true, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

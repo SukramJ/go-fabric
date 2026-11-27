@@ -42,7 +42,7 @@ func TestTlvInvokeRequestParityMatterJS(t *testing.T) {
 	t.Run("decodes a group request that leaves out SuppressResponse and TimedRequest", func(t *testing.T) {
 		t.Parallel()
 		// An AddGroup group invoke, InteractionModelRevision 14, starting
-		// directly with InvokeRequests (TlvInvokeRequestTest.ts:47-49).
+		// directly with InvokeRequests (TlvInvokeRequestTest.ts:45-48).
 		req, err := decode(t, "153602153700240104240200183501250001012c010018181824ff0e18")
 		if err != nil {
 			t.Fatalf("decode: %v", err)

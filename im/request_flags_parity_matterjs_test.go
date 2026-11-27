@@ -32,14 +32,18 @@ func TestRequestFlagsForSendingParityMatterJS(t *testing.T) {
 		{"keeps a flag that is true", false, false, rev, rev, true},
 		{"sends both flags at the current revision of this node", false, false, rev, uint16(MatterInteractionModelRevision), false},
 	} {
-		if got := RequestFlagsForSending(tc.omit, tc.group, tc.peer, tc.own); got.OmitFalseFlags != tc.wantOmitted {
+		if got := requestFlagsForSending(tc.omit, tc.group, tc.peer, tc.own); got.OmitFalseFlags != tc.wantOmitted {
 			t.Errorf("%s: OmitFalseFlags %v, want %v", tc.name, got.OmitFalseFlags, tc.wantOmitted)
 		}
 	}
 	// The last row is matter.js's characterization (:940-943): it fails
 	// once this module's revision reaches 14, as a reminder that peers then
-	// get fewer flags.
+	// get fewer flags — and that the one sender outside the rule must take it.
 	if MatterInteractionModelRevision >= FalseRequestFlagsOmittedFromRevision {
-		t.Error("this module's revision leaves out false flags now: peers get fewer flags")
+		t.Error("this module's revision leaves out false flags now: peers get fewer flags; " +
+			"bridge/ota_provider_link.go's QueryImage invoke must take RequestFlagsForSending")
+	}
+	if got := RequestFlagsForSending(false, false, rev); got.OmitFalseFlags {
+		t.Error("RequestFlagsForSending omits at this module's revision")
 	}
 }

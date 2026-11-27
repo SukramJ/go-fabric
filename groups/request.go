@@ -80,7 +80,7 @@ func (s *Sender) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields
 // groupRequestEncoding is the encoding of a group request's flags: the
 // sender's rule for a group request, the peer's revision unknown.
 func groupRequestEncoding(opts RequestOptions) im.RequestEncoding {
-	return im.RequestFlagsForSending(opts.OmitFalseFlags, true, 0, uint16(im.MatterInteractionModelRevision))
+	return im.RequestFlagsForSending(opts.OmitFalseFlags, true, 0)
 }
 
 // logInvoke logs a group invoke as it leaves, naming the group and the
