@@ -74,13 +74,13 @@ func (f holdFixture) held(t *testing.T, id uint16) <-chan error {
 // waitArmed waits until n hold timers are armed (holdTimers, :798-801).
 func (f holdFixture) waitArmed(t *testing.T, n int) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for f.clk.Pending() != n {
-		if time.Now().After(deadline) {
-			t.Fatalf("%d hold timers armed, want %d", f.clk.Pending(), n)
+	for range patience {
+		if f.clk.Pending() == n {
+			return
 		}
-		time.Sleep(time.Millisecond)
+		f.clk.Yield()
 	}
+	t.Fatalf("%d hold timers armed, want %d", f.clk.Pending(), n)
 }
 
 func (f holdFixture) register(t *testing.T, id uint16) {
@@ -88,27 +88,55 @@ func (f holdFixture) register(t *testing.T, id uint16) {
 	upsert(t, f.r, makeSession(withID(id), withPeer(peerNode), withFabric(fabric1)))
 }
 
-// pending reports that out has not settled within a short wall time
+// pause is the tests' pause between looks: the fake clock's Yield, a
+// scheduler hint and a short real pause (clocktest.Fake.Yield). Its own
+// time is never moved.
+var pause = clocktest.New(fabrictest.DefaultStart)
+
+// patience is the number of pauses a wait looks before it fails; each is
+// at least a millisecond.
+const patience = 5000
+
+// receive waits for a value on ch, at most [patience] pauses.
+func receive[T any](t *testing.T, what string, ch <-chan T) T {
+	t.Helper()
+	for range patience {
+		select {
+		case v := <-ch:
+			return v
+		default:
+			pause.Yield()
+		}
+	}
+	var zero T
+	t.Fatalf("timed out waiting for %s", what)
+	return zero
+}
+
+// quiet reports that nothing arrives on out across n pauses.
+func quiet[T any](t *testing.T, what string, out <-chan T, n int) {
+	t.Helper()
+	for range n {
+		select {
+		case v := <-out:
+			t.Fatalf("%s settled: %v", what, v)
+		default:
+			pause.Yield()
+		}
+	}
+}
+
+// pending reports that out has not settled across twenty pauses
 // (isSettled false).
 func pending(t *testing.T, out <-chan error) {
 	t.Helper()
-	select {
-	case err := <-out:
-		t.Fatalf("the held signal settled: %v", err)
-	case <-time.After(20 * time.Millisecond):
-	}
+	quiet(t, "the held signal", out, 20)
 }
 
 // settled waits for out (settlesPromptly true).
 func settled(t *testing.T, out <-chan error) error {
 	t.Helper()
-	select {
-	case err := <-out:
-		return err
-	case <-time.After(5 * time.Second):
-		t.Fatal("the held signal did not settle")
-		return nil
-	}
+	return receive(t, "the held signal to settle", out)
 }
 
 func (r *recorder) delivered(name string) []uint16 {
@@ -367,11 +395,7 @@ func goEnd(r *camera.Requestor, id uint16) <-chan error {
 
 func wait(t *testing.T, ch <-chan struct{}) {
 	t.Helper()
-	select {
-	case <-ch:
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out")
-	}
+	receive(t, "the signal", ch)
 }
 
 func ids(sessions []camera.WebRTCSession) []uint16 {
@@ -532,12 +556,16 @@ func TestParityMatterJS_RequestorSignalsAgainstChanges(t *testing.T) { //nolint:
 // "signals invoked through the interaction server" (:1040-1446) that runs
 // through the interaction server: the provider's signals reach the
 // requestor over a CASE session while the host holds the provider's
-// signals, on a site on the system clock (the requestor's hold timer is
-// the system's too, and every hold here ends by a registration well
-// inside it).
+// signals, on a site on the system clock. The requestor's hold timer runs
+// on a fake clock that is never moved, so a held signal waits until its
+// registration whatever the machine's speed, and a signal that waited
+// behind it would never settle.
 func TestParityMatterJS_RequestorHeldSignalsOverTheWire(t *testing.T) {
 	rec := &recorder{}
-	r := newRequestor(t, rec)
+	r, err := camera.NewRequestor(camera.RequestorConfig{Port: rec, Clock: clocktest.New(fabrictest.DefaultStart)})
+	if err != nil {
+		t.Fatal(err)
+	}
 	_, pair, ep := cameraPairOn(t, r, clock.System{})
 	ctx := wireCtx(t)
 	fabs, err := pair.Device.Node().Store().ListFabrics(ctx)
@@ -566,11 +594,7 @@ func TestParityMatterJS_RequestorHeldSignalsOverTheWire(t *testing.T) {
 	}
 	held := func(t *testing.T, out <-chan error) {
 		t.Helper()
-		select {
-		case err := <-out:
-			t.Fatalf("the held signal settled: %v", err)
-		case <-time.After(300 * time.Millisecond):
-		}
+		quiet(t, "the held signal", out, 300)
 	}
 
 	t.Run("delivers an offer the provider invokes before its response is processed", func(t *testing.T) { // :1174
@@ -618,13 +642,8 @@ func TestParityMatterJS_RequestorHeldSignalsOverTheWire(t *testing.T) {
 			WebRtcSessionId: 5,
 			IceCandidates:   []camera.ICECandidate{{Candidate: "c", SdpMid: spec.ValueOf("0"), SdpmLineIndex: spec.ValueOf[uint16](0)}},
 		})
-		select {
-		case err := <-candidates:
-			if err != nil {
-				t.Fatal(err)
-			}
-		case <-time.After(camera.EarlySignalHoldTime / 2):
-			t.Fatal("the candidates waited behind the held offer")
+		if err := receive(t, "the candidates, not behind the held offer", candidates); err != nil {
+			t.Fatal(err)
 		}
 		if _, ice := rec.counts(); ice != iceBefore+1 {
 			t.Fatalf("%d iceCandidates, want %d", ice, iceBefore+1)
