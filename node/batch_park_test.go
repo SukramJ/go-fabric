@@ -408,3 +408,66 @@ func TestParkedErasureRunsEveryRecordedKey(t *testing.T) {
 		t.Errorf("forget in progress %q after the heal; want none", rec)
 	}
 }
+
+// TestDeferredErasureIsJudgedWhenItRuns (decision 729, Fable L4): a
+// deferred erasure is judged with the batch that runs it, as within one
+// batch (decision 575). y serves owner's part key owner/light when
+// Forget(owner)'s reassembly fails; the next batch removes y, so when the
+// parked erasure runs nobody serves owner/light and it is erased with its
+// record. y, added again, gets its own number back, its part a new one —
+// not the outcome without the failure, where the erasure spares the
+// served part and y's Remove keeps its number.
+func TestDeferredErasureIsJudgedWhenItRuns(t *testing.T) {
+	ctx := t.Context()
+	const partKey = "owner/light"
+	s := newParkStores()
+	labels := &failingLabelReads{}
+	n := s.node(t, labels)
+	agg := n.Aggregator()
+	for _, d := range []*device.BridgedNode{bridgedWithParts(t, "owner", partKey), bridgedWithParts(t, "x")} {
+		if err := agg.Add(ctx, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := agg.Remove(ctx, endpoint.StringKey("owner")); err != nil {
+		t.Fatal(err)
+	}
+	if err := agg.Add(ctx, bridgedWithParts(t, "y", partKey)); err != nil {
+		t.Fatal(err)
+	}
+	yBefore, ok := servedNumberOf(n, "y")
+	if !ok {
+		t.Fatal("y is not served")
+	}
+	partBefore, ok := servedNumberOf(n, partKey)
+	if !ok {
+		t.Fatalf("%s is not served by y", partKey)
+	}
+	labels.fails.Store(1)
+	reassemblyErr(t, agg.Batch(ctx, func(b *node.Batch) error {
+		return b.Forget(endpoint.StringKey("owner"))
+	}))
+	if err := agg.Batch(ctx, func(b *node.Batch) error {
+		return b.Remove(endpoint.StringKey("y"))
+	}); err != nil {
+		t.Fatalf("the batch that removes y and runs the erasure: %v", err)
+	}
+	if hasEndpointRecord(t, s.eps, partKey) {
+		t.Errorf("%s's record survived the erasure; nobody served it when it ran", partKey)
+	}
+	if !hasEndpointRecord(t, s.eps, "y") {
+		t.Error("y's record is gone; the erasure does not reach y's own key")
+	}
+	if err := agg.Add(ctx, bridgedWithParts(t, "y", partKey)); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := servedNumberOf(n, "y"); !ok || got != yBefore {
+		t.Errorf("y returns at %d (served %v); want its own number %d", got, ok, yBefore)
+	}
+	if got, ok := servedNumberOf(n, partKey); !ok || got == partBefore {
+		t.Errorf("%s returns at %d (served %v); want a new number, not %d", partKey, got, ok, partBefore)
+	}
+}

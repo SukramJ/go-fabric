@@ -77,7 +77,8 @@ type BatchError struct {
 	// does too (returning its error plain), [Node.Stop] runs them once nothing is served, and the
 	// next [New] finishes what is left. Until then a removed device
 	// is still bound: an Add of the same instance is
-	// [device.ErrAddedElsewhere] in the next batch, which heals.
+	// [device.ErrAddedElsewhere] in the next batch, which heals when
+	// its reassembly succeeds.
 	Reassembly error
 }
 

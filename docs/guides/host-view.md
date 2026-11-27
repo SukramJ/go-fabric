@@ -273,11 +273,13 @@ later `Replace`, a held `Add` dropped by a `Remove` or `Forget`) — one
 call, in call order, with the call's kind (`BatchAdd`, `BatchReplace`,
 `BatchRemove`, `BatchForget`), its own key and `Applied`, which says
 whether the call changed state and only the store work after it failed
-(an `Add` then stays added, a `Forget` can be made again) — or, for a
-held `Replace` by a declaration the specification level withholds,
-whether it took the replaced endpoint off the wire. An erasure a failed
+(an `Add` then stays added, a `Forget` can be made again) — and true
+for a held `Replace` by a declaration the specification level withholds,
+which took the replaced endpoint off the wire. An erasure a failed
 reassembly deferred is recorded as a forget in progress: `Stop` runs it,
-and the next start finishes what is left. `Store`
+and the next start finishes what is left. It is judged with the batch
+that runs it: as within one batch, it spares what is served when it
+runs. `Store`
 holds the store errors of no call, `Reassembly` the reassembly's: the
 set holds the batch's changes but the node still serves the topology
 before, keeps the removed devices bound and defers the erasures. The

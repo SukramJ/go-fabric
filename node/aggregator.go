@@ -615,15 +615,17 @@ type takenCall struct {
 // (decision 722). Each such erasure is recorded as a forget in progress
 // at once; the next batch reassembles, an empty one too, then unbinds and
 // erases what the failed one left; a repeated failure is that batch's
-// error. [Node.Stop] unbinds and erases it once nothing is served, and
+// error. A deferred erasure is judged with the batch that runs it: it
+// spares what is served when it runs, as within one batch (decisions
+// 575, 729). [Node.Stop] unbinds and erases it once nothing is served, and
 // one that still cannot run — Stop, a crash, a store that refuses it —
 // is finished at the next [New] before the host adds anything (decision
 // 726). An erasure whose record cannot be written is its Forget's
 // [BatchCallError], applied: make the Forget again. Until the next
 // reassembly succeeds a removed device is still bound, so an Add of the
 // same instance is refused at the call with [device.ErrAddedElsewhere];
-// the batch that refuses it heals and unbinds it, and the next Add takes
-// it (decision 727). So a batch that starts after a failed reassembly
+// the batch that refuses it heals when its reassembly succeeds and then
+// unbinds it, and an Add after that takes it (decision 727). So a batch that starts after a failed reassembly
 // returned serves the whole set, or returns why not (issue #633, decision
 // 718).
 //
