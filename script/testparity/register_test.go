@@ -246,8 +246,10 @@ const testparityPlannedRatchet = 3
 // responder (P6-D): 179 ported, 1009 missing.
 // Review II phase 8 (#604, R2-C2-doc-2156) takes PeerAddressMonitorTest.ts's
 // four sleeping-LIT-ICD cases out of missing: 179 ported, 1005 missing.
+// Pin lift db91886c P1-A ports the new TlvWriteRequestTest.ts (#5047): 180
+// ported.
 const (
-	testparityPortedRatchet  = 179
+	testparityPortedRatchet  = 180
 	testparityMissingRatchet = 1005
 )
 

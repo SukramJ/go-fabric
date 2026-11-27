@@ -6,7 +6,11 @@ package bridge
 import (
 	"testing"
 
+	mattercore "thingfabric.dev/go-fabric/cluster/core"
+	bidef "thingfabric.dev/go-fabric/cluster/spec/basicinformation"
+	"thingfabric.dev/go-fabric/contract"
 	"thingfabric.dev/go-fabric/im"
+	"thingfabric.dev/go-fabric/store"
 	"thingfabric.dev/go-fabric/tlv"
 	"thingfabric.dev/go-fabric/transport/message"
 )
@@ -146,4 +150,82 @@ func TestRequestBooleanFieldOfAnotherTypeAnsweredFailure(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestRequestWithoutFlagsParityMatterJS: through the secure receive path, a
+// unicast Write without TimedRequest is written and answered, and an Invoke
+// without SuppressResponse and TimedRequest runs and is answered — both
+// flags are TlvOptionalField and read as false (TlvWriteRequest.ts:29,
+// TlvInvokeRequest.ts:23, :30 at db91886c). Mirrors
+// InteractionProtocolTest.ts:1438-1450 ("writes values when the request
+// leaves out TimedRequest") and :2176-2193 ("invokes a command whose
+// request leaves out SuppressResponse and TimedRequest") at db91886c.
+func TestRequestWithoutFlagsParityMatterJS(t *testing.T) {
+	t.Parallel()
+	t.Run("writes values when the request leaves out TimedRequest", func(t *testing.T) {
+		t.Parallel()
+		var bi *mattercore.BasicInformation
+		h := newSecureHarness(t, nil, func(*store.Store, uint8) []contract.ClusterServer {
+			var err error
+			if bi, err = mattercore.NewBasicInformation(mattercore.Config{VendorID: 0xFFF1, ProductID: 0x8001, NodeLabel: "", VendorName: "v", ProductName: "p", SerialNumber: "s"}); err != nil {
+				t.Fatal(err)
+			}
+			return []contract.ClusterServer{bi}
+		})
+		h.allowAll()
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		enc.StartArray(tlv.ContextTag(2))
+		enc.StartStruct(tlv.AnonymousTag())
+		im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x0028, Attribute: 0x0005, HasEndpoint: true, HasCluster: true, HasAttribute: true}.MarshalTLV(enc, tlv.ContextTag(1))
+		enc.PutUTF8(tlv.ContextTag(2), "test")
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+		enc.PutUint(tlv.ContextTag(0xFF), 12)
+		_ = enc.EndContainer()
+		body, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		op, payload, ok := h.exchange(im.OpcodeWriteRequest, body)
+		if !ok || op != im.OpcodeWriteResponse {
+			t.Fatalf("reply opcode 0x%02X (ok=%v), want WriteResponse", op, ok)
+		}
+		statuses := decodeTLVTree(t, payload).mustChild(t, 0).Children
+		if len(statuses) != 1 {
+			t.Fatalf("%d AttributeStatusIBs, want 1", len(statuses))
+		}
+		if got := im.StatusCode(statuses[0].mustChild(t, 1).mustChild(t, 0).El.Uint); got != im.StatusSuccess {
+			t.Fatalf("NodeLabel write status %v, want SUCCESS", got)
+		}
+		if v, _ := bi.MatterRead(bidef.AttrNodeLabel); v.(tlv.BoundedString).Value != "test" {
+			t.Fatalf("NodeLabel = %v, want test", v)
+		}
+	})
+	t.Run("invokes a command whose request leaves out SuppressResponse and TimedRequest", func(t *testing.T) {
+		t.Parallel()
+		h, srv, ep := newScriptedHarness(t)
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		enc.StartArray(tlv.ContextTag(2))
+		enc.StartStruct(tlv.AnonymousTag())
+		im.ConcreteCommandPath{Endpoint: ep, Cluster: 0x0006, Command: 0x01, HasEndpoint: true, HasCluster: true, HasCommand: true}.MarshalTLV(enc, tlv.ContextTag(0))
+		enc.StartStruct(tlv.ContextTag(1))
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+		enc.PutUint(tlv.ContextTag(0xFF), 12)
+		_ = enc.EndContainer()
+		body, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		op, _, ok := h.exchange(im.OpcodeInvokeRequest, body)
+		if !ok || op != im.OpcodeInvokeResponse {
+			t.Fatalf("reply opcode 0x%02X (ok=%v), want InvokeResponse", op, ok)
+		}
+		if !srv.isOn() {
+			t.Fatal("On did not run")
+		}
+	})
 }

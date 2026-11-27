@@ -10,7 +10,13 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `im`: `RequestEncoding{OmitFalseFlags}`, `MarshalInvokeRequestTLVWith` and `WriteRequest.MarshalTLVWith` — the client encoders can leave out a SuppressResponse and a TimedRequest that are false (a true flag is written, MoreChunkedMessages stays); `MarshalInvokeRequestTLV` and `WriteRequest.MarshalTLV` keep writing both. `WriteRequest.HasSuppressResponse` says whether a decoded WriteRequest carried SuppressResponse (matter.js #5047, pin db91886c).
+
 ### Changed
+
+- `im`, `bridge` (matter.js #5047, pin db91886c): an InvokeRequest without SuppressResponse or TimedRequest and a WriteRequest without TimedRequest are no longer refused as a missing field (InvalidAction): the absent flag reads as false, so the request runs and is answered. A group WriteRequest without SuppressResponse counts it as true — it is written, and one with MoreChunkedMessages is refused (InvalidAction); a group write with an explicit SuppressResponse false stays refused. `im.HandleGroupWrite` and `HandleGroupWriteRequest` read `WriteRequest.HasSuppressResponse`: a hand-built `WriteRequest{}` without it now means "absent" and runs as a suppressed group write instead of InvalidAction — set `HasSuppressResponse: true` to state an explicit false.
 
 - Dependencies: `golang.org/x/net` v0.62.0 → v0.63.0, `golang.org/x/tools` v0.52.0 → v0.53.0, `modernc.org/sqlite` v1.61.1 → v1.63.0 (with `modernc.org/libc` v1.80.1, `golang.org/x/sys` v0.50.0, `golang.org/x/sync` v0.25.0, `golang.org/x/mod` v0.43.0 and the `golang.org/x/exp` of the `apidiff` tool at `d6646c509b6d`); the nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in their `go.sum`. The pinned `golangci-lint` moves to v2.15.0 (`Makefile`, `ci.yml`); `script/ble-virtual` takes `semver` 7.8.6 (supersedes #531 and #541). No licence changes.
 

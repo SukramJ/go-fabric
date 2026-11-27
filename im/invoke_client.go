@@ -16,20 +16,32 @@ import (
 // The tags are the server side's; the shape is matter.js's TlvInvokeRequest
 // / TlvInvokeResponse (packages/types/src/protocol/messages/).
 
-// MarshalInvokeRequestTLV encodes req as an InvokeRequestMessage, each
+// MarshalInvokeRequestTLV encodes req as an InvokeRequestMessage:
+// [MarshalInvokeRequestTLVWith] with the zero [RequestEncoding], both
+// flags written.
+func MarshalInvokeRequestTLV(enc *tlv.Encoder, req InvokeRequest, fieldsWriter CommandFieldsWriter) {
+	MarshalInvokeRequestTLVWith(enc, req, fieldsWriter, RequestEncoding{})
+}
+
+// MarshalInvokeRequestTLVWith encodes req as an InvokeRequestMessage, each
 // command's fields through fieldsWriter, in matter.js TlvInvokeRequest's
-// field order (packages/types/src/protocol/messages/TlvInvokeRequest.ts:17-31
-// at b25ed960): the DelayReportData (tag 3) when req carries one, both its
-// fields written (TlvDelayReportData.ts, TlvField with a decode fallback
-// only), then req's InteractionModelRevision — this module's
+// field order (packages/types/src/protocol/messages/TlvInvokeRequest.ts:17-39
+// at db91886c): SuppressResponse (0) and TimedRequest (1), each left out
+// when it is false and how omits false flags, the DelayReportData (tag 3)
+// when req carries one, both its fields written (TlvDelayReportData.ts,
+// TlvField with a decode fallback only), then req's InteractionModelRevision — this module's
 // [MatterInteractionModelRevision] when 0. fieldsWriter is required: it
 // is called for every command data, and a nil one panics — unlike the
 // reader of [UnmarshalInvokeResponseTLV], which may be nil (review II,
 // R2-P6-api-0566).
-func MarshalInvokeRequestTLV(enc *tlv.Encoder, req InvokeRequest, fieldsWriter CommandFieldsWriter) {
+func MarshalInvokeRequestTLVWith(enc *tlv.Encoder, req InvokeRequest, fieldsWriter CommandFieldsWriter, how RequestEncoding) {
 	enc.StartStruct(tlv.AnonymousTag())
-	enc.PutBool(tlv.ContextTag(tagInvokeReqSuppressResponse), req.SuppressResponse)
-	enc.PutBool(tlv.ContextTag(tagInvokeReqTimedRequest), req.TimedRequest)
+	if req.SuppressResponse || !how.OmitFalseFlags {
+		enc.PutBool(tlv.ContextTag(tagInvokeReqSuppressResponse), req.SuppressResponse)
+	}
+	if req.TimedRequest || !how.OmitFalseFlags {
+		enc.PutBool(tlv.ContextTag(tagInvokeReqTimedRequest), req.TimedRequest)
+	}
 	enc.StartArray(tlv.ContextTag(tagInvokeReqInvokeRequests))
 	for _, inv := range req.Invokes {
 		enc.StartStruct(tlv.AnonymousTag())

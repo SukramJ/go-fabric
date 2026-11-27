@@ -3045,7 +3045,7 @@
   },
   {
     "file": "im/write.go",
-    "line": 573,
+    "line": 585,
     "citation": "AttributeWriteResponse.ts:355-358",
     "resolved": "packages/protocol/src/action/server/AttributeWriteResponse.ts",
     "identifier": "isHeldByOtherWrite",

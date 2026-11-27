@@ -4883,8 +4883,10 @@
         "im:TestChunkedWriteHoldParityMatterJS",
         "im:TestGroupInvokeParityMatterJS",
         "im:TestGroupWriteParityMatterJS",
+        "im:TestGroupWriteSuppressResponsePresenceFromTheDecoder",
         "node:TestInteractionProtocolParityMatterJS",
-        "node:TestWildcardPathFlagsParityMatterJS"
+        "node:TestWildcardPathFlagsParityMatterJS",
+        "bridge:TestRequestWithoutFlagsParityMatterJS"
       ],
       "missing": [
         "does not answer the subscriber's error status for the initial report with a status",
@@ -4911,8 +4913,8 @@
           "reason": "matter.js log-line text of a unicast invoke"
         }
       ],
-      "reason": "The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case. Pin lift b25ed960: under SuppressResponse no InvokeResponse is sent also when a CommandDataIB was produced (#5011, P1-C; findings F-b25ed960-6 closed); the two held-response cases it replaces are gone upstream and from the Go subtests, and the suppressed cases (command throws, only a status, a CommandDataIB) are ported.",
-      "snapshotSha": "35735557f10029f24896788242447a6db8cb9879"
+      "reason": "The version filters, path ceilings, wildcard writes, the timed-interaction gates and the invoke-batch checks are covered on the Go IM paths; chunked-write holds, group dispatch, response chunking and the remaining read/subscribe cases are not ported case by case. Pin lift b25ed960: under SuppressResponse no InvokeResponse is sent also when a CommandDataIB was produced (#5011, P1-C; findings F-b25ed960-6 closed); the two held-response cases it replaces are gone upstream and from the Go subtests, and the suppressed cases (command throws, only a status, a CommandDataIB) are ported. Pin lift db91886c (#5047, P1-A): a Write without TimedRequest and an Invoke without SuppressResponse and TimedRequest are processed and answered (bridge, over the secure receive path), and a group write without SuppressResponse counts it as true — written and unanswered, refused when chunked — while an explicit false is refused (im, on HandleGroupWrite and from the decoder).",
+      "snapshotSha": "1222a615f3e682803d4882932b3c79456416611b"
     },
     {
       "path": "packages/node/test/endpoint/server/ProtocolServiceTest.ts",
@@ -10913,8 +10915,18 @@
           "reason": "a second TLV schema object without the field; the module's one InvokeRequest decoder reads tag 3 and skips other unknown context tags"
         }
       ],
-      "reason": "The decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. Missing: the module has no DelayReportData encoder (its client sends none), so the encoded bytes are not asserted.",
-      "snapshotSha": "a128398457c1e9540f4ec396692315b36f110286"
+      "reason": "The CHIP SDK's group invoke without SuppressResponse and TimedRequest decodes with both false (pin lift db91886c, #5047), and the decode side of DelayReportData on im.UnmarshalInvokeRequestTLV: tag 3 with its two fields (the decode half of the round trip), a request without it, a missing field as 0, a value that is not a structure refused. Missing: the module has no DelayReportData encoder (its client sends none), so the encoded bytes are not asserted.",
+      "snapshotSha": "1ee2a8f6ade2c5664c1d6ea3223bd473e3a5b821"
+    },
+    {
+      "path": "packages/types/test/protocol/TlvWriteRequestTest.ts",
+      "status": "ported",
+      "go": [
+        "im:TestTlvWriteRequestParityMatterJS",
+        "im:TestMandatoryWriteInvokeFieldParity"
+      ],
+      "reason": "A WriteRequest that carries only WriteRequests decodes on im.UnmarshalWriteRequestTLV with SuppressResponse absent and TimedRequest false (pin lift db91886c, #5047).",
+      "snapshotSha": "f383cf710e4e86c35af975b9853d84b8436fa745"
     },
     {
       "path": "packages/types/test/schema/Base38SchemaTest.ts",

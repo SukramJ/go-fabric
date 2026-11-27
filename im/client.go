@@ -112,21 +112,49 @@ func DataVersionFilterSize(f DataVersionFilter) int {
 	return len(b)
 }
 
-// MarshalTLV encodes w as a client sends it. Mirrors matter.js
-// packages/types/src/protocol/messages/TlvWriteRequest.ts:16-27 at
-// db021da0 with the request action/request/Write.ts:49-191 builds:
-// SuppressResponse (0) only when set, TimedRequest (1), WriteRequests (2)
+// MarshalTLV encodes w as a client sends it: [WriteRequest.MarshalTLVWith]
+// with the zero [RequestEncoding], every flag written.
+func (w WriteRequest) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWriter) {
+	w.MarshalTLVWith(enc, valueWriter, RequestEncoding{})
+}
+
+// RequestEncoding is how a client's Invoke or Write request flags go on
+// the wire. It is an encoder argument, not a field of [InvokeRequest] or
+// [WriteRequest]: those structs are shared with the server's decoders, and
+// matter.js keeps the option off the server's request types too (it lives
+// on the client's request options,
+// packages/protocol/src/action/client/RequestFlagsOptions.ts:10-22 at
+// db91886c).
+type RequestEncoding struct {
+	// OmitFalseFlags leaves out a SuppressResponse and a TimedRequest that
+	// are false; a true flag is written. Mirrors the copy
+	// InteractionClientMessenger.requestFlagsForSending returns when it
+	// omits (packages/protocol/src/interaction/InteractionMessenger.ts:1587-1611
+	// at db91886c, the copy :1603-1610). MoreChunkedMessages and InteractionModelRevision are
+	// untouched. Whether to omit is the sender's decision
+	// (client/interaction's request flag rule), not the encoder's.
+	OmitFalseFlags bool
+}
+
+// MarshalTLVWith encodes w as a client sends it, its flags as how says.
+// Mirrors matter.js
+// packages/types/src/protocol/messages/TlvWriteRequest.ts:16-35 at
+// db91886c with the request action/request/Write.ts:49-191 builds:
+// SuppressResponse (0) only when set, TimedRequest (1) unless how omits
+// it as false, WriteRequests (2)
 // of AttributeDataIB — DataVersion (0) when set, Path (1), Data (2)
 // through valueWriter (the attribute's own TLV schema, Write.ts:165-186
-// at db021da0) — MoreChunkedMessages (3),
-// which the request builder defaults to false (Write.ts:83), and
+// at db021da0) — MoreChunkedMessages (3), always written, false
+// when no chunk follows (Write.ts:86-88 at db91886c), and
 // InteractionModelRevision (0xFF).
-func (w WriteRequest) MarshalTLV(enc *tlv.Encoder, valueWriter AttributeValueWriter) {
+func (w WriteRequest) MarshalTLVWith(enc *tlv.Encoder, valueWriter AttributeValueWriter, how RequestEncoding) {
 	enc.StartStruct(tlv.AnonymousTag())
 	if w.SuppressResponse {
 		enc.PutBool(tlv.ContextTag(tagWriteReqSuppressResponse), true)
 	}
-	enc.PutBool(tlv.ContextTag(tagWriteReqTimedRequest), w.TimedRequest)
+	if w.TimedRequest || !how.OmitFalseFlags {
+		enc.PutBool(tlv.ContextTag(tagWriteReqTimedRequest), w.TimedRequest)
+	}
 	enc.StartArray(tlv.ContextTag(tagWriteReqWriteRequests))
 	for _, a := range w.Writes {
 		enc.StartStruct(tlv.AnonymousTag())
