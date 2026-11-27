@@ -866,8 +866,10 @@ const driveStep = 50 * time.Millisecond
 
 // runDriven runs run and advances clock by driveStep at a time until it
 // returns: the flow's waits — the exchange's response timeout, the
-// expiry's canceledExpiryWait — run on clock. It returns clock's time at the return and
-// clock's time at the return; the test fails after ten wall seconds.
+// expiry's canceledExpiryWait — run on clock. It returns clock's time at
+// the return and run's error; the test fails after ten wall seconds.
+// Between two steps it paces with clock's Yield (the fake clock's own
+// pause), not a wall-clock sleep of its own.
 func runDriven(t *testing.T, clock *fakeClock, run func() error) (time.Time, error) {
 	t.Helper()
 	done := make(chan error, 1)
@@ -883,6 +885,6 @@ func runDriven(t *testing.T, clock *fakeClock, run func() error) (time.Time, err
 			t.Fatal("the flow has not returned")
 		}
 		clock.Advance(driveStep)
-		time.Sleep(time.Millisecond)
+		clock.Yield()
 	}
 }

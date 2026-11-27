@@ -309,7 +309,7 @@ func (f *flow) now() time.Time { return f.c.ctx.Clock.Now() }
 // longer (requestContext).
 func (f *flow) execute(ctx context.Context) error {
 	f.sortSteps()
-	// The BLE re-arm timer ends with the flow (close, :2138-2140).
+	// The BLE re-arm timer ends with the flow (close, :2256-2259).
 	defer f.stopArmInterval()
 	rearmedAfterPrevious := false
 	for _, s := range f.steps {
@@ -388,7 +388,7 @@ func (f *flow) requestContext(ctx context.Context) context.Context {
 }
 
 // canceled reports whether the caller canceled before the commit cut-off:
-// `this.#requestAbort?.aborted` (:458, :479-480).
+// `this.#requestAbort?.aborted` (:458, :480-481).
 func (f *flow) canceled(ctx context.Context) bool {
 	return !f.committed && ctx.Err() != nil
 }
@@ -396,17 +396,22 @@ func (f *flow) canceled(ctx context.Context) bool {
 // cancelError is the error a canceled flow returns: the cancel's reason
 // (`throw asError(cancel.reason)`, ControllerCommissioningFlow.ts:486 at
 // db91886c) — context.Cause(ctx) — which also matches ctx.Err() with
-// errors.Is (a reason that is not ctx.Err() is joined with it,
-// [canceledError]). A step's own error that came with the cancel is not
-// returned.
+// errors.Is: a reason that matches ctx.Err() already (ctx.Err() itself, or
+// a reason that wraps it, such as fmt.Errorf("user quit: %w",
+// context.Canceled)) is returned as it is, one that does not is joined
+// with it ([canceledError]). A step's own error that came with the cancel
+// is not returned.
 func cancelError(ctx context.Context) error {
 	err := ctx.Err()
 	if err == nil {
 		return nil
 	}
 	cause := context.Cause(ctx)
-	if cause == nil || errors.Is(cause, err) {
+	if cause == nil {
 		return err
+	}
+	if errors.Is(cause, err) {
+		return cause
 	}
 	return &canceledError{cause: cause, ctxErr: err}
 }
@@ -1535,7 +1540,7 @@ func (f *flow) reconnectWithDevice(ctx context.Context) (stepResult, error) {
 
 // completeCommissioning is step 20.1: CommissioningComplete over CASE,
 // checked, the failsafe end cleared. Mirrors matter.js
-// packages/protocol/src/peer/ControllerCommissioningFlow.ts:2175-2200 at
+// packages/protocol/src/peer/ControllerCommissioningFlow.ts:2175-2199 at
 // db91886c (#completeCommissioning): its first act is the commit cut-off
 // (`this.#commitStarted = true`, :2176) — from here the caller's cancel
 // reaches no request and no step (requestContext), so the device's answer
