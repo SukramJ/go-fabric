@@ -760,6 +760,11 @@ func (a *Aggregator) leave(ctx context.Context, detach []func(), erase []reserva
 			continue
 		}
 		erase[i].marked = &f
+		// The run covers every key the record names, and servedInErasure
+		// judges them all (it reads tree): a reservation under key that
+		// grew since the call and is released before the run is erased
+		// all the same, not cleared with the record unerased (Fable R1).
+		erase[i].tree = slices.DeleteFunc(slices.Clone(f.Keys), func(k string) bool { return k == erase[i].key })
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()

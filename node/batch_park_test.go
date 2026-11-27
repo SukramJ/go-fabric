@@ -362,3 +362,49 @@ func TestCancelForgetErrorIsStore(t *testing.T) {
 		t.Fatalf("Batch: %v; want the cancel's read error in Store alone", err)
 	}
 }
+
+// TestParkedErasureRunsEveryRecordedKey (Fable R1, unit level): the run
+// of a parked erasure covers every key its record names, even one whose
+// reservation under the forgotten key is gone by the run. The store is
+// written directly to make the case: b's reservation grows to x between
+// the Forget's call and the parking (in the field an undone take's joined
+// reserve, refuseLateCollisionsLocked) and is released before the run (in
+// the field an Add of b in the next batch). Without the record's keys in
+// the op the run erased b alone and cleared the record with x unerased.
+func TestParkedErasureRunsEveryRecordedKey(t *testing.T) {
+	ctx := t.Context()
+	s := newParkStores()
+	labels := &failingLabelReads{}
+	n := s.node(t, labels, "a", "b", "x")
+	agg := n.Aggregator()
+	if err := agg.Batch(ctx, func(b *node.Batch) error {
+		return b.Remove(endpoint.StringKey("x"))
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !hasEndpointRecord(t, s.eps, "x") {
+		t.Fatal("removed x has no record; the case needs one")
+	}
+	node.SetAfterFailedReassembly(agg, func() {
+		node.SetAfterFailedReassembly(agg, nil)
+		if err := s.creds.Port.SetSetting(ctx, "endpoint_number_reserved.b", `["b","x"]`); err != nil {
+			t.Error(err)
+		}
+	})
+	reassemblyErr(t, parkForgetB(t, n, labels))
+	if rec := s.pendingForget(t); !strings.Contains(rec, `"x"`) {
+		t.Fatalf("forget in progress %q; want x recorded at parking", rec)
+	}
+	if err := s.creds.Port.SetSetting(ctx, "endpoint_number_reserved.b", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := agg.Batch(ctx, func(*node.Batch) error { return nil }); err != nil {
+		t.Fatalf("healing batch: %v", err)
+	}
+	if hasEndpointRecord(t, s.eps, "x") {
+		t.Error("x's record survived the run of the erasure that recorded it")
+	}
+	if rec := s.pendingForget(t); rec != "" {
+		t.Errorf("forget in progress %q after the heal; want none", rec)
+	}
+}
