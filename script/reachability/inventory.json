@@ -26209,7 +26209,7 @@
       "identifier": "TestClientAttestationCancelParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/commissioning_cancel_parity_matterjs_test.go",
-      "line": 350
+      "line": 359
     },
     {
       "package": "controller/commissioner",
@@ -26265,7 +26265,7 @@
       "identifier": "TestCommissioningCancelParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/commissioning_cancel_parity_matterjs_test.go",
-      "line": 131
+      "line": 132
     },
     {
       "package": "controller/commissioner",
@@ -26447,7 +26447,7 @@
       "identifier": "TestEnsureFailsafeTimerFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 810
+      "line": 822
     },
     {
       "package": "controller/commissioner",
@@ -26552,28 +26552,28 @@
       "identifier": "TestFlowCumulativeTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 190
+      "line": 196
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFlowDisarmsFailsafeStartedNotAnswered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 476
+      "line": 484
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFlowDisarmsFailsafeWhenCallerAborts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 316
+      "line": 322
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFlowErrorClasses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 214
+      "line": 220
     },
     {
       "package": "controller/commissioner",
@@ -26594,21 +26594,21 @@
       "identifier": "TestFlowRearmsBelowHalf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 159
+      "line": 165
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFlowReconnectAbort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 620
+      "line": 630
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFlowResetsFailsafeAfterContextEnded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
-      "line": 280
+      "line": 286
     },
     {
       "package": "controller/commissioner",
@@ -26958,7 +26958,7 @@
       "identifier": "TestSplitCommissioningHandOffOutlastsTimeLimit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/commissioning_cancel_parity_matterjs_test.go",
-      "line": 316
+      "line": 325
     },
     {
       "package": "controller/commissioner",
