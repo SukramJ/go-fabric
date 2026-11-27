@@ -3,13 +3,15 @@
 
 // WebRtcTransportRequestor: a port of matter.js
 // packages/node/test/behaviors/web-rtc-transport-requestor/
-// WebRtcTransportRequestorServerTest.ts at 862ad75f, by meaning. Its 28
-// `it` cases (37 with the four commands of :258-282 expanded) are the
-// subtests of the three tests below. matter.js's withPeerContext (:52-64)
+// WebRtcTransportRequestorServerTest.ts at db91886c, by meaning: the
+// groups "upsertSession / removeSession", "command identity checks and
+// events" and "ACL install"; the hold of early signals and the signals
+// through the interaction server are requestor_hold_parity_matterjs_test.go.
+// matter.js's withPeerContext (:85-97)
 // invokes the server's methods under a mocked remote actor with a fabric
 // and a peer node; here peer is the context the bridge stamps for a CASE
 // invoke (im.WithFabricFilter, im.WithSubject) and the command runs
-// through MatterInvoke. The ACL cases (:550-604) and one signal of each
+// through MatterInvoke. The ACL cases (:1448-1523) and one signal of each
 // kind run over the wire on fabrictest.
 package camera_test
 
@@ -22,6 +24,7 @@ import (
 	"time"
 
 	"thingfabric.dev/go-fabric/bridge/bridgetest"
+	"thingfabric.dev/go-fabric/clock"
 	"thingfabric.dev/go-fabric/cluster/camera"
 	"thingfabric.dev/go-fabric/cluster/spec"
 	wrdef "thingfabric.dev/go-fabric/cluster/spec/webrtctransportrequestor"
@@ -32,7 +35,7 @@ import (
 	"thingfabric.dev/go-fabric/store"
 )
 
-// makeSession is WebRtcTransportRequestorServerTest.ts:66-78.
+// makeSession is WebRtcTransportRequestorServerTest.ts:99-111.
 func makeSession(edit ...func(*camera.WebRTCSession)) camera.WebRTCSession {
 	video, audio := []uint16{10}, []uint16{20}
 	s := camera.WebRTCSession{
@@ -80,6 +83,8 @@ type answered struct {
 type refusal struct {
 	signal    camera.Signal
 	sessionID uint16
+	fabric    uint8
+	node      uint64
 }
 
 func (r *recorder) Offer(_ context.Context, s camera.WebRTCSession, _ wrdef.OfferRequest) {
@@ -106,10 +111,10 @@ func (r *recorder) End(_ context.Context, s camera.WebRTCSession, _ uint8) {
 	r.ends = append(r.ends, s)
 }
 
-func (r *recorder) Refused(_ context.Context, signal camera.Signal, id uint16, _ uint8, _ uint64) {
+func (r *recorder) Refused(_ context.Context, signal camera.Signal, id uint16, fabric uint8, nodeID uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.refusals = append(r.refusals, refusal{signal, id})
+	r.refusals = append(r.refusals, refusal{signal, id, fabric, nodeID})
 }
 
 func newRequestor(t *testing.T, port camera.RequestorPort) *camera.Requestor {
@@ -130,13 +135,13 @@ func upsert(t *testing.T, r *camera.Requestor, sessions ...camera.WebRTCSession)
 	}
 }
 
-// peer is withPeerContext (:52-64): a CASE invoke of fabricIndex's node
+// peer is withPeerContext (:85-97): a CASE invoke of fabricIndex's node
 // peerNodeID.
 func peer(fabricIndex uint8, peerNodeID uint64) context.Context {
 	return im.WithSubject(im.WithFabricFilter(context.Background(), false, fabricIndex), peerNodeID, nil)
 }
 
-// The command cases of :226-256.
+// The command cases of :371-401.
 type commandCase struct {
 	name   string
 	invoke func(ctx context.Context, r *camera.Requestor, id uint16) error
@@ -185,51 +190,51 @@ func end(r *camera.Requestor, fabric uint8, nodeID uint64, id uint16) error {
 }
 
 // TestParityMatterJS_RequestorUpsertRemove is "upsertSession /
-// removeSession" (:81-202).
+// removeSession" (:133-347).
 func TestParityMatterJS_RequestorUpsertRemove(t *testing.T) {
-	t.Run("inserts a new session by id", func(t *testing.T) { // :94
+	t.Run("inserts a new session by id", func(t *testing.T) { // :146
 		r := newRequestor(t, nil)
 		upsert(t, r, makeSession(withID(1)))
 		if got := r.Sessions(); len(got) != 1 || got[0].Id != 1 {
 			t.Fatalf("sessions %+v", got)
 		}
 	})
-	t.Run("replaces an existing session with the same id, fabric and peer node", func(t *testing.T) { // :104
+	t.Run("replaces an existing session with the same id, fabric and peer node", func(t *testing.T) { // :156
 		r := newRequestor(t, nil)
 		upsert(t, r, makeSession(withUsage(wrdef.StreamUsageLiveView)), makeSession(withUsage(wrdef.StreamUsageRecording)))
 		if got := r.Sessions(); len(got) != 1 || got[0].StreamUsage != wrdef.StreamUsageRecording {
 			t.Fatalf("sessions %+v", got)
 		}
 	})
-	t.Run("keeps sessions with the same id from different peer nodes", func(t *testing.T) { // :117
+	t.Run("keeps sessions with the same id from different peer nodes", func(t *testing.T) { // :262
 		r := newRequestor(t, nil)
 		upsert(t, r, makeSession(withPeer(10)), makeSession(withPeer(99)))
 		if got := peers(r.Sessions()); !slices.Equal(got, []uint64{10, 99}) {
 			t.Fatalf("peer nodes %v", got)
 		}
 	})
-	t.Run("keeps sessions with the same id and peer node on different fabrics", func(t *testing.T) { // :127
+	t.Run("keeps sessions with the same id and peer node on different fabrics", func(t *testing.T) { // :272
 		r := newRequestor(t, nil)
 		upsert(t, r, makeSession(withFabric(1)), makeSession(withFabric(2)))
 		if got := fabrics(r.Sessions()); !slices.Equal(got, []uint8{1, 2}) {
 			t.Fatalf("fabrics %v", got)
 		}
 	})
-	t.Run("mirrors videoStreams[0] into deprecated videoStreamId scalar", func(t *testing.T) { // :137
+	t.Run("mirrors videoStreams[0] into deprecated videoStreamId scalar", func(t *testing.T) { // :282
 		r := newRequestor(t, nil)
 		upsert(t, r, makeSession())
 		if v := r.Sessions()[0].VideoStreamId; v == nil || v.Null || v.Value != 10 {
 			t.Fatalf("VideoStreamId %+v", v)
 		}
 	})
-	t.Run("mirrors audioStreams[0] into deprecated audioStreamId scalar", func(t *testing.T) { // :146
+	t.Run("mirrors audioStreams[0] into deprecated audioStreamId scalar", func(t *testing.T) { // :291
 		r := newRequestor(t, nil)
 		upsert(t, r, makeSession())
 		if v := r.Sessions()[0].AudioStreamId; v == nil || v.Null || v.Value != 20 {
 			t.Fatalf("AudioStreamId %+v", v)
 		}
 	})
-	t.Run("removes a session by its key", func(t *testing.T) { // :155
+	t.Run("removes a session by its key", func(t *testing.T) { // :300
 		r := newRequestor(t, nil)
 		s := makeSession()
 		upsert(t, r, s)
@@ -238,7 +243,7 @@ func TestParityMatterJS_RequestorUpsertRemove(t *testing.T) {
 			t.Fatalf("sessions %+v", got)
 		}
 	})
-	t.Run("removeSession is a no-op when the id is absent", func(t *testing.T) { // :166
+	t.Run("removeSession is a no-op when the id is absent", func(t *testing.T) { // :311
 		r := newRequestor(t, nil)
 		s := makeSession()
 		upsert(t, r, s)
@@ -249,7 +254,7 @@ func TestParityMatterJS_RequestorUpsertRemove(t *testing.T) {
 			t.Fatalf("sessions %+v", got)
 		}
 	})
-	t.Run("removeSession keeps the session with the same id from another peer node", func(t *testing.T) { // :177
+	t.Run("removeSession keeps the session with the same id from another peer node", func(t *testing.T) { // :322
 		r := newRequestor(t, nil)
 		a, b := makeSession(withPeer(10)), makeSession(withPeer(99))
 		upsert(t, r, a, b)
@@ -258,7 +263,7 @@ func TestParityMatterJS_RequestorUpsertRemove(t *testing.T) {
 			t.Fatalf("peer nodes %v", got)
 		}
 	})
-	t.Run("removeSession keeps the session with the same id and peer node on another fabric", func(t *testing.T) { // :190
+	t.Run("removeSession keeps the session with the same id and peer node on another fabric", func(t *testing.T) { // :335
 		r := newRequestor(t, nil)
 		a, b := makeSession(withFabric(1)), makeSession(withFabric(2))
 		upsert(t, r, a, b)
@@ -285,7 +290,7 @@ func fabrics(sessions []camera.WebRTCSession) []uint8 {
 	return out
 }
 
-// The fixture of "command identity checks and events" (:204-224).
+// The fixture of "command identity checks and events" (:349-369).
 const (
 	fabric1   uint8  = 1
 	peerNode  uint64 = 42
@@ -301,9 +306,9 @@ func signallingRequestor(t *testing.T) (*camera.Requestor, *recorder) {
 }
 
 // TestParityMatterJS_RequestorCommands is "command identity checks and
-// events" (:204-548).
+// events" (:349-710).
 func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocyclo,funlen // one subtest per matter.js case
-	for _, c := range commandCases { // :258-282
+	for _, c := range commandCases { // :403-427
 		t.Run(c.name+" returns NOT_FOUND when session id is unknown", func(t *testing.T) {
 			r, _ := signallingRequestor(t)
 			wantStatus(t, c.invoke(peer(fabric1, peerNode), r, 999), im.StatusNotFound)
@@ -317,15 +322,15 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 			wantStatus(t, c.invoke(peer(fabric1, 99), r, sessionID), im.StatusNotFound)
 		})
 	}
-	t.Run("refused names the signal and the unknown session id", func(t *testing.T) { // :284
+	t.Run("refused names the signal, the unknown session id and the peer", func(t *testing.T) { // :429
 		r, rec := signallingRequestor(t)
 		_, err := r.MatterInvoke(peer(fabric1, peerNode), wrdef.CmdOffer, wrdef.OfferRequest{WebRtcSessionId: 999, Sdp: "offer"})
 		wantStatus(t, err, im.StatusNotFound)
-		if want := []refusal{{camera.Signal("offer"), 999}}; !slices.Equal(rec.refusals, want) {
+		if want := []refusal{{camera.Signal("offer"), 999, fabric1, peerNode}}; !slices.Equal(rec.refusals, want) {
 			t.Fatalf("refusals %+v, want %+v", rec.refusals, want)
 		}
 	})
-	t.Run("refused does not fire for a session the peer holds", func(t *testing.T) { // :302
+	t.Run("refused does not fire for a session the peer holds", func(t *testing.T) { // :464
 		r, rec := signallingRequestor(t)
 		if _, err := r.MatterInvoke(peer(fabric1, peerNode), wrdef.CmdOffer, wrdef.OfferRequest{WebRtcSessionId: sessionID, Sdp: "offer"}); err != nil {
 			t.Fatal(err)
@@ -334,26 +339,26 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 			t.Fatalf("refusals %+v", rec.refusals)
 		}
 	})
-	t.Run("iceCandidates records no refusal for an empty list, which never reaches a session", func(t *testing.T) { // :318
+	t.Run("iceCandidates records no refusal for an empty list, which never reaches a session", func(t *testing.T) { // :480
 		r, rec := signallingRequestor(t)
 		_, _ = r.MatterInvoke(peer(fabric1, peerNode), wrdef.CmdIceCandidates, wrdef.IceCandidatesRequest{WebRtcSessionId: sessionID})
 		if len(rec.refusals) != 0 {
 			t.Fatalf("refusals %+v", rec.refusals)
 		}
 	})
-	t.Run("iceCandidates returns CONSTRAINT_ERROR for an empty list", func(t *testing.T) { // :334
+	t.Run("iceCandidates returns CONSTRAINT_ERROR for an empty list", func(t *testing.T) { // :496
 		r, _ := signallingRequestor(t)
 		_, err := r.MatterInvoke(peer(fabric1, peerNode), wrdef.CmdIceCandidates, wrdef.IceCandidatesRequest{WebRtcSessionId: sessionID})
 		wantStatus(t, err, im.StatusConstraintError)
 	})
-	t.Run("end removes the session and a subsequent answer returns NOT_FOUND", func(t *testing.T) { // :350
+	t.Run("end removes the session and a subsequent answer returns NOT_FOUND", func(t *testing.T) { // :512
 		r, _ := signallingRequestor(t)
 		if err := end(r, fabric1, peerNode, sessionID); err != nil {
 			t.Fatal(err)
 		}
 		wantStatus(t, answer(r, fabric1, peerNode, sessionID, "answer"), im.StatusNotFound)
 	})
-	t.Run("end keeps the sessions of other fabrics", func(t *testing.T) { // :368
+	t.Run("end keeps the sessions of other fabrics", func(t *testing.T) { // :530
 		r, _ := signallingRequestor(t)
 		upsert(t, r, makeSession(withID(sessionID+1), withPeer(peerNode), withFabric(2)))
 		if err := end(r, fabric1, peerNode, sessionID); err != nil {
@@ -364,7 +369,7 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 		}
 	})
 
-	// "with a session of the same id from another peer node" (:386-444).
+	// "with a session of the same id from another peer node" (:548-606).
 	const otherPeer uint64 = 43
 	withOtherPeer := func(t *testing.T) (*camera.Requestor, *recorder) {
 		t.Helper()
@@ -372,7 +377,7 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 		upsert(t, r, makeSession(withID(sessionID), withPeer(otherPeer), withFabric(fabric1), withUsage(wrdef.StreamUsageRecording)))
 		return r, rec
 	}
-	t.Run("delivers each peer's signaling with its own session", func(t *testing.T) { // :401
+	t.Run("delivers each peer's signaling with its own session", func(t *testing.T) { // :563
 		r, rec := withOtherPeer(t)
 		if err := answer(r, fabric1, peerNode, sessionID, "a"); err != nil {
 			t.Fatal(err)
@@ -384,7 +389,7 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 			t.Fatalf("answers %+v, want %+v", rec.answers, want)
 		}
 	})
-	t.Run("end from one peer keeps the other peer's session", func(t *testing.T) { // :423
+	t.Run("end from one peer keeps the other peer's session", func(t *testing.T) { // :585
 		r, _ := withOtherPeer(t)
 		if err := end(r, fabric1, peerNode, sessionID); err != nil {
 			t.Fatal(err)
@@ -398,8 +403,8 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 	})
 
 	// "with a session of the same id and peer node on another fabric"
-	// (:446-477).
-	t.Run("end on one fabric keeps the session on the other fabric", func(t *testing.T) { // :456
+	// (:608-639).
+	t.Run("end on one fabric keeps the session on the other fabric", func(t *testing.T) { // :618
 		r, _ := signallingRequestor(t)
 		const otherFabric uint8 = 2
 		upsert(t, r, makeSession(withID(sessionID), withPeer(peerNode), withFabric(otherFabric)))
@@ -414,7 +419,7 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 		}
 	})
 
-	t.Run("offer emits the offer observable exactly once", func(t *testing.T) { // :479
+	t.Run("offer emits the offer observable exactly once", func(t *testing.T) { // :641
 		r, rec := signallingRequestor(t)
 		if _, err := r.MatterInvoke(peer(fabric1, peerNode), wrdef.CmdOffer, wrdef.OfferRequest{WebRtcSessionId: sessionID, Sdp: "offer"}); err != nil {
 			t.Fatal(err)
@@ -423,7 +428,7 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 			t.Fatalf("%d offers", len(rec.offers))
 		}
 	})
-	t.Run("answer emits the answer observable exactly once", func(t *testing.T) { // :495
+	t.Run("answer emits the answer observable exactly once", func(t *testing.T) { // :657
 		r, rec := signallingRequestor(t)
 		if err := answer(r, fabric1, peerNode, sessionID, "answer"); err != nil {
 			t.Fatal(err)
@@ -432,7 +437,7 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 			t.Fatalf("%d answers", len(rec.answers))
 		}
 	})
-	t.Run("iceCandidates emits the iceCandidates observable exactly once", func(t *testing.T) { // :511
+	t.Run("iceCandidates emits the iceCandidates observable exactly once", func(t *testing.T) { // :673
 		r, rec := signallingRequestor(t)
 		candidate := camera.ICECandidate{
 			Candidate: "candidate:1 1 udp 2113937151 192.168.1.1 54321 typ host",
@@ -447,7 +452,7 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 			t.Fatalf("%d iceCandidates", rec.ice)
 		}
 	})
-	t.Run("end emits the end observable exactly once", func(t *testing.T) { // :533
+	t.Run("end emits the end observable exactly once", func(t *testing.T) { // :695
 		r, rec := signallingRequestor(t)
 		if err := end(r, fabric1, peerNode, sessionID); err != nil {
 			t.Fatal(err)
@@ -461,13 +466,20 @@ func TestParityMatterJS_RequestorCommands(t *testing.T) { //nolint:gocognit,gocy
 const deviceTypeCameraController = 0x0147
 
 // cameraPair commissions a device whose "camera-controller" endpoint
-// serves r (createTestNode, :29-50). The four signalling commands are
+// serves r (createTestNode, :62-83). The four signalling commands are
 // large messages (quality L, web-rtc-transport-requestor.element.ts:27-61), which
 // a controller sends over TCP only: the site runs on loopback sockets and
 // both sides speak TCP.
 func cameraPair(t *testing.T, r *camera.Requestor) (*fabrictest.Site, *fabrictest.Pair, uint16) {
 	t.Helper()
-	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true})
+	return cameraPairOn(t, r, nil)
+}
+
+// cameraPairOn is cameraPair on a site whose clock is clk (nil: the
+// site's driven clock).
+func cameraPairOn(t *testing.T, r *camera.Requestor, clk clock.Clock) (*fabrictest.Site, *fabrictest.Pair, uint16) {
+	t.Helper()
+	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true, Clock: clk})
 	pair := site.CommissionedPair(fabrictest.PairOptions{
 		Device: fabrictest.Topology{
 			Bridged: []node.Endpoint{fabrictest.Endpoint("camera-controller", deviceTypeCameraController, r)},
@@ -497,7 +509,7 @@ func wireCtx(t *testing.T) context.Context {
 	return ctx
 }
 
-// requestorEntries are the ACL entries of :575-582 on the device's fabric.
+// requestorEntries are the ACL entries of :1473-1480 on the device's fabric.
 func requestorEntries(t *testing.T, pair *fabrictest.Pair, ep uint16) int {
 	t.Helper()
 	ctx := wireCtx(t)
@@ -520,18 +532,18 @@ func requestorEntries(t *testing.T, pair *fabrictest.Pair, ep uint16) int {
 	return n
 }
 
-// TestParityMatterJS_RequestorACLInstall is "ACL install" (:550-604): the
+// TestParityMatterJS_RequestorACLInstall is "ACL install" (:1448-1523): the
 // node installs the Operate entry when a fabric its host grants
-// (node.WebRTCRequestorConfig.GrantFabric) arrives, and once only. The repeated online event of :586-603 is a restart of the device,
+// (node.WebRTCRequestorConfig.GrantFabric) arrives, and once only. The repeated online event of :1505-1522 is a restart of the device,
 // which runs the installation again with the fabric present.
 func TestParityMatterJS_RequestorACLInstall(t *testing.T) {
-	t.Run("ACL install adds one entry on first online", func(t *testing.T) { // :570
+	t.Run("ACL install adds one entry on first online", func(t *testing.T) { // :1468
 		_, pair, ep := cameraPair(t, newRequestor(t, nil))
 		if n := requestorEntries(t, pair, ep); n != 1 {
 			t.Fatalf("%d requestor entries, want 1", n)
 		}
 	})
-	t.Run("does not duplicate the entry across repeated online events", func(t *testing.T) { // :586
+	t.Run("does not duplicate the entry across repeated online events", func(t *testing.T) { // :1505
 		_, pair, ep := cameraPair(t, newRequestor(t, nil))
 		if err := pair.Device.Restart(wireCtx(t)); err != nil {
 			t.Fatal(err)

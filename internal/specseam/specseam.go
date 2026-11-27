@@ -13,9 +13,28 @@
 // cluster/spec's public Server would be a production affordance every
 // consumer sees; the seam is module-internal, so it cannot become a
 // consumer-visible surface.
+//
+// The second seam, [LeaveSessionTurn], lets a command handler that waits
+// for something other than its own session's next message hand that
+// session's turn on (decision 744: the WebRTC requestor's held signal).
+// Package bridge installs it from its init; the servers call it. A public
+// context function in im would be a production affordance every consumer
+// sees for one server's wait.
 package specseam
 
-import "thingfabric.dev/go-fabric/contract"
+import (
+	"context"
+
+	"thingfabric.dev/go-fabric/contract"
+)
+
+// LeaveSessionTurn hands the turn of the session the message behind ctx
+// arrived on to that session's next message, as the bridge's own handlers
+// do before they wait for the peer (bridge/session_order.go): a handler
+// that waits afterwards no longer holds up the session's other messages.
+// A context without a turn releases nothing, and the release is
+// idempotent. Set by bridge's init; nil until that package is linked.
+var LeaveSessionTurn func(ctx context.Context)
 
 // SetAttributesStored is server's (a *spec.Server, threaded through as
 // any because this package must not import cluster/spec)
