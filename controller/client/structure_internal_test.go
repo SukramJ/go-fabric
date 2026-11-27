@@ -479,23 +479,9 @@ func mustEncode(t *testing.T, n spec.Node) []byte {
 	return b
 }
 
-// TestStructureEvents: an event of an installed endpoint without data in
-// the report is delivered before the structure events; one of an endpoint
-// with data, or of an unknown one, after them (:506-528, :1553-1563).
-func TestStructureEvents(t *testing.T) {
-	t.Parallel()
-	n, _, _ := testNode(t, &MemoryStore{})
-	n.apply(wildcard, &bridge(2).r, true)
-	ev := func(ep uint16) interaction.EventData {
-		return interaction.EventData{Path: im.ConcreteEventPath{Endpoint: ep, Cluster: onoff.ClusterID, HasEndpoint: true, HasCluster: true, HasEvent: true}}
-	}
-	b := &report{}
-	b.attr(2, onoff.ClusterID, 0, boolNode(true), 3)
-	b.r.Events = []interaction.EventData{ev(2), ev(3), ev(9)}
-	n.mu.Lock()
-	n.s.mutate(wildcard, &b.r, true, nil)
-	em := n.s.takeEmissions()
-	n.mu.Unlock()
+// emissionOrder names the emissions of one mutate: "event <endpoint>",
+// "changed" or "structure".
+func emissionOrder(em []emission) []string {
 	var got []string
 	for _, e := range em {
 		switch e.kind {
@@ -507,9 +493,121 @@ func TestStructureEvents(t *testing.T) {
 			got = append(got, "structure")
 		}
 	}
-	if !slices.Equal(got, []string{"event 3", "changed", "event 2", "event 9"}) {
+	return got
+}
+
+// mutateEmissions applies r to n's structure and returns its emissions.
+func mutateEmissions(n *Node, r *interaction.Report) []string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.s.mutate(wildcard, r, true, nil)
+	return emissionOrder(n.s.takeEmissions())
+}
+
+// switchClusterID is the Switch cluster, which no endpoint of bridge has.
+const switchClusterID = 0x003B
+
+// TestStructureEvents: an event is delivered before the structure events
+// unless matter.js's #emitEvent delays it to after them
+// (ClientStructure.ts:626-651, :637-646, :505-512 at db91886c): an
+// endpoint with data in the report or an unknown one delays it, and once
+// one event of the report is delayed every later one is too, so the
+// device's order is kept (:638-639) — event 3, of an installed endpoint
+// without data, now follows the delayed event 2.
+func TestStructureEvents(t *testing.T) {
+	t.Parallel()
+	n, _, _ := testNode(t, &MemoryStore{})
+	n.apply(wildcard, &bridge(2).r, true)
+	ev := func(ep uint16) interaction.EventData {
+		return interaction.EventData{Path: im.ConcreteEventPath{Endpoint: ep, Cluster: onoff.ClusterID, HasEndpoint: true, HasCluster: true, HasEvent: true}}
+	}
+	b := &report{}
+	b.attr(2, onoff.ClusterID, 0, boolNode(true), 3)
+	b.r.Events = []interaction.EventData{ev(2), ev(3), ev(9)}
+	if got := mutateEmissions(n, &b.r); !slices.Equal(got, []string{"changed", "event 2", "event 3", "event 9"}) {
 		t.Fatalf("emissions %v", got)
 	}
+
+	// An event of an installed endpoint without data and with its cluster
+	// is still delivered first (:648-649).
+	b = &report{}
+	b.attr(2, onoff.ClusterID, 0, boolNode(false), 4)
+	b.r.Events = []interaction.EventData{ev(3)}
+	if got := mutateEmissions(n, &b.r); !slices.Equal(got, []string{"event 3", "changed"}) {
+		t.Fatalf("emissions %v", got)
+	}
+}
+
+// TestParityMatterJS_ClientEventNotificationDelayed ports
+// ClientEventNotificationTest.ts at db91886c (#5030): the two delay
+// conditions #emitEvent gained (ClientStructure.ts:638-643).
+func TestParityMatterJS_ClientEventNotificationDelayed(t *testing.T) {
+	t.Parallel()
+	ev := func(ep uint16, cluster uint32, number uint64) interaction.EventData {
+		return interaction.EventData{Number: number, Path: im.ConcreteEventPath{Endpoint: ep, Cluster: cluster, HasEndpoint: true, HasCluster: true, HasEvent: true}}
+	}
+
+	// :1058 "emits an event that arrives before its cluster's data once the
+	// read installed the cluster". Go merges a report's chunks and applies
+	// its data before its events (structure.go mutate), so the merged form
+	// pins that the event is emitted after the data, with the cluster
+	// resolvable.
+	t.Run("emits an event with its cluster's data after the cluster is installed", func(t *testing.T) {
+		t.Parallel()
+		n, _, _ := testNode(t, &MemoryStore{})
+		n.apply(wildcard, &bridge(1).r, true)
+		b := &report{}
+		b.attr(2, onoff.ClusterID, 0, boolNode(true), 3)
+		b.r.Events = []interaction.EventData{ev(2, onoff.ClusterID, 1)}
+		if got := mutateEmissions(n, &b.r); !slices.Equal(got, []string{"changed", "event 2"}) {
+			t.Fatalf("emissions %v", got)
+		}
+		n.mu.Lock()
+		c := n.s.endpoints[2].clusters[onoff.ClusterID]
+		n.mu.Unlock()
+		if c == nil || c.current == nil {
+			t.Fatal("the event's cluster has no behaviour when the event is emitted")
+		}
+	})
+
+	// The event-only variant (:642-643): an event for a cluster the
+	// installed endpoint does not hold, in a report without data for that
+	// endpoint, is delayed behind the report's change instead of emitted
+	// first.
+	t.Run("delays an event for a cluster the endpoint does not hold", func(t *testing.T) {
+		t.Parallel()
+		n, _, _ := testNode(t, &MemoryStore{})
+		n.apply(wildcard, &bridge(2).r, true)
+		b := &report{}
+		b.attr(2, onoff.ClusterID, 0, boolNode(true), 3)
+		b.r.Events = []interaction.EventData{ev(3, switchClusterID, 1)}
+		if got := mutateEmissions(n, &b.r); !slices.Equal(got, []string{"changed", "event 3"}) {
+			t.Fatalf("emissions %v", got)
+		}
+	})
+
+	// :1122 "emits the events of a read in the order the device sent them
+	// when an earlier one is delayed": event 10 on a cluster the endpoint
+	// does not hold, event 11 on BasicInformation.
+	t.Run("emits the events of a read in the order the device sent them when an earlier one is delayed", func(t *testing.T) {
+		t.Parallel()
+		n, _, _ := testNode(t, &MemoryStore{})
+		n.apply(wildcard, &bridge(1).r, true)
+		r := &interaction.Report{Events: []interaction.EventData{ev(0, switchClusterID, 10), ev(0, clBasicInfo, 11)}}
+		n.mu.Lock()
+		n.s.mutate(wildcard, r, true, nil)
+		em := n.s.takeEmissions()
+		n.mu.Unlock()
+		var got []uint64
+		for _, e := range em {
+			if e.kind == emitEvent {
+				got = append(got, e.event.Number)
+			}
+		}
+		if !slices.Equal(got, []uint64{10, 11}) {
+			t.Fatalf("event order %v, want [10 11]", got)
+		}
+	})
 }
 
 // TestStructureHookPanics: a panicking structure hook is logged, never

@@ -14,6 +14,10 @@ pseudo-version of `main`.
 
 - Dependencies: `golang.org/x/net` v0.62.0 → v0.63.0, `golang.org/x/tools` v0.52.0 → v0.53.0, `modernc.org/sqlite` v1.61.1 → v1.63.0 (with `modernc.org/libc` v1.80.1, `golang.org/x/sys` v0.50.0, `golang.org/x/sync` v0.25.0, `golang.org/x/mod` v0.43.0 and the `golang.org/x/exp` of the `apidiff` tool at `d6646c509b6d`); the nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in their `go.sum`. The pinned `golangci-lint` moves to v2.15.0 (`Makefile`, `ci.yml`); `script/ble-virtual` takes `semver` 7.8.6 (supersedes #531 and #541). No licence changes.
 
+### Fixed
+
+- `controller/client`: an event is delayed to the end of its report — after the structure hooks and `Changed` — also while an earlier event of the report is delayed, so a report's events reach `Hooks.Event` in the order the device sent them, and when its cluster is unknown on the endpoint or has no behaviour yet, so the event no longer arrives before its cluster is resolvable (matter.js #5030).
+
 ## [0.28.0] — 2026-11-27
 
 Review II, after the release of v0.27.0 (decisions 695–729): the follow-up issues #625, #628, #629, #630, #632 and #634 (#636), and #633, #616 and #635 (#637). A value encoder that fails costs its own attribute, event or command, not the interaction; a failed reassembly after `Partition.Batch` is redone by the next batch and its unbinding and erasures wait for it, recorded as a forget in progress; `Partition.Batch` names each refused or failed call in a `*BatchError`; the camera kit can evict an idle WebRTC session at its bounds, within a fabric and, opt-in, across fabrics by fair share; a Leave, ShutDown or StartUp in a subscription's priming report no longer acts once the subscription is live; the report chunker reuses one encoder (`tlv.Encoder.Reset`). No source change required: `make apidiff` reports no incompatible change against `v0.27.0`, here or in the nested modules. The nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` did not change and keep `v0.27.0`.
