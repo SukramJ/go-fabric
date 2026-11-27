@@ -69,8 +69,10 @@ type ClusterServer interface {
 	// encoder of its own (the bridge also runs it, the same way, when it
 	// compares a value for change or logs one), so it may run more than
 	// once for one value: it must be deterministic and free of side
-	// effects. It writes exactly one element under the tag it is handed.
-	// One that
+	// effects. It writes exactly one element under the tag it is handed,
+	// and it does not keep the *tlv.Encoder past its return: the encoder
+	// is reset and reused for the next value (tlv.Encoder.Reset), so a
+	// write on a kept encoder lands in another value. One that
 	// panics, leaves a container open or writes no element or more than
 	// one answers FAILURE (an AttributeStatusIB) for its own path, logged
 	// at ERROR; the rest of the read, the priming report or the
