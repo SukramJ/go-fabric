@@ -483,7 +483,8 @@ func mustEncode(t *testing.T, n spec.Node) []byte {
 // "changed" or "structure".
 func emissionOrder(em []emission) []string {
 	var got []string
-	for _, e := range em {
+	for i := range em {
+		e := &em[i]
 		switch e.kind {
 		case emitEvent:
 			got = append(got, fmt.Sprint("event ", e.event.Path.Endpoint))
@@ -599,8 +600,8 @@ func TestParityMatterJS_ClientEventNotificationDelayed(t *testing.T) {
 		em := n.s.takeEmissions()
 		n.mu.Unlock()
 		var got []uint64
-		for _, e := range em {
-			if e.kind == emitEvent {
+		for i := range em {
+			if e := &em[i]; e.kind == emitEvent {
 				got = append(got, e.event.Number)
 			}
 		}
