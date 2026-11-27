@@ -50,6 +50,21 @@ type Encoder struct {
 // NewEncoder returns a fresh encoder.
 func NewEncoder() *Encoder { return &Encoder{} }
 
+// Reset empties the encoder for reuse: the bytes written and the open
+// containers are discarded, the buffer's capacity is kept for the next
+// stream. A slice [Encoder.Bytes] returned before stays valid — Bytes
+// copies, so no result aliases the buffer.
+//
+// A function handed an encoder to write one value into (an EncodeTLV
+// method, a value writer) must not retain the *Encoder past its return:
+// an encoder that is Reset and reused carries a later value by then, and
+// whatever the retained reference writes lands in that value's stream.
+func (e *Encoder) Reset() {
+	e.buf = e.buf[:0]
+	e.openCont = 0
+	e.containerStack = e.containerStack[:0]
+}
+
 // Bytes returns the accumulated wire payload. Returns
 // [ErrUnbalancedContainer] when one or more containers are still open.
 func (e *Encoder) Bytes() ([]byte, error) {
