@@ -4690,11 +4690,17 @@
     },
     {
       "path": "packages/node/test/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServerTest.ts",
-      "status": "ported",
+      "status": "partial",
       "go": [
         "cluster/camera:TestParityMatterJS_RequestorUpsertRemove",
         "cluster/camera:TestParityMatterJS_RequestorCommands",
-        "cluster/camera:TestParityMatterJS_RequestorACLInstall"
+        "cluster/camera:TestParityMatterJS_RequestorACLInstall",
+        "cluster/camera:TestParityMatterJS_RequestorHoldUnknownSignals",
+        "cluster/camera:TestParityMatterJS_RequestorSignalsAgainstChanges",
+        "cluster/camera:TestParityMatterJS_RequestorHeldSignalsOverTheWire"
+      ],
+      "missing": [
+        "ACL install adds an entry for a requestor endpoint added to a node that is online with a fabric"
       ],
       "left": [
         {
@@ -4721,10 +4727,25 @@
           "it": "logs the signal it refused with the peer and its own endpoint",
           "class": "js-runtime-only",
           "reason": "the text of matter.js's debug log line for a refused signal (#4996), which its own chip-testing harness matches"
+        },
+        {
+          "it": "throws ImplementationError for an endpoint without the requestor",
+          "class": "by-design",
+          "reason": "HoldUnknownSignals is a method of camera.Requestor, so a host cannot name an endpoint without the server; BD-Matter-Camera-RequestorRegistersAtArrival"
+        },
+        {
+          "it": "delivers the signals of one session in the order they arrived while they wait for the lock",
+          "class": "js-runtime-only",
+          "reason": "the order of matter.js's transaction-lock waiters (the case documents current behaviour, not a guarantee); Offer, Answer and IceCandidates take no lock an End holds here, and the bridge's session order handles one session's messages in arrival order (bridge/session_order.go)"
+        },
+        {
+          "it": "registers a session inside a transaction that already locked the requestor",
+          "class": "js-runtime-only",
+          "reason": "the reentrancy of matter.js's transaction lock (the case documents current behaviour, not a guarantee); UpsertSession must not be called from the server's own change notification (cluster/camera/requestor.go)"
         }
       ],
-      "reason": "28 of the 33 cases run on cluster/camera's Requestor (brief 26-A1): upsert and remove by session key, the four commands' identity checks under the context the bridge stamps for a CASE invoke (matter.js's mocked remote actor), the refused, empty-candidate and end cases, the signalling handed to the RequestorPort; the ACL install over the wire on fabrictest, the repeated online event a device restart (cluster/camera/requestor_parity_matterjs_test.go).",
-      "snapshotSha": "b66454fc910134053cca43849ba3dd9aa729c00b"
+      "reason": "37 of the 45 cases run on cluster/camera's Requestor (brief 26-A1, phase 9 P1-G): upsert and remove by session key, the four commands' identity checks under the context the bridge stamps for a CASE invoke (matter.js's mocked remote actor), the refused, empty-candidate and end cases, the signalling handed to the RequestorPort; the hold of early signals on a driven clock (HoldUnknownSignals, its release, the 5 s from the arrival, MatterQuiesce for the node going offline and the endpoint closing or resetting, :978, :1013 and :1024 in one subtest; :858 and :873 in one); the End's lookup-and-removal and the registrations against a change that holds the requestor's publication lock; the held offer and end and a signal for another session behind a held one over the wire on fabrictest; the ACL install over the wire, the repeated online event a device restart (cluster/camera/requestor_parity_matterjs_test.go, requestor_hold_parity_matterjs_test.go). Missing: the ACL entry for a requestor endpoint a reassembly adds while the node is online with a fabric — node/ installs the entry at Start and after CommissioningComplete only (node/webrtc_provider_peers.go, node/node.go), outside #5045 (phase 9 P1-G, open question).",
+      "snapshotSha": "0b460c2ad6b117602ee2229790318100017e0486"
     },
     {
       "path": "packages/node/test/behaviors/window-covering/WindowCoveringServerTest.ts",

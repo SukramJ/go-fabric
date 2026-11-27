@@ -246,9 +246,12 @@ const testparityPlannedRatchet = 3
 // responder (P6-D): 179 ported, 1009 missing.
 // Review II phase 8 (#604, R2-C2-doc-2156) takes PeerAddressMonitorTest.ts's
 // four sleeping-LIT-ICD cases out of missing: 179 ported, 1005 missing.
+// Review II phase 9, P1-G: WebRtcTransportRequestorServerTest.ts becomes
+// partial, its new ACL case for an endpoint a reassembly adds missing
+// (outside #5045): 178 ported, 1006 missing.
 const (
-	testparityPortedRatchet  = 179
-	testparityMissingRatchet = 1005
+	testparityPortedRatchet  = 178
+	testparityMissingRatchet = 1006
 )
 
 // testparityLeftRatchet is the number of left it cases summed over the
@@ -355,7 +358,11 @@ const (
 // Pin lift b25ed960 wave P6 leaves ServerSubscriptionTest.ts's flush on a
 // given session (by design, BD-Matter-Subscription-FlushOnOwnSessionOnly,
 // P6-B): 773.
-const testparityLeftRatchet = 773
+// Review II phase 9, P1-G leaves three WebRtcTransportRequestorServerTest.ts
+// cases: the ImplementationError of an endpoint without the requestor (by
+// design) and two that document matter.js's transaction lock
+// (js-runtime-only): 776.
+const testparityLeftRatchet = 776
 
 // The matterjs-server register's four ratchets, exact in both directions as
 // the matter.js register's are (the comments above give the rules). Set by

@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `camera.Requestor.HoldUnknownSignals(fabricIndex, peerNodeID) (release func())`: while a host asks a provider for a WebRTC session, the provider's Offer, Answer, IceCandidates or End for a session the requestor does not track yet waits — at most `camera.EarlySignalHoldTime` (5 s) from its arrival, timed on the new `RequestorConfig.Clock` (nil: the system clock) — for the session's registration instead of being refused NOT_FOUND; it is refused when the hold is released, the time runs out or the server is quiesced. A waiting signal does not hold up the peer's other messages on the same CASE session. `camera.Requestor` now implements `contract.ClusterQuiescer`, which ends every hold. Mirrors matter.js #5045 (pin `db91886c`). The controller's own requestor takes no hold: it registers a session when the provider's response arrives.
+
+### Fixed
+
+- `camera.Requestor`: two Ends for one session that arrive at the same time remove it and reach `RequestorPort.End` once; the other is refused NOT_FOUND, with the `RequestorRefusals` report, as is an End for a session the host removed meanwhile.
+
 ### Changed
 
 - Dependencies: `golang.org/x/net` v0.62.0 → v0.63.0, `golang.org/x/tools` v0.52.0 → v0.53.0, `modernc.org/sqlite` v1.61.1 → v1.63.0 (with `modernc.org/libc` v1.80.1, `golang.org/x/sys` v0.50.0, `golang.org/x/sync` v0.25.0, `golang.org/x/mod` v0.43.0 and the `golang.org/x/exp` of the `apidiff` tool at `d6646c509b6d`); the nested modules `ble/bluez`, `ble/esphome` and `wifi/wpasupplicant` follow in their `go.sum`. The pinned `golangci-lint` moves to v2.15.0 (`Makefile`, `ci.yml`); `script/ble-virtual` takes `semver` 7.8.6 (supersedes #531 and #541). No licence changes.
