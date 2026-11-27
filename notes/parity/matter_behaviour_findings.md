@@ -500,11 +500,12 @@ b25ed960; connectedhomeip was read only where an entry names it at 6170af84 (oth
 
 The gaps of the lift b25ed960 → db91886c (`pin-lifts.md`), each with the
 unit of review II's phase 9 that closes it (decision 737: every one before
-the release). The two rows the lift caught up in the *Ahead of matter.js*
-register (`BD-chip-Thermostat-Schedules`, P1-F;
-`BD-chip-Commissioner-AbortDisarmsFailSafe`, P1-D) are tracked there and in
-`script/aheadcheck/caught-up.txt`; the reconcile's differences of the
-second are F-db91886c-5. matter.js lines are at db91886c, Go lines at
+the release). Of the two rows the lift caught up in the *Ahead of
+matter.js* register, `BD-chip-Thermostat-Schedules` (P1-F) is tracked there
+and in `script/aheadcheck/caught-up.txt`;
+`BD-chip-Commissioner-AbortDisarmsFailSafe` closed in P1-D, with the
+reconcile's differences, F-db91886c-5, in
+`matter_behaviour_findings_closed.md`. matter.js lines are at db91886c, Go lines at
 c26625dfa; connectedhomeip at 6170af84 where an entry names it. Closed
 entries move to `matter_behaviour_findings_closed.md`, same section.
 
