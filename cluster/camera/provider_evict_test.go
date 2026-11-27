@@ -823,3 +823,166 @@ func TestProviderEvictAcrossFabricsInert(t *testing.T) {
 		t.Fatalf("CurrentSessions %v, want the solicited session", sessionIDs(s.p))
 	}
 }
+
+// failPort makes the port refuse every offer (fail true) or take them.
+func (r *evictRig) failPort(fail bool) {
+	r.port.mu.Lock()
+	defer r.port.mu.Unlock()
+	r.port.err = nil
+	if fail {
+		r.port.err = errors.New("upstream down")
+	}
+}
+
+// TestProviderEvictSpentClaim (decision 713, review M1): a fabric whose
+// offer the port refuses after it took another fabric's entry takes only
+// its own until EvictIdle has passed — a camera that keeps refusing it
+// ends at most one view of another fabric per EvictIdle — or until a
+// session of it is stored, or its claim goes with a removed fabric. The
+// eviction stands whatever the port answers: the slot is free.
+func TestProviderEvictSpentClaim(t *testing.T) {
+	t.Parallel()
+	a, c := peer(1, 0x55), peer(3, 0x77)
+	// fill is A at four of four entries, the oldest idle.
+	fill := func(t *testing.T, r *evictRig) []uint16 {
+		t.Helper()
+		ids := make([]uint16, 0, 4)
+		for range 4 {
+			ids = append(ids, r.open(a, t))
+		}
+		r.clk.Advance(evictIdle)
+		return ids
+	}
+	t.Run("retries", func(t *testing.T) {
+		t.Parallel()
+		r := newEvictRig(t, across(4, 0))
+		aIDs := fill(t, r)
+		r.failPort(true)
+		_, err := provideNew(c, t, r.p)
+		wantCode(t, "C's offer the port refuses", statusOf(err), im.StatusFailure)
+		wantEnded(t, r.port, aIDs[0])
+		if len(r.p.Sessions()) != 3 {
+			t.Fatalf("CurrentSessions %v, want the slot free", sessionIDs(r.p))
+		}
+		r.failPort(false)
+		r.open(a, t) // A refills the slot
+		r.failPort(true)
+		for range 3 {
+			_, err = provideNew(c, t, r.p)
+			wantCode(t, "C's retry with its claim spent", statusOf(err), im.StatusResourceExhausted)
+		}
+		wantEnded(t, r.port, aIDs[0])
+		r.clk.Advance(evictIdle - 2*time.Second) // a second short of EvictIdle after the failure
+		_, err = provideNew(c, t, r.p)
+		wantCode(t, "C a second before EvictIdle", statusOf(err), im.StatusResourceExhausted)
+		r.clk.Advance(time.Second) // EvictIdle after the failure
+		_, err = provideNew(c, t, r.p)
+		wantCode(t, "C after EvictIdle, the port refusing", statusOf(err), im.StatusFailure)
+		wantEnded(t, r.port, aIDs[0], aIDs[1])
+	})
+	t.Run("stored session clears", func(t *testing.T) {
+		t.Parallel()
+		r := newEvictRig(t, across(4, 0))
+		aIDs := fill(t, r)
+		r.failPort(true)
+		if _, err := provideNew(c, t, r.p); err == nil {
+			t.Fatal("accepted")
+		}
+		r.failPort(false)
+		r.open(c, t) // the free slot: stored without an eviction
+		_, err := provideNew(c, t, r.p)
+		if err != nil {
+			t.Fatalf("C after a stored session: %v", err)
+		}
+		wantEnded(t, r.port, aIDs[0], aIDs[1])
+	})
+	t.Run("fabric removal clears", func(t *testing.T) {
+		t.Parallel()
+		r := newEvictRig(t, across(4, 0))
+		aIDs := fill(t, r)
+		r.failPort(true)
+		if _, err := provideNew(c, t, r.p); err == nil {
+			t.Fatal("accepted")
+		}
+		r.failPort(false)
+		r.open(a, t)
+		if err := r.p.MatterDropFabric(context.Background(), 3); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := provideNew(c, t, r.p); err != nil {
+			t.Fatalf("C after its fabric's removal: %v", err)
+		}
+		wantEnded(t, r.port, aIDs[0], aIDs[1])
+	})
+	t.Run("own fabric unaffected", func(t *testing.T) {
+		t.Parallel()
+		r := newEvictRig(t, across(0, 2))
+		first := r.open(a, t)
+		r.open(a, t)
+		r.clk.Advance(evictIdle)
+		r.failPort(true)
+		if _, err := provideNew(a, t, r.p); err == nil {
+			t.Fatal("accepted")
+		}
+		r.failPort(false)
+		r.open(a, t)
+		r.clk.Advance(evictIdle)
+		if _, err := provideNew(a, t, r.p); err != nil {
+			t.Fatalf("A's own eviction after a failed own one: %v", err)
+		}
+		if got := r.port.ended(); len(got) != 2 || got[0].id != first {
+			t.Fatalf("the port's EndSession %v", got)
+		}
+	})
+}
+
+// TestProviderEvictRacingRemoval (review L3): a removal between the
+// admission and the eviction's own removal — the host's RemoveSession —
+// owns the victim: the offer is judged again and admitted without an
+// eviction, no EndSession, no End; a second such race, with the host
+// refilling the slot each time, refuses.
+func TestProviderEvictRacingRemoval(t *testing.T) {
+	t.Parallel()
+	a := peer(1, 0x55)
+	r := newEvictRig(t, bounds(0, 1))
+	victim := r.open(a, t)
+	r.clk.Advance(evictIdle)
+	once := false
+	camera.SetEvictHook(r.p, func(v camera.ProviderSession) {
+		if !once {
+			once = true
+			r.p.RemoveSession(v.Id)
+		}
+	})
+	id, err := provideNew(a, t, r.p)
+	if err != nil {
+		t.Fatalf("offer after the host removed the victim: %v", err)
+	}
+	if len(r.port.ended()) != 0 || !once || slices.Contains(sessionIDs(r.p), victim) {
+		t.Fatalf("the port's EndSession %v, CurrentSessions %v", r.port.ended(), sessionIDs(r.p))
+	}
+	if err := r.p.End(context.Background(), id, 3); err != nil {
+		t.Fatal(err)
+	}
+	if c := r.nextEnd(t); c.req.WebRtcSessionId != id {
+		t.Fatalf("End %+v, want the sentinel's: the evict sent one", c)
+	}
+
+	q := newEvictRig(t, bounds(0, 2))
+	q.open(a, t)
+	q.open(a, t)
+	q.clk.Advance(evictIdle)
+	refill := uint16(200)
+	camera.SetEvictHook(q.p, func(v camera.ProviderSession) {
+		q.p.RemoveSession(v.Id)
+		if err := q.p.UpsertSession(hostSession(refill, 1)); err != nil {
+			t.Error(err)
+		}
+		refill++
+	})
+	_, err = provideNew(a, t, q.p)
+	wantCode(t, "two races", statusOf(err), im.StatusResourceExhausted)
+	if len(q.port.ended()) != 0 || refill != 202 {
+		t.Fatalf("the port's EndSession %v, %d races", q.port.ended(), refill-200)
+	}
+}
