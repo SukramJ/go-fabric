@@ -1114,6 +1114,25 @@ Closed by the units of review II's phase 9 (2026-11-27).
 - **F-db91886c-6: an event is emitted before a delayed one, and before its cluster has a behavior (#5030).** Low. matter.js delays an event also while delayed events wait, keeping the device's order (`packages/node/src/node/client/ClientStructure.ts:639`), and when its cluster has no behavior yet (`:643`); the conditions are `:637-646` of `#emitEvent` (`:626-651`). Here `controller/client/structure.go:401` checks the other four only; the analogue of the behavior is `Cluster.current` (`controller/client/cluster.go:45-50`). Closes in P1-E.
   Closed 2026-11-27 (pin lift db91886c, unit P1-E): `emitEvent` delays in matter.js's order also while an earlier event of the report waits and while the event's cluster is unknown on the endpoint or has no `current` (`controller/client/structure.go`, `ClientStructure.ts:637-646` at db91886c), reading `ep.clusters` directly. Pinned by `controller/client:TestParityMatterJS_ClientEventNotificationDelayed` (`ClientEventNotificationTest.ts:1058`, its event-only variant, `:1122`) and `TestStructureEvents`, whose event of an installed endpoint now follows the delayed one before it.
 
+- **Push transport motion and blind period (P1-H).** Not a gap of this range: the certifiability finding "The reference daemon's push transport augments a clip on every motion; chip's once per elapsed duration" (section *Certification harness — open certifiability findings*) is that entry; it closes in P1-H and leaves the register with the change.
+  Closed 2026-11-27 (pin lift db91886c, unit P1-H, decision 746) with the certifiability finding it names, which read:
+
+  - **The reference daemon's push transport augments a clip on every motion;
+    chip's once per elapsed duration.** `examples/reference-bridge/camera.go`
+    `motionTriggered` extends a recording transport's clip on each motion
+    within the clip, where chip's `PushAVTransport` augments only when it has
+    not yet augmented or the clip has run past the previous detected
+    duration (`examples/camera-app/linux/src/pushav-transport/pushav-transport.cpp:375-387`
+    at 6170af84, `mHasAugmented`, `mPreviousMotionDetectedDurationS`): a third
+    motion soon after the second extends the clip here and not in chip. And
+    at the instant a recording ends, chip is already in the blind period
+    (`InBlindPeriod`, `:330-342`, `elapsedSeconds >= 0`) where the daemon is
+    not until the next instant (`now.After`). Found by the #404 unit tests
+    (2026-11-05), which assert only the agreeing cases. Route: align
+    `motionTriggered` and the blind-period start with chip in the next
+    camera-simulation change; the app-camera family does not reach either.
+  Closed: `motionTriggered` (`examples/reference-bridge/camera.go`) augments only when the recording was not augmented yet or ran for at least the previous detected duration, resetting both where a recording starts, the manual activation included (`pushav-transport.cpp:357-388`, `:375` at 6170af84); the blind period starts at the recording's end instant and is counted in whole seconds truncated toward zero, `0 <= elapsed < BlindDuration` (`InBlindPeriod`, `:330-342`), so a motion in a clip's last second is blind too. Pinned by `examples/reference-bridge:TestCameraSimMotionTransportAugmentation`. `docs/certifiability.md` states nothing about either (grep for pushav, blind, motion, augment: the PAVST/2.15 and 2.8 rows and the field judging at :875 only).
+
 ## Closed in the 2026-10-17 findings wave (v0.6.0)
 
 Every open entry was worked through (briefs AX and AY, the owner's

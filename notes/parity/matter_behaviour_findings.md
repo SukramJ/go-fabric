@@ -514,7 +514,6 @@ entries move to `matter_behaviour_findings_closed.md`, same section.
 - **F-db91886c-4: the BUSY hold differs from matter.js's in value, jitter, handler and re-check (#5050).** Severity not stated by the fact note (unclassified). matter.js holds every new Sigma1 of a connection process after a BUSY from any address (`packages/protocol/src/peer/PeerConnection.ts:176`): the hold is the raw minimum wait (`holdNewSigma1WhilePeerBusy` `:536-545`), recorded before `attempt.fail` and so before the `handleError` hook (`:683`, `:686`), each waiter draws its own jitter once (`waitWhilePeerBusy` `:523-534`), and the wait is re-checked after the socket opens (`:558`, `:580`). Here the hold is the final delay including jitter or the handler's replacement, recorded after the handler (`client/peer/connection.go:1643-1663`), `waitOutBusy` sleeps without jitter and only before the attempt (`:1482-1494`, `:1388`). Decision 734 adopts the four; the proven-address restriction (`connection.go:1657`) and the hold's life on the Peer (`client/peer/peer.go:67-69`, `:437`) stay as the rewritten `BD-Matter-PeerBusyDeadline`. Closes in P1-C.
 - **F-db91886c-5: the cancel after PASE differs from matter.js's (#5049).** Severity not stated by the fact note (unclassified). matter.js cuts the cancel off when CommissioningComplete starts (`packages/protocol/src/peer/ControllerCommissioningFlow.ts:2176`, `#requestAbort` `:557-559`) and sends that command with `network: "unlimited"` (`:2189`); after a cancel the fail-safe expiry waits at most 2 s (`CANCELED_EXPIRY_WAIT` `:323`, `:1166-1173`) and the flow rejects with the cancel reason, also when the cancel came during the cleanup of an ordinary failure (`:479-487`); each step checks the cancel at entry (`:413`); `Stop` breaks before the time-limit check and the re-arm (`:425-427`); the attestation's DCL wait ends with the cancel (`:1375-1377`); the winner of the PASE race gets a cancel that comes after the win (`packages/node/src/behavior/system/controller/discovery/ParallelPaseDiscovery.ts:102`, `:178-185`). Here CommissioningComplete and the steps after it stay cancelable (`controller/commissioner/flow.go:1512-1513`, `:375-381`, `:1531`) without the unlimited send, the disarm wait is 10 s (`abortDisarmTimeout`, `flow.go:48-55`), a cancel during a failure's cleanup aborts the send at once and the step's error is returned (`:1060-1067`, `:338-344`), no step checks the ctx at entry (`:306-320`), `afterStep` runs before the stop break (`:321-327`, `:403-421`), `attestation.Validate` takes no context (`flow.go:1252`), and `client/discovery` drops an interruption after the win (`session_kinds.go:602-610`; `controller.Pair` reaches the winner through its own contexts, `controller/pair_race.go:93-95`). Decision 736. Closes in P1-D, with `BD-chip-Commissioner-AbortDisarmsFailSafe`.
 - **F-db91886c-7: the served WebRTC requestor refuses a signal that precedes its session's registration (#5045).** Low. matter.js lets the application hold a peer's unknown signals (`packages/node/src/behaviors/web-rtc-transport-requestor/WebRtcTransportRequestorServer.ts:102-116`): such a signal waits at most 5 s from its arrival for the registration (`:24`, `#awaitRegistration` `:362-389`), ends with the hold, the node going offline or the behavior closing (`:124`, `:131-141`), and a handler holds no lock while it waits (`lockOnInvoke = false`, `:57`). Here `findSessionStrict` refuses at once (`cluster/camera/requestor.go:365-383`). Decision 735: the hold on the served requestor; the controller keeps registering at the response's arrival (`controller/camera/provider_sessions.go:621-663`), recorded as a divergence. Closes in P1-G.
-- **Push transport motion and blind period (P1-H).** Not a gap of this range: the certifiability finding "The reference daemon's push transport augments a clip on every motion; chip's once per elapsed duration" (section *Certification harness — open certifiability findings*) is that entry; it closes in P1-H and leaves the register with the change.
 
 ## Tier 3 — LOW
 
@@ -532,20 +531,6 @@ entries move to `matter_behaviour_findings_closed.md`, same section.
 
 ## Certification harness — open certifiability findings
 
-- **The reference daemon's push transport augments a clip on every motion;
-  chip's once per elapsed duration.** `examples/reference-bridge/camera.go`
-  `motionTriggered` extends a recording transport's clip on each motion
-  within the clip, where chip's `PushAVTransport` augments only when it has
-  not yet augmented or the clip has run past the previous detected
-  duration (`examples/camera-app/linux/src/pushav-transport/pushav-transport.cpp:375-387`
-  at 6170af84, `mHasAugmented`, `mPreviousMotionDetectedDurationS`): a third
-  motion soon after the second extends the clip here and not in chip. And
-  at the instant a recording ends, chip is already in the blind period
-  (`InBlindPeriod`, `:330-342`, `elapsedSeconds >= 0`) where the daemon is
-  not until the next instant (`now.After`). Found by the #404 unit tests
-  (2026-11-05), which assert only the agreeing cases. Route: align
-  `motionTriggered` and the blind-period start with chip in the next
-  camera-simulation change; the app-camera family does not reach either.
 - **The reference daemon's camera simulation holds a solicited session's
   streams until EndSession; chip releases them at a 30 s connection
   timer.** `examples/reference-bridge/camera.go` `SolicitOffer` acquires the

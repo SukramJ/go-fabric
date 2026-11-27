@@ -17,6 +17,7 @@ pseudo-version of `main`.
 ### Fixed
 
 - `controller/client`: an event is delayed to the end of its report — after the structure hooks and `Changed` — also while an earlier event of the report is delayed, so a report's events reach `Hooks.Event` in the order the device sent them, and when its cluster is unknown on the endpoint or has no behaviour yet, so the event no longer arrives before its cluster is resolvable (matter.js #5030).
+- `examples/reference-bridge` `--camera-sim`: a motion-triggered push transport augments its recording as connectedhomeip's camera app — once, then again only once the clip has run for the previous detected duration — and its blind period starts at the instant the recording ends, counted in whole seconds, so a motion at that instant or in a clip's last second begins or extends nothing (decision 746).
 
 ## [0.28.0] — 2026-11-27
 
