@@ -2387,7 +2387,7 @@
   },
   {
     "file": "controller/client/structure.go",
-    "line": 815,
+    "line": 825,
     "citation": "ClientStructure.ts:1237-1262",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "at": "b25ed960",
