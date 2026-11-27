@@ -412,7 +412,7 @@ func ApplyFabricScope(rep im.AttributeReport, write im.AttributeValueWriter) im.
 	}
 	scope := *rep.FabricScope
 	rep.FabricScope = nil
-	encoded, err := encodeValue(Writer(write), rep.Value)
+	encoded, err := elementOf(Writer(write), rep.Value)
 	if err != nil {
 		return AttributeStatus(rep, im.StatusFailure)
 	}
@@ -482,7 +482,7 @@ func SplitList(rd im.ReportData, rep im.AttributeReport, budget int, write im.At
 	}
 	members, ok := rep.Value.Value.(List)
 	if !ok {
-		encoded, err := encodeValue(write, rep.Value)
+		encoded, err := elementOf(write, rep.Value)
 		if err != nil {
 			return nil, false
 		}
@@ -598,20 +598,25 @@ func (c *Chunker) capOversizedEventReport(ev im.EventReport) (out im.EventReport
 }
 
 // resolver resolves a report's value once ([Encoded]), or answers its path
-// FAILURE when the value cannot be encoded.
+// FAILURE when the value cannot be encoded. It encodes value after value
+// on one scratch encoder of its own ([valueenc.Scratch], #625 follow-up
+// #635): reset before each value, dropped after a failed one, so a value
+// costs the copy of its element and not a new encoder and buffer. One
+// resolver serves one [Chunker] or one [Split], on one goroutine.
 type resolver struct {
-	write  im.AttributeValueWriter
-	failed func(EncodeFailure)
+	write   im.AttributeValueWriter
+	failed  func(EncodeFailure)
+	scratch valueenc.Scratch
 }
 
 // attribute is rep with its value resolved, or the AttributeStatusIB
 // FAILURE of its path. A status, and a value already carried as bytes,
 // is returned as it is.
-func (r resolver) attribute(rep im.AttributeReport) im.AttributeReport {
+func (r *resolver) attribute(rep im.AttributeReport) im.AttributeReport {
 	if rep.IsStatus || resolved(rep.Value) {
 		return rep
 	}
-	el, err := encodeValue(r.write, rep.Value)
+	el, err := r.encode(rep.Value)
 	if err != nil {
 		if r.failed != nil {
 			r.failed(EncodeFailure{AttributePath: rep.Path, Err: err})
@@ -625,11 +630,11 @@ func (r resolver) attribute(rep im.AttributeReport) im.AttributeReport {
 // event is ev with its payload resolved, or the EventStatusIB FAILURE of
 // its path. A status, an event without a payload and a payload already
 // carried as bytes are returned as they are.
-func (r resolver) event(ev im.EventReport) im.EventReport {
+func (r *resolver) event(ev im.EventReport) im.EventReport {
 	if ev.IsStatus || ev.Data.IsNull || ev.Data.Value == nil || resolved(ev.Data) {
 		return ev
 	}
-	el, err := encodeValue(r.write, ev.Data)
+	el, err := r.encode(ev.Data)
 	if err != nil {
 		if r.failed != nil {
 			r.failed(EncodeFailure{IsEvent: true, EventPath: ev.Path, Err: err})
@@ -652,7 +657,21 @@ func resolved(v im.AttributeValue) bool {
 	return false
 }
 
-// encodeValue is v as write writes it, in isolation ([valueenc.Encode]).
-func encodeValue(write im.AttributeValueWriter, v im.AttributeValue) ([]byte, error) {
+// encode is v as the resolver's writer writes it, in isolation on the
+// resolver's scratch encoder ([valueenc.Scratch.Encode]).
+func (r *resolver) encode(v im.AttributeValue) ([]byte, error) {
+	return r.scratch.Encode(func(enc *tlv.Encoder, tag tlv.Tag) { r.write(enc, tag, v) })
+}
+
+// elementOf is v's one anonymous element: an [Encoded] value's own bytes,
+// which hold exactly that by construction (the resolver and
+// [ResolveInvoke] keep only what [valueenc] accepted, and write
+// writes it back verbatim, [Writer]), so encoding it again would copy and
+// re-check the same bytes; any other value as write writes it, in
+// isolation ([valueenc.Encode]). The bytes are read, never written.
+func elementOf(write im.AttributeValueWriter, v im.AttributeValue) ([]byte, error) {
+	if e, ok := v.Value.(Encoded); ok && !v.IsNull {
+		return e, nil
+	}
 	return valueenc.Encode(func(enc *tlv.Encoder, tag tlv.Tag) { write(enc, tag, v) })
 }
