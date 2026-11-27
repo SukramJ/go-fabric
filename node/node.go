@@ -1622,7 +1622,7 @@ func (n *Node) stopLocked(ctx context.Context) error {
 	// The devices are unbound once no controller reaches them: each
 	// device's queue drains before Stop returns.
 	if n.agg != nil {
-		n.agg.detachAll()
+		n.agg.detachAll(ctx)
 	}
 	// The node's own callbacks drain the same way (OnDiagnosticEventAsync).
 	n.callbacks.Stop()

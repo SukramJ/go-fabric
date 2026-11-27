@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"reflect"
 	"slices"
@@ -590,9 +591,14 @@ type takenCall struct {
 // A reassembly that fails leaves the topology before served
 // ([BatchError.Reassembly]): the devices the batch removed or replaced
 // stay bound and its erasures wait, since controllers still reach them
-// (decision 722). The next batch reassembles, an empty one too, then
-// unbinds and erases what the failed one left; a repeated failure is that
-// batch's error. So a batch that starts after a failed reassembly
+// (decision 722). Each such erasure is recorded as a forget in progress
+// at once; the next batch reassembles, an empty one too, then unbinds and
+// erases what the failed one left; a repeated failure is that batch's
+// error. [Node.Stop] unbinds and erases it once nothing is served, and
+// one that still cannot run — Stop, a crash, a store that refuses it —
+// is finished at the next [New] before the host adds anything (decision
+// 726). An erasure whose record cannot be written is its Forget's
+// [BatchCallError], applied: make the Forget again. So a batch that starts after a failed reassembly
 // returned serves the whole set, or returns why not (issue #633, decision
 // 718).
 //
@@ -645,8 +651,11 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 	}
 	erase = append(left, erase...)
 	storeErr = errors.Join(storeErr, a.applyReservations(ctx, pre, nil, &b.calls))
-	erase, served, cancel, keep, findErr := a.servedInErasure(ctx, erase, &b.calls)
+	erase, again, served, cancel, keep, findErr := a.servedInErasure(ctx, erase, &b.calls)
 	storeErr = errors.Join(storeErr, findErr)
+	// A parked erasure whose judgement could not read the store stays
+	// parked, its forget in progress still recorded (decision 726).
+	defer a.park(again)
 	var reErr error
 	var restore func() bool
 	switch {
@@ -660,16 +669,21 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 		// too (issue #633, decision 718).
 		reErr = a.reassembleIfBehind(ctx)
 	}
-	if reErr != nil && a.leave(detach, erase) {
-		// The topology before stays served, with the endpoints the set
-		// no longer holds: their devices stay bound and the erasures
-		// wait for a reassembly that succeeds (decision 722). The held
-		// endpoints go back into the set unserved; the record of the
-		// failure makes the next batch reassemble.
-		if restore != nil {
-			restore()
+	if reErr != nil {
+		left, recErr := a.leave(ctx, detach, erase, keep, &b.calls)
+		storeErr = errors.Join(storeErr, recErr)
+		if left {
+			// The topology before stays served, with the endpoints the
+			// set no longer holds: their devices stay bound and the
+			// erasures wait for a reassembly that succeeds (decision
+			// 722). The held endpoints go back into the set unserved,
+			// so the topology is behind it whatever a concurrent
+			// reassembly installed meanwhile (F2).
+			if restore != nil && restore() {
+				a.markBehind()
+			}
+			return batchResult(fnErr, &b.calls, storeErr, reErr)
 		}
-		return batchResult(fnErr, &b.calls, storeErr, reErr)
 	}
 	// Unbound after the reassembly: no controller reaches them any more.
 	for _, d := range detach {
@@ -690,16 +704,79 @@ func (p *Partition) Batch(ctx context.Context, fn func(b *Batch) error) error {
 
 // leave keeps detach and erase for the next batch after a failed
 // reassembly and reports whether it did: on a stopped node nothing is
-// served any more, so they run at once.
-func (a *Aggregator) leave(detach []func(), erase []reservationOp) bool {
+// served any more, so they run at once. Each erasure is first recorded
+// as a forget in progress, with keep (decision 568), so a Stop, a crash
+// or a store failure before it runs leaves it to the next New
+// ([Aggregator.finishForgets], decision 726); an erasure whose record
+// cannot be written is its Forget's error in calls (applied: the Forget
+// is to be made again), or returned when it is no call's.
+func (a *Aggregator) leave(ctx context.Context, detach []func(), erase []reservationOp, keep []string, calls *callErrors) (bool, error) {
+	a.mu.Lock()
+	closed := a.closed
+	a.mu.Unlock()
+	if closed {
+		return false, nil
+	}
+	var errs []error
+	for i := range erase {
+		if erase[i].marked != nil {
+			continue
+		}
+		f, err := a.forgetRecord(ctx, erase[i], keep)
+		if err == nil {
+			err = a.markForget(ctx, f, true)
+		}
+		if err != nil {
+			errs = append(errs, calls.add(erase[i].origins, true, fmt.Errorf("node: the erasure of %q is not recorded: %w", erase[i].key, err)))
+			continue
+		}
+		erase[i].marked = &f
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.closed {
-		return false
+		return false, errors.Join(errs...)
 	}
 	a.leftDetach = append(a.leftDetach, detach...)
 	a.leftErase = append(a.leftErase, erase...)
-	return true
+	return true, errors.Join(errs...)
+}
+
+// park keeps erase, parked erasures a batch could not judge, for the next
+// one; on a stopped node they stay with their records for the next New.
+func (a *Aggregator) park(erase []reservationOp) {
+	if len(erase) == 0 {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !a.closed {
+		a.leftErase = append(a.leftErase, erase...)
+	}
+}
+
+// markBehind records the topology served as behind the set, as a failed
+// reassembly does.
+func (a *Aggregator) markBehind() {
+	a.reassembleMu.Lock()
+	a.behind.Store(true)
+	a.reassembleMu.Unlock()
+}
+
+// finishLeft runs the erasures parked when the node stops: nothing is
+// served any more, so they run against the set as it is, sparing the
+// records of what it holds as a batch's erasure does. What fails stays
+// recorded for the next New.
+func (a *Aggregator) finishLeft(ctx context.Context, erase []reservationOp) {
+	run, again, _, cancel, keep, err := a.servedInErasure(ctx, erase, nil)
+	_ = again // recorded; the next New finishes them
+	err = errors.Join(err, a.applyReservations(ctx, run, keep, nil))
+	for _, k := range cancel {
+		err = errors.Join(err, a.cancelForget(ctx, k))
+	}
+	if err != nil {
+		a.n.logger.Warn("node.stop.erasure_left", slog.Any("err", err))
+	}
 }
 
 // batchResult is [Partition.Batch]'s result: nil, fn's error alone as it
@@ -1415,18 +1492,22 @@ func (a *Aggregator) detachSetLocked(key string, detach func()) {
 // detachAll unbinds every device the Aggregator holds — at [Node.Stop],
 // after the bridge stopped — waiting for their queued callbacks. The set
 // stays: a device is bound again only by a new Add.
-func (a *Aggregator) detachAll() {
+func (a *Aggregator) detachAll(ctx context.Context) {
 	a.mu.Lock()
 	detach := a.detach
 	a.detach = nil
 	left := a.leftDetach
-	a.leftDetach = nil
+	leftErase := a.leftErase
+	a.leftDetach, a.leftErase = nil, nil
 	a.closed = true
 	a.mu.Unlock()
-	// The devices a batch whose reassembly failed removed first: nothing
-	// is served any more.
+	// The devices a batch whose reassembly failed removed first, then its
+	// erasures: nothing is served any more (decision 726).
 	for _, d := range left {
 		d()
+	}
+	if len(leftErase) > 0 {
+		a.finishLeft(ctx, leftErase)
 	}
 	for _, key := range slices.Sorted(maps.Keys(detach)) {
 		detach[key]()

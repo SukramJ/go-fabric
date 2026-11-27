@@ -60,14 +60,18 @@ type BatchError struct {
 	Calls []*BatchCallError
 	// Store are the store errors no call of the batch owns: a forget in
 	// progress that could not be cancelled, or the erasure a batch whose
-	// reassembly failed left to this one (see Reassembly).
+	// reassembly failed left to this one (see Reassembly) — recorded as
+	// a forget in progress, it runs again with the next batch or is
+	// finished at the next start.
 	Store error
 	// Reassembly, when set, is the reassembly's error: the set holds the
 	// batch's changes but the node still serves the topology before.
 	// The devices the batch removed or replaced stay bound and the
-	// erasures of its Forgets wait until a reassembly succeeds; the next
-	// Batch, an empty one included, reassembles and runs them, and
-	// [Aggregator.RetirePartition] does too.
+	// erasures of its Forgets wait, recorded as forgets in progress,
+	// until a reassembly succeeds; the next Batch, an empty one
+	// included, reassembles and runs them, [Aggregator.RetirePartition]
+	// does too, [Node.Stop] runs them once nothing is served, and the
+	// next [New] finishes what is left.
 	Reassembly error
 }
 
@@ -147,6 +151,9 @@ type callErrors struct {
 func (c *callErrors) add(origins []callOrigin, applied bool, err error) error {
 	if err == nil {
 		return nil
+	}
+	if c == nil {
+		return err
 	}
 	var owned bool
 	for _, o := range origins {

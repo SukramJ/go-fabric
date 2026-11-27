@@ -127,6 +127,9 @@ type reservationOp struct {
 	// are theirs ([BatchCallError]); none for an erasure a batch whose
 	// reassembly failed left to a later one.
 	origins []callOrigin
+	// marked is the forget in progress recorded for a parked erasure
+	// ([Aggregator.leave]), cleared once the erasure ran.
+	marked *pendingForget
 }
 
 type reservationKind uint8
@@ -181,7 +184,12 @@ func (a *Aggregator) applyReservation(ctx context.Context, op reservationOp, kee
 		// done for it must not erase it at the next New.
 		return errors.Join(p.release(ctx, op.key), a.cancelForget(ctx, op.key))
 	case opErase:
-		return a.erase(ctx, op, keep)
+		if err := a.erase(ctx, op, keep); err != nil {
+			return err
+		}
+		if op.marked != nil {
+			return a.clearForget(ctx, *op.marked)
+		}
 	}
 	return nil
 }
@@ -203,16 +211,48 @@ func (a *Aggregator) applyReservation(ctx context.Context, op reservationOp, kee
 // left half done spares the held endpoint's record too and the endpoint
 // keeps its number across the restart (decision 568).
 func (a *Aggregator) erase(ctx context.Context, op reservationOp, keep []string) error {
-	reserved, err := a.n.persisted.reservedTree(ctx, op.key)
+	f, err := a.forgetRecord(ctx, op, keep)
 	if err != nil {
 		return err
 	}
-	keys := slices.Compact(slices.Sorted(slices.Values(slices.Concat([]string{op.key}, op.tree, reserved))))
-	kept := slices.DeleteFunc(slices.Clone(keys), func(k string) bool { return !slices.Contains(keep, k) })
-	if err := a.markForget(ctx, pendingForget{Keys: keys, Keep: kept}, true); err != nil {
+	if err := a.markForget(ctx, f, true); err != nil {
 		return err
 	}
-	return a.forgetKeys(ctx, keys, kept)
+	return a.forgetKeys(ctx, f.Keys, f.Keep)
+}
+
+// forgetRecord is the forget in progress an erasure of op records: the
+// keys it erases — op's key, its tree and the tree the store reserves for
+// it — and those of keep among them.
+func (a *Aggregator) forgetRecord(ctx context.Context, op reservationOp, keep []string) (pendingForget, error) {
+	reserved, err := a.n.persisted.reservedTree(ctx, op.key)
+	if err != nil {
+		return pendingForget{}, err
+	}
+	keys := slices.Compact(slices.Sorted(slices.Values(slices.Concat([]string{op.key}, op.tree, reserved))))
+	kept := slices.DeleteFunc(slices.Clone(keys), func(k string) bool { return !slices.Contains(keep, k) })
+	return pendingForget{Keys: keys, Keep: kept}, nil
+}
+
+// clearForget drops the record of a parked erasure that ran (f, as
+// [Aggregator.leave] recorded it): every forget in progress whose keys
+// are among f's — [Aggregator.cancelForget] may have taken keys added
+// again out of it since, and the erasure that ran erased the rest or
+// spared what the set serves.
+func (a *Aggregator) clearForget(ctx context.Context, f pendingForget) error {
+	a.forgetMu.Lock()
+	defer a.forgetMu.Unlock()
+	pending, err := a.n.persisted.pendingForgets(ctx)
+	if err != nil || len(pending) == 0 {
+		return err
+	}
+	kept := slices.DeleteFunc(slices.Clone(pending), func(p pendingForget) bool {
+		return !slices.ContainsFunc(p.Keys, func(k string) bool { return !slices.Contains(f.Keys, k) })
+	})
+	if len(kept) == len(pending) {
+		return nil
+	}
+	return a.storeForgets(ctx, kept)
 }
 
 // forgetKeys is erase's writes for keys, recorded as a forget in progress:
@@ -630,9 +670,12 @@ func splitErasures(ops []reservationOp) (pre, erase []reservationOp) {
 // reach cannot be known — its keys are neither held back nor erased, and
 // the Forget can be made again (review II, R3-store-3703). That error is
 // the Forget's, recorded in calls; err is such an error of no call.
-func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp, calls *callErrors) (run []reservationOp, held []heldKey, cancel, keep []string, err error) {
+//
+// again are the parked erasures among those left out ([Aggregator.leave]):
+// their forget in progress is recorded, so they are parked once more.
+func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp, calls *callErrors) (run, again []reservationOp, held []heldKey, cancel, keep []string, err error) {
 	if len(erase) == 0 {
-		return nil, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil, nil
 	}
 	forgotten := map[string]bool{}
 	fresh := map[string]bool{}
@@ -641,6 +684,9 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp,
 		reserved, err := a.n.persisted.reservedTree(ctx, op.key)
 		if err != nil {
 			errs = append(errs, calls.add(op.origins, true, fmt.Errorf("node: the erasure of %q is skipped: %w", op.key, err)))
+			if op.marked != nil {
+				again = append(again, op)
+			}
 			continue
 		}
 		run = append(run, op)
@@ -693,7 +739,7 @@ func (a *Aggregator) servedInErasure(ctx context.Context, erase []reservationOp,
 			keep = append(keep, k)
 		}
 	}
-	return run, held, cancel, keep, errors.Join(errs...)
+	return run, again, held, cancel, keep, errors.Join(errs...)
 }
 
 // heldKey names an endpoint to hold back: its partition and its key.
