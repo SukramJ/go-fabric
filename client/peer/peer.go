@@ -70,20 +70,20 @@ type Peer struct {
 }
 
 // holdBusy holds every Sigma1 to the peer for d from now: the peer
-// answered an attempt with Busy, d the attempt's final delay — the one
-// classifyError computed, or the error handler's replacement. A later
-// deadline replaces an earlier one, never the other way round; a session
-// clears it (addSession), and a Busy handled while the peer has a session
-// holds nothing. It does not depend on Timing.ProvenAddressRetention.
+// answered an attempt at its proven address with Busy, d the minimum wait
+// it asked for (connection.holdBusyAt). A later deadline replaces an
+// earlier one, never the other way round; a session clears it
+// (addSession), and a Busy handled while the peer has a session holds
+// nothing. It does not depend on Timing.ProvenAddressRetention.
 //
-// Ahead of matter.js, which waits the Busy delay inside the attempt that
-// received it (PeerConnection.ts:700-701 at b25ed960): an abort of that
-// attempt ends the wait with it, and an attempt at another address — or
-// the same address again, once discovery advertised it anew — sends a
-// fresh Sigma1 inside the window the node asked for (issue 507: a border
-// router's SRV flipping a Thread node's addresses in and out of discovery
-// while the node answered Busy). The node's Busy is the node's, not the
-// address's.
+// matter.js holds every new Sigma1 of the connection process the same way
+// (peerBusyUntil, packages/protocol/src/peer/PeerConnection.ts:176,
+// :536-545 at db91886c), but its deadline is a local of one process. Here
+// it lives on the Peer, across connection processes, until it passes or a
+// session is added (issue 507: a border router's SRV flipping a Thread
+// node's addresses in and out of discovery while the node answered Busy).
+// The node's Busy is the node's, not the address's or the process's
+// (notes/parity/by_design.md, BD-Matter-PeerBusyDeadline).
 func (p *Peer) holdBusy(d time.Duration) {
 	if d <= 0 {
 		return

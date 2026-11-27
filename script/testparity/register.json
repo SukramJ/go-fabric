@@ -9470,6 +9470,19 @@
       "snapshotSha": "9e03dac5a4c1594eb0490afab2d97cca5e6187cf"
     },
     {
+      "path": "packages/protocol/test/peer/PeerConnectionBusyTest.ts",
+      "status": "ported",
+      "go": [
+        "client/peer:TestPeerConnectionBusyParity",
+        "client/peer:TestIssue507_BusyDeadline",
+        "client/peer:TestIssue507_BusyHoldsTheHandlersDelay",
+        "client/peer:TestBusyAtAnUnprovenAddressHoldsOnlyItsAttempt",
+        "client/peer:TestBusyAtAnotherAddressOfTheProvenHostHoldsOnlyItsAttempt"
+      ],
+      "reason": "All nine cases ported by meaning through the connection process on the fake clock. The rig keeps the harness's random 0.5, so every wait ends 2 s after matter.js's; a BUSY holds every address only when it came from the proven operational address (BD-Matter-PeerBusyDeadline), so the cases whose BUSY holds another address take it from there, the second BUSY of the extension case is the hold its handling records, and the later-end cases measure the address held by both the peer's and its own attempt's deadline. The socket re-check runs on a TCP dial, the one step that blocks between the attempt's first wait and its Sigma1.",
+      "snapshotSha": "c1416b757fb64dbd01fc93771f4632b31b975551"
+    },
+    {
       "path": "packages/protocol/test/peer/PeerConnectionErrorHandlerTest.ts",
       "status": "partial",
       "go": [
