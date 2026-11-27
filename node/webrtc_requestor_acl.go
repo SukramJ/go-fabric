@@ -83,7 +83,7 @@ func (n *Node) ensureRequestorACL(ctx context.Context) {
 		n.logger.Warn("webrtc.requestor.acl_list_failed", slog.Any("err", err))
 		return
 	}
-	if len(fabrics) == 0 { // :59-62
+	if len(fabrics) == 0 { // :146-149
 		return
 	}
 	for i := range fabrics {
@@ -97,8 +97,8 @@ func (n *Node) ensureRequestorACL(ctx context.Context) {
 }
 
 // ensureRequestorACLOn adds the requestor's Operate/CASE entry to
-// fabricIndex's ACL unless it is there (the duplicate check :67-79, the
-// entry :81-91), under the AccessControl server's write lock
+// fabricIndex's ACL unless it is there (the duplicate check :154-167, the
+// entry :168-177), under the AccessControl server's write lock
 // (addLocalOperateEntry).
 func (n *Node) ensureRequestorACLOn(ctx context.Context, fabricIndex uint8, epID uint16) {
 	if !n.addLocalOperateEntry(ctx, fabricIndex, epID, camera.RequestorClusterID, "webrtc.requestor.acl") {
