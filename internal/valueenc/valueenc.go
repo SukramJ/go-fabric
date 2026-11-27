@@ -111,7 +111,12 @@ func Encode(write func(enc *tlv.Encoder, tag tlv.Tag)) (element []byte, err erro
 // [tlv.Encoder.Reset]). The contract forbids it (contract.ClusterServer,
 // MatterRead: an EncodeTLV writes exactly one element under the tag it is
 // handed, deterministic and free of side effects); a synchronous
-// misbehaviour is still contained to its own value.
+// misbehaviour is still contained to its own value. An asynchronous write
+// is a data race with the value being encoded: one that lands inside a
+// container that value has open passes the one-element check, and that
+// path goes out with foreign bytes and no FAILURE. Elements already
+// returned never change (each is a copy), and fabric masking still
+// applies to what goes out.
 //
 // The zero Scratch is ready to use. A Scratch is not safe for concurrent
 // use: one goroutine encodes on it at a time.
