@@ -10,6 +10,13 @@ import (
 	"thingfabric.dev/go-fabric/cluster/jointfabric"
 )
 
+// SetAfterFailedReassembly runs f in a batch whose reassembly failed,
+// before its work is parked.
+func SetAfterFailedReassembly(a *Aggregator, f func()) { a.afterFailedReassembly = f }
+
+// Reassemble reassembles the running node, as a batch does.
+func Reassemble(ctx context.Context, a *Aggregator) error { return a.reassemble(ctx) }
+
 // RemoveFabricBindings is the node's removal of a fabric's server state —
 // its Binding entries among it — what OperationalCredentials' RemoveFabric
 // runs first (fabricRemoved → dropFabricState).
