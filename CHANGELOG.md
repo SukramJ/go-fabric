@@ -17,6 +17,7 @@ pseudo-version of `main`.
 ### Fixed
 
 - `camera.Requestor`: two Ends for one session that arrive at the same time remove it and reach `RequestorPort.End` once; the other is refused NOT_FOUND, with the `RequestorRefusals` report, as is an End for a session the host removed meanwhile.
+- `camera.Requestor`: an Offer, Answer or IceCandidates no longer reaches the `RequestorPort` after the End of its session; an End's removal waits for those port calls in flight, so a port that blocks in one of them holds back every End meanwhile (it may still call `UpsertSession` or `RemoveSession` from inside). A held signal whose session was registered and removed again before it looked is refused NOT_FOUND at once instead of waiting for the release or the hold time.
 
 ### Changed
 

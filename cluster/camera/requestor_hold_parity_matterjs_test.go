@@ -501,10 +501,8 @@ func TestParityMatterJS_RequestorSignalsAgainstChanges(t *testing.T) { //nolint:
 			t.Fatalf("sessions %+v", got)
 		}
 	})
-	// Go's Offer looks its session up in the table the End's change has
-	// already stored (the table is kept before the notification), so it
-	// is refused at once instead of after the End's commit; the outcome is
-	// matter.js's.
+	// Go's Offer waits for the End's removal (the delivery lock the End
+	// holds through its change) and then looks its session up.
 	t.Run("refuses an offer for a session whose end commits while the offer arrives", func(t *testing.T) { // :1416
 		rec := &recorder{}
 		r := newRequestor(t, rec)
@@ -512,10 +510,15 @@ func TestParityMatterJS_RequestorSignalsAgainstChanges(t *testing.T) { //nolint:
 		entered, release := blockNextChange(r)
 		ended := goEnd(r, 7)
 		wait(t, entered)
-		_, err := r.MatterInvoke(peer(fabric1, peerNode), wrdef.CmdOffer, wrdef.OfferRequest{WebRtcSessionId: 7, Sdp: "offer"})
-		wantStatus(t, err, im.StatusNotFound)
+		offered := make(chan error, 1)
+		go func() {
+			_, err := r.MatterInvoke(peer(fabric1, peerNode), wrdef.CmdOffer, wrdef.OfferRequest{WebRtcSessionId: 7, Sdp: "offer"})
+			offered <- err
+		}()
+		pending(t, offered)
 		release()
 
+		wantStatus(t, settled(t, offered), im.StatusNotFound)
 		if err := settled(t, ended); err != nil {
 			t.Fatal(err)
 		}

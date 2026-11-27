@@ -4736,7 +4736,7 @@
         {
           "it": "delivers the signals of one session in the order they arrived while they wait for the lock",
           "class": "js-runtime-only",
-          "reason": "the order of matter.js's transaction-lock waiters (the case documents current behaviour, not a guarantee); Offer, Answer and IceCandidates take no lock an End holds here, and the bridge's session order handles one session's messages in arrival order (bridge/session_order.go)"
+          "reason": "the order of matter.js's transaction-lock waiters (the case documents current behaviour, not a guarantee); Offer, Answer and IceCandidates wait for an End's removal on the requestor's delivery lock (cluster/camera/requestor.go, deliver) without leaving their CASE session's turn — only a held signal leaves it — so the bridge's session order (bridge/session_order.go) keeps one session's messages in arrival order"
         },
         {
           "it": "registers a session inside a transaction that already locked the requestor",

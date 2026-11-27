@@ -77,7 +77,11 @@ type RequestorConfig struct {
 // removes it on the peer's side. While the host asks a provider for a new
 // session, it keeps a [Requestor.HoldUnknownSignals] hold for that
 // provider, so the signalling that arrives before the provider's response
-// waits for the registration instead of being refused. The node installs
+// waits for the registration instead of being refused. An End's removal
+// waits for the Offer, Answer and IceCandidates calls at the port, so the
+// port sees no signal for a session after its End; a port that blocks in
+// one of them holds back every End meanwhile, and may itself call
+// UpsertSession or RemoveSession. The node installs
 // the Operate entry the peer needs in the fabrics its host grants
 // (node.WebRTCRequestorConfig.GrantFabric, node/webrtc_requestor_acl.go;
 // matter.js WebRtcTransportRequestorServer.ts:118-129 and :143-181 write
@@ -93,9 +97,19 @@ type Requestor struct {
 
 	clock clock.Clock
 
+	// deliver orders a signal's delivery against End's removal: Offer,
+	// Answer and IceCandidates hold it shared from the session's lookup
+	// through the port call, End holds it exclusively while it removes the
+	// session, so the port never sees a signal for a session after its
+	// End (matter.js holds the behaviour lock from the lookup through the
+	// event, #lockSession WebRtcTransportRequestorServer.ts:317-318, and
+	// End removes under the same lock, :294-296). It is not pub: a port
+	// may call UpsertSession or RemoveSession from inside a signal. The
+	// lock order is deliver, pub, the spec server's, mu.
+	deliver sync.RWMutex
 	// pub serialises the changes of the session table with their
 	// publication; mu guards sessions, the table CurrentSessions reports,
-	// the holds and recheck.
+	// the holds, the waiters and recheck.
 	pub      sync.Mutex
 	mu       sync.Mutex
 	sessions []WebRTCSession
@@ -103,10 +117,24 @@ type Requestor struct {
 	// one peer are two entries (matter.js's Set of PeerAddress objects,
 	// WebRtcTransportRequestorServer.ts:107-108).
 	holds map[*signalHold]struct{}
+	// waiters are the held signals, each with the session key it waits
+	// for; a committed change that tracks a waiter's key marks it, so the
+	// waiter leaves its wait even when a later change removed the session
+	// before the waiter looked again.
+	waiters map[*signalWaiter]struct{}
 	// recheck is closed, and replaced, when a held signal's wait may have
 	// ended: a committed change of the table, a released hold, a quiesce
-	// (matter.js internal.recheck, :411-423).
+	// (matter.js internal.recheck, :418-422).
 	recheck chan struct{}
+}
+
+// signalWaiter is one held signal: the key it waits for, and whether a
+// committed change tracked that key since the signal started waiting
+// (matter.js re-checks #isHeld in the continuation of the committed
+// change, :374-384 with recheck from #sessionsChanged :232).
+type signalWaiter struct {
+	key        wrdef.SessionKey
+	registered bool
 }
 
 // signalHold is one hold: the provider's fabric and node, the session key
@@ -134,7 +162,7 @@ var (
 
 // NewRequestor builds a WebRtcTransportRequestor server with no session.
 func NewRequestor(cfg RequestorConfig) (*Requestor, error) {
-	r := &Requestor{port: cfg.Port, clock: clock.Or(cfg.Clock), holds: map[*signalHold]struct{}{}, recheck: make(chan struct{})}
+	r := &Requestor{port: cfg.Port, clock: clock.Or(cfg.Clock), holds: map[*signalHold]struct{}{}, waiters: map[*signalWaiter]struct{}{}, recheck: make(chan struct{})}
 	handlers := map[uint32]spec.CommandHandler{
 		wrdef.CmdOffer:         r.offer,
 		wrdef.CmdAnswer:        r.answer,
@@ -320,8 +348,14 @@ func (r *Requestor) change(origin contract.Origin, edit func([]WebRTCSession) ([
 	keep := func() {
 		r.mu.Lock()
 		r.sessions = next
-		// The committed change wakes the held signals (matter.js
-		// #sessionsChanged, WebRtcTransportRequestorServer.ts:231-232).
+		// The committed change marks the held signals whose session it
+		// tracks and wakes them all (matter.js #sessionsChanged,
+		// WebRtcTransportRequestorServer.ts:231-232).
+		for w := range r.waiters {
+			if !w.registered && slices.ContainsFunc(next, func(s WebRTCSession) bool { return wrdef.KeyOf(s) == w.key }) {
+				w.registered = true
+			}
+		}
 		r.recheckLocked()
 		r.mu.Unlock()
 	}
@@ -419,7 +453,13 @@ func (r *Requestor) offer(ctx context.Context, fields any) (any, error) {
 	if !ok {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "WebRtcTransportRequestor: Offer payload %T", fields)
 	}
-	session, err := r.findSessionStrict(ctx, wrdef.SignalOffer, req.WebRtcSessionId)
+	key, err := r.awaitSession(ctx, wrdef.SignalOffer, req.WebRtcSessionId)
+	if err != nil {
+		return nil, err
+	}
+	r.deliver.RLock()
+	defer r.deliver.RUnlock()
+	session, err := r.findSessionStrict(ctx, wrdef.SignalOffer, key)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +476,13 @@ func (r *Requestor) answer(ctx context.Context, fields any) (any, error) {
 	if !ok {
 		return nil, spec.Errorf(im.StatusInvalidCommand, "WebRtcTransportRequestor: Answer payload %T", fields)
 	}
-	session, err := r.findSessionStrict(ctx, wrdef.SignalAnswer, req.WebRtcSessionId)
+	key, err := r.awaitSession(ctx, wrdef.SignalAnswer, req.WebRtcSessionId)
+	if err != nil {
+		return nil, err
+	}
+	r.deliver.RLock()
+	defer r.deliver.RUnlock()
+	session, err := r.findSessionStrict(ctx, wrdef.SignalAnswer, key)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +505,13 @@ func (r *Requestor) iceCandidates(ctx context.Context, fields any) (any, error) 
 	if len(req.IceCandidates) == 0 { // :280-284
 		return nil, spec.Errorf(im.StatusConstraintError, "WebRtcTransportRequestor: ICE candidates list must not be empty")
 	}
-	session, err := r.findSessionStrict(ctx, wrdef.SignalIceCandidates, req.WebRtcSessionId)
+	key, err := r.awaitSession(ctx, wrdef.SignalIceCandidates, req.WebRtcSessionId)
+	if err != nil {
+		return nil, err
+	}
+	r.deliver.RLock()
+	defer r.deliver.RUnlock()
+	session, err := r.findSessionStrict(ctx, wrdef.SignalIceCandidates, key)
 	if err != nil {
 		return nil, err
 	}
@@ -473,7 +525,9 @@ func (r *Requestor) iceCandidates(ctx context.Context, fields any) (any, error) 
 // with the reason. The lookup and the removal are one step under pub, so
 // of two Ends for one session one removes it and is surfaced, and the
 // other is refused NOT_FOUND, as is an End for a session the host removed
-// while the End waited. Mirrors matter.js
+// while the End waited. The removal waits for every Offer, Answer and
+// IceCandidates already at the port (deliver), so none reaches the port
+// after the End for its session. Mirrors matter.js
 // WebRtcTransportRequestorServer.ts:292-297 (removeSession under the lock
 // #lockSession took, :294-296).
 func (r *Requestor) end(ctx context.Context, fields any) (any, error) {
@@ -487,6 +541,7 @@ func (r *Requestor) end(ctx context.Context, fields any) (any, error) {
 	}
 	var session WebRTCSession
 	found := false
+	r.deliver.Lock()
 	err = r.change(contract.OriginCommand, func(sessions []WebRTCSession) ([]WebRTCSession, bool) {
 		idx := slices.IndexFunc(sessions, func(s WebRTCSession) bool { return wrdef.KeyOf(s) == key })
 		if idx < 0 {
@@ -495,6 +550,7 @@ func (r *Requestor) end(ctx context.Context, fields any) (any, error) {
 		session, found = sessions[idx], true
 		return slices.Delete(sessions, idx, idx+1), true
 	})
+	r.deliver.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -507,18 +563,14 @@ func (r *Requestor) end(ctx context.Context, fields any) (any, error) {
 	return nil, nil
 }
 
-// findSessionStrict finds the session id names for the invoking peer: the
-// same id on the peer's fabric from the peer's node, once a held signal's
-// wait ended ([Requestor.awaitSession]). An unknown session is reported
-// to the port's [RequestorRefusals] and answered NOT_FOUND. Mirrors
-// matter.js WebRtcTransportRequestorServer.ts:306-337 (#lockSession and
-// #sessionOrRefuse: the lookup after the wait :317-318, :327, the refusal
-// :328-335).
-func (r *Requestor) findSessionStrict(ctx context.Context, signal Signal, id uint16) (WebRTCSession, error) {
-	key, err := r.awaitSession(ctx, signal, id)
-	if err != nil {
-		return WebRTCSession{}, err
-	}
+// findSessionStrict finds the session of key — the id a signal names on
+// the peer's fabric from the peer's node, once a held signal's wait ended
+// ([Requestor.awaitSession]). An unknown session is reported to the
+// port's [RequestorRefusals] and answered NOT_FOUND. The caller holds
+// deliver shared. Mirrors matter.js WebRtcTransportRequestorServer.ts:306-337
+// (#lockSession and #sessionOrRefuse: the lookup after the wait :317-318,
+// :327, the refusal :328-335).
+func (r *Requestor) findSessionStrict(ctx context.Context, signal Signal, key wrdef.SessionKey) (WebRTCSession, error) {
 	r.mu.Lock()
 	idx := slices.IndexFunc(r.sessions, func(s WebRTCSession) bool { return wrdef.KeyOf(s) == key })
 	var session WebRTCSession
@@ -551,7 +603,9 @@ func (r *Requestor) refuse(ctx context.Context, signal Signal, key wrdef.Session
 // WebRtcTransportRequestorServer.ts:339-343). A signal for an untracked
 // session of a held peer waits — at most [EarlySignalHoldTime] from its
 // arrival, a timer started once and not restarted — until its session is
-// tracked, no hold for its peer is left, or ctx ends. It waits holding
+// tracked (a committed change tracked it, even if a later one removed it
+// again before the signal looked), no hold for its peer is left, or ctx
+// ends. It waits holding
 // neither pub, nor mu, nor the spec server's lock (matter.js
 // lockOnInvoke = false, :57), and it hands its CASE session's turn to the
 // session's next message first, so the peer's other signals on that
@@ -564,12 +618,21 @@ func (r *Requestor) awaitSession(ctx context.Context, signal Signal, id uint16) 
 	}
 	node, _ := im.SubjectFromContext(ctx)
 	key := wrdef.SessionKey{ID: id, FabricIndex: fabric, PeerNodeID: node}
+	w := &signalWaiter{key: key}
 	r.mu.Lock()
 	held := r.isHeldLocked(key)
+	if held {
+		r.waiters[w] = struct{}{}
+	}
 	r.mu.Unlock()
 	if !held { // :366-368
 		return key, nil
 	}
+	defer func() {
+		r.mu.Lock()
+		delete(r.waiters, w)
+		r.mu.Unlock()
+	}()
 	timeout := r.clock.NewTimer(EarlySignalHoldTime) // :373, from the arrival
 	defer timeout.Stop()
 	if leave := specseam.LeaveSessionTurn; leave != nil {
@@ -577,7 +640,7 @@ func (r *Requestor) awaitSession(ctx context.Context, signal Signal, id uint16) 
 	}
 	for { // :374-384
 		r.mu.Lock()
-		held, wake := r.isHeldLocked(key), r.recheck
+		held, wake := !w.registered && r.isHeldLocked(key), r.recheck
 		r.mu.Unlock()
 		if !held {
 			return key, nil

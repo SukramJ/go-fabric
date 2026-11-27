@@ -21,3 +21,10 @@ func SetZoneCommitRefusal(z *Zones, refuse func() error) {
 func SetEvictHook(p *Provider, hook func(victim ProviderSession)) {
 	p.beforeEvictForTests = hook
 }
+
+// LockDeliver takes r's delivery lock exclusively, as an End's removal
+// does, until the returned unlock.
+func LockDeliver(r *Requestor) (unlock func()) {
+	r.deliver.Lock()
+	return r.deliver.Unlock
+}
