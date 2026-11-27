@@ -7527,7 +7527,7 @@ Review II, phase 6b (owner decision 193, R2-P6-par-1805): the entry holds for a 
 ### BD-Matter-Commissioner-GivenUpPASEDisarmed — a PASE session given up before its commissioning flow gets ArmFailSafe(0) before it is closed
 
 matter.js's devices arm a fail-safe when a PASE session is established
-(`packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:56-65`
+(`packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:56-67`
 at `db91886c`), and the commissioner's flow ends it on every failure and
 cancel since #5049 (`#failSafeMayBeArmed`,
 `packages/protocol/src/peer/ControllerCommissioningFlow.ts:354-355`,
@@ -7547,10 +7547,9 @@ callers: a node id another candidate claimed and a failure before the flow
 in `Commission`, a losing session through `connectionConfig.giveUp` /
 `Commissioner.giveUpPASE`, and one `EstablishPASE`'s `ContinueAfterPASE`
 refuses): the device's rollback ends the PASE session
-(`packages/protocol/src/common/FailsafeContext.ts` `rollback`, `:275` at
-`db91886c`; the line that closes the session was not re-read at this pin —
-unverified), and until it ends the device accepts no new PASE exchange
-(`packages/protocol/src/session/pase/PaseServer.ts:80-83` at `db91886c`). The disarm is bounded by the
+(`packages/protocol/src/common/FailsafeContext.ts` `rollback` `:275`, its
+`closePaseSession` `:283` at `db91886c`), and until it ends the device accepts no new PASE exchange
+(`packages/protocol/src/session/pase/PaseServer.ts:80-86` at `db91886c`). The disarm is bounded by the
 caller's context and the exchange's response timeout and, that context
 having ended, by `canceledExpiryWait` (2 s, matter.js's
 `CANCELED_EXPIRY_WAIT`, `ControllerCommissioningFlow.ts:323` at `db91886c`);
