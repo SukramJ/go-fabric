@@ -39,7 +39,7 @@ func scopedWrite(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
 }
 
 // resolvedValue is v as the resolver carries it ([reportchunk.Encoded]).
-func resolvedValue(t testing.TB, w im.AttributeValueWriter, v im.AttributeValue) im.AttributeValue {
+func resolvedValue(t *testing.T, w im.AttributeValueWriter, v im.AttributeValue) im.AttributeValue {
 	t.Helper()
 	el, err := valueenc.Encode(func(enc *tlv.Encoder, tag tlv.Tag) { w(enc, tag, v) })
 	if err != nil {
